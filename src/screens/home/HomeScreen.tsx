@@ -163,6 +163,11 @@ export const HomeScreen = () => {
         <Text style={styles.medicationCtaBody}>Manage meds, schedules, reminders, and adherence</Text>
       </Pressable>
 
+      <Pressable style={styles.medicationCta} onPress={() => navigation.navigate('FamilyDashboard')}>
+        <Text style={styles.medicationCtaTitle}>Family Wellness Sharing</Text>
+        <Text style={styles.medicationCtaBody}>Connect family with consent-based health visibility and reassurance.</Text>
+      </Pressable>
+
       <Modal visible={medicationOpen} animationType="slide" transparent onRequestClose={() => setMedicationOpen(false)}>
         <View style={styles.sheetOverlay}>
           <Pressable style={styles.sheetBackdrop} onPress={() => setMedicationOpen(false)} />

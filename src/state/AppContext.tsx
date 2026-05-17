@@ -11,6 +11,13 @@ import {
   CyclePrediction,
   CyclePhase,
   CycleSymptom,
+  FamilyConnection,
+  FamilyEmergencyEvent,
+  FamilyInvite,
+  FamilyPermissions,
+  FamilyRelationshipType,
+  FamilyShareType,
+  FamilyWellnessSummary,
   MoodSelection,
   Medication,
   MedicationLog,
@@ -41,6 +48,13 @@ import {
   getPhaseForDate
 } from '../services/cyclePredictionService';
 import { clearCycleNotifications, scheduleCycleNotifications } from '../services/cycleNotificationService';
+import {
+  buildFamilySummary,
+  defaultFamilyPermissions,
+  generateInviteCode,
+  normalizeInviteCode,
+  validateInviteCode
+} from '../services/familyConnectService';
 
 type AppContextValue = {
   bootstrapped: boolean;
@@ -109,6 +123,19 @@ type AppContextValue = {
     consistencyScore: number;
     commonSymptoms: Array<{ symptom: CycleSymptom; count: number }>;
   };
+  familyInvites: FamilyInvite[];
+  familyConnections: FamilyConnection[];
+  familyEmergencyEvents: FamilyEmergencyEvent[];
+  generateFamilyInvite: (prefix?: 'FIT' | 'CARE' | 'FTSY') => FamilyInvite;
+  requestFamilyConnection: (params: { code: string; memberName: string; relationship: FamilyRelationshipType }) => { ok: boolean; reason?: string };
+  approveFamilyConnection: (connectionId: string, permissions: FamilyPermissions) => void;
+  rejectFamilyConnection: (connectionId: string) => void;
+  updateFamilyPermissions: (connectionId: string, permissions: Partial<FamilyPermissions>) => void;
+  setFamilySharingPaused: (connectionId: string, paused: boolean) => void;
+  disconnectFamilyMember: (connectionId: string) => void;
+  sendFamilyPing: (connectionId: string, message: string) => Promise<void>;
+  triggerFamilySOS: (connectionId: string, message?: string) => Promise<void>;
+  getFamilySummary: (connectionId: string) => FamilyWellnessSummary | null;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -125,7 +152,10 @@ const STORAGE_KEYS = {
   medicationPermission: 'nuetra.medicationPermission',
   cycleLogs: 'nuetra.cycleLogs',
   cycleNotificationSettings: 'nuetra.cycleNotificationSettings',
-  cyclePermission: 'nuetra.cyclePermission'
+  cyclePermission: 'nuetra.cyclePermission',
+  familyInvites: 'nuetra.familyInvites',
+  familyConnections: 'nuetra.familyConnections',
+  familyEmergencyEvents: 'nuetra.familyEmergencyEvents'
 } as const;
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
@@ -154,13 +184,32 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     reminderTime24h: '20:00',
     notificationIds: []
   });
+  const [familyInvites, setFamilyInvites] = useState<FamilyInvite[]>([]);
+  const [familyConnections, setFamilyConnections] = useState<FamilyConnection[]>([]);
+  const [familyEmergencyEvents, setFamilyEmergencyEvents] = useState<FamilyEmergencyEvent[]>([]);
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
         await initMedicationNotifications();
 
-        const [storedOnboarding, storedAssessment, storedAuth, storedTheme, storedSelectedDeviceId, storedDevices, storedMedications, storedMedicationLogs, storedMedicationPermission, storedCycleLogs, storedCycleSettings, storedCyclePermission] = await Promise.all([
+        const [
+          storedOnboarding,
+          storedAssessment,
+          storedAuth,
+          storedTheme,
+          storedSelectedDeviceId,
+          storedDevices,
+          storedMedications,
+          storedMedicationLogs,
+          storedMedicationPermission,
+          storedCycleLogs,
+          storedCycleSettings,
+          storedCyclePermission,
+          storedFamilyInvites,
+          storedFamilyConnections,
+          storedFamilyEmergencyEvents
+        ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.onboarding),
           AsyncStorage.getItem(STORAGE_KEYS.assessment),
           AsyncStorage.getItem(STORAGE_KEYS.auth),
@@ -172,7 +221,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           AsyncStorage.getItem(STORAGE_KEYS.medicationPermission),
           AsyncStorage.getItem(STORAGE_KEYS.cycleLogs),
           AsyncStorage.getItem(STORAGE_KEYS.cycleNotificationSettings),
-          AsyncStorage.getItem(STORAGE_KEYS.cyclePermission)
+          AsyncStorage.getItem(STORAGE_KEYS.cyclePermission),
+          AsyncStorage.getItem(STORAGE_KEYS.familyInvites),
+          AsyncStorage.getItem(STORAGE_KEYS.familyConnections),
+          AsyncStorage.getItem(STORAGE_KEYS.familyEmergencyEvents)
         ]);
 
         if (storedOnboarding) {
@@ -217,6 +269,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
         if (storedCyclePermission === '1') {
           setCyclePermissionGranted(true);
+        }
+        if (storedFamilyInvites) {
+          const parsed = JSON.parse(storedFamilyInvites) as FamilyInvite[];
+          if (Array.isArray(parsed)) setFamilyInvites(parsed);
+        }
+        if (storedFamilyConnections) {
+          const parsed = JSON.parse(storedFamilyConnections) as FamilyConnection[];
+          if (Array.isArray(parsed)) setFamilyConnections(parsed);
+        }
+        if (storedFamilyEmergencyEvents) {
+          const parsed = JSON.parse(storedFamilyEmergencyEvents) as FamilyEmergencyEvent[];
+          if (Array.isArray(parsed)) setFamilyEmergencyEvents(parsed);
         }
       } finally {
         setBootstrapped(true);
@@ -318,6 +382,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const persistCycleNotificationSettings = useCallback((next: CycleNotificationSettings) => {
     AsyncStorage.setItem(STORAGE_KEYS.cycleNotificationSettings, JSON.stringify(next));
+  }, []);
+  const persistFamilyInvites = useCallback((next: FamilyInvite[]) => {
+    AsyncStorage.setItem(STORAGE_KEYS.familyInvites, JSON.stringify(next));
+  }, []);
+  const persistFamilyConnections = useCallback((next: FamilyConnection[]) => {
+    AsyncStorage.setItem(STORAGE_KEYS.familyConnections, JSON.stringify(next));
+  }, []);
+  const persistFamilyEmergencyEvents = useCallback((next: FamilyEmergencyEvent[]) => {
+    AsyncStorage.setItem(STORAGE_KEYS.familyEmergencyEvents, JSON.stringify(next));
   }, []);
 
   const requestMedicationPermission = useCallback(async () => {
@@ -422,6 +495,191 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     syncCycleNotifications();
     // intentionally track cycle prediction and reminder time changes
   }, [cyclePrediction, cyclePermissionGranted, cycleNotificationSettings.enabled, cycleNotificationSettings.reminderTime24h]);
+
+  const generateFamilyInvite = useCallback<AppContextValue['generateFamilyInvite']>(
+    (prefix = 'FIT') => {
+      const now = new Date();
+      const invite: FamilyInvite = {
+        code: generateInviteCode(prefix),
+        createdAtISO: now.toISOString(),
+        expiresAtISO: new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7).toISOString(),
+        createdByUserId: userId,
+        usedByUserId: null,
+        revoked: false
+      };
+      setFamilyInvites((previous) => {
+        const next = [invite, ...previous].slice(0, 40);
+        persistFamilyInvites(next);
+        return next;
+      });
+      return invite;
+    },
+    [persistFamilyInvites]
+  );
+
+  const requestFamilyConnection = useCallback<AppContextValue['requestFamilyConnection']>(
+    ({ code, memberName, relationship }) => {
+      const normalized = normalizeInviteCode(code);
+      if (!validateInviteCode(normalized)) return { ok: false, reason: 'Invalid invite code format.' };
+      const invite = familyInvites.find((item) => item.code === normalized && !item.revoked);
+      if (!invite) return { ok: false, reason: 'Invite code not found or expired.' };
+      if (new Date(invite.expiresAtISO).getTime() < Date.now()) return { ok: false, reason: 'Invite code expired.' };
+      if (familyConnections.some((item) => item.inviteCode === normalized && item.status !== 'disconnected')) {
+        return { ok: false, reason: 'Connection request already exists.' };
+      }
+
+      const now = new Date().toISOString();
+      const connection: FamilyConnection = {
+        id: `fam-${Date.now()}`,
+        memberName: memberName.trim() || 'Family Member',
+        relationship,
+        role: 'connected_member',
+        status: 'pending_outgoing',
+        inviteCode: normalized,
+        permissions: defaultFamilyPermissions(),
+        sharingPaused: false,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        lastCheckInISO: null,
+        createdAtISO: now,
+        updatedAtISO: now
+      };
+      setFamilyConnections((previous) => {
+        const next = [connection, ...previous];
+        persistFamilyConnections(next);
+        return next;
+      });
+      return { ok: true };
+    },
+    [familyConnections, familyInvites, persistFamilyConnections]
+  );
+
+  const approveFamilyConnection = useCallback<AppContextValue['approveFamilyConnection']>(
+    (connectionId, permissions) => {
+      setFamilyConnections((previous) => {
+        const next = previous.map((item) =>
+          item.id === connectionId ? { ...item, status: 'connected' as const, permissions, updatedAtISO: new Date().toISOString() } : item
+        );
+        persistFamilyConnections(next);
+        return next;
+      });
+    },
+    [persistFamilyConnections]
+  );
+
+  const rejectFamilyConnection = useCallback<AppContextValue['rejectFamilyConnection']>(
+    (connectionId) => {
+      setFamilyConnections((previous) => {
+        const next = previous.map((item) =>
+          item.id === connectionId ? { ...item, status: 'rejected' as const, updatedAtISO: new Date().toISOString() } : item
+        );
+        persistFamilyConnections(next);
+        return next;
+      });
+    },
+    [persistFamilyConnections]
+  );
+
+  const updateFamilyPermissions = useCallback<AppContextValue['updateFamilyPermissions']>(
+    (connectionId, permissions) => {
+      setFamilyConnections((previous) => {
+        const next = previous.map((item) =>
+          item.id === connectionId
+            ? { ...item, permissions: { ...item.permissions, ...permissions }, updatedAtISO: new Date().toISOString() }
+            : item
+        );
+        persistFamilyConnections(next);
+        return next;
+      });
+    },
+    [persistFamilyConnections]
+  );
+
+  const setFamilySharingPaused = useCallback<AppContextValue['setFamilySharingPaused']>(
+    (connectionId, paused) => {
+      setFamilyConnections((previous) => {
+        const next = previous.map((item) =>
+          item.id === connectionId ? { ...item, sharingPaused: paused, updatedAtISO: new Date().toISOString() } : item
+        );
+        persistFamilyConnections(next);
+        return next;
+      });
+    },
+    [persistFamilyConnections]
+  );
+
+  const disconnectFamilyMember = useCallback<AppContextValue['disconnectFamilyMember']>(
+    (connectionId) => {
+      setFamilyConnections((previous) => {
+        const next = previous.map((item) =>
+          item.id === connectionId ? { ...item, status: 'disconnected' as const, sharingPaused: true, updatedAtISO: new Date().toISOString() } : item
+        );
+        persistFamilyConnections(next);
+        return next;
+      });
+    },
+    [persistFamilyConnections]
+  );
+
+  const sendFamilyPing = useCallback<AppContextValue['sendFamilyPing']>(
+    async (connectionId, message) => {
+      const event: FamilyEmergencyEvent = {
+        id: `fam-evt-${Date.now()}`,
+        connectionId,
+        type: 'check_in_ping',
+        message,
+        createdAtISO: new Date().toISOString(),
+        delivery: 'sent'
+      };
+      setFamilyEmergencyEvents((previous) => {
+        const next = [event, ...previous].slice(0, 200);
+        persistFamilyEmergencyEvents(next);
+        return next;
+      });
+      await Notifications.scheduleNotificationAsync({
+        content: { title: 'Family check-in sent', body: message, sound: 'default', data: { type: 'family_ping', connectionId } },
+        trigger: null
+      });
+    },
+    [persistFamilyEmergencyEvents]
+  );
+
+  const triggerFamilySOS = useCallback<AppContextValue['triggerFamilySOS']>(
+    async (connectionId, message = 'SOS: Please check in immediately.') => {
+      const event: FamilyEmergencyEvent = {
+        id: `fam-evt-${Date.now()}`,
+        connectionId,
+        type: 'sos',
+        message,
+        createdAtISO: new Date().toISOString(),
+        delivery: 'sent'
+      };
+      setFamilyEmergencyEvents((previous) => {
+        const next = [event, ...previous].slice(0, 200);
+        persistFamilyEmergencyEvents(next);
+        return next;
+      });
+      await Notifications.scheduleNotificationAsync({
+        content: { title: 'Emergency alert sent', body: message, sound: 'default', data: { type: 'family_sos', connectionId } },
+        trigger: null
+      });
+    },
+    [persistFamilyEmergencyEvents]
+  );
+
+  const getFamilySummary = useCallback<AppContextValue['getFamilySummary']>(
+    (connectionId) => {
+      const connection = familyConnections.find((item) => item.id === connectionId && item.status === 'connected');
+      if (!connection || connection.sharingPaused) return null;
+      return buildFamilySummary({
+        connection,
+        medications,
+        medicationLogs,
+        wellness,
+        checkIns
+      });
+    },
+    [checkIns, familyConnections, medicationLogs, medications, wellness]
+  );
 
   const addMedication = useCallback<AppContextValue['addMedication']>(
     async (input) => {
@@ -688,6 +946,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setMedicationLogs([]);
     setCycleLogs([]);
     setCycleNotificationSettings({ enabled: false, reminderTime24h: '20:00', notificationIds: [] });
+    setFamilyInvites([]);
+    setFamilyConnections([]);
+    setFamilyEmergencyEvents([]);
   }, [setIsAuthenticated, setSelectedDeviceId]);
 
   const value = useMemo(
@@ -736,7 +997,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       updateCycleNotificationSettings,
       logCycleForDate,
       getCycleDaySnapshot,
-      getCycleInsights
+      getCycleInsights,
+      familyInvites,
+      familyConnections,
+      familyEmergencyEvents,
+      generateFamilyInvite,
+      requestFamilyConnection,
+      approveFamilyConnection,
+      rejectFamilyConnection,
+      updateFamilyPermissions,
+      setFamilySharingPaused,
+      disconnectFamilyMember,
+      sendFamilyPing,
+      triggerFamilySOS,
+      getFamilySummary
     }),
     [
       addWearableSyncData,
@@ -756,6 +1030,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       cycleLogs,
       cycleNotificationSettings,
       cyclePrediction,
+      familyConnections,
+      familyEmergencyEvents,
+      familyInvites,
       mood,
       nudges,
       onboarding,
@@ -780,6 +1057,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       logCycleForDate,
       getCycleDaySnapshot,
       getCycleInsights,
+      generateFamilyInvite,
+      requestFamilyConnection,
+      approveFamilyConnection,
+      rejectFamilyConnection,
+      updateFamilyPermissions,
+      setFamilySharingPaused,
+      disconnectFamilyMember,
+      sendFamilyPing,
+      triggerFamilySOS,
+      getFamilySummary,
       submitCheckIn,
       themeMode,
       wearableSyncData,

@@ -27,6 +27,8 @@ export type RootStackParamList = {
   CycleCalendar: undefined;
   CycleInsights: undefined;
   CycleNotifications: undefined;
+  FamilyDashboard: undefined;
+  FamilyMemberDetail: { connectionId: string };
   TrackerDetail: {
     metricKey: string;
     metricTitle: string;

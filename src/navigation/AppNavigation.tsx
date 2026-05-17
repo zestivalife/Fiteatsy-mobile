@@ -35,6 +35,8 @@ import { CycleScreen } from '../screens/cycle/CycleScreen';
 import { CycleCalendarScreen } from '../screens/cycle/CycleCalendarScreen';
 import { CycleInsightsScreen } from '../screens/cycle/CycleInsightsScreen';
 import { CycleNotificationsScreen } from '../screens/cycle/CycleNotificationsScreen';
+import { FamilyDashboardScreen } from '../screens/family/FamilyDashboardScreen';
+import { FamilyMemberDetailScreen } from '../screens/family/FamilyMemberDetailScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -105,6 +107,8 @@ export const AppNavigation = () => {
         <Stack.Screen name="CycleCalendar" component={CycleCalendarScreen} />
         <Stack.Screen name="CycleInsights" component={CycleInsightsScreen} />
         <Stack.Screen name="CycleNotifications" component={CycleNotificationsScreen} />
+        <Stack.Screen name="FamilyDashboard" component={FamilyDashboardScreen} />
+        <Stack.Screen name="FamilyMemberDetail" component={FamilyMemberDetailScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

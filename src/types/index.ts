@@ -293,3 +293,61 @@ export type CycleNotificationSettings = {
   reminderTime24h: string;
   notificationIds: string[];
 };
+
+export type FamilyRelationshipType = 'parent' | 'child' | 'spouse' | 'caregiver' | 'family_member';
+export type FamilyRole = 'primary_user' | 'connected_member';
+export type FamilyConnectionStatus = 'pending_outgoing' | 'pending_incoming' | 'connected' | 'rejected' | 'disconnected';
+export type FamilyShareType =
+  | 'medication_adherence'
+  | 'wellness_checkins'
+  | 'activity_consistency'
+  | 'sleep_summary'
+  | 'emergency_alerts'
+  | 'appointment_reminders'
+  | 'uploaded_reports'
+  | 'wellness_trends';
+
+export type FamilyPermissions = Record<FamilyShareType, boolean>;
+
+export type FamilyInvite = {
+  code: string;
+  createdAtISO: string;
+  expiresAtISO: string;
+  createdByUserId: string;
+  usedByUserId: string | null;
+  revoked: boolean;
+};
+
+export type FamilyConnection = {
+  id: string;
+  memberName: string;
+  relationship: FamilyRelationshipType;
+  role: FamilyRole;
+  status: FamilyConnectionStatus;
+  inviteCode: string | null;
+  permissions: FamilyPermissions;
+  sharingPaused: boolean;
+  timezone: string;
+  lastCheckInISO: string | null;
+  createdAtISO: string;
+  updatedAtISO: string;
+};
+
+export type FamilyWellnessSummary = {
+  connectionId: string;
+  summaryDateISO: string;
+  medicationAdherence: 'completed_today' | 'partially_completed' | 'needs_attention' | 'unknown';
+  wellnessActivity: 'active' | 'steady' | 'quiet' | 'unknown';
+  sleepSummary: 'normal' | 'needs_rest' | 'unknown';
+  checkInStatus: 'recent' | 'pending' | 'overdue';
+  trendLabel: string;
+};
+
+export type FamilyEmergencyEvent = {
+  id: string;
+  connectionId: string;
+  type: 'sos' | 'check_in_ping' | 'call_request';
+  message: string;
+  createdAtISO: string;
+  delivery: 'sent' | 'failed';
+};
