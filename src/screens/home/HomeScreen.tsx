@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -53,17 +53,20 @@ const RecoveryRing = ({ value }: { value: number }) => {
   );
 };
 
-const MetricCard = ({ value, title, subtitle }: { value: string; title: string; subtitle: string }) => (
-  <View style={styles.metricCard}>
-    <Text style={styles.metricValue}>{value}</Text>
-    <Text style={styles.metricTitle}>{title}</Text>
-    <Text style={styles.metricSubtitle}>{subtitle}</Text>
-  </View>
-);
-
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { onboarding, wellness, devices, selectedDeviceId } = useAppContext();
+  const [medicationOpen, setMedicationOpen] = useState(false);
+  const {
+    onboarding,
+    wellness,
+    devices,
+    selectedDeviceId,
+    medications,
+    getMedicationTimelineForDate,
+    markMedicationAction,
+    pauseMedication,
+    deleteMedication
+  } = useAppContext();
 
   const connectedDevice = devices.find((d) => d.id === selectedDeviceId) ?? null;
 
@@ -71,6 +74,8 @@ export const HomeScreen = () => {
     const today = Math.max(0, Math.min(100, wellness.wellnessScore));
     return [0, 10, 25, 30, Math.max(45, today - 6), Math.max(55, today), 0];
   }, [wellness.wellnessScore]);
+
+  const todayTimeline = useMemo(() => getMedicationTimelineForDate(new Date().toISOString()), [getMedicationTimelineForDate, medications]);
 
   return (
     <Screen scroll contentStyle={styles.content}>
@@ -138,12 +143,6 @@ export const HomeScreen = () => {
         </View>
       </LinearGradient>
 
-      <View style={styles.metricsRow}>
-        <MetricCard value={`${Math.round((wellness.sleepHours / 8) * 100)}%`} title="Sleep" subtitle={`${wellness.sleepHours.toFixed(1)} hrs`} />
-        <MetricCard value={`${Math.max(1, (onboarding?.symptomTags?.length ?? 2))}`} title="Symptoms" subtitle="Manual Markers" />
-        <MetricCard value={`${wellness.hydrationLiters.toFixed(1)}L`} title="Hydration" subtitle={`Goal ${wellness.hydrationGoalLiters}L`} />
-      </View>
-
       <View style={styles.assistantCard}>
         <View style={styles.assistantHeader}>
           <Text style={styles.assistantTitle}>Fiteatsy Assistant</Text>
@@ -158,6 +157,78 @@ export const HomeScreen = () => {
         <View style={styles.assistantPoint}><Ionicons name="flower-outline" size={14} color="#59BE08" /><Text style={styles.assistantPointText}>Dr. Rhea Kapoor - Diabetes & Metabolic Nutrition</Text></View>
         <View style={styles.assistantPoint}><Ionicons name="return-up-back-outline" size={14} color="#59BE08" /><Text style={styles.assistantPointText}>Energy support reset</Text></View>
       </View>
+
+      <Pressable style={styles.medicationCta} onPress={() => setMedicationOpen(true)}>
+        <Text style={styles.medicationCtaTitle}>Medication</Text>
+        <Text style={styles.medicationCtaBody}>Manage meds, schedules, reminders, and adherence</Text>
+      </Pressable>
+
+      <Modal visible={medicationOpen} animationType="slide" transparent onRequestClose={() => setMedicationOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setMedicationOpen(false)} />
+          <View style={styles.sheetWrap}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Medication Dashboard</Text>
+
+            <ScrollView contentContainerStyle={styles.sheetContent}>
+              <Text style={styles.section}>Today&apos;s Medications</Text>
+              {todayTimeline.length === 0 ? (
+                <Text style={styles.empty}>No medications scheduled for today.</Text>
+              ) : (
+                todayTimeline.map((item) => (
+                  <View key={`${item.medication.id}-${item.scheduledForISO}`} style={styles.medRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.medName}>{item.medication.name}</Text>
+                      <Text style={styles.medTime}>{new Date(item.scheduledForISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                    </View>
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusText}>{item.status}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+
+              <Text style={styles.section}>Quick Actions</Text>
+              {todayTimeline.slice(0, 3).map((item) => (
+                <View key={`quick-${item.medication.id}-${item.scheduledForISO}`} style={styles.quickRow}>
+                  <Text style={styles.quickLabel}>{item.medication.name}</Text>
+                  <View style={styles.quickActions}>
+                    <Pressable style={styles.quickBtn} onPress={() => markMedicationAction({ medicationId: item.medication.id, scheduledForISO: item.scheduledForISO, status: 'taken' })}><Text style={styles.quickBtnText}>Taken</Text></Pressable>
+                    <Pressable style={styles.quickBtn} onPress={() => markMedicationAction({ medicationId: item.medication.id, scheduledForISO: item.scheduledForISO, status: 'snoozed', snoozeMinutes: 10 })}><Text style={styles.quickBtnText}>Snooze</Text></Pressable>
+                    <Pressable style={styles.quickBtn} onPress={() => markMedicationAction({ medicationId: item.medication.id, scheduledForISO: item.scheduledForISO, status: 'skipped' })}><Text style={styles.quickBtnText}>Skip</Text></Pressable>
+                  </View>
+                </View>
+              ))}
+
+              <View style={styles.ctaRow}>
+                <Pressable style={styles.ctaBtn} onPress={() => { setMedicationOpen(false); navigation.navigate('MedicationForm'); }}><Text style={styles.ctaText}>+ Add Medication</Text></Pressable>
+                <Pressable style={styles.ctaBtn} onPress={() => { setMedicationOpen(false); navigation.navigate('MedicationCalendar'); }}><Text style={styles.ctaText}>View Calendar</Text></Pressable>
+                <Pressable style={styles.ctaBtn} onPress={() => { setMedicationOpen(false); navigation.navigate('MedicationNotifications'); }}><Text style={styles.ctaText}>Manage Notifications</Text></Pressable>
+                <Pressable style={styles.ctaBtn} onPress={() => setMedicationOpen(false)}><Text style={styles.ctaText}>Close</Text></Pressable>
+              </View>
+
+              <Text style={styles.section}>Existing Medications</Text>
+              {medications.length === 0 ? (
+                <Text style={styles.empty}>No medications yet.</Text>
+              ) : (
+                medications.map((medication) => (
+                  <View key={medication.id} style={styles.medCard}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.medName}>{medication.name}</Text>
+                      <Text style={styles.medTime}>{medication.dosage} • {medication.status}</Text>
+                    </View>
+                    <View style={styles.manageRow}>
+                      <Pressable onPress={() => { setMedicationOpen(false); navigation.navigate('MedicationForm', { medicationId: medication.id }); }}><Text style={styles.link}>Edit</Text></Pressable>
+                      <Pressable onPress={() => pauseMedication(medication.id)}><Text style={styles.link}>Pause</Text></Pressable>
+                      <Pressable onPress={() => deleteMedication(medication.id)}><Text style={styles.deleteLink}>Delete</Text></Pressable>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 };
@@ -342,36 +413,6 @@ const styles = StyleSheet.create({
     width: 20,
     textAlign: 'center'
   },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: 8
-  },
-  metricCard: {
-    flex: 1,
-    borderRadius: 16,
-    backgroundColor: '#000000',
-    borderWidth: 1,
-    borderColor: '#F1C40F',
-    padding: 10,
-    minHeight: 98
-  },
-  metricValue: {
-    color: '#F5F5F5',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4
-  },
-  metricTitle: {
-    color: '#F5F5F5',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 3
-  },
-  metricSubtitle: {
-    color: '#E3E3E3',
-    fontSize: 12,
-    fontWeight: '400'
-  },
   assistantCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -415,5 +456,172 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400',
     lineHeight: 16
+  },
+  medicationCta: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#59BE08',
+    backgroundColor: '#000000',
+    padding: 12
+  },
+  medicationCtaTitle: {
+    color: '#F4F4F4',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8
+  },
+  medicationCtaBody: {
+    color: '#C2C2C2',
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 16
+  },
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.52)',
+    justifyContent: 'flex-end'
+  },
+  sheetBackdrop: {
+    flex: 1
+  },
+  sheetWrap: {
+    maxHeight: '82%',
+    backgroundColor: '#121212',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    padding: 14
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 48,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: '#6F6F6F',
+    marginBottom: 10
+  },
+  sheetTitle: {
+    color: '#F4F4F4',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 10
+  },
+  sheetContent: {
+    gap: 10,
+    paddingBottom: 20
+  },
+  section: {
+    color: '#F4F4F4',
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  empty: {
+    color: '#9A9A9A',
+    fontSize: 12,
+    fontWeight: '400'
+  },
+  medRow: {
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    borderRadius: 12,
+    backgroundColor: '#0B0B0B',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  medName: {
+    color: '#F4F4F4',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  medTime: {
+    color: '#9A9A9A',
+    fontSize: 12,
+    fontWeight: '400'
+  },
+  statusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#59BE08'
+  },
+  statusText: {
+    color: '#000000',
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'capitalize'
+  },
+  quickRow: {
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: '#0B0B0B'
+  },
+  quickLabel: {
+    color: '#F4F4F4',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: 8
+  },
+  quickBtn: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#3A3A3A',
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  quickBtnText: {
+    color: '#F4F4F4',
+    fontSize: 12,
+    fontWeight: '400'
+  },
+  ctaRow: {
+    gap: 8
+  },
+  ctaBtn: {
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: '#171717',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#59BE08'
+  },
+  ctaText: {
+    color: '#F4F4F4',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  medCard: {
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    borderRadius: 12,
+    backgroundColor: '#0B0B0B',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10
+  },
+  manageRow: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  link: {
+    color: '#59BE08',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  deleteLink: {
+    color: '#D04053',
+    fontSize: 12,
+    fontWeight: '600'
   }
 });

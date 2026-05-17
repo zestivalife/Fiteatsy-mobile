@@ -6,6 +6,11 @@ import {
   AssessmentProfile,
   DailyCheckIn,
   DecisionLog,
+  CycleLog,
+  CycleNotificationSettings,
+  CyclePrediction,
+  CyclePhase,
+  CycleSymptom,
   MoodSelection,
   Medication,
   MedicationLog,
@@ -30,6 +35,12 @@ import {
   scheduleSnoozeNotification
 } from '../services/medicationNotificationService';
 import { buildLogId, getMedicationOccurrencesForDate, getMedicationStatusForOccurrence } from '../services/medicationUtils';
+import {
+  buildCyclePrediction,
+  getMostCommonSymptoms,
+  getPhaseForDate
+} from '../services/cyclePredictionService';
+import { clearCycleNotifications, scheduleCycleNotifications } from '../services/cycleNotificationService';
 
 type AppContextValue = {
   bootstrapped: boolean;
@@ -78,6 +89,26 @@ type AppContextValue = {
     scheduledForISO: string;
     status: MedicationLogStatus;
   }>;
+  cycleLogs: CycleLog[];
+  cycleNotificationSettings: CycleNotificationSettings;
+  cyclePrediction: CyclePrediction;
+  requestCyclePermission: () => Promise<boolean>;
+  updateCycleNotificationSettings: (patch: Partial<CycleNotificationSettings>) => Promise<void>;
+  logCycleForDate: (input: Omit<CycleLog, 'id' | 'createdAtISO' | 'updatedAtISO'>) => Promise<void>;
+  getCycleDaySnapshot: (dateISO: string) => {
+    phase: CyclePhase;
+    isPeriodDay: boolean;
+    isPredictedFertile: boolean;
+    isPredictedOvulation: boolean;
+    log: CycleLog | null;
+  };
+  getCycleInsights: () => {
+    averageCycleLengthDays: number;
+    averagePeriodDurationDays: number;
+    confidence: CyclePrediction['confidence'];
+    consistencyScore: number;
+    commonSymptoms: Array<{ symptom: CycleSymptom; count: number }>;
+  };
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -91,7 +122,10 @@ const STORAGE_KEYS = {
   devices: 'nuetra.devices',
   medications: 'nuetra.medications',
   medicationLogs: 'nuetra.medicationLogs',
-  medicationPermission: 'nuetra.medicationPermission'
+  medicationPermission: 'nuetra.medicationPermission',
+  cycleLogs: 'nuetra.cycleLogs',
+  cycleNotificationSettings: 'nuetra.cycleNotificationSettings',
+  cyclePermission: 'nuetra.cyclePermission'
 } as const;
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
@@ -113,13 +147,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [medicationPermissionGranted, setMedicationPermissionGranted] = useState(false);
   const [medications, setMedications] = useState<Medication[]>([]);
   const [medicationLogs, setMedicationLogs] = useState<MedicationLog[]>([]);
+  const [cycleLogs, setCycleLogs] = useState<CycleLog[]>([]);
+  const [cyclePermissionGranted, setCyclePermissionGranted] = useState(false);
+  const [cycleNotificationSettings, setCycleNotificationSettings] = useState<CycleNotificationSettings>({
+    enabled: false,
+    reminderTime24h: '20:00',
+    notificationIds: []
+  });
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
         await initMedicationNotifications();
 
-        const [storedOnboarding, storedAssessment, storedAuth, storedTheme, storedSelectedDeviceId, storedDevices, storedMedications, storedMedicationLogs, storedMedicationPermission] = await Promise.all([
+        const [storedOnboarding, storedAssessment, storedAuth, storedTheme, storedSelectedDeviceId, storedDevices, storedMedications, storedMedicationLogs, storedMedicationPermission, storedCycleLogs, storedCycleSettings, storedCyclePermission] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.onboarding),
           AsyncStorage.getItem(STORAGE_KEYS.assessment),
           AsyncStorage.getItem(STORAGE_KEYS.auth),
@@ -128,7 +169,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           AsyncStorage.getItem(STORAGE_KEYS.devices),
           AsyncStorage.getItem(STORAGE_KEYS.medications),
           AsyncStorage.getItem(STORAGE_KEYS.medicationLogs),
-          AsyncStorage.getItem(STORAGE_KEYS.medicationPermission)
+          AsyncStorage.getItem(STORAGE_KEYS.medicationPermission),
+          AsyncStorage.getItem(STORAGE_KEYS.cycleLogs),
+          AsyncStorage.getItem(STORAGE_KEYS.cycleNotificationSettings),
+          AsyncStorage.getItem(STORAGE_KEYS.cyclePermission)
         ]);
 
         if (storedOnboarding) {
@@ -162,6 +206,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
         if (storedMedicationPermission === '1') {
           setMedicationPermissionGranted(true);
+        }
+        if (storedCycleLogs) {
+          const parsed = JSON.parse(storedCycleLogs) as CycleLog[];
+          if (Array.isArray(parsed)) setCycleLogs(parsed);
+        }
+        if (storedCycleSettings) {
+          const parsed = JSON.parse(storedCycleSettings) as CycleNotificationSettings;
+          if (parsed && typeof parsed === 'object') setCycleNotificationSettings(parsed);
+        }
+        if (storedCyclePermission === '1') {
+          setCyclePermissionGranted(true);
         }
       } finally {
         setBootstrapped(true);
@@ -257,12 +312,116 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     AsyncStorage.setItem(STORAGE_KEYS.medicationLogs, JSON.stringify(next));
   }, []);
 
+  const persistCycleLogs = useCallback((next: CycleLog[]) => {
+    AsyncStorage.setItem(STORAGE_KEYS.cycleLogs, JSON.stringify(next));
+  }, []);
+
+  const persistCycleNotificationSettings = useCallback((next: CycleNotificationSettings) => {
+    AsyncStorage.setItem(STORAGE_KEYS.cycleNotificationSettings, JSON.stringify(next));
+  }, []);
+
   const requestMedicationPermission = useCallback(async () => {
     const granted = await requestMedicationNotificationPermissions();
     setMedicationPermissionGranted(granted);
     AsyncStorage.setItem(STORAGE_KEYS.medicationPermission, granted ? '1' : '0');
     return granted;
   }, []);
+
+  const cyclePrediction = useMemo(() => buildCyclePrediction(cycleLogs), [cycleLogs]);
+
+  const requestCyclePermission = useCallback(async () => {
+    const granted = await requestMedicationNotificationPermissions();
+    setCyclePermissionGranted(granted);
+    AsyncStorage.setItem(STORAGE_KEYS.cyclePermission, granted ? '1' : '0');
+    return granted;
+  }, []);
+
+  const updateCycleNotificationSettings = useCallback<AppContextValue['updateCycleNotificationSettings']>(
+    async (patch) => {
+      const next = { ...cycleNotificationSettings, ...patch };
+      if (next.notificationIds.length > 0) {
+        await clearCycleNotifications(next.notificationIds);
+      }
+      let notificationIds: string[] = [];
+      if (next.enabled && cyclePermissionGranted) {
+        notificationIds = await scheduleCycleNotifications({
+          reminderTime24h: next.reminderTime24h,
+          prediction: cyclePrediction
+        });
+      }
+      const hydrated = { ...next, notificationIds };
+      setCycleNotificationSettings(hydrated);
+      persistCycleNotificationSettings(hydrated);
+    },
+    [cycleNotificationSettings, cyclePermissionGranted, cyclePrediction, persistCycleNotificationSettings]
+  );
+
+  const logCycleForDate = useCallback<AppContextValue['logCycleForDate']>(
+    async (input) => {
+      const day = new Date(input.dateISO);
+      const normalizedISO = new Date(day.getFullYear(), day.getMonth(), day.getDate()).toISOString();
+      const now = new Date().toISOString();
+      setCycleLogs((previous) => {
+        const existing = previous.find((log) => toDayKey(log.dateISO) === toDayKey(normalizedISO));
+        const nextLog: CycleLog = existing
+          ? { ...existing, ...input, dateISO: normalizedISO, updatedAtISO: now }
+          : { ...input, id: `cycle-${Date.now()}`, dateISO: normalizedISO, createdAtISO: now, updatedAtISO: now };
+        const next = [nextLog, ...previous.filter((log) => toDayKey(log.dateISO) !== toDayKey(normalizedISO))].slice(0, 800);
+        persistCycleLogs(next);
+        return next;
+      });
+    },
+    [persistCycleLogs]
+  );
+
+  const getCycleDaySnapshot = useCallback<AppContextValue['getCycleDaySnapshot']>(
+    (dateISO) => {
+      const dayKey = toDayKey(dateISO);
+      const log = cycleLogs.find((item) => toDayKey(item.dateISO) === dayKey) ?? null;
+      const phase = getPhaseForDate(cycleLogs, dateISO, cyclePrediction);
+      const isPeriodDay = Boolean(log?.flow || log?.periodStarted);
+      const isPredictedFertile =
+        Boolean(cyclePrediction.predictedFertileStartISO) &&
+        Boolean(cyclePrediction.predictedFertileEndISO) &&
+        toDayKey(dateISO) >= toDayKey(cyclePrediction.predictedFertileStartISO ?? dateISO) &&
+        toDayKey(dateISO) <= toDayKey(cyclePrediction.predictedFertileEndISO ?? dateISO);
+      const isPredictedOvulation =
+        Boolean(cyclePrediction.predictedOvulationISO) &&
+        toDayKey(dateISO) === toDayKey(cyclePrediction.predictedOvulationISO ?? dateISO);
+
+      return { phase, isPeriodDay, isPredictedFertile, isPredictedOvulation, log };
+    },
+    [cycleLogs, cyclePrediction]
+  );
+
+  const getCycleInsights = useCallback<AppContextValue['getCycleInsights']>(
+    () => ({
+      averageCycleLengthDays: cyclePrediction.averageCycleLengthDays,
+      averagePeriodDurationDays: cyclePrediction.averagePeriodDurationDays,
+      confidence: cyclePrediction.confidence,
+      consistencyScore: cyclePrediction.consistencyScore,
+      commonSymptoms: getMostCommonSymptoms(cycleLogs)
+    }),
+    [cycleLogs, cyclePrediction]
+  );
+
+  useEffect(() => {
+    const syncCycleNotifications = async () => {
+      if (!cycleNotificationSettings.enabled || !cyclePermissionGranted) return;
+      const ids = await scheduleCycleNotifications({
+        reminderTime24h: cycleNotificationSettings.reminderTime24h,
+        prediction: cyclePrediction
+      });
+      if (cycleNotificationSettings.notificationIds.length > 0) {
+        await clearCycleNotifications(cycleNotificationSettings.notificationIds);
+      }
+      const next = { ...cycleNotificationSettings, notificationIds: ids };
+      setCycleNotificationSettings(next);
+      persistCycleNotificationSettings(next);
+    };
+    syncCycleNotifications();
+    // intentionally track cycle prediction and reminder time changes
+  }, [cyclePrediction, cyclePermissionGranted, cycleNotificationSettings.enabled, cycleNotificationSettings.reminderTime24h]);
 
   const addMedication = useCallback<AppContextValue['addMedication']>(
     async (input) => {
@@ -527,6 +686,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setWearableSyncData([]);
     setMedications([]);
     setMedicationLogs([]);
+    setCycleLogs([]);
+    setCycleNotificationSettings({ enabled: false, reminderTime24h: '20:00', notificationIds: [] });
   }, [setIsAuthenticated, setSelectedDeviceId]);
 
   const value = useMemo(
@@ -567,7 +728,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       pauseMedication,
       deleteMedication,
       markMedicationAction,
-      getMedicationTimelineForDate
+      getMedicationTimelineForDate,
+      cycleLogs,
+      cycleNotificationSettings,
+      cyclePrediction,
+      requestCyclePermission,
+      updateCycleNotificationSettings,
+      logCycleForDate,
+      getCycleDaySnapshot,
+      getCycleInsights
     }),
     [
       addWearableSyncData,
@@ -584,6 +753,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       medicationLogs,
       medicationPermissionGranted,
       medications,
+      cycleLogs,
+      cycleNotificationSettings,
+      cyclePrediction,
       mood,
       nudges,
       onboarding,
@@ -598,11 +770,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setThemeMode,
       setWellness,
       requestMedicationPermission,
+      requestCyclePermission,
       addMedication,
       updateMedication,
       pauseMedication,
       deleteMedication,
       getMedicationTimelineForDate,
+      updateCycleNotificationSettings,
+      logCycleForDate,
+      getCycleDaySnapshot,
+      getCycleInsights,
       submitCheckIn,
       themeMode,
       wearableSyncData,

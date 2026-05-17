@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { colors, radius, spacing, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
@@ -15,6 +16,7 @@ const statusColor: Record<string, string> = {
 const toDateOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
 export const MedicationCalendarScreen = () => {
+  const navigation = useNavigation();
   const { getMedicationTimelineForDate } = useAppContext();
   const [cursor, setCursor] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
@@ -39,6 +41,9 @@ export const MedicationCalendarScreen = () => {
 
   return (
     <Screen>
+      <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <Text style={styles.backText}>‹ Back</Text>
+      </Pressable>
       <View style={styles.header}>
         <Pressable onPress={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}><Text style={styles.nav}>{'<'}</Text></Pressable>
         <Text style={styles.title}>{cursor.toLocaleString('default', { month: 'long' })} {cursor.getFullYear()}</Text>
@@ -46,7 +51,7 @@ export const MedicationCalendarScreen = () => {
       </View>
 
       <View style={styles.weekRow}>
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label) => <Text key={label} style={styles.weekLabel}>{label}</Text>)}
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, idx) => <Text key={`${label}-${idx}`} style={styles.weekLabel}>{label}</Text>)}
       </View>
 
       <View style={styles.grid}>
@@ -85,6 +90,20 @@ export const MedicationCalendarScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  backBtn: {
+    alignSelf: 'flex-start',
+    minHeight: 34,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    marginBottom: spacing.sm
+  },
+  backText: {
+    ...typography.caption,
+    color: colors.textPrimary
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

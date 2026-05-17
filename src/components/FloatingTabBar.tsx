@@ -12,7 +12,8 @@ const iconMap: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = 
   Home: 'home-outline',
   Tracker: 'fitness-outline',
   Reports: 'heart-outline',
-  Sessions: 'id-card-outline'
+  Sessions: 'id-card-outline',
+  Cycle: 'flower-outline'
 };
 
 export const FloatingTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {

@@ -247,3 +247,49 @@ export type MedicationLog = {
   snoozedUntilISO: string | null;
   note?: string;
 };
+
+export type CycleFlowIntensity = 'light' | 'medium' | 'heavy';
+export type CycleSymptom =
+  | 'cramps'
+  | 'bloating'
+  | 'headache'
+  | 'acne'
+  | 'fatigue'
+  | 'breast_tenderness'
+  | 'mood_swings';
+export type CycleMood = 'happy' | 'low' | 'irritated' | 'calm' | 'anxious' | 'emotional';
+export type CycleEnergy = 'high' | 'medium' | 'low';
+export type CyclePhase = 'menstrual' | 'follicular' | 'ovulation_window' | 'luteal';
+export type PredictionConfidence = 'high' | 'medium' | 'low';
+
+export type CycleLog = {
+  id: string;
+  dateISO: string;
+  periodStarted: boolean;
+  periodEnded: boolean;
+  flow: CycleFlowIntensity | null;
+  symptoms: CycleSymptom[];
+  mood: CycleMood | null;
+  energy: CycleEnergy | null;
+  notes: string;
+  createdAtISO: string;
+  updatedAtISO: string;
+};
+
+export type CyclePrediction = {
+  predictedNextPeriodStartISO: string | null;
+  predictedFertileStartISO: string | null;
+  predictedFertileEndISO: string | null;
+  predictedOvulationISO: string | null;
+  averageCycleLengthDays: number;
+  averagePeriodDurationDays: number;
+  confidence: PredictionConfidence;
+  basedOnCycleCount: number;
+  consistencyScore: number;
+};
+
+export type CycleNotificationSettings = {
+  enabled: boolean;
+  reminderTime24h: string;
+  notificationIds: string[];
+};

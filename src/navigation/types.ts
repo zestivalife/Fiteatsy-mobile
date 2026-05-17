@@ -24,6 +24,9 @@ export type RootStackParamList = {
   MedicationForm: { medicationId?: string } | undefined;
   MedicationCalendar: undefined;
   MedicationNotifications: undefined;
+  CycleCalendar: undefined;
+  CycleInsights: undefined;
+  CycleNotifications: undefined;
   TrackerDetail: {
     metricKey: string;
     metricTitle: string;
@@ -49,4 +52,5 @@ export type MainTabParamList = {
   Tracker: undefined;
   Reports: undefined;
   Sessions: undefined;
+  Cycle: undefined;
 };

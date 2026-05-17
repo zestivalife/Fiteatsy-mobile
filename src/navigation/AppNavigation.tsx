@@ -31,6 +31,10 @@ import { ReportsChatScreen } from '../screens/home/ReportsChatScreen';
 import { MedicationFormScreen } from '../screens/medication/MedicationFormScreen';
 import { MedicationCalendarScreen } from '../screens/medication/MedicationCalendarScreen';
 import { MedicationNotificationsScreen } from '../screens/medication/MedicationNotificationsScreen';
+import { CycleScreen } from '../screens/cycle/CycleScreen';
+import { CycleCalendarScreen } from '../screens/cycle/CycleCalendarScreen';
+import { CycleInsightsScreen } from '../screens/cycle/CycleInsightsScreen';
+import { CycleNotificationsScreen } from '../screens/cycle/CycleNotificationsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -66,6 +70,7 @@ const MainTabs = () => {
       <Tab.Screen name="Tracker" component={TrackerScreen} />
       <Tab.Screen name="Reports" component={ReportsScreen} />
       <Tab.Screen name="Sessions" component={SessionsScreen} />
+      <Tab.Screen name="Cycle" component={CycleScreen} />
     </Tab.Navigator>
   );
 };
@@ -97,6 +102,9 @@ export const AppNavigation = () => {
         <Stack.Screen name="MedicationForm" component={MedicationFormScreen} />
         <Stack.Screen name="MedicationCalendar" component={MedicationCalendarScreen} />
         <Stack.Screen name="MedicationNotifications" component={MedicationNotificationsScreen} />
+        <Stack.Screen name="CycleCalendar" component={CycleCalendarScreen} />
+        <Stack.Screen name="CycleInsights" component={CycleInsightsScreen} />
+        <Stack.Screen name="CycleNotifications" component={CycleNotificationsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

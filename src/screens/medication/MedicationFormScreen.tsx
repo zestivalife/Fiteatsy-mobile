@@ -135,6 +135,9 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
+        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>‹ Back</Text>
+        </Pressable>
         <Text style={styles.title}>{editing ? 'Edit Medication' : 'Add Medication'}</Text>
 
         <View style={styles.field}>
@@ -241,6 +244,19 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: spacing.xxl,
     gap: spacing.md
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
+    minHeight: 34,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    justifyContent: 'center',
+    paddingHorizontal: 10
+  },
+  backText: {
+    ...typography.caption,
+    color: colors.textPrimary
   },
   title: {
     ...typography.section,
