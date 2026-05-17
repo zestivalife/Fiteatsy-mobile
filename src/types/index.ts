@@ -183,3 +183,67 @@ export type WellnessSnapshot = {
   hrvStatus: HrvStatus;
   stressScore: number;
 };
+
+export type MedicationType = 'tablet' | 'capsule' | 'syrup' | 'injection' | 'drops' | 'powder';
+export type MealRelation = 'before_meal' | 'after_meal' | 'with_meal' | 'empty_stomach';
+export type MedicationStatus = 'active' | 'paused';
+export type MedicationLogStatus = 'taken' | 'upcoming' | 'missed' | 'snoozed' | 'skipped';
+export type ReminderSound = 'default' | 'soft' | 'bell' | 'medical_alert';
+
+export type FrequencyPreset =
+  | 'every_day'
+  | 'alternate_days'
+  | 'specific_weekdays'
+  | 'every_x_days'
+  | 'weekly'
+  | 'monthly'
+  | 'custom';
+
+export type MedicationFrequencyRule = {
+  preset: FrequencyPreset;
+  intervalDays?: number;
+  weekdays?: number[];
+  monthlyDays?: number[];
+  customRule?: string;
+};
+
+export type MedicationTimeSlot = {
+  id: string;
+  time24h: string;
+  mealRelation: MealRelation;
+};
+
+export type MedicationDuration = {
+  startDateISO: string;
+  endDateISO: string | null;
+  ongoing: boolean;
+};
+
+export type MedicationSchedule = {
+  frequency: MedicationFrequencyRule;
+  timeSlots: MedicationTimeSlot[];
+  duration: MedicationDuration;
+};
+
+export type Medication = {
+  id: string;
+  name: string;
+  type: MedicationType;
+  dosage: string;
+  schedule: MedicationSchedule;
+  reminderSound: ReminderSound;
+  status: MedicationStatus;
+  createdAtISO: string;
+  updatedAtISO: string;
+  notificationIds: string[];
+};
+
+export type MedicationLog = {
+  id: string;
+  medicationId: string;
+  scheduledForISO: string;
+  status: MedicationLogStatus;
+  actionedAtISO: string | null;
+  snoozedUntilISO: string | null;
+  note?: string;
+};

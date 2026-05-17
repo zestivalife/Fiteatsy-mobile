@@ -1,11 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import * as Notifications from 'expo-notifications';
 import { mockDevices, initialWellness } from '../data/mock';
 import {
   AssessmentProfile,
   DailyCheckIn,
   DecisionLog,
   MoodSelection,
+  Medication,
+  MedicationLog,
+  MedicationLogStatus,
   Nudge,
   NudgeAction,
   OnboardingProfile,
@@ -18,6 +22,14 @@ import {
 import { applyMoodImpact } from '../utils/wellness';
 import { generatePriorityPlan, buildDecisionLog } from '../services/intelligenceEngine';
 import { todayKey, toDayKey } from '../utils/date';
+import {
+  clearScheduledMedicationNotifications,
+  initMedicationNotifications,
+  requestMedicationNotificationPermissions,
+  scheduleMedicationNotifications,
+  scheduleSnoozeNotification
+} from '../services/medicationNotificationService';
+import { buildLogId, getMedicationOccurrencesForDate, getMedicationStatusForOccurrence } from '../services/medicationUtils';
 
 type AppContextValue = {
   bootstrapped: boolean;
@@ -47,6 +59,25 @@ type AppContextValue = {
   logout: () => void;
   selectedDeviceId: string | null;
   setSelectedDeviceId: React.Dispatch<React.SetStateAction<string | null>>;
+  medicationPermissionGranted: boolean;
+  medications: Medication[];
+  medicationLogs: MedicationLog[];
+  requestMedicationPermission: () => Promise<boolean>;
+  addMedication: (input: Omit<Medication, 'id' | 'createdAtISO' | 'updatedAtISO' | 'notificationIds'>) => Promise<void>;
+  updateMedication: (medicationId: string, patch: Partial<Medication>) => Promise<void>;
+  pauseMedication: (medicationId: string) => Promise<void>;
+  deleteMedication: (medicationId: string) => Promise<void>;
+  markMedicationAction: (params: {
+    medicationId: string;
+    scheduledForISO: string;
+    status: Extract<MedicationLogStatus, 'taken' | 'snoozed' | 'skipped'>;
+    snoozeMinutes?: 5 | 10 | 15 | 30;
+  }) => Promise<void>;
+  getMedicationTimelineForDate: (dateISO: string) => Array<{
+    medication: Medication;
+    scheduledForISO: string;
+    status: MedicationLogStatus;
+  }>;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -57,7 +88,10 @@ const STORAGE_KEYS = {
   auth: 'nuetra.auth',
   theme: 'nuetra.theme',
   selectedDeviceId: 'nuetra.selectedDeviceId',
-  devices: 'nuetra.devices'
+  devices: 'nuetra.devices',
+  medications: 'nuetra.medications',
+  medicationLogs: 'nuetra.medicationLogs',
+  medicationPermission: 'nuetra.medicationPermission'
 } as const;
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
@@ -76,17 +110,25 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [wearableSyncData, setWearableSyncData] = useState<WearableSyncPayload[]>([]);
   const [themeMode, setThemeModeState] = useState<ThemeMode>('dark');
   const [selectedDeviceId, setSelectedDeviceIdState] = useState<string | null>(null);
+  const [medicationPermissionGranted, setMedicationPermissionGranted] = useState(false);
+  const [medications, setMedications] = useState<Medication[]>([]);
+  const [medicationLogs, setMedicationLogs] = useState<MedicationLog[]>([]);
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        const [storedOnboarding, storedAssessment, storedAuth, storedTheme, storedSelectedDeviceId, storedDevices] = await Promise.all([
+        await initMedicationNotifications();
+
+        const [storedOnboarding, storedAssessment, storedAuth, storedTheme, storedSelectedDeviceId, storedDevices, storedMedications, storedMedicationLogs, storedMedicationPermission] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.onboarding),
           AsyncStorage.getItem(STORAGE_KEYS.assessment),
           AsyncStorage.getItem(STORAGE_KEYS.auth),
           AsyncStorage.getItem(STORAGE_KEYS.theme),
           AsyncStorage.getItem(STORAGE_KEYS.selectedDeviceId),
-          AsyncStorage.getItem(STORAGE_KEYS.devices)
+          AsyncStorage.getItem(STORAGE_KEYS.devices),
+          AsyncStorage.getItem(STORAGE_KEYS.medications),
+          AsyncStorage.getItem(STORAGE_KEYS.medicationLogs),
+          AsyncStorage.getItem(STORAGE_KEYS.medicationPermission)
         ]);
 
         if (storedOnboarding) {
@@ -109,6 +151,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           if (Array.isArray(parsed) && parsed.length > 0) {
             setDevicesState(parsed);
           }
+        }
+        if (storedMedications) {
+          const parsed = JSON.parse(storedMedications) as Medication[];
+          if (Array.isArray(parsed)) setMedications(parsed);
+        }
+        if (storedMedicationLogs) {
+          const parsed = JSON.parse(storedMedicationLogs) as MedicationLog[];
+          if (Array.isArray(parsed)) setMedicationLogs(parsed);
+        }
+        if (storedMedicationPermission === '1') {
+          setMedicationPermissionGranted(true);
         }
       } finally {
         setBootstrapped(true);
@@ -194,6 +247,176 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       });
     },
     []
+  );
+
+  const persistMedications = useCallback((next: Medication[]) => {
+    AsyncStorage.setItem(STORAGE_KEYS.medications, JSON.stringify(next));
+  }, []);
+
+  const persistMedicationLogs = useCallback((next: MedicationLog[]) => {
+    AsyncStorage.setItem(STORAGE_KEYS.medicationLogs, JSON.stringify(next));
+  }, []);
+
+  const requestMedicationPermission = useCallback(async () => {
+    const granted = await requestMedicationNotificationPermissions();
+    setMedicationPermissionGranted(granted);
+    AsyncStorage.setItem(STORAGE_KEYS.medicationPermission, granted ? '1' : '0');
+    return granted;
+  }, []);
+
+  const addMedication = useCallback<AppContextValue['addMedication']>(
+    async (input) => {
+      const nowISO = new Date().toISOString();
+      const medication: Medication = {
+        ...input,
+        id: `med-${Date.now()}`,
+        createdAtISO: nowISO,
+        updatedAtISO: nowISO,
+        notificationIds: []
+      };
+
+      let notificationIds: string[] = [];
+      if (medicationPermissionGranted) {
+        notificationIds = await scheduleMedicationNotifications(medication);
+      }
+
+      const withNotifications = { ...medication, notificationIds };
+      setMedications((previous) => {
+        const next = [withNotifications, ...previous];
+        persistMedications(next);
+        return next;
+      });
+    },
+    [medicationPermissionGranted, persistMedications]
+  );
+
+  const updateMedication = useCallback<AppContextValue['updateMedication']>(
+    async (medicationId, patch) => {
+      const existing = medications.find((m) => m.id === medicationId);
+      if (!existing) return;
+
+      await clearScheduledMedicationNotifications(existing.notificationIds);
+      const candidate: Medication = {
+        ...existing,
+        ...patch,
+        id: existing.id,
+        updatedAtISO: new Date().toISOString(),
+        notificationIds: []
+      };
+
+      const nextNotificationIds =
+        medicationPermissionGranted && candidate.status === 'active' ? await scheduleMedicationNotifications(candidate) : [];
+      const hydrated = { ...candidate, notificationIds: nextNotificationIds };
+
+      setMedications((previous) => {
+        const next = previous.map((item) => (item.id === medicationId ? hydrated : item));
+        persistMedications(next);
+        return next;
+      });
+    },
+    [medicationPermissionGranted, medications, persistMedications]
+  );
+
+  const pauseMedication = useCallback<AppContextValue['pauseMedication']>(
+    async (medicationId) => {
+      const existing = medications.find((m) => m.id === medicationId);
+      if (!existing) return;
+      await clearScheduledMedicationNotifications(existing.notificationIds);
+      await updateMedication(medicationId, { status: 'paused', notificationIds: [] });
+    },
+    [medications, updateMedication]
+  );
+
+  const deleteMedication = useCallback<AppContextValue['deleteMedication']>(
+    async (medicationId) => {
+      const existing = medications.find((m) => m.id === medicationId);
+      if (!existing) return;
+      await clearScheduledMedicationNotifications(existing.notificationIds);
+
+      setMedications((previous) => {
+        const next = previous.filter((item) => item.id !== medicationId);
+        persistMedications(next);
+        return next;
+      });
+      setMedicationLogs((previous) => {
+        const next = previous.filter((item) => item.medicationId !== medicationId);
+        persistMedicationLogs(next);
+        return next;
+      });
+    },
+    [medications, persistMedicationLogs, persistMedications]
+  );
+
+  const markMedicationAction = useCallback<AppContextValue['markMedicationAction']>(
+    async ({ medicationId, scheduledForISO, status, snoozeMinutes }) => {
+      const medication = medications.find((item) => item.id === medicationId);
+      if (!medication) return;
+
+      const slot = medication.schedule.timeSlots[0];
+      const log: MedicationLog = {
+        id: buildLogId(medicationId, slot, scheduledForISO),
+        medicationId,
+        scheduledForISO,
+        status,
+        actionedAtISO: new Date().toISOString(),
+        snoozedUntilISO: null
+      };
+
+      if (status === 'snoozed' && snoozeMinutes) {
+        const snoozedUntilISO = new Date(Date.now() + snoozeMinutes * 60_000).toISOString();
+        log.snoozedUntilISO = snoozedUntilISO;
+        await scheduleSnoozeNotification(medication.name, medication.id, snoozeMinutes);
+      }
+
+      setMedicationLogs((previous) => {
+        const withoutSame = previous.filter((item) => !(item.medicationId === medicationId && item.scheduledForISO === scheduledForISO));
+        const next = [log, ...withoutSame].slice(0, 2000);
+        persistMedicationLogs(next);
+        return next;
+      });
+    },
+    [medications, persistMedicationLogs]
+  );
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response: Notifications.NotificationResponse) => {
+      const action = response.actionIdentifier;
+      const data = response.notification.request.content.data as { medicationId?: string; scheduledForISO?: string } | undefined;
+      if (!data?.medicationId || !data?.scheduledForISO) return;
+
+      if (action === 'TAKEN') {
+        markMedicationAction({ medicationId: data.medicationId, scheduledForISO: data.scheduledForISO, status: 'taken' });
+      } else if (action === 'SKIP') {
+        markMedicationAction({ medicationId: data.medicationId, scheduledForISO: data.scheduledForISO, status: 'skipped' });
+      } else if (action === 'SNOOZE_5') {
+        markMedicationAction({ medicationId: data.medicationId, scheduledForISO: data.scheduledForISO, status: 'snoozed', snoozeMinutes: 5 });
+      } else if (action === 'SNOOZE_10') {
+        markMedicationAction({ medicationId: data.medicationId, scheduledForISO: data.scheduledForISO, status: 'snoozed', snoozeMinutes: 10 });
+      } else if (action === 'SNOOZE_15') {
+        markMedicationAction({ medicationId: data.medicationId, scheduledForISO: data.scheduledForISO, status: 'snoozed', snoozeMinutes: 15 });
+      } else if (action === 'SNOOZE_30') {
+        markMedicationAction({ medicationId: data.medicationId, scheduledForISO: data.scheduledForISO, status: 'snoozed', snoozeMinutes: 30 });
+      }
+    });
+    return () => sub.remove();
+  }, [markMedicationAction]);
+
+  const getMedicationTimelineForDate = useCallback<AppContextValue['getMedicationTimelineForDate']>(
+    (dateISO) => {
+      const day = new Date(dateISO);
+      return medications.flatMap((medication) => {
+        const occurrences = getMedicationOccurrencesForDate(medication, day);
+        return occurrences.map((occurrence) => {
+          const scheduledForISO = occurrence.scheduledFor.toISOString();
+          return {
+            medication,
+            scheduledForISO,
+            status: getMedicationStatusForOccurrence(medication.id, scheduledForISO, medicationLogs)
+          };
+        });
+      });
+    },
+    [medicationLogs, medications]
   );
 
   const setWellness = useCallback<React.Dispatch<React.SetStateAction<WellnessSnapshot>>>(
@@ -302,6 +525,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setDecisionLogs([]);
     setNudges([]);
     setWearableSyncData([]);
+    setMedications([]);
+    setMedicationLogs([]);
   }, [setIsAuthenticated, setSelectedDeviceId]);
 
   const value = useMemo(
@@ -332,7 +557,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setThemeMode,
       logout,
       selectedDeviceId,
-      setSelectedDeviceId
+      setSelectedDeviceId,
+      medicationPermissionGranted,
+      medications,
+      medicationLogs,
+      requestMedicationPermission,
+      addMedication,
+      updateMedication,
+      pauseMedication,
+      deleteMedication,
+      markMedicationAction,
+      getMedicationTimelineForDate
     }),
     [
       addWearableSyncData,
@@ -345,6 +580,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       isAuthenticated,
       logNudgeAction,
       logout,
+      markMedicationAction,
+      medicationLogs,
+      medicationPermissionGranted,
+      medications,
       mood,
       nudges,
       onboarding,
@@ -358,6 +597,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setSelectedDeviceId,
       setThemeMode,
       setWellness,
+      requestMedicationPermission,
+      addMedication,
+      updateMedication,
+      pauseMedication,
+      deleteMedication,
+      getMedicationTimelineForDate,
       submitCheckIn,
       themeMode,
       wearableSyncData,

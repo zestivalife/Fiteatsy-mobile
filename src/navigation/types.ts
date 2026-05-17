@@ -21,6 +21,9 @@ export type RootStackParamList = {
   Notifications: undefined;
   Profile: undefined;
   ReportsChat: { reportName: string; reportParameters: ReportParameter[] };
+  MedicationForm: { medicationId?: string } | undefined;
+  MedicationCalendar: undefined;
+  MedicationNotifications: undefined;
   TrackerDetail: {
     metricKey: string;
     metricTitle: string;
