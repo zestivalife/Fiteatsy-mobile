@@ -56,6 +56,7 @@ const RecoveryRing = ({ value }: { value: number }) => {
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
   const [medicationOpen, setMedicationOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const {
     onboarding,
     wellness,
@@ -65,7 +66,11 @@ export const HomeScreen = () => {
     getMedicationTimelineForDate,
     markMedicationAction,
     pauseMedication,
-    deleteMedication
+    deleteMedication,
+    cyclePrediction,
+    getCycleDaySnapshot,
+    familyConnections,
+    getFamilySummary
   } = useAppContext();
 
   const connectedDevice = devices.find((d) => d.id === selectedDeviceId) ?? null;
@@ -76,6 +81,26 @@ export const HomeScreen = () => {
   }, [wellness.wellnessScore]);
 
   const todayTimeline = useMemo(() => getMedicationTimelineForDate(new Date().toISOString()), [getMedicationTimelineForDate, medications]);
+  const todayISO = new Date().toISOString();
+  const cycleSnapshot = getCycleDaySnapshot(todayISO);
+  const medicationPending = todayTimeline.filter((item) => item.status === 'upcoming' || item.status === 'missed' || item.status === 'snoozed').length;
+  const cycleLabel = cycleSnapshot.phase === 'ovulation_window'
+    ? 'Ovulation Window'
+    : cycleSnapshot.phase === 'follicular'
+      ? 'Follicular Phase'
+      : cycleSnapshot.phase === 'luteal'
+        ? 'Luteal Phase'
+        : 'Menstrual Phase';
+  const familyConnected = familyConnections.filter((member) => member.status === 'connected');
+  const familyPending = familyConnected.filter((member) => {
+    const summary = getFamilySummary(member.id);
+    return summary?.medicationAdherence === 'needs_attention' || summary?.checkInStatus === 'pending';
+  }).length;
+  const aiInsight = medicationPending > 0
+    ? 'Complete pending medication reminders to protect energy consistency.'
+    : cycleSnapshot.phase === 'ovulation_window'
+      ? 'Hydration and gentle movement can support this cycle window.'
+      : 'Protect energy dips with protein-first meals.';
 
   return (
     <Screen scroll contentStyle={styles.content}>
@@ -143,30 +168,50 @@ export const HomeScreen = () => {
         </View>
       </LinearGradient>
 
-      <View style={styles.assistantCard}>
-        <View style={styles.assistantHeader}>
-          <Text style={styles.assistantTitle}>Fiteatsy Assistant</Text>
-          <Text style={styles.assistantBadge}>AI-guided</Text>
-        </View>
-        <Text style={styles.assistantCopy}>Your blood sugar care will improve most from protein-first meals, consistent hydration, and short walks after eating.</Text>
-        <Text style={styles.assistantCopy}>Protect your energy before the next dip</Text>
-        <Text style={styles.assistantCopy}>* Dr. Rhea Kapoor - Diabetes & Metabolic Nutrition</Text>
-        <Text style={styles.assistantCopy}>Energy support reset</Text>
-
-        <View style={styles.assistantPoint}><Ionicons name="flash-outline" size={14} color="#59BE08" /><Text style={styles.assistantPointText}>Protect your energy before the next dip</Text></View>
-        <View style={styles.assistantPoint}><Ionicons name="flower-outline" size={14} color="#59BE08" /><Text style={styles.assistantPointText}>Dr. Rhea Kapoor - Diabetes & Metabolic Nutrition</Text></View>
-        <View style={styles.assistantPoint}><Ionicons name="return-up-back-outline" size={14} color="#59BE08" /><Text style={styles.assistantPointText}>Energy support reset</Text></View>
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryTitle}>Today&apos;s Wellness Summary</Text>
+        <View style={styles.summaryRow}><Text style={styles.summaryKey}>Medication</Text><Text style={styles.summaryValue}>{medicationPending > 0 ? `${medicationPending} Pending` : 'On Track'}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.summaryKey}>Cycle</Text><Text style={styles.summaryValue}>{cycleLabel}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.summaryKey}>Wellness</Text><Text style={styles.summaryValue}>{wellness.wellnessScore >= 70 ? 'Stable' : 'Needs Attention'}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.summaryKey}>Family</Text><Text style={styles.summaryValue}>{familyConnected.length === 0 ? 'Not Connected' : familyPending > 0 ? `${familyPending} Pending` : 'All Good'}</Text></View>
       </View>
 
-      <Pressable style={styles.medicationCta} onPress={() => setMedicationOpen(true)}>
-        <Text style={styles.medicationCtaTitle}>Medication</Text>
-        <Text style={styles.medicationCtaBody}>Manage meds, schedules, reminders, and adherence</Text>
-      </Pressable>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionRow}>
+        <Pressable style={styles.quickActionPill} onPress={() => setMedicationOpen(true)}><Ionicons name="medical-outline" size={16} color="#59BE08" /><Text style={styles.quickActionText}>Medication</Text></Pressable>
+        <Pressable style={styles.quickActionPill} onPress={() => navigation.navigate('CycleCalendar')}><Ionicons name="flower-outline" size={16} color="#59BE08" /><Text style={styles.quickActionText}>Cycle</Text></Pressable>
+        <Pressable style={styles.quickActionPill} onPress={() => navigation.navigate('FamilyDashboard')}><Ionicons name="people-outline" size={16} color="#59BE08" /><Text style={styles.quickActionText}>Family</Text></Pressable>
+        <Pressable style={styles.quickActionPill} onPress={() => navigation.navigate('Main')}><Ionicons name="document-text-outline" size={16} color="#59BE08" /><Text style={styles.quickActionText}>Reports</Text></Pressable>
+      </ScrollView>
 
-      <Pressable style={styles.medicationCta} onPress={() => navigation.navigate('FamilyDashboard')}>
-        <Text style={styles.medicationCtaTitle}>Family Wellness Sharing</Text>
-        <Text style={styles.medicationCtaBody}>Connect family with consent-based health visibility and reassurance.</Text>
-      </Pressable>
+      <View style={styles.aiCompactCard}>
+        <Text style={styles.aiCompactTitle}>AI Insight</Text>
+        <Text style={styles.aiCompactBody}>{aiInsight}</Text>
+        <Pressable onPress={() => navigation.navigate('Main')}><Text style={styles.aiCompactLink}>View Details</Text></Pressable>
+      </View>
+
+      <View style={styles.familyCircleCard}>
+        <View style={styles.familyCircleHeader}>
+          <Text style={styles.familyCircleTitle}>Family Circle</Text>
+          <Pressable onPress={() => navigation.navigate('FamilyDashboard')}><Text style={styles.familyCircleAdd}>+ Add Member</Text></Pressable>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.familyCircleList}>
+          {familyConnected.length === 0 ? (
+            <Text style={styles.familyCircleEmpty}>No family members connected yet.</Text>
+          ) : (
+            familyConnected.map((member) => {
+              const summary = getFamilySummary(member.id);
+              const status = summary?.medicationAdherence === 'needs_attention' ? 'Medication Pending' : summary?.wellnessActivity === 'active' ? 'Active' : 'Normal';
+              return (
+                <Pressable key={member.id} style={styles.familyCircleMember} onPress={() => navigation.navigate('FamilyMemberDetail', { connectionId: member.id })}>
+                  <View style={styles.familyCircleAvatar}><Text style={styles.familyCircleAvatarText}>{member.memberName.charAt(0).toUpperCase()}</Text></View>
+                  <Text style={styles.familyCircleName} numberOfLines={1}>{member.memberName}</Text>
+                  <Text style={styles.familyCircleStatus} numberOfLines={1}>{status}</Text>
+                </Pressable>
+              );
+            })
+          )}
+        </ScrollView>
+      </View>
 
       <Modal visible={medicationOpen} animationType="slide" transparent onRequestClose={() => setMedicationOpen(false)}>
         <View style={styles.sheetOverlay}>
@@ -234,6 +279,37 @@ export const HomeScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={aiOpen} animationType="slide" transparent onRequestClose={() => setAiOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setAiOpen(false)} />
+          <View style={styles.sheetWrap}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Fiteatsy Assistant</Text>
+            <ScrollView contentContainerStyle={styles.sheetContent}>
+              <View style={styles.assistantCard}>
+                <View style={styles.assistantHeader}>
+                  <Text style={styles.assistantTitle}>Fiteatsy Assistant</Text>
+                  <Text style={styles.assistantBadge}>AI-guided</Text>
+                </View>
+                <Text style={styles.assistantCopy}>Your blood sugar care will improve most from protein-first meals, consistent hydration, and short walks after eating.</Text>
+                <Text style={styles.assistantCopy}>Protect your energy before the next dip</Text>
+                <Text style={styles.assistantCopy}>* Dr. Rhea Kapoor - Diabetes & Metabolic Nutrition</Text>
+                <Text style={styles.assistantCopy}>Energy support reset</Text>
+                <View style={styles.assistantPoint}><Ionicons name="flash-outline" size={14} color="#59BE08" /><Text style={styles.assistantPointText}>Protect your energy before the next dip</Text></View>
+                <View style={styles.assistantPoint}><Ionicons name="flower-outline" size={14} color="#59BE08" /><Text style={styles.assistantPointText}>Dr. Rhea Kapoor - Diabetes & Metabolic Nutrition</Text></View>
+                <View style={styles.assistantPoint}><Ionicons name="return-up-back-outline" size={14} color="#59BE08" /><Text style={styles.assistantPointText}>Energy support reset</Text></View>
+              </View>
+              <Pressable style={styles.ctaBtn} onPress={() => setAiOpen(false)}><Text style={styles.ctaText}>Close</Text></Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Pressable style={styles.aiFab} onPress={() => setAiOpen(true)}>
+        <Ionicons name="sparkles-outline" size={18} color="#59BE08" />
+        <Text style={styles.aiFabText}>AI</Text>
+      </Pressable>
     </Screen>
   );
 };
@@ -481,6 +557,33 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 16
   },
+  aiFab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 96,
+    minWidth: 58,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    zIndex: 20,
+    elevation: 12,
+    shadowColor: '#000000',
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 }
+  },
+  aiFabText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '700'
+  },
   sheetOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.52)',
@@ -628,5 +731,139 @@ const styles = StyleSheet.create({
     color: '#D04053',
     fontSize: 12,
     fontWeight: '600'
+  },
+  summaryCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#252525',
+    backgroundColor: '#151515',
+    padding: 12,
+    gap: 8
+  },
+  summaryTitle: {
+    color: '#F4F4F4',
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  summaryKey: {
+    color: '#9A9A9A',
+    fontSize: 12,
+    fontWeight: '400'
+  },
+  summaryValue: {
+    color: '#F4F4F4',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  quickActionRow: {
+    gap: 8,
+    paddingRight: 8
+  },
+  quickActionPill: {
+    minHeight: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2E2E2E',
+    backgroundColor: '#101010',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  quickActionText: {
+    color: '#F4F4F4',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  aiCompactCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#232323',
+    backgroundColor: '#131313',
+    padding: 12,
+    gap: 6
+  },
+  aiCompactTitle: {
+    color: '#59BE08',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  aiCompactBody: {
+    color: '#E2E2E2',
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 18
+  },
+  aiCompactLink: {
+    color: '#A6D97A',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  familyCircleCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#232323',
+    backgroundColor: '#131313',
+    padding: 12,
+    gap: 10
+  },
+  familyCircleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  familyCircleTitle: {
+    color: '#F4F4F4',
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  familyCircleAdd: {
+    color: '#59BE08',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  familyCircleList: {
+    gap: 10,
+    paddingRight: 8
+  },
+  familyCircleEmpty: {
+    color: '#9A9A9A',
+    fontSize: 12,
+    fontWeight: '400'
+  },
+  familyCircleMember: {
+    width: 96,
+    alignItems: 'center',
+    gap: 4
+  },
+  familyCircleAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#59BE08',
+    backgroundColor: '#1B1B1B',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  familyCircleAvatarText: {
+    color: '#F4F4F4',
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  familyCircleName: {
+    color: '#F4F4F4',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  familyCircleStatus: {
+    color: '#9A9A9A',
+    fontSize: 11,
+    fontWeight: '400'
   }
 });
