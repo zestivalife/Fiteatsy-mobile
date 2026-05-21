@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,7 +7,9 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
-import { connectHealthApp, getAvailableHealthApps, type HealthAppId, type HealthAppOption } from '../../services/healthAppService';
+import { connectHealthApp, getAvailableHealthApps, syncConnectedHealthApp, type HealthAppId, type HealthAppOption } from '../../services/healthAppService';
+import { recalculateWellness } from '../../utils/wellness';
+import { initialWellness } from '../../data/mock';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SyncWearable'>;
 
@@ -19,14 +21,17 @@ const iconMap: Record<HealthAppId, keyof typeof Ionicons.glyphMap> = {
   fitbit: 'moon-outline'
 };
 
-export const SyncWearableScreen = ({ navigation }: Props) => {
-  const { setWearableSetupCompleted, selectedDeviceId, setSelectedDeviceId, onboarding, setOnboarding } = useAppContext();
-  const [sheetOpen, setSheetOpen] = useState(true);
+export const SyncWearableScreen = ({ navigation, route }: Props) => {
+  const autoSync = route.params?.autoSync === true;
+  const { setWearableSetupCompleted, selectedDeviceId, setSelectedDeviceId, onboarding, setOnboarding, addWearableSyncData, setWellness } = useAppContext();
+  const [sheetOpen, setSheetOpen] = useState(!autoSync);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(selectedDeviceId);
   const [apps, setApps] = useState<HealthAppOption[]>([]);
   const [loadingApps, setLoadingApps] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncInfo, setSyncInfo] = useState<string | null>(null);
+  const autoSyncAttemptedRef = useRef(false);
 
   const selectedApp = useMemo(
     () => apps.find((app) => app.id === selectedAppId) ?? null,
@@ -59,11 +64,35 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     };
   }, []);
 
-  const continueWithSelection = async () => {
+  const continueWithSelection = useCallback(async () => {
     if (!selectedAppId) return;
     setConnecting(true);
     setError(null);
+    setSyncInfo(null);
     await connectHealthApp(selectedAppId as HealthAppId);
+    const livePayload = await syncConnectedHealthApp(selectedAppId as HealthAppId);
+    addWearableSyncData(livePayload);
+
+    const hasLiveRecords = !livePayload.dataQuality.isEstimated && livePayload.dataQuality.confidence >= 0.9;
+    if (hasLiveRecords) {
+      setWellness(
+        recalculateWellness({
+          ...initialWellness,
+          heartRateAvg: livePayload.metrics.heartRateAvg,
+          sleepHours: livePayload.metrics.sleepHours,
+          hydrationLiters: livePayload.metrics.hydrationLiters,
+          focusMinutes: livePayload.metrics.focusMinutes,
+          breathingMinutes: livePayload.metrics.breathingMinutes,
+          movementMinutes: livePayload.metrics.movementMinutes
+        })
+      );
+      setSyncInfo('Health app records synced successfully.');
+    } else {
+      setError('No recent records were received from this health app. Open the health app, confirm data exists there, and retry sync.');
+      setConnecting(false);
+      return;
+    }
+
     setSelectedDeviceId(selectedAppId);
     if (onboarding) {
       setOnboarding({
@@ -76,7 +105,26 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     setSheetOpen(false);
     navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
     setConnecting(false);
-  };
+  }, [
+    addWearableSyncData,
+    navigation,
+    onboarding,
+    selectedAppId,
+    setOnboarding,
+    setSelectedDeviceId,
+    setWearableSetupCompleted,
+    setWellness
+  ]);
+
+  useEffect(() => {
+    if (!autoSync || loadingApps || connecting || autoSyncAttemptedRef.current) return;
+    if (selectedAppId) {
+      autoSyncAttemptedRef.current = true;
+      void continueWithSelection();
+      return;
+    }
+    setSheetOpen(true);
+  }, [autoSync, connecting, continueWithSelection, loadingApps, selectedAppId]);
 
   const skipForNow = () => {
     if (onboarding) {
@@ -140,6 +188,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
               })}
             </View>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {syncInfo ? <Text style={styles.infoText}>{syncInfo}</Text> : null}
 
             <PrimaryButton title={connecting ? 'Connecting...' : 'Continue'} onPress={continueWithSelection} disabled={!selectedAppId || connecting} />
             <Pressable style={styles.sheetSkip} onPress={skipForNow}>
@@ -263,5 +312,9 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.caption,
     color: colors.danger
+  },
+  infoText: {
+    ...typography.caption,
+    color: colors.textSecondary
   }
 });

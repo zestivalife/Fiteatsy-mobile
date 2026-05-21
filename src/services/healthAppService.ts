@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { WearableSyncPayload } from '../types';
 
 export type HealthAppId = 'apple-health' | 'health-connect' | 'google-fit' | 'samsung-health' | 'fitbit';
 
@@ -65,18 +66,68 @@ export const connectHealthApp = async (appId: HealthAppId) => {
 
     return (await response.json()) as {
       connected: boolean;
+      connectionId: string;
       appId: HealthAppId;
       appName: string;
       provider: string;
       connectedAtISO: string;
+      status: 'connected' | 'paused';
     };
   } catch {
     return {
       connected: true,
+      connectionId: `local-${Date.now()}`,
       appId,
       appName: fallbackApps.find((item) => item.id === appId)?.label ?? 'Health App',
       provider: 'Local Health Adapter',
-      connectedAtISO: new Date().toISOString()
+      connectedAtISO: new Date().toISOString(),
+      status: 'connected' as const
+    };
+  }
+};
+
+export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<WearableSyncPayload> => {
+  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+  const body = {
+    userId: 'emp-demo-1',
+    appId,
+    platform
+  };
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/v1/wearables/sync/live`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      throw new Error('live_sync_failed');
+    }
+
+    const payload = (await response.json()) as { payload: WearableSyncPayload };
+    return payload.payload;
+  } catch {
+    return {
+      deviceId: `local-${appId}`,
+      brand: appId === 'apple-health' ? 'Apple' : appId === 'samsung-health' ? 'Samsung' : 'Other',
+      model: fallbackApps.find((item) => item.id === appId)?.label ?? 'Health App',
+      provider: 'Local Health Adapter',
+      syncedAtISO: new Date().toISOString(),
+      source: 'api',
+      metrics: {
+        heartRateAvg: 72,
+        sleepHours: 7.1,
+        hydrationLiters: 2.4,
+        focusMinutes: 20,
+        breathingMinutes: 9,
+        movementMinutes: 18
+      },
+      dataQuality: {
+        confidence: 0.82,
+        isEstimated: true,
+        warnings: ['Live sync endpoint unavailable. Using local adapter baseline.']
+      }
     };
   }
 };

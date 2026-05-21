@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
-import { colors, radius, typography } from '../../design/tokens';
+import { colors, getThemeColors, radius, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
 
 const searchableItems = [
@@ -20,7 +20,7 @@ const searchableItems = [
 export const SearchScreen = () => {
   const navigation = useNavigation();
   const { themeMode } = useAppContext();
-  const isLight = themeMode === 'light';
+  const palette = getThemeColors(themeMode);
   const [query, setQuery] = useState('');
 
   const results = useMemo(() => {
@@ -34,20 +34,20 @@ export const SearchScreen = () => {
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={styles.title}>Search</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close search" style={styles.closeButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={18} color={isLight ? '#F5E1E1' : colors.textPrimary} />
+        <Text style={[styles.title, { color: palette.textPrimary }]}>Search</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close search" style={[styles.closeButton, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]} onPress={() => navigation.goBack()}>
+          <Ionicons name="close" size={18} color={palette.textPrimary} />
         </Pressable>
       </View>
-      <View style={[styles.inputWrap, isLight && styles.inputWrapLight]}>
-        <Ionicons name="search-outline" size={20} color={isLight ? '#939393' : colors.textMuted} />
+      <View style={[styles.inputWrap, { borderColor: palette.stroke, backgroundColor: palette.cardRaised }]}>
+        <Ionicons name="search-outline" size={20} color={palette.textMuted} />
         <TextInput
           accessibilityLabel="Search features and reports"
-          style={[styles.input, isLight && styles.inputLight]}
+          style={[styles.input, { color: palette.textPrimary }]}
           value={query}
           onChangeText={setQuery}
           placeholder="Search features, sessions, reports"
-          placeholderTextColor={isLight ? '#939393' : colors.textMuted}
+          placeholderTextColor={palette.textMuted}
         />
       </View>
 
@@ -62,7 +62,7 @@ export const SearchScreen = () => {
             </Card>
           </Pressable>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>No matches found</Text>}
+        ListEmptyComponent={<Text style={[styles.empty, { color: palette.textSecondary }]}>No matches found</Text>}
       />
     </Screen>
   );
@@ -99,17 +99,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8
   },
-  inputWrapLight: {
-    backgroundColor: 'rgba(0,0,0,0.29)',
-    borderColor: 'rgba(170,190,229,0.9)'
-  },
   input: {
     flex: 1,
     color: colors.textPrimary,
     fontSize: 16
-  },
-  inputLight: {
-    color: '#F5E1E1'
   },
   list: {
     paddingTop: 12,

@@ -108,14 +108,14 @@ const MetricSparkCard = ({
 
   return (
     <Pressable onPress={onOpen} style={styles.metricTile}>
-      <Card style={[styles.metricCard, !isLight && styles.metricCardDark]}>
+      <Card style={[styles.metricCard, isLight ? styles.metricCardLight : styles.metricCardDark]}>
         <View style={styles.metricHeaderRow}>
           <View style={[styles.metricIconWrap, !isLight && styles.metricIconWrapDark]}>
             <Text style={styles.metricIcon}>{icon}</Text>
           </View>
           <View style={styles.metricHeaderTextWrap}>
-            <Text style={[styles.metricTitle, !isLight && styles.metricTitleDark]} numberOfLines={1}>{title}</Text>
-            <Text style={[styles.metricSubtitle, !isLight && styles.metricSubtitleDark]} numberOfLines={1}>{subtitle}</Text>
+            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{title}</Text>
+            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{subtitle}</Text>
           </View>
         </View>
 
@@ -143,7 +143,7 @@ const MetricSparkCard = ({
           </View>
         </View>
 
-        <Animated.Text style={[styles.metricValue, !isLight && styles.metricValueDark, { transform: [{ scale: pulse }] }]}> 
+        <Animated.Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }, { transform: [{ scale: pulse }] }]}> 
           {selected ? selected.value : value} {unit}
         </Animated.Text>
       </Card>
@@ -186,14 +186,14 @@ const MetricBarsCard = ({
 
   return (
     <Pressable onPress={onOpen} style={styles.metricTile}>
-      <Card style={[styles.metricCard, !isLight && styles.metricCardDark]}>
+      <Card style={[styles.metricCard, isLight ? styles.metricCardLight : styles.metricCardDark]}>
         <View style={styles.metricHeaderRow}>
           <View style={[styles.metricIconWrap, !isLight && styles.metricIconWrapDark]}>
             <Text style={styles.metricIcon}>{icon}</Text>
           </View>
           <View style={styles.metricHeaderTextWrap}>
-            <Text style={[styles.metricTitle, !isLight && styles.metricTitleDark]} numberOfLines={1}>{title}</Text>
-            <Text style={[styles.metricSubtitle, !isLight && styles.metricSubtitleDark]} numberOfLines={1}>{subtitle}</Text>
+            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{title}</Text>
+            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{subtitle}</Text>
           </View>
         </View>
 
@@ -224,7 +224,7 @@ const MetricBarsCard = ({
           })}
         </View>
 
-        <Text style={[styles.metricValue, !isLight && styles.metricValueDark]}>
+        <Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }]}>
           {bars[selectedBar]} {unit}
         </Text>
       </Card>
@@ -236,12 +236,13 @@ export const TrackerScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { themeMode, checkIns, wearableSyncData, wellness } = useAppContext();
   const isLight = themeMode === 'light';
+  const todayWeekIndex = new Date().getDay();
 
   const [activeTab, setActiveTab] = useState<TrackerTab>('health');
   const sectionHighlight = activeTab === 'wellness' ? '#60AF00' : '#60AF00';
   const badgeHighlight = activeTab === 'wellness' ? '#60AF00' : '#60AF00';
   const [rangeMode, setRangeMode] = useState<RangeMode>('7D');
-  const [selectedDay, setSelectedDay] = useState(6);
+  const [selectedDay, setSelectedDay] = useState(todayWeekIndex);
   const [compareYesterday, setCompareYesterday] = useState(false);
   const [trackerInsightsLoading, setTrackerInsightsLoading] = useState(false);
   const [trackerInsights, setTrackerInsights] = useState<TrackerSectionImprovementResult>({
@@ -263,9 +264,14 @@ export const TrackerScreen = () => {
     const baseCal = Math.round(1000 + (latestSync?.metrics.focusMinutes ?? wellness.focusMinutes) * 18);
     const baseDistance = Number((Math.max(2.2, wellness.movementMinutes / 8)).toFixed(1));
 
+    const base = new Date();
+    const weekStart = new Date(base);
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(base.getDate() - base.getDay());
+
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
       const stressNoise = ((i + 3) % 5) - 2;
       const moodEnergy = checkIns.length > 0 ? checkIns[Math.max(0, checkIns.length - 1)] : null;
       const moodFactor = moodEnergy ? (moodEnergy.mood + moodEnergy.energy + moodEnergy.sleepQuality) / 3 : 3;
@@ -503,7 +509,7 @@ export const TrackerScreen = () => {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll contentStyle={styles.screenContent}>
       <View style={styles.topRow}>
         <View style={[styles.tabSwitch, isLight ? styles.tabSwitchLight : styles.tabSwitchDark]}>
           <Pressable
@@ -564,8 +570,24 @@ export const TrackerScreen = () => {
               style={[styles.dayCard, isLight ? styles.dayCardLight : styles.dayCardDark, active && styles.dayCardActive, active && { backgroundColor: sectionHighlight, borderColor: sectionHighlight }]}
               onPress={() => setSelectedDay(index)}
             >
-              <Text style={[styles.dayName, !isLight && styles.dayNameDark, active && styles.dayNameActive]}>{day.dayLabel}</Text>
-              <Text style={[styles.dayDate, !isLight && styles.dayDateDark, active && styles.dayDateActive]}>{day.dateNum}</Text>
+              <Text
+                style={[
+                  styles.dayName,
+                  !active && { color: '#FFFFFF' },
+                  active && styles.dayNameActive
+                ]}
+              >
+                {day.dayLabel}
+              </Text>
+              <Text
+                style={[
+                  styles.dayDate,
+                  !active && { color: '#FFFFFF' },
+                  active && styles.dayDateActive
+                ]}
+              >
+                {day.dateNum}
+              </Text>
             </Pressable>
           );
         })}
@@ -647,6 +669,9 @@ export const TrackerScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  screenContent: {
+    paddingBottom: 176
+  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -670,7 +695,7 @@ const styles = StyleSheet.create({
     borderColor: colors.strokeStrong
   },
   tabTextDark: {
-    color: colors.textSecondary
+    color: '#FFFFFF'
   },
   tabButton: {
     flex: 1,
@@ -684,6 +709,7 @@ const styles = StyleSheet.create({
   tabText: {
     ...typography.bodyStrong,
     fontSize: 14,
+    fontWeight: '700',
     color: colors.textSecondary
   },
   tabTextActive: {
@@ -704,6 +730,7 @@ const styles = StyleSheet.create({
   rangeText: {
     ...typography.caption,
     fontSize: 12,
+    fontWeight: '700',
     color: colors.textSecondary
   },
   rangeTextActive: {
@@ -735,11 +762,14 @@ const styles = StyleSheet.create({
   summaryValue: {
     ...typography.title,
     color: colors.textPrimary,
-    fontSize: 20,
-    lineHeight: 24
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700'
   },
   summaryLabel: {
     ...typography.bodyStrong,
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.textSecondary
   },
   compareButton: {
@@ -787,26 +817,28 @@ const styles = StyleSheet.create({
   },
   dayName: {
     ...typography.body,
-    fontSize: 13
+    fontSize: 12,
+    fontWeight: '700'
   },
   dayNameDark: {
-    color: colors.textSecondary
+    color: '#FFFFFF'
   },
   dayNameActive: {
-    color: colors.textPrimary,
+    color: '#FFFFFF',
     fontWeight: '700'
   },
   dayDate: {
     ...typography.section,
-    fontSize: 28,
-    lineHeight: 32,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700',
     color: colors.textPrimary
   },
   dayDateDark: {
     color: colors.white
   },
   dayDateActive: {
-    color: '#151515'
+    color: '#FFFFFF'
   },
   grid: {
     gap: spacing.xs
@@ -827,6 +859,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.29)',
     borderColor: '#C9CFD4',
     justifyContent: 'space-between'
+  },
+  metricCardLight: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#CBD5E1'
   },
   metricCardDark: {
     backgroundColor: colors.cardRaised,
@@ -858,18 +894,26 @@ const styles = StyleSheet.create({
     ...typography.section,
     color: colors.textPrimary,
     fontSize: 14,
-    lineHeight: 18
+    lineHeight: 18,
+    fontWeight: '700'
   },
   metricTitleDark: {
-    color: '#F5E1E1'
+    color: '#FFFFFF'
+  },
+  metricTitleLight: {
+    color: '#000000'
   },
   metricSubtitle: {
     ...typography.caption,
     color: colors.textMuted,
-    fontSize: 12
+    fontSize: 12,
+    fontWeight: '700'
   },
   metricSubtitleDark: {
-    color: colors.textMuted
+    color: '#FFFFFF'
+  },
+  metricSubtitleLight: {
+    color: '#000000'
   },
   sparkWrap: {
     marginTop: 12,
@@ -919,14 +963,18 @@ const styles = StyleSheet.create({
   },
   metricValue: {
     ...typography.section,
-    fontSize: 23,
-    lineHeight: 28,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700',
     color: colors.textPrimary,
     textAlign: 'center',
     marginTop: 10
   },
   metricValueDark: {
-    color: colors.white
+    color: '#FFFFFF'
+  },
+  metricValueLight: {
+    color: '#000000'
   },
   insightCard: {
     marginTop: spacing.sm,
@@ -939,19 +987,21 @@ const styles = StyleSheet.create({
   insightTitle: {
     ...typography.bodyStrong,
     fontSize: 14,
+    fontWeight: '700',
     marginBottom: 4,
-    color: colors.textPrimary
+    color: '#000000'
   },
   insightTitleDark: {
-    color: '#F5E1E1'
+    color: '#FFFFFF'
   },
   insightCopy: {
     ...typography.body,
-    fontSize: 14,
-    color: colors.textSecondary
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#000000'
   },
   insightCopyDark: {
-    color: colors.textSecondary
+    color: '#FFFFFF'
   },
   suggestionCard: {
     marginTop: spacing.xs
@@ -973,20 +1023,20 @@ const styles = StyleSheet.create({
   suggestionText: {
     ...typography.body,
     flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#939393'
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#000000'
   },
   suggestionTextDark: {
-    color: '#C9CFD4'
+    color: '#FFFFFF'
   },
   insightSub: {
     ...typography.caption,
     fontSize: 12,
     marginTop: 8,
-    color: colors.textMuted
+    color: '#000000'
   },
   insightSubDark: {
-    color: colors.textMuted
+    color: '#FFFFFF'
   }
 });

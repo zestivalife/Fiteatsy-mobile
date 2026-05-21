@@ -9,7 +9,7 @@ export type RootStackParamList = {
   OnboardingAssessment: undefined;
   SignIn: undefined;
   SignUp: undefined;
-  SyncWearable: undefined;
+  SyncWearable: { autoSync?: boolean } | undefined;
   SyncSuccess: { deviceName: string };
   Main: undefined;
   FocusSession: undefined;

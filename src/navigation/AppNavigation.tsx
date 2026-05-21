@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { colors } from '../design/tokens';
+import { getThemeColors } from '../design/tokens';
 import { RootStackParamList, MainTabParamList } from './types';
 import { SplashScreen } from '../screens/auth/SplashScreen';
 import { OnboardingBasicsScreen } from '../screens/onboarding/OnboardingBasicsScreen';
@@ -37,22 +37,10 @@ import { CycleInsightsScreen } from '../screens/cycle/CycleInsightsScreen';
 import { CycleNotificationsScreen } from '../screens/cycle/CycleNotificationsScreen';
 import { FamilyDashboardScreen } from '../screens/family/FamilyDashboardScreen';
 import { FamilyMemberDetailScreen } from '../screens/family/FamilyMemberDetailScreen';
+import { useAppContext } from '../state/AppContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
-
-const navTheme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    background: colors.bgPrimary,
-    card: colors.card,
-    text: colors.textPrimary,
-    border: colors.stroke,
-    primary: colors.blue,
-    notification: colors.pink
-  }
-};
 
 const MainTabs = () => {
   return (
@@ -78,6 +66,21 @@ const MainTabs = () => {
 };
 
 export const AppNavigation = () => {
+  const { themeMode } = useAppContext();
+  const palette = getThemeColors(themeMode);
+  const navTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: palette.bgPrimary,
+      card: palette.card,
+      text: palette.textPrimary,
+      border: palette.stroke,
+      primary: palette.blue,
+      notification: palette.pink
+    }
+  };
+
   return (
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">

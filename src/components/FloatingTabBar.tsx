@@ -5,8 +5,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { colors, radius, spacing, typography } from '../design/tokens';
+import { getThemeColors, radius, spacing, typography } from '../design/tokens';
 import { MainTabParamList } from '../navigation/types';
+import { useAppContext } from '../state/AppContext';
 
 const iconMap: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = {
   Home: 'home-outline',
@@ -18,13 +19,16 @@ const iconMap: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = 
 
 export const FloatingTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
   const insets = useSafeAreaInsets();
+  const { themeMode } = useAppContext();
+  const palette = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
   const bottomOffset = 0;
 
   return (
     <View pointerEvents="box-none" style={[styles.container, { bottom: bottomOffset }]}>
-      <BlurView intensity={52} tint="dark" style={styles.blurShell}>
+      <BlurView intensity={52} tint={isLight ? 'light' : 'dark'} style={[styles.blurShell, { borderColor: isLight ? '#C7D2DF' : '#000000' }]}>
         <LinearGradient
-          colors={['rgba(0,0,0,0.29)', '#323232', '#151515']}
+          colors={isLight ? ['rgba(255,255,255,0.78)', '#EFF4FA', '#E5EDF6'] : ['rgba(0,0,0,0.29)', '#323232', '#151515']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.bar, { paddingBottom: Math.max(2, Math.round(insets.bottom * 0.45)) }]}
@@ -64,9 +68,9 @@ export const FloatingTabBar = ({ state, descriptors, navigation }: BottomTabBarP
               <Ionicons
                 name={iconMap[route.name as keyof MainTabParamList]}
                 size={20}
-                color={isFocused ? colors.white : colors.textMuted}
+                color={isFocused ? (isLight ? '#000000' : palette.white) : palette.textMuted}
               />
-                <Text style={[styles.label, isFocused && styles.labelActive]}>{String(label)}</Text>
+                <Text style={[styles.label, { color: isFocused ? (isLight ? '#000000' : palette.white) : palette.textMuted }, isFocused && styles.labelActive]}>{String(label)}</Text>
               </Pressable>
             );
           })}
@@ -87,7 +91,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#000000',
     shadowColor: '#000000',
     shadowOpacity: 0.35,
     shadowRadius: 16,
@@ -111,15 +114,13 @@ const styles = StyleSheet.create({
     gap: 4
   },
   itemActive: {
-    backgroundColor: colors.blue
+    backgroundColor: '#60AF00'
   },
   label: {
     ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 12
   },
   labelActive: {
-    color: colors.white,
     fontFamily: 'Poppins_700Bold',
     fontWeight: '700'
   }

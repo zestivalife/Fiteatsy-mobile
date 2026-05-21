@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors, radius, spacing, typography } from '../../design/tokens';
+import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { Screen } from '../../components/Screen';
 import { RootStackParamList } from '../../navigation/types';
 import { CycleEnergy, CycleFlowIntensity, CycleMood, CycleSymptom } from '../../types';
@@ -38,8 +38,11 @@ export const CycleScreen = () => {
     cycleLogs,
     cyclePrediction,
     logCycleForDate,
-    getCycleDaySnapshot
+    getCycleDaySnapshot,
+    themeMode
   } = useAppContext();
+  const palette = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
 
   const [logOpen, setLogOpen] = useState(false);
   const [periodStarted, setPeriodStarted] = useState(false);
@@ -108,45 +111,45 @@ export const CycleScreen = () => {
 
   return (
     <Screen scroll>
-      <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Text style={styles.backText}>‹ Back</Text>
+      <Pressable style={[styles.backBtn, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardRaised }]} onPress={() => navigation.goBack()}>
+        <Text style={[styles.backText, { color: isLight ? '#000000' : palette.textPrimary }]}>‹ Back</Text>
       </Pressable>
-      <Text style={styles.title}>Cycle</Text>
+      <Text style={[styles.title, { color: isLight ? '#000000' : palette.textPrimary }]}>Cycle</Text>
       {!isWomenOnlyEnabled ? (
-        <View style={styles.noticeCard}>
-          <Text style={styles.noticeTitle}>Cycle tracking is for women only in this build</Text>
-          <Text style={styles.noticeBody}>Switch profile gender to Female if you want to use this module.</Text>
+        <View style={[styles.noticeCard, { backgroundColor: isLight ? '#FFF4F4' : colors.cardMuted }]}>
+          <Text style={[styles.noticeTitle, { color: palette.textPrimary }]}>Cycle tracking is for women only in this build</Text>
+          <Text style={[styles.noticeBody, { color: palette.textSecondary }]}>Switch profile gender to Female if you want to use this module.</Text>
         </View>
       ) : null}
 
-      <View style={styles.statusCard}>
-        <Text style={styles.statusTitle}>{statusTitle}</Text>
-        <Text style={styles.statusSubtitle}>{statusSubtitle}</Text>
+      <View style={[styles.statusCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardMuted }]}>
+        <Text style={[styles.statusTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>{statusTitle}</Text>
+        <Text style={[styles.statusSubtitle, { color: isLight ? '#000000' : palette.textSecondary }]}>{statusSubtitle}</Text>
         <View style={styles.phaseRow}>
-          <View style={[styles.phasePill, snapshot.phase === 'menstrual' && styles.phaseActive]}><Text style={styles.phaseText}>Menstrual</Text></View>
-          <View style={[styles.phasePill, snapshot.phase === 'follicular' && styles.phaseActive]}><Text style={styles.phaseText}>Follicular</Text></View>
-          <View style={[styles.phasePill, snapshot.phase === 'ovulation_window' && styles.phaseActiveBlue]}><Text style={styles.phaseText}>Ovulation</Text></View>
-          <View style={[styles.phasePill, snapshot.phase === 'luteal' && styles.phaseActivePurple]}><Text style={styles.phaseText}>Luteal</Text></View>
+          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'menstrual' && styles.phaseActive]}><Text style={[styles.phaseText, { color: isLight ? '#000000' : palette.textPrimary }]}>Menstrual</Text></View>
+          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'follicular' && styles.phaseActive]}><Text style={[styles.phaseText, { color: isLight ? '#000000' : palette.textPrimary }]}>Follicular</Text></View>
+          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'ovulation_window' && styles.phaseActiveBlue]}><Text style={[styles.phaseText, { color: isLight ? '#000000' : palette.textPrimary }]}>Ovulation</Text></View>
+          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'luteal' && styles.phaseActivePurple]}><Text style={[styles.phaseText, { color: isLight ? '#000000' : palette.textPrimary }]}>Luteal</Text></View>
         </View>
       </View>
 
       <Pressable style={[styles.logButton, !isWomenOnlyEnabled && styles.logButtonDisabled]} onPress={() => isWomenOnlyEnabled && setLogOpen(true)}>
-        <Ionicons name="add-circle-outline" size={18} color={colors.textPrimary} />
-        <Text style={styles.logButtonText}>Log Today</Text>
+        <Ionicons name="add-circle-outline" size={18} color="#000000" />
+        <Text style={[styles.logButtonText, { color: '#000000' }]}>Log Today</Text>
       </Pressable>
 
       <View style={styles.quickRow}>
-        <Pressable style={styles.quickCard} onPress={() => navigation.navigate('CycleCalendar')}><Text style={styles.quickTitle}>Calendar</Text><Text style={styles.quickBody}>View logs and predictions</Text></Pressable>
-        <Pressable style={styles.quickCard} onPress={() => navigation.navigate('CycleInsights')}><Text style={styles.quickTitle}>Insights</Text><Text style={styles.quickBody}>Patterns and consistency</Text></Pressable>
+        <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleCalendar')}><Text style={[styles.quickTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>Calendar</Text><Text style={[styles.quickBody, { color: isLight ? '#000000' : palette.textSecondary }]}>View logs and predictions</Text></Pressable>
+        <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleInsights')}><Text style={[styles.quickTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>Insights</Text><Text style={[styles.quickBody, { color: isLight ? '#000000' : palette.textSecondary }]}>Patterns and consistency</Text></Pressable>
       </View>
-      <Pressable style={styles.quickCard} onPress={() => navigation.navigate('CycleNotifications')}><Text style={styles.quickTitle}>Reminders</Text><Text style={styles.quickBody}>Manage cycle notification timing</Text></Pressable>
+      <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleNotifications')}><Text style={[styles.quickTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>Reminders</Text><Text style={[styles.quickBody, { color: isLight ? '#000000' : palette.textSecondary }]}>Manage cycle notification timing</Text></Pressable>
 
       <Modal visible={logOpen} transparent animationType="slide" onRequestClose={() => setLogOpen(false)}>
-        <View style={styles.sheetOverlay}>
+        <View style={[styles.sheetOverlay, { backgroundColor: isLight ? 'rgba(15,23,42,0.40)' : colors.overlay }]}>
           <Pressable style={styles.sheetBackdrop} onPress={() => setLogOpen(false)} />
-          <View style={styles.sheet}>
+          <View style={[styles.sheet, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardRaised }]}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Quick Log</Text>
+            <Text style={[styles.sheetTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>Quick Log</Text>
 
             <ScrollView contentContainerStyle={styles.sheetContent}>
               <View style={styles.row}>
@@ -221,11 +224,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm
   },
   backText: {
-    ...typography.caption,
+    ...typography.body,
+    fontSize: 12,
+    lineHeight: 18,
     color: colors.textPrimary
   },
   title: {
-    ...typography.section,
+    ...typography.bodyStrong,
+    fontSize: 14,
+    lineHeight: 20,
     marginBottom: spacing.sm
   },
   noticeCard: {
@@ -239,10 +246,13 @@ const styles = StyleSheet.create({
   noticeTitle: {
     ...typography.bodyStrong,
     fontSize: 14,
+    lineHeight: 20,
     marginBottom: 6
   },
   noticeBody: {
-    ...typography.caption
+    ...typography.body,
+    fontSize: 12,
+    lineHeight: 18
   },
   statusCard: {
     borderRadius: radius.lg,
@@ -254,11 +264,14 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     ...typography.bodyStrong,
-    fontSize: 18,
+    fontSize: 14,
+    lineHeight: 20,
     marginBottom: 6
   },
   statusSubtitle: {
-    ...typography.caption,
+    ...typography.body,
+    fontSize: 12,
+    lineHeight: 18,
     marginBottom: spacing.sm,
     color: colors.textSecondary
   },
@@ -287,7 +300,9 @@ const styles = StyleSheet.create({
     borderColor: '#9C86FF'
   },
   phaseText: {
-    ...typography.caption,
+    ...typography.body,
+    fontSize: 12,
+    lineHeight: 18,
     color: colors.textPrimary
   },
   logButton: {
@@ -307,7 +322,8 @@ const styles = StyleSheet.create({
   },
   logButtonText: {
     ...typography.bodyStrong,
-    fontSize: 15
+    fontSize: 14,
+    lineHeight: 20
   },
   quickRow: {
     flexDirection: 'row',
@@ -325,10 +341,13 @@ const styles = StyleSheet.create({
   quickTitle: {
     ...typography.bodyStrong,
     fontSize: 14,
+    lineHeight: 20,
     marginBottom: 6
   },
   quickBody: {
-    ...typography.caption
+    ...typography.body,
+    fontSize: 12,
+    lineHeight: 18
   },
   sheetOverlay: {
     flex: 1,
@@ -357,7 +376,8 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     ...typography.bodyStrong,
-    fontSize: 18,
+    fontSize: 14,
+    lineHeight: 20,
     marginBottom: spacing.sm
   },
   sheetContent: {
@@ -366,7 +386,8 @@ const styles = StyleSheet.create({
   },
   section: {
     ...typography.bodyStrong,
-    fontSize: 14
+    fontSize: 14,
+    lineHeight: 20
   },
   row: {
     flexDirection: 'row',
@@ -392,9 +413,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.blueSoft
   },
   chipText: {
-    ...typography.caption,
+    ...typography.body,
     color: colors.textPrimary,
-    fontSize: 13
+    fontSize: 12,
+    lineHeight: 18
   },
   optionalToggle: {
     minHeight: 42,
@@ -405,7 +427,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   optionalToggleText: {
-    ...typography.caption,
+    ...typography.body,
+    fontSize: 12,
+    lineHeight: 18,
     color: colors.textSecondary
   },
   input: {
@@ -428,6 +452,7 @@ const styles = StyleSheet.create({
   saveText: {
     ...typography.bodyStrong,
     color: colors.white,
-    fontSize: 15
+    fontSize: 14,
+    lineHeight: 20
   }
 });

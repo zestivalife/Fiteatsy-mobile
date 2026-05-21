@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
-import { colors, typography } from '../../design/tokens';
+import { colors, getThemeColors, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
 
 type NotificationItem = {
@@ -37,7 +37,8 @@ const initialNotifications: NotificationItem[] = [
 
 export const NotificationsScreen = () => {
   const navigation = useNavigation();
-  const { nudges, logNudgeAction } = useAppContext();
+  const { nudges, logNudgeAction, themeMode } = useAppContext();
+  const palette = getThemeColors(themeMode);
   const [items, setItems] = useState<NotificationItem[]>(initialNotifications);
 
   const mappedNudges = useMemo<NotificationItem[]>(
@@ -60,23 +61,23 @@ export const NotificationsScreen = () => {
   return (
     <Screen scroll>
       <View style={styles.header}>
-        <Text style={styles.title}>Notifications</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close notifications" style={styles.closeButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={18} color={colors.textPrimary} />
+        <Text style={[styles.title, { color: palette.textPrimary }]}>Notifications</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close notifications" style={[styles.closeButton, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]} onPress={() => navigation.goBack()}>
+          <Ionicons name="close" size={18} color={palette.textPrimary} />
         </Pressable>
       </View>
       <View style={styles.list}>
         {listItems.map((item) => (
           <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.read ? 'Read' : 'Unread'}`} accessibilityHint="Opens notification actions and marks read state" onPress={() => toggleRead(item.id)}>
             <Card style={[styles.card, item.read && styles.cardRead]}>
-              <Text style={styles.itemTitle}>{item.title}</Text>
-              <Text style={styles.itemBody}>{item.body}</Text>
+              <Text style={[styles.itemTitle, { color: palette.textPrimary }]}>{item.title}</Text>
+              <Text style={[styles.itemBody, { color: palette.textSecondary }]}>{item.body}</Text>
               <View style={styles.actionRow}>
                 <Pressable accessibilityRole="button" accessibilityLabel={`Snooze ${item.title}`} onPress={() => logNudgeAction(item.id, 'snoozed')}>
-                  <Text style={styles.itemState}>Snooze</Text>
+                  <Text style={[styles.itemState, { color: '#60AF00' }]}>Snooze</Text>
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel={`Dismiss ${item.title}`} onPress={() => logNudgeAction(item.id, 'dismissed')}>
-                  <Text style={styles.itemState}>Dismiss</Text>
+                  <Text style={[styles.itemState, { color: '#60AF00' }]}>Dismiss</Text>
                 </Pressable>
               </View>
             </Card>

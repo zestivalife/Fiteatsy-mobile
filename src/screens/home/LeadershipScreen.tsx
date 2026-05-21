@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Pressable } from 'react-native';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
-import { colors, typography } from '../../design/tokens';
+import { colors, getThemeColors, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
 
 const leaders = [
@@ -17,17 +17,17 @@ const leaders = [
 export const LeadershipScreen = () => {
   const navigation = useNavigation();
   const { themeMode } = useAppContext();
-  const isLight = themeMode === 'light';
+  const palette = getThemeColors(themeMode);
 
   return (
     <Screen scroll>
       <View style={styles.header}>
-        <Text style={[styles.title, isLight && styles.titleLight]}>Leadership</Text>
-        <Pressable accessibilityRole="button" style={[styles.closeButton, isLight && styles.closeButtonLight]} onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={18} color={isLight ? '#F5E1E1' : colors.textPrimary} />
+        <Text style={[styles.title, { color: palette.textPrimary }]}>Leadership</Text>
+        <Pressable accessibilityRole="button" style={[styles.closeButton, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]} onPress={() => navigation.goBack()}>
+          <Ionicons name="close" size={18} color={palette.textPrimary} />
         </Pressable>
       </View>
-      <Text style={[styles.subtitle, isLight && styles.subtitleLight]}>Active Performance Rankings</Text>
+      <Text style={[styles.subtitle, { color: palette.textSecondary }]}>Active Performance Rankings</Text>
 
       <View style={styles.list}>
         {leaders.map((leader) => (
@@ -35,8 +35,8 @@ export const LeadershipScreen = () => {
             <View style={styles.row}>
               <Text style={styles.rank}>#{leader.rank}</Text>
               <View>
-                <Text style={styles.name}>{leader.name}</Text>
-                <Text style={styles.score}>{leader.score} pts</Text>
+                <Text style={[styles.name, { color: palette.textPrimary }]}>{leader.name}</Text>
+                <Text style={[styles.score, { color: palette.textSecondary }]}>{leader.score} pts</Text>
               </View>
             </View>
           </Card>
@@ -56,9 +56,6 @@ const styles = StyleSheet.create({
   title: {
     ...typography.section
   },
-  titleLight: {
-    color: '#F5E1E1'
-  },
   closeButton: {
     width: 32,
     height: 32,
@@ -69,16 +66,9 @@ const styles = StyleSheet.create({
     borderColor: colors.stroke,
     backgroundColor: '#151515'
   },
-  closeButtonLight: {
-    borderColor: '#C9CFD4',
-    backgroundColor: 'rgba(0,0,0,0.29)'
-  },
   subtitle: {
     ...typography.body,
     marginBottom: 12
-  },
-  subtitleLight: {
-    color: '#939393'
   },
   list: {
     gap: 10,

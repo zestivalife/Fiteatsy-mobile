@@ -74,20 +74,20 @@ type AnalysisReviewState = {
 };
 
 const palette = {
-  teal: colors.blueDark,
-  tealLight: colors.surfaceAccent,
-  amber: colors.warning,
-  amberLight: colors.warningSoft,
-  coral: colors.pink,
-  coralLight: colors.dangerSoft,
-  purple: colors.blueDark,
-  purpleLight: colors.surfaceAccent,
-  bg: colors.bgPrimary,
-  card: colors.cardRaised,
-  border: colors.stroke,
-  textDark: colors.textPrimary,
-  textMid: colors.textSecondary,
-  textLight: colors.textMuted
+  teal: '#2E6B00',
+  tealLight: '#EEF4EA',
+  amber: '#8A6400',
+  amberLight: 'rgba(245, 181, 68, 0.18)',
+  coral: '#B4233B',
+  coralLight: 'rgba(208, 64, 83, 0.12)',
+  purple: '#2E6B00',
+  purpleLight: '#F4F8F1',
+  bg: '#F3F6FA',
+  card: '#FFFFFF',
+  border: '#C7D2DF',
+  textDark: '#0F172A',
+  textMid: '#1E293B',
+  textLight: '#475569'
 } as const;
 
 const categoryMeta: Array<{ key: CategoryKey; icon: keyof typeof Ionicons.glyphMap; color: string }> = [
@@ -1233,7 +1233,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     borderRadius: 100,
-    backgroundColor: colors.surfaceAccent,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.successSoft,
     paddingHorizontal: 10,
@@ -1241,7 +1241,7 @@ const styles = StyleSheet.create({
   },
   heroToggleText: {
     fontSize: 12,
-    color: palette.teal,
+    color: '#000000',
     fontWeight: '600'
   },
   heroTopRow: {
@@ -1281,7 +1281,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.stroke,
-    backgroundColor: colors.cardMuted,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
     paddingVertical: 10
   },
@@ -1357,7 +1357,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderLeftWidth: 3,
     borderLeftColor: palette.purple,
-    backgroundColor: palette.purpleLight,
+    backgroundColor: '#FFFFFF',
     borderColor: colors.stroke,
     marginBottom: 12
   },
@@ -1377,17 +1377,17 @@ const styles = StyleSheet.create({
   nuetraTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: '#000000',
     marginBottom: 6
   },
   nuetraCopy: {
     fontSize: 15,
     lineHeight: 24,
-    color: colors.textSecondary,
+    color: '#000000',
     marginBottom: 10
   },
   askNuetra: {
-    color: palette.purple,
+    color: '#000000',
     fontSize: 13,
     fontWeight: '600'
   },
@@ -1414,7 +1414,7 @@ const styles = StyleSheet.create({
   detailCard: {
     borderRadius: 16,
     borderColor: palette.border,
-    backgroundColor: colors.cardRaised,
+    backgroundColor: '#FFFFFF',
     marginBottom: 12
   },
   detailTitle: {
@@ -1424,7 +1424,7 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   detailEmpty: {
-    color: palette.textMid,
+    color: '#000000',
     fontSize: 13
   },
   parameterRow: {
@@ -1452,12 +1452,12 @@ const styles = StyleSheet.create({
   },
   parameterRange: {
     marginTop: 3,
-    color: palette.textMid,
+    color: '#000000',
     fontSize: 12
   },
   parameterInsight: {
     marginTop: 6,
-    color: colors.textSecondary,
+    color: '#000000',
     fontSize: 12,
     lineHeight: 18
   },
@@ -1467,7 +1467,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     marginBottom: 8,
-    backgroundColor: colors.cardRaised
+    backgroundColor: '#FFFFFF'
   },
   actionTop: {
     flexDirection: 'row',
@@ -1492,7 +1492,7 @@ const styles = StyleSheet.create({
   },
   actionDetail: {
     fontSize: 13,
-    color: palette.textMid,
+    color: '#000000',
     lineHeight: 19
   },
   actionDoctor: {
@@ -1503,7 +1503,7 @@ const styles = StyleSheet.create({
   },
   crossRow: {
     borderRadius: 12,
-    backgroundColor: colors.cardMuted,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.stroke,
     padding: 10,
@@ -1511,13 +1511,13 @@ const styles = StyleSheet.create({
   },
   crossConnection: {
     fontSize: 13,
-    color: colors.textPrimary,
+    color: '#000000',
     lineHeight: 18,
     marginBottom: 3
   },
   crossMeta: {
     fontSize: 12,
-    color: colors.textSecondary
+    color: '#000000'
   },
   sectionHead: {
     flexDirection: 'row',
@@ -1571,7 +1571,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: palette.border,
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 12
   },
@@ -1599,7 +1599,7 @@ const styles = StyleSheet.create({
   },
   reportDate: {
     fontSize: 13,
-    color: palette.textMid,
+    color: '#000000',
     marginTop: 1
   },
   reportMeta: {
@@ -1667,7 +1667,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   sheet: {
-    backgroundColor: colors.cardRaised,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
@@ -1696,13 +1696,13 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: colors.textPrimary
+    color: '#000000'
   },
   sheetSubtitle: {
     marginTop: 4,
     marginBottom: 12,
     fontSize: 13,
-    color: colors.textSecondary
+    color: '#000000'
   },
   uploadMethodRow: {
     flexDirection: 'row',
@@ -1720,7 +1720,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 8,
-    backgroundColor: colors.card
+    backgroundColor: '#FFFFFF'
   },
   uploadMethodCardActive: {
     borderColor: palette.teal,
@@ -1730,13 +1730,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 13,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: '#000000',
     textAlign: 'center'
   },
   uploadMethodCopy: {
     marginTop: 2,
     fontSize: 11,
-    color: colors.textSecondary,
+    color: '#000000',
     textAlign: 'center'
   },
   uploadStatusRow: {
@@ -2088,13 +2088,13 @@ const styles = StyleSheet.create({
     borderColor: colors.stroke
   },
   heroLabelDark: {
-    color: colors.textSecondary
+    color: '#FFFFFF'
   },
   heroUpdatedDark: {
-    color: colors.textMuted
+    color: '#FFFFFF'
   },
   heroSubDark: {
-    color: '#939393'
+    color: '#FFFFFF'
   },
   heroToggleChipDark: {
     backgroundColor: '#151515',
@@ -2107,7 +2107,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2A2A2A'
   },
   categoryNameDark: {
-    color: '#939393'
+    color: '#FFFFFF'
   },
   miniTrackDark: {
     backgroundColor: '#2A2A2A'
@@ -2116,23 +2116,23 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   lastReportDark: {
-    color: '#939393'
+    color: '#FFFFFF'
   },
   seeAllDark: {
-    color: '#C9CFD4'
+    color: '#FFFFFF'
   },
   nuetraCardDark: {
     backgroundColor: colors.card,
     borderColor: '#C9CFD4'
   },
   nuetraTitleDark: {
-    color: '#F5E1E1'
+    color: '#FFFFFF'
   },
   nuetraCopyDark: {
-    color: '#C9CFD4'
+    color: '#FFFFFF'
   },
   askNuetraDark: {
-    color: '#C9CFD4'
+    color: '#FFFFFF'
   },
   detailCardDark: {
     backgroundColor: '#151515',
@@ -2142,20 +2142,20 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   detailEmptyDark: {
-    color: '#BDB6D9'
+    color: '#FFFFFF'
   },
   parameterRowDark: {
     borderColor: '#C9CFD4',
     backgroundColor: '#151515'
   },
   parameterNameDark: {
-    color: '#F5E1E1'
+    color: '#FFFFFF'
   },
   parameterRangeDark: {
-    color: '#BDB6D9'
+    color: '#FFFFFF'
   },
   parameterInsightDark: {
-    color: '#C9CFD4'
+    color: '#FFFFFF'
   },
   actionCardDark: {
     borderColor: '#C9CFD4',
@@ -2165,17 +2165,17 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   actionDetailDark: {
-    color: '#939393'
+    color: '#FFFFFF'
   },
   crossRowDark: {
     backgroundColor: '#151515',
     borderColor: '#C9CFD4'
   },
   crossConnectionDark: {
-    color: '#F5E1E1'
+    color: '#FFFFFF'
   },
   crossMetaDark: {
-    color: '#939393'
+    color: '#FFFFFF'
   },
   sectionTitleDark: {
     color: colors.white
@@ -2191,10 +2191,10 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   reportDateDark: {
-    color: '#939393'
+    color: '#FFFFFF'
   },
   reportMetaDark: {
-    color: '#C9CFD4'
+    color: '#FFFFFF'
   },
   trendDark: {
     opacity: 0.95

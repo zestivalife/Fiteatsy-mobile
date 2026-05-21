@@ -1,6 +1,7 @@
 import { TextStyle, ViewStyle } from 'react-native';
+import { ThemeMode } from '../types';
 
-export const colors = {
+export const darkColors = {
   bgPrimary: '#151515',
   bgSecondary: '#323232',
   card: 'rgba(0, 0, 0, 0.29)',
@@ -30,6 +31,38 @@ export const colors = {
   white: '#FFFFFF'
 } as const;
 
+export const lightColors = {
+  bgPrimary: '#F3F6FA',
+  bgSecondary: '#E8EEF5',
+  card: '#FFFFFF',
+  cardMuted: '#F8FAFC',
+  cardRaised: '#FFFFFF',
+  surfaceTint: '#F1F5F9',
+  surfaceAccent: '#EEF2F7',
+  stroke: '#C7D2DF',
+  strokeStrong: '#AAB7C7',
+  textPrimary: '#0F172A',
+  textSecondary: '#1E293B',
+  textMuted: '#475569',
+  blue: '#60AF00',
+  blueDark: '#2E6B00',
+  blueSoft: 'rgba(96, 175, 0, 0.12)',
+  pink: '#B82A3E',
+  purple: '#DDE5EF',
+  success: '#3D7C0F',
+  successSoft: 'rgba(96, 175, 0, 0.11)',
+  warning: '#8A6400',
+  warningSoft: 'rgba(245, 181, 68, 0.18)',
+  danger: '#B4233B',
+  dangerSoft: 'rgba(208, 64, 83, 0.12)',
+  info: '#334155',
+  infoSoft: '#E2E8F0',
+  overlay: 'rgba(15, 23, 42, 0.28)',
+  white: '#FFFFFF'
+} as const;
+
+export const colors = darkColors;
+
 export const spacing = {
   xxs: 4,
   xs: 8,
@@ -51,38 +84,32 @@ export const typography: Record<string, TextStyle> = {
   titleXL: {
     fontFamily: 'Poppins_700Bold',
     fontSize: 30,
-    lineHeight: 36,
-    color: colors.textPrimary
+    lineHeight: 36
   },
   title: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 24,
-    lineHeight: 30,
-    color: colors.textPrimary
+    lineHeight: 30
   },
   section: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 20,
-    lineHeight: 26,
-    color: colors.textPrimary
+    lineHeight: 26
   },
   body: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 16,
-    lineHeight: 24,
-    color: colors.textSecondary
+    lineHeight: 24
   },
   bodyStrong: {
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 16,
-    lineHeight: 24,
-    color: colors.textPrimary
+    lineHeight: 24
   },
   caption: {
     fontFamily: 'Poppins_400Regular',
     fontSize: 13,
-    lineHeight: 18,
-    color: colors.textMuted
+    lineHeight: 18
   }
 };
 
@@ -98,8 +125,13 @@ export const shadows: Record<string, ViewStyle> = {
 
 export const gradients = {
   appBackground: ['#323232', '#151515'],
-  appBackgroundLight: ['#323232', '#151515'],
+  appBackgroundLight: ['#F3F6FA', '#E8EEF5'],
   accent: ['#60AF00', '#00401F'],
   cardDark: ['#323232', '#151515'],
   ring: ['#60AF00', '#00401F']
 } as const;
+
+export const getThemeColors = (mode: ThemeMode) => (mode === 'light' ? lightColors : darkColors);
+export const getThemeGradients = (mode: ThemeMode) => ({
+  appBackground: mode === 'light' ? gradients.appBackgroundLight : gradients.appBackground
+});

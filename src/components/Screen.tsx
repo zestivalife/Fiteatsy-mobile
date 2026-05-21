@@ -2,7 +2,8 @@ import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { colors, gradients, spacing } from '../design/tokens';
+import { colors, getThemeGradients, spacing } from '../design/tokens';
+import { useAppContext } from '../state/AppContext';
 
 export const Screen = ({
   children,
@@ -13,7 +14,9 @@ export const Screen = ({
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
 }) => {
-  const backgroundGradient = gradients.appBackground;
+  const { themeMode } = useAppContext();
+  const themeGradients = getThemeGradients(themeMode);
+  const backgroundGradient = themeGradients.appBackground;
 
   return (
     <LinearGradient colors={[...backgroundGradient]} style={styles.gradient}>

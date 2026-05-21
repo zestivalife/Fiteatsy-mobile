@@ -1,9 +1,19 @@
 import { WearableDevice, WearableSyncPayload, WellnessSnapshot } from '../types';
 import { initialWellness } from '../data/mock';
 import { recalculateWellness } from '../utils/wellness';
+import Constants from 'expo-constants';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const apiBaseUrl = 'http://localhost:4001';
+const getApiBaseUrl = () => {
+  const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
+  if (fromExtra) return fromExtra;
+  const hostUri = Constants.expoConfig?.hostUri ?? '';
+  const host = hostUri.split(':')[0];
+  if (!host) return 'http://localhost:4001';
+  return `http://${host}:4001`;
+};
+
+const apiBaseUrl = getApiBaseUrl();
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 

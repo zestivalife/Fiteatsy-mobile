@@ -8,6 +8,7 @@ import { Card } from '../../components/Card';
 import { colors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { getTrackerAnalysis, TrackerAnalysisResult } from '../../services/trackerAnalysisService';
+import { useAppContext } from '../../state/AppContext';
 
 type TrackerDetailRoute = RouteProp<RootStackParamList, 'TrackerDetail'>;
 
@@ -28,7 +29,7 @@ const formatMetricValue = (value: number, unit: string) => {
   return Math.round(value).toString();
 };
 
-const ScoreRing = ({ progress, score, color }: { progress: number; score: number; color: string }) => {
+const ScoreRing = ({ progress, score, color, isLight }: { progress: number; score: number; color: string; isLight: boolean }) => {
   const size = 116;
   const stroke = 10;
   const radiusValue = (size - stroke) / 2;
@@ -60,8 +61,8 @@ const ScoreRing = ({ progress, score, color }: { progress: number; score: number
         />
       </Svg>
       <View style={styles.ringCenter}>
-        <Text style={styles.ringScore}>{score}</Text>
-        <Text style={styles.ringScoreLabel}>Score</Text>
+        <Text style={[styles.ringScore, { color: isLight ? '#000000' : '#FFFFFF' }]}>{score}</Text>
+        <Text style={[styles.ringScoreLabel, { color: isLight ? '#000000' : '#FFFFFF' }]}>Score</Text>
       </View>
     </View>
   );
@@ -71,12 +72,16 @@ const TrendArea = ({
   values,
   color,
   average,
-  reveal
+  reveal,
+  isLight,
+  textColor
 }: {
   values: number[];
   color: string;
   average: number;
   reveal: Animated.Value;
+  isLight: boolean;
+  textColor: string;
 }) => {
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -109,7 +114,7 @@ const TrendArea = ({
             </SvgGradient>
           </Defs>
 
-          <Rect x={0} y={0} width={trendWidth} height={trendHeight} rx={14} fill="rgba(0,0,0,0.29)" />
+          <Rect x={0} y={0} width={trendWidth} height={trendHeight} rx={14} fill={isLight ? '#FFFFFF' : 'transparent'} />
           <Line x1={12} y1={avgY} x2={trendWidth - 12} y2={avgY} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 4" strokeWidth={1} />
           <Path d={areaPath} fill="url(#areaGradient)" />
           <Path d={linePath} stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -119,8 +124,8 @@ const TrendArea = ({
 
       <Animated.View style={{ opacity: reveal }}>
         <View style={styles.trendLegendRow}>
-          <Text style={styles.trendLegendText}>Now: {formatMetricValue(latest.value, '')}</Text>
-          <Text style={styles.trendLegendText}>7d avg: {average.toFixed(1)}</Text>
+          <Text style={[styles.trendLegendText, { color: textColor }]}>Now: {formatMetricValue(latest.value, '')}</Text>
+          <Text style={[styles.trendLegendText, { color: textColor }]}>7d avg: {average.toFixed(1)}</Text>
         </View>
       </Animated.View>
     </View>
@@ -130,6 +135,10 @@ const TrendArea = ({
 export const TrackerDetailScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<TrackerDetailRoute>();
+  const { themeMode } = useAppContext();
+  const isLight = themeMode === 'light';
+  const textPrimary = isLight ? '#000000' : '#FFFFFF';
+  const textSecondary = isLight ? '#000000' : '#FFFFFF';
   const [loading, setLoading] = useState(true);
   const [analysis, setAnalysis] = useState<TrackerAnalysisResult | null>(null);
   const [animatedScore, setAnimatedScore] = useState(0);
@@ -235,18 +244,18 @@ export const TrackerDetailScreen = () => {
     <Screen scroll>
       <View style={styles.headerRow}>
         <View>
-          <Text style={styles.title}>{params.metricTitle}</Text>
-          <Text style={styles.subtitle}>{params.subtitle}</Text>
+          <Text style={[styles.title, { color: textPrimary }]}>{params.metricTitle}</Text>
+          <Text style={[styles.subtitle, { color: textSecondary }]}>{params.subtitle}</Text>
         </View>
-        <Pressable style={styles.closeButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.closeText}>×</Text>
+        <Pressable style={[styles.closeButton, { borderColor: isLight ? '#64748B' : '#475569', backgroundColor: isLight ? '#D1D5DB' : 'rgba(0,0,0,0.29)' }]} onPress={() => navigation.goBack()}>
+          <Text style={[styles.closeText, { color: textPrimary }]}>×</Text>
         </Pressable>
       </View>
 
       {loading ? (
         <Card style={styles.loadingCard}>
           <ActivityIndicator color={colors.blue} />
-          <Text style={styles.loadingText}>Generating analytical insights...</Text>
+          <Text style={[styles.loadingText, { color: textSecondary }]}>Generating analytical insights...</Text>
         </Card>
       ) : analysis ? (
         <>
@@ -255,25 +264,25 @@ export const TrackerDetailScreen = () => {
               <View style={styles.scoreLeft}>
                 <View style={styles.iconPill}>
                   <Text style={styles.iconText}>{params.icon}</Text>
-                  <Text style={styles.iconPillTitle}>Fiteatsy Score</Text>
+                  <Text style={[styles.iconPillTitle, { color: textPrimary }]}>Fiteatsy Score</Text>
                 </View>
-                <Text style={styles.bigValue}>{formatMetricValue(analysis.latest, params.unit)} {params.unit}</Text>
-                <Text style={styles.scoreMeta}>
+                <Text style={[styles.bigValue, { color: textPrimary }]}>{formatMetricValue(analysis.latest, params.unit)} {params.unit}</Text>
+                <Text style={[styles.scoreMeta, { color: textSecondary }]}>
                   {analysis.trend.toUpperCase()} • Confidence {Math.round(analysis.confidence * 100)}%
                 </Text>
               </View>
 
-              <ScoreRing score={animatedScore} progress={animatedScore / 100} color={params.color} />
+              <ScoreRing score={animatedScore} progress={animatedScore / 100} color={params.color} isLight={isLight} />
             </View>
           </Card>
 
           <Card style={styles.trendCard}>
-            <Text style={styles.sectionTitle}>Performance Trend</Text>
-            <TrendArea values={params.values} color={params.color} average={analysis.average} reveal={trendReveal} />
+            <Text style={[styles.sectionTitle, { color: textPrimary }]}>Performance Trend</Text>
+            <TrendArea values={params.values} color={params.color} average={analysis.average} reveal={trendReveal} isLight={isLight} textColor={textSecondary} />
           </Card>
 
           <Card style={styles.compareCard}>
-            <Text style={styles.sectionTitle}>Quick Compare</Text>
+            <Text style={[styles.sectionTitle, { color: textPrimary }]}>Quick Compare</Text>
             <View style={styles.compareBarsRow}>
               {compareBlocks.map((block, index) => {
                 const h = compareReveal.interpolate({
@@ -285,8 +294,8 @@ export const TrackerDetailScreen = () => {
                 return (
                   <Animated.View key={block.label} style={[styles.compareBarItem, { opacity: compareReveal }]}> 
                     <Animated.View style={[styles.compareBar, { height: h, backgroundColor: block.accent }]} />
-                    <Text style={styles.compareValue}>{formatMetricValue(block.value, params.unit)}</Text>
-                    <Text style={styles.compareLabel}>{block.label}</Text>
+                    <Text style={[styles.compareValue, { color: textPrimary }]}>{formatMetricValue(block.value, params.unit)}</Text>
+                    <Text style={[styles.compareLabel, { color: textSecondary }]}>{block.label}</Text>
                   </Animated.View>
                 );
               })}
@@ -294,9 +303,9 @@ export const TrackerDetailScreen = () => {
           </Card>
 
           <Card style={styles.summaryCard}>
-            <Text style={styles.sectionTitle}>Fiteatsy Summary</Text>
-            <Text style={styles.summaryText}>{analysis.summary}</Text>
-            <Text style={styles.deltaText}>
+            <Text style={[styles.sectionTitle, { color: textPrimary }]}>Fiteatsy Summary</Text>
+            <Text style={[styles.summaryText, { color: textPrimary }]}>{analysis.summary}</Text>
+            <Text style={[styles.deltaText, { color: textSecondary }]}>
               Δ prev {analysis.deltaFromPrevious >= 0 ? '+' : ''}
               {analysis.deltaFromPrevious} • Δ avg {analysis.deltaFromAverage >= 0 ? '+' : ''}
               {analysis.deltaFromAverage}
@@ -304,7 +313,7 @@ export const TrackerDetailScreen = () => {
           </Card>
 
           <Card style={styles.impactCard}>
-            <Text style={styles.sectionTitle}>Impact Drivers</Text>
+            <Text style={[styles.sectionTitle, { color: textPrimary }]}>Impact Drivers</Text>
             <View style={styles.factorsColumn}>
               {analysis.factors.map((factor) => {
                 const width = Math.min(260, Math.max(24, factor.impact * 10));
@@ -318,7 +327,7 @@ export const TrackerDetailScreen = () => {
                 return (
                   <View key={factor.label} style={styles.factorBlock}>
                     <View style={styles.factorLabelRow}>
-                      <Text style={styles.factorName}>{factor.label}</Text>
+                      <Text style={[styles.factorName, { color: textPrimary }]}>{factor.label}</Text>
                       <Text style={[styles.factorImpact, isUp ? styles.impactUp : styles.impactDown]}>
                         {isUp ? '↑' : '↓'} {factor.impact}
                       </Text>
@@ -335,12 +344,12 @@ export const TrackerDetailScreen = () => {
           </Card>
 
           <Card style={styles.suggestionCard}>
-            <Text style={styles.sectionTitle}>Improvement Suggestions</Text>
+            <Text style={[styles.sectionTitle, { color: textPrimary }]}>Improvement Suggestions</Text>
             <View style={styles.suggestionList}>
               {analysis.suggestions.map((suggestion, index) => (
                 <View key={`${suggestion}-${index}`} style={styles.suggestionRow}>
                   <View style={styles.dot} />
-                  <Text style={styles.suggestionText}>{suggestion}</Text>
+                  <Text style={[styles.suggestionText, { color: textSecondary }]}>{suggestion}</Text>
                 </View>
               ))}
             </View>
@@ -360,12 +369,14 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title,
-    fontSize: 30,
-    lineHeight: 34
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700'
   },
   subtitle: {
     ...typography.body,
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.textSecondary,
     marginTop: 2
   },
@@ -429,8 +440,9 @@ const styles = StyleSheet.create({
   },
   bigValue: {
     ...typography.title,
-    fontSize: 34,
-    lineHeight: 38
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700'
   },
   scoreMeta: {
     ...typography.caption,
@@ -449,8 +461,9 @@ const styles = StyleSheet.create({
   },
   ringScore: {
     ...typography.section,
-    fontSize: 24,
-    lineHeight: 28
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700'
   },
   ringScoreLabel: {
     ...typography.caption,
@@ -464,6 +477,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...typography.bodyStrong,
     fontSize: 14,
+    fontWeight: '700',
     marginBottom: 8
   },
   trendLegendRow: {
@@ -498,12 +512,14 @@ const styles = StyleSheet.create({
   },
   compareValue: {
     ...typography.bodyStrong,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.textPrimary
   },
   compareLabel: {
     ...typography.caption,
-    fontSize: 11,
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.textSecondary
   },
   summaryCard: {
@@ -512,7 +528,7 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     ...typography.body,
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textPrimary
   },
   deltaText: {
@@ -537,12 +553,14 @@ const styles = StyleSheet.create({
   },
   factorName: {
     ...typography.body,
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.textPrimary
   },
   factorImpact: {
     ...typography.bodyStrong,
-    fontSize: 13
+    fontSize: 14,
+    fontWeight: '700'
   },
   factorTrack: {
     height: 8,
@@ -581,7 +599,7 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     ...typography.body,
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textSecondary,
     flex: 1
   }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Text, TextInput } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
@@ -12,9 +12,28 @@ import {
   Poppins_700Bold
 } from '@expo-google-fonts/poppins';
 import { AppNavigation } from './src/navigation/AppNavigation';
-import { AppProvider } from './src/state/AppContext';
+import { AppProvider, useAppContext } from './src/state/AppContext';
+import { getThemeColors } from './src/design/tokens';
 
 let hasConfiguredGlobalFont = false;
+
+const Root = () => {
+  const { themeMode } = useAppContext();
+  const palette = getThemeColors(themeMode);
+
+  useEffect(() => {
+    const GlobalText = Text as typeof Text & { defaultProps?: { style?: unknown } };
+    GlobalText.defaultProps = GlobalText.defaultProps ?? {};
+    GlobalText.defaultProps.style = [{ fontFamily: 'Poppins_400Regular', color: palette.textPrimary }, GlobalText.defaultProps.style];
+  }, [palette.textPrimary]);
+
+  return (
+    <>
+      <StatusBar style={themeMode === 'light' ? 'dark' : 'light'} />
+      <AppNavigation />
+    </>
+  );
+};
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -44,8 +63,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>
-        <StatusBar style="light" />
-        <AppNavigation />
+        <Root />
       </AppProvider>
     </GestureHandlerRootView>
   );
