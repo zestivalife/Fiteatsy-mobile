@@ -35,6 +35,14 @@ export const mockDevices: WearableDevice[] = [
     lastSyncISO: '2026-03-31T20:01:00.000Z'
   },
   {
+    id: 'dev-gobolt-1',
+    brand: 'GoBOLT',
+    model: 'GoBOLT Health Watch',
+    connected: false,
+    battery: 68,
+    lastSyncISO: '2026-04-02T11:30:00.000Z'
+  },
+  {
     id: 'dev-other-1',
     brand: 'Other',
     model: 'Bluetooth Wearable',

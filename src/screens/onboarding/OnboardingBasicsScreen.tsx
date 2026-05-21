@@ -1,107 +1,70 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../../components/Screen';
-import { TextField } from '../../components/TextField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import {
   AgeBracket,
+  AssessmentGender,
   HealthCondition,
   HealthGoal,
-  OnboardingProfile,
-  SymptomTag,
-  WearablePreference
+  OnboardingProfile
 } from '../../types';
 import { useAppContext } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingBasics'>;
 
-const ageBrackets: AgeBracket[] = ['18-24', '25-34', '35-44', '45-54', '55+'];
+const goals: HealthGoal[] = ['Better Energy', 'Better Sleep', 'Weight Loss', 'Sugar Control', 'Hormone Balance'];
+const genders: AssessmentGender[] = ['Male', 'Female', 'Prefer not to say'];
 const conditions: HealthCondition[] = [
   'Diabetes',
   'Prediabetes',
   'Hypertension',
   'PCOS',
-  'PCOD',
   'Thyroid',
   'Obesity',
   'High Cholesterol',
-  'Fatty Liver',
-  'Insulin Resistance',
-  'Gut Health',
-  'Anemia',
-  'Vitamin Deficiency',
-  'Kidney Care',
-  'Hormonal Imbalance',
-  'Inflammation'
-];
-const symptoms: SymptomTag[] = [
-  'Fatigue',
-  'Cravings',
-  'Bloating',
-  'Poor Sleep',
-  'Sugar Crashes',
-  'Irregular Cycles',
-  'Acne',
-  'Hair Fall',
-  'Digestive Discomfort',
-  'High Hunger',
-  'Low Mood',
-  'Joint Pain'
-];
-const goals: HealthGoal[] = [
-  'Sugar Control',
-  'Weight Loss',
-  'Hormone Balance',
-  'BP Control',
-  'Gut Relief',
-  'Better Energy',
-  'Better Sleep',
-  'Sustainable Habits'
-];
-const wearableOptions: Array<{ value: WearablePreference; label: string; copy: string }> = [
-  { value: 'sync', label: 'Yes, sync wearable', copy: 'Use smartwatch or fitness band data inside your dashboard.' },
-  { value: 'manual', label: 'No, manual tracking', copy: 'Use guided assessments, symptoms, hydration, sleep, and vitals logging.' },
-  { value: 'later', label: 'Maybe later', copy: 'Start with assessments now and connect a device anytime.' }
+  'Gut Health'
 ];
 
-const baseProfile = (): OnboardingProfile => ({
-  name: '',
-  ageBracket: '25-34',
-  primaryConditions: ['Gut Health'],
-  symptomTags: ['Fatigue'],
-  healthGoals: ['Better Energy'],
-  wearablePreference: 'manual',
-  careTrack: 'Foundational Recovery Care',
-  matchedDietitianName: 'Dr. Aisha Menon',
-  matchedDietitianSpecialty: 'Clinical Nutrition & Habit Recovery',
-  calendarProvider: 'None',
-  calendarPermissionGranted: false,
-  notificationPermissionGranted: false,
-  createdAtISO: new Date().toISOString()
-});
-
-const toggleValue = <T extends string>(list: T[], value: T, max = 3) => {
-  if (list.includes(value)) {
-    return list.filter((item) => item !== value);
-  }
-  return [...list, value].slice(-max);
+const toAgeBracket = (age: number): AgeBracket => {
+  if (age <= 24) return '18-24';
+  if (age <= 34) return '25-34';
+  if (age <= 44) return '35-44';
+  if (age <= 54) return '45-54';
+  return '55+';
 };
 
-const deriveCareTrack = (selectedConditions: HealthCondition[], selectedGoals: HealthGoal[]) => {
-  if (selectedConditions.some((item) => ['Diabetes', 'Prediabetes', 'Insulin Resistance'].includes(item))) {
+const calculateAgeFromDob = (dob: Date): number => {
+  const now = new Date();
+  let years = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+    years -= 1;
+  }
+  return Math.max(18, Math.min(99, years));
+};
+
+const formatDob = (date: Date): string =>
+  date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+
+const deriveCareTrack = (selectedConditions: HealthCondition[], goal: HealthGoal | null) => {
+  if (selectedConditions.some((item) => ['Diabetes', 'Prediabetes'].includes(item)) || goal === 'Sugar Control') {
     return 'Blood Sugar Recovery Care';
   }
-  if (selectedConditions.some((item) => ['PCOS', 'PCOD', 'Hormonal Imbalance', 'Thyroid'].includes(item))) {
+  if (selectedConditions.some((item) => ['PCOS', 'Thyroid'].includes(item)) || goal === 'Hormone Balance') {
     return 'Hormone Balance Care';
   }
-  if (selectedConditions.some((item) => ['Gut Health', 'Fatty Liver'].includes(item)) || selectedGoals.includes('Gut Relief')) {
+  if (selectedConditions.includes('Gut Health')) {
     return 'Digestive & Metabolic Care';
-  }
-  if (selectedConditions.some((item) => ['Hypertension', 'High Cholesterol'].includes(item)) || selectedGoals.includes('BP Control')) {
-    return 'Heart & Pressure Care';
   }
   return 'Foundational Recovery Care';
 };
@@ -114,139 +77,156 @@ const deriveDietitian = (careTrack: string) => {
     return { name: 'Dr. Aisha Menon', specialty: 'PCOS, Thyroid & Hormonal Nutrition' };
   }
   if (careTrack === 'Digestive & Metabolic Care') {
-    return { name: 'Dr. Neha Batra', specialty: 'Gut Health & Fatty Liver Nutrition' };
-  }
-  if (careTrack === 'Heart & Pressure Care') {
-    return { name: 'Dr. Sana Verma', specialty: 'BP, Lipids & Cardio Nutrition' };
+    return { name: 'Dr. Neha Batra', specialty: 'Gut Health & Metabolic Nutrition' };
   }
   return { name: 'Dr. Aisha Menon', specialty: 'Clinical Nutrition & Habit Recovery' };
 };
 
+const baseProfile = (): OnboardingProfile => ({
+  name: '',
+  dateOfBirthISO: new Date(1996, 0, 1).toISOString(),
+  age: 28,
+  gender: 'Prefer not to say',
+  wellnessGoal: 'Better Energy',
+  ageBracket: '25-34',
+  primaryConditions: [],
+  symptomTags: ['Fatigue'],
+  healthGoals: ['Better Energy'],
+  wearablePreference: 'later',
+  careTrack: 'Foundational Recovery Care',
+  matchedDietitianName: 'Dr. Aisha Menon',
+  matchedDietitianSpecialty: 'Clinical Nutrition & Habit Recovery',
+  calendarProvider: 'None',
+  calendarPermissionGranted: false,
+  notificationPermissionGranted: false,
+  createdAtISO: new Date().toISOString()
+});
+
 export const OnboardingBasicsScreen = ({ navigation }: Props) => {
-  const { onboarding, setOnboarding } = useAppContext();
+  const { onboarding, setOnboarding, setWearableSetupCompleted } = useAppContext();
   const seed = useMemo(() => onboarding ?? baseProfile(), [onboarding]);
 
-  const [name, setName] = useState(seed.name);
-  const [ageBracket, setAgeBracket] = useState<AgeBracket>(seed.ageBracket);
-  const [primaryConditions, setPrimaryConditions] = useState<HealthCondition[]>(seed.primaryConditions);
-  const [symptomTags, setSymptomTags] = useState<SymptomTag[]>(seed.symptomTags);
-  const [healthGoals, setHealthGoals] = useState<HealthGoal[]>(seed.healthGoals);
-  const [wearablePreference, setWearablePreference] = useState<WearablePreference>(seed.wearablePreference);
+  const initialDob = seed.dateOfBirthISO ? new Date(seed.dateOfBirthISO) : new Date(1996, 0, 1);
+  const [dob, setDob] = useState(initialDob);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [gender, setGender] = useState<AssessmentGender>(seed.gender ?? 'Prefer not to say');
+  const [wellnessGoal, setWellnessGoal] = useState<HealthGoal | null>(seed.wellnessGoal ?? seed.healthGoals[0] ?? null);
+  const [primaryConditions, setPrimaryConditions] = useState<HealthCondition[]>(seed.primaryConditions ?? []);
 
-  const careTrack = deriveCareTrack(primaryConditions, healthGoals);
+  const age = calculateAgeFromDob(dob);
+  const ageBracket = toAgeBracket(age);
+  const careTrack = deriveCareTrack(primaryConditions, wellnessGoal);
   const dietitian = deriveDietitian(careTrack);
 
-  const continueNext = () => {
+  const onDobChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (event.type === 'set' && selectedDate) {
+      setDob(selectedDate);
+    }
+  };
+
+  const persistAndContinue = (mode: 'continue' | 'skip') => {
+    const finalGoal = mode === 'skip' ? null : wellnessGoal;
+    const finalConditions = mode === 'skip' ? [] : primaryConditions;
+    const finalTrack = deriveCareTrack(finalConditions, finalGoal);
+    const finalDietitian = deriveDietitian(finalTrack);
+
     setOnboarding({
       ...seed,
-      name: name.trim() || 'Member',
+      name: seed.name.trim() || 'Member',
+      dateOfBirthISO: dob.toISOString(),
+      age,
+      gender,
+      wellnessGoal: finalGoal ?? undefined,
       ageBracket,
-      primaryConditions: primaryConditions.length ? primaryConditions : ['Gut Health'],
-      symptomTags: symptomTags.length ? symptomTags : ['Fatigue'],
-      healthGoals: healthGoals.length ? healthGoals : ['Better Energy'],
-      wearablePreference,
-      careTrack,
-      matchedDietitianName: dietitian.name,
-      matchedDietitianSpecialty: dietitian.specialty,
+      primaryConditions: finalConditions,
+      healthGoals: finalGoal ? [finalGoal] : ['Better Energy'],
+      wearablePreference: 'later',
+      careTrack: finalTrack,
+      matchedDietitianName: finalDietitian.name,
+      matchedDietitianSpecialty: finalDietitian.specialty,
       createdAtISO: seed.createdAtISO || new Date().toISOString()
     });
+    setWearableSetupCompleted(false);
     navigation.navigate('OnboardingCalendar');
   };
 
   return (
     <Screen>
       <View style={styles.body}>
-        <Text style={styles.kicker}>Step 2 · Get Matched</Text>
-        <Text style={styles.title}>Tell us what your health needs right now</Text>
-        <Text style={styles.subtitle}>We use this to match you with the right clinical dietitian, dashboard, and care plan.</Text>
+        <Text style={styles.kicker}>Quick Setup</Text>
+        <Text style={styles.title}>Tell us just what we need</Text>
+        <Text style={styles.subtitle}>This takes less than a minute. You can update everything later.</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <View style={styles.form}>
-            <TextField label="Name" placeholder="Your first name" value={name} onChangeText={setName} />
-          </View>
+          <Text style={styles.label}>Date of birth</Text>
+          <Pressable style={styles.dateField} onPress={() => setShowDatePicker(true)}>
+            <View style={styles.dateFieldLeft}>
+              <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+              <Text style={styles.dateFieldText}>{formatDob(dob)}</Text>
+            </View>
+            <Text style={styles.dateAgeText}>{age} yrs</Text>
+          </Pressable>
+          {showDatePicker ? (
+            <DateTimePicker
+              value={dob}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              maximumDate={new Date()}
+              onChange={onDobChange}
+            />
+          ) : null}
 
-          <Text style={styles.label}>Age group</Text>
+          <Text style={styles.label}>Gender</Text>
           <View style={styles.options}>
-            {ageBrackets.map((item) => {
-              const active = ageBracket === item;
+            {genders.map((item) => {
+              const active = gender === item;
               return (
-                <Pressable key={item} accessibilityRole="radio" accessibilityState={{ selected: active }} accessibilityLabel={`Age group ${item}`} style={[styles.option, active && styles.optionActive]} onPress={() => setAgeBracket(item)}>
+                <Pressable key={item} style={[styles.option, active && styles.optionActive]} onPress={() => setGender(item)}>
                   <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <Text style={styles.label}>Primary conditions</Text>
-          <Text style={styles.helper}>Choose up to 3</Text>
+          <Text style={styles.label}>Wellness goal</Text>
+          <Text style={styles.helper}>Choose one or select “Maybe later”</Text>
+          <View style={styles.options}>
+            {goals.map((item) => {
+              const active = wellnessGoal === item;
+              return (
+                <Pressable key={item} style={[styles.option, active && styles.optionActive]} onPress={() => setWellnessGoal(item)}>
+                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
+                </Pressable>
+              );
+            })}
+            <Pressable style={[styles.option, wellnessGoal === null && styles.optionActive]} onPress={() => setWellnessGoal(null)}>
+              <Text style={[styles.optionText, wellnessGoal === null && styles.optionTextActive]}>Maybe later</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.label}>Existing conditions (optional)</Text>
+          <Text style={styles.helper}>Select if relevant, or leave blank</Text>
           <View style={styles.options}>
             {conditions.map((item) => {
               const active = primaryConditions.includes(item);
               return (
                 <Pressable
                   key={item}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: active }}
-                  accessibilityLabel={item}
                   style={[styles.option, active && styles.optionActive]}
-                  onPress={() => setPrimaryConditions((current) => toggleValue(current, item, 3))}
+                  onPress={() => {
+                    setPrimaryConditions((current) => {
+                      const exists = current.includes(item);
+                      if (exists) {
+                        return current.filter((x) => x !== item);
+                      }
+                      return [...current, item];
+                    });
+                  }}
                 >
                   <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Text style={styles.label}>Current symptoms</Text>
-          <Text style={styles.helper}>Choose what feels most relevant today</Text>
-          <View style={styles.options}>
-            {symptoms.map((item) => {
-              const active = symptomTags.includes(item);
-              return (
-                <Pressable
-                  key={item}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: active }}
-                  accessibilityLabel={item}
-                  style={[styles.option, active && styles.optionActive]}
-                  onPress={() => setSymptomTags((current) => toggleValue(current, item, 4))}
-                >
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Text style={styles.label}>What do you want to improve first?</Text>
-          <View style={styles.options}>
-            {goals.map((item) => {
-              const active = healthGoals.includes(item);
-              return (
-                <Pressable
-                  key={item}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: active }}
-                  accessibilityLabel={item}
-                  style={[styles.option, active && styles.optionActive]}
-                  onPress={() => setHealthGoals((current) => toggleValue(current, item, 3))}
-                >
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Text style={styles.label}>Wearable sync</Text>
-          <View style={styles.stack}>
-            {wearableOptions.map((item) => {
-              const active = wearablePreference === item.value;
-              return (
-                <Pressable key={item.value} accessibilityRole="radio" accessibilityState={{ selected: active }} accessibilityLabel={item.label} style={[styles.radioCard, active && styles.radioCardActive]} onPress={() => setWearablePreference(item.value)}>
-                  <View style={[styles.radioDot, active && styles.radioDotActive]} />
-                  <View style={styles.radioCopy}>
-                    <Text style={[styles.radioTitle, active && styles.radioTitleActive]}>{item.label}</Text>
-                    <Text style={styles.radioText}>{item.copy}</Text>
-                  </View>
                 </Pressable>
               );
             })}
@@ -262,7 +242,10 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
       </View>
 
       <View style={styles.footer}>
-        <PrimaryButton title="Continue" onPress={continueNext} />
+        <PrimaryButton title="Continue" onPress={() => persistAndContinue('continue')} />
+        <Pressable style={styles.skipBtn} onPress={() => persistAndContinue('skip')}>
+          <Text style={styles.skipText}>Skip for now</Text>
+        </Pressable>
       </View>
     </Screen>
   );
@@ -273,14 +256,15 @@ const styles = StyleSheet.create({
     flex: 1
   },
   scrollContent: {
-    paddingBottom: 16
+    paddingBottom: 16,
+    gap: 12
   },
   footer: {
     paddingTop: 12
   },
   kicker: {
     ...typography.caption,
-    color: colors.blueDark,
+    color: colors.blue,
     marginBottom: 8
   },
   title: {
@@ -293,119 +277,98 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 20
   },
-  form: {
-    gap: 12,
-    marginBottom: 16
-  },
   label: {
     ...typography.bodyStrong,
-    fontSize: 14,
-    marginBottom: 8
+    fontSize: 14
   },
   helper: {
     ...typography.caption,
-    marginTop: -4,
-    marginBottom: 10
+    marginTop: -6,
+    marginBottom: 2
   },
   options: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 18
+    gap: 8
   },
   option: {
     borderWidth: 1,
     borderColor: colors.stroke,
     borderRadius: 999,
     backgroundColor: colors.cardMuted,
-    paddingHorizontal: 14,
-    paddingVertical: 10
+    paddingHorizontal: 12,
+    paddingVertical: 9
   },
   optionActive: {
-    backgroundColor: 'rgba(96,175,0,0.16)',
-    borderColor: colors.blue
+    borderColor: colors.blue,
+    backgroundColor: 'rgba(96,175,0,0.24)'
   },
   optionText: {
+    ...typography.caption,
+    color: colors.textSecondary
+  },
+  optionTextActive: {
+    color: colors.textPrimary
+  },
+  matchCard: {
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    borderRadius: 16,
+    backgroundColor: colors.cardMuted,
+    padding: 14,
+    marginTop: 4
+  },
+  matchEyebrow: {
+    ...typography.caption,
+    color: colors.blue
+  },
+  dateField: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    backgroundColor: colors.cardMuted,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  dateFieldLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  dateFieldText: {
     ...typography.body,
     fontSize: 14,
     color: colors.textPrimary
   },
-  optionTextActive: {
-    color: colors.textPrimary,
-    fontWeight: '700'
-  },
-  stack: {
-    gap: 10,
-    marginBottom: 18
-  },
-  radioCard: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    borderRadius: 18,
-    backgroundColor: colors.card,
-    paddingHorizontal: 14,
-    paddingVertical: 14
-  },
-  radioCardActive: {
-    borderColor: colors.blue,
-    backgroundColor: 'rgba(96,175,0,0.12)'
-  },
-  radioDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.textMuted,
-    marginTop: 2
-  },
-  radioDotActive: {
-    borderColor: colors.blue,
-    backgroundColor: colors.blue
-  },
-  radioCopy: {
-    flex: 1,
-    gap: 4
-  },
-  radioTitle: {
-    ...typography.bodyStrong,
-    fontSize: 14
-  },
-  radioTitleActive: {
-    color: colors.textPrimary
-  },
-  radioText: {
-    ...typography.body,
-    fontSize: 13,
-    lineHeight: 18
-  },
-  matchCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(96,175,0,0.24)',
-    borderRadius: 22,
-    backgroundColor: 'rgba(96,175,0,0.11)',
-    padding: 16
-  },
-  matchEyebrow: {
+  dateAgeText: {
     ...typography.caption,
-    color: colors.blueDark,
-    marginBottom: 6
+    color: colors.blue
   },
   matchTrack: {
     ...typography.bodyStrong,
-    fontSize: 18,
-    color: colors.textPrimary,
-    marginBottom: 6
+    marginTop: 6,
+    fontSize: 16
   },
   matchDietitian: {
     ...typography.bodyStrong,
-    fontSize: 15,
-    color: colors.textPrimary
+    marginTop: 10
   },
   matchSpecialty: {
-    ...typography.body,
-    marginTop: 4
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 3
+  },
+  skipBtn: {
+    marginTop: 12,
+    alignSelf: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  skipText: {
+    ...typography.caption,
+    color: colors.textSecondary
   }
 });

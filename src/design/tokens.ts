@@ -49,37 +49,37 @@ export const radius = {
 
 export const typography: Record<string, TextStyle> = {
   titleXL: {
-    fontFamily: 'System',
+    fontFamily: 'Poppins_700Bold',
     fontSize: 30,
     lineHeight: 36,
     color: colors.textPrimary
   },
   title: {
-    fontFamily: 'System',
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 24,
     lineHeight: 30,
     color: colors.textPrimary
   },
   section: {
-    fontFamily: 'System',
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 20,
     lineHeight: 26,
     color: colors.textPrimary
   },
   body: {
-    fontFamily: 'System',
+    fontFamily: 'Poppins_400Regular',
     fontSize: 16,
     lineHeight: 24,
     color: colors.textSecondary
   },
   bodyStrong: {
-    fontFamily: 'System',
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 16,
     lineHeight: 24,
     color: colors.textPrimary
   },
   caption: {
-    fontFamily: 'System',
+    fontFamily: 'Poppins_400Regular',
     fontSize: 13,
     lineHeight: 18,
     color: colors.textMuted

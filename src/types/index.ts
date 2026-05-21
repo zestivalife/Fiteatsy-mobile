@@ -1,4 +1,4 @@
-export type WearableBrand = 'Apple' | 'Samsung' | 'Xiaomi' | 'Amazfit' | 'Other';
+export type WearableBrand = 'Apple' | 'Samsung' | 'Xiaomi' | 'Amazfit' | 'GoBOLT' | 'Other';
 
 export type MoodSelection = '😂' | '😀' | '🙂' | '😐' | '☹️' | '😔';
 
@@ -64,6 +64,10 @@ export type WearablePreference = 'sync' | 'manual' | 'later';
 
 export type OnboardingProfile = {
   name: string;
+  dateOfBirthISO?: string;
+  age?: number;
+  gender?: AssessmentGender;
+  wellnessGoal?: HealthGoal;
   ageBracket: AgeBracket;
   primaryConditions: HealthCondition[];
   symptomTags: SymptomTag[];
@@ -86,6 +90,7 @@ export type AssessmentProfile = {
   goal: AssessmentGoal;
   gender: AssessmentGender;
   age: number;
+  heightCm: number;
   weightKg: number;
   mood: AssessmentMood;
   soughtHelpBefore: AssessmentHelpHistory;

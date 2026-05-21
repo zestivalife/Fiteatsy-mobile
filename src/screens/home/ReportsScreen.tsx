@@ -2,16 +2,24 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Platform,
   Easing,
   Modal,
   PanResponder,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,6 +37,7 @@ import {
   ReportParameter
 } from '../../services/nuetraService';
 import { useAppContext } from '../../state/AppContext';
+import { ReportAnalysisResponse, uploadAndAnalyzeReport } from '../../services/reportUploadService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type CategoryKey = 'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins';
@@ -43,6 +52,25 @@ type ReportItem = {
   trend: 'up' | 'down' | 'flat';
   categoryScores: Record<CategoryKey, number>;
   parametersData: ReportParameter[];
+  uploadSource?: 'camera' | 'gallery' | 'pdf';
+  uploadedAtISO?: string;
+};
+
+type PickedUpload = {
+  uri: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  source: 'camera' | 'gallery' | 'pdf';
+};
+
+type AnalysisReviewState = {
+  report: ReportItem;
+  summary: string;
+  comparisonSummary: string;
+  actionPlan: NuetraActionItem[];
+  goodParameters: ReportParameter[];
+  attentionParameters: ReportParameter[];
 };
 
 const palette = {
@@ -125,6 +153,14 @@ const scorePillBg = (score: number) => {
     return palette.amberLight;
   }
   return palette.coralLight;
+};
+
+const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+
+const bytesToLabel = (value: number) => {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const buildCategoryScores = (parameters: ReportParameter[]): Record<CategoryKey, number> => {
@@ -259,10 +295,23 @@ export const ReportsScreen = () => {
   const [showProcessing, setShowProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const [showHistory, setShowHistory] = useState(false);
 
-  const [reportDate, setReportDate] = useState('15 March 2026');
+  const [reportDate, setReportDate] = useState('15 Mar 2026');
+  const [reportDateValue, setReportDateValue] = useState<Date>(new Date('2026-03-15T00:00:00.000Z'));
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [labName, setLabName] = useState('');
   const [uploadType, setUploadType] = useState<'camera' | 'gallery' | 'pdf' | null>(null);
+  const [selectedUpload, setSelectedUpload] = useState<PickedUpload | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [showUploadPreparing, setShowUploadPreparing] = useState(false);
+  const [preparingProgress, setPreparingProgress] = useState(0);
+  const [analysisLaunching, setAnalysisLaunching] = useState(false);
+  const [lastPickSource, setLastPickSource] = useState<'camera' | 'gallery' | 'pdf' | null>(null);
+  const [latestComparisonSummary, setLatestComparisonSummary] = useState<string | null>(null);
+  const [analysisReview, setAnalysisReview] = useState<AnalysisReviewState | null>(null);
+  const [showAnalysisReview, setShowAnalysisReview] = useState(false);
 
   const [nuetraSummary, setNuetraSummary] = useState('');
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -291,6 +340,182 @@ export const ReportsScreen = () => {
     () => latestReport?.parametersData.filter((parameter) => parameter.status !== 'normal') ?? [],
     [latestReport]
   );
+
+  const hydratePickedFile = async (
+    uri: string,
+    source: 'camera' | 'gallery' | 'pdf',
+    fallbackName: string,
+    fallbackMimeType: string,
+    knownSizeBytes?: number
+  ): Promise<PickedUpload> => {
+    let sizeBytes = typeof knownSizeBytes === 'number' && knownSizeBytes > 0 ? knownSizeBytes : 0;
+    if (sizeBytes <= 0) {
+      try {
+        const info = (await Promise.race([
+          FileSystem.getInfoAsync(uri),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('FILE_INFO_TIMEOUT')), 3000))
+        ])) as { exists: boolean; size?: number };
+        sizeBytes = info.exists && typeof info.size === 'number' ? info.size : 0;
+      } catch {
+        sizeBytes = 0;
+      }
+    }
+    if (sizeBytes > MAX_UPLOAD_BYTES) {
+      throw new Error(`File is too large (${bytesToLabel(sizeBytes)}). Please upload a file below ${bytesToLabel(MAX_UPLOAD_BYTES)}.`);
+    }
+    return {
+      uri,
+      name: fallbackName,
+      mimeType: fallbackMimeType,
+      sizeBytes,
+      source
+    };
+  };
+
+  const pickUpload = async (source: 'camera' | 'gallery' | 'pdf') => {
+    setUploadError(null);
+    setUploadBusy(true);
+    setLastPickSource(source);
+    setUploadType(source);
+    let progressTimer: ReturnType<typeof setInterval> | null = null;
+    const startPreparing = () => {
+      setPreparingProgress(0);
+      setShowUploadPreparing(true);
+      progressTimer = setInterval(() => {
+        setPreparingProgress((prev) => {
+          if (prev >= 92) return prev;
+          return prev + 8;
+        });
+      }, 120);
+    };
+    const finishPreparing = () => {
+      setPreparingProgress(100);
+      if (progressTimer) clearInterval(progressTimer);
+      setTimeout(() => setShowUploadPreparing(false), 180);
+    };
+    const stopPreparingWithError = () => {
+      if (progressTimer) clearInterval(progressTimer);
+      setShowUploadPreparing(false);
+    };
+
+    try {
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          throw new Error('Camera permission is denied. Please allow camera access and retry.');
+        }
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.72
+        });
+        if (result.canceled || !result.assets?.[0]) {
+          stopPreparingWithError();
+          setUploadBusy(false);
+          return;
+        }
+        const captured = result.assets[0];
+        startPreparing();
+        const optimized = await ImageManipulator.manipulateAsync(
+          captured.uri,
+          [{ resize: { width: 1600 } }],
+          { compress: 0.72, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        const picked = await hydratePickedFile(
+          optimized.uri,
+          source,
+          captured.fileName ?? `camera-report-${Date.now()}.jpg`,
+          captured.mimeType ?? 'image/jpeg',
+          captured.fileSize
+        );
+        setSelectedUpload(picked);
+        finishPreparing();
+        return;
+      }
+
+      if (source === 'gallery') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          throw new Error('Gallery permission is denied. Please allow photo library access and retry.');
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.72
+        });
+        if (result.canceled || !result.assets?.[0]) {
+          stopPreparingWithError();
+          setUploadBusy(false);
+          return;
+        }
+        const selected = result.assets[0];
+        startPreparing();
+        const optimized = await ImageManipulator.manipulateAsync(
+          selected.uri,
+          [{ resize: { width: 1600 } }],
+          { compress: 0.72, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        const picked = await hydratePickedFile(
+          optimized.uri,
+          source,
+          selected.fileName ?? `gallery-report-${Date.now()}.jpg`,
+          selected.mimeType ?? 'image/jpeg',
+          selected.fileSize
+        );
+        setSelectedUpload(picked);
+        finishPreparing();
+        return;
+      }
+
+      const doc = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: false
+      });
+      if (doc.canceled || !doc.assets?.[0]) {
+        stopPreparingWithError();
+        setUploadBusy(false);
+        return;
+      }
+      const file = doc.assets[0];
+      startPreparing();
+      const picked = await hydratePickedFile(
+        file.uri,
+        source,
+        file.name ?? `report-${Date.now()}.pdf`,
+        file.mimeType ?? 'application/pdf',
+        file.size
+      );
+      setSelectedUpload(picked);
+      finishPreparing();
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Unable to select file. Please retry.');
+      stopPreparingWithError();
+    } finally {
+      setUploadBusy(false);
+    }
+  };
+
+  const startAnalysis = async () => {
+    if (uploadBusy || analysisLaunching) return;
+    if (!selectedUpload) {
+      setUploadError('Please select a report file first (Photo, Gallery, or PDF).');
+      return;
+    }
+    setUploadError(null);
+    setUploadType(selectedUpload.source);
+    setAnalysisLaunching(true);
+    setShowUploadSheet(false);
+    setShowProcessing(true);
+  };
+
+  const applyAnalysisReview = () => {
+    if (!analysisReview) return;
+    setReports((prev) => [analysisReview.report, ...prev]);
+    setLatestComparisonSummary(analysisReview.comparisonSummary);
+    setNuetraSummary(analysisReview.summary);
+    setActionPlan(analysisReview.actionPlan);
+    setShowAnalysisReview(false);
+    setAnalysisReview(null);
+  };
 
   useEffect(() => {
     Animated.spring(heroAnim, {
@@ -409,42 +634,103 @@ export const ReportsScreen = () => {
       });
     }, 1300);
 
-    const finish = setTimeout(() => {
-      const syntheticScore = Math.max(58, Math.min(92, Math.round((wellness.wellnessScore + 76) / 2)));
-      const syntheticParameters: ReportParameter[] = [
-        { name: 'Vitamin D', value: syntheticScore > 80 ? 32 : 19, unit: 'ng/mL', status: syntheticScore > 80 ? 'normal' : 'low', referenceRange: '30-100', category: 'Vitamins' },
-        { name: 'HbA1c', value: syntheticScore > 75 ? 5.5 : 5.9, unit: '%', status: syntheticScore > 75 ? 'normal' : 'high', referenceRange: '4.0-5.6', category: 'Metabolic' },
-        { name: 'LDL Cholesterol', value: syntheticScore > 75 ? 104 : 139, unit: 'mg/dL', status: syntheticScore > 75 ? 'normal' : 'high', referenceRange: '<100', category: 'Metabolic' },
-        { name: 'Hemoglobin', value: 13.7, unit: 'g/dL', status: 'normal', referenceRange: '13.0-17.0', category: 'Blood' },
-        { name: 'TSH', value: 2.5, unit: 'mIU/L', status: 'normal', referenceRange: '0.4-4.0', category: 'Thyroid' }
-      ];
-
-      const abnormal = syntheticParameters.filter((parameter) => parameter.status !== 'normal').length;
-
-      const newReport: ReportItem = {
-        id: `rep-${Date.now()}`,
-        labName: labName.trim() || 'Uploaded Lab Report',
-        date: reportDate,
-        parameters: syntheticParameters.length,
-        abnormal,
-        score: syntheticScore,
-        trend: reports.length > 0 ? (syntheticScore >= reports[0].score ? 'up' : 'down') : 'flat',
-        categoryScores: buildCategoryScores(syntheticParameters),
-        parametersData: syntheticParameters
-      };
-
-      setReports((prev) => [newReport, ...prev]);
+    let cancelled = false;
+    const failSafeTimeout = setTimeout(() => {
+      if (cancelled) return;
       setShowProcessing(false);
-      setUploadType(null);
-      setLabName('');
-      setShowUploadSheet(false);
-    }, 5600);
+      setAnalysisLaunching(false);
+      setShowUploadSheet(true);
+      setUploadError('Analysis is taking too long. Please retry. If issue continues, restart backend and app.');
+    }, 35000);
+
+    const execute = async () => {
+      try {
+        if (!selectedUpload) throw new Error('No report file selected.');
+        const analysis: ReportAnalysisResponse = await uploadAndAnalyzeReport({
+          fileUri: selectedUpload.uri,
+          fileName: selectedUpload.name,
+          mimeType: selectedUpload.mimeType,
+          reportDate,
+          labName
+        });
+
+        if (cancelled) return;
+        setReportDate(analysis.reportDate);
+        setLabName(analysis.labName);
+
+        const previous = reports[0] ?? null;
+        const abnormal = analysis.parameters.filter((parameter) => parameter.status !== 'normal').length;
+        const trend: ReportItem['trend'] = previous
+          ? analysis.score > previous.score
+            ? 'up'
+            : analysis.score < previous.score
+              ? 'down'
+              : 'flat'
+          : 'flat';
+
+        const newReport: ReportItem = {
+          id: `rep-${Date.now()}`,
+          labName: analysis.labName,
+          date: analysis.reportDate,
+          parameters: analysis.parameters.length,
+          abnormal,
+          score: analysis.score,
+          trend,
+          categoryScores: analysis.categoryScores,
+          parametersData: analysis.parameters,
+          uploadSource: selectedUpload.source,
+          uploadedAtISO: new Date().toISOString()
+        };
+
+        const prevText = previous ? `Compared with ${previous.date} (${previous.labName}), ` : '';
+        const comparisonSummary = `${prevText}${analysis.summary}`;
+        setAnalysisReview({
+          report: newReport,
+          summary: analysis.summary,
+          comparisonSummary,
+          actionPlan: analysis.actionPlan.map((item) => ({ ...item, requiresDoctor: false })),
+          goodParameters: analysis.parameters.filter((parameter) => parameter.status === 'normal'),
+          attentionParameters: analysis.parameters.filter((parameter) => parameter.status !== 'normal')
+        });
+        setShowAnalysisReview(true);
+        setShowProcessing(false);
+        setAnalysisLaunching(false);
+        setUploadType(null);
+        setSelectedUpload(null);
+        setShowUploadSheet(false);
+      } catch (error) {
+        if (cancelled) return;
+        setShowProcessing(false);
+        setAnalysisLaunching(false);
+        setShowUploadSheet(true);
+        setUploadError(error instanceof Error ? error.message : 'Analysis failed. Please retry with a clear report.');
+      } finally {
+        clearTimeout(failSafeTimeout);
+      }
+    };
+    execute();
 
     return () => {
+      cancelled = true;
       clearInterval(interval);
-      clearTimeout(finish);
+      clearTimeout(failSafeTimeout);
     };
-  }, [labName, progressAnim, reportDate, reports, showProcessing, wellness.wellnessScore]);
+  }, [labName, progressAnim, reportDate, reports, selectedUpload, showProcessing]);
+
+  const onDatePicked = (_event: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (!selected) return;
+    setReportDateValue(selected);
+    setReportDate(
+      selected.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      })
+    );
+  };
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],
@@ -622,103 +908,166 @@ export const ReportsScreen = () => {
 
       <View style={styles.sectionHead}>
         <Text style={[styles.sectionTitle, !isLight && styles.sectionTitleDark]}>Your Reports</Text>
-        <View style={[styles.countChip, !isLight && styles.countChipDark]}>
-          <Text style={styles.countChipText}>{reportCountLabel}</Text>
+        <Pressable style={[styles.countChip, !isLight && styles.countChipDark]} onPress={() => setShowHistory((prev) => !prev)}>
+          <Text style={styles.countChipText}>{showHistory ? 'Hide history' : `View history (${reportCountLabel})`}</Text>
+        </Pressable>
+      </View>
+
+      {showHistory ? (
+        <View style={styles.reportList}>
+          {reports.map((report) => (
+            <SwipeableReportCard
+              key={report.id}
+              report={report}
+              onOpen={() => setReports((prev) => [report, ...prev.filter((item) => item.id !== report.id)])}
+              onDelete={() => setReports((prev) => prev.filter((r) => r.id !== report.id))}
+              isLight={isLight}
+              highlightColor={sectionHighlight}
+            />
+          ))}
         </View>
-      </View>
+      ) : null}
 
-      <View style={styles.reportList}>
-        {reports.map((report) => (
-          <SwipeableReportCard
-            key={report.id}
-            report={report}
-            onOpen={() => setReports((prev) => [report, ...prev.filter((item) => item.id !== report.id)])}
-            onDelete={() => setReports((prev) => prev.filter((r) => r.id !== report.id))}
-            isLight={isLight}
-            highlightColor={sectionHighlight}
-          />
-        ))}
-      </View>
+      {latestComparisonSummary ? (
+        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
+          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Recovery-Oriented Comparison</Text>
+          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>{latestComparisonSummary}</Text>
+        </Card>
+      ) : null}
 
-      <Pressable style={[styles.fab, { backgroundColor: sectionHighlight }]} onPress={() => setShowUploadSheet(true)}>
-        <Ionicons name="cloud-upload-outline" size={24} color={colors.white} />
-      </Pressable>
+      {!showUploadSheet && !showProcessing ? (
+        <Pressable style={[styles.fab, { backgroundColor: sectionHighlight }]} onPress={() => setShowUploadSheet(true)}>
+          <Ionicons name="cloud-upload-outline" size={24} color={colors.white} />
+        </Pressable>
+      ) : null}
 
-      <Modal visible={showUploadSheet} animationType="slide" transparent>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setShowUploadSheet(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
+      <Modal
+        visible={showUploadSheet}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
+        hardwareAccelerated
+        onRequestClose={() => setShowUploadSheet(false)}
+      >
+        <View style={styles.sheetBackdrop}>
+          <Pressable style={styles.sheetDismissZone} onPress={() => setShowUploadSheet(false)} />
+          <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Add Health Report</Text>
             <Text style={styles.sheetSubtitle}>Fiteatsy will analyse all parameters automatically</Text>
 
-            <View style={styles.uploadMethodRow}>
-              {[
-                { key: 'camera', icon: 'camera-outline', title: 'Take Photo', copy: 'Photograph your report' },
-                { key: 'gallery', icon: 'image-outline', title: 'Choose Photo', copy: 'Select from library' },
-                { key: 'pdf', icon: 'document-outline', title: 'Upload PDF', copy: 'From your files' }
-              ].map((item) => {
-                const active = uploadType === (item.key as 'camera' | 'gallery' | 'pdf');
-                return (
-                  <Pressable
-                    key={item.key}
-                    style={[styles.uploadMethodCard, active && styles.uploadMethodCardActive]}
-                    onPress={() => setUploadType(item.key as 'camera' | 'gallery' | 'pdf')}
-                  >
-                    <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={26} color={isLight ? palette.teal : sectionHighlight} />
-                    <Text style={styles.uploadMethodTitle}>{item.title}</Text>
-                    <Text style={styles.uploadMethodCopy}>{item.copy}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScrollContent}>
+              <View style={styles.uploadMethodRow}>
+                {[
+                  { key: 'camera', icon: 'camera-outline', title: 'Take Photo', copy: 'Photograph your report' },
+                  { key: 'gallery', icon: 'image-outline', title: 'Choose Photo', copy: 'Select from library' },
+                  { key: 'pdf', icon: 'document-outline', title: 'Upload PDF', copy: 'From your files' }
+                ].map((item) => {
+                  const active = uploadType === (item.key as 'camera' | 'gallery' | 'pdf');
+                  return (
+                    <Pressable
+                      key={item.key}
+                      style={[styles.uploadMethodCard, active && styles.uploadMethodCardActive]}
+                      onPress={() => pickUpload(item.key as 'camera' | 'gallery' | 'pdf')}
+                    >
+                      <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={26} color={isLight ? palette.teal : sectionHighlight} />
+                      <Text style={styles.uploadMethodTitle}>{item.title}</Text>
+                      <Text style={styles.uploadMethodCopy}>{item.copy}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {uploadBusy ? (
+                <View style={styles.uploadStatusRow}>
+                  <ActivityIndicator size="small" color={isLight ? palette.teal : sectionHighlight} />
+                  <Text style={styles.uploadStatusText}>Preparing file for upload...</Text>
+                </View>
+              ) : null}
+
+              {selectedUpload ? (
+                <View style={styles.uploadStatusCard}>
+                  <Text style={styles.uploadStatusTitle}>Ready to analyze</Text>
+                  <Text style={styles.uploadStatusText}>
+                    {selectedUpload.name} · {bytesToLabel(selectedUpload.sizeBytes)} · {selectedUpload.source.toUpperCase()}
+                  </Text>
+                </View>
+              ) : null}
+
+              {uploadError ? (
+                <View style={styles.uploadErrorCard}>
+                  <Text style={styles.uploadErrorText}>{uploadError}</Text>
+                  {lastPickSource ? (
+                    <Pressable style={styles.retryBtn} onPress={() => pickUpload(lastPickSource)}>
+                      <Text style={styles.retryBtnText}>Retry File Pick</Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable style={styles.retryBtn} onPress={startAnalysis}>
+                    <Text style={styles.retryBtnText}>Retry Analysis</Text>
                   </Pressable>
-                );
-              })}
-            </View>
+                </View>
+              ) : null}
 
-            <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>Report Date</Text>
-              <View style={styles.fieldRow}>
-                <Ionicons name="calendar-outline" size={16} color={palette.textMid} />
-                <TextInput value={reportDate} onChangeText={setReportDate} style={styles.inputText} />
+              <View style={styles.fieldWrap}>
+                <Text style={styles.fieldLabel}>Report Date</Text>
+                <Pressable style={styles.fieldRow} onPress={() => setShowDatePicker(true)}>
+                  <Ionicons name="calendar-outline" size={16} color={palette.textMid} />
+                  <Text style={styles.inputText}>{reportDate}</Text>
+                </Pressable>
+                {showDatePicker ? (
+                  <View style={styles.pickerWrap}>
+                    <DateTimePicker
+                      value={reportDateValue}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={onDatePicked}
+                      maximumDate={new Date()}
+                    />
+                    {Platform.OS === 'ios' ? (
+                      <Pressable style={styles.pickerDoneBtn} onPress={() => setShowDatePicker(false)}>
+                        <Text style={styles.pickerDoneText}>Done</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
-            </View>
 
-            <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>Lab / Hospital Name</Text>
-              <View style={styles.fieldRow}>
-                <Ionicons name="business-outline" size={16} color={palette.textMid} />
-                <TextInput
-                  value={labName}
-                  onChangeText={setLabName}
-                  placeholder="e.g. Dr. Lal PathLabs"
-                  placeholderTextColor={palette.textLight}
-                  style={styles.inputText}
-                />
+              <View style={styles.fieldWrap}>
+                <Text style={styles.fieldLabel}>Lab / Hospital Name</Text>
+                <View style={styles.fieldRow}>
+                  <Ionicons name="business-outline" size={16} color={palette.textMid} />
+                  <TextInput
+                    value={labName}
+                    onChangeText={setLabName}
+                    placeholder="Auto-filled from report (editable)"
+                    placeholderTextColor={palette.textLight}
+                    style={styles.inputText}
+                  />
+                </View>
               </View>
-            </View>
 
-            <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>Report Type</Text>
-              <View style={styles.readonlyChip}>
-                <Text style={styles.readonlyChipText}>Full Body Checkup</Text>
+              <View style={styles.fieldWrap}>
+                <Text style={styles.fieldLabel}>Report Type</Text>
+                <View style={styles.readonlyChip}>
+                  <Text style={styles.readonlyChipText}>Full Body Checkup</Text>
+                </View>
               </View>
-            </View>
 
-            <View style={styles.privacyRow}>
-              <Ionicons name="lock-closed-outline" size={12} color={isLight ? palette.teal : sectionHighlight} />
-              <Text style={styles.privacyText}>Your reports are encrypted. Never shared with your employer.</Text>
-            </View>
+              <View style={styles.privacyRow}>
+                <Ionicons name="lock-closed-outline" size={12} color={isLight ? palette.teal : sectionHighlight} />
+                <Text style={styles.privacyText}>Your reports are encrypted. Never shared with your employer.</Text>
+              </View>
 
-            <Pressable
-              style={[styles.primaryBtn, !uploadType && styles.primaryBtnDisabled]}
-              onPress={() => {
-                if (!uploadType) {
-                  return;
-                }
-                setShowProcessing(true);
-              }}
-            >
-              <Text style={styles.primaryBtnText}>Start Analysis</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
+              <Pressable
+                style={[styles.primaryBtn, (!selectedUpload || uploadBusy || analysisLaunching) && styles.primaryBtnDisabled]}
+                onPress={startAnalysis}
+              >
+                <Text style={styles.primaryBtnText}>{analysisLaunching ? 'Starting analysis...' : 'Start Analysis'}</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       <Modal visible={showProcessing} animationType="fade" transparent>
@@ -751,6 +1100,76 @@ export const ReportsScreen = () => {
             </View>
             <Text style={styles.processingHint}>This takes about 15–20 seconds</Text>
             <ActivityIndicator color={palette.purple} style={{ marginTop: 8 }} />
+            <Pressable
+              style={styles.processingCancelBtn}
+              onPress={() => {
+                setShowProcessing(false);
+                setAnalysisLaunching(false);
+                setShowUploadSheet(true);
+                setUploadError('Analysis cancelled. You can retry now.');
+              }}
+            >
+              <Text style={styles.processingCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showUploadPreparing} animationType="fade" transparent statusBarTranslucent>
+        <View style={styles.processingScreen}>
+          <View style={styles.processingCenter}>
+            <View style={styles.processingLogo}>
+              <Ionicons name="cloud-upload-outline" size={34} color={colors.white} />
+            </View>
+            <Text style={styles.processingTitle}>Preparing Report Upload</Text>
+            <Text style={styles.processingHint}>Optimizing and validating file...</Text>
+            <View style={styles.processingTrack}>
+              <View style={[styles.processingFill, { width: `${preparingProgress}%` }]} />
+            </View>
+            <Text style={styles.processingHint}>{preparingProgress}% complete</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showAnalysisReview} animationType="fade" transparent statusBarTranslucent>
+        <View style={styles.reviewBackdrop}>
+          <View style={styles.reviewCard}>
+            <Text style={styles.reviewTitle}>Analysis Review</Text>
+            <Text style={styles.reviewSubtitle}>Please confirm to update My Health numbers.</Text>
+
+            <View style={styles.reviewRow}>
+              <Text style={styles.reviewGood}>Good: {analysisReview?.goodParameters.length ?? 0}</Text>
+              <Text style={styles.reviewBad}>Needs Attention: {analysisReview?.attentionParameters.length ?? 0}</Text>
+            </View>
+
+            {analysisReview?.attentionParameters.length ? (
+              <View style={styles.reviewList}>
+                {analysisReview.attentionParameters.slice(0, 5).map((parameter) => (
+                  <Text key={`${parameter.name}-${parameter.value}`} style={styles.reviewListItem}>
+                    • {parameter.name}: {parameter.value} {parameter.unit} (Range {parameter.referenceRange})
+                  </Text>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.reviewAllGood}>All tracked parameters are in normal range.</Text>
+            )}
+
+            <Text style={styles.reviewSummaryText}>{analysisReview?.summary}</Text>
+
+            <View style={styles.reviewActions}>
+              <Pressable
+                style={styles.reviewSecondaryBtn}
+                onPress={() => {
+                  setShowAnalysisReview(false);
+                  setAnalysisReview(null);
+                }}
+              >
+                <Text style={styles.reviewSecondaryText}>Dismiss</Text>
+              </Pressable>
+              <Pressable style={styles.reviewPrimaryBtn} onPress={applyAnalysisReview}>
+                <Text style={styles.reviewPrimaryText}>Confirm Update</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1038,8 +1457,7 @@ const styles = StyleSheet.create({
   },
   parameterInsight: {
     marginTop: 6,
-    color: colors.blueDark,
-    fontStyle: 'italic',
+    color: colors.textSecondary,
     fontSize: 12,
     lineHeight: 18
   },
@@ -1242,17 +1660,30 @@ const styles = StyleSheet.create({
   },
   sheetBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20,18,30,0.35)',
+    backgroundColor: 'rgba(8,10,16,0.74)',
     justifyContent: 'flex-end'
   },
+  sheetDismissZone: {
+    flex: 1
+  },
   sheet: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardRaised,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.stroke,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 18,
-    minHeight: '75%'
+    maxHeight: '78%',
+    shadowColor: '#000',
+    shadowOpacity: 0.32,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 16
+  },
+  sheetScrollContent: {
+    paddingBottom: 10
   },
   sheetHandle: {
     alignSelf: 'center',
@@ -1265,21 +1696,23 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: palette.textDark
+    color: colors.textPrimary
   },
   sheetSubtitle: {
     marginTop: 4,
     marginBottom: 12,
     fontSize: 13,
-    color: palette.textMid
+    color: colors.textSecondary
   },
   uploadMethodRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 12
   },
   uploadMethodCard: {
-    flex: 1,
+    width: '31%',
+    minHeight: 132,
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: 12,
@@ -1297,21 +1730,73 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 13,
     fontWeight: '600',
-    color: palette.textDark,
+    color: colors.textPrimary,
     textAlign: 'center'
   },
   uploadMethodCopy: {
     marginTop: 2,
     fontSize: 11,
-    color: palette.textMid,
+    color: colors.textSecondary,
     textAlign: 'center'
+  },
+  uploadStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8
+  },
+  uploadStatusCard: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 10,
+    backgroundColor: colors.cardMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8
+  },
+  uploadStatusTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textPrimary
+  },
+  uploadStatusText: {
+    marginTop: 2,
+    fontSize: 12,
+    color: colors.textSecondary
+  },
+  uploadErrorCard: {
+    borderWidth: 1,
+    borderColor: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8
+  },
+  uploadErrorText: {
+    fontSize: 12,
+    color: colors.danger,
+    lineHeight: 16
+  },
+  retryBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    paddingHorizontal: 12,
+    paddingVertical: 5
+  },
+  retryBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.danger
   },
   fieldWrap: {
     marginBottom: 10
   },
   fieldLabel: {
     fontSize: 13,
-    color: palette.textMid,
+    color: colors.textSecondary,
     marginBottom: 6
   },
   fieldRow: {
@@ -1319,27 +1804,52 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: palette.border,
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardMuted,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 10
   },
+  pickerWrap: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 10,
+    backgroundColor: colors.cardMuted,
+    alignItems: 'flex-start',
+    overflow: 'hidden'
+  },
+  pickerDoneBtn: {
+    alignSelf: 'flex-end',
+    marginRight: 8,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: colors.card
+  },
+  pickerDoneText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textPrimary
+  },
   inputText: {
     flex: 1,
     fontSize: 14,
-    color: palette.textDark,
+    color: colors.textPrimary,
     paddingVertical: 0
   },
   readonlyChip: {
     alignSelf: 'flex-start',
     borderRadius: 8,
-    backgroundColor: palette.tealLight,
+    backgroundColor: colors.cardMuted,
     paddingHorizontal: 10,
     paddingVertical: 6
   },
   readonlyChipText: {
-    color: palette.teal,
+    color: colors.textPrimary,
     fontSize: 12,
     fontWeight: '600'
   },
@@ -1352,7 +1862,7 @@ const styles = StyleSheet.create({
   privacyText: {
     flex: 1,
     fontSize: 12,
-    color: palette.textMid
+    color: colors.textSecondary
   },
   primaryBtn: {
     marginTop: 14,
@@ -1447,6 +1957,121 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 12,
     color: palette.textLight
+  },
+  processingCancelBtn: {
+    marginTop: 14,
+    height: 36,
+    minWidth: 108,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card
+  },
+  processingCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary
+  },
+  reviewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(8,10,16,0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20
+  },
+  reviewCard: {
+    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    backgroundColor: colors.cardRaised,
+    padding: 16
+  },
+  reviewTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary
+  },
+  reviewSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: colors.textSecondary
+  },
+  reviewRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    gap: 8
+  },
+  reviewGood: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.success
+  },
+  reviewBad: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.danger
+  },
+  reviewList: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: colors.cardMuted,
+    borderWidth: 1,
+    borderColor: colors.stroke
+  },
+  reviewListItem: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textPrimary
+  },
+  reviewAllGood: {
+    marginTop: 10,
+    fontSize: 12,
+    color: colors.success
+  },
+  reviewSummaryText: {
+    marginTop: 12,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary
+  },
+  reviewActions: {
+    marginTop: 14,
+    flexDirection: 'row',
+    gap: 10
+  },
+  reviewSecondaryBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card
+  },
+  reviewSecondaryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary
+  },
+  reviewPrimaryBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: palette.teal,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  reviewPrimaryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.white
   },
   screenContentDark: {
     backgroundColor: colors.bgPrimary

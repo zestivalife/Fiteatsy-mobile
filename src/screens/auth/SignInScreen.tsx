@@ -25,7 +25,7 @@ const isCorporateEmail = (email: string) => {
 };
 
 export const SignInScreen = ({ navigation }: Props) => {
-  const { setIsAuthenticated, assessment } = useAppContext();
+  const { setIsAuthenticated, onboarding, assessment, wearableSetupCompleted } = useAppContext();
   const [email, setEmail] = useState('care@fiteatsy.com');
   const [password, setPassword] = useState('Demo@123');
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +40,15 @@ export const SignInScreen = ({ navigation }: Props) => {
 
     setError(null);
     setIsAuthenticated(true);
-    navigation.replace(assessment ? 'Main' : 'OnboardingAssessment');
+    if (!assessment) {
+      navigation.replace('OnboardingAssessment');
+      return;
+    }
+    if (!onboarding) {
+      navigation.replace('OnboardingBasics');
+      return;
+    }
+    navigation.replace(wearableSetupCompleted ? 'Main' : 'SyncWearable');
   };
 
   return (
@@ -123,6 +131,6 @@ const styles = StyleSheet.create({
   },
   link: {
     ...typography.caption,
-    color: colors.blueDark
+    color: colors.blue
   }
 });

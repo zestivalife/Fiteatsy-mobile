@@ -52,25 +52,32 @@ const scheduleOne = async (medication: Medication, when: Date) => {
   const now = Date.now();
   if (when.getTime() <= now) return null;
 
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: `Medication reminder: ${medication.name}`,
-      body: `${medication.dosage} • ${medication.type}`,
-      sound: 'default',
-      categoryIdentifier: 'MEDICATION_ACTIONS',
-      data: {
-        medicationId: medication.id,
-        scheduledForISO: when.toISOString()
-      }
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: when,
-      channelId: Platform.OS === 'android' ? 'medication-reminders' : undefined
+  let attempt = 0;
+  while (attempt < 2) {
+    try {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `Medication reminder: ${medication.name}`,
+          body: `${medication.dosage} • ${medication.type}`,
+          sound: 'default',
+          categoryIdentifier: 'MEDICATION_ACTIONS',
+          data: {
+            medicationId: medication.id,
+            scheduledForISO: when.toISOString()
+          }
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: when,
+          channelId: Platform.OS === 'android' ? 'medication-reminders' : undefined
+        }
+      });
+      return id;
+    } catch {
+      attempt += 1;
     }
-  });
-
-  return id;
+  }
+  return null;
 };
 
 export const clearScheduledMedicationNotifications = async (notificationIds: string[]) => {
@@ -93,6 +100,18 @@ export const scheduleMedicationNotifications = async (medication: Medication) =>
     if (id) ids.push(id);
   }
   return ids;
+};
+
+export const cancelAllMedicationScheduledNotifications = async () => {
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  const medicationIds = all
+    .filter((item) => {
+      const data = item.content.data as { medicationId?: string } | undefined;
+      return Boolean(data?.medicationId);
+    })
+    .map((item) => item.identifier);
+
+  await Promise.all(medicationIds.map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => null)));
 };
 
 export const scheduleSnoozeNotification = async (medicationName: string, medicationId: string, minutes: 5 | 10 | 15 | 30) => {

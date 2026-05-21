@@ -29,7 +29,7 @@ const FiteatsyWordmark = ({ width }: { width: number }) => {
 };
 
 export const SplashScreen = ({ navigation }: Props) => {
-  const { onboarding, isAuthenticated, assessment, bootstrapped } = useAppContext();
+  const { onboarding, assessment, isAuthenticated, bootstrapped, wearableSetupCompleted } = useAppContext();
   const { width } = useWindowDimensions();
 
   const introOpacity = useRef(new Animated.Value(0)).current;
@@ -123,18 +123,23 @@ export const SplashScreen = ({ navigation }: Props) => {
 
       navigated.current = true;
 
+      if (!isAuthenticated) {
+        navigation.replace('SignIn');
+        return;
+      }
+
       if (!assessment) {
         navigation.replace('OnboardingAssessment');
         return;
       }
 
       if (!onboarding) {
-        navigation.replace('OnboardingBasics');
+        navigation.replace('OnboardingAssessment');
         return;
       }
 
-      if (!isAuthenticated) {
-        navigation.replace('SignIn');
+      if (!wearableSetupCompleted) {
+        navigation.replace('SyncWearable');
         return;
       }
 
@@ -149,7 +154,7 @@ export const SplashScreen = ({ navigation }: Props) => {
       sweepX.stopAnimation();
       bgShift.stopAnimation();
     };
-  }, [assessment, bootstrapped, introOpacity, introScale, isAuthenticated, navigation, onboarding, glowOpacity, sweepX, bgShift]);
+  }, [bootstrapped, introOpacity, introScale, isAuthenticated, navigation, onboarding, assessment, wearableSetupCompleted, glowOpacity, sweepX, bgShift]);
 
   const logoWidth = Math.min(width * 0.78, 420);
 

@@ -27,7 +27,7 @@ const fallbackProfile = (): OnboardingProfile => ({
 });
 
 export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
-  const { onboarding, setOnboarding, isAuthenticated } = useAppContext();
+  const { onboarding, setOnboarding, setWearableSetupCompleted } = useAppContext();
   const profile = onboarding ?? fallbackProfile();
 
   const allowNotifications = () => {
@@ -41,9 +41,10 @@ export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
     if (!profile.notificationPermissionGranted) {
       allowNotifications();
     }
+    setWearableSetupCompleted(false);
     navigation.reset({
       index: 0,
-      routes: [{ name: isAuthenticated ? 'Main' : 'SignIn' }]
+      routes: [{ name: 'SyncWearable' }]
     });
   };
 
@@ -56,7 +57,7 @@ export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{profile.careTrack}</Text>
-          <Text style={styles.cardCopy}>Matched with {profile.matchedDietitianName}. Your dashboard will blend condition tracking, symptom recovery, hydration, nutrition guidance, and optional wearable sync.</Text>
+          <Text style={styles.cardCopy}>Matched with {profile.matchedDietitianName}. Your dashboard will blend condition tracking, symptom recovery, hydration, nutrition guidance, and optional health-app sync.</Text>
         </View>
 
         <Pressable style={styles.permissionButton} onPress={allowNotifications}>

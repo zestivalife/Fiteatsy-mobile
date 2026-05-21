@@ -10,7 +10,7 @@ import {
   View,
   useWindowDimensions
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -47,6 +47,9 @@ const sleepQualityLevels: AssessmentSleepQuality[] = ['Excellent', 'Good', 'Fair
 const AGE_MIN = 16;
 const AGE_MAX = 80;
 const AGE_ITEM_HEIGHT = 52;
+const HEIGHT_MIN = 130;
+const HEIGHT_MAX = 210;
+const HEIGHT_TICK_WIDTH = 14;
 const WEIGHT_MIN = 40;
 const WEIGHT_MAX = 160;
 const WEIGHT_TICK_WIDTH = 14;
@@ -122,6 +125,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
   const [goal, setGoal] = useState<AssessmentGoal>('Reduce Stress');
   const [gender, setGender] = useState<AssessmentGender>('Male');
   const [age, setAge] = useState(28);
+  const [heightCm, setHeightCm] = useState(170);
   const [weightKg, setWeightKg] = useState(68);
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
   const [mood, setAssessmentMood] = useState<AssessmentMood>('Neutral');
@@ -134,13 +138,16 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
   const [voiceAnalysis, setVoiceAnalysis] = useState<VoiceAnalysis | null>(null);
 
   const ageValues = useMemo(() => Array.from({ length: AGE_MAX - AGE_MIN + 1 }, (_, i) => AGE_MIN + i), []);
+  const heightValues = useMemo(() => Array.from({ length: HEIGHT_MAX - HEIGHT_MIN + 1 }, (_, i) => HEIGHT_MIN + i), []);
   const weightValues = useMemo(() => Array.from({ length: WEIGHT_MAX - WEIGHT_MIN + 1 }, (_, i) => WEIGHT_MIN + i), []);
   const pulse = useRef(new Animated.Value(1)).current;
   const micScale = useRef(new Animated.Value(1)).current;
   const ageRef = useRef<ScrollView>(null);
   const weightRef = useRef<ScrollView>(null);
+  const heightRef = useRef<ScrollView>(null);
   const rulerSidePadding = Math.max(16, (width - 32) / 2);
   const ageIndex = age - AGE_MIN;
+  const heightIndex = heightCm - HEIGHT_MIN;
   const weightIndex = weightKg - WEIGHT_MIN;
 
   const weightDisplay = useMemo(() => {
@@ -148,7 +155,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
     return `${Math.round(weightKg * 2.20462)} lbs`;
   }, [unit, weightKg]);
 
-  const totalSteps = 10;
+  const totalSteps = 11;
   const isLast = step === totalSteps;
 
   const stressCopy = useMemo(() => {
@@ -179,6 +186,16 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
   useEffect(() => {
     if (step === 4) {
       const id = setTimeout(() => {
+        heightRef.current?.scrollTo({ x: heightIndex * HEIGHT_TICK_WIDTH, animated: false });
+      }, 40);
+      return () => clearTimeout(id);
+    }
+    return undefined;
+  }, [step, heightIndex]);
+
+  useEffect(() => {
+    if (step === 5) {
+      const id = setTimeout(() => {
         weightRef.current?.scrollTo({ x: weightIndex * WEIGHT_TICK_WIDTH, animated: false });
       }, 40);
       return () => clearTimeout(id);
@@ -194,6 +211,11 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
   const onWeightScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const rawIndex = Math.round(event.nativeEvent.contentOffset.x / WEIGHT_TICK_WIDTH);
     setWeightKg(weightValues[clamp(rawIndex, 0, weightValues.length - 1)]);
+  };
+
+  const onHeightScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const rawIndex = Math.round(event.nativeEvent.contentOffset.x / HEIGHT_TICK_WIDTH);
+    setHeightCm(heightValues[clamp(rawIndex, 0, heightValues.length - 1)]);
   };
 
   const startVoiceCapture = () => {
@@ -240,6 +262,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
       goal,
       gender,
       age,
+      heightCm,
       weightKg,
       mood,
       soughtHelpBefore,
@@ -355,6 +378,38 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 4 ? (
             <View>
+              <Text style={styles.question}>What’s your height?</Text>
+              <View style={styles.weightCard}>
+                <Text style={styles.bigNumber}>{heightCm} cm</Text>
+                <View style={styles.rulerWrap}>
+                  <ScrollView
+                    ref={heightRef}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    decelerationRate="fast"
+                    snapToInterval={HEIGHT_TICK_WIDTH}
+                    contentContainerStyle={{ paddingHorizontal: rulerSidePadding }}
+                    onMomentumScrollEnd={onHeightScrollEnd}
+                  >
+                    {heightValues.map((item) => {
+                      const selected = item === heightCm;
+                      const major = item % 5 === 0;
+                      return (
+                        <View key={`ht-${item}`} style={styles.tickItem}>
+                          <View style={[styles.tick, major && styles.tickMajor, selected && styles.tickSelected]} />
+                          {major ? <Text style={styles.tickLabel}>{item}</Text> : <View style={styles.tickLabelSpacer} />}
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                  <View pointerEvents="none" style={styles.rulerIndicator} />
+                </View>
+              </View>
+            </View>
+          ) : null}
+
+          {step === 5 ? (
+            <View>
               <Text style={styles.question}>What’s your weight?</Text>
               <View style={styles.unitRow}>
                 <Pressable style={[styles.unitChip, unit === 'kg' && styles.unitChipActive]} onPress={() => setUnit('kg')}>
@@ -394,7 +449,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 5 ? (
+          {step === 6 ? (
             <View>
               <Text style={styles.question}>How would you describe your mood?</Text>
               <View style={styles.rowWrap}>
@@ -418,7 +473,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 6 ? (
+          {step === 7 ? (
             <View>
               <Text style={styles.question}>Have you sought professional help before?</Text>
               <View style={styles.binaryRow}>
@@ -432,7 +487,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 7 ? (
+          {step === 8 ? (
             <View>
               <Text style={styles.question}>Are you experiencing any physical distress?</Text>
               <View style={styles.binaryRow}>
@@ -446,7 +501,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 8 ? (
+          {step === 9 ? (
             <View>
               <Text style={styles.question}>How would you rate your sleep quality?</Text>
               <View style={styles.sleepRailWrap}>
@@ -468,7 +523,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 9 ? (
+          {step === 10 ? (
             <View>
               <Text style={styles.question}>How would you rate your stress level?</Text>
               <Text style={styles.stressValue}>{stressLevel}</Text>
@@ -487,7 +542,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 10 ? (
+          {step === 11 ? (
             <View>
               <Text style={styles.question}>AI Sound Analysis</Text>
               <View style={styles.voiceCard}>

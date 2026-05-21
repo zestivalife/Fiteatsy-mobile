@@ -1,16 +1,18 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { RootStackParamList } from '../../navigation/types';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, typography } from '../../design/tokens';
+import { useAppContext } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SyncSuccess'>;
 
 export const SyncSuccessScreen = ({ navigation, route }: Props) => {
+  const { setWearableSetupCompleted } = useAppContext();
   return (
     <Screen>
       <View style={styles.container}>
@@ -23,7 +25,10 @@ export const SyncSuccessScreen = ({ navigation, route }: Props) => {
           <PrimaryButton
             title="Go To Dashboard"
             style={styles.cta}
-            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Main' }] })}
+            onPress={() => {
+              setWearableSetupCompleted(true);
+              navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+            }}
           />
         </Card>
       </View>

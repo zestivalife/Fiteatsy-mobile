@@ -16,14 +16,41 @@
       "bundleIdentifier": "com.fiteatsy.health"
     },
     "android": {
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "ACTIVITY_RECOGNITION",
+        "BODY_SENSORS",
+        "POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/adaptive-icon.png",
         "backgroundColor": "#191533"
-      }
+      },
+      "package": "com.fiteatsy.health"
     },
     "web": {
       "bundler": "metro",
       "favicon": "./src/assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "70254234-571c-4351-87d9-33e8f851dde1"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Fiteatsy to access your photos for health report upload.",
+          "cameraPermission": "Allow Fiteatsy to use your camera to capture health reports."
+        }
+      ],
+      "expo-document-picker",
+      "@react-native-community/datetimepicker"
+    ]
   }
 }

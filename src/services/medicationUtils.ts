@@ -18,6 +18,18 @@ export const parseTimeToParts = (time24h: string) => {
   return { hours: Number.isFinite(h) ? h : 0, minutes: Number.isFinite(m) ? m : 0 };
 };
 
+export const resolveMedicationSlotForOccurrence = (medication: Medication, scheduledForISO: string) => {
+  const scheduled = new Date(scheduledForISO);
+  const hours = scheduled.getHours();
+  const minutes = scheduled.getMinutes();
+  return (
+    medication.schedule.timeSlots.find((slot) => {
+      const parts = parseTimeToParts(slot.time24h);
+      return parts.hours === hours && parts.minutes === minutes;
+    }) ?? medication.schedule.timeSlots[0]
+  );
+};
+
 const matchesFrequency = (rule: MedicationFrequencyRule, day: Date, start: Date) => {
   const diffDays = Math.floor((toStartOfDay(day).getTime() - toStartOfDay(start).getTime()) / DAY_MS);
   if (diffDays < 0) return false;
@@ -75,7 +87,18 @@ export const getMedicationStatusForOccurrence = (
     .filter((log) => log.medicationId === medicationId && log.scheduledForISO === scheduledForISO)
     .sort((a, b) => new Date(b.actionedAtISO ?? b.scheduledForISO).getTime() - new Date(a.actionedAtISO ?? a.scheduledForISO).getTime())[0];
 
-  if (existing) return existing.status;
+  if (existing) {
+    if (existing.status === 'snoozed' && existing.snoozedUntilISO && new Date(existing.snoozedUntilISO).getTime() > Date.now()) {
+      return 'upcoming';
+    }
+    return existing.status;
+  }
+  const snoozed = logs
+    .filter((log) => log.medicationId === medicationId && log.status === 'snoozed' && log.snoozedUntilISO)
+    .sort((a, b) => new Date(b.actionedAtISO ?? b.scheduledForISO).getTime() - new Date(a.actionedAtISO ?? a.scheduledForISO).getTime())[0];
+  if (snoozed?.snoozedUntilISO && new Date(snoozed.snoozedUntilISO).getTime() > Date.now()) {
+    return 'upcoming';
+  }
 
   const now = Date.now();
   const when = new Date(scheduledForISO).getTime();

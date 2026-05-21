@@ -35,13 +35,19 @@ import { applyMoodImpact } from '../utils/wellness';
 import { generatePriorityPlan, buildDecisionLog } from '../services/intelligenceEngine';
 import { todayKey, toDayKey } from '../utils/date';
 import {
+  cancelAllMedicationScheduledNotifications,
   clearScheduledMedicationNotifications,
   initMedicationNotifications,
   requestMedicationNotificationPermissions,
   scheduleMedicationNotifications,
   scheduleSnoozeNotification
 } from '../services/medicationNotificationService';
-import { buildLogId, getMedicationOccurrencesForDate, getMedicationStatusForOccurrence } from '../services/medicationUtils';
+import {
+  buildLogId,
+  getMedicationOccurrencesForDate,
+  getMedicationStatusForOccurrence,
+  resolveMedicationSlotForOccurrence
+} from '../services/medicationUtils';
 import {
   buildCyclePrediction,
   getMostCommonSymptoms,
@@ -84,6 +90,8 @@ type AppContextValue = {
   logout: () => void;
   selectedDeviceId: string | null;
   setSelectedDeviceId: React.Dispatch<React.SetStateAction<string | null>>;
+  wearableSetupCompleted: boolean;
+  setWearableSetupCompleted: React.Dispatch<React.SetStateAction<boolean>>;
   medicationPermissionGranted: boolean;
   medications: Medication[];
   medicationLogs: MedicationLog[];
@@ -146,6 +154,7 @@ const STORAGE_KEYS = {
   auth: 'nuetra.auth',
   theme: 'nuetra.theme',
   selectedDeviceId: 'nuetra.selectedDeviceId',
+  wearableSetupCompleted: 'nuetra.wearableSetupCompleted',
   devices: 'nuetra.devices',
   medications: 'nuetra.medications',
   medicationLogs: 'nuetra.medicationLogs',
@@ -174,6 +183,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [wearableSyncData, setWearableSyncData] = useState<WearableSyncPayload[]>([]);
   const [themeMode, setThemeModeState] = useState<ThemeMode>('dark');
   const [selectedDeviceId, setSelectedDeviceIdState] = useState<string | null>(null);
+  const [wearableSetupCompleted, setWearableSetupCompletedState] = useState(false);
   const [medicationPermissionGranted, setMedicationPermissionGranted] = useState(false);
   const [medications, setMedications] = useState<Medication[]>([]);
   const [medicationLogs, setMedicationLogs] = useState<MedicationLog[]>([]);
@@ -199,6 +209,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           storedAuth,
           storedTheme,
           storedSelectedDeviceId,
+          storedWearableSetupCompleted,
           storedDevices,
           storedMedications,
           storedMedicationLogs,
@@ -215,6 +226,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           AsyncStorage.getItem(STORAGE_KEYS.auth),
           AsyncStorage.getItem(STORAGE_KEYS.theme),
           AsyncStorage.getItem(STORAGE_KEYS.selectedDeviceId),
+          AsyncStorage.getItem(STORAGE_KEYS.wearableSetupCompleted),
           AsyncStorage.getItem(STORAGE_KEYS.devices),
           AsyncStorage.getItem(STORAGE_KEYS.medications),
           AsyncStorage.getItem(STORAGE_KEYS.medicationLogs),
@@ -241,6 +253,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
         if (storedSelectedDeviceId) {
           setSelectedDeviceIdState(storedSelectedDeviceId);
+        }
+        if (storedWearableSetupCompleted) {
+          setWearableSetupCompletedState(storedWearableSetupCompleted === '1');
         }
         if (storedDevices) {
           const parsed = JSON.parse(storedDevices) as WearableDevice[];
@@ -351,6 +366,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           AsyncStorage.removeItem(STORAGE_KEYS.selectedDeviceId);
         }
+        return next;
+      });
+    },
+    []
+  );
+
+  const setWearableSetupCompleted = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(
+    (updater) => {
+      setWearableSetupCompletedState((previous) => {
+        const next = typeof updater === 'function' ? updater(previous) : updater;
+        AsyncStorage.setItem(STORAGE_KEYS.wearableSetupCompleted, next ? '1' : '0');
         return next;
       });
     },
@@ -769,7 +795,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const medication = medications.find((item) => item.id === medicationId);
       if (!medication) return;
 
-      const slot = medication.schedule.timeSlots[0];
+      const slot = resolveMedicationSlotForOccurrence(medication, scheduledForISO);
       const log: MedicationLog = {
         id: buildLogId(medicationId, slot, scheduledForISO),
         medicationId,
@@ -794,6 +820,32 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     },
     [medications, persistMedicationLogs]
   );
+
+  useEffect(() => {
+    if (!bootstrapped || !medicationPermissionGranted) return;
+
+    let cancelled = false;
+    const reconcile = async () => {
+      await cancelAllMedicationScheduledNotifications();
+      const refreshed = await Promise.all(
+        medications.map(async (medication) => {
+          if (medication.status !== 'active') {
+            return { ...medication, notificationIds: [] };
+          }
+          const notificationIds = await scheduleMedicationNotifications(medication);
+          return { ...medication, notificationIds };
+        })
+      );
+      if (cancelled) return;
+      setMedications(refreshed);
+      persistMedications(refreshed);
+    };
+
+    reconcile();
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrapped, medicationPermissionGranted, medications.length, persistMedications]);
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response: Notifications.NotificationResponse) => {
@@ -937,6 +989,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setMood(null);
     setIsAuthenticated(false);
     setSelectedDeviceId(null);
+    setWearableSetupCompleted(false);
     setCheckIns([]);
     setPriorityPlan(null);
     setDecisionLogs([]);
@@ -949,7 +1002,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setFamilyInvites([]);
     setFamilyConnections([]);
     setFamilyEmergencyEvents([]);
-  }, [setIsAuthenticated, setSelectedDeviceId]);
+  }, [setIsAuthenticated, setSelectedDeviceId, setWearableSetupCompleted]);
 
   const value = useMemo(
     () => ({
@@ -980,6 +1033,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       logout,
       selectedDeviceId,
       setSelectedDeviceId,
+      wearableSetupCompleted,
+      setWearableSetupCompleted,
       medicationPermissionGranted,
       medications,
       medicationLogs,
@@ -1038,12 +1093,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       onboarding,
       priorityPlan,
       selectedDeviceId,
+      wearableSetupCompleted,
       setAssessment,
       setDevices,
       setIsAuthenticated,
       setMoodWithImpact,
       setOnboarding,
       setSelectedDeviceId,
+      setWearableSetupCompleted,
       setThemeMode,
       setWellness,
       requestMedicationPermission,
