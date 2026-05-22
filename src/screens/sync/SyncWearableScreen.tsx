@@ -1,159 +1,177 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { SdkAvailabilityStatus, getSdkStatus } from 'react-native-health-connect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
-import { connectHealthApp, getAvailableHealthApps, syncConnectedHealthApp, type HealthAppId, type HealthAppOption } from '../../services/healthAppService';
+import {
+  classifyRecoveryConnectionState,
+  openHealthConnectPlayStore,
+  syncConnectedHealthApp,
+  type RecoveryConnectionState
+} from '../../services/healthAppService';
 import { recalculateWellness } from '../../utils/wellness';
 import { initialWellness } from '../../data/mock';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SyncWearable'>;
 
-const iconMap: Record<HealthAppId, keyof typeof Ionicons.glyphMap> = {
-  'apple-health': 'heart-circle-outline',
-  'health-connect': 'pulse-outline',
-  'google-fit': 'walk-outline',
-  'samsung-health': 'watch-outline',
-  fitbit: 'moon-outline'
+const stateCopy: Record<RecoveryConnectionState, { title: string; description: string; tone: 'ok' | 'warn' | 'calm' }> = {
+  connected: {
+    title: 'Recovery Signals Connected',
+    description: 'Realtime recovery signals are available and your dashboard is now synced.',
+    tone: 'ok'
+  },
+  partial: {
+    title: 'Partially Connected',
+    description: 'Some recovery signals are available. Fiteatsy will keep improving as more signals sync.',
+    tone: 'calm'
+  },
+  calibrating: {
+    title: 'Recovery Calibration Started',
+    description: 'Recovery signals are syncing. Insights will become stronger as continuity builds.',
+    tone: 'calm'
+  },
+  no_recent_data: {
+    title: 'No Recent Recovery Signals',
+    description: 'Your health apps are connected, but recent records are not available yet.',
+    tone: 'warn'
+  },
+  no_signals: {
+    title: 'No Recovery Signals Yet',
+    description: 'Permissions are granted, but no supported recovery records were found yet.',
+    tone: 'warn'
+  },
+  permission_missing: {
+    title: 'Permission Needed',
+    description: 'Recovery access is still needed to read sleep, activity, and heart recovery signals.',
+    tone: 'warn'
+  }
 };
 
-export const SyncWearableScreen = ({ navigation, route }: Props) => {
-  const autoSync = route.params?.autoSync === true;
-  const { setWearableSetupCompleted, selectedDeviceId, setSelectedDeviceId, onboarding, setOnboarding, addWearableSyncData, setWellness } = useAppContext();
-  const [sheetOpen, setSheetOpen] = useState(!autoSync);
-  const [selectedAppId, setSelectedAppId] = useState<string | null>(selectedDeviceId);
-  const [apps, setApps] = useState<HealthAppOption[]>([]);
-  const [loadingApps, setLoadingApps] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+export const SyncWearableScreen = ({ navigation }: Props) => {
+  const {
+    setWearableSetupCompleted,
+    setSelectedDeviceId,
+    onboarding,
+    setOnboarding,
+    addWearableSyncData,
+    setWellness
+  } = useAppContext();
+
+  const [isRunning, setIsRunning] = useState(false);
+  const [pendingInstall, setPendingInstall] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [syncInfo, setSyncInfo] = useState<string | null>(null);
-  const autoSyncAttemptedRef = useRef(false);
-
-  const selectedApp = useMemo(
-    () => apps.find((app) => app.id === selectedAppId) ?? null,
-    [apps, selectedAppId]
+  const [connectionState, setConnectionState] = useState<RecoveryConnectionState | null>(null);
+  const [statusTitle, setStatusTitle] = useState('Connect Your Recovery');
+  const [statusBody, setStatusBody] = useState(
+    'Fiteatsy securely connects your sleep, activity, and wellness signals automatically.'
   );
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      setLoadingApps(true);
-      setError(null);
-      try {
-        const available = await getAvailableHealthApps();
-        if (active) {
-          setApps(available);
-        }
-      } catch {
-        if (active) {
-          setError('Unable to fetch health apps right now.');
-        }
-      } finally {
-        if (active) {
-          setLoadingApps(false);
-        }
-      }
-    };
-    load();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const completeOnboardingFlow = useCallback(() => {
+    if (onboarding) {
+      setOnboarding({
+        ...onboarding,
+        wearablePreference: connectionState === 'connected' || connectionState === 'partial' ? 'sync' : 'later'
+      });
+    }
+    setWearableSetupCompleted(true);
+    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+  }, [connectionState, navigation, onboarding, setOnboarding, setWearableSetupCompleted]);
 
-  const continueWithSelection = useCallback(async () => {
-    if (!selectedAppId) return;
-    setConnecting(true);
+  const runRecoveryConnection = useCallback(async () => {
+    if (Platform.OS !== 'android') {
+      completeOnboardingFlow();
+      return;
+    }
+
+    setIsRunning(true);
     setError(null);
-    setSyncInfo(null);
+    setStatusTitle('Checking Recovery Connection');
+    setStatusBody('Preparing secure access to your recovery signals.');
+
     try {
-      await connectHealthApp(selectedAppId as HealthAppId);
-      const livePayload = await syncConnectedHealthApp(selectedAppId as HealthAppId);
-      addWearableSyncData(livePayload);
-      const connectedMetrics = livePayload.dataQuality.connectedMetrics ?? {};
+      const sdkStatus = await getSdkStatus();
+      if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
+        setPendingInstall(true);
+        setConnectionState(null);
+        setStatusTitle('Health Connect Needed');
+        setStatusBody('Health Connect helps securely sync your recovery signals.');
+        await openHealthConnectPlayStore();
+        setIsRunning(false);
+        return;
+      }
+
+      setPendingInstall(false);
+      setStatusTitle('Syncing Recovery Signals');
+      setStatusBody('Reading sleep, activity, and heart recovery data securely from your device.');
+
+      const payload = await syncConnectedHealthApp('health-connect');
+      addWearableSyncData(payload);
+      setSelectedDeviceId('health-connect');
+
+      const state = classifyRecoveryConnectionState(payload);
+      setConnectionState(state);
+      setStatusTitle(stateCopy[state].title);
+      setStatusBody(stateCopy[state].description);
+
+      const connectedMetrics = payload.dataQuality.connectedMetrics ?? {};
       const syncedCount = Object.values(connectedMetrics).filter((status) => status === 'synced').length;
-      const hasPermissionsIssue = Object.values(connectedMetrics).some((status) => status === 'no_permission');
-      const hasRecentDataIssue = Object.values(connectedMetrics).every(
-        (status) => status === 'no_recent_data' || status === 'unsupported' || status === 'unavailable'
-      );
 
       if (syncedCount > 0) {
         setWellness(
           recalculateWellness({
             ...initialWellness,
-            heartRateAvg: livePayload.metrics.heartRateAvg,
-            sleepHours: livePayload.metrics.sleepHours,
-            hydrationLiters: livePayload.metrics.hydrationLiters,
-            focusMinutes: livePayload.metrics.focusMinutes,
-            breathingMinutes: livePayload.metrics.breathingMinutes,
-            movementMinutes: livePayload.metrics.movementMinutes
+            heartRateAvg: payload.metrics.heartRateAvg,
+            sleepHours: payload.metrics.sleepHours,
+            hydrationLiters: payload.metrics.hydrationLiters,
+            focusMinutes: payload.metrics.focusMinutes,
+            breathingMinutes: payload.metrics.breathingMinutes,
+            movementMinutes: payload.metrics.movementMinutes
           })
         );
-        setSyncInfo('Health app sync completed with real connected metrics.');
-      } else if (hasPermissionsIssue) {
-        setError('Health data permission is missing. Allow required permissions in Health Connect and retry sync.');
-        setConnecting(false);
-        return;
-      } else if (hasRecentDataIssue) {
-        setError('No recent health records were found for the selected metrics. Open your health app, confirm recent activity, and retry sync.');
-        setConnecting(false);
-        return;
-      } else {
-        setError('Sync completed but no supported metrics were available.');
-        setConnecting(false);
-        return;
       }
 
-      setSelectedDeviceId(selectedAppId);
-      if (onboarding) {
-        setOnboarding({
-          ...onboarding,
-          wearablePreference: 'sync'
-        });
+      if (state !== 'permission_missing') {
+        completeOnboardingFlow();
       }
-
-      setWearableSetupCompleted(true);
-      setSheetOpen(false);
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-      setConnecting(false);
     } catch (syncError) {
       const message = syncError instanceof Error ? syncError.message : 'sync_failed';
       if (message.includes('health_connect_unavailable')) {
-        setError('Health Connect is unavailable on this device. Install or update Health Connect and retry.');
+        setStatusTitle('Health Connect Needed');
+        setStatusBody('Install or update Health Connect to continue recovery sync.');
+        setPendingInstall(true);
       } else if (message.includes('health_connect_initialize_failed')) {
-        setError('Unable to initialize Health Connect. Please reopen the app and try again.');
-      } else if (message.includes('health_app_connect_failed')) {
-        setError('Unable to connect selected health app. Please retry.');
+        setStatusTitle('Recovery Connection Paused');
+        setStatusBody('Recovery connection is temporarily unavailable. Please retry in a moment.');
       } else {
-        setError('Sync failed. Please verify health app permissions and retry.');
+        setStatusTitle('Recovery Signals Pending');
+        setStatusBody('Recovery signals are still calibrating. You can continue and sync again anytime.');
       }
-      setConnecting(false);
-      return;
+      setError('Recovery sync could not be completed right now.');
+    } finally {
+      setIsRunning(false);
     }
-
-  }, [
-    addWearableSyncData,
-    navigation,
-    onboarding,
-    selectedAppId,
-    setOnboarding,
-    setSelectedDeviceId,
-    setWearableSetupCompleted,
-    setWellness
-  ]);
+  }, [addWearableSyncData, completeOnboardingFlow, setSelectedDeviceId, setWellness]);
 
   useEffect(() => {
-    if (!autoSync || loadingApps || connecting || autoSyncAttemptedRef.current) return;
-    if (selectedAppId) {
-      autoSyncAttemptedRef.current = true;
-      void continueWithSelection();
-      return;
-    }
-    setSheetOpen(true);
-  }, [autoSync, connecting, continueWithSelection, loadingApps, selectedAppId]);
+    void runRecoveryConnection();
+  }, [runRecoveryConnection]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      const wasBackground = appStateRef.current.match(/inactive|background/);
+      appStateRef.current = nextState;
+      if (pendingInstall && wasBackground && nextState === 'active') {
+        void runRecoveryConnection();
+      }
+    });
+    return () => sub.remove();
+  }, [pendingInstall, runRecoveryConnection]);
 
   const skipForNow = () => {
     if (onboarding) {
@@ -163,69 +181,58 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
       });
     }
     setWearableSetupCompleted(true);
-    setSheetOpen(false);
     navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
   };
 
   return (
     <Screen>
       <View style={styles.container}>
-        <Text style={styles.title}>Connect a health app</Text>
+        <Text style={styles.title}>Connect Your Recovery</Text>
         <Text style={styles.subTitle}>
-          Sync is optional. Choose a health app to import wellness signals into Fiteatsy, or skip and continue.
+          Fiteatsy securely connects your sleep, activity, and wellness signals automatically.
+        </Text>
+        <Text style={styles.supportText}>
+          Works with Health Connect compatible wellness apps including: Samsung Health, Google Fit, NoiseFit, boAt
+          Crest, Fitbit and more.
         </Text>
 
-        <PrimaryButton title="Choose health app" onPress={() => setSheetOpen(true)} />
+        <View style={styles.statusCard}>
+          <View style={styles.statusHeader}>
+            <Ionicons
+              name={
+                connectionState === 'connected'
+                  ? 'checkmark-circle'
+                  : connectionState === 'permission_missing'
+                    ? 'lock-closed-outline'
+                    : 'pulse-outline'
+              }
+              size={20}
+              color={connectionState === 'connected' ? colors.success : connectionState === 'permission_missing' ? colors.warning : colors.blue}
+            />
+            <Text style={styles.statusTitle}>{statusTitle}</Text>
+          </View>
+          <Text style={styles.statusBody}>{statusBody}</Text>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </View>
+
+        <PrimaryButton
+          title={
+            isRunning
+              ? 'Connecting...'
+              : pendingInstall
+                ? 'Continue After Install'
+                : connectionState === 'permission_missing'
+                  ? 'Retry Permission'
+                  : 'Continue'
+          }
+          onPress={() => void runRecoveryConnection()}
+          disabled={isRunning}
+        />
 
         <Pressable style={styles.skipInline} onPress={skipForNow}>
-          <Text style={styles.skipInlineText}>Maybe later</Text>
+          <Text style={styles.skipInlineText}>Skip for now</Text>
         </Pressable>
       </View>
-
-      <Modal visible={sheetOpen} transparent animationType="slide" onRequestClose={skipForNow}>
-        <View style={styles.overlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={skipForNow} />
-          <View style={styles.sheet}>
-            <View style={styles.grabber} />
-            <Text style={styles.sheetTitle}>Select health app</Text>
-            <Text style={styles.sheetCopy}>Choose one to continue. You can change this anytime in Profile.</Text>
-
-            <View style={styles.optionsList}>
-              {loadingApps ? (
-                <Text style={styles.loadingText}>Loading available apps...</Text>
-              ) : null}
-              {apps.map((app) => {
-                const active = selectedAppId === app.id;
-                return (
-                  <Pressable
-                    key={app.id}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: active }}
-                    onPress={() => setSelectedAppId(app.id)}
-                    style={[styles.option, active && styles.optionActive]}
-                  >
-                    <View style={styles.optionLeft}>
-                      <Ionicons name={iconMap[app.id]} size={20} color={active ? colors.blue : colors.textPrimary} />
-                      <View style={styles.optionTextWrap}>
-                        <Text style={styles.optionTitle}>{app.label}</Text>
-                        <Text style={styles.optionSub}>{app.subtitle}</Text>
-                      </View>
-                    </View>
-                    {active ? <Ionicons name="checkmark-circle" size={20} color={colors.blue} /> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            {syncInfo ? <Text style={styles.infoText}>{syncInfo}</Text> : null}
-
-            <PrimaryButton title={connecting ? 'Connecting...' : 'Continue'} onPress={continueWithSelection} disabled={!selectedAppId || connecting} />
-            <Pressable style={styles.sheetSkip} onPress={skipForNow}>
-              <Text style={styles.sheetSkipText}>Skip for now</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </Screen>
   );
 };
@@ -238,12 +245,46 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title,
-    fontSize: 24
+    fontSize: 24,
+    color: colors.textPrimary
   },
   subTitle: {
     ...typography.body,
     fontSize: 14,
     color: colors.textSecondary
+  },
+  supportText: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.textSecondary
+  },
+  statusCard: {
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 14,
+    gap: 8
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  statusTitle: {
+    ...typography.bodyStrong,
+    fontSize: 14,
+    color: colors.textPrimary
+  },
+  statusBody: {
+    ...typography.body,
+    fontSize: 12,
+    color: colors.textSecondary
+  },
+  errorText: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.danger
   },
   skipInline: {
     alignSelf: 'center',
@@ -251,98 +292,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   skipInlineText: {
-    ...typography.caption,
-    color: colors.textSecondary
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    justifyContent: 'flex-end'
-  },
-  sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    backgroundColor: colors.bgSecondary,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 22,
-    gap: 12
-  },
-  grabber: {
-    alignSelf: 'center',
-    width: 44,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: '#4A4A4A',
-    marginBottom: 2
-  },
-  sheetTitle: {
-    ...typography.bodyStrong,
-    fontSize: 18,
-    color: colors.textPrimary
-  },
-  sheetCopy: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 13
-  },
-  optionsList: {
-    gap: 10,
-    marginBottom: 4
-  },
-  option: {
-    minHeight: 58,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    backgroundColor: colors.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  optionActive: {
-    borderColor: colors.blue,
-    backgroundColor: 'rgba(96,175,0,0.12)'
-  },
-  optionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1
-  },
-  optionTextWrap: {
-    flex: 1
-  },
-  optionTitle: {
-    ...typography.bodyStrong,
-    fontSize: 14
-  },
-  optionSub: {
-    ...typography.caption,
-    fontSize: 12
-  },
-  sheetSkip: {
-    alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  sheetSkipText: {
-    ...typography.caption,
-    color: colors.textSecondary
-  },
-  loadingText: {
-    ...typography.caption,
-    color: colors.textSecondary
-  },
-  errorText: {
-    ...typography.caption,
-    color: colors.danger
-  },
-  infoText: {
     ...typography.caption,
     color: colors.textSecondary
   }

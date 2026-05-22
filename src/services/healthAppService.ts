@@ -1,9 +1,16 @@
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { WearableSyncPayload } from '../types';
 import { syncFromHealthConnect } from './healthConnectService';
 
 export type HealthAppId = 'apple-health' | 'health-connect' | 'google-fit' | 'samsung-health' | 'fitbit';
+export type RecoveryConnectionState =
+  | 'connected'
+  | 'partial'
+  | 'calibrating'
+  | 'no_recent_data'
+  | 'no_signals'
+  | 'permission_missing';
 
 export type HealthAppOption = {
   id: HealthAppId;
@@ -13,10 +20,7 @@ export type HealthAppOption = {
 
 const fallbackApps: HealthAppOption[] = [
   { id: 'apple-health', label: 'Apple Health', subtitle: 'iPhone wellness and activity data' },
-  { id: 'health-connect', label: 'Health Connect', subtitle: 'Android unified health data' },
-  { id: 'google-fit', label: 'Google Fit', subtitle: 'Activity, steps, and heart trends' },
-  { id: 'samsung-health', label: 'Samsung Health', subtitle: 'Samsung device health insights' },
-  { id: 'fitbit', label: 'Fitbit', subtitle: 'Sleep and movement summaries' }
+  { id: 'health-connect', label: 'Health Connect', subtitle: 'Android unified recovery signals' }
 ];
 
 const getApiBaseUrl = () => {
@@ -32,6 +36,10 @@ const getApiBaseUrl = () => {
 const apiBaseUrl = getApiBaseUrl();
 
 export const getAvailableHealthApps = async (): Promise<HealthAppOption[]> => {
+  if (Platform.OS === 'android') {
+    return [{ id: 'health-connect', label: 'Health Connect', subtitle: 'Android unified recovery signals' }];
+  }
+
   try {
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
     const response = await fetch(`${apiBaseUrl}/v1/wearables/health-apps?platform=${platform}`);
@@ -49,6 +57,18 @@ export const getAvailableHealthApps = async (): Promise<HealthAppOption[]> => {
 };
 
 export const connectHealthApp = async (appId: HealthAppId) => {
+  if (Platform.OS === 'android' && appId === 'health-connect') {
+    return {
+      connected: true,
+      connectionId: `health-connect-${Date.now()}`,
+      appId: 'health-connect' as const,
+      appName: 'Health Connect',
+      provider: 'Health Connect',
+      connectedAtISO: new Date().toISOString(),
+      status: 'connected' as const
+    };
+  }
+
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   const response = await fetch(`${apiBaseUrl}/v1/wearables/connect-app`, {
     method: 'POST',
@@ -99,6 +119,48 @@ export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<Wearab
     throw new Error('live_sync_failed');
   }
 
-  const payload = (await response.json()) as { payload: WearableSyncPayload };
+const payload = (await response.json()) as { payload: WearableSyncPayload };
   return payload.payload;
+};
+
+export const openHealthConnectPlayStore = async () => {
+  if (Platform.OS !== 'android') return;
+  const marketUrl = 'market://details?id=com.google.android.apps.healthdata';
+  const webUrl = 'https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata';
+
+  const canOpenMarket = await Linking.canOpenURL(marketUrl);
+  await Linking.openURL(canOpenMarket ? marketUrl : webUrl);
+};
+
+const metricPriority: Array<keyof NonNullable<WearableSyncPayload['dataQuality']['connectedMetrics']>> = [
+  'steps',
+  'sleep',
+  'heart_rate',
+  'hrv',
+  'workouts'
+];
+
+export const classifyRecoveryConnectionState = (payload: WearableSyncPayload): RecoveryConnectionState => {
+  const connectedMetrics = payload.dataQuality.connectedMetrics ?? {};
+  const statuses = metricPriority.map((key) => connectedMetrics[key] ?? 'missing');
+  const syncedCount = statuses.filter((status) => status === 'synced').length;
+  const noPermissionCount = statuses.filter((status) => status === 'no_permission').length;
+  const noRecentCount = statuses.filter((status) => status === 'no_recent_data').length;
+
+  if (noPermissionCount > 0 && syncedCount === 0) {
+    return 'permission_missing';
+  }
+  if (syncedCount >= 4) {
+    return 'connected';
+  }
+  if (syncedCount >= 2) {
+    return 'partial';
+  }
+  if (syncedCount === 1) {
+    return 'calibrating';
+  }
+  if (noRecentCount >= 3) {
+    return 'no_recent_data';
+  }
+  return 'no_signals';
 };

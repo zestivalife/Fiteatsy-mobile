@@ -1047,7 +1047,7 @@ const styles = StyleSheet.create({
     top: 119 * HERO_SCALE
   },
   nodeNutrition: {
-    left: (307 * HERO_SCALE) - 4,
+    left: (307 * HERO_SCALE) - 8,
     top: 119 * HERO_SCALE
   },
   nodeRhythm: {
