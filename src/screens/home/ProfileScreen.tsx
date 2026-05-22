@@ -70,6 +70,10 @@ export const ProfileScreen = ({ navigation }: Props) => {
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Total Syncs</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{wearableSyncData.length}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Check-ins Logged</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{checkIns.length}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Care Nudges</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{nudges.length}</Text></View>
+        <Pressable style={styles.metricsLink} onPress={() => navigation.navigate('ConnectedMetrics')}>
+          <Text style={[styles.metricsLinkText, { color: palette.blue }]}>View Connected Metrics</Text>
+          <Ionicons name="chevron-forward" size={14} color={palette.blue} />
+        </Pressable>
       </Card>
 
       <Card>
@@ -212,5 +216,15 @@ const styles = StyleSheet.create({
     ...typography.bodyStrong,
     fontSize: 14,
     color: colors.white
+  },
+  metricsLink: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  metricsLinkText: {
+    ...typography.bodyStrong,
+    fontSize: 12
   }
 });

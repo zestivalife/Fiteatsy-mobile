@@ -21,7 +21,21 @@ const healthAppConnectSchema = z.object({
 });
 
 const healthRecordSchema = z.object({
-  type: z.enum(['steps', 'sleep_minutes', 'resting_heart_rate', 'hydration_ml', 'active_minutes', 'mindfulness_minutes']),
+  type: z.enum([
+    'steps',
+    'sleep_minutes',
+    'resting_heart_rate',
+    'hydration_ml',
+    'active_minutes',
+    'mindfulness_minutes',
+    'hrv_ms',
+    'calories_kcal',
+    'workout_minutes',
+    'stress_score',
+    'cycle_day',
+    'spo2_pct',
+    'respiratory_rate_brpm'
+  ]),
   value: z.number().finite(),
   recordedAtISO: z.string().datetime()
 });

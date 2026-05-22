@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -38,16 +39,6 @@ const getGlobalRecoveryMicroState = (score: number) => {
   if (score <= 69) return 'Recovering';
   if (score <= 84) return 'Stable';
   return 'Thriving';
-};
-
-const getDimensionMicroState = (dimension: RecoveryDimension, score: number) => {
-  const isLow = score <= 39;
-  const isHigh = score >= 75;
-  if (dimension === 'calm') return isLow ? 'Overloaded' : isHigh ? 'Centered' : 'Settling';
-  if (dimension === 'activity') return isLow ? 'Slowing' : isHigh ? 'Energized' : 'Active';
-  if (dimension === 'nutrition') return isLow ? 'Depleted' : isHigh ? 'Restored' : 'Nourished';
-  if (dimension === 'sleep') return isLow ? 'Drained' : isHigh ? 'Recharged' : 'Recovering';
-  return isLow ? 'Unsteady' : isHigh ? 'Aligned' : 'Balancing';
 };
 
 const scoreColor = (value: number, index: number) => {
@@ -272,6 +263,11 @@ export const HomeScreen = () => {
   const [medicationOpen, setMedicationOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [activeDimension, setActiveDimension] = useState<RecoveryDimension>('calm');
+  const [sessionAntiManipulation, setSessionAntiManipulation] = useState({
+    todaySessionCount: 0,
+    recentCooldownPenalty: 1,
+    sessionInfluenceMultiplier: 1
+  });
   const heroPulse = useRef(new Animated.Value(0)).current;
   const {
     onboarding,
@@ -338,42 +334,45 @@ export const HomeScreen = () => {
       wellness,
       checkIns,
       medication: { scheduledToday, takenToday, pendingToday, skippedToday, missedToday },
-      hasWearable: Boolean(connectedDevice)
+      hasWearable: Boolean(connectedDevice),
+      wearableSyncData,
+      sessionAntiManipulation
     });
-  }, [todayTimeline, wellness, checkIns, connectedDevice]);
+  }, [todayTimeline, wellness, checkIns, connectedDevice, wearableSyncData, sessionAntiManipulation]);
 
   const dimensionData = useMemo(() => {
     const driverMap = Object.fromEntries(recoveryIntel.recoveryDrivers.map((driver) => [driver.key, driver]));
+    const recoveryBase = recoveryIntel.recoveryScore ?? 0;
     const calmScore = Math.round(
-      ((driverMap.stress_recovery?.score ?? recoveryIntel.recoveryScore) * 0.6) +
-      ((driverMap.emotional_checkins?.score ?? recoveryIntel.recoveryScore) * 0.4)
+      ((driverMap.stress_recovery?.score ?? recoveryBase) * 0.6) +
+      ((driverMap.emotional_checkins?.score ?? recoveryBase) * 0.4)
     );
 
     const byKey: Record<RecoveryDimension, { score: number; reason: string; trend: number[] }> = {
       calm: {
         score: Math.max(0, Math.min(100, calmScore)),
         reason: driverMap.stress_recovery?.reason ?? 'Calm data is available from stress and emotional check-ins.',
-        trend: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 6 + idx * 0.5))))
+        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 6 + idx * 0.5)))) : [0, 0, 0, 0, 0, 0, 0]
       },
       activity: {
-        score: driverMap.activity?.score ?? recoveryIntel.recoveryScore,
+        score: driverMap.activity?.score ?? recoveryBase,
         reason: driverMap.activity?.reason ?? 'Activity data sync is in progress.',
-        trend: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 8 + idx))))
+        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 8 + idx)))) : [0, 0, 0, 0, 0, 0, 0]
       },
       nutrition: {
-        score: driverMap.hydration?.score ?? recoveryIntel.recoveryScore,
-        reason: driverMap.hydration?.reason ?? 'Nutrition data is generated from hydration and meal consistency.',
-        trend: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 4 + idx * 0.6))))
+        score: driverMap.emotional_checkins?.score ?? recoveryBase,
+        reason: driverMap.emotional_checkins?.reason ?? 'Nutrition data is calibration-aware and updates with real signals.',
+        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 4 + idx * 0.6)))) : [0, 0, 0, 0, 0, 0, 0]
       },
       rhythm: {
-        score: driverMap.focus_consistency?.score ?? recoveryIntel.recoveryScore,
-        reason: driverMap.focus_consistency?.reason ?? 'Rhythm data tracks routine consistency signals.',
-        trend: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 5 + idx * 0.4))))
+        score: driverMap.wellness_sessions?.score ?? recoveryBase,
+        reason: driverMap.wellness_sessions?.reason ?? 'Rhythm data tracks routine consistency signals.',
+        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 5 + idx * 0.4)))) : [0, 0, 0, 0, 0, 0, 0]
       },
       sleep: {
-        score: driverMap.sleep?.score ?? recoveryIntel.recoveryScore,
+        score: driverMap.sleep?.score ?? recoveryBase,
         reason: driverMap.sleep?.reason ?? 'Sleep data sync is in progress.',
-        trend: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 2 + idx * 0.3))))
+        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 2 + idx * 0.3)))) : [0, 0, 0, 0, 0, 0, 0]
       }
     };
     return byKey;
@@ -381,24 +380,6 @@ export const HomeScreen = () => {
 
   const activeVisual = DIMENSION_VISUALS.find((item) => item.key === activeDimension) ?? DIMENSION_VISUALS[0];
   const activeDimensionStats = dimensionData[activeDimension];
-
-  const recoveryDrivers = [
-    {
-      label: recoveryIntel.recoveryDrivers[2].label,
-      value: recoveryIntel.recoveryDrivers[2].reason,
-      tone: recoveryIntel.recoveryDrivers[2].status === 'needs_attention' ? '#FFB84D' : '#59BE08'
-    },
-    {
-      label: recoveryIntel.recoveryDrivers[0].label,
-      value: recoveryIntel.recoveryDrivers[0].reason,
-      tone: '#7BB8DB'
-    },
-    {
-      label: recoveryIntel.recoveryDrivers[6].label,
-      value: recoveryIntel.recoveryDrivers[6].reason,
-      tone: '#A6D97A'
-    }
-  ];
 
   const attentionItems = [
     ...recoveryIntel.blockers,
@@ -415,9 +396,7 @@ export const HomeScreen = () => {
   ].slice(0, 3);
 
   const todayFocus = highestImpactActions[0] ?? 'Take one small wellness action today to support consistency.';
-  const driverLead = recoveryIntel.recoveryDrivers.find((driver) => driver.status === 'strong')?.label ?? 'Sleep';
-  const heroState = getGlobalRecoveryMicroState(activeDimensionStats.score);
-  const dimensionState = getDimensionMicroState(activeDimension, activeDimensionStats.score);
+  const heroState = recoveryIntel.isCalibrating ? 'Calibrating' : getGlobalRecoveryMicroState(activeDimensionStats.score);
   const celebrationLine =
     recoveryIntel.recoveryDirection === 'improving'
       ? 'Consistency improved over recent days. Keep this rhythm.'
@@ -428,6 +407,44 @@ export const HomeScreen = () => {
   useEffect(() => {
     setActiveDimension('calm');
   }, []);
+
+  useEffect(() => {
+    const hydrateSessionAntiManipulation = async () => {
+      try {
+        const raw = await AsyncStorage.getItem('fiteatsy.sessionSignals.v1');
+        const parsed = raw ? (JSON.parse(raw) as Array<{ timestamp?: string }>) : [];
+        const now = Date.now();
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const dayStartMs = startOfDay.getTime();
+        const todaySessions = parsed.filter((item) => {
+          if (!item?.timestamp) return false;
+          const t = +new Date(item.timestamp);
+          return Number.isFinite(t) && t >= dayStartMs;
+        });
+        const todaySessionCount = todaySessions.length;
+        const sessionInfluenceMultiplier = todaySessionCount <= 1 ? 1 : todaySessionCount === 2 ? 0.6 : todaySessionCount === 3 ? 0.3 : 0.15;
+        const lastTimestamp = todaySessions[0]?.timestamp;
+        const lastMs = lastTimestamp ? +new Date(lastTimestamp) : NaN;
+        const minutesSinceLast = Number.isFinite(lastMs) ? Math.max(0, (now - lastMs) / 60000) : Number.POSITIVE_INFINITY;
+        const recentCooldownPenalty = minutesSinceLast < 15 ? 0.5 : minutesSinceLast < 30 ? 0.75 : 1;
+
+        setSessionAntiManipulation({
+          todaySessionCount,
+          sessionInfluenceMultiplier,
+          recentCooldownPenalty
+        });
+      } catch {
+        setSessionAntiManipulation({
+          todaySessionCount: 0,
+          sessionInfluenceMultiplier: 1,
+          recentCooldownPenalty: 1
+        });
+      }
+    };
+
+    hydrateSessionAntiManipulation();
+  }, [wellness.breathingMinutes, wellness.focusMinutes, wellness.moodScore]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -505,7 +522,9 @@ export const HomeScreen = () => {
       <View style={[styles.focusCard, { backgroundColor: ui.focusBg, borderColor: ui.focusBorder }]}>
         <View style={styles.focusTextWrap}>
           <Text style={[styles.focusTitle, { color: ui.textPrimary }]}>Today&apos;s Focus</Text>
-          <Text style={[styles.focusBody, { color: ui.textSecondary }]}>Add a 12-20 minute low-intensity walk to improve recovery momentum.</Text>
+          <Text style={[styles.focusBody, { color: ui.textSecondary }]}>
+            {recoveryIntel.isCalibrating ? (recoveryIntel.insufficientReason ?? 'Recovery calibration in progress.') : todayFocus}
+          </Text>
         </View>
         <Pressable style={styles.focusCta} onPress={() => setAiOpen(true)}><Text style={styles.focusCtaText}>Assistance</Text></Pressable>
       </View>
@@ -548,7 +567,7 @@ export const HomeScreen = () => {
             <StarCircleShape isLight={isLight} />
           </View>
           <RecoveryRing value={activeDimensionStats.score} pulse={heroPulse} gradient={activeVisual.gradient} isLight={isLight} />
-          <View style={styles.lowerTag}><Text style={styles.lowerTagText} numberOfLines={1}>{heroState}</Text></View>
+          <View style={styles.lowerTag}><Text style={styles.lowerTagText} numberOfLines={1}>{recoveryIntel.isCalibrating ? 'Calibration' : heroState}</Text></View>
         </View>
       </View>
 
@@ -588,8 +607,10 @@ export const HomeScreen = () => {
             <Text style={[styles.lowerCardTitle, { color: ui.textPrimary }]}>Stress Recovery</Text>
             <Ionicons name="fitness-outline" size={18} color={ui.textSecondary} />
           </View>
-          <Text style={[styles.lowerScore, { color: ui.textPrimary }]}>36/100</Text>
-          <Text style={[styles.lowerHint, { color: ui.textSecondary }]}>Adjusted by breathing minutes</Text>
+          <Text style={[styles.lowerScore, { color: ui.textPrimary }]}>{recoveryIntel.stressRecoveryScore == null ? '—' : `${recoveryIntel.stressRecoveryScore}/100`}</Text>
+          <Text style={[styles.lowerHint, { color: ui.textSecondary }]}>
+            {recoveryIntel.isCalibrating ? 'Not enough recent real signals yet' : 'Adjusted by sleep, HRV, and calm sessions'}
+          </Text>
           <View style={styles.lowerBarRow}>
             <View style={[styles.lowerBar, { backgroundColor: '#FF808A' }]} />
             <View style={styles.lowerBar} />

@@ -69,42 +69,71 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
     setConnecting(true);
     setError(null);
     setSyncInfo(null);
-    await connectHealthApp(selectedAppId as HealthAppId);
-    const livePayload = await syncConnectedHealthApp(selectedAppId as HealthAppId);
-    addWearableSyncData(livePayload);
-
-    const hasLiveRecords = !livePayload.dataQuality.isEstimated && livePayload.dataQuality.confidence >= 0.9;
-    if (hasLiveRecords) {
-      setWellness(
-        recalculateWellness({
-          ...initialWellness,
-          heartRateAvg: livePayload.metrics.heartRateAvg,
-          sleepHours: livePayload.metrics.sleepHours,
-          hydrationLiters: livePayload.metrics.hydrationLiters,
-          focusMinutes: livePayload.metrics.focusMinutes,
-          breathingMinutes: livePayload.metrics.breathingMinutes,
-          movementMinutes: livePayload.metrics.movementMinutes
-        })
+    try {
+      await connectHealthApp(selectedAppId as HealthAppId);
+      const livePayload = await syncConnectedHealthApp(selectedAppId as HealthAppId);
+      addWearableSyncData(livePayload);
+      const connectedMetrics = livePayload.dataQuality.connectedMetrics ?? {};
+      const syncedCount = Object.values(connectedMetrics).filter((status) => status === 'synced').length;
+      const hasPermissionsIssue = Object.values(connectedMetrics).some((status) => status === 'no_permission');
+      const hasRecentDataIssue = Object.values(connectedMetrics).every(
+        (status) => status === 'no_recent_data' || status === 'unsupported' || status === 'unavailable'
       );
-      setSyncInfo('Health app records synced successfully.');
-    } else {
-      setError('No recent records were received from this health app. Open the health app, confirm data exists there, and retry sync.');
+
+      if (syncedCount > 0) {
+        setWellness(
+          recalculateWellness({
+            ...initialWellness,
+            heartRateAvg: livePayload.metrics.heartRateAvg,
+            sleepHours: livePayload.metrics.sleepHours,
+            hydrationLiters: livePayload.metrics.hydrationLiters,
+            focusMinutes: livePayload.metrics.focusMinutes,
+            breathingMinutes: livePayload.metrics.breathingMinutes,
+            movementMinutes: livePayload.metrics.movementMinutes
+          })
+        );
+        setSyncInfo('Health app sync completed with real connected metrics.');
+      } else if (hasPermissionsIssue) {
+        setError('Health data permission is missing. Allow required permissions in Health Connect and retry sync.');
+        setConnecting(false);
+        return;
+      } else if (hasRecentDataIssue) {
+        setError('No recent health records were found for the selected metrics. Open your health app, confirm recent activity, and retry sync.');
+        setConnecting(false);
+        return;
+      } else {
+        setError('Sync completed but no supported metrics were available.');
+        setConnecting(false);
+        return;
+      }
+
+      setSelectedDeviceId(selectedAppId);
+      if (onboarding) {
+        setOnboarding({
+          ...onboarding,
+          wearablePreference: 'sync'
+        });
+      }
+
+      setWearableSetupCompleted(true);
+      setSheetOpen(false);
+      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      setConnecting(false);
+    } catch (syncError) {
+      const message = syncError instanceof Error ? syncError.message : 'sync_failed';
+      if (message.includes('health_connect_unavailable')) {
+        setError('Health Connect is unavailable on this device. Install or update Health Connect and retry.');
+      } else if (message.includes('health_connect_initialize_failed')) {
+        setError('Unable to initialize Health Connect. Please reopen the app and try again.');
+      } else if (message.includes('health_app_connect_failed')) {
+        setError('Unable to connect selected health app. Please retry.');
+      } else {
+        setError('Sync failed. Please verify health app permissions and retry.');
+      }
       setConnecting(false);
       return;
     }
 
-    setSelectedDeviceId(selectedAppId);
-    if (onboarding) {
-      setOnboarding({
-        ...onboarding,
-        wearablePreference: 'sync'
-      });
-    }
-
-    setWearableSetupCompleted(true);
-    setSheetOpen(false);
-    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-    setConnecting(false);
   }, [
     addWearableSyncData,
     navigation,

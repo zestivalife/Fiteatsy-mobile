@@ -20,6 +20,7 @@ export type RootStackParamList = {
   Search: undefined;
   Notifications: undefined;
   Profile: undefined;
+  ConnectedMetrics: undefined;
   ReportsChat: { reportName: string; reportParameters: ReportParameter[] };
   MedicationForm: { medicationId?: string } | undefined;
   MedicationCalendar: undefined;

@@ -165,11 +165,41 @@ export type WearableSyncPayload = {
     focusMinutes: number;
     breathingMinutes: number;
     movementMinutes: number;
+    hrvMs?: number | null;
+    caloriesKcal?: number | null;
+    workoutMinutes?: number | null;
+    stressScore?: number | null;
+    cyclePhase?: string | null;
+    spo2Pct?: number | null;
+    respiratoryRateBrpm?: number | null;
   };
   dataQuality: {
     confidence: number;
     isEstimated: boolean;
     warnings: string[];
+    connectedMetrics?: Partial<
+      Record<
+        | 'sleep'
+        | 'steps'
+        | 'heart_rate'
+        | 'hrv'
+        | 'calories'
+        | 'workouts'
+        | 'stress'
+        | 'cycle'
+        | 'spo2'
+        | 'respiratory_rate',
+        'synced' | 'missing' | 'unsupported' | 'estimated' | 'no_permission' | 'no_recent_data' | 'unavailable'
+      >
+    >;
+    normalizedDomains?: {
+      Activity: number | null;
+      Sleep: number | null;
+      Recovery: number | null;
+      Calm: number | null;
+      Cycle: number | null;
+      Nutrition: number | null;
+    };
   };
 };
 
