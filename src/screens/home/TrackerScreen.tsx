@@ -130,8 +130,8 @@ const MetricSparkCard = ({
             <Text style={styles.metricIcon}>{icon}</Text>
           </View>
           <View style={styles.metricHeaderTextWrap}>
-            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{title}</Text>
-            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{subtitle}</Text>
+            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#4A4A4A' }]} numberOfLines={1}>{title}</Text>
+            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#4A4A4A' }]} numberOfLines={1}>{subtitle}</Text>
           </View>
         </View>
 
@@ -159,13 +159,13 @@ const MetricSparkCard = ({
           </View>
         </View>
 
-        <Animated.Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }, { transform: [{ scale: pulse }] }]}> 
+        <Animated.Text style={[styles.metricValue, { color: isLight ? '#000000' : '#4A4A4A' }, { transform: [{ scale: pulse }] }]}> 
           {selected ? selected.value : value} {unit}
         </Animated.Text>
-        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#D1D5DB' }]} numberOfLines={1}>
+        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#4A4A4A' }]} numberOfLines={1}>
           {signalState} • {recoveryImpact}
         </Text>
-        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#9CA3AF' }]} numberOfLines={1}>
+        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#4A4A4A' }]} numberOfLines={1}>
           {freshness} • Confidence {confidence}
         </Text>
       </Card>
@@ -224,8 +224,8 @@ const MetricBarsCard = ({
             <Text style={styles.metricIcon}>{icon}</Text>
           </View>
           <View style={styles.metricHeaderTextWrap}>
-            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{title}</Text>
-            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{subtitle}</Text>
+            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#4A4A4A' }]} numberOfLines={1}>{title}</Text>
+            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#4A4A4A' }]} numberOfLines={1}>{subtitle}</Text>
           </View>
         </View>
 
@@ -256,13 +256,13 @@ const MetricBarsCard = ({
           })}
         </View>
 
-        <Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }]}>
+        <Text style={[styles.metricValue, { color: isLight ? '#000000' : '#4A4A4A' }]}>
           {bars[selectedBar]} {unit}
         </Text>
-        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#D1D5DB' }]} numberOfLines={1}>
+        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#4A4A4A' }]} numberOfLines={1}>
           {signalState} • {recoveryImpact}
         </Text>
-        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#9CA3AF' }]} numberOfLines={1}>
+        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#4A4A4A' }]} numberOfLines={1}>
           {freshness} • Confidence {confidence}
         </Text>
       </Card>
@@ -663,16 +663,16 @@ export const TrackerScreen = () => {
       <Card style={[styles.summaryCard, !isLight && styles.summaryCardDark]}>
         <View style={styles.summaryStatsRow}>
           <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{selected.calories.toFixed(1)}</Text>
-            <Text style={styles.summaryLabel}>Cal</Text>
+            <Text style={[styles.summaryValue, !isLight && styles.summaryValueDark]}>{selected.calories.toFixed(1)}</Text>
+            <Text style={[styles.summaryLabel, !isLight && styles.summaryLabelDark]}>Cal</Text>
           </View>
           <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{selected.distanceKm.toFixed(1)}</Text>
-            <Text style={styles.summaryLabel}>Km</Text>
+            <Text style={[styles.summaryValue, !isLight && styles.summaryValueDark]}>{selected.distanceKm.toFixed(1)}</Text>
+            <Text style={[styles.summaryLabel, !isLight && styles.summaryLabelDark]}>Km</Text>
           </View>
           <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{selected.steps}</Text>
-            <Text style={styles.summaryLabel}>Steps</Text>
+            <Text style={[styles.summaryValue, !isLight && styles.summaryValueDark]}>{selected.steps}</Text>
+            <Text style={[styles.summaryLabel, !isLight && styles.summaryLabelDark]}>Steps</Text>
           </View>
         </View>
 
@@ -693,7 +693,7 @@ export const TrackerScreen = () => {
               <Text
                 style={[
                   styles.dayName,
-                  !active && { color: '#FFFFFF' },
+                  !active && { color: '#4A4A4A' },
                   active && styles.dayNameActive
                 ]}
               >
@@ -702,7 +702,7 @@ export const TrackerScreen = () => {
               <Text
                 style={[
                   styles.dayDate,
-                  !active && { color: '#FFFFFF' },
+                  !active && { color: '#4A4A4A' },
                   active && styles.dayDateActive
                 ]}
               >
@@ -825,7 +825,7 @@ const styles = StyleSheet.create({
     borderColor: colors.strokeStrong
   },
   tabTextDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   tabButton: {
     flex: 1,
@@ -892,15 +892,21 @@ const styles = StyleSheet.create({
   summaryValue: {
     ...typography.title,
     color: colors.textPrimary,
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '700'
   },
   summaryLabel: {
     ...typography.bodyStrong,
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.textSecondary
+  },
+  summaryValueDark: {
+    color: '#FFFFFF'
+  },
+  summaryLabelDark: {
+    color: '#FFFFFF'
   },
   compareButton: {
     alignSelf: 'center',
@@ -951,10 +957,10 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   dayNameDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   dayNameActive: {
-    color: '#FFFFFF',
+    color: '#4A4A4A',
     fontWeight: '700'
   },
   dayDate: {
@@ -968,7 +974,7 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   dayDateActive: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   grid: {
     gap: spacing.xs
@@ -990,7 +996,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     minHeight: 208,
     backgroundColor: 'rgba(0,0,0,0.29)',
-    borderColor: '#C9CFD4',
+    borderColor: colors.stroke,
     justifyContent: 'space-between'
   },
   metricCardLight: {
@@ -999,7 +1005,8 @@ const styles = StyleSheet.create({
   },
   metricCardDark: {
     backgroundColor: colors.cardRaised,
-    borderColor: colors.stroke
+    borderColor: 'transparent',
+    borderWidth: 0
   },
   metricHeaderRow: {
     flexDirection: 'row',
@@ -1031,7 +1038,7 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   metricTitleDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   metricTitleLight: {
     color: '#000000'
@@ -1043,7 +1050,7 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   metricSubtitleDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   metricSubtitleLight: {
     color: '#000000'
@@ -1120,7 +1127,7 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   metricValueDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   metricValueLight: {
     color: '#000000'
@@ -1131,7 +1138,8 @@ const styles = StyleSheet.create({
   },
   insightCardDark: {
     backgroundColor: colors.cardRaised,
-    borderColor: colors.strokeStrong
+    borderColor: 'transparent',
+    borderWidth: 0
   },
   insightTitle: {
     ...typography.bodyStrong,
@@ -1141,7 +1149,7 @@ const styles = StyleSheet.create({
     color: '#000000'
   },
   insightTitleDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   insightCopy: {
     ...typography.body,
@@ -1150,7 +1158,7 @@ const styles = StyleSheet.create({
     color: '#000000'
   },
   insightCopyDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   suggestionCard: {
     marginTop: spacing.xs
@@ -1177,7 +1185,7 @@ const styles = StyleSheet.create({
     color: '#000000'
   },
   suggestionTextDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   insightSub: {
     ...typography.caption,
@@ -1186,6 +1194,6 @@ const styles = StyleSheet.create({
     color: '#000000'
   },
   insightSubDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   }
 });

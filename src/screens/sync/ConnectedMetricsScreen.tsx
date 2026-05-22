@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Card } from '../../components/Card';
 import { Screen } from '../../components/Screen';
 import { getThemeColors, typography } from '../../design/tokens';
@@ -102,9 +103,7 @@ export const ConnectedMetricsScreen = ({ navigation }: Props) => {
   return (
     <Screen scroll>
       <View style={styles.headerRow}>
-        <Pressable style={[styles.iconBtn, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={18} color={palette.textPrimary} />
-        </Pressable>
+        <AppBackButton iconOnly onPress={() => navigation.goBack()} />
         <Text style={[styles.title, { color: palette.textPrimary }]}>Connected Metrics</Text>
         <View style={styles.iconSpacer} />
       </View>

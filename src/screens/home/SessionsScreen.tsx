@@ -182,7 +182,15 @@ export const SessionsScreen = () => {
   const persistSessionPayload = async (payload: SessionStoragePayload) => {
     const key = 'fiteatsy.sessionSignals.v1';
     const raw = await AsyncStorage.getItem(key);
-    const parsed = raw ? (JSON.parse(raw) as SessionStoragePayload[]) : [];
+    let parsed: SessionStoragePayload[] = [];
+    if (raw) {
+      try {
+        const value = JSON.parse(raw) as SessionStoragePayload[];
+        parsed = Array.isArray(value) ? value : [];
+      } catch {
+        parsed = [];
+      }
+    }
     parsed.unshift(payload);
     await AsyncStorage.setItem(key, JSON.stringify(parsed.slice(0, 60)));
   };
@@ -692,7 +700,7 @@ const SessionGroup = ({
               <Text style={[styles.bodyText, { color: palette.textSecondary }]}>{session.subtitle}</Text>
               <Text style={styles.impactText}>{session.impactLabel}</Text>
             </Pressable>
-            <Pressable style={[styles.sessionCTA, { backgroundColor: '#60AF00' }]} onPress={() => onStart(session)}>
+            <Pressable style={styles.sessionCTA} onPress={() => onStart(session)}>
               <Text style={styles.sessionCTAText}>{ctaLabel}</Text>
             </Pressable>
           </Card>
@@ -774,7 +782,7 @@ const styles = StyleSheet.create({
   sessionCTA: {
     minHeight: 44,
     borderRadius: radius.pill,
-    backgroundColor: colors.blue,
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -782,7 +790,7 @@ const styles = StyleSheet.create({
     ...typography.bodyStrong,
     fontSize: 14,
     lineHeight: 20,
-    color: '#000000'
+    color: '#CCCCCC'
   },
   resultRow: {
     marginTop: 8,

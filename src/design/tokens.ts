@@ -2,18 +2,18 @@ import { TextStyle, ViewStyle } from 'react-native';
 import { ThemeMode } from '../types';
 
 export const darkColors = {
-  bgPrimary: '#151515',
-  bgSecondary: '#323232',
-  card: 'rgba(0, 0, 0, 0.29)',
-  cardMuted: '#222222',
-  cardRaised: '#2B2B2B',
+  bgPrimary: '#000000',
+  bgSecondary: '#000000',
+  card: '#131313',
+  cardMuted: '#131313',
+  cardRaised: '#131313',
   surfaceTint: '#1E1E1E',
   surfaceAccent: '#2A2A2A',
-  stroke: '#000000',
+  stroke: '#2A2A2A',
   strokeStrong: '#C9CFD4',
-  textPrimary: '#FFFFFF',
-  textSecondary: '#F5E1E1',
-  textMuted: '#939393',
+  textPrimary: '#4A4A4A',
+  textSecondary: '#4A4A4A',
+  textMuted: '#4A4A4A',
   blue: '#60AF00',
   blueDark: '#00401F',
   blueSoft: 'rgba(96, 175, 0, 0.16)',
@@ -124,10 +124,10 @@ export const shadows: Record<string, ViewStyle> = {
 };
 
 export const gradients = {
-  appBackground: ['#323232', '#151515'],
+  appBackground: ['#000000', '#000000'],
   appBackgroundLight: ['#F3F6FA', '#E8EEF5'],
   accent: ['#60AF00', '#00401F'],
-  cardDark: ['#323232', '#151515'],
+  cardDark: ['rgba(51, 51, 51, 1)', 'rgba(0, 0, 0, 1)', '#000000'],
   ring: ['#60AF00', '#00401F']
 } as const;
 

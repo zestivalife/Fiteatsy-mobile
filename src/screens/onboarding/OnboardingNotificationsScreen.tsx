@@ -1,9 +1,10 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { colors, typography } from '../../design/tokens';
+import { colors, getThemeColors, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { OnboardingProfile } from '../../types';
 import { useAppContext } from '../../state/AppContext';
@@ -27,7 +28,9 @@ const fallbackProfile = (): OnboardingProfile => ({
 });
 
 export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
-  const { onboarding, setOnboarding, setWearableSetupCompleted } = useAppContext();
+  const { onboarding, setOnboarding, setWearableSetupCompleted, themeMode } = useAppContext();
+  const isLight = themeMode === 'light';
+  const themeColors = getThemeColors(themeMode);
   const profile = onboarding ?? fallbackProfile();
 
   const allowNotifications = () => {
@@ -51,17 +54,17 @@ export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
   return (
     <Screen>
       <View style={styles.body}>
-        <Text style={styles.kicker}>Step 4 · Track & Transform</Text>
-        <Text style={styles.title}>Your plan is ready</Text>
-        <Text style={styles.subtitle}>We will only remind you when it helps your recovery. No spam, no guilt, no noise.</Text>
+        <Text style={[styles.kicker, { color: themeColors.blue }]}>Step 4 · Track & Transform</Text>
+        <Text style={[styles.title, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Your plan is ready</Text>
+        <Text style={[styles.subtitle, { color: isLight ? '#334155' : colors.textSecondary }]}>We will only remind you when it helps your recovery. No spam, no guilt, no noise.</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{profile.careTrack}</Text>
-          <Text style={styles.cardCopy}>Matched with {profile.matchedDietitianName}. Your dashboard will blend condition tracking, symptom recovery, hydration, nutrition guidance, and optional health-app sync.</Text>
-        </View>
+        <LinearGradient colors={isLight ? ['#FFFFFF', '#EEF2F7'] : [colors.cardMuted, colors.cardMuted]} style={[styles.card, { borderColor: themeColors.stroke }]}>
+          <Text style={[styles.cardTitle, { color: isLight ? '#000000' : themeColors.textPrimary }]}>{profile.careTrack}</Text>
+          <Text style={[styles.cardCopy, { color: isLight ? '#334155' : colors.textSecondary }]}>Matched with {profile.matchedDietitianName}. Your dashboard will blend condition tracking, symptom recovery, hydration, nutrition guidance, and optional health-app sync.</Text>
+        </LinearGradient>
 
-        <Pressable style={styles.permissionButton} onPress={allowNotifications}>
-          <Text style={styles.permissionText}>Allow smart health reminders</Text>
+        <Pressable style={[styles.permissionButton, { borderColor: themeColors.blue }]} onPress={allowNotifications}>
+          <Text style={[styles.permissionText, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Allow smart health reminders</Text>
         </Pressable>
       </View>
 

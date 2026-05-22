@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { colors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
@@ -64,7 +65,7 @@ export const FamilyDashboardScreen = () => {
 
   return (
     <Screen scroll>
-      <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}><Text style={styles.backText}>‹ Back</Text></Pressable>
+      <AppBackButton onPress={() => navigation.goBack()} />
       <Text style={styles.title}>Family Wellness Sharing</Text>
       <Text style={styles.subtitle}>Support loved ones with permission-based wellness visibility.</Text>
 

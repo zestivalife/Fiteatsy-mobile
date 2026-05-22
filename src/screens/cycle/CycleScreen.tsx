@@ -4,6 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { RootStackParamList } from '../../navigation/types';
 import { CycleEnergy, CycleFlowIntensity, CycleMood, CycleSymptom } from '../../types';
@@ -111,9 +112,7 @@ export const CycleScreen = () => {
 
   return (
     <Screen scroll>
-      <Pressable style={[styles.backBtn, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardRaised }]} onPress={() => navigation.goBack()}>
-        <Text style={[styles.backText, { color: isLight ? '#000000' : palette.textPrimary }]}>‹ Back</Text>
-      </Pressable>
+      <AppBackButton onPress={() => navigation.goBack()} />
       <Text style={[styles.title, { color: isLight ? '#000000' : palette.textPrimary }]}>Cycle</Text>
       {!isWomenOnlyEnabled ? (
         <View style={[styles.noticeCard, { backgroundColor: isLight ? '#FFF4F4' : colors.cardMuted }]}>
@@ -133,9 +132,9 @@ export const CycleScreen = () => {
         </View>
       </View>
 
-      <Pressable style={[styles.logButton, !isWomenOnlyEnabled && styles.logButtonDisabled]} onPress={() => isWomenOnlyEnabled && setLogOpen(true)}>
-        <Ionicons name="add-circle-outline" size={18} color="#000000" />
-        <Text style={[styles.logButtonText, { color: '#000000' }]}>Log Today</Text>
+      <Pressable style={[styles.logButton, !isLight && styles.logButtonDark, !isWomenOnlyEnabled && styles.logButtonDisabled]} onPress={() => isWomenOnlyEnabled && setLogOpen(true)}>
+        <Ionicons name="add-circle-outline" size={18} color={isLight ? '#000000' : '#CCCCCC'} />
+        <Text style={[styles.logButtonText, { color: isLight ? '#000000' : '#CCCCCC' }]}>Log Today</Text>
       </Pressable>
 
       <View style={styles.quickRow}>
@@ -316,6 +315,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: spacing.sm
+  },
+  logButtonDark: {
+    backgroundColor: '#424242',
+    borderColor: 'transparent',
+    borderWidth: 0
   },
   logButtonDisabled: {
     opacity: 0.5

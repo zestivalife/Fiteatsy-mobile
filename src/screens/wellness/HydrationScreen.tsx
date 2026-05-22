@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -212,9 +213,7 @@ export const HydrationScreen = () => {
   return (
     <Screen>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={18} color={colors.textPrimary} />
-        </Pressable>
+        <AppBackButton iconOnly onPress={() => navigation.goBack()} />
         <Text style={styles.title}>Hydration</Text>
         <View style={styles.headerGhost} />
       </View>

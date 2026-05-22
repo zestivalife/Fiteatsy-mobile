@@ -432,7 +432,8 @@ export const HomeScreen = () => {
     const hydrateSessionAntiManipulation = async () => {
       try {
         const raw = await AsyncStorage.getItem('fiteatsy.sessionSignals.v1');
-        const parsed = raw ? (JSON.parse(raw) as Array<{ timestamp?: string }>) : [];
+        const parsedRaw = raw ? (JSON.parse(raw) as unknown) : [];
+        const parsed = Array.isArray(parsedRaw) ? (parsedRaw as Array<{ timestamp?: string }>) : [];
         const now = Date.now();
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
@@ -552,7 +553,7 @@ export const HomeScreen = () => {
       </View>
 
       <View style={styles.heroZone}>
-        <Pressable style={styles.heroSyncButton} onPress={() => navigation.navigate('SyncWearable', { autoSync: true })}>
+        <Pressable style={styles.heroSyncButton} onPress={() => navigation.navigate('SyncWearable')}>
           <Text style={styles.heroSyncText}>Sync</Text>
         </Pressable>
         <View style={styles.starLayerContainer}>

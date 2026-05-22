@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { colors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
@@ -17,7 +18,7 @@ export const FamilyMemberDetailScreen = () => {
   if (!connection) {
     return (
       <Screen>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}><Text style={styles.backText}>‹ Back</Text></Pressable>
+        <AppBackButton onPress={() => navigation.goBack()} />
         <Text style={styles.empty}>Member not found.</Text>
       </Screen>
     );
@@ -31,7 +32,7 @@ export const FamilyMemberDetailScreen = () => {
 
   return (
     <Screen scroll>
-      <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}><Text style={styles.backText}>‹ Back</Text></Pressable>
+      <AppBackButton onPress={() => navigation.goBack()} />
       <Text style={styles.title}>{connection.memberName}</Text>
       <Text style={styles.subtitle}>{relationshipLabel(connection.relationship)} • Supportive sharing</Text>
 

@@ -63,7 +63,7 @@ export const FloatingTabBar = ({ state, descriptors, navigation }: BottomTabBarP
                 accessibilityState={isFocused ? { selected: true } : {}}
                 onPress={onPress}
                 onLongPress={onLongPress}
-                style={[styles.item, isFocused && styles.itemActive]}
+                style={({ pressed }) => [styles.item, isFocused && styles.itemActive, pressed && styles.itemPressed]}
               >
               <Ionicons
                 name={iconMap[route.name as keyof MainTabParamList]}
@@ -115,6 +115,9 @@ const styles = StyleSheet.create({
   },
   itemActive: {
     backgroundColor: '#60AF00'
+  },
+  itemPressed: {
+    transform: [{ scale: 0.97 }]
   },
   label: {
     ...typography.caption,

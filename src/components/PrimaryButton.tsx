@@ -1,12 +1,12 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
 import { colors, radius, typography } from '../design/tokens';
 
 type Props = {
   title: string;
   onPress: () => void;
   disabled?: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 };
 
 export const PrimaryButton = ({ title, onPress, disabled = false, style }: Props) => {

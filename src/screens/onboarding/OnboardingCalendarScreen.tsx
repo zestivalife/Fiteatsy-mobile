@@ -1,9 +1,10 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { colors, typography } from '../../design/tokens';
+import { colors, getThemeColors, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { CalendarProvider, OnboardingProfile } from '../../types';
 import { useAppContext } from '../../state/AppContext';
@@ -29,7 +30,10 @@ const fallbackProfile = (): OnboardingProfile => ({
 });
 
 export const OnboardingCalendarScreen = ({ navigation }: Props) => {
-  const { onboarding, setOnboarding } = useAppContext();
+  const { onboarding, setOnboarding, themeMode } = useAppContext();
+  const isLight = themeMode === 'light';
+  const themeColors = getThemeColors(themeMode);
+  const selectedLightBg = isLight ? themeColors.blueDark : undefined;
   const profile = onboarding ?? fallbackProfile();
 
   const selectProvider = (provider: CalendarProvider) => {
@@ -51,24 +55,51 @@ export const OnboardingCalendarScreen = ({ navigation }: Props) => {
   return (
     <Screen>
       <View style={styles.body}>
-        <Text style={styles.kicker}>Step 3 · Personalized Guidance</Text>
-        <Text style={styles.title}>Connect your daily schedule</Text>
-        <Text style={styles.subtitle}>Optional, but helpful. We use your schedule only to place meals, walks, hydration, and recovery nudges at the right time.</Text>
+        <Text style={[styles.kicker, { color: themeColors.blue }]}>Step 3 · Personalized Guidance</Text>
+        <Text style={[styles.title, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Connect your daily schedule</Text>
+        <Text style={[styles.subtitle, { color: isLight ? '#334155' : colors.textSecondary }]}>Optional, but helpful. We use your schedule only to place meals, walks, hydration, and recovery nudges at the right time.</Text>
 
         <View style={styles.list}>
           {providers.map((provider) => {
             const active = profile.calendarProvider === provider;
             return (
-              <Pressable key={provider} accessibilityRole="radio" accessibilityState={{ selected: active }} accessibilityLabel={provider} style={[styles.option, active && styles.optionActive]} onPress={() => selectProvider(provider)}>
-                <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>{provider}</Text>
-                <Text style={styles.optionCopy}>Time meals, hydration, supplements, and movement reminders around your real day.</Text>
+              <Pressable
+                key={provider}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={provider}
+                style={[
+                  styles.option,
+                  { borderColor: themeColors.stroke },
+                  active && styles.optionActive,
+                  active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                ]}
+                onPress={() => selectProvider(provider)}
+              >
+                <LinearGradient colors={isLight ? ['#FFFFFF', '#EEF2F7'] : [colors.cardMuted, colors.cardMuted]} style={styles.optionGradient}>
+                  <Text style={[styles.optionTitle, { color: isLight ? '#000000' : themeColors.textPrimary }, active && styles.optionTitleActive]}>{provider}</Text>
+                  <Text style={[styles.optionCopy, { color: isLight ? '#334155' : colors.textSecondary }]}>Time meals, hydration, supplements, and movement reminders around your real day.</Text>
+                </LinearGradient>
               </Pressable>
             );
           })}
 
-          <Pressable accessibilityRole="radio" accessibilityState={{ selected: profile.calendarProvider === 'None' }} accessibilityLabel="Skip calendar connection for now" style={[styles.option, profile.calendarProvider === 'None' && styles.optionActive]} onPress={() => setOnboarding({ ...profile, calendarProvider: 'None', calendarPermissionGranted: false })}>
-            <Text style={[styles.optionTitle, profile.calendarProvider === 'None' && styles.optionTitleActive]}>Skip for now</Text>
-            <Text style={styles.optionCopy}>You can continue with manual planning and connect your schedule later.</Text>
+          <Pressable
+            accessibilityRole="radio"
+            accessibilityState={{ selected: profile.calendarProvider === 'None' }}
+            accessibilityLabel="Skip calendar connection for now"
+            style={[
+              styles.option,
+              { borderColor: themeColors.stroke },
+              profile.calendarProvider === 'None' && styles.optionActive,
+              profile.calendarProvider === 'None' && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+            ]}
+            onPress={() => setOnboarding({ ...profile, calendarProvider: 'None', calendarPermissionGranted: false })}
+          >
+            <LinearGradient colors={isLight ? ['#FFFFFF', '#EEF2F7'] : [colors.cardMuted, colors.cardMuted]} style={styles.optionGradient}>
+              <Text style={[styles.optionTitle, { color: isLight ? '#000000' : themeColors.textPrimary }, profile.calendarProvider === 'None' && styles.optionTitleActive]}>Skip for now</Text>
+              <Text style={[styles.optionCopy, { color: isLight ? '#334155' : colors.textSecondary }]}>You can continue with manual planning and connect your schedule later.</Text>
+            </LinearGradient>
           </Pressable>
         </View>
       </View>
@@ -110,7 +141,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.stroke,
     borderRadius: 16,
-    backgroundColor: colors.cardMuted,
+    overflow: 'hidden'
+  },
+  optionGradient: {
     paddingHorizontal: 14,
     paddingVertical: 14
   },

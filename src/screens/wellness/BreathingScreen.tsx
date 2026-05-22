@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { ProgressRing } from '../../components/ProgressRing';
 import { colors, typography } from '../../design/tokens';
@@ -146,9 +147,7 @@ export const BreathingScreen = () => {
   return (
     <Screen>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={18} color={colors.textPrimary} />
-        </Pressable>
+        <AppBackButton iconOnly onPress={() => navigation.goBack()} />
         <Text style={styles.title}>Breathing</Text>
         <View style={styles.headerGhost} />
       </View>

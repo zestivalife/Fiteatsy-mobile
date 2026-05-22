@@ -84,7 +84,15 @@ export const AppNavigation = () => {
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          animationDuration: 240,
+          gestureEnabled: true
+        }}
+        initialRouteName="Splash"
+      >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="OnboardingBasics" component={OnboardingBasicsScreen} />
         <Stack.Screen name="OnboardingCalendar" component={OnboardingCalendarScreen} />

@@ -1,19 +1,30 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, View, TextInputProps } from 'react-native';
-import { colors, radius, typography } from '../design/tokens';
+import { getThemeColors, radius, typography } from '../design/tokens';
+import { useAppContext } from '../state/AppContext';
 
 type Props = TextInputProps & {
   label: string;
 };
 
 export const TextField = ({ label, ...props }: Props) => {
+  const { themeMode } = useAppContext();
+  const themeColors = getThemeColors(themeMode);
+
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: themeColors.textPrimary }]}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
-        placeholderTextColor={colors.textMuted}
-        style={styles.input}
+        placeholderTextColor={themeColors.textMuted}
+        style={[
+          styles.input,
+          {
+            borderColor: themeColors.stroke,
+            backgroundColor: themeColors.cardMuted,
+            color: themeColors.textPrimary
+          }
+        ]}
         {...props}
       />
     </View>
@@ -32,9 +43,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.stroke,
-    backgroundColor: colors.cardMuted,
-    color: colors.textPrimary,
     paddingHorizontal: 14
   }
 });

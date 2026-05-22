@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { colors, radius, spacing, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
@@ -18,9 +19,7 @@ export const CycleInsightsScreen = () => {
 
   return (
     <Screen scroll>
-      <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Text style={styles.backText}>‹ Back</Text>
-      </Pressable>
+      <AppBackButton onPress={() => navigation.goBack()} />
       <Text style={styles.title}>Cycle Insights</Text>
       <View style={styles.card}>
         <Text style={styles.metric}>Average cycle length: {insights.averageCycleLengthDays} days</Text>
@@ -49,20 +48,6 @@ export const CycleInsightsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  backBtn: {
-    alignSelf: 'flex-start',
-    minHeight: 34,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    marginBottom: spacing.sm
-  },
-  backText: {
-    ...typography.caption,
-    color: colors.textPrimary
-  },
   title: {
     ...typography.section
   },

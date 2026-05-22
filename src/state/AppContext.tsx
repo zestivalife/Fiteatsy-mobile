@@ -167,6 +167,15 @@ const STORAGE_KEYS = {
   familyEmergencyEvents: 'nuetra.familyEmergencyEvents'
 } as const;
 
+const safeParse = <T,>(raw: string | null, fallback: T): T => {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const userId = 'emp-demo-1';
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -240,10 +249,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         ]);
 
         if (storedOnboarding) {
-          setOnboardingState(JSON.parse(storedOnboarding) as OnboardingProfile);
+          const parsed = safeParse<OnboardingProfile | null>(storedOnboarding, null);
+          if (parsed && typeof parsed === 'object') setOnboardingState(parsed);
         }
         if (storedAssessment) {
-          setAssessmentState(JSON.parse(storedAssessment) as AssessmentProfile);
+          const parsed = safeParse<AssessmentProfile | null>(storedAssessment, null);
+          if (parsed && typeof parsed === 'object') setAssessmentState(parsed);
         }
         if (storedAuth) {
           setIsAuthenticatedState(storedAuth === '1');
@@ -258,43 +269,49 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           setWearableSetupCompletedState(storedWearableSetupCompleted === '1');
         }
         if (storedDevices) {
-          const parsed = JSON.parse(storedDevices) as WearableDevice[];
+          const parsed = safeParse<WearableDevice[]>(storedDevices, []);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setDevicesState(parsed);
           }
         }
         if (storedMedications) {
-          const parsed = JSON.parse(storedMedications) as Medication[];
+          const parsed = safeParse<Medication[]>(storedMedications, []);
           if (Array.isArray(parsed)) setMedications(parsed);
         }
         if (storedMedicationLogs) {
-          const parsed = JSON.parse(storedMedicationLogs) as MedicationLog[];
+          const parsed = safeParse<MedicationLog[]>(storedMedicationLogs, []);
           if (Array.isArray(parsed)) setMedicationLogs(parsed);
         }
         if (storedMedicationPermission === '1') {
           setMedicationPermissionGranted(true);
         }
         if (storedCycleLogs) {
-          const parsed = JSON.parse(storedCycleLogs) as CycleLog[];
+          const parsed = safeParse<CycleLog[]>(storedCycleLogs, []);
           if (Array.isArray(parsed)) setCycleLogs(parsed);
         }
         if (storedCycleSettings) {
-          const parsed = JSON.parse(storedCycleSettings) as CycleNotificationSettings;
-          if (parsed && typeof parsed === 'object') setCycleNotificationSettings(parsed);
+          const parsed = safeParse<Partial<CycleNotificationSettings>>(storedCycleSettings, {});
+          if (parsed && typeof parsed === 'object') {
+            setCycleNotificationSettings({
+              enabled: Boolean(parsed.enabled),
+              reminderTime24h: typeof parsed.reminderTime24h === 'string' ? parsed.reminderTime24h : '20:00',
+              notificationIds: Array.isArray(parsed.notificationIds) ? parsed.notificationIds : []
+            });
+          }
         }
         if (storedCyclePermission === '1') {
           setCyclePermissionGranted(true);
         }
         if (storedFamilyInvites) {
-          const parsed = JSON.parse(storedFamilyInvites) as FamilyInvite[];
+          const parsed = safeParse<FamilyInvite[]>(storedFamilyInvites, []);
           if (Array.isArray(parsed)) setFamilyInvites(parsed);
         }
         if (storedFamilyConnections) {
-          const parsed = JSON.parse(storedFamilyConnections) as FamilyConnection[];
+          const parsed = safeParse<FamilyConnection[]>(storedFamilyConnections, []);
           if (Array.isArray(parsed)) setFamilyConnections(parsed);
         }
         if (storedFamilyEmergencyEvents) {
-          const parsed = JSON.parse(storedFamilyEmergencyEvents) as FamilyEmergencyEvent[];
+          const parsed = safeParse<FamilyEmergencyEvent[]>(storedFamilyEmergencyEvents, []);
           if (Array.isArray(parsed)) setFamilyEmergencyEvents(parsed);
         }
       } finally {

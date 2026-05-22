@@ -3,9 +3,10 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { colors, typography } from '../../design/tokens';
+import { colors, getThemeColors, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import {
   AgeBracket,
@@ -103,7 +104,10 @@ const baseProfile = (): OnboardingProfile => ({
 });
 
 export const OnboardingBasicsScreen = ({ navigation }: Props) => {
-  const { onboarding, setOnboarding, setWearableSetupCompleted } = useAppContext();
+  const { onboarding, setOnboarding, setWearableSetupCompleted, themeMode } = useAppContext();
+  const isLight = themeMode === 'light';
+  const themeColors = getThemeColors(themeMode);
+  const selectedLightBg = isLight ? themeColors.blueDark : undefined;
   const seed = useMemo(() => onboarding ?? baseProfile(), [onboarding]);
 
   const initialDob = seed.dateOfBirthISO ? new Date(seed.dateOfBirthISO) : new Date(1996, 0, 1);
@@ -156,16 +160,16 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
   return (
     <Screen>
       <View style={styles.body}>
-        <Text style={styles.kicker}>Quick Setup</Text>
-        <Text style={styles.title}>Tell us just what we need</Text>
-        <Text style={styles.subtitle}>This takes less than a minute. You can update everything later.</Text>
+        <Text style={[styles.kicker, { color: themeColors.blue }]}>Quick Setup</Text>
+        <Text style={[styles.title, { color: themeColors.textPrimary }]}>Tell us just what we need</Text>
+        <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>This takes less than a minute. You can update everything later.</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.label}>Date of birth</Text>
-          <Pressable style={styles.dateField} onPress={() => setShowDatePicker(true)}>
+          <Text style={[styles.label, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Date of birth</Text>
+          <Pressable style={[styles.dateField, { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted }]} onPress={() => setShowDatePicker(true)}>
             <View style={styles.dateFieldLeft}>
-              <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
-              <Text style={styles.dateFieldText}>{formatDob(dob)}</Text>
+              <Ionicons name="calendar-outline" size={16} color={isLight ? '#475569' : colors.textSecondary} />
+              <Text style={[styles.dateFieldText, { color: isLight ? '#000000' : themeColors.textPrimary }]}>{formatDob(dob)}</Text>
             </View>
             <Text style={styles.dateAgeText}>{age} yrs</Text>
           </Pressable>
@@ -179,43 +183,74 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
             />
           ) : null}
 
-          <Text style={styles.label}>Gender</Text>
+          <Text style={[styles.label, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Gender</Text>
           <View style={styles.options}>
             {genders.map((item) => {
               const active = gender === item;
               return (
-                <Pressable key={item} style={[styles.option, active && styles.optionActive]} onPress={() => setGender(item)}>
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
+                <Pressable
+                  key={item}
+                  style={[
+                    styles.option,
+                    { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted },
+                    active && styles.optionActive,
+                    active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                  ]}
+                  onPress={() => setGender(item)}
+                >
+                  <Text style={[styles.optionText, { color: isLight ? '#000000' : themeColors.textPrimary }, active && styles.optionTextActive]}>{item}</Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <Text style={styles.label}>Wellness goal</Text>
-          <Text style={styles.helper}>Choose one or select “Maybe later”</Text>
+          <Text style={[styles.label, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Wellness goal</Text>
+          <Text style={[styles.helper, { color: isLight ? '#334155' : colors.textSecondary }]}>Choose one or select “Maybe later”</Text>
           <View style={styles.options}>
             {goals.map((item) => {
               const active = wellnessGoal === item;
               return (
-                <Pressable key={item} style={[styles.option, active && styles.optionActive]} onPress={() => setWellnessGoal(item)}>
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
+                <Pressable
+                  key={item}
+                  style={[
+                    styles.option,
+                    { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted },
+                    active && styles.optionActive,
+                    active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                  ]}
+                  onPress={() => setWellnessGoal(item)}
+                >
+                  <Text style={[styles.optionText, { color: isLight ? '#000000' : themeColors.textPrimary }, active && styles.optionTextActive]}>{item}</Text>
                 </Pressable>
               );
             })}
-            <Pressable style={[styles.option, wellnessGoal === null && styles.optionActive]} onPress={() => setWellnessGoal(null)}>
-              <Text style={[styles.optionText, wellnessGoal === null && styles.optionTextActive]}>Maybe later</Text>
+            <Pressable
+              style={[
+                styles.option,
+                { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted },
+                wellnessGoal === null && styles.optionActive,
+                wellnessGoal === null && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+              ]}
+              onPress={() => setWellnessGoal(null)}
+            >
+              <Text style={[styles.optionText, { color: isLight ? '#000000' : themeColors.textPrimary }, wellnessGoal === null && styles.optionTextActive]}>Maybe later</Text>
             </Pressable>
           </View>
 
-          <Text style={styles.label}>Existing conditions (optional)</Text>
-          <Text style={styles.helper}>Select if relevant, or leave blank</Text>
+          <Text style={[styles.label, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Existing conditions (optional)</Text>
+          <Text style={[styles.helper, { color: isLight ? '#334155' : colors.textSecondary }]}>Select if relevant, or leave blank</Text>
           <View style={styles.options}>
             {conditions.map((item) => {
               const active = primaryConditions.includes(item);
               return (
                 <Pressable
                   key={item}
-                  style={[styles.option, active && styles.optionActive]}
+                  style={[
+                    styles.option,
+                    { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted },
+                    active && styles.optionActive,
+                    active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                  ]}
                   onPress={() => {
                     setPrimaryConditions((current) => {
                       const exists = current.includes(item);
@@ -226,25 +261,25 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
                     });
                   }}
                 >
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
+                  <Text style={[styles.optionText, { color: isLight ? '#000000' : themeColors.textPrimary }, active && styles.optionTextActive]}>{item}</Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <View style={styles.matchCard}>
-            <Text style={styles.matchEyebrow}>Matched for you</Text>
-            <Text style={styles.matchTrack}>{careTrack}</Text>
-            <Text style={styles.matchDietitian}>{dietitian.name}</Text>
-            <Text style={styles.matchSpecialty}>{dietitian.specialty}</Text>
-          </View>
+          <LinearGradient colors={isLight ? ['#FFFFFF', '#EEF2F7'] : [colors.cardMuted, colors.cardMuted]} style={[styles.matchCard, { borderColor: themeColors.stroke }]}>
+            <Text style={[styles.matchEyebrow, { color: themeColors.blue }]}>Matched for you</Text>
+            <Text style={[styles.matchTrack, { color: isLight ? '#000000' : themeColors.textPrimary }]}>{careTrack}</Text>
+            <Text style={[styles.matchDietitian, { color: isLight ? '#000000' : themeColors.textPrimary }]}>{dietitian.name}</Text>
+            <Text style={[styles.matchSpecialty, { color: isLight ? '#334155' : colors.textSecondary }]}>{dietitian.specialty}</Text>
+          </LinearGradient>
         </ScrollView>
       </View>
 
       <View style={styles.footer}>
         <PrimaryButton title="Continue" onPress={() => persistAndContinue('continue')} />
         <Pressable style={styles.skipBtn} onPress={() => persistAndContinue('skip')}>
-          <Text style={styles.skipText}>Skip for now</Text>
+          <Text style={[styles.skipText, { color: isLight ? '#334155' : colors.textSecondary }]}>Skip for now</Text>
         </Pressable>
       </View>
     </Screen>

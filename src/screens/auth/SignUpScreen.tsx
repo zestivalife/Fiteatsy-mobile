@@ -13,7 +13,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { TextField } from '../../components/TextField';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { colors, radius, typography } from '../../design/tokens';
+import { getThemeColors, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import {
@@ -28,7 +28,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 const OTP_LENGTH = 6;
 
 export const SignUpScreen = ({ navigation }: Props) => {
-  const { setIsAuthenticated, setOnboarding } = useAppContext();
+  const { setIsAuthenticated, setOnboarding, themeMode } = useAppContext();
+  const themeColors = getThemeColors(themeMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
@@ -197,8 +198,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
           </>
         ) : (
           <>
-            <Text style={styles.verifyTitle}>Verify OTP</Text>
-            <Text style={styles.verifySubTitle}>
+            <Text style={[styles.verifyTitle, { color: themeColors.textPrimary }]}>Verify OTP</Text>
+            <Text style={[styles.verifySubTitle, { color: themeColors.textSecondary }]}>
               Enter the 6-digit code sent to {email.trim().toLowerCase()} and {mobileNumber.trim()}.
             </Text>
             <TextInput
@@ -216,39 +217,49 @@ export const SignUpScreen = ({ navigation }: Props) => {
               {otpCells.map((digit, index) => {
                 const focused = otp.length === index || (otp.length === OTP_LENGTH && index === OTP_LENGTH - 1);
                 return (
-                  <View key={index} style={[styles.otpInput, focused && styles.otpInputActive]}>
-                    <Text style={styles.otpDigit}>{digit || ''}</Text>
+                  <View
+                    key={index}
+                    style={[
+                      styles.otpInput,
+                      {
+                        borderColor: themeColors.stroke,
+                        backgroundColor: themeColors.cardMuted
+                      },
+                      focused && [styles.otpInputActive, { borderColor: themeColors.blueDark }]
+                    ]}
+                  >
+                    <Text style={[styles.otpDigit, { color: themeColors.textPrimary }]}>{digit || ''}</Text>
                   </View>
                 );
               })}
             </Pressable>
 
-            <Text style={styles.timerText}>
+            <Text style={[styles.timerText, { color: themeColors.textSecondary }]}>
               {otpExpired ? 'OTP expired. Please resend.' : `Code expires in ${Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000))}s`}
             </Text>
-            <Text style={styles.timerText}>Attempts remaining: {attemptsRemaining}</Text>
+            <Text style={[styles.timerText, { color: themeColors.textSecondary }]}>Attempts remaining: {attemptsRemaining}</Text>
 
-            {debugOtp ? <Text style={styles.debugOtp}>Dev OTP: {debugOtp}</Text> : null}
+            {debugOtp ? <Text style={[styles.debugOtp, { color: themeColors.warning }]}>Dev OTP: {debugOtp}</Text> : null}
 
             <PrimaryButton title={verifying ? 'Verifying...' : 'Verify OTP'} onPress={verifyOtp} disabled={!canVerify} />
             <PrimaryButton
               title={loading ? 'Resending...' : canResend ? 'Resend OTP' : `Resend in ${resendRemainingSec}s`}
               onPress={resendOtp}
               disabled={!canResend}
-              style={styles.secondaryBtn}
+              style={[styles.secondaryBtn, { backgroundColor: themeColors.cardMuted, borderColor: themeColors.stroke }]}
             />
             <Pressable onPress={() => setPhase('collect')}>
-              <Text style={styles.backToEdit}>Edit details</Text>
+              <Text style={[styles.backToEdit, { color: themeColors.blue }]}>Edit details</Text>
             </Pressable>
           </>
         )}
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <Text style={[styles.errorText, { color: themeColors.danger }]}>{error}</Text> : null}
 
         <View style={styles.footerLine}>
-          <Text style={styles.helper}>Already have an account? </Text>
+          <Text style={[styles.helper, { color: themeColors.textSecondary }]}>Already have an account? </Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Go to sign in" onPress={() => navigation.navigate('SignIn')}>
-            <Text style={styles.link}>Sign In</Text>
+            <Text style={[styles.link, { color: themeColors.blue }]}>Sign In</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -267,8 +278,7 @@ const styles = StyleSheet.create({
     fontSize: 24
   },
   verifySubTitle: {
-    ...typography.body,
-    color: colors.textSecondary
+    ...typography.body
   },
   hiddenOtpInput: {
     position: 'absolute',
@@ -280,8 +290,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   otpLabel: {
-    ...typography.caption,
-    color: colors.textMuted
+    ...typography.caption
   },
   otpRow: {
     flexDirection: 'row',
@@ -292,37 +301,32 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.stroke,
-    backgroundColor: colors.cardMuted,
     alignItems: 'center',
     justifyContent: 'center'
   },
   otpInputActive: {
-    borderColor: colors.blueDark
+    borderColor: '#2E6B00'
   },
   otpDigit: {
     ...typography.bodyStrong,
     fontSize: 18
   },
   timerText: {
-    ...typography.caption,
-    color: colors.textSecondary
+    ...typography.caption
   },
   debugOtp: {
-    ...typography.caption,
-    color: colors.warning
+    ...typography.caption
   },
   secondaryBtn: {
-    backgroundColor: colors.cardMuted
+    borderWidth: 1,
+    borderColor: '#C7D2DF'
   },
   backToEdit: {
     ...typography.caption,
-    color: colors.blue,
     textAlign: 'center'
   },
   errorText: {
-    ...typography.caption,
-    color: colors.danger
+    ...typography.caption
   },
   footerLine: {
     flexDirection: 'row',
@@ -330,11 +334,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   helper: {
-    ...typography.caption,
-    color: colors.textSecondary
+    ...typography.caption
   },
   link: {
-    ...typography.caption,
-    color: colors.blue
+    ...typography.caption
   }
 });

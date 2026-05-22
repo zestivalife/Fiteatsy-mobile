@@ -2088,17 +2088,17 @@ const styles = StyleSheet.create({
     borderColor: colors.stroke
   },
   heroLabelDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   heroUpdatedDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   heroSubDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   heroToggleChipDark: {
     backgroundColor: '#151515',
-    borderColor: '#C9CFD4'
+    borderColor: colors.stroke
   },
   heroToggleTextDark: {
     color: '#F5E1E1'
@@ -2107,7 +2107,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2A2A2A'
   },
   categoryNameDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   miniTrackDark: {
     backgroundColor: '#2A2A2A'
@@ -2116,23 +2116,23 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   lastReportDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   seeAllDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   nuetraCardDark: {
     backgroundColor: colors.card,
-    borderColor: '#C9CFD4'
+    borderColor: colors.stroke
   },
   nuetraTitleDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   nuetraCopyDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   askNuetraDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   detailCardDark: {
     backgroundColor: '#151515',
@@ -2142,40 +2142,40 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   detailEmptyDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   parameterRowDark: {
-    borderColor: '#C9CFD4',
+    borderColor: colors.stroke,
     backgroundColor: '#151515'
   },
   parameterNameDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   parameterRangeDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   parameterInsightDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   actionCardDark: {
-    borderColor: '#C9CFD4',
+    borderColor: colors.stroke,
     backgroundColor: '#151515'
   },
   actionTitleDark: {
     color: colors.white
   },
   actionDetailDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   crossRowDark: {
     backgroundColor: '#151515',
-    borderColor: '#C9CFD4'
+    borderColor: colors.stroke
   },
   crossConnectionDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   crossMetaDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   sectionTitleDark: {
     color: colors.white
@@ -2184,17 +2184,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#151515'
   },
   reportRowDark: {
-    borderColor: '#C9CFD4',
+    borderColor: colors.stroke,
     backgroundColor: '#151515'
   },
   reportLabDark: {
     color: colors.white
   },
   reportDateDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   reportMetaDark: {
-    color: '#FFFFFF'
+    color: '#4A4A4A'
   },
   trendDark: {
     opacity: 0.95

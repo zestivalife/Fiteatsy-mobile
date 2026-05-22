@@ -5,7 +5,7 @@ import { SdkAvailabilityStatus, getSdkStatus } from 'react-native-health-connect
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { colors, radius, typography } from '../../design/tokens';
+import { colors, getThemeColors, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import {
@@ -54,6 +54,7 @@ const stateCopy: Record<RecoveryConnectionState, { title: string; description: s
 
 export const SyncWearableScreen = ({ navigation }: Props) => {
   const {
+    themeMode,
     setWearableSetupCompleted,
     setSelectedDeviceId,
     onboarding,
@@ -70,7 +71,18 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   const [statusBody, setStatusBody] = useState(
     'Fiteatsy securely connects your sleep, activity, and wellness signals automatically.'
   );
+  const palette = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const isMountedRef = useRef(true);
+  const inFlightRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const completeOnboardingFlow = useCallback(() => {
     if (onboarding) {
@@ -84,40 +96,63 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   }, [connectionState, navigation, onboarding, setOnboarding, setWearableSetupCompleted]);
 
   const runRecoveryConnection = useCallback(async () => {
+    if (inFlightRef.current) {
+      return;
+    }
+    inFlightRef.current = true;
+
     if (Platform.OS !== 'android') {
+      inFlightRef.current = false;
       completeOnboardingFlow();
       return;
     }
+    if (typeof Platform.Version === 'number' && Platform.Version < 26) {
+      if (isMountedRef.current) {
+        setConnectionState('no_signals');
+        setStatusTitle('Recovery Connection Not Supported');
+        setStatusBody('This Android version does not support secure recovery sync.');
+        setError('Please use Android 8.0 or newer for Health Connect recovery sync.');
+      }
+      inFlightRef.current = false;
+      return;
+    }
 
-    setIsRunning(true);
-    setError(null);
-    setStatusTitle('Checking Recovery Connection');
-    setStatusBody('Preparing secure access to your recovery signals.');
+    if (isMountedRef.current) {
+      setIsRunning(true);
+      setError(null);
+      setStatusTitle('Checking Recovery Connection');
+      setStatusBody('Preparing secure access to your recovery signals.');
+    }
 
     try {
       const sdkStatus = await getSdkStatus();
       if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
-        setPendingInstall(true);
-        setConnectionState(null);
-        setStatusTitle('Health Connect Needed');
-        setStatusBody('Health Connect helps securely sync your recovery signals.');
+        if (isMountedRef.current) {
+          setPendingInstall(true);
+          setConnectionState(null);
+          setStatusTitle('Health Connect Needed');
+          setStatusBody('Health Connect helps securely sync your recovery signals.');
+        }
         await openHealthConnectPlayStore();
-        setIsRunning(false);
         return;
       }
 
-      setPendingInstall(false);
-      setStatusTitle('Syncing Recovery Signals');
-      setStatusBody('Reading sleep, activity, and heart recovery data securely from your device.');
+      if (isMountedRef.current) {
+        setPendingInstall(false);
+        setStatusTitle('Syncing Recovery Signals');
+        setStatusBody('Reading sleep, activity, and heart recovery data securely from your device.');
+      }
 
       const payload = await syncConnectedHealthApp('health-connect');
       addWearableSyncData(payload);
       setSelectedDeviceId('health-connect');
 
       const state = classifyRecoveryConnectionState(payload);
-      setConnectionState(state);
-      setStatusTitle(stateCopy[state].title);
-      setStatusBody(stateCopy[state].description);
+      if (isMountedRef.current) {
+        setConnectionState(state);
+        setStatusTitle(stateCopy[state].title);
+        setStatusBody(stateCopy[state].description);
+      }
 
       const connectedMetrics = payload.dataQuality.connectedMetrics ?? {};
       const syncedCount = Object.values(connectedMetrics).filter((status) => status === 'synced').length;
@@ -142,25 +177,37 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     } catch (syncError) {
       const message = syncError instanceof Error ? syncError.message : 'sync_failed';
       if (message.includes('health_connect_unavailable')) {
-        setStatusTitle('Health Connect Needed');
-        setStatusBody('Install or update Health Connect to continue recovery sync.');
-        setPendingInstall(true);
+        if (isMountedRef.current) {
+          setStatusTitle('Health Connect Needed');
+          setStatusBody('Install or update Health Connect to continue recovery sync.');
+          setPendingInstall(true);
+        }
       } else if (message.includes('health_connect_initialize_failed')) {
-        setStatusTitle('Recovery Connection Paused');
-        setStatusBody('Recovery connection is temporarily unavailable. Please retry in a moment.');
+        if (isMountedRef.current) {
+          setStatusTitle('Recovery Connection Paused');
+          setStatusBody('Recovery connection is temporarily unavailable. Please retry in a moment.');
+        }
       } else {
-        setStatusTitle('Recovery Signals Pending');
-        setStatusBody('Recovery signals are still calibrating. You can continue and sync again anytime.');
+        if (isMountedRef.current) {
+          setStatusTitle('Recovery Signals Pending');
+          setStatusBody('Recovery signals are still calibrating. You can continue and sync again anytime.');
+        }
       }
-      setError('Recovery sync could not be completed right now.');
+      if (isMountedRef.current) {
+        setError('Recovery sync could not be completed right now.');
+      }
     } finally {
-      setIsRunning(false);
+      inFlightRef.current = false;
+      if (isMountedRef.current) {
+        setIsRunning(false);
+      }
     }
   }, [addWearableSyncData, completeOnboardingFlow, setSelectedDeviceId, setWellness]);
 
-  useEffect(() => {
-    void runRecoveryConnection();
-  }, [runRecoveryConnection]);
+  // Stability guard:
+  // avoid auto-triggering Health Connect permission/data reads during
+  // screen transitions (logout/login/home sync navigation), which can crash
+  // on some Android builds. Sync starts via explicit user action.
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
@@ -187,16 +234,16 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   return (
     <Screen>
       <View style={styles.container}>
-        <Text style={styles.title}>Connect Your Recovery</Text>
-        <Text style={styles.subTitle}>
+        <Text style={[styles.title, { color: palette.textPrimary }]}>Connect Your Recovery</Text>
+        <Text style={[styles.subTitle, { color: palette.textSecondary }]}>
           Fiteatsy securely connects your sleep, activity, and wellness signals automatically.
         </Text>
-        <Text style={styles.supportText}>
+        <Text style={[styles.supportText, { color: palette.textSecondary }]}>
           Works with Health Connect compatible wellness apps including: Samsung Health, Google Fit, NoiseFit, boAt
           Crest, Fitbit and more.
         </Text>
 
-        <View style={styles.statusCard}>
+        <View style={[styles.statusCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
           <View style={styles.statusHeader}>
             <Ionicons
               name={
@@ -209,10 +256,10 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
               size={20}
               color={connectionState === 'connected' ? colors.success : connectionState === 'permission_missing' ? colors.warning : colors.blue}
             />
-            <Text style={styles.statusTitle}>{statusTitle}</Text>
+            <Text style={[styles.statusTitle, { color: palette.textPrimary }]}>{statusTitle}</Text>
           </View>
-          <Text style={styles.statusBody}>{statusBody}</Text>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          <Text style={[styles.statusBody, { color: palette.textSecondary }]}>{statusBody}</Text>
+          {error ? <Text style={[styles.errorText, { color: isLight ? '#B42318' : colors.danger }]}>{error}</Text> : null}
         </View>
 
         <PrimaryButton
@@ -230,7 +277,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         />
 
         <Pressable style={styles.skipInline} onPress={skipForNow}>
-          <Text style={styles.skipInlineText}>Skip for now</Text>
+          <Text style={[styles.skipInlineText, { color: palette.textSecondary }]}>Skip for now</Text>
         </Pressable>
       </View>
     </Screen>
@@ -245,23 +292,18 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title,
-    fontSize: 24,
-    color: colors.textPrimary
+    fontSize: 24
   },
   subTitle: {
     ...typography.body,
-    fontSize: 14,
-    color: colors.textSecondary
+    fontSize: 14
   },
   supportText: {
     ...typography.caption,
-    fontSize: 12,
-    color: colors.textSecondary
+    fontSize: 12
   },
   statusCard: {
     borderWidth: 1,
-    borderColor: colors.stroke,
-    backgroundColor: colors.card,
     borderRadius: radius.lg,
     padding: 14,
     gap: 8
@@ -273,18 +315,15 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     ...typography.bodyStrong,
-    fontSize: 14,
-    color: colors.textPrimary
+    fontSize: 14
   },
   statusBody: {
     ...typography.body,
-    fontSize: 12,
-    color: colors.textSecondary
+    fontSize: 12
   },
   errorText: {
     ...typography.caption,
-    fontSize: 12,
-    color: colors.danger
+    fontSize: 12
   },
   skipInline: {
     alignSelf: 'center',
@@ -292,7 +331,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   skipInlineText: {
-    ...typography.caption,
-    color: colors.textSecondary
+    ...typography.caption
   }
 });

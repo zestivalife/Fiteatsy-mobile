@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { colors, radius, typography } from '../../design/tokens';
+import { colors, getThemeColors, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import {
   AssessmentGender,
@@ -118,8 +119,16 @@ const createVoiceAnalysis = ({
 };
 
 export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
-  const { setAssessment, submitCheckIn, setMood } = useAppContext();
+  const { setAssessment, submitCheckIn, setMood, themeMode } = useAppContext();
   const { width } = useWindowDimensions();
+  const isLight = themeMode === 'light';
+  const palette = getThemeColors(themeMode);
+  const surface = isLight ? '#FFFFFF' : colors.cardMuted;
+  const surfaceRaised = isLight ? '#EEF2F7' : colors.bgSecondary;
+  const selectedLightBg = isLight ? palette.blueDark : undefined;
+  const textStrong = isLight ? '#000000' : colors.textPrimary;
+  const textSoft = isLight ? '#334155' : colors.textSecondary;
+  const textLow = isLight ? '#475569' : colors.textMuted;
 
   const [step, setStep] = useState(1);
   const [goal, setGoal] = useState<AssessmentGoal>('Reduce Stress');
@@ -286,8 +295,8 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
     <Screen>
       <View style={styles.body}>
         <View style={styles.headerRow}>
-          <Pressable
-            style={styles.backBtn}
+          <AppBackButton
+            iconOnly
             onPress={() => {
               if (step > 1) {
                 setStep((current) => current - 1);
@@ -295,31 +304,34 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
               }
               navigation.goBack();
             }}
-          >
-            <Text style={styles.backBtnText}>{'<'}</Text>
-          </Pressable>
-          <Text style={styles.title}>Assessment</Text>
-          <Text style={styles.progress}>{step} of {totalSteps}</Text>
+          />
+          <Text style={[styles.title, { color: textStrong }]}>Assessment</Text>
+          <Text style={[styles.progress, { color: textLow }]}>{step} of {totalSteps}</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {step === 1 ? (
             <View>
-              <Text style={styles.question}>What’s your health goal for today?</Text>
+              <Text style={[styles.question, { color: textStrong }]}>What’s your health goal for today?</Text>
               <View style={styles.list}>
                 {goals.map((item) => {
                   const active = goal === item;
                   return (
                     <Pressable
                       key={item}
-                      style={[styles.optionRow, active && styles.optionRowActive]}
+                      style={[
+                        styles.optionRow,
+                        { backgroundColor: surface, borderColor: palette.stroke },
+                        active && styles.optionRowActive,
+                        active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                      ]}
                       onPress={() => {
                         setGoal(item);
                         animatePulse();
                       }}
                     >
-                      <View style={[styles.radioDot, active && styles.radioDotActive]} />
-                      <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>{item}</Text>
+                      <View style={[styles.radioDot, { borderColor: textLow }, active && styles.radioDotActive]} />
+                      <Text style={[styles.optionLabel, { color: textStrong }, active && styles.optionLabelActive]}>{item}</Text>
                     </Pressable>
                   );
                 })}
@@ -329,20 +341,25 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 2 ? (
             <View>
-              <Text style={styles.question}>What’s your official gender?</Text>
+              <Text style={[styles.question, { color: textStrong }]}>What’s your official gender?</Text>
               <View style={styles.list}>
                 {genders.map((item) => {
                   const active = gender === item;
                   return (
                     <Pressable
                       key={item}
-                      style={[styles.optionRow, active && styles.optionRowActive]}
+                      style={[
+                        styles.optionRow,
+                        { backgroundColor: surface, borderColor: palette.stroke },
+                        active && styles.optionRowActive,
+                        active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                      ]}
                       onPress={() => {
                         setGender(item);
                         animatePulse();
                       }}
                     >
-                      <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>{item}</Text>
+                      <Text style={[styles.optionLabel, { color: textStrong }, active && styles.optionLabelActive]}>{item}</Text>
                     </Pressable>
                   );
                 })}
@@ -352,8 +369,8 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 3 ? (
             <View>
-              <Text style={styles.question}>What’s your age?</Text>
-              <View style={styles.ageWheelWrap}>
+              <Text style={[styles.question, { color: textStrong }]}>What’s your age?</Text>
+              <View style={[styles.ageWheelWrap, { backgroundColor: surface, borderColor: palette.stroke }]}>
                 <ScrollView
                   ref={ageRef}
                   showsVerticalScrollIndicator={false}
@@ -366,7 +383,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
                     const selected = item === age;
                     return (
                       <View key={`age-${item}`} style={styles.ageItem}>
-                        <Text style={[styles.ageText, selected && styles.ageTextActive]}>{item}</Text>
+                        <Text style={[styles.ageText, { color: textLow }, selected && [styles.ageTextActive, { color: textStrong }]]}>{item}</Text>
                       </View>
                     );
                   })}
@@ -378,9 +395,9 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 4 ? (
             <View>
-              <Text style={styles.question}>What’s your height?</Text>
-              <View style={styles.weightCard}>
-                <Text style={styles.bigNumber}>{heightCm} cm</Text>
+              <Text style={[styles.question, { color: textStrong }]}>What’s your height?</Text>
+              <View style={[styles.weightCard, { backgroundColor: surface, borderColor: palette.stroke }]}>
+                <Text style={[styles.bigNumber, { color: textStrong }]}>{heightCm} cm</Text>
                 <View style={styles.rulerWrap}>
                   <ScrollView
                     ref={heightRef}
@@ -396,8 +413,8 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
                       const major = item % 5 === 0;
                       return (
                         <View key={`ht-${item}`} style={styles.tickItem}>
-                          <View style={[styles.tick, major && styles.tickMajor, selected && styles.tickSelected]} />
-                          {major ? <Text style={styles.tickLabel}>{item}</Text> : <View style={styles.tickLabelSpacer} />}
+                          <View style={[styles.tick, { backgroundColor: textLow }, major && styles.tickMajor, selected && styles.tickSelected]} />
+                          {major ? <Text style={[styles.tickLabel, { color: textLow }]}>{item}</Text> : <View style={styles.tickLabelSpacer} />}
                         </View>
                       );
                     })}
@@ -410,18 +427,34 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 5 ? (
             <View>
-              <Text style={styles.question}>What’s your weight?</Text>
+              <Text style={[styles.question, { color: textStrong }]}>What’s your weight?</Text>
               <View style={styles.unitRow}>
-                <Pressable style={[styles.unitChip, unit === 'kg' && styles.unitChipActive]} onPress={() => setUnit('kg')}>
-                  <Text style={[styles.unitChipText, unit === 'kg' && styles.unitChipTextActive]}>kg</Text>
+                <Pressable
+                  style={[
+                    styles.unitChip,
+                    { backgroundColor: surface, borderColor: palette.stroke },
+                    unit === 'kg' && styles.unitChipActive,
+                    unit === 'kg' && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                  ]}
+                  onPress={() => setUnit('kg')}
+                >
+                  <Text style={[styles.unitChipText, { color: textStrong }, unit === 'kg' && styles.unitChipTextActive]}>kg</Text>
                 </Pressable>
-                <Pressable style={[styles.unitChip, unit === 'lbs' && styles.unitChipActive]} onPress={() => setUnit('lbs')}>
-                  <Text style={[styles.unitChipText, unit === 'lbs' && styles.unitChipTextActive]}>lbs</Text>
+                <Pressable
+                  style={[
+                    styles.unitChip,
+                    { backgroundColor: surface, borderColor: palette.stroke },
+                    unit === 'lbs' && styles.unitChipActive,
+                    unit === 'lbs' && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                  ]}
+                  onPress={() => setUnit('lbs')}
+                >
+                  <Text style={[styles.unitChipText, { color: textStrong }, unit === 'lbs' && styles.unitChipTextActive]}>lbs</Text>
                 </Pressable>
               </View>
 
-              <View style={styles.weightCard}>
-                <Text style={styles.bigNumber}>{weightDisplay}</Text>
+              <View style={[styles.weightCard, { backgroundColor: surface, borderColor: palette.stroke }]}>
+                <Text style={[styles.bigNumber, { color: textStrong }]}>{weightDisplay}</Text>
                 <View style={styles.rulerWrap}>
                   <ScrollView
                     ref={weightRef}
@@ -437,8 +470,8 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
                       const major = item % 5 === 0;
                       return (
                         <View key={`wt-${item}`} style={styles.tickItem}>
-                          <View style={[styles.tick, major && styles.tickMajor, selected && styles.tickSelected]} />
-                          {major ? <Text style={styles.tickLabel}>{item}</Text> : <View style={styles.tickLabelSpacer} />}
+                          <View style={[styles.tick, { backgroundColor: textLow }, major && styles.tickMajor, selected && styles.tickSelected]} />
+                          {major ? <Text style={[styles.tickLabel, { color: textLow }]}>{item}</Text> : <View style={styles.tickLabelSpacer} />}
                         </View>
                       );
                     })}
@@ -451,21 +484,26 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 6 ? (
             <View>
-              <Text style={styles.question}>How would you describe your mood?</Text>
+              <Text style={[styles.question, { color: textStrong }]}>How would you describe your mood?</Text>
               <View style={styles.rowWrap}>
                 {moods.map((item) => {
                   const active = mood === item.value;
                   return (
                     <Pressable
                       key={item.value}
-                      style={[styles.moodCard, active && styles.moodCardActive]}
+                      style={[
+                        styles.moodCard,
+                        { backgroundColor: surface, borderColor: palette.stroke },
+                        active && styles.moodCardActive,
+                        active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                      ]}
                       onPress={() => {
                         setAssessmentMood(item.value);
                         animatePulse();
                       }}
                     >
                       <Text style={styles.moodEmoji}>{item.emoji}</Text>
-                      <Text style={[styles.moodLabel, active && styles.optionLabelActive]}>{item.label}</Text>
+                      <Text style={[styles.moodLabel, { color: textStrong }, active && styles.optionLabelActive]}>{item.label}</Text>
                     </Pressable>
                   );
                 })}
@@ -475,13 +513,29 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 7 ? (
             <View>
-              <Text style={styles.question}>Have you sought professional help before?</Text>
+              <Text style={[styles.question, { color: textStrong }]}>Have you sought professional help before?</Text>
               <View style={styles.binaryRow}>
-                <Pressable style={[styles.binaryOption, soughtHelpBefore === 'Yes' && styles.binaryOptionActive]} onPress={() => setSoughtHelpBefore('Yes')}>
-                  <Text style={[styles.optionLabel, soughtHelpBefore === 'Yes' && styles.optionLabelActive]}>Yes</Text>
+                <Pressable
+                  style={[
+                    styles.binaryOption,
+                    { backgroundColor: surface, borderColor: palette.stroke },
+                    soughtHelpBefore === 'Yes' && styles.binaryOptionActive,
+                    soughtHelpBefore === 'Yes' && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                  ]}
+                  onPress={() => setSoughtHelpBefore('Yes')}
+                >
+                  <Text style={[styles.optionLabel, { color: textStrong }, soughtHelpBefore === 'Yes' && styles.optionLabelActive]}>Yes</Text>
                 </Pressable>
-                <Pressable style={[styles.binaryOption, soughtHelpBefore === 'No' && styles.binaryOptionActive]} onPress={() => setSoughtHelpBefore('No')}>
-                  <Text style={[styles.optionLabel, soughtHelpBefore === 'No' && styles.optionLabelActive]}>No</Text>
+                <Pressable
+                  style={[
+                    styles.binaryOption,
+                    { backgroundColor: surface, borderColor: palette.stroke },
+                    soughtHelpBefore === 'No' && styles.binaryOptionActive,
+                    soughtHelpBefore === 'No' && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                  ]}
+                  onPress={() => setSoughtHelpBefore('No')}
+                >
+                  <Text style={[styles.optionLabel, { color: textStrong }, soughtHelpBefore === 'No' && styles.optionLabelActive]}>No</Text>
                 </Pressable>
               </View>
             </View>
@@ -489,13 +543,29 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 8 ? (
             <View>
-              <Text style={styles.question}>Are you experiencing any physical distress?</Text>
+              <Text style={[styles.question, { color: textStrong }]}>Are you experiencing any physical distress?</Text>
               <View style={styles.binaryRow}>
-                <Pressable style={[styles.binaryOption, physicalDistress === 'Yes' && styles.binaryOptionActive]} onPress={() => setPhysicalDistress('Yes')}>
-                  <Text style={[styles.optionLabel, physicalDistress === 'Yes' && styles.optionLabelActive]}>Yes, one or multiple</Text>
+                <Pressable
+                  style={[
+                    styles.binaryOption,
+                    { backgroundColor: surface, borderColor: palette.stroke },
+                    physicalDistress === 'Yes' && styles.binaryOptionActive,
+                    physicalDistress === 'Yes' && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                  ]}
+                  onPress={() => setPhysicalDistress('Yes')}
+                >
+                  <Text style={[styles.optionLabel, { color: textStrong }, physicalDistress === 'Yes' && styles.optionLabelActive]}>Yes, one or multiple</Text>
                 </Pressable>
-                <Pressable style={[styles.binaryOption, physicalDistress === 'No' && styles.binaryOptionActive]} onPress={() => setPhysicalDistress('No')}>
-                  <Text style={[styles.optionLabel, physicalDistress === 'No' && styles.optionLabelActive]}>No physical pain at all</Text>
+                <Pressable
+                  style={[
+                    styles.binaryOption,
+                    { backgroundColor: surface, borderColor: palette.stroke },
+                    physicalDistress === 'No' && styles.binaryOptionActive,
+                    physicalDistress === 'No' && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                  ]}
+                  onPress={() => setPhysicalDistress('No')}
+                >
+                  <Text style={[styles.optionLabel, { color: textStrong }, physicalDistress === 'No' && styles.optionLabelActive]}>No physical pain at all</Text>
                 </Pressable>
               </View>
             </View>
@@ -503,18 +573,18 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 9 ? (
             <View>
-              <Text style={styles.question}>How would you rate your sleep quality?</Text>
-              <View style={styles.sleepRailWrap}>
+              <Text style={[styles.question, { color: textStrong }]}>How would you rate your sleep quality?</Text>
+              <View style={[styles.sleepRailWrap, { backgroundColor: surface, borderColor: palette.stroke }]}>
                 {sleepQualityLevels.map((item, index) => {
                   const active = sleepQuality === item;
                   const hint = index === 0 ? '7+ hrs' : index === 1 ? '6-7 hrs' : index === 2 ? '5-6 hrs' : index === 3 ? '3-4 hrs' : '<3 hrs';
                   return (
                     <Pressable key={item} style={styles.sleepRow} onPress={() => setSleepQuality(item)}>
-                      <Text style={[styles.sleepLabel, active && styles.sleepLabelActive]}>{item}</Text>
+                      <Text style={[styles.sleepLabel, { color: textSoft }, active && [styles.sleepLabelActive, { color: textStrong }]]}>{item}</Text>
                       <View style={styles.sleepDotTrack}>
-                        <View style={[styles.sleepDot, active && styles.sleepDotActive]} />
+                        <View style={[styles.sleepDot, { backgroundColor: textLow }, active && styles.sleepDotActive]} />
                       </View>
-                      <Text style={[styles.sleepHint, active && styles.sleepHintActive]}>{hint}</Text>
+                      <Text style={[styles.sleepHint, { color: textLow }, active && styles.sleepHintActive]}>{hint}</Text>
                     </Pressable>
                   );
                 })}
@@ -525,50 +595,63 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 10 ? (
             <View>
-              <Text style={styles.question}>How would you rate your stress level?</Text>
-              <Text style={styles.stressValue}>{stressLevel}</Text>
+              <Text style={[styles.question, { color: textStrong }]}>How would you rate your stress level?</Text>
+              <Text style={[styles.stressValue, { color: textStrong }]}>{stressLevel}</Text>
               <View style={styles.stressRow}>
                 {[1, 2, 3, 4, 5].map((value) => {
                   const level = value as 1 | 2 | 3 | 4 | 5;
                   const active = stressLevel === level;
                   return (
-                    <Pressable key={value} style={[styles.stressChip, active && styles.stressChipActive]} onPress={() => setStressLevel(level)}>
-                      <Text style={[styles.stressChipText, active && styles.stressChipTextActive]}>{value}</Text>
+                    <Pressable
+                      key={value}
+                      style={[
+                        styles.stressChip,
+                        { backgroundColor: surface, borderColor: palette.stroke },
+                        active && styles.stressChipActive,
+                        active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
+                      ]}
+                      onPress={() => setStressLevel(level)}
+                    >
+                      <Text style={[styles.stressChipText, { color: textStrong }, active && styles.stressChipTextActive]}>{value}</Text>
                     </Pressable>
                   );
                 })}
               </View>
-              <Text style={styles.stressCopy}>{stressCopy}</Text>
+              <Text style={[styles.stressCopy, { color: textLow }]}>{stressCopy}</Text>
             </View>
           ) : null}
 
           {step === 11 ? (
             <View>
-              <Text style={styles.question}>AI Sound Analysis</Text>
-              <View style={styles.voiceCard}>
+              <Text style={[styles.question, { color: textStrong }]}>AI Sound Analysis</Text>
+              <View style={[styles.voiceCard, { backgroundColor: surface, borderColor: palette.stroke }]}>
                 <Animated.View style={[styles.micButtonWrap, { transform: [{ scale: isRecordingVoice ? micScale : pulse }] }]}>
                   <Pressable
                     onPressIn={startVoiceCapture}
                     onPressOut={stopVoiceCapture}
-                    style={[styles.micButton, isRecordingVoice && styles.micButtonActive]}
+                    style={[styles.micButton, { backgroundColor: surfaceRaised }, isRecordingVoice && styles.micButtonActive]}
                   >
-                    <Ionicons name="mic" size={34} color={colors.white} />
+                    <Ionicons
+                      name="mic"
+                      size={34}
+                      color={isRecordingVoice ? colors.white : isLight ? '#0F172A' : colors.white}
+                    />
                   </Pressable>
                 </Animated.View>
-                <Text style={styles.voiceTitle}>{isRecordingVoice ? 'Listening...' : 'Hold the mic and say the statement'}</Text>
-                <Text style={styles.voiceCopy}>“{voiceReflection}”</Text>
+                <Text style={[styles.voiceTitle, { color: textStrong }]}>{isRecordingVoice ? 'Listening...' : 'Hold the mic and say the statement'}</Text>
+                <Text style={[styles.voiceCopy, { color: textStrong }]}>“{voiceReflection}”</Text>
 
                 {voiceAnalysis ? (
                   <View style={styles.voiceAnalysisCard}>
                     <View style={styles.voiceAnalysisHeader}>
-                      <Text style={styles.voiceAnalysisTitle}>{voiceAnalysis.title}</Text>
-                      <Text style={styles.voiceAnalysisConfidence}>{voiceAnalysis.confidence}</Text>
+                      <Text style={[styles.voiceAnalysisTitle, { color: textStrong }]}>{voiceAnalysis.title}</Text>
+                      <Text style={[styles.voiceAnalysisConfidence, { color: palette.success }]}>{voiceAnalysis.confidence}</Text>
                     </View>
-                    <Text style={styles.voiceAnalysisMood}>{voiceAnalysis.moodLabel}</Text>
-                    <Text style={styles.voiceAnalysisSummary}>{voiceAnalysis.summary}</Text>
+                    <Text style={[styles.voiceAnalysisMood, { color: textSoft }]}>{voiceAnalysis.moodLabel}</Text>
+                    <Text style={[styles.voiceAnalysisSummary, { color: textStrong }]}>{voiceAnalysis.summary}</Text>
                   </View>
                 ) : (
-                  <Text style={styles.voiceHint}>Release the mic to let AI read your mood and recovery tone.</Text>
+                  <Text style={[styles.voiceHint, { color: textSoft }]}>Release the mic to let AI read your mood and recovery tone.</Text>
                 )}
               </View>
             </View>
@@ -602,7 +685,7 @@ const styles = StyleSheet.create({
     borderColor: colors.stroke,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.29)'
+    backgroundColor: colors.cardMuted
   },
   backBtnText: { color: colors.textPrimary, fontSize: 18, lineHeight: 21 },
   title: { ...typography.bodyStrong, fontSize: 16 },
@@ -613,7 +696,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.stroke,
     borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.29)',
+    backgroundColor: colors.cardMuted,
     minHeight: 54,
     justifyContent: 'flex-start',
     alignItems: 'center',
@@ -631,13 +714,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: colors.stroke,
-    backgroundColor: 'rgba(0,0,0,0.29)',
+    backgroundColor: colors.cardMuted,
     marginBottom: 20,
     overflow: 'hidden'
   },
   ageListContent: { paddingVertical: AGE_ITEM_HEIGHT * 2 },
   ageItem: { height: AGE_ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center' },
-  ageText: { ...typography.title, fontSize: 34, color: '#939393' },
+  ageText: { ...typography.title, fontSize: 34, color: colors.textMuted },
   ageTextActive: { color: colors.textPrimary, fontSize: 46, lineHeight: 52 },
   ageSelectionBand: {
     position: 'absolute',
@@ -657,7 +740,7 @@ const styles = StyleSheet.create({
     borderColor: colors.stroke,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: 'rgba(0,0,0,0.29)'
+    backgroundColor: colors.cardMuted
   },
   unitChipActive: { backgroundColor: BRAND_GREEN, borderColor: BRAND_GREEN },
   unitChipText: { ...typography.body, fontSize: 14 },
@@ -666,7 +749,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.stroke,
     borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.29)',
+    backgroundColor: colors.cardMuted,
     padding: 16,
     marginBottom: 20,
     alignItems: 'center'
@@ -677,7 +760,7 @@ const styles = StyleSheet.create({
   tick: { width: 2, height: 18, borderRadius: 1, backgroundColor: '#939393' },
   tickMajor: { height: 28, backgroundColor: '#939393' },
   tickSelected: { backgroundColor: BRAND_GREEN },
-  tickLabel: { ...typography.caption, fontSize: 10, marginTop: 4, color: '#939393' },
+  tickLabel: { ...typography.caption, fontSize: 10, marginTop: 4, color: colors.textMuted },
   tickLabelSpacer: { height: 16, marginTop: 4 },
   rulerIndicator: { position: 'absolute', alignSelf: 'center', width: 4, height: 46, borderRadius: 2, backgroundColor: BRAND_GREEN },
   rowWrap: { flexDirection: 'row', gap: 8, marginBottom: 20 },
@@ -686,7 +769,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.stroke,
-    backgroundColor: 'rgba(0,0,0,0.29)',
+    backgroundColor: colors.cardMuted,
     alignItems: 'center',
     paddingVertical: 14,
     gap: 6
@@ -699,7 +782,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.stroke,
-    backgroundColor: 'rgba(0,0,0,0.29)',
+    backgroundColor: colors.cardMuted,
     paddingVertical: 14,
     paddingHorizontal: 12
   },
@@ -708,22 +791,22 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.stroke,
-    backgroundColor: 'rgba(0,0,0,0.29)',
+    backgroundColor: colors.cardMuted,
     paddingVertical: 8,
     paddingHorizontal: 12,
     marginBottom: 20,
     position: 'relative'
   },
   sleepRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center' },
-  sleepLabel: { ...typography.body, fontSize: 16, width: 88, color: '#F5E1E1' },
+  sleepLabel: { ...typography.body, fontSize: 16, width: 88, color: colors.textSecondary },
   sleepLabelActive: { color: colors.textPrimary, fontWeight: '700' },
   sleepDotTrack: { width: 24, alignItems: 'center', justifyContent: 'center' },
   sleepDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#939393' },
   sleepDotActive: { backgroundColor: BRAND_GREEN },
-  sleepHint: { ...typography.caption, fontSize: 12, color: '#939393', marginLeft: 8 },
-  sleepHintActive: { color: '#509512' },
+  sleepHint: { ...typography.caption, fontSize: 12, color: colors.textMuted, marginLeft: 8 },
+  sleepHintActive: { color: colors.success },
   sleepActiveBar: { position: 'absolute', right: 12, width: 4, height: 24, borderRadius: 3, backgroundColor: BRAND_GREEN },
-  stressValue: { ...typography.title, fontSize: 72, lineHeight: 76, color: '#F5E1E1', textAlign: 'center', marginBottom: 8 },
+  stressValue: { ...typography.title, fontSize: 72, lineHeight: 76, color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
   stressRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   stressChip: {
     width: 44,
@@ -733,17 +816,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.stroke,
-    backgroundColor: 'rgba(0,0,0,0.29)'
+    backgroundColor: colors.cardMuted
   },
   stressChipActive: { borderColor: BRAND_GREEN, backgroundColor: BRAND_GREEN },
   stressChipText: { ...typography.bodyStrong, fontSize: 16 },
   stressChipTextActive: { color: '#FFFFFF' },
-  stressCopy: { ...typography.body, color: '#939393' },
+  stressCopy: { ...typography.body, color: colors.textMuted },
   voiceCard: {
     borderWidth: 1,
     borderColor: colors.stroke,
     borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.29)',
+    backgroundColor: colors.cardMuted,
     alignItems: 'center',
     padding: 20,
     gap: 14,
@@ -759,7 +842,7 @@ const styles = StyleSheet.create({
     borderRadius: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#323232',
+    backgroundColor: colors.bgSecondary,
     shadowColor: '#8A7864',
     shadowOpacity: 0.18,
     shadowRadius: 14,
@@ -806,12 +889,12 @@ const styles = StyleSheet.create({
   },
   voiceAnalysisConfidence: {
     ...typography.caption,
-    color: '#509512'
+    color: colors.success
   },
   voiceAnalysisMood: {
     ...typography.caption,
     fontSize: 13,
-    color: '#F5E1E1'
+    color: colors.textSecondary
   },
   voiceAnalysisSummary: {
     ...typography.body,
