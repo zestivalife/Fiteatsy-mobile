@@ -54,6 +54,139 @@ const within = (timestamp: string, maxAgeMs: number) => {
   return Number.isFinite(t) && now() - t <= maxAgeMs;
 };
 
+export type HealthConnectRuntimeDiagnostics = {
+  platform: string;
+  sdkStatus: string;
+  initialized: boolean;
+  permissionStates: Record<string, boolean>;
+  grantedPermissions: string[];
+  lastCheckedISO: string;
+  metricDebug: {
+    steps: { recordCount: number; lastRecordISO: string | null; stale: boolean };
+    sleep: { recordCount: number; lastRecordISO: string | null; stale: boolean };
+    restingHeartRate: { recordCount: number; lastRecordISO: string | null; stale: boolean };
+    hrv: { recordCount: number; lastRecordISO: string | null; stale: boolean };
+    workouts: { recordCount: number; lastRecordISO: string | null; stale: boolean };
+  };
+};
+
+export const getHealthConnectRuntimeDiagnostics = async (): Promise<HealthConnectRuntimeDiagnostics> => {
+  const base: HealthConnectRuntimeDiagnostics = {
+    platform: Platform.OS,
+    sdkStatus: 'unknown',
+    initialized: false,
+    permissionStates: {},
+    grantedPermissions: [],
+    lastCheckedISO: new Date().toISOString(),
+    metricDebug: {
+      steps: { recordCount: 0, lastRecordISO: null, stale: true },
+      sleep: { recordCount: 0, lastRecordISO: null, stale: true },
+      restingHeartRate: { recordCount: 0, lastRecordISO: null, stale: true },
+      hrv: { recordCount: 0, lastRecordISO: null, stale: true },
+      workouts: { recordCount: 0, lastRecordISO: null, stale: true }
+    }
+  };
+
+  if (Platform.OS !== 'android') {
+    return { ...base, sdkStatus: 'not_android' };
+  }
+
+  const sdkStatus = await getSdkStatus();
+  if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
+    return { ...base, sdkStatus: String(sdkStatus) };
+  }
+
+  const initialized = await initialize();
+  const granted = await getGrantedPermissions();
+  const grantedSet = new Set(granted.map((permission) => toPermissionKey(permission as Permission)));
+  const toGranted = (recordType: string) => grantedSet.has(`read:${recordType}`);
+
+  const permissionStates = {
+    Steps: toGranted('Steps'),
+    SleepSession: toGranted('SleepSession'),
+    RestingHeartRate: toGranted('RestingHeartRate'),
+    HeartRateVariabilityRmssd: toGranted('HeartRateVariabilityRmssd'),
+    ExerciseSession: toGranted('ExerciseSession')
+  };
+
+  const end = toIso(now());
+  const diagnostics: HealthConnectRuntimeDiagnostics = {
+    ...base,
+    sdkStatus: String(sdkStatus),
+    initialized,
+    permissionStates,
+    grantedPermissions: Array.from(grantedSet),
+    lastCheckedISO: new Date().toISOString()
+  };
+
+  if (permissionStates.Steps) {
+    const steps = await readRecords('Steps', {
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY), endTime: end }
+    });
+    const records = steps.records.filter((record) => within(record.endTime, DAY));
+    const last = records.at(-1)?.endTime ?? null;
+    diagnostics.metricDebug.steps = {
+      recordCount: records.length,
+      lastRecordISO: last,
+      stale: !last || !within(last, DAY)
+    };
+  }
+
+  if (permissionStates.SleepSession) {
+    const sleep = await readRecords('SleepSession', {
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 2), endTime: end }
+    });
+    const records = sleep.records.filter((record) => within(record.endTime, DAY * 2));
+    const last = records.at(-1)?.endTime ?? null;
+    diagnostics.metricDebug.sleep = {
+      recordCount: records.length,
+      lastRecordISO: last,
+      stale: !last || !within(last, DAY * 2)
+    };
+  }
+
+  if (permissionStates.RestingHeartRate) {
+    const hr = await readRecords('RestingHeartRate', {
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
+    });
+    const records = hr.records.filter((record) => within(record.time, DAY * 7));
+    const last = records.at(-1)?.time ?? null;
+    diagnostics.metricDebug.restingHeartRate = {
+      recordCount: records.length,
+      lastRecordISO: last,
+      stale: !last || !within(last, DAY * 7)
+    };
+  }
+
+  if (permissionStates.HeartRateVariabilityRmssd) {
+    const hrv = await readRecords('HeartRateVariabilityRmssd', {
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
+    });
+    const records = hrv.records.filter((record) => within(record.time, DAY * 7));
+    const last = records.at(-1)?.time ?? null;
+    diagnostics.metricDebug.hrv = {
+      recordCount: records.length,
+      lastRecordISO: last,
+      stale: !last || !within(last, DAY * 7)
+    };
+  }
+
+  if (permissionStates.ExerciseSession) {
+    const workouts = await readRecords('ExerciseSession', {
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
+    });
+    const records = workouts.records.filter((record) => within(record.endTime, DAY * 7));
+    const last = records.at(-1)?.endTime ?? null;
+    diagnostics.metricDebug.workouts = {
+      recordCount: records.length,
+      lastRecordISO: last,
+      stale: !last || !within(last, DAY * 7)
+    };
+  }
+
+  return diagnostics;
+};
+
 export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   if (Platform.OS !== 'android') {
     console.warn('[HealthConnect] Unsupported platform:', Platform.OS);

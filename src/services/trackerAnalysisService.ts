@@ -158,7 +158,7 @@ const buildFallbackAnalysis = (input: TrackerAnalysisInput): TrackerAnalysisResu
         : `${input.metricTitle} trend is ${trend}. Repeat today's strongest habit at the same time tomorrow to lock consistency.`,
       compareDelta !== null
         ? `Compare baseline delta is ${compareDelta >= 0 ? '+' : ''}${compareDelta.toFixed(1)} ${input.unit}. If this drops tomorrow, run a quick reset from Sessions.`
-        : 'Enable compare data to unlock stronger day-over-day coaching.'
+        : 'Continue syncing daily signals to strengthen day-over-day coaching confidence.'
     ],
     generatedAtISO: new Date().toISOString(),
     model: 'nuetra-fallback-v1'
@@ -193,7 +193,7 @@ const buildFallbackSectionImprovement = (input: TrackerSectionImprovementInput):
         : 'Lock one deep-focus slot and one decompression break to stabilize wellness trends.',
       input.compareYesterday
         ? 'If this trend stays lower than yesterday tomorrow, switch to a recovery-first routine for one day.'
-        : 'Enable Compare Yesterday to track whether your small action produced a measurable change.'
+        : 'Track recovery direction tomorrow to confirm whether today’s action improved continuity.'
     ],
     generatedAtISO: new Date().toISOString(),
     model: 'nuetra-fallback-v1'

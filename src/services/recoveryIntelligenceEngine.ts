@@ -40,6 +40,19 @@ export type RecoveryOutput = {
   whyChanged: string[];
   blockers: string[];
   trendValues7d: number[];
+  debug: {
+    rawRecoveryScore: number;
+    smoothedRecoveryScore: number | null;
+    rawCalmScore: number;
+    smoothedCalmScore: number | null;
+    rawStressRecoveryScore: number;
+    smoothedStressRecoveryScore: number | null;
+    sessionInfluenceMultiplier: number;
+    recentCooldownPenalty: number;
+    effectiveSessionInfluence: number;
+    signalCoverageCount: number;
+    confidenceState: 'high' | 'moderate' | 'low';
+  };
 };
 
 type SessionAntiManipulation = {
@@ -319,7 +332,10 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
         'Recovery insights improve as more recovery signals become available.',
         'Continue syncing recovery signals for deeper insights.',
         'Recovery calibration adapting to your rhythm.'
-      ];
+    ];
+
+  const confidenceState: 'high' | 'moderate' | 'low' =
+    coverageCount >= 4 && !hasEnoughForCalibration ? 'moderate' : coverageCount >= 4 ? 'high' : coverageCount >= 2 ? 'moderate' : 'low';
 
   return {
     isCalibrating: !hasEnoughForCalibration,
@@ -334,7 +350,19 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
     contextualInsights,
     whyChanged,
     blockers,
-    trendValues7d: buildTrend(recoveryScore ?? previousRecovery, input.checkIns)
+    trendValues7d: buildTrend(recoveryScore ?? previousRecovery, input.checkIns),
+    debug: {
+      rawRecoveryScore,
+      smoothedRecoveryScore: recoveryScore,
+      rawCalmScore,
+      smoothedCalmScore: calmScore,
+      rawStressRecoveryScore,
+      smoothedStressRecoveryScore: stressRecoveryScore,
+      sessionInfluenceMultiplier: antiManip.sessionInfluenceMultiplier,
+      recentCooldownPenalty: antiManip.recentCooldownPenalty,
+      effectiveSessionInfluence: sessionInfluence,
+      signalCoverageCount: coverageCount,
+      confidenceState
+    }
   };
 };
-

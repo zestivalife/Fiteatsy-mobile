@@ -14,6 +14,7 @@ import {
   TrackerTab
 } from '../../services/trackerAnalysisService';
 import { toDayKey } from '../../utils/date';
+import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
 
 type RangeMode = '7D' | '30D';
 
@@ -46,6 +47,11 @@ type MetricConfig = {
   values: number[];
   latestValue: number;
   compareValues: number[];
+  recoveryImpact: 'Supporting Recovery' | 'Neutral' | 'Reducing Recovery' | 'Needs Attention' | 'Positive';
+  signalState: 'Improving' | 'Stable' | 'Declining' | 'Recovering' | 'Overloaded' | 'Settling';
+  freshness: 'Synced Recently' | 'Manual Input' | 'No Recent Data' | 'Calibration Mode';
+  confidence: 'High' | 'Moderate' | 'Low';
+  primary?: boolean;
 };
 
 const chartW = 130;
@@ -67,6 +73,11 @@ const MetricSparkCard = ({
   value,
   unit,
   icon,
+  signalState,
+  recoveryImpact,
+  freshness,
+  confidence,
+  primary,
   onOpen,
   isLight
 }: {
@@ -77,6 +88,11 @@ const MetricSparkCard = ({
   value: number;
   unit: string;
   icon: string;
+  signalState: string;
+  recoveryImpact: string;
+  freshness: string;
+  confidence: string;
+  primary?: boolean;
   onOpen: () => void;
   isLight: boolean;
 }) => {
@@ -107,7 +123,7 @@ const MetricSparkCard = ({
   const selected = points[selectedPoint];
 
   return (
-    <Pressable onPress={onOpen} style={styles.metricTile}>
+    <Pressable onPress={onOpen} style={[styles.metricTile, primary && styles.metricTilePrimary]}>
       <Card style={[styles.metricCard, isLight ? styles.metricCardLight : styles.metricCardDark]}>
         <View style={styles.metricHeaderRow}>
           <View style={[styles.metricIconWrap, !isLight && styles.metricIconWrapDark]}>
@@ -146,6 +162,12 @@ const MetricSparkCard = ({
         <Animated.Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }, { transform: [{ scale: pulse }] }]}> 
           {selected ? selected.value : value} {unit}
         </Animated.Text>
+        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#D1D5DB' }]} numberOfLines={1}>
+          {signalState} • {recoveryImpact}
+        </Text>
+        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#9CA3AF' }]} numberOfLines={1}>
+          {freshness} • Confidence {confidence}
+        </Text>
       </Card>
     </Pressable>
   );
@@ -158,6 +180,11 @@ const MetricBarsCard = ({
   color,
   icon,
   unit,
+  signalState,
+  recoveryImpact,
+  freshness,
+  confidence,
+  primary,
   onOpen,
   isLight
 }: {
@@ -167,6 +194,11 @@ const MetricBarsCard = ({
   color: string;
   icon: string;
   unit: string;
+  signalState: string;
+  recoveryImpact: string;
+  freshness: string;
+  confidence: string;
+  primary?: boolean;
   onOpen: () => void;
   isLight: boolean;
 }) => {
@@ -185,7 +217,7 @@ const MetricBarsCard = ({
   const max = Math.max(...bars, 1);
 
   return (
-    <Pressable onPress={onOpen} style={styles.metricTile}>
+    <Pressable onPress={onOpen} style={[styles.metricTile, primary && styles.metricTilePrimary]}>
       <Card style={[styles.metricCard, isLight ? styles.metricCardLight : styles.metricCardDark]}>
         <View style={styles.metricHeaderRow}>
           <View style={[styles.metricIconWrap, !isLight && styles.metricIconWrapDark]}>
@@ -227,6 +259,12 @@ const MetricBarsCard = ({
         <Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }]}>
           {bars[selectedBar]} {unit}
         </Text>
+        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#D1D5DB' }]} numberOfLines={1}>
+          {signalState} • {recoveryImpact}
+        </Text>
+        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#9CA3AF' }]} numberOfLines={1}>
+          {freshness} • Confidence {confidence}
+        </Text>
       </Card>
     </Pressable>
   );
@@ -249,7 +287,7 @@ export const TrackerScreen = () => {
     summary: "Fiteatsy is preparing personalized guidance for today's tracker values.",
     suggestions: [
       'Keep one steady routine around meals, sleep, and movement today.',
-      'Use Compare Yesterday to monitor day-over-day recovery change.',
+      'Review recovery direction and keep one consistency anchor for tomorrow.',
       'Tap a metric card to view the deeper health trend behind the number.'
     ],
     generatedAtISO: new Date().toISOString(),
@@ -309,6 +347,16 @@ export const TrackerScreen = () => {
   const selected = days[selectedDay] ?? days[days.length - 1];
   const yesterday = days[Math.max(0, selectedDay - 1)] ?? selected;
 
+  const recoveryIntel = useMemo(() => {
+    return buildRecoveryIntelligence({
+      wellness,
+      checkIns,
+      medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
+      hasWearable: wearableSyncData.length > 0,
+      wearableSyncData
+    });
+  }, [wellness, checkIns, wearableSyncData]);
+
   useEffect(() => {
     contentAnim.setValue(0.86);
     Animated.timing(contentAnim, {
@@ -319,120 +367,192 @@ export const TrackerScreen = () => {
   }, [activeTab, selectedDay, contentAnim]);
 
   const fallbackSummaryText = useMemo(() => {
-    if (!compareYesterday) {
-      return 'Tap any card for full AI analysis and improvement guidance.';
-    }
-
     const stepDelta = selected.steps - yesterday.steps;
     const hrDelta = selected.heartRate - yesterday.heartRate;
     const stepLabel = `${stepDelta >= 0 ? '+' : ''}${stepDelta} steps`;
     const hrLabel = `${hrDelta >= 0 ? '+' : ''}${hrDelta} bpm`;
-    return `Compared to yesterday: ${stepLabel}, ${hrLabel}.`;
-  }, [compareYesterday, selected, yesterday]);
+    return recoveryIntel.isCalibrating
+      ? (recoveryIntel.insufficientReason ?? 'Recovery calibration adapting to your rhythm.')
+      : `Recovery ${recoveryIntel.recoveryDirection} vs yesterday (${stepLabel}, ${hrLabel}).`;
+  }, [selected, yesterday, recoveryIntel]);
+
+  const statusToFreshness = (status?: string): MetricConfig['freshness'] => {
+    if (recoveryIntel.isCalibrating) return 'Calibration Mode';
+    if (status === 'synced') return 'Synced Recently';
+    if (status === 'no_recent_data') return 'No Recent Data';
+    if (status === 'no_permission') return 'No Recent Data';
+    return 'Manual Input';
+  };
+
+  const trendState = (series: number[]): MetricConfig['signalState'] => {
+    if (recoveryIntel.isCalibrating) return 'Settling';
+    if (series.length < 2) return 'Stable';
+    const delta = series[series.length - 1] - series[Math.max(0, series.length - 2)];
+    if (delta > 1.5) return 'Improving';
+    if (delta < -1.5) return 'Declining';
+    return 'Stable';
+  };
+
+  const impactState = (score: number): MetricConfig['recoveryImpact'] => {
+    if (recoveryIntel.isCalibrating) return 'Needs Attention';
+    if (score >= 75) return 'Supporting Recovery';
+    if (score >= 55) return 'Neutral';
+    if (score >= 40) return 'Reducing Recovery';
+    return 'Needs Attention';
+  };
+
+  const confidenceState = (): MetricConfig['confidence'] => {
+    const syncedCount = Object.values(recoveryIntel.signalCoverage).filter(Boolean).length;
+    if (syncedCount >= 4 && !recoveryIntel.isCalibrating) return 'High';
+    if (syncedCount >= 2) return 'Moderate';
+    return 'Low';
+  };
+
+  const driverMap = useMemo(() => Object.fromEntries(recoveryIntel.recoveryDrivers.map((d) => [d.label, d])), [recoveryIntel.recoveryDrivers]);
 
   const healthMetrics: MetricConfig[] = [
     {
       key: 'heart-rate',
-      title: 'Heart Rate',
-      subtitle: 'Resting',
+      title: 'Heart Recovery',
+      subtitle: 'Resting heart load signal',
       icon: '❤️',
-      unit: 'bpm',
+      unit: 'index',
       kind: 'spark',
       color: '#60AF00',
-      values: selected.cardioRecovery.map((v, i) => v - 8 + (i % 2 === 0 ? 2 : -1)),
-      latestValue: selected.heartRate,
-      compareValues: yesterday.cardioRecovery.map((v, i) => v - 8 + (i % 2 === 0 ? 2 : -1))
+      values: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 4 + idx * 0.3)))),
+      latestValue: driverMap['Resting heart load']?.score ?? 0,
+      compareValues: recoveryIntel.trendValues7d,
+      signalState: trendState(recoveryIntel.trendValues7d),
+      recoveryImpact: impactState(driverMap['Resting heart load']?.score ?? 0),
+      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.heart_rate),
+      confidence: confidenceState()
     },
     {
       key: 'activity-energy',
-      title: 'Activity Energy',
-      subtitle: 'Cal burn',
+      title: 'Activity Load',
+      subtitle: 'Movement + workout recovery',
       icon: '🏃',
-      unit: 'pts',
+      unit: 'index',
       kind: 'bars',
       color: '#60AF00',
-      values: selected.activityEnergy,
-      latestValue: selected.activityEnergy[selected.activityEnergy.length - 1],
-      compareValues: yesterday.activityEnergy
+      values: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 10 + idx)))),
+      latestValue: driverMap['Movement / Workouts']?.score ?? 0,
+      compareValues: recoveryIntel.trendValues7d,
+      signalState: trendState(recoveryIntel.trendValues7d),
+      recoveryImpact: impactState(driverMap['Movement / Workouts']?.score ?? 0),
+      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.workouts),
+      confidence: confidenceState()
     },
     {
       key: 'cardio-recovery',
-      title: 'Cardio Recovery',
-      subtitle: 'Heart variability',
+      title: 'HRV Stability',
+      subtitle: 'Recovery balance rhythm',
       icon: '❤️',
-      unit: 'score',
+      unit: 'index',
       kind: 'spark',
       color: '#60AF00',
-      values: selected.cardioRecovery,
-      latestValue: selected.cardioRecovery[selected.cardioRecovery.length - 1],
-      compareValues: yesterday.cardioRecovery
+      values: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 6 + idx * 0.7)))),
+      latestValue: driverMap['HRV / Recovery balance']?.score ?? 0,
+      compareValues: recoveryIntel.trendValues7d,
+      signalState: trendState(recoveryIntel.trendValues7d),
+      recoveryImpact: impactState(driverMap['HRV / Recovery balance']?.score ?? 0),
+      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.hrv),
+      confidence: confidenceState()
     },
     {
       key: 'sleep-score',
-      title: 'Sleep Score',
-      subtitle: 'Night quality',
+      title: 'Sleep Recovery',
+      subtitle: 'Sleep continuity signal',
       icon: '🛌',
-      unit: 'pts',
+      unit: 'index',
       kind: 'bars',
       color: '#60AF00',
-      values: selected.sleepScoreBars,
-      latestValue: selected.sleepScoreBars[selected.sleepScoreBars.length - 1],
-      compareValues: yesterday.sleepScoreBars
+      values: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 2 + idx * 0.2)))),
+      latestValue: driverMap.Sleep?.score ?? 0,
+      compareValues: recoveryIntel.trendValues7d,
+      signalState: trendState(recoveryIntel.trendValues7d),
+      recoveryImpact: impactState(driverMap.Sleep?.score ?? 0),
+      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.sleep),
+      confidence: confidenceState()
     }
   ];
 
   const wellnessMetrics: MetricConfig[] = [
     {
       key: 'wellness-trend',
-      title: 'Wellness Trend',
-      subtitle: 'Daily composite',
+      title: 'Recovery Momentum',
+      subtitle: '7-day continuity',
       icon: '✨',
-      unit: 'pts',
+      unit: 'index',
       kind: 'spark',
       color: '#60AF00',
-      values: selected.wellnessTrend,
-      latestValue: selected.wellnessTrend[selected.wellnessTrend.length - 1],
-      compareValues: yesterday.wellnessTrend
+      values: recoveryIntel.trendValues7d,
+      latestValue: recoveryIntel.recoveryScore ?? 0,
+      compareValues: recoveryIntel.trendValues7d,
+      signalState: trendState(recoveryIntel.trendValues7d),
+      recoveryImpact: impactState(recoveryIntel.recoveryScore ?? 0),
+      freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Synced Recently',
+      confidence: confidenceState()
     },
     {
       key: 'stress-load',
       title: 'Stress Load',
-      subtitle: 'Lower is better',
+      subtitle: 'Resilience under load',
       icon: '🧠',
-      unit: 'lvl',
+      unit: 'load',
       kind: 'bars',
       color: '#60AF00',
-      values: selected.stressLoad,
-      latestValue: selected.stressLoad[selected.stressLoad.length - 1],
-      compareValues: yesterday.stressLoad
+      values: recoveryIntel.trendValues7d.map((v) => Math.max(0, Math.min(100, 100 - v))),
+      latestValue: recoveryIntel.stressRecoveryScore == null ? 0 : Math.max(0, 100 - recoveryIntel.stressRecoveryScore),
+      compareValues: recoveryIntel.trendValues7d.map((v) => Math.max(0, Math.min(100, 100 - v))),
+      signalState: trendState(recoveryIntel.trendValues7d.map((v) => 100 - v)),
+      recoveryImpact: impactState(100 - (recoveryIntel.stressRecoveryScore ?? 0)),
+      freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Synced Recently',
+      confidence: confidenceState()
     },
     {
       key: 'focus-stability',
       title: 'Focus Stability',
-      subtitle: 'Consistency',
+      subtitle: 'Session consistency signal',
       icon: '🎯',
-      unit: 'pts',
+      unit: 'index',
       kind: 'spark',
       color: '#60AF00',
-      values: selected.focusTrend,
-      latestValue: selected.focusTrend[selected.focusTrend.length - 1],
-      compareValues: yesterday.focusTrend
+      values: recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 5 + idx * 0.4)))),
+      latestValue: driverMap['Calm sessions']?.score ?? 0,
+      compareValues: recoveryIntel.trendValues7d,
+      signalState: trendState(recoveryIntel.trendValues7d),
+      recoveryImpact: impactState(driverMap['Calm sessions']?.score ?? 0),
+      freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Manual Input',
+      confidence: confidenceState()
     },
     {
       key: 'recovery-readiness',
       title: 'Recovery Capacity',
       subtitle: 'Resilience',
       icon: '🌙',
-      unit: 'pts',
+      unit: 'index',
       kind: 'bars',
       color: '#60AF00',
-      values: selected.cardioRecovery,
-      latestValue: selected.cardioRecovery[selected.cardioRecovery.length - 1],
-      compareValues: yesterday.cardioRecovery
+      values: recoveryIntel.trendValues7d,
+      latestValue: recoveryIntel.recoveryScore ?? 0,
+      compareValues: recoveryIntel.trendValues7d,
+      signalState: trendState(recoveryIntel.trendValues7d),
+      recoveryImpact: impactState(recoveryIntel.recoveryScore ?? 0),
+      freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Synced Recently',
+      confidence: confidenceState()
     }
   ];
 
-  const metrics = activeTab === 'health' ? healthMetrics : wellnessMetrics;
+  const metrics = useMemo(() => {
+    const source = activeTab === 'health' ? healthMetrics : wellnessMetrics;
+    const scored = source.map((metric) => {
+      const impactRank = metric.recoveryImpact === 'Needs Attention' ? 4 : metric.recoveryImpact === 'Reducing Recovery' ? 3 : metric.recoveryImpact === 'Neutral' ? 2 : 1;
+      return { metric, score: impactRank * 100 + (100 - metric.latestValue) };
+    });
+    const primaryKey = scored.sort((a, b) => b.score - a.score)[0]?.metric.key;
+    return source.map((metric) => ({ ...metric, primary: metric.key === primaryKey }));
+  }, [activeTab, healthMetrics, wellnessMetrics]);
 
   useEffect(() => {
     let alive = true;
@@ -556,8 +676,8 @@ export const TrackerScreen = () => {
           </View>
         </View>
 
-        <Pressable style={[styles.compareButton, !isLight && styles.compareButtonDark]} onPress={() => setCompareYesterday((v) => !v)} accessibilityRole="button" accessibilityLabel="Compare with yesterday">
-          <Text style={[styles.compareButtonText, !isLight && styles.compareButtonTextDark]}>{compareYesterday ? 'Hide Comparison' : 'Compare Yesterday'}</Text>
+        <Pressable style={[styles.compareButton, !isLight && styles.compareButtonDark]} onPress={() => setCompareYesterday((v) => !v)} accessibilityRole="button" accessibilityLabel="Toggle recovery comparison">
+          <Text style={[styles.compareButtonText, !isLight && styles.compareButtonTextDark]}>{compareYesterday ? 'Hide Comparison' : 'Recovery vs Yesterday'}</Text>
         </Pressable>
       </Card>
 
@@ -617,6 +737,11 @@ export const TrackerScreen = () => {
                     data={metric.values}
                     value={metric.latestValue}
                     unit={metric.unit}
+                    signalState={metric.signalState}
+                    recoveryImpact={metric.recoveryImpact}
+                    freshness={metric.freshness}
+                    confidence={metric.confidence}
+                    primary={metric.primary}
                     onOpen={() => openDetail(metric)}
                     isLight={isLight}
                   />
@@ -629,6 +754,11 @@ export const TrackerScreen = () => {
                     color={metric.color}
                     bars={metric.values}
                     unit={metric.unit}
+                    signalState={metric.signalState}
+                    recoveryImpact={metric.recoveryImpact}
+                    freshness={metric.freshness}
+                    confidence={metric.confidence}
+                    primary={metric.primary}
                     onOpen={() => openDetail(metric)}
                     isLight={isLight}
                   />
@@ -654,7 +784,7 @@ export const TrackerScreen = () => {
         <View style={styles.suggestionList}>
           {(trackerInsights.suggestions.length ? trackerInsights.suggestions : [
             'Protect one micro-break before your next work block.',
-            'Use Compare Yesterday to track measurable daily change.',
+            'Check whether recovery direction is improving or settling.',
             'Tap any metric card for a deeper trend explanation.'
           ]).slice(0, 3).map((item, index) => (
             <View key={item + '-' + index} style={styles.suggestionRow}>
@@ -850,6 +980,9 @@ const styles = StyleSheet.create({
   metricTile: {
     flex: 1
   },
+  metricTilePrimary: {
+    transform: [{ scale: 1.01 }]
+  },
   metricCard: {
     width: '100%',
     borderRadius: 24,
@@ -969,6 +1102,22 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     textAlign: 'center',
     marginTop: 10
+  },
+  metricMeta: {
+    ...typography.caption,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 6
+  },
+  metricMetaSub: {
+    ...typography.caption,
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 2
   },
   metricValueDark: {
     color: '#FFFFFF'

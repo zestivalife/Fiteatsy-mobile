@@ -11,6 +11,7 @@ import { Screen } from '../../components/Screen';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
+import { getHealthConnectRuntimeDiagnostics, type HealthConnectRuntimeDiagnostics } from '../../services/healthConnectService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -263,6 +264,10 @@ export const HomeScreen = () => {
   const [medicationOpen, setMedicationOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [activeDimension, setActiveDimension] = useState<RecoveryDimension>('calm');
+  const [devPanelOpen, setDevPanelOpen] = useState(false);
+  const [devDiagnostics, setDevDiagnostics] = useState<HealthConnectRuntimeDiagnostics | null>(null);
+  const [devLoading, setDevLoading] = useState(false);
+  const [devError, setDevError] = useState<string | null>(null);
   const [sessionAntiManipulation, setSessionAntiManipulation] = useState({
     todaySessionCount: 0,
     recentCooldownPenalty: 1,
@@ -408,6 +413,21 @@ export const HomeScreen = () => {
     setActiveDimension('calm');
   }, []);
 
+  const openDevPanel = async () => {
+    setDevPanelOpen(true);
+    setDevLoading(true);
+    setDevError(null);
+    try {
+      const diagnostics = await getHealthConnectRuntimeDiagnostics();
+      setDevDiagnostics(diagnostics);
+    } catch (error) {
+      setDevError(error instanceof Error ? error.message : 'dev_runtime_diagnostics_failed');
+      setDevDiagnostics(null);
+    } finally {
+      setDevLoading(false);
+    }
+  };
+
   useEffect(() => {
     const hydrateSessionAntiManipulation = async () => {
       try {
@@ -500,7 +520,9 @@ export const HomeScreen = () => {
   return (
     <Screen scroll contentStyle={styles.content}>
       <View style={styles.headerRow}>
-        <Text style={[styles.greeting, { color: ui.textPrimary }]}>Hi!, {onboarding?.name ?? 'Rahul'}</Text>
+        <Pressable onLongPress={openDevPanel}>
+          <Text style={[styles.greeting, { color: ui.textPrimary }]}>Hi!, {onboarding?.name ?? 'Rahul'}</Text>
+        </Pressable>
 
         <View style={styles.topRightRow}>
           <View style={styles.actionRail}>
@@ -719,6 +741,68 @@ export const HomeScreen = () => {
                 <Text style={styles.consultantHint}>Your corrective guidance is aligned with this consultant profile.</Text>
               </View>
               <Pressable style={styles.ctaBtn} onPress={() => setAiOpen(false)}><Text style={styles.ctaText}>Close</Text></Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={devPanelOpen} animationType="slide" transparent onRequestClose={() => setDevPanelOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setDevPanelOpen(false)} />
+          <View style={styles.sheetWrap}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Runtime Trust QA</Text>
+            <ScrollView contentContainerStyle={styles.sheetContent}>
+              {devLoading ? <Text style={styles.assistantCopy}>Loading runtime diagnostics...</Text> : null}
+              {devError ? <Text style={[styles.assistantCopy, { color: '#FF808A' }]}>{devError}</Text> : null}
+
+              <View style={styles.assistantCard}>
+                <Text style={styles.assistantTitle}>Health Connect Status</Text>
+                <Text style={styles.assistantPointText}>SDK: {devDiagnostics?.sdkStatus ?? 'unknown'}</Text>
+                <Text style={styles.assistantPointText}>Initialized: {devDiagnostics?.initialized ? 'yes' : 'no'}</Text>
+                <Text style={styles.assistantPointText}>Last checked: {devDiagnostics?.lastCheckedISO ?? 'n/a'}</Text>
+              </View>
+
+              <View style={styles.assistantCard}>
+                <Text style={styles.assistantTitle}>Permissions</Text>
+                <Text style={styles.assistantPointText}>Steps: {devDiagnostics?.permissionStates?.Steps ? 'granted' : 'missing'}</Text>
+                <Text style={styles.assistantPointText}>Sleep: {devDiagnostics?.permissionStates?.SleepSession ? 'granted' : 'missing'}</Text>
+                <Text style={styles.assistantPointText}>Resting HR: {devDiagnostics?.permissionStates?.RestingHeartRate ? 'granted' : 'missing'}</Text>
+                <Text style={styles.assistantPointText}>HRV: {devDiagnostics?.permissionStates?.HeartRateVariabilityRmssd ? 'granted' : 'missing'}</Text>
+                <Text style={styles.assistantPointText}>Workouts: {devDiagnostics?.permissionStates?.ExerciseSession ? 'granted' : 'missing'}</Text>
+              </View>
+
+              <View style={styles.assistantCard}>
+                <Text style={styles.assistantTitle}>Signal Runtime</Text>
+                <Text style={styles.assistantPointText}>Steps: {devDiagnostics?.metricDebug.steps.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.steps.stale ? 'yes' : 'no'}</Text>
+                <Text style={styles.assistantPointText}>Sleep: {devDiagnostics?.metricDebug.sleep.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.sleep.stale ? 'yes' : 'no'}</Text>
+                <Text style={styles.assistantPointText}>Resting HR: {devDiagnostics?.metricDebug.restingHeartRate.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.restingHeartRate.stale ? 'yes' : 'no'}</Text>
+                <Text style={styles.assistantPointText}>HRV: {devDiagnostics?.metricDebug.hrv.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.hrv.stale ? 'yes' : 'no'}</Text>
+                <Text style={styles.assistantPointText}>Workouts: {devDiagnostics?.metricDebug.workouts.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.workouts.stale ? 'yes' : 'no'}</Text>
+              </View>
+
+              <View style={styles.assistantCard}>
+                <Text style={styles.assistantTitle}>Recovery Engine</Text>
+                <Text style={styles.assistantPointText}>Raw score: {recoveryIntel.debug.rawRecoveryScore}</Text>
+                <Text style={styles.assistantPointText}>Smoothed score: {recoveryIntel.debug.smoothedRecoveryScore ?? 'calibrating'}</Text>
+                <Text style={styles.assistantPointText}>Raw calm: {recoveryIntel.debug.rawCalmScore}</Text>
+                <Text style={styles.assistantPointText}>Smoothed calm: {recoveryIntel.debug.smoothedCalmScore ?? 'calibrating'}</Text>
+                <Text style={styles.assistantPointText}>Raw stress recovery: {recoveryIntel.debug.rawStressRecoveryScore}</Text>
+                <Text style={styles.assistantPointText}>Smoothed stress recovery: {recoveryIntel.debug.smoothedStressRecoveryScore ?? 'calibrating'}</Text>
+                <Text style={styles.assistantPointText}>Coverage: {recoveryIntel.debug.signalCoverageCount}/5</Text>
+                <Text style={styles.assistantPointText}>Confidence: {recoveryIntel.debug.confidenceState}</Text>
+                <Text style={styles.assistantPointText}>Calibration: {recoveryIntel.isCalibrating ? 'yes' : 'no'}</Text>
+              </View>
+
+              <View style={styles.assistantCard}>
+                <Text style={styles.assistantTitle}>Session Influence</Text>
+                <Text style={styles.assistantPointText}>Today sessions: {sessionAntiManipulation.todaySessionCount}</Text>
+                <Text style={styles.assistantPointText}>Multiplier: {recoveryIntel.debug.sessionInfluenceMultiplier.toFixed(2)}</Text>
+                <Text style={styles.assistantPointText}>Cooldown penalty: {recoveryIntel.debug.recentCooldownPenalty.toFixed(2)}</Text>
+                <Text style={styles.assistantPointText}>Effective influence: {recoveryIntel.debug.effectiveSessionInfluence.toFixed(2)}</Text>
+              </View>
+
+              <Pressable style={styles.ctaBtn} onPress={() => setDevPanelOpen(false)}><Text style={styles.ctaText}>Close</Text></Pressable>
             </ScrollView>
           </View>
         </View>
