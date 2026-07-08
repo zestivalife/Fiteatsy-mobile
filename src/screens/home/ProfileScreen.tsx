@@ -1,52 +1,139 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { colors, getThemeColors, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
+import { AssessmentGender } from '../../types';
 import { useAppContext } from '../../state/AppContext';
+import { formatConsultantAvailability, formatDobLabel, getConsultantProfile } from '../../utils/healthProfile';
+import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
-const formatDate = (iso: string | undefined) => {
+const formatDate = (iso: string | null | undefined) => {
   if (!iso) return 'Not available';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
+const personalInfoOptions: AssessmentGender[] = ['Male', 'Female', 'Prefer not to say'];
+
 export const ProfileScreen = ({ navigation }: Props) => {
-  const { onboarding, themeMode, setThemeMode, logout, devices, selectedDeviceId, checkIns, wearableSyncData, nudges, assessment } = useAppContext();
+  const {
+    onboarding,
+    setOnboarding,
+    themeMode,
+    setThemeMode,
+    logout,
+    devices,
+    selectedDeviceId,
+    checkIns,
+    wearableSyncData,
+    nudges,
+    assessment
+  } = useAppContext();
   const connectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? null;
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
+  const consultant = getConsultantProfile(onboarding);
+  const healthProfile = buildHealthProfileCompletion(onboarding, assessment, 0);
+
+  const updateGender = (gender: AssessmentGender) => {
+    if (!onboarding) return;
+    setOnboarding({
+      ...onboarding,
+      gender
+    });
+  };
+
+  const openChannel = async (url: string | null) => {
+    if (!url) return;
+    await Linking.openURL(url);
+  };
 
   return (
     <Screen scroll>
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: palette.textPrimary }]}>Fiteatsy Care Profile</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close profile" style={[styles.closeButton, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]} onPress={() => navigation.goBack()}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close profile"
+          style={[styles.closeButton, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]}
+          onPress={() => navigation.goBack()}
+        >
           <Ionicons name="close" size={18} color={palette.textPrimary} />
         </Pressable>
       </View>
 
       <Card>
+        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Health Profile Completion</Text>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Completion</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfile.completionPercent}%</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Nutrition Profile Readiness</Text><Text style={[styles.value, { color: healthProfile.isAiReady ? '#59BE08' : '#F0B44C' }]}>{healthProfile.readinessPercent}%</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Missing</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfile.missingItems.slice(0, 3).join(', ') || 'Nothing important missing'}</Text></View>
+      </Card>
+
+      <Card>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Member Profile</Text>
         <Text style={[styles.valuePrimary, { color: palette.textPrimary }]}>{onboarding?.name ?? 'Member'}</Text>
         <Text style={[styles.valueSecondary, { color: palette.textSecondary }]}>{onboarding?.careTrack ?? 'Foundational Recovery Care'}</Text>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Age Group</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.ageBracket ?? '25-34'}</Text></View>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Primary Conditions</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.primaryConditions?.join(', ') ?? 'Not set'}</Text></View>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Health Goals</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.healthGoals?.join(', ') ?? 'Not set'}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Primary Conditions</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.primaryConditions?.join(', ') || 'Not set'}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Primary Goal</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.primaryGoal ?? 'Not set'}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Secondary Goals</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.secondaryGoals?.join(', ') || 'None'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Member Since</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDate(onboarding?.createdAtISO)}</Text></View>
       </Card>
 
       <Card>
-        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Dietitian Match</Text>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Assigned Dietitian</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.matchedDietitianName ?? 'Pending'}</Text></View>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Specialty</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.matchedDietitianSpecialty ?? 'Clinical Nutrition'}</Text></View>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Symptoms</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.symptomTags?.join(', ') ?? 'Not set'}</Text></View>
+        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Personal Information</Text>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Date of Birth</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.dateOfBirthISO ? formatDobLabel(onboarding.dateOfBirthISO) : 'Not set'}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Calculated Age</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.calculatedAge ? `${onboarding.calculatedAge} yrs` : 'Not set'}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Age Group</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.ageBracket ?? 'Not set'}</Text></View>
+        <Text style={[styles.inlineLabel, { color: palette.textSecondary }]}>Gender</Text>
+        <View style={styles.chipRow}>
+          {personalInfoOptions.map((option) => {
+            const active = onboarding?.gender === option;
+            return (
+              <Pressable
+                key={option}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={[
+                  styles.genderChip,
+                  { backgroundColor: palette.cardMuted, borderColor: palette.stroke },
+                  active && styles.genderChipActive
+                ]}
+                onPress={() => updateGender(option)}
+              >
+                <Text style={[styles.genderChipText, { color: palette.textPrimary }, active && styles.genderChipTextActive]}>{option}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Card>
+
+      <Card>
+        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Consultant Assignment</Text>
+        <View style={styles.consultantHeader}>
+          <View style={[styles.consultantAvatar, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]}>
+            <Text style={[styles.consultantAvatarText, { color: palette.textPrimary }]}>{consultant.fullName.slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <View style={styles.consultantMeta}>
+            <Text style={[styles.consultantName, { color: palette.textPrimary }]}>{consultant.fullName}</Text>
+            <Text style={[styles.consultantSpecialty, { color: palette.textSecondary }]}>{consultant.specialization}</Text>
+          </View>
+        </View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Availability</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatConsultantAvailability(consultant.availability)}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Last Consultation</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDate(consultant.lastConsultationISO)}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Next Appointment</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDate(consultant.nextAppointmentISO)}</Text></View>
+        <View style={styles.channelRow}>
+          <Pressable style={[styles.channelChip, { borderColor: palette.stroke }]} disabled={!consultant.chatEnabled}><Text style={[styles.channelChipText, { color: consultant.chatEnabled ? palette.textPrimary : palette.textSecondary }]}>Chat</Text></Pressable>
+          <Pressable style={[styles.channelChip, { borderColor: palette.stroke }]} disabled={!consultant.callEnabled} onPress={() => openChannel(consultant.callEnabled ? 'tel:' : null)}><Text style={[styles.channelChipText, { color: consultant.callEnabled ? palette.textPrimary : palette.textSecondary }]}>Call</Text></Pressable>
+          <Pressable style={[styles.channelChip, { borderColor: palette.stroke }]} disabled={!consultant.whatsappNumber} onPress={() => openChannel(consultant.whatsappNumber ? `https://wa.me/${consultant.whatsappNumber.replace(/\D/g, '')}` : null)}><Text style={[styles.channelChipText, { color: consultant.whatsappNumber ? palette.textPrimary : palette.textSecondary }]}>WhatsApp</Text></Pressable>
+          <Pressable style={[styles.channelChip, { borderColor: palette.stroke }]} disabled={!consultant.email} onPress={() => openChannel(consultant.email ? `mailto:${consultant.email}` : null)}><Text style={[styles.channelChipText, { color: consultant.email ? palette.textPrimary : palette.textSecondary }]}>Email</Text></Pressable>
+        </View>
       </Card>
 
       <Card>
@@ -162,6 +249,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 8
   },
+  inlineLabel: {
+    ...typography.body,
+    fontSize: 14,
+    marginTop: 6,
+    marginBottom: 8
+  },
   label: {
     ...typography.body,
     fontSize: 14,
@@ -172,6 +265,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'right',
     flexShrink: 1
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  genderChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 7
+  },
+  genderChipActive: {
+    backgroundColor: 'rgba(96,175,0,0.24)',
+    borderColor: colors.blue
+  },
+  genderChipText: {
+    ...typography.caption
+  },
+  genderChipTextActive: {
+    fontFamily: 'Poppins_700Bold'
+  },
+  consultantHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12
+  },
+  consultantAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  consultantAvatarText: {
+    ...typography.bodyStrong,
+    fontSize: 18
+  },
+  consultantMeta: {
+    flex: 1
+  },
+  consultantName: {
+    ...typography.bodyStrong,
+    fontSize: 16
+  },
+  consultantSpecialty: {
+    ...typography.caption,
+    marginTop: 2
+  },
+  channelRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6
+  },
+  channelChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 7
+  },
+  channelChipText: {
+    ...typography.caption
   },
   themeChip: {
     borderRadius: 999,
@@ -218,13 +376,13 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   metricsLink: {
-    marginTop: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4
+    gap: 4,
+    marginTop: 4
   },
   metricsLinkText: {
     ...typography.bodyStrong,
-    fontSize: 12
+    fontSize: 13
   }
 });

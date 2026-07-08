@@ -1,21 +1,36 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { HealthProfileSheet } from '../../components/HealthProfileSheet';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Path, Stop } from 'react-native-svg';
 import { Screen } from '../../components/Screen';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
 import { getHealthConnectRuntimeDiagnostics, type HealthConnectRuntimeDiagnostics } from '../../services/healthConnectService';
+import { FamilyRelationshipType, FamilyVisibilityLevel } from '../../types';
+import { relationshipLabel, toRecoveryShareState, toSupportMoment } from '../../services/familyConnectService';
+import { formatConsultantAvailability, getConsultantProfile } from '../../utils/healthProfile';
+import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const WEEK_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
+
+type HealthProfileReportSummary = {
+  id: string;
+  labName: string;
+  date: string;
+  abnormal: number;
+  score: number;
+  uploadedAtISO?: string;
+};
 type RecoveryDimension = 'calm' | 'activity' | 'nutrition' | 'rhythm' | 'sleep';
 
 type DimensionVisual = {
@@ -265,18 +280,34 @@ export const HomeScreen = () => {
   const [aiOpen, setAiOpen] = useState(false);
   const [activeDimension, setActiveDimension] = useState<RecoveryDimension>('calm');
   const [devPanelOpen, setDevPanelOpen] = useState(false);
+  const [familyCareOpen, setFamilyCareOpen] = useState(false);
+  const [addTrustedOpen, setAddTrustedOpen] = useState(false);
+  const [supportName, setSupportName] = useState('');
+  const [supportRelationship, setSupportRelationship] = useState<FamilyRelationshipType>('parent');
+  const [supportContactMethod, setSupportContactMethod] = useState<'phone' | 'whatsapp'>('phone');
+  const [supportContactValue, setSupportContactValue] = useState('');
+  const [supportVisibilityLevel, setSupportVisibilityLevel] = useState<FamilyVisibilityLevel>('basic_support');
+  const [supportError, setSupportError] = useState<string | null>(null);
   const [devDiagnostics, setDevDiagnostics] = useState<HealthConnectRuntimeDiagnostics | null>(null);
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
+  const [healthProfileOpen, setHealthProfileOpen] = useState(false);
+  const [reportHistoryCount, setReportHistoryCount] = useState(0);
+  const [reportHistory, setReportHistory] = useState<HealthProfileReportSummary[]>([]);
   const [sessionAntiManipulation, setSessionAntiManipulation] = useState({
     todaySessionCount: 0,
     recentCooldownPenalty: 1,
     sessionInfluenceMultiplier: 1
   });
   const heroPulse = useRef(new Animated.Value(0)).current;
+  const ctaNeonColor = useRef(new Animated.Value(0)).current;
+  const ctaNeonGlow = useRef(new Animated.Value(0)).current;
   const {
     onboarding,
+    setOnboarding,
     wellness,
+    assessment,
+    setAssessment,
     wearableSyncData,
     checkIns,
     devices,
@@ -290,6 +321,12 @@ export const HomeScreen = () => {
     getCycleDaySnapshot,
     familyConnections,
     getFamilySummary,
+    generateFamilyInvite,
+    requestFamilyConnection,
+    updateFamilyPermissions,
+    setFamilySharingPaused,
+    sendFamilyPing,
+    familyEmergencyEvents,
     themeMode
   } = useAppContext();
   const isLight = themeMode === 'light';
@@ -318,6 +355,10 @@ export const HomeScreen = () => {
         ? 'Luteal Phase'
         : 'Menstrual Phase';
   const familyConnected = familyConnections.filter((member) => member.status === 'connected');
+  const familyConnectedSummaries = familyConnected.map((member) => ({
+    member,
+    summary: getFamilySummary(member.id)
+  }));
   const familyPending = familyConnected.filter((member) => {
     const summary = getFamilySummary(member.id);
     return summary?.medicationAdherence === 'needs_attention' || summary?.checkInStatus === 'pending';
@@ -401,6 +442,12 @@ export const HomeScreen = () => {
   ].slice(0, 3);
 
   const todayFocus = highestImpactActions[0] ?? 'Take one small wellness action today to support consistency.';
+  const careCircleLabel = familyConnected.length > 0
+    ? `Care Circle • ${familyConnected.length} connected`
+    : 'Recovery support inactive';
+  const careCircleSubLabel = familyConnected.length > 0
+    ? `${familyPending} can use a supportive check-in`
+    : 'Add trusted support to share gentle recovery states.';
   const heroState = recoveryIntel.isCalibrating ? 'Calibrating' : getGlobalRecoveryMicroState(activeDimensionStats.score);
   const celebrationLine =
     recoveryIntel.recoveryDirection === 'improving'
@@ -488,6 +535,52 @@ export const HomeScreen = () => {
     return () => loop.stop();
   }, [heroPulse]);
 
+  useEffect(() => {
+    const colorLoop = Animated.loop(
+      Animated.timing(ctaNeonColor, {
+        toValue: 1,
+        duration: 2400,
+        easing: Easing.linear,
+        useNativeDriver: false
+      })
+    );
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ctaNeonGlow, {
+          toValue: 1,
+          duration: 1100,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false
+        }),
+        Animated.timing(ctaNeonGlow, {
+          toValue: 0,
+          duration: 1100,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false
+        })
+      ])
+    );
+    colorLoop.start();
+    glowLoop.start();
+    return () => {
+      colorLoop.stop();
+      glowLoop.stop();
+    };
+  }, [ctaNeonColor, ctaNeonGlow]);
+
+  const neonBorderColor = ctaNeonColor.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: ['#7FFFD4', '#00E5FF', '#66FCF1', '#22D3EE', '#7FFFD4']
+  });
+  const neonGlowOpacity = ctaNeonGlow.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.32, 0.82]
+  });
+  const neonGlowRadius = ctaNeonGlow.interpolate({
+    inputRange: [0, 1],
+    outputRange: [5, 11]
+  });
+
   const supportiveAttention = attentionItems.map((item) =>
     item
       .replace('is reducing recovery', 'may benefit from one small step today')
@@ -515,8 +608,86 @@ export const HomeScreen = () => {
     return suggestions.slice(0, 5);
   }, [connectedDevice, medicationPending, recoveryIntel.highestImpactActions, supportiveAttention]);
 
-  const consultantName = onboarding?.matchedDietitianName ?? 'Dr. Aisha Menon';
-  const consultantSpecialty = onboarding?.matchedDietitianSpecialty ?? 'Clinical Nutrition & Habit Recovery';
+  const consultant = getConsultantProfile(onboarding ?? null);
+  const healthProfile = useMemo(
+    () => buildHealthProfileCompletion(onboarding, assessment, reportHistoryCount),
+    [assessment, onboarding, reportHistoryCount]
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      AsyncStorage.getItem(REPORT_HISTORY_STORAGE_KEY)
+        .then((raw) => {
+          if (!active) return;
+          const parsed = raw ? JSON.parse(raw) : [];
+          const reports = Array.isArray(parsed)
+            ? parsed.map((item) => ({
+                id: String(item?.id ?? ''),
+                labName: String(item?.labName ?? 'Blood Report'),
+                date: String(item?.date ?? 'Date unavailable'),
+                abnormal: Number(item?.abnormal ?? 0),
+                score: Number(item?.score ?? 0),
+                uploadedAtISO: typeof item?.uploadedAtISO === 'string' ? item.uploadedAtISO : undefined
+              }))
+            : [];
+          setReportHistory(reports.filter((item) => item.id));
+          setReportHistoryCount(reports.length);
+        })
+        .catch(() => {
+          if (active) {
+            setReportHistory([]);
+            setReportHistoryCount(0);
+          }
+        });
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  const onConnectTrustedSupport = () => {
+    const trimmedName = supportName.trim();
+    const trimmedContact = supportContactValue.trim();
+    if (!trimmedName) {
+      setSupportError('Enter member name.');
+      return;
+    }
+    if (!trimmedContact) {
+      setSupportError('Enter phone number or WhatsApp number.');
+      return;
+    }
+
+    const invite = generateFamilyInvite('CARE');
+    const response = requestFamilyConnection({
+      code: invite.code,
+      memberName: trimmedName,
+      relationship: supportRelationship,
+      visibilityLevel: supportVisibilityLevel,
+      contactMethod: supportContactMethod,
+      contactValue: trimmedContact
+    });
+
+    if (!response.ok) {
+      setSupportError(response.reason ?? 'Could not add trusted support.');
+      return;
+    }
+
+    if (response.connectionId) {
+      updateFamilyPermissions(response.connectionId, {
+        appointment_reminders: supportVisibilityLevel === 'wellness_support',
+        uploaded_reports: false,
+        wellness_trends: true,
+        emergency_alerts: true
+      });
+    }
+
+    setSupportName('');
+    setSupportContactValue('');
+    setSupportVisibilityLevel('basic_support');
+    setSupportContactMethod('phone');
+    setSupportError('Trusted support request sent. Approval is required before sharing starts.');
+  };
 
   return (
     <Screen scroll contentStyle={styles.content}>
@@ -542,20 +713,56 @@ export const HomeScreen = () => {
         </View>
       </View>
 
-      <View style={[styles.focusCard, { backgroundColor: ui.focusBg, borderColor: ui.focusBorder }]}>
-        <View style={styles.focusTextWrap}>
-          <Text style={[styles.focusTitle, { color: ui.textPrimary }]}>Today&apos;s Focus</Text>
-          <Text style={[styles.focusBody, { color: ui.textSecondary }]}>
-            {recoveryIntel.isCalibrating ? (recoveryIntel.insufficientReason ?? 'Recovery calibration in progress.') : todayFocus}
-          </Text>
+      <LinearGradient colors={[ui.trendBg1, ui.trendBg2]} style={[styles.card, isLight && { borderColor: ui.cardBorder }]}>
+        <Text style={[styles.cardTitle, { color: ui.textPrimary }]}>Your 7 day’s Recovery Trend</Text>
+        <View style={styles.trendRow}>
+          {activeDimensionStats.trend.map((value, index) => {
+            const chip = scoreColor(value, index);
+            return (
+              <View key={`chip-${index}-${value}`} style={[styles.trendChip, { backgroundColor: chip.bg }]}>
+                <Text style={[styles.trendChipText, { color: chip.text }]}>{Math.round(value)}%</Text>
+              </View>
+            );
+          })}
         </View>
-        <Pressable style={styles.focusCta} onPress={() => setAiOpen(true)}><Text style={styles.focusCtaText}>Assistance</Text></Pressable>
-      </View>
+        <View style={styles.trendWeekRow}>
+          {WEEK_LABELS.map((label, idx) => (
+            <Text key={`day-${idx}-${label}`} style={[styles.trendWeekLabel, { color: ui.textPrimary }]}>{label}</Text>
+          ))}
+        </View>
+      </LinearGradient>
 
       <View style={styles.heroZone}>
-        <Pressable style={styles.heroSyncButton} onPress={() => navigation.navigate('SyncWearable')}>
-          <Text style={styles.heroSyncText}>Sync</Text>
-        </Pressable>
+        <Animated.View
+          style={[
+            styles.heroAssistButton,
+            {
+              borderColor: neonBorderColor,
+              shadowColor: '#66FCF1',
+              shadowOpacity: neonGlowOpacity,
+              shadowRadius: neonGlowRadius
+            }
+          ]}
+        >
+          <Pressable style={styles.heroCtaTouch} onPress={() => setAiOpen(true)}>
+            <Text style={styles.heroSyncText}>Assist</Text>
+          </Pressable>
+        </Animated.View>
+        <Animated.View
+          style={[
+            styles.heroSyncButton,
+            {
+              borderColor: neonBorderColor,
+              shadowColor: '#66FCF1',
+              shadowOpacity: neonGlowOpacity,
+              shadowRadius: neonGlowRadius
+            }
+          ]}
+        >
+          <Pressable style={styles.heroCtaTouch} onPress={() => navigation.navigate('SyncWearable')}>
+            <Text style={styles.heroSyncText}>Sync</Text>
+          </Pressable>
+        </Animated.View>
         <View style={styles.starLayerContainer}>
           <View style={styles.starLayerGlowWrap}>
             <View style={styles.starLayerDarkWrap}>
@@ -593,25 +800,6 @@ export const HomeScreen = () => {
           <View style={styles.lowerTag}><Text style={styles.lowerTagText} numberOfLines={1}>{recoveryIntel.isCalibrating ? 'Calibration' : heroState}</Text></View>
         </View>
       </View>
-
-      <LinearGradient colors={[ui.trendBg1, ui.trendBg2]} style={[styles.card, isLight && { borderColor: ui.cardBorder }]}>
-        <Text style={[styles.cardTitle, { color: ui.textPrimary }]}>Your 7 day’s Recovery Trend</Text>
-        <View style={styles.trendRow}>
-          {activeDimensionStats.trend.map((value, index) => {
-            const chip = scoreColor(value, index);
-            return (
-              <View key={`chip-${index}-${value}`} style={[styles.trendChip, { backgroundColor: chip.bg }]}>
-                <Text style={[styles.trendChipText, { color: chip.text }]}>{Math.round(value)}%</Text>
-              </View>
-            );
-          })}
-        </View>
-        <View style={styles.trendWeekRow}>
-          {WEEK_LABELS.map((label, idx) => (
-            <Text key={`day-${idx}-${label}`} style={[styles.trendWeekLabel, { color: ui.textPrimary }]}>{label}</Text>
-          ))}
-        </View>
-      </LinearGradient>
       <View style={styles.lowerRow}>
         <Pressable style={[styles.lowerCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]} onPress={() => setMedicationOpen(true)}>
           <View style={styles.lowerCardTop}>
@@ -641,6 +829,55 @@ export const HomeScreen = () => {
           </View>
         </View>
       </View>
+
+      <Pressable
+        style={[styles.healthProfileCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
+        onPress={() => setHealthProfileOpen(true)}
+      >
+        <View style={styles.healthProfileTop}>
+          <View>
+            <Text style={[styles.healthProfileEyebrow, { color: ui.textSecondary }]}>Your Dietitian</Text>
+            <Text style={[styles.healthProfileName, { color: ui.textPrimary }]}>
+              {consultant.status === 'pending_assignment' ? 'Consultant assignment in progress' : consultant.fullName}
+            </Text>
+            <Text style={[styles.healthProfileMeta, { color: ui.textSecondary }]}>
+              {consultant.status === 'pending_assignment'
+                ? 'No consultant assigned yet'
+                : `${consultant.specialization} • ${formatConsultantAvailability(consultant.availability)}`}
+            </Text>
+          </View>
+          <View style={[styles.healthProfileBadge, { backgroundColor: isLight ? '#EEF6E8' : '#19250D' }]}>
+            <Text style={styles.healthProfileBadgeText}>{healthProfile.completionPercent}% Complete</Text>
+          </View>
+        </View>
+        <View style={styles.healthProfileBottom}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.healthProfileSectionTitle, { color: ui.textPrimary }]}>Health Profile</Text>
+            <Text style={[styles.healthProfileMissing, { color: ui.textSecondary }]}>
+              {healthProfile.missingItems.slice(0, 3).join(' • ') || 'Profile is ready for consultant review'}
+            </Text>
+          </View>
+          <View style={[styles.healthProfileCta, { backgroundColor: '#59BE08' }]}>
+            <Text style={styles.healthProfileCtaText}>
+              {healthProfile.completionPercent >= 100 ? 'View Profile' : 'Complete Health Profile'}
+            </Text>
+          </View>
+        </View>
+      </Pressable>
+
+      <Pressable
+        style={[styles.careCircleChip, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
+        onPress={() => {
+          setAddTrustedOpen(false);
+          setFamilyCareOpen(true);
+        }}
+      >
+        <View>
+          <Text style={[styles.careCircleChipTitle, { color: ui.textPrimary }]}>Recovery Support</Text>
+          <Text style={[styles.careCircleChipSubtitle, { color: ui.textSecondary }]}>{careCircleLabel} • {careCircleSubLabel}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={ui.textSecondary} />
+      </Pressable>
 
       <Modal visible={medicationOpen} animationType="slide" transparent onRequestClose={() => setMedicationOpen(false)}>
         <View style={styles.sheetOverlay}>
@@ -709,6 +946,28 @@ export const HomeScreen = () => {
         </View>
       </Modal>
 
+      <HealthProfileSheet
+        visible={healthProfileOpen}
+        onboarding={onboarding}
+        assessment={assessment}
+        reportCount={reportHistoryCount}
+        reports={reportHistory}
+        themeMode={themeMode}
+        onClose={() => setHealthProfileOpen(false)}
+        onOpenReports={() => {
+          setHealthProfileOpen(false);
+          navigation.getParent()?.navigate('Reports' as never);
+        }}
+        onUpdateOnboarding={(patch) => {
+          if (!onboarding) return;
+          setOnboarding({ ...onboarding, ...patch });
+        }}
+        onUpdateAssessment={(patch) => {
+          if (!assessment) return;
+          setAssessment({ ...assessment, ...patch });
+        }}
+      />
+
       <Modal visible={aiOpen} animationType="slide" transparent onRequestClose={() => setAiOpen(false)}>
         <View style={styles.sheetOverlay}>
           <Pressable style={styles.sheetBackdrop} onPress={() => setAiOpen(false)} />
@@ -734,14 +993,185 @@ export const HomeScreen = () => {
 
               <View style={styles.consultantCard}>
                 <View style={styles.consultantHeaderRow}>
-                  <Text style={styles.consultantLabel}>Clinical Diet Consultant</Text>
+                  <Text style={styles.consultantLabel}>Assigned Consultant</Text>
                   <Ionicons name="medkit-outline" size={15} color="#59BE08" />
                 </View>
-                <Text style={styles.consultantName}>{consultantName}</Text>
-                <Text style={styles.consultantSpecialty}>{consultantSpecialty}</Text>
-                <Text style={styles.consultantHint}>Your corrective guidance is aligned with this consultant profile.</Text>
+                <Text style={styles.consultantName}>{consultant.fullName}</Text>
+                <Text style={styles.consultantSpecialty}>{consultant.specialization}</Text>
+                <Text style={styles.consultantHint}>{formatConsultantAvailability(consultant.availability)}</Text>
               </View>
               <Pressable style={styles.ctaBtn} onPress={() => setAiOpen(false)}><Text style={styles.ctaText}>Close</Text></Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={familyCareOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setAddTrustedOpen(false);
+          setFamilyCareOpen(false);
+        }}
+      >
+        <View style={styles.sheetOverlay}>
+          <Pressable
+            style={styles.sheetBackdrop}
+            onPress={() => {
+              setAddTrustedOpen(false);
+              setFamilyCareOpen(false);
+            }}
+          />
+          <View style={styles.sheetWrap}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Family Care</Text>
+            <ScrollView contentContainerStyle={styles.sheetContent}>
+              <View style={[styles.familySupportCard, isLight && styles.familySupportCardLight]}>
+                <Text style={styles.familySupportTitle}>Trusted People</Text>
+                {familyConnectedSummaries.length === 0 ? (
+                  <Text style={styles.familySupportBody}>Recovery feels easier with trusted support.</Text>
+                ) : (
+                  familyConnectedSummaries.map(({ member, summary }) => (
+                    <View key={member.id} style={styles.familySupportRow}>
+                      <View style={styles.familySupportAvatar}>
+                        <Text style={styles.familySupportAvatarText}>{member.memberName.slice(0, 1).toUpperCase()}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.familySupportMember}>{member.memberName}</Text>
+                        <Text style={styles.familySupportMeta}>{relationshipLabel(member.relationship)} • {toRecoveryShareState(summary)}</Text>
+                      </View>
+                      <Pressable onPress={() => setFamilySharingPaused(member.id, !member.sharingPaused)}>
+                        <Text style={styles.familyActionText}>{member.sharingPaused ? 'Resume' : 'Pause'}</Text>
+                      </Pressable>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              <View style={styles.familySupportCard}>
+                <Text style={styles.familySupportTitle}>Quick Actions</Text>
+                <View style={styles.familyActionRow}>
+                  <Pressable style={[styles.familyActionBtn, isLight && styles.familyActionBtnLight]} onPress={() => setAddTrustedOpen(true)}>
+                    <Text style={styles.familyActionText}>Add Trusted Support</Text>
+                  </Pressable>
+                  <Pressable style={[styles.familyActionBtn, isLight && styles.familyActionBtnLight]} onPress={() => navigation.navigate('FamilyDashboard')}>
+                    <Text style={styles.familyActionText}>Adjust Sharing</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.familyActionRow}>
+                  <Pressable
+                    style={[styles.familyActionBtn, isLight && styles.familyActionBtnLight]}
+                    onPress={() => {
+                      const first = familyConnected[0];
+                      if (first) {
+                        sendFamilyPing(first.id, 'How are you feeling today?');
+                      }
+                    }}
+                  >
+                    <Text style={styles.familyActionText}>Send Check-in</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.familyActionBtn, isLight && styles.familyActionBtnLight]}
+                    onPress={() => {
+                      setAddTrustedOpen(false);
+                      setFamilyCareOpen(false);
+                    }}
+                  >
+                    <Text style={styles.familyActionText}>Close</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={[styles.familySupportCard, isLight && styles.familySupportCardLight]}>
+                <Text style={styles.familySupportTitle}>Support Moments</Text>
+                {familyConnectedSummaries.length === 0 ? (
+                  <Text style={styles.familySupportBody}>Recovery support active when you connect trusted people.</Text>
+                ) : (
+                  familyConnectedSummaries.map(({ member, summary }) => (
+                    <Text key={`moment-${member.id}`} style={styles.familySupportBody}>
+                      • {member.memberName}: {toSupportMoment(summary)}
+                    </Text>
+                  ))
+                )}
+                {familyEmergencyEvents.length > 0 ? (
+                  <Text style={styles.familySupportBody}>• Recent support event logged {new Date(familyEmergencyEvents[0].createdAtISO).toLocaleDateString()}.</Text>
+                ) : null}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={addTrustedOpen} animationType="slide" transparent onRequestClose={() => setAddTrustedOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setAddTrustedOpen(false)} />
+          <View style={styles.sheetWrap}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Add Trusted Support</Text>
+            <ScrollView contentContainerStyle={styles.sheetContent}>
+              <Text style={styles.familySupportBody}>Recovery feels easier with trusted support.</Text>
+              <TextInput
+                style={[styles.familyInput, isLight && styles.familyInputLight]}
+                value={supportName}
+                onChangeText={setSupportName}
+                placeholder="Name"
+                placeholderTextColor="#8D8D8D"
+              />
+              <View style={styles.familyPillRow}>
+                {(['spouse', 'parent', 'child', 'caregiver', 'family_member'] as FamilyRelationshipType[]).map((item) => (
+                  <Pressable
+                    key={item}
+                    style={[styles.familyPill, supportRelationship === item && styles.familyPillActive, isLight && styles.familyPillLight]}
+                    onPress={() => setSupportRelationship(item)}
+                  >
+                    <Text style={styles.familyPillText}>{relationshipLabel(item)}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.familyPillRow}>
+                <Pressable
+                  style={[styles.familyPill, supportContactMethod === 'phone' && styles.familyPillActive, isLight && styles.familyPillLight]}
+                  onPress={() => setSupportContactMethod('phone')}
+                >
+                  <Text style={styles.familyPillText}>Phone</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.familyPill, supportContactMethod === 'whatsapp' && styles.familyPillActive, isLight && styles.familyPillLight]}
+                  onPress={() => setSupportContactMethod('whatsapp')}
+                >
+                  <Text style={styles.familyPillText}>WhatsApp Invite</Text>
+                </Pressable>
+              </View>
+              <TextInput
+                style={[styles.familyInput, isLight && styles.familyInputLight]}
+                value={supportContactValue}
+                onChangeText={setSupportContactValue}
+                placeholder={supportContactMethod === 'phone' ? 'Phone number' : 'WhatsApp number'}
+                placeholderTextColor="#8D8D8D"
+                keyboardType="phone-pad"
+              />
+
+              <Text style={styles.familySupportTitle}>Sharing Level</Text>
+              <View style={styles.familyPillRow}>
+                <Pressable
+                  style={[styles.familyPill, supportVisibilityLevel === 'basic_support' && styles.familyPillActive, isLight && styles.familyPillLight]}
+                  onPress={() => setSupportVisibilityLevel('basic_support')}
+                >
+                  <Text style={styles.familyPillText}>Basic Support</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.familyPill, supportVisibilityLevel === 'wellness_support' && styles.familyPillActive, isLight && styles.familyPillLight]}
+                  onPress={() => setSupportVisibilityLevel('wellness_support')}
+                >
+                  <Text style={styles.familyPillText}>Wellness Support</Text>
+                </Pressable>
+              </View>
+
+              {supportError ? <Text style={[styles.familySupportBody, { color: '#D18A8A' }]}>{supportError}</Text> : null}
+              <Pressable style={styles.focusCta} onPress={onConnectTrustedSupport}>
+                <Text style={styles.focusCtaText}>Continue</Text>
+              </Pressable>
             </ScrollView>
           </View>
         </View>
@@ -827,7 +1257,7 @@ const styles = StyleSheet.create({
   greeting: {
     color: '#F5F5F5',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     lineHeight: 18
   },
   focusCard: {
@@ -848,13 +1278,13 @@ const styles = StyleSheet.create({
   focusTitle: {
     color: '#F3F5F7',
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     marginBottom: 6
   },
   focusBody: {
     color: '#8E9399',
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 17,
     maxWidth: 236
   },
@@ -871,7 +1301,7 @@ const styles = StyleSheet.create({
   focusCtaText: {
     color: '#F4F8F1',
     fontSize: 14,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   topRightRow: {
     flexDirection: 'row',
@@ -911,7 +1341,7 @@ const styles = StyleSheet.create({
   notifyBadgeText: {
     color: '#FFFFFF',
     fontSize: 9,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   avatar: {
     width: 44,
@@ -968,19 +1398,19 @@ const styles = StyleSheet.create({
   cardTitle: {
     color: '#F4F4F4',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     marginBottom: 8
   },
   cardSub: {
     color: '#848484',
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     marginBottom: 10
   },
   heroState: {
     color: '#DCECDD',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     marginBottom: 6
   },
   heroScoreRow: {
@@ -1000,13 +1430,13 @@ const styles = StyleSheet.create({
   heroScoreValue: {
     color: '#F4F4F4',
     fontSize: 38,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     lineHeight: 40
   },
   heroScoreSlash: {
     color: '#9A9A9A',
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
     marginBottom: 5
   },
   heroTrendPill: {
@@ -1024,13 +1454,13 @@ const styles = StyleSheet.create({
   heroTrendText: {
     color: '#9AC7AE',
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     textTransform: 'capitalize'
   },
   heroSentence: {
     color: '#BFC7C0',
     fontSize: 13,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 18,
     marginTop: 8
   },
@@ -1063,7 +1493,7 @@ const styles = StyleSheet.create({
     color: '#D5DADE',
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '400'
+    fontFamily: 'Poppins_400Regular'
   },
   scoreBody: {
     flexDirection: 'row',
@@ -1091,7 +1521,7 @@ const styles = StyleSheet.create({
   metricPillText: {
     fontSize: 12,
     color: '#59BE08',
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     flexShrink: 1
   },
   ringWrap: {
@@ -1111,7 +1541,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 32,
     color: '#DDE5EF',
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     textAlign: 'center'
   },
   ringSub: {
@@ -1119,7 +1549,7 @@ const styles = StyleSheet.create({
     color: '#D6DBE0',
     fontSize: 10,
     lineHeight: 18,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
     textAlign: 'center'
   },
   centerOrb: {
@@ -1170,12 +1600,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     lineHeight: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   bodyCopy: {
     color: '#888888',
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 16,
     marginBottom: 10
   },
@@ -1192,7 +1622,7 @@ const styles = StyleSheet.create({
   syncText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   trendRow: {
     flexDirection: 'row',
@@ -1218,7 +1648,7 @@ const styles = StyleSheet.create({
   },
   trendChipText: {
     fontSize: 11,
-    fontWeight: '500'
+    fontFamily: 'Poppins_500Medium'
   },
   trendWeekRow: {
     flexDirection: 'row',
@@ -1228,7 +1658,7 @@ const styles = StyleSheet.create({
   trendWeekLabel: {
     color: '#EEEEEE',
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     width: 20,
     textAlign: 'center'
   },
@@ -1254,7 +1684,7 @@ const styles = StyleSheet.create({
   lowerCardTitle: {
     color: '#EAEAEA',
     fontSize: 14,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   lowerStatsRow: {
     flexDirection: 'row',
@@ -1264,29 +1694,29 @@ const styles = StyleSheet.create({
   lowerStatValue: {
     color: '#F2F2F2',
     fontSize: 12,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   lowerStatLabel: {
     color: '#7C848C',
     fontSize: 12,
-    fontWeight: '400'
+    fontFamily: 'Poppins_400Regular'
   },
   lowerLink: {
     marginTop: 'auto',
     color: '#8ADE67',
     fontSize: 14,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   lowerScore: {
     color: '#F2F2F2',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     marginBottom: 4
   },
   lowerHint: {
     color: '#7C848C',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     marginBottom: 10
   },
   heroSyncButton: {
@@ -1295,16 +1725,43 @@ const styles = StyleSheet.create({
     top: 6,
     minHeight: 32,
     borderRadius: 16,
-    backgroundColor: '#59BE08',
+    backgroundColor: '#000000',
+    borderWidth: 0.5,
+    borderColor: '#7FFFD4',
     paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 12
+    zIndex: 12,
+    elevation: 7,
+    shadowOffset: { width: 0, height: 0 }
+  },
+  heroAssistButton: {
+    position: 'absolute',
+    left: 8,
+    top: 6,
+    minHeight: 32,
+    borderRadius: 16,
+    backgroundColor: '#000000',
+    borderWidth: 0.5,
+    borderColor: '#7FFFD4',
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 12,
+    elevation: 7,
+    shadowOffset: { width: 0, height: 0 }
+  },
+  heroCtaTouch: {
+    minHeight: 32,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   heroSyncText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   lowerBarRow: {
     flexDirection: 'row',
@@ -1333,17 +1790,17 @@ const styles = StyleSheet.create({
   assistantTitle: {
     color: '#F5F5F5',
     fontSize: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   assistantBadge: {
     color: '#00C92C',
     fontSize: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   assistantCopy: {
     color: '#8D8D8D',
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 16,
     marginBottom: 2
   },
@@ -1363,7 +1820,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#8D8D8D',
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 16
   },
   consultantCard: {
@@ -1382,12 +1839,12 @@ const styles = StyleSheet.create({
   consultantLabel: {
     color: '#59BE08',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   consultantName: {
     color: '#F4F4F4',
     fontSize: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   consultantSpecialty: {
     color: '#CDD2D6',
@@ -1410,13 +1867,13 @@ const styles = StyleSheet.create({
   medicationCtaTitle: {
     color: '#F4F4F4',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     marginBottom: 8
   },
   medicationCtaBody: {
     color: '#C2C2C2',
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 16
   },
   sheetOverlay: {
@@ -1447,7 +1904,7 @@ const styles = StyleSheet.create({
   sheetTitle: {
     color: '#F4F4F4',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     marginBottom: 10
   },
   sheetContent: {
@@ -1457,12 +1914,12 @@ const styles = StyleSheet.create({
   section: {
     color: '#F4F4F4',
     fontSize: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   empty: {
     color: '#9A9A9A',
     fontSize: 12,
-    fontWeight: '400'
+    fontFamily: 'Poppins_400Regular'
   },
   medRow: {
     borderWidth: 1,
@@ -1477,12 +1934,12 @@ const styles = StyleSheet.create({
   medName: {
     color: '#F4F4F4',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   medTime: {
     color: '#9A9A9A',
     fontSize: 12,
-    fontWeight: '400'
+    fontFamily: 'Poppins_400Regular'
   },
   statusBadge: {
     borderRadius: 999,
@@ -1493,7 +1950,7 @@ const styles = StyleSheet.create({
   statusText: {
     color: '#000000',
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     textTransform: 'capitalize'
   },
   quickRow: {
@@ -1507,7 +1964,7 @@ const styles = StyleSheet.create({
   quickLabel: {
     color: '#F4F4F4',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   quickActions: {
     flexDirection: 'row',
@@ -1523,7 +1980,7 @@ const styles = StyleSheet.create({
   quickBtnText: {
     color: '#F4F4F4',
     fontSize: 12,
-    fontWeight: '400'
+    fontFamily: 'Poppins_400Regular'
   },
   ctaRow: {
     gap: 8
@@ -1540,7 +1997,7 @@ const styles = StyleSheet.create({
   ctaText: {
     color: '#F4F4F4',
     fontSize: 14,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   medCard: {
     borderWidth: 1,
@@ -1560,12 +2017,12 @@ const styles = StyleSheet.create({
   link: {
     color: '#59BE08',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   deleteLink: {
     color: '#D04053',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   summaryCard: {
     borderRadius: 16,
@@ -1578,7 +2035,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     color: '#F4F4F4',
     fontSize: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   summaryRow: {
     flexDirection: 'row',
@@ -1588,12 +2045,12 @@ const styles = StyleSheet.create({
   summaryKey: {
     color: '#9A9A9A',
     fontSize: 12,
-    fontWeight: '400'
+    fontFamily: 'Poppins_400Regular'
   },
   summaryValue: {
     color: '#F4F4F4',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   attentionRow: {
     flexDirection: 'row',
@@ -1604,7 +2061,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#D8D8D8',
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 17
   },
   driverRow: {
@@ -1616,19 +2073,19 @@ const styles = StyleSheet.create({
     width: 14,
     textAlign: 'center',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     marginTop: 1
   },
   driverTitle: {
     color: '#EAEAEA',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     marginBottom: 2
   },
   driverBody: {
     color: '#9FA5A1',
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 16
   },
   quickActionRow: {
@@ -1652,7 +2109,7 @@ const styles = StyleSheet.create({
   quickActionText: {
     color: '#DBE8DE',
     fontSize: 12,
-    fontWeight: '500'
+    fontFamily: 'Poppins_500Medium'
   },
   aiCompactCard: {
     borderRadius: 16,
@@ -1665,18 +2122,18 @@ const styles = StyleSheet.create({
   aiCompactTitle: {
     color: '#59BE08',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   aiCompactBody: {
     color: '#E2E2E2',
     fontSize: 13,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 18
   },
   aiCompactLink: {
     color: '#A6D97A',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   celebrationCard: {
     borderRadius: 14,
@@ -1692,8 +2149,147 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#C7D8CC',
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
     lineHeight: 17
+  },
+  careCircleChip: {
+    marginTop: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  careCircleChipTitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold'
+  },
+  careCircleChipSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 2
+  },
+  familySupportCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+    backgroundColor: '#141414',
+    padding: 12,
+    gap: 8
+  },
+  familySupportCardLight: {
+    borderColor: '#C9D2DE',
+    backgroundColor: '#FFFFFF'
+  },
+  familySupportTitle: {
+    color: '#F1F1F1',
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold'
+  },
+  familySupportBody: {
+    color: '#BDBDBD',
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    lineHeight: 18
+  },
+  familySupportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  familySupportAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: '#59BE08',
+    backgroundColor: '#1A1A1A',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  familySupportAvatarText: {
+    color: '#F4F4F4',
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold'
+  },
+  familySupportMember: {
+    color: '#F2F2F2',
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold'
+  },
+  familySupportMeta: {
+    color: '#A0A0A0',
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular'
+  },
+  familyActionRow: {
+    flexDirection: 'row',
+    gap: 8
+  },
+  familyActionBtn: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2F2F2F',
+    backgroundColor: '#111111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10
+  },
+  familyActionBtnLight: {
+    borderColor: '#C3D0DC',
+    backgroundColor: '#F8FAFD'
+  },
+  familyActionText: {
+    color: '#D8E8D0',
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold'
+  },
+  familyInput: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2E2E2E',
+    backgroundColor: '#111111',
+    color: '#E8E8E8',
+    paddingHorizontal: 12,
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular'
+  },
+  familyInputLight: {
+    borderColor: '#C3D0DC',
+    backgroundColor: '#FFFFFF',
+    color: '#1B2430'
+  },
+  familyPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  familyPill: {
+    minHeight: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: '#2F2F2F',
+    backgroundColor: '#111111',
+    justifyContent: 'center',
+    paddingHorizontal: 12
+  },
+  familyPillLight: {
+    borderColor: '#C3D0DC',
+    backgroundColor: '#FFFFFF'
+  },
+  familyPillActive: {
+    borderColor: '#59BE08',
+    backgroundColor: '#1D2B14'
+  },
+  familyPillText: {
+    color: '#D8D8D8',
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium'
   },
   familyCircleCard: {
     borderRadius: 16,
@@ -1711,12 +2307,12 @@ const styles = StyleSheet.create({
   familyCircleTitle: {
     color: '#F4F4F4',
     fontSize: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   familyCircleAdd: {
     color: '#59BE08',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   familyCircleList: {
     gap: 10,
@@ -1725,7 +2321,7 @@ const styles = StyleSheet.create({
   familyCircleEmpty: {
     color: '#9A9A9A',
     fontSize: 12,
-    fontWeight: '400'
+    fontFamily: 'Poppins_400Regular'
   },
   familyCircleMember: {
     width: 96,
@@ -1745,16 +2341,82 @@ const styles = StyleSheet.create({
   familyCircleAvatarText: {
     color: '#F4F4F4',
     fontSize: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   familyCircleName: {
     color: '#F4F4F4',
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   familyCircleStatus: {
     color: '#9A9A9A',
     fontSize: 11,
-    fontWeight: '400'
+    fontFamily: 'Poppins_400Regular'
+  },
+  healthProfileCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 16,
+    marginTop: 14,
+    gap: 14
+  },
+  healthProfileTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12
+  },
+  healthProfileEyebrow: {
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium'
+  },
+  healthProfileName: {
+    fontSize: 18,
+    fontFamily: 'Poppins_600SemiBold',
+    marginTop: 4
+  },
+  healthProfileMeta: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 4,
+    maxWidth: 220
+  },
+  healthProfileBadge: {
+    minWidth: 96,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  healthProfileBadgeText: {
+    color: '#59BE08',
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center'
+  },
+  healthProfileBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  healthProfileSectionTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins_600SemiBold'
+  },
+  healthProfileMissing: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 4,
+    lineHeight: 18
+  },
+  healthProfileCta: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  healthProfileCtaText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'Poppins_600SemiBold'
   }
 });

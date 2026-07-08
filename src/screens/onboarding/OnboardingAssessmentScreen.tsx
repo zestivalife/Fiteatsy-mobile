@@ -1,29 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions
-} from 'react-native';
+import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppBackButton } from '../../components/AppBackButton';
+import { NumericWheelPicker } from '../../components/NumericWheelPicker';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, getThemeColors, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
-import {
-  AssessmentGender,
-  AssessmentGoal,
-  AssessmentMood,
-  AssessmentPhysicalDistress,
-  AssessmentSleepQuality
-} from '../../types';
+import { AssessmentGoal, AssessmentMood, AssessmentPhysicalDistress, AssessmentSleepQuality } from '../../types';
 import { useAppContext } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingAssessment'>;
@@ -37,23 +22,17 @@ type VoiceAnalysis = {
 
 const BRAND_GREEN = '#60AF00';
 const goals: AssessmentGoal[] = ['Reduce Stress', 'Try AI Therapy', 'Cope With Trauma', 'Become Better'];
-const genders: AssessmentGender[] = ['Male', 'Female', 'Prefer not to say'];
 const moods: { value: AssessmentMood; label: string; emoji: string }[] = [
   { value: 'Low', label: 'Low', emoji: '☹️' },
   { value: 'Neutral', label: 'Neutral', emoji: '😐' },
   { value: 'Positive', label: 'Positive', emoji: '🙂' }
 ];
 const sleepQualityLevels: AssessmentSleepQuality[] = ['Excellent', 'Good', 'Fair', 'Poor', 'Worst'];
-
-const AGE_MIN = 16;
-const AGE_MAX = 80;
-const AGE_ITEM_HEIGHT = 52;
 const HEIGHT_MIN = 130;
-const HEIGHT_MAX = 210;
-const HEIGHT_TICK_WIDTH = 14;
+const HEIGHT_MAX = 220;
+const HEIGHT_RULER_ITEM_HEIGHT = 24;
 const WEIGHT_MIN = 40;
 const WEIGHT_MAX = 160;
-const WEIGHT_TICK_WIDTH = 14;
 const DEFAULT_VOICE_REFLECTION = 'I believe in myself and my progress.';
 
 const moodToScore = (mood: AssessmentMood): 1 | 2 | 3 | 4 | 5 => {
@@ -72,8 +51,6 @@ const sleepToScore = (quality: AssessmentSleepQuality): 1 | 2 | 3 | 4 | 5 => {
   };
   return map[quality];
 };
-
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 const createVoiceAnalysis = ({
   mood,
@@ -102,9 +79,10 @@ const createVoiceAnalysis = ({
   if (mood === 'Low' || stressLevel >= 4 || physicalDistress === 'Yes') {
     return {
       title: 'Needs gentler pacing',
-      summary: soughtHelpBefore === 'Yes'
-        ? 'Your voice pattern sounds tense and a bit heavy. Fiteatsy would recommend a slower day structure, hydration, and one short recovery break before intense work.'
-        : 'Your voice pattern sounds strained. Fiteatsy would recommend a slower day structure, a breathing break, and one supportive check-in later today.',
+      summary:
+        soughtHelpBefore === 'Yes'
+          ? 'Your voice pattern sounds tense and a bit heavy. Fiteatsy would recommend a slower day structure, hydration, and one short recovery break before intense work.'
+          : 'Your voice pattern sounds strained. Fiteatsy would recommend a slower day structure, a breathing break, and one supportive check-in later today.',
       moodLabel: 'Elevated stress signature',
       confidence
     };
@@ -118,22 +96,162 @@ const createVoiceAnalysis = ({
   };
 };
 
+const HeightRuler = ({
+  value,
+  min,
+  max,
+  textColor,
+  mutedTextColor,
+  borderColor,
+  backgroundColor,
+  onChange
+}: {
+  value: number;
+  min: number;
+  max: number;
+  textColor: string;
+  mutedTextColor: string;
+  borderColor: string;
+  backgroundColor: string;
+  onChange: (value: number) => void;
+}) => {
+  const scrollRef = useRef<ScrollView>(null);
+  const values = useMemo(() => Array.from({ length: max - min + 1 }, (_, index) => max - index), [max, min]);
+  const selectedIndex = max - value;
+  const sidePadding = HEIGHT_RULER_ITEM_HEIGHT * 4;
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: selectedIndex * HEIGHT_RULER_ITEM_HEIGHT, animated: false });
+    }, 20);
+    return () => clearTimeout(id);
+  }, [selectedIndex]);
+
+  const applyValueFromOffset = (offsetY: number) => {
+    const rawIndex = Math.round(offsetY / HEIGHT_RULER_ITEM_HEIGHT);
+    const nextIndex = Math.max(0, Math.min(values.length - 1, rawIndex));
+    const nextValue = values[nextIndex];
+    scrollRef.current?.scrollTo({ y: nextIndex * HEIGHT_RULER_ITEM_HEIGHT, animated: true });
+    if (nextValue !== value) {
+      onChange(nextValue);
+    }
+  };
+
+  return (
+    <View style={[styles.heightRulerShell, { backgroundColor, borderColor }]}>
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={HEIGHT_RULER_ITEM_HEIGHT}
+        contentContainerStyle={{ paddingVertical: sidePadding }}
+        onMomentumScrollEnd={(event) => applyValueFromOffset(event.nativeEvent.contentOffset.y)}
+        onScrollEndDrag={(event) => applyValueFromOffset(event.nativeEvent.contentOffset.y)}
+      >
+        {values.map((item) => {
+          const selected = item === value;
+          const major = item % 5 === 0;
+          return (
+            <View key={`height-ruler-${item}`} style={styles.heightRulerRow}>
+              {major ? <Text style={[styles.heightRulerLabel, { color: selected ? textColor : mutedTextColor }]}>{item}</Text> : <View style={styles.heightRulerLabelSpacer} />}
+              <View style={[styles.heightRulerTick, major && styles.heightRulerTickMajor, { backgroundColor: selected ? BRAND_GREEN : mutedTextColor }]} />
+            </View>
+          );
+        })}
+      </ScrollView>
+      <View pointerEvents="none" style={styles.heightRulerSelectionBand}>
+        <View style={styles.heightRulerSelectionLine} />
+      </View>
+    </View>
+  );
+};
+
+const WeightRuler = ({
+  value,
+  min,
+  max,
+  unit,
+  textColor,
+  mutedTextColor,
+  borderColor,
+  backgroundColor,
+  onChange
+}: {
+  value: number;
+  min: number;
+  max: number;
+  unit: 'kg' | 'lbs';
+  textColor: string;
+  mutedTextColor: string;
+  borderColor: string;
+  backgroundColor: string;
+  onChange: (value: number) => void;
+}) => {
+  const scrollRef = useRef<ScrollView>(null);
+  const values = useMemo(() => Array.from({ length: max - min + 1 }, (_, index) => max - index), [max, min]);
+  const selectedIndex = max - value;
+  const sidePadding = HEIGHT_RULER_ITEM_HEIGHT * 4;
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: selectedIndex * HEIGHT_RULER_ITEM_HEIGHT, animated: false });
+    }, 20);
+    return () => clearTimeout(id);
+  }, [selectedIndex]);
+
+  const applyValueFromOffset = (offsetY: number) => {
+    const rawIndex = Math.round(offsetY / HEIGHT_RULER_ITEM_HEIGHT);
+    const nextIndex = Math.max(0, Math.min(values.length - 1, rawIndex));
+    const nextValue = values[nextIndex];
+    scrollRef.current?.scrollTo({ y: nextIndex * HEIGHT_RULER_ITEM_HEIGHT, animated: true });
+    if (nextValue !== value) {
+      onChange(nextValue);
+    }
+  };
+
+  return (
+    <View style={[styles.heightRulerShell, { backgroundColor, borderColor }]}>
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={HEIGHT_RULER_ITEM_HEIGHT}
+        contentContainerStyle={{ paddingVertical: sidePadding }}
+        onMomentumScrollEnd={(event) => applyValueFromOffset(event.nativeEvent.contentOffset.y)}
+        onScrollEndDrag={(event) => applyValueFromOffset(event.nativeEvent.contentOffset.y)}
+      >
+        {values.map((item) => {
+          const selected = item === value;
+          const major = item % 5 === 0;
+          const display = unit === 'kg' ? `${item}` : `${Math.round(item * 2.20462)}`;
+          return (
+            <View key={`weight-ruler-${item}`} style={styles.heightRulerRow}>
+              {major ? <Text style={[styles.heightRulerLabel, { color: selected ? textColor : mutedTextColor }]}>{display}</Text> : <View style={styles.heightRulerLabelSpacer} />}
+              <View style={[styles.heightRulerTick, major && styles.heightRulerTickMajor, { backgroundColor: selected ? BRAND_GREEN : mutedTextColor }]} />
+            </View>
+          );
+        })}
+      </ScrollView>
+      <View pointerEvents="none" style={styles.heightRulerSelectionBand}>
+        <View style={styles.heightRulerSelectionLine} />
+      </View>
+    </View>
+  );
+};
+
 export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
-  const { setAssessment, submitCheckIn, setMood, themeMode } = useAppContext();
-  const { width } = useWindowDimensions();
+  const { onboarding, setAssessment, submitCheckIn, setMood, themeMode } = useAppContext();
   const isLight = themeMode === 'light';
   const palette = getThemeColors(themeMode);
   const surface = isLight ? '#FFFFFF' : colors.cardMuted;
   const surfaceRaised = isLight ? '#EEF2F7' : colors.bgSecondary;
   const selectedLightBg = isLight ? palette.blueDark : undefined;
-  const textStrong = isLight ? '#000000' : colors.textPrimary;
-  const textSoft = isLight ? '#334155' : colors.textSecondary;
-  const textLow = isLight ? '#475569' : colors.textMuted;
+  const textStrong = isLight ? '#000000' : '#FFFFFF';
+  const textSoft = isLight ? '#334155' : '#FFFFFF';
+  const textLow = isLight ? '#475569' : '#FFFFFF';
 
   const [step, setStep] = useState(1);
   const [goal, setGoal] = useState<AssessmentGoal>('Reduce Stress');
-  const [gender, setGender] = useState<AssessmentGender>('Male');
-  const [age, setAge] = useState(28);
   const [heightCm, setHeightCm] = useState(170);
   const [weightKg, setWeightKg] = useState(68);
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
@@ -146,26 +264,19 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
   const [voiceReflection, setVoiceReflection] = useState(DEFAULT_VOICE_REFLECTION);
   const [voiceAnalysis, setVoiceAnalysis] = useState<VoiceAnalysis | null>(null);
 
-  const ageValues = useMemo(() => Array.from({ length: AGE_MAX - AGE_MIN + 1 }, (_, i) => AGE_MIN + i), []);
-  const heightValues = useMemo(() => Array.from({ length: HEIGHT_MAX - HEIGHT_MIN + 1 }, (_, i) => HEIGHT_MIN + i), []);
-  const weightValues = useMemo(() => Array.from({ length: WEIGHT_MAX - WEIGHT_MIN + 1 }, (_, i) => WEIGHT_MIN + i), []);
   const pulse = useRef(new Animated.Value(1)).current;
   const micScale = useRef(new Animated.Value(1)).current;
-  const ageRef = useRef<ScrollView>(null);
-  const weightRef = useRef<ScrollView>(null);
-  const heightRef = useRef<ScrollView>(null);
-  const rulerSidePadding = Math.max(16, (width - 32) / 2);
-  const ageIndex = age - AGE_MIN;
-  const heightIndex = heightCm - HEIGHT_MIN;
-  const weightIndex = weightKg - WEIGHT_MIN;
+  const profileGender = onboarding?.gender ?? 'Prefer not to say';
+  const profileAge = onboarding?.calculatedAge ?? onboarding?.age ?? null;
+  const totalSteps = 9;
+  const isLast = step === totalSteps;
+  const heightImageUri =
+    profileGender === 'Female' ? 'file:///Users/l.paunikar/Downloads/women.jpeg' : 'file:///Users/l.paunikar/Downloads/man.jpeg';
 
   const weightDisplay = useMemo(() => {
     if (unit === 'kg') return `${weightKg} kg`;
     return `${Math.round(weightKg * 2.20462)} lbs`;
   }, [unit, weightKg]);
-
-  const totalSteps = 11;
-  const isLast = step === totalSteps;
 
   const stressCopy = useMemo(() => {
     if (stressLevel <= 2) return 'You look calm today.';
@@ -182,51 +293,6 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
     ]).start();
   };
 
-  useEffect(() => {
-    if (step === 3) {
-      const id = setTimeout(() => {
-        ageRef.current?.scrollTo({ y: ageIndex * AGE_ITEM_HEIGHT, animated: false });
-      }, 40);
-      return () => clearTimeout(id);
-    }
-    return undefined;
-  }, [step, ageIndex]);
-
-  useEffect(() => {
-    if (step === 4) {
-      const id = setTimeout(() => {
-        heightRef.current?.scrollTo({ x: heightIndex * HEIGHT_TICK_WIDTH, animated: false });
-      }, 40);
-      return () => clearTimeout(id);
-    }
-    return undefined;
-  }, [step, heightIndex]);
-
-  useEffect(() => {
-    if (step === 5) {
-      const id = setTimeout(() => {
-        weightRef.current?.scrollTo({ x: weightIndex * WEIGHT_TICK_WIDTH, animated: false });
-      }, 40);
-      return () => clearTimeout(id);
-    }
-    return undefined;
-  }, [step, weightIndex]);
-
-  const onAgeScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const rawIndex = Math.round(event.nativeEvent.contentOffset.y / AGE_ITEM_HEIGHT);
-    setAge(ageValues[clamp(rawIndex, 0, ageValues.length - 1)]);
-  };
-
-  const onWeightScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const rawIndex = Math.round(event.nativeEvent.contentOffset.x / WEIGHT_TICK_WIDTH);
-    setWeightKg(weightValues[clamp(rawIndex, 0, weightValues.length - 1)]);
-  };
-
-  const onHeightScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const rawIndex = Math.round(event.nativeEvent.contentOffset.x / HEIGHT_TICK_WIDTH);
-    setHeightCm(heightValues[clamp(rawIndex, 0, heightValues.length - 1)]);
-  };
-
   const startVoiceCapture = () => {
     setIsRecordingVoice(true);
     setVoiceAnalysis(null);
@@ -239,10 +305,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
   };
 
   const stopVoiceCapture = () => {
-    if (!isRecordingVoice) {
-      return;
-    }
-
+    if (!isRecordingVoice) return;
     micScale.stopAnimation(() => {
       micScale.setValue(1);
     });
@@ -269,8 +332,8 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
     setAssessment({
       completedAtISO,
       goal,
-      gender,
-      age,
+      gender: onboarding?.gender,
+      age: onboarding?.calculatedAge ?? onboarding?.age,
       heightCm,
       weightKg,
       mood,
@@ -288,7 +351,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
     submitCheckIn({ mood: moodScore, energy: energyScore, sleepQuality: sleepScore });
     setMood(moodScore >= 4 ? '🙂' : moodScore === 3 ? '😐' : '☹️');
 
-    navigation.reset({ index: 0, routes: [{ name: 'OnboardingBasics' }] });
+    navigation.reset({ index: 0, routes: [{ name: 'SyncWearable' }] });
   };
 
   return (
@@ -302,14 +365,21 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
                 setStep((current) => current - 1);
                 return;
               }
-              navigation.goBack();
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+                return;
+              }
+              navigation.navigate('OnboardingNotifications');
             }}
           />
           <Text style={[styles.title, { color: textStrong }]}>Assessment</Text>
           <Text style={[styles.progress, { color: textLow }]}>{step} of {totalSteps}</Text>
         </View>
+        <Text style={[styles.profileSourceCopy, { color: textSoft }]}>
+          Using profile details from Quick Setup{profileAge ? ` • ${profileGender} • ${profileAge} yrs` : ` • ${profileGender}`}
+        </Text>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.scrollContent}>
           {step === 1 ? (
             <View>
               <Text style={[styles.question, { color: textStrong }]}>What’s your health goal for today?</Text>
@@ -341,91 +411,25 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
 
           {step === 2 ? (
             <View>
-              <Text style={[styles.question, { color: textStrong }]}>What’s your official gender?</Text>
-              <View style={styles.list}>
-                {genders.map((item) => {
-                  const active = gender === item;
-                  return (
-                    <Pressable
-                      key={item}
-                      style={[
-                        styles.optionRow,
-                        { backgroundColor: surface, borderColor: palette.stroke },
-                        active && styles.optionRowActive,
-                        active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
-                      ]}
-                      onPress={() => {
-                        setGender(item);
-                        animatePulse();
-                      }}
-                    >
-                      <Text style={[styles.optionLabel, { color: textStrong }, active && styles.optionLabelActive]}>{item}</Text>
-                    </Pressable>
-                  );
-                })}
+              <Text style={[styles.question, { color: textStrong }]}>What’s your height?</Text>
+              <Text style={[styles.bigNumber, styles.heightBigNumber, { color: textStrong }]}>{heightCm} cm</Text>
+              <View style={styles.heightSelectorRow}>
+                <Image source={{ uri: heightImageUri }} style={styles.heightFigureImage} resizeMode="cover" />
+                <HeightRuler
+                  value={heightCm}
+                  min={HEIGHT_MIN}
+                  max={HEIGHT_MAX}
+                  textColor={textStrong}
+                  mutedTextColor={textLow}
+                  borderColor={palette.stroke}
+                  backgroundColor={surface}
+                  onChange={setHeightCm}
+                />
               </View>
             </View>
           ) : null}
 
           {step === 3 ? (
-            <View>
-              <Text style={[styles.question, { color: textStrong }]}>What’s your age?</Text>
-              <View style={[styles.ageWheelWrap, { backgroundColor: surface, borderColor: palette.stroke }]}>
-                <ScrollView
-                  ref={ageRef}
-                  showsVerticalScrollIndicator={false}
-                  decelerationRate="fast"
-                  snapToInterval={AGE_ITEM_HEIGHT}
-                  contentContainerStyle={styles.ageListContent}
-                  onMomentumScrollEnd={onAgeScrollEnd}
-                >
-                  {ageValues.map((item) => {
-                    const selected = item === age;
-                    return (
-                      <View key={`age-${item}`} style={styles.ageItem}>
-                        <Text style={[styles.ageText, { color: textLow }, selected && [styles.ageTextActive, { color: textStrong }]]}>{item}</Text>
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-                <View pointerEvents="none" style={styles.ageSelectionBand} />
-              </View>
-            </View>
-          ) : null}
-
-          {step === 4 ? (
-            <View>
-              <Text style={[styles.question, { color: textStrong }]}>What’s your height?</Text>
-              <View style={[styles.weightCard, { backgroundColor: surface, borderColor: palette.stroke }]}>
-                <Text style={[styles.bigNumber, { color: textStrong }]}>{heightCm} cm</Text>
-                <View style={styles.rulerWrap}>
-                  <ScrollView
-                    ref={heightRef}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    decelerationRate="fast"
-                    snapToInterval={HEIGHT_TICK_WIDTH}
-                    contentContainerStyle={{ paddingHorizontal: rulerSidePadding }}
-                    onMomentumScrollEnd={onHeightScrollEnd}
-                  >
-                    {heightValues.map((item) => {
-                      const selected = item === heightCm;
-                      const major = item % 5 === 0;
-                      return (
-                        <View key={`ht-${item}`} style={styles.tickItem}>
-                          <View style={[styles.tick, { backgroundColor: textLow }, major && styles.tickMajor, selected && styles.tickSelected]} />
-                          {major ? <Text style={[styles.tickLabel, { color: textLow }]}>{item}</Text> : <View style={styles.tickLabelSpacer} />}
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                  <View pointerEvents="none" style={styles.rulerIndicator} />
-                </View>
-              </View>
-            </View>
-          ) : null}
-
-          {step === 5 ? (
             <View>
               <Text style={[styles.question, { color: textStrong }]}>What’s your weight?</Text>
               <View style={styles.unitRow}>
@@ -453,36 +457,25 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
                 </Pressable>
               </View>
 
-              <View style={[styles.weightCard, { backgroundColor: surface, borderColor: palette.stroke }]}>
-                <Text style={[styles.bigNumber, { color: textStrong }]}>{weightDisplay}</Text>
-                <View style={styles.rulerWrap}>
-                  <ScrollView
-                    ref={weightRef}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    decelerationRate="fast"
-                    snapToInterval={WEIGHT_TICK_WIDTH}
-                    contentContainerStyle={{ paddingHorizontal: rulerSidePadding }}
-                    onMomentumScrollEnd={onWeightScrollEnd}
-                  >
-                    {weightValues.map((item) => {
-                      const selected = item === weightKg;
-                      const major = item % 5 === 0;
-                      return (
-                        <View key={`wt-${item}`} style={styles.tickItem}>
-                          <View style={[styles.tick, { backgroundColor: textLow }, major && styles.tickMajor, selected && styles.tickSelected]} />
-                          {major ? <Text style={[styles.tickLabel, { color: textLow }]}>{item}</Text> : <View style={styles.tickLabelSpacer} />}
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                  <View pointerEvents="none" style={styles.rulerIndicator} />
-                </View>
+              <Text style={[styles.bigNumber, styles.heightBigNumber, { color: textStrong }]}>{weightDisplay}</Text>
+              <View style={styles.heightSelectorRow}>
+                <Image source={{ uri: heightImageUri }} style={styles.heightFigureImage} resizeMode="cover" />
+                <WeightRuler
+                  value={weightKg}
+                  min={WEIGHT_MIN}
+                  max={WEIGHT_MAX}
+                  unit={unit}
+                  textColor={textStrong}
+                  mutedTextColor={textLow}
+                  borderColor={palette.stroke}
+                  backgroundColor={surface}
+                  onChange={setWeightKg}
+                />
               </View>
             </View>
           ) : null}
 
-          {step === 6 ? (
+          {step === 4 ? (
             <View>
               <Text style={[styles.question, { color: textStrong }]}>How would you describe your mood?</Text>
               <View style={styles.rowWrap}>
@@ -511,7 +504,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 7 ? (
+          {step === 5 ? (
             <View>
               <Text style={[styles.question, { color: textStrong }]}>Have you sought professional help before?</Text>
               <View style={styles.binaryRow}>
@@ -541,7 +534,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 8 ? (
+          {step === 6 ? (
             <View>
               <Text style={[styles.question, { color: textStrong }]}>Are you experiencing any physical distress?</Text>
               <View style={styles.binaryRow}>
@@ -571,7 +564,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 9 ? (
+          {step === 7 ? (
             <View>
               <Text style={[styles.question, { color: textStrong }]}>How would you rate your sleep quality?</Text>
               <View style={[styles.sleepRailWrap, { backgroundColor: surface, borderColor: palette.stroke }]}>
@@ -593,7 +586,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 10 ? (
+          {step === 8 ? (
             <View>
               <Text style={[styles.question, { color: textStrong }]}>How would you rate your stress level?</Text>
               <Text style={[styles.stressValue, { color: textStrong }]}>{stressLevel}</Text>
@@ -621,7 +614,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
             </View>
           ) : null}
 
-          {step === 11 ? (
+          {step === 9 ? (
             <View>
               <Text style={[styles.question, { color: textStrong }]}>AI Sound Analysis</Text>
               <View style={[styles.voiceCard, { backgroundColor: surface, borderColor: palette.stroke }]}>
@@ -631,11 +624,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
                     onPressOut={stopVoiceCapture}
                     style={[styles.micButton, { backgroundColor: surfaceRaised }, isRecordingVoice && styles.micButtonActive]}
                   >
-                    <Ionicons
-                      name="mic"
-                      size={34}
-                      color={isRecordingVoice ? colors.white : isLight ? '#0F172A' : colors.white}
-                    />
+                    <Ionicons name="mic" size={34} color={isRecordingVoice ? colors.white : isLight ? '#0F172A' : colors.white} />
                   </Pressable>
                 </Animated.View>
                 <Text style={[styles.voiceTitle, { color: textStrong }]}>{isRecordingVoice ? 'Listening...' : 'Hold the mic and say the statement'}</Text>
@@ -656,7 +645,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
               </View>
             </View>
           ) : null}
-        </ScrollView>
+        </View>
       </View>
 
       <View style={styles.footer}>
@@ -674,22 +663,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
     gap: 10
   },
-  backBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.cardMuted
-  },
-  backBtnText: { color: colors.textPrimary, fontSize: 18, lineHeight: 21 },
   title: { ...typography.bodyStrong, fontSize: 16 },
   progress: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginLeft: 'auto' },
+  profileSourceCopy: { ...typography.caption, marginBottom: 16 },
   question: { ...typography.title, fontSize: 28, lineHeight: 34, marginBottom: 16 },
   list: { gap: 10, marginBottom: 20 },
   optionRow: {
@@ -708,31 +687,7 @@ const styles = StyleSheet.create({
   radioDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: '#C9CFD4' },
   radioDotActive: { borderColor: BRAND_GREEN, backgroundColor: BRAND_GREEN },
   optionLabel: { ...typography.body, fontSize: 14 },
-  optionLabelActive: { color: colors.textPrimary, fontWeight: '700' },
-  ageWheelWrap: {
-    height: AGE_ITEM_HEIGHT * 5,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    backgroundColor: colors.cardMuted,
-    marginBottom: 20,
-    overflow: 'hidden'
-  },
-  ageListContent: { paddingVertical: AGE_ITEM_HEIGHT * 2 },
-  ageItem: { height: AGE_ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center' },
-  ageText: { ...typography.title, fontSize: 34, color: colors.textMuted },
-  ageTextActive: { color: colors.textPrimary, fontSize: 46, lineHeight: 52 },
-  ageSelectionBand: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    top: AGE_ITEM_HEIGHT * 2,
-    height: AGE_ITEM_HEIGHT,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: BRAND_GREEN,
-    backgroundColor: 'rgba(96,175,0,0.22)'
-  },
+  optionLabelActive: { color: colors.textPrimary, fontFamily: 'Poppins_700Bold' },
   unitRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   unitChip: {
     borderRadius: radius.pill,
@@ -744,25 +699,89 @@ const styles = StyleSheet.create({
   },
   unitChipActive: { backgroundColor: BRAND_GREEN, borderColor: BRAND_GREEN },
   unitChipText: { ...typography.body, fontSize: 14 },
-  unitChipTextActive: { color: '#FFFFFF', fontWeight: '700' },
-  weightCard: {
+  unitChipTextActive: { color: '#FFFFFF', fontFamily: 'Poppins_700Bold' },
+  measurementCard: {
     borderWidth: 1,
     borderColor: colors.stroke,
     borderRadius: 24,
     backgroundColor: colors.cardMuted,
     padding: 16,
     marginBottom: 20,
-    alignItems: 'center'
+    alignItems: 'flex-end'
   },
-  bigNumber: { ...typography.title, fontSize: 44, lineHeight: 52, marginBottom: 12 },
-  rulerWrap: { width: '100%', height: 82, justifyContent: 'center' },
-  tickItem: { width: WEIGHT_TICK_WIDTH, alignItems: 'center' },
-  tick: { width: 2, height: 18, borderRadius: 1, backgroundColor: '#939393' },
-  tickMajor: { height: 28, backgroundColor: '#939393' },
-  tickSelected: { backgroundColor: BRAND_GREEN },
-  tickLabel: { ...typography.caption, fontSize: 10, marginTop: 4, color: colors.textMuted },
-  tickLabelSpacer: { height: 16, marginTop: 4 },
-  rulerIndicator: { position: 'absolute', alignSelf: 'center', width: 4, height: 46, borderRadius: 2, backgroundColor: BRAND_GREEN },
+  bigNumber: { ...typography.title, fontSize: 44, lineHeight: 52, marginBottom: 12, alignSelf: 'stretch', textAlign: 'right' },
+  heightBigNumber: {
+    marginBottom: 18
+  },
+  measurementWheel: {
+    alignSelf: 'flex-end',
+    width: 172
+  },
+  weightWheel: {
+    alignSelf: 'stretch',
+    width: 120,
+    height: 320
+  },
+  heightSelectorRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    minHeight: 320,
+    gap: 16
+  },
+  heightFigureImage: {
+    flex: 1,
+    borderRadius: 16,
+    minHeight: 320
+  },
+  heightRulerShell: {
+    width: 92,
+    height: 320,
+    overflow: 'hidden',
+    alignSelf: 'stretch'
+  },
+  heightRulerRow: {
+    height: HEIGHT_RULER_ITEM_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingRight: 8,
+    gap: 8
+  },
+  heightRulerLabel: {
+    ...typography.caption,
+    fontSize: 12,
+    width: 30,
+    textAlign: 'right'
+  },
+  heightRulerLabelSpacer: {
+    width: 30
+  },
+  heightRulerTick: {
+    width: 20,
+    height: 2,
+    borderRadius: 2
+  },
+  heightRulerTickMajor: {
+    width: 34,
+    height: 3
+  },
+  heightRulerSelectionBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '50%',
+    marginTop: -(HEIGHT_RULER_ITEM_HEIGHT / 2),
+    height: HEIGHT_RULER_ITEM_HEIGHT,
+    justifyContent: 'center'
+  },
+  heightRulerSelectionLine: {
+    height: 2,
+    backgroundColor: BRAND_GREEN,
+    marginHorizontal: 0,
+    borderRadius: 2
+  },
   rowWrap: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   moodCard: {
     flex: 1,
@@ -799,7 +818,7 @@ const styles = StyleSheet.create({
   },
   sleepRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center' },
   sleepLabel: { ...typography.body, fontSize: 16, width: 88, color: colors.textSecondary },
-  sleepLabelActive: { color: colors.textPrimary, fontWeight: '700' },
+  sleepLabelActive: { color: colors.textPrimary, fontFamily: 'Poppins_700Bold' },
   sleepDotTrack: { width: 24, alignItems: 'center', justifyContent: 'center' },
   sleepDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#939393' },
   sleepDotActive: { backgroundColor: BRAND_GREEN },

@@ -35,7 +35,7 @@ const moodOptions: Array<{ label: string; value: CycleMood; emoji: string }> = [
 export const CycleScreen = () => {
   const navigation = useNavigation<Nav>();
   const {
-    assessment,
+    onboarding,
     cycleLogs,
     cyclePrediction,
     logCycleForDate,
@@ -44,6 +44,8 @@ export const CycleScreen = () => {
   } = useAppContext();
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
+  const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
+  const darkGraySurfacePlaceholder = isLight ? colors.textMuted : '#FFFFFF';
 
   const [logOpen, setLogOpen] = useState(false);
   const [periodStarted, setPeriodStarted] = useState(false);
@@ -78,7 +80,7 @@ export const CycleScreen = () => {
     return 'Cycle insights based on your history';
   }, [daysToOvulation, daysToPeriod, snapshot.phase]);
 
-  const isWomenOnlyEnabled = assessment?.gender === 'Female';
+  const isWomenOnlyEnabled = onboarding?.gender === 'Female';
 
   const resetForm = () => {
     setPeriodStarted(false);
@@ -113,90 +115,90 @@ export const CycleScreen = () => {
   return (
     <Screen scroll>
       <AppBackButton onPress={() => navigation.goBack()} />
-      <Text style={[styles.title, { color: isLight ? '#000000' : palette.textPrimary }]}>Cycle</Text>
+      <Text style={[styles.title, { color: darkGraySurfaceText }]}>Cycle</Text>
       {!isWomenOnlyEnabled ? (
         <View style={[styles.noticeCard, { backgroundColor: isLight ? '#FFF4F4' : colors.cardMuted }]}>
-          <Text style={[styles.noticeTitle, { color: palette.textPrimary }]}>Cycle tracking is for women only in this build</Text>
-          <Text style={[styles.noticeBody, { color: palette.textSecondary }]}>Switch profile gender to Female if you want to use this module.</Text>
+          <Text style={[styles.noticeTitle, { color: darkGraySurfaceText }]}>Cycle tracking is for women only in this build</Text>
+          <Text style={[styles.noticeBody, { color: darkGraySurfaceText }]}>Switch profile gender to Female if you want to use this module.</Text>
         </View>
       ) : null}
 
       <View style={[styles.statusCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardMuted }]}>
-        <Text style={[styles.statusTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>{statusTitle}</Text>
-        <Text style={[styles.statusSubtitle, { color: isLight ? '#000000' : palette.textSecondary }]}>{statusSubtitle}</Text>
+        <Text style={[styles.statusTitle, { color: darkGraySurfaceText }]}>{statusTitle}</Text>
+        <Text style={[styles.statusSubtitle, { color: darkGraySurfaceText }]}>{statusSubtitle}</Text>
         <View style={styles.phaseRow}>
-          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'menstrual' && styles.phaseActive]}><Text style={[styles.phaseText, { color: isLight ? '#000000' : palette.textPrimary }]}>Menstrual</Text></View>
-          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'follicular' && styles.phaseActive]}><Text style={[styles.phaseText, { color: isLight ? '#000000' : palette.textPrimary }]}>Follicular</Text></View>
-          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'ovulation_window' && styles.phaseActiveBlue]}><Text style={[styles.phaseText, { color: isLight ? '#000000' : palette.textPrimary }]}>Ovulation</Text></View>
-          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'luteal' && styles.phaseActivePurple]}><Text style={[styles.phaseText, { color: isLight ? '#000000' : palette.textPrimary }]}>Luteal</Text></View>
+          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'menstrual' && styles.phaseActive]}><Text style={[styles.phaseText, { color: darkGraySurfaceText }]}>Menstrual</Text></View>
+          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'follicular' && styles.phaseActive]}><Text style={[styles.phaseText, { color: darkGraySurfaceText }]}>Follicular</Text></View>
+          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'ovulation_window' && styles.phaseActiveBlue]}><Text style={[styles.phaseText, { color: darkGraySurfaceText }]}>Ovulation</Text></View>
+          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'luteal' && styles.phaseActivePurple]}><Text style={[styles.phaseText, { color: darkGraySurfaceText }]}>Luteal</Text></View>
         </View>
       </View>
 
       <Pressable style={[styles.logButton, !isLight && styles.logButtonDark, !isWomenOnlyEnabled && styles.logButtonDisabled]} onPress={() => isWomenOnlyEnabled && setLogOpen(true)}>
-        <Ionicons name="add-circle-outline" size={18} color={isLight ? '#000000' : '#CCCCCC'} />
-        <Text style={[styles.logButtonText, { color: isLight ? '#000000' : '#CCCCCC' }]}>Log Today</Text>
+        <Ionicons name="add-circle-outline" size={18} color={darkGraySurfaceText} />
+        <Text style={[styles.logButtonText, { color: darkGraySurfaceText }]}>Log Today</Text>
       </Pressable>
 
       <View style={styles.quickRow}>
-        <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleCalendar')}><Text style={[styles.quickTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>Calendar</Text><Text style={[styles.quickBody, { color: isLight ? '#000000' : palette.textSecondary }]}>View logs and predictions</Text></Pressable>
-        <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleInsights')}><Text style={[styles.quickTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>Insights</Text><Text style={[styles.quickBody, { color: isLight ? '#000000' : palette.textSecondary }]}>Patterns and consistency</Text></Pressable>
+        <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleCalendar')}><Text style={[styles.quickTitle, { color: darkGraySurfaceText }]}>Calendar</Text><Text style={[styles.quickBody, { color: darkGraySurfaceText }]}>View logs and predictions</Text></Pressable>
+        <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleInsights')}><Text style={[styles.quickTitle, { color: darkGraySurfaceText }]}>Insights</Text><Text style={[styles.quickBody, { color: darkGraySurfaceText }]}>Patterns and consistency</Text></Pressable>
       </View>
-      <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleNotifications')}><Text style={[styles.quickTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>Reminders</Text><Text style={[styles.quickBody, { color: isLight ? '#000000' : palette.textSecondary }]}>Manage cycle notification timing</Text></Pressable>
+      <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleNotifications')}><Text style={[styles.quickTitle, { color: darkGraySurfaceText }]}>Reminders</Text><Text style={[styles.quickBody, { color: darkGraySurfaceText }]}>Manage cycle notification timing</Text></Pressable>
 
       <Modal visible={logOpen} transparent animationType="slide" onRequestClose={() => setLogOpen(false)}>
         <View style={[styles.sheetOverlay, { backgroundColor: isLight ? 'rgba(15,23,42,0.40)' : colors.overlay }]}>
           <Pressable style={styles.sheetBackdrop} onPress={() => setLogOpen(false)} />
           <View style={[styles.sheet, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardRaised }]}>
             <View style={styles.sheetHandle} />
-            <Text style={[styles.sheetTitle, { color: isLight ? '#000000' : palette.textPrimary }]}>Quick Log</Text>
+            <Text style={[styles.sheetTitle, { color: darkGraySurfaceText }]}>Quick Log</Text>
 
             <ScrollView contentContainerStyle={styles.sheetContent}>
               <View style={styles.row}>
-                <Pressable style={[styles.chip, periodStarted && styles.chipActive]} onPress={() => setPeriodStarted((v) => !v)}><Text style={styles.chipText}>Period Started</Text></Pressable>
-                <Pressable style={[styles.chip, periodEnded && styles.chipActive]} onPress={() => setPeriodEnded((v) => !v)}><Text style={styles.chipText}>Period Ended</Text></Pressable>
+                <Pressable style={[styles.chip, periodStarted && styles.chipActive]} onPress={() => setPeriodStarted((v) => !v)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>Period Started</Text></Pressable>
+                <Pressable style={[styles.chip, periodEnded && styles.chipActive]} onPress={() => setPeriodEnded((v) => !v)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>Period Ended</Text></Pressable>
               </View>
 
-              <Text style={styles.section}>Flow</Text>
+              <Text style={[styles.section, { color: darkGraySurfaceText }]}>Flow</Text>
               <View style={styles.row}>
                 {(['light', 'medium', 'heavy'] as CycleFlowIntensity[]).map((level) => (
-                  <Pressable key={level} style={[styles.chip, flow === level && styles.chipActive]} onPress={() => setFlow(level)}><Text style={styles.chipText}>{level[0].toUpperCase() + level.slice(1)}</Text></Pressable>
+                  <Pressable key={level} style={[styles.chip, flow === level && styles.chipActive]} onPress={() => setFlow(level)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{level[0].toUpperCase() + level.slice(1)}</Text></Pressable>
                 ))}
               </View>
 
               <Pressable style={styles.optionalToggle} onPress={() => setShowOptional((v) => !v)}>
-                <Text style={styles.optionalToggleText}>{showOptional ? 'Hide optional details' : 'Add symptoms, mood, energy, notes (optional)'}</Text>
+                <Text style={[styles.optionalToggleText, { color: darkGraySurfaceText }]}>{showOptional ? 'Hide optional details' : 'Add symptoms, mood, energy, notes (optional)'}</Text>
               </Pressable>
 
               {showOptional ? (
                 <>
-                  <Text style={styles.section}>Symptoms</Text>
+                  <Text style={[styles.section, { color: darkGraySurfaceText }]}>Symptoms</Text>
                   <View style={styles.wrapRow}>
                     {symptomOptions.map((item) => (
-                      <Pressable key={item.value} style={[styles.chip, symptoms.includes(item.value) && styles.chipActive]} onPress={() => toggleSymptom(item.value)}><Text style={styles.chipText}>{item.label}</Text></Pressable>
+                      <Pressable key={item.value} style={[styles.chip, symptoms.includes(item.value) && styles.chipActive]} onPress={() => toggleSymptom(item.value)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{item.label}</Text></Pressable>
                     ))}
                   </View>
 
-                  <Text style={styles.section}>Mood</Text>
+                  <Text style={[styles.section, { color: darkGraySurfaceText }]}>Mood</Text>
                   <View style={styles.wrapRow}>
                     {moodOptions.map((item) => (
-                      <Pressable key={item.value} style={[styles.chip, mood === item.value && styles.chipActive]} onPress={() => setMood(item.value)}><Text style={styles.chipText}>{item.emoji} {item.label}</Text></Pressable>
+                      <Pressable key={item.value} style={[styles.chip, mood === item.value && styles.chipActive]} onPress={() => setMood(item.value)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{item.emoji} {item.label}</Text></Pressable>
                     ))}
                   </View>
 
-                  <Text style={styles.section}>Energy</Text>
+                  <Text style={[styles.section, { color: darkGraySurfaceText }]}>Energy</Text>
                   <View style={styles.row}>
                     {(['high', 'medium', 'low'] as CycleEnergy[]).map((value) => (
-                      <Pressable key={value} style={[styles.chip, energy === value && styles.chipActive]} onPress={() => setEnergy(value)}><Text style={styles.chipText}>{value[0].toUpperCase() + value.slice(1)}</Text></Pressable>
+                      <Pressable key={value} style={[styles.chip, energy === value && styles.chipActive]} onPress={() => setEnergy(value)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{value[0].toUpperCase() + value.slice(1)}</Text></Pressable>
                     ))}
                   </View>
 
-                  <Text style={styles.section}>Notes</Text>
+                  <Text style={[styles.section, { color: darkGraySurfaceText }]}>Notes</Text>
                   <TextInput
                     value={notes}
                     onChangeText={setNotes}
                     placeholder="Optional"
-                    placeholderTextColor={colors.textMuted}
-                    style={styles.input}
+                    placeholderTextColor={darkGraySurfacePlaceholder}
+                    style={[styles.input, { color: darkGraySurfaceText }]}
                     maxLength={220}
                   />
                 </>

@@ -1,0 +1,49 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const schemaSql = fs.readFileSync(
+  '/Users/l.paunikar/Desktop/fiteatsy-mobile/backend/src/db/schema.sql',
+  'utf8'
+);
+
+const hasPattern = (pattern: RegExp) => pattern.test(schemaSql);
+
+test('database schema defines required platform tables for CRUD coverage', () => {
+  for (const tableName of [
+    'health_profiles',
+    'recovery_programs',
+    'care_cases',
+    'nutrition_profiles',
+    'timeline_events',
+    'health_events',
+    'health_tickets',
+    'lab_reports',
+    'biomarkers',
+    'diet_plans',
+    'diet_plan_versions',
+    'clinical_memory',
+    'communications',
+    'notifications',
+    'attachments',
+  ]) {
+    assert.equal(hasPattern(new RegExp(`create table if not exists ${tableName} \\(`, 'i')), true);
+  }
+});
+
+test('database schema includes foreign keys for healthcare ownership integrity', () => {
+  assert.equal(hasPattern(/health_profile_id uuid not null references health_profiles/i), true);
+  assert.equal(hasPattern(/recovery_program_id uuid not null references recovery_programs/i), true);
+  assert.equal(hasPattern(/care_case_id uuid not null references care_cases/i), true);
+  assert.equal(hasPattern(/report_id uuid references lab_reports/i), true);
+});
+
+test('database schema includes soft delete and versioning fields', () => {
+  assert.equal(hasPattern(/status text not null default 'active'/i), true);
+  assert.equal(hasPattern(/version integer not null default 1/i), true);
+  assert.equal(hasPattern(/deleted_at timestamptz/i), true);
+});
+
+test.skip('database CRUD runtime validation is pending a live PostgreSQL test database');
+test.skip('database rollback semantics are pending a live PostgreSQL test database');
+test.skip('database transaction semantics are pending a live PostgreSQL test database');

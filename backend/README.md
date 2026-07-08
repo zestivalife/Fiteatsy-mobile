@@ -7,16 +7,32 @@ Production-oriented Node.js + PostgreSQL scaffold for:
 - Intelligence decisions (single priority + burnout flag + one nudge)
 - Nudge policy guardrails
 - Decision logging
+- Shared health-profile / nutrition-profile / care-case platform foundation
 
 ## API Summary
 
 - `POST /v1/checkins`
 - `POST /v1/intelligence/priority`
 - `POST /v1/nudges/dispatch-check`
+- `GET /v1/platform/health-profile`
+- `PATCH /v1/platform/health-profile`
+- `GET /v1/platform/health-profile/completion`
+- `POST /v1/platform/health-profile/request-missing-information`
+- `GET /v1/platform/care-cases/current`
+- `POST /v1/platform/care-cases/:careCaseId/assign-consultant`
+- `GET /v1/platform/care-cases/:careCaseId/timeline`
+- `GET /v1/platform/care-cases/:careCaseId/events`
+- `GET /v1/platform/care-cases/:careCaseId/tickets`
+- `GET /v1/platform/notifications`
+- `POST /v1/reports/analyze`
 
 ## SQL Schema
 
 Apply `/src/db/schema.sql` in PostgreSQL.
+
+## Phase 1 Foundation
+
+See `PLATFORM_FOUNDATION_PHASE1.md` for the new shared care-case architecture, lifecycle, calculation engine, and report pipeline integration.
 
 ## AI Prompt Contract
 

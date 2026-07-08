@@ -129,3 +129,7 @@ export const addFeedback = (reportId, feedback) => {
     reports.set(reportId, record);
     return entry;
 };
+export const resetReportsStoreForTests = () => {
+    reports.clear();
+    uploads.clear();
+};

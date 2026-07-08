@@ -335,3 +335,8 @@ export const buildLiveSyncPayload = (params: { userId: string; appId?: HealthApp
 
   return { connection, payload };
 };
+
+export const resetWearablesStateForTests = () => {
+  connections.clear();
+  recordsByConnectionId.clear();
+};

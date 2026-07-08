@@ -65,12 +65,18 @@ export const FloatingTabBar = ({ state, descriptors, navigation }: BottomTabBarP
                 onLongPress={onLongPress}
                 style={({ pressed }) => [styles.item, isFocused && styles.itemActive, pressed && styles.itemPressed]}
               >
-              <Ionicons
-                name={iconMap[route.name as keyof MainTabParamList]}
-                size={20}
-                color={isFocused ? (isLight ? '#000000' : palette.white) : palette.textMuted}
-              />
-                <Text style={[styles.label, { color: isFocused ? (isLight ? '#000000' : palette.white) : palette.textMuted }, isFocused && styles.labelActive]}>{String(label)}</Text>
+                <View style={[styles.itemInner, isFocused && styles.itemInnerActive]}>
+                  <Ionicons
+                    name={iconMap[route.name as keyof MainTabParamList]}
+                    size={20}
+                    color={isFocused ? (isLight ? '#000000' : palette.white) : palette.textMuted}
+                  />
+                  {isFocused ? (
+                    <Text style={[styles.label, { color: isLight ? '#000000' : palette.white }, styles.labelActive]}>
+                      {String(label)}
+                    </Text>
+                  ) : null}
+                </View>
               </Pressable>
             );
           })}
@@ -106,15 +112,24 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    borderRadius: 26,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
-    paddingVertical: 8,
-    gap: 4
+    minHeight: 44,
+    paddingVertical: 6
   },
   itemActive: {
-    backgroundColor: '#60AF00'
+    backgroundColor: '#60AF00',
+    flex: 1.55
+  },
+  itemInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0
+  },
+  itemInnerActive: {
+    gap: 6
   },
   itemPressed: {
     transform: [{ scale: 0.97 }]
@@ -124,7 +139,6 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   labelActive: {
-    fontFamily: 'Poppins_700Bold',
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   }
 });

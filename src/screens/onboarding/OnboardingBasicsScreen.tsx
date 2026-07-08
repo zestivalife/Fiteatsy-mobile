@@ -9,13 +9,13 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, getThemeColors, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import {
-  AgeBracket,
   AssessmentGender,
   HealthCondition,
   HealthGoal,
   OnboardingProfile
 } from '../../types';
 import { useAppContext } from '../../state/AppContext';
+import { calculateAgeFromDob, createPendingConsultant, formatConsultantAvailability, normalizeOnboardingProfile } from '../../utils/healthProfile';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingBasics'>;
 
@@ -31,24 +31,6 @@ const conditions: HealthCondition[] = [
   'High Cholesterol',
   'Gut Health'
 ];
-
-const toAgeBracket = (age: number): AgeBracket => {
-  if (age <= 24) return '18-24';
-  if (age <= 34) return '25-34';
-  if (age <= 44) return '35-44';
-  if (age <= 54) return '45-54';
-  return '55+';
-};
-
-const calculateAgeFromDob = (dob: Date): number => {
-  const now = new Date();
-  let years = now.getFullYear() - dob.getFullYear();
-  const monthDiff = now.getMonth() - dob.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
-    years -= 1;
-  }
-  return Math.max(18, Math.min(99, years));
-};
 
 const formatDob = (date: Date): string =>
   date.toLocaleDateString('en-GB', {
@@ -70,22 +52,10 @@ const deriveCareTrack = (selectedConditions: HealthCondition[], goal: HealthGoal
   return 'Foundational Recovery Care';
 };
 
-const deriveDietitian = (careTrack: string) => {
-  if (careTrack === 'Blood Sugar Recovery Care') {
-    return { name: 'Dr. Rhea Kapoor', specialty: 'Diabetes & Metabolic Nutrition' };
-  }
-  if (careTrack === 'Hormone Balance Care') {
-    return { name: 'Dr. Aisha Menon', specialty: 'PCOS, Thyroid & Hormonal Nutrition' };
-  }
-  if (careTrack === 'Digestive & Metabolic Care') {
-    return { name: 'Dr. Neha Batra', specialty: 'Gut Health & Metabolic Nutrition' };
-  }
-  return { name: 'Dr. Aisha Menon', specialty: 'Clinical Nutrition & Habit Recovery' };
-};
-
 const baseProfile = (): OnboardingProfile => ({
   name: '',
   dateOfBirthISO: new Date(1996, 0, 1).toISOString(),
+  calculatedAge: 28,
   age: 28,
   gender: 'Prefer not to say',
   wellnessGoal: 'Better Energy',
@@ -93,10 +63,12 @@ const baseProfile = (): OnboardingProfile => ({
   primaryConditions: [],
   symptomTags: ['Fatigue'],
   healthGoals: ['Better Energy'],
+  primaryGoal: 'Better Energy',
+  secondaryGoals: [],
   wearablePreference: 'later',
   careTrack: 'Foundational Recovery Care',
-  matchedDietitianName: 'Dr. Aisha Menon',
-  matchedDietitianSpecialty: 'Clinical Nutrition & Habit Recovery',
+  assignedConsultantId: null,
+  assignedConsultant: null,
   calendarProvider: 'None',
   calendarPermissionGranted: false,
   notificationPermissionGranted: false,
@@ -107,6 +79,8 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
   const { onboarding, setOnboarding, setWearableSetupCompleted, themeMode } = useAppContext();
   const isLight = themeMode === 'light';
   const themeColors = getThemeColors(themeMode);
+  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
+  const darkTextSoft = isLight ? '#334155' : '#FFFFFF';
   const selectedLightBg = isLight ? themeColors.blueDark : undefined;
   const seed = useMemo(() => onboarding ?? baseProfile(), [onboarding]);
 
@@ -114,13 +88,12 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
   const [dob, setDob] = useState(initialDob);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [gender, setGender] = useState<AssessmentGender>(seed.gender ?? 'Prefer not to say');
-  const [wellnessGoal, setWellnessGoal] = useState<HealthGoal | null>(seed.wellnessGoal ?? seed.healthGoals[0] ?? null);
+  const [selectedGoals, setSelectedGoals] = useState<HealthGoal[]>(seed.healthGoals ?? []);
   const [primaryConditions, setPrimaryConditions] = useState<HealthCondition[]>(seed.primaryConditions ?? []);
 
   const age = calculateAgeFromDob(dob);
-  const ageBracket = toAgeBracket(age);
-  const careTrack = deriveCareTrack(primaryConditions, wellnessGoal);
-  const dietitian = deriveDietitian(careTrack);
+  const careTrack = deriveCareTrack(primaryConditions, selectedGoals[0] ?? null);
+  const assignmentPreview = createPendingConsultant(careTrack, seed.createdAtISO);
 
   const onDobChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -132,27 +105,25 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
   };
 
   const persistAndContinue = (mode: 'continue' | 'skip') => {
-    const finalGoal = mode === 'skip' ? null : wellnessGoal;
+    const finalGoals = mode === 'skip' ? [] : selectedGoals;
+    const finalGoal = finalGoals[0] ?? null;
     const finalConditions = mode === 'skip' ? [] : primaryConditions;
     const finalTrack = deriveCareTrack(finalConditions, finalGoal);
-    const finalDietitian = deriveDietitian(finalTrack);
-
-    setOnboarding({
+    setOnboarding(normalizeOnboardingProfile({
       ...seed,
       name: seed.name.trim() || 'Member',
       dateOfBirthISO: dob.toISOString(),
-      age,
       gender,
-      wellnessGoal: finalGoal ?? undefined,
-      ageBracket,
       primaryConditions: finalConditions,
-      healthGoals: finalGoal ? [finalGoal] : ['Better Energy'],
+      healthGoals: finalGoals,
+      primaryGoal: finalGoal ?? undefined,
+      secondaryGoals: finalGoal ? finalGoals.filter((goal) => goal !== finalGoal) : [],
       wearablePreference: 'later',
       careTrack: finalTrack,
-      matchedDietitianName: finalDietitian.name,
-      matchedDietitianSpecialty: finalDietitian.specialty,
+      assignedConsultantId: seed.assignedConsultantId ?? null,
+      assignedConsultant: seed.assignedConsultant ?? null,
       createdAtISO: seed.createdAtISO || new Date().toISOString()
-    });
+    }));
     setWearableSetupCompleted(false);
     navigation.navigate('OnboardingCalendar');
   };
@@ -161,15 +132,15 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
     <Screen>
       <View style={styles.body}>
         <Text style={[styles.kicker, { color: themeColors.blue }]}>Quick Setup</Text>
-        <Text style={[styles.title, { color: themeColors.textPrimary }]}>Tell us just what we need</Text>
-        <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>This takes less than a minute. You can update everything later.</Text>
+        <Text style={[styles.title, { color: darkTextStrong }]}>Tell us just what we need</Text>
+        <Text style={[styles.subtitle, { color: darkTextSoft }]}>This takes less than a minute. You can update everything later.</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <Text style={[styles.label, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Date of birth</Text>
+          <Text style={[styles.label, { color: darkTextStrong }]}>Date of birth</Text>
           <Pressable style={[styles.dateField, { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted }]} onPress={() => setShowDatePicker(true)}>
             <View style={styles.dateFieldLeft}>
-              <Ionicons name="calendar-outline" size={16} color={isLight ? '#475569' : colors.textSecondary} />
-              <Text style={[styles.dateFieldText, { color: isLight ? '#000000' : themeColors.textPrimary }]}>{formatDob(dob)}</Text>
+              <Ionicons name="calendar-outline" size={16} color={darkTextSoft} />
+              <Text style={[styles.dateFieldText, { color: darkTextStrong }]}>{formatDob(dob)}</Text>
             </View>
             <Text style={styles.dateAgeText}>{age} yrs</Text>
           </Pressable>
@@ -183,7 +154,7 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
             />
           ) : null}
 
-          <Text style={[styles.label, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Gender</Text>
+          <Text style={[styles.label, { color: darkTextStrong }]}>Gender</Text>
           <View style={styles.options}>
             {genders.map((item) => {
               const active = gender === item;
@@ -198,17 +169,17 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
                   ]}
                   onPress={() => setGender(item)}
                 >
-                  <Text style={[styles.optionText, { color: isLight ? '#000000' : themeColors.textPrimary }, active && styles.optionTextActive]}>{item}</Text>
+                  <Text style={[styles.optionText, { color: darkTextStrong }, active && styles.optionTextActive]}>{item}</Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <Text style={[styles.label, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Wellness goal</Text>
-          <Text style={[styles.helper, { color: isLight ? '#334155' : colors.textSecondary }]}>Choose one or select “Maybe later”</Text>
+          <Text style={[styles.label, { color: darkTextStrong }]}>Wellness goals</Text>
+          <Text style={[styles.helper, { color: darkTextSoft }]}>Choose one or more. Your first selected goal becomes primary.</Text>
           <View style={styles.options}>
             {goals.map((item) => {
-              const active = wellnessGoal === item;
+              const active = selectedGoals.includes(item);
               return (
                 <Pressable
                   key={item}
@@ -218,27 +189,26 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
                     active && styles.optionActive,
                     active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
                   ]}
-                  onPress={() => setWellnessGoal(item)}
+                  onPress={() => {
+                    setSelectedGoals((current) => {
+                      if (current.includes(item)) {
+                        return current.filter((goal) => goal !== item);
+                      }
+                      return [...current, item];
+                    });
+                  }}
                 >
-                  <Text style={[styles.optionText, { color: isLight ? '#000000' : themeColors.textPrimary }, active && styles.optionTextActive]}>{item}</Text>
+                  <Text style={[styles.optionText, { color: darkTextStrong }, active && styles.optionTextActive]}>{item}</Text>
                 </Pressable>
               );
             })}
-            <Pressable
-              style={[
-                styles.option,
-                { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted },
-                wellnessGoal === null && styles.optionActive,
-                wellnessGoal === null && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
-              ]}
-              onPress={() => setWellnessGoal(null)}
-            >
-              <Text style={[styles.optionText, { color: isLight ? '#000000' : themeColors.textPrimary }, wellnessGoal === null && styles.optionTextActive]}>Maybe later</Text>
-            </Pressable>
           </View>
+          <Text style={[styles.helper, { color: darkTextSoft }]}>
+            {selectedGoals.length > 0 ? `Primary: ${selectedGoals[0]}${selectedGoals.length > 1 ? ` • Secondary: ${selectedGoals.slice(1).join(', ')}` : ''}` : 'You can skip goals for now.'}
+          </Text>
 
-          <Text style={[styles.label, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Existing conditions (optional)</Text>
-          <Text style={[styles.helper, { color: isLight ? '#334155' : colors.textSecondary }]}>Select if relevant, or leave blank</Text>
+          <Text style={[styles.label, { color: darkTextStrong }]}>Existing conditions (optional)</Text>
+          <Text style={[styles.helper, { color: darkTextSoft }]}>Select if relevant, or leave blank</Text>
           <View style={styles.options}>
             {conditions.map((item) => {
               const active = primaryConditions.includes(item);
@@ -261,17 +231,18 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
                     });
                   }}
                 >
-                  <Text style={[styles.optionText, { color: isLight ? '#000000' : themeColors.textPrimary }, active && styles.optionTextActive]}>{item}</Text>
+                  <Text style={[styles.optionText, { color: darkTextStrong }, active && styles.optionTextActive]}>{item}</Text>
                 </Pressable>
               );
             })}
           </View>
 
           <LinearGradient colors={isLight ? ['#FFFFFF', '#EEF2F7'] : [colors.cardMuted, colors.cardMuted]} style={[styles.matchCard, { borderColor: themeColors.stroke }]}>
-            <Text style={[styles.matchEyebrow, { color: themeColors.blue }]}>Matched for you</Text>
-            <Text style={[styles.matchTrack, { color: isLight ? '#000000' : themeColors.textPrimary }]}>{careTrack}</Text>
-            <Text style={[styles.matchDietitian, { color: isLight ? '#000000' : themeColors.textPrimary }]}>{dietitian.name}</Text>
-            <Text style={[styles.matchSpecialty, { color: isLight ? '#334155' : colors.textSecondary }]}>{dietitian.specialty}</Text>
+            <Text style={[styles.matchEyebrow, { color: themeColors.blue }]}>Consultant assignment</Text>
+            <Text style={[styles.matchTrack, { color: darkTextStrong }]}>{careTrack}</Text>
+            <Text style={[styles.matchDietitian, { color: darkTextStrong }]}>Assigned after program activation</Text>
+            <Text style={[styles.matchSpecialty, { color: darkTextSoft }]}>{assignmentPreview.specialization} • {formatConsultantAvailability(assignmentPreview.availability)}</Text>
+            <Text style={[styles.matchSpecialty, { color: darkTextSoft }]}>Your consultant syncs automatically from the backend once your care case is created and assigned.</Text>
           </LinearGradient>
         </ScrollView>
       </View>
@@ -279,7 +250,7 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
       <View style={styles.footer}>
         <PrimaryButton title="Continue" onPress={() => persistAndContinue('continue')} />
         <Pressable style={styles.skipBtn} onPress={() => persistAndContinue('skip')}>
-          <Text style={[styles.skipText, { color: isLight ? '#334155' : colors.textSecondary }]}>Skip for now</Text>
+          <Text style={[styles.skipText, { color: darkTextSoft }]}>Skip for now</Text>
         </Pressable>
       </View>
     </Screen>

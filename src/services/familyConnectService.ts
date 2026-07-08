@@ -83,6 +83,43 @@ export const buildFamilySummary = (params: {
   };
 };
 
+export const toRecoveryShareState = (summary: FamilyWellnessSummary | null) => {
+  if (!summary) return 'Recovery sharing paused';
+  if (summary.medicationAdherence === 'needs_attention') return 'Recovery Lower Today';
+  if (summary.sleepSummary === 'needs_rest') return 'Sleep Recovery Inconsistent';
+  if (summary.wellnessActivity === 'active' || summary.wellnessActivity === 'steady') return 'Recovery Improving';
+  return 'Recovery Stable';
+};
+
+export const toSupportMoment = (summary: FamilyWellnessSummary | null) => {
+  if (!summary) return 'Support paused. You can resume anytime.';
+  if (summary.medicationAdherence === 'needs_attention') return 'Medication reminder support enabled.';
+  if (summary.checkInStatus === 'pending') return 'A gentle check-in could help today.';
+  if (summary.wellnessActivity === 'active') return 'Recovery rhythm improving this week.';
+  return 'Recovery support active.';
+};
+
+export const buildFamilySupportEvents = (params: {
+  summary: FamilyWellnessSummary | null;
+  daysWithLowRecovery: number;
+  missedMedicationDays: number;
+  missedCheckInDays: number;
+}) => {
+  const { summary, daysWithLowRecovery, missedMedicationDays, missedCheckInDays } = params;
+  const events: Array<{ type: 'sustained_recovery_decline' | 'missed_medication' | 'missed_checkins'; state: 'watch' | 'active' }> = [];
+
+  if (!summary) return events;
+  if (daysWithLowRecovery >= 3) events.push({ type: 'sustained_recovery_decline', state: 'active' });
+  if (missedMedicationDays >= 2 || summary.medicationAdherence === 'needs_attention') {
+    events.push({ type: 'missed_medication', state: 'watch' });
+  }
+  if (missedCheckInDays >= 2 || summary.checkInStatus === 'pending') {
+    events.push({ type: 'missed_checkins', state: 'watch' });
+  }
+
+  return events;
+};
+
 export const shareTypeLabel = (type: FamilyShareType) => {
   const map: Record<FamilyShareType, string> = {
     medication_adherence: 'Medication adherence',

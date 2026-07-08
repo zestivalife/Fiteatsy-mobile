@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
-import { colors, radius, spacing, typography } from '../../design/tokens';
+import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
 
 const weekday = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -13,9 +13,12 @@ const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), 
 
 export const CycleCalendarScreen = () => {
   const navigation = useNavigation();
-  const { getCycleDaySnapshot } = useAppContext();
+  const { getCycleDaySnapshot, themeMode } = useAppContext();
   const [viewMonth, setViewMonth] = useState(monthStart(new Date()));
   const [selected, setSelected] = useState(new Date());
+  const palette = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
+  const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
 
   const cells = useMemo(() => {
     const start = monthStart(viewMonth);
@@ -30,12 +33,12 @@ export const CycleCalendarScreen = () => {
     <Screen scroll>
       <AppBackButton onPress={() => navigation.goBack()} />
       <View style={styles.headerRow}>
-        <Pressable style={styles.navBtn} onPress={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}><Text style={styles.navText}>Prev</Text></Pressable>
-        <Text style={styles.monthLabel}>{viewMonth.toLocaleDateString([], { month: 'long', year: 'numeric' })}</Text>
-        <Pressable style={styles.navBtn} onPress={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}><Text style={styles.navText}>Next</Text></Pressable>
+        <Pressable style={[styles.navBtn, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}><Text style={[styles.navText, { color: darkGraySurfaceText }]}>Prev</Text></Pressable>
+        <Text style={[styles.monthLabel, { color: darkGraySurfaceText }]}>{viewMonth.toLocaleDateString([], { month: 'long', year: 'numeric' })}</Text>
+        <Pressable style={[styles.navBtn, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}><Text style={[styles.navText, { color: darkGraySurfaceText }]}>Next</Text></Pressable>
       </View>
 
-      <View style={styles.weekRow}>{weekday.map((d, idx) => <Text key={`${d}-${idx}`} style={styles.weekText}>{d}</Text>)}</View>
+      <View style={styles.weekRow}>{weekday.map((d, idx) => <Text key={`${d}-${idx}`} style={[styles.weekText, { color: darkGraySurfaceText }]}>{d}</Text>)}</View>
       <View style={styles.grid}>
         {cells.map((date) => {
           const inMonth = date.getMonth() === viewMonth.getMonth();
@@ -46,6 +49,7 @@ export const CycleCalendarScreen = () => {
               key={date.toISOString()}
               style={[
                 styles.cell,
+                { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card },
                 snapshot.isPeriodDay && styles.periodCell,
                 snapshot.isPredictedFertile && styles.fertileCell,
                 snapshot.isPredictedOvulation && styles.ovulationCell,
@@ -54,20 +58,20 @@ export const CycleCalendarScreen = () => {
               ]}
               onPress={() => setSelected(date)}
             >
-              <Text style={styles.cellText}>{date.getDate()}</Text>
-              {snapshot.log?.symptoms.length ? <View style={styles.dot} /> : null}
+              <Text style={[styles.cellText, { color: darkGraySurfaceText }]}>{date.getDate()}</Text>
+              {snapshot.log?.symptoms.length ? <View style={[styles.dot, { backgroundColor: palette.blue }]} /> : null}
             </Pressable>
           );
         })}
       </View>
 
-      <View style={styles.detailCard}>
-        <Text style={styles.detailTitle}>{selected.toDateString()}</Text>
-        <Text style={styles.detailText}>Phase: {selectedSnapshot.phase.replace('_', ' ')}</Text>
-        <Text style={styles.detailText}>Flow: {selectedSnapshot.log?.flow ?? 'None logged'}</Text>
-        <Text style={styles.detailText}>Mood: {selectedSnapshot.log?.mood ?? 'Not logged'}</Text>
-        <Text style={styles.detailText}>Symptoms: {selectedSnapshot.log?.symptoms.length ? selectedSnapshot.log.symptoms.join(', ') : 'None logged'}</Text>
-        {selectedSnapshot.log?.notes ? <Text style={styles.detailText}>Notes: {selectedSnapshot.log.notes}</Text> : null}
+      <View style={[styles.detailCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardMuted }]}>
+        <Text style={[styles.detailTitle, { color: darkGraySurfaceText }]}>{selected.toDateString()}</Text>
+        <Text style={[styles.detailText, { color: darkGraySurfaceText }]}>Phase: {selectedSnapshot.phase.replace('_', ' ')}</Text>
+        <Text style={[styles.detailText, { color: darkGraySurfaceText }]}>Flow: {selectedSnapshot.log?.flow ?? 'None logged'}</Text>
+        <Text style={[styles.detailText, { color: darkGraySurfaceText }]}>Mood: {selectedSnapshot.log?.mood ?? 'Not logged'}</Text>
+        <Text style={[styles.detailText, { color: darkGraySurfaceText }]}>Symptoms: {selectedSnapshot.log?.symptoms.length ? selectedSnapshot.log.symptoms.join(', ') : 'None logged'}</Text>
+        {selectedSnapshot.log?.notes ? <Text style={[styles.detailText, { color: darkGraySurfaceText }]}>Notes: {selectedSnapshot.log.notes}</Text> : null}
       </View>
     </Screen>
   );

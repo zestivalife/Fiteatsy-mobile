@@ -15,6 +15,7 @@ export const AppBackButton = ({ onPress, label = 'Back', style, iconOnly = false
   const { themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
+  const buttonTextColor = isLight ? palette.textPrimary : '#FFFFFF';
 
   return (
     <Pressable
@@ -32,8 +33,8 @@ export const AppBackButton = ({ onPress, label = 'Back', style, iconOnly = false
         style
       ]}
     >
-      <Ionicons name="chevron-back" size={18} color={palette.textPrimary} />
-      {!iconOnly ? <Text style={[styles.label, { color: palette.textPrimary }]}>{label}</Text> : null}
+      <Ionicons name="chevron-back" size={18} color={buttonTextColor} />
+      {!iconOnly ? <Text style={[styles.label, { color: buttonTextColor }]}>{label}</Text> : null}
     </Pressable>
   );
 };

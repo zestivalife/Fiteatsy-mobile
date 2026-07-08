@@ -61,6 +61,8 @@ import {
   normalizeInviteCode,
   validateInviteCode
 } from '../services/familyConnectService';
+import { queueHealthEvent } from '../services/platformEventService';
+import { normalizeOnboardingProfile } from '../utils/healthProfile';
 
 type AppContextValue = {
   bootstrapped: boolean;
@@ -135,7 +137,14 @@ type AppContextValue = {
   familyConnections: FamilyConnection[];
   familyEmergencyEvents: FamilyEmergencyEvent[];
   generateFamilyInvite: (prefix?: 'FIT' | 'CARE' | 'FTSY') => FamilyInvite;
-  requestFamilyConnection: (params: { code: string; memberName: string; relationship: FamilyRelationshipType }) => { ok: boolean; reason?: string };
+  requestFamilyConnection: (params: {
+    code: string;
+    memberName: string;
+    relationship: FamilyRelationshipType;
+    visibilityLevel?: 'basic_support' | 'wellness_support';
+    contactMethod?: 'phone' | 'whatsapp';
+    contactValue?: string;
+  }) => { ok: boolean; reason?: string; connectionId?: string };
   approveFamilyConnection: (connectionId: string, permissions: FamilyPermissions) => void;
   rejectFamilyConnection: (connectionId: string) => void;
   updateFamilyPermissions: (connectionId: string, permissions: Partial<FamilyPermissions>) => void;
@@ -250,7 +259,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (storedOnboarding) {
           const parsed = safeParse<OnboardingProfile | null>(storedOnboarding, null);
-          if (parsed && typeof parsed === 'object') setOnboardingState(parsed);
+          if (parsed && typeof parsed === 'object') {
+            const normalized = normalizeOnboardingProfile(parsed);
+            setOnboardingState(normalized);
+            AsyncStorage.setItem(STORAGE_KEYS.onboarding, JSON.stringify(normalized));
+          }
         }
         if (storedAssessment) {
           const parsed = safeParse<AssessmentProfile | null>(storedAssessment, null);
@@ -327,14 +340,29 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setOnboardingState((previous) => {
         const next = typeof updater === 'function' ? updater(previous) : updater;
         if (next) {
-          AsyncStorage.setItem(STORAGE_KEYS.onboarding, JSON.stringify(next));
+          const normalized = normalizeOnboardingProfile(next);
+          AsyncStorage.setItem(STORAGE_KEYS.onboarding, JSON.stringify(normalized));
+          void queueHealthEvent({
+            userId,
+            onboarding: normalized,
+            eventType: previous ? 'profile_updated' : 'profile_created',
+            eventSource: 'mobile.onboarding',
+            eventPayload: {
+              careTrack: normalized.careTrack,
+              gender: normalized.gender,
+              wearablePreference: normalized.wearablePreference,
+              primaryGoal: normalized.primaryGoal ?? null,
+              secondaryGoals: normalized.secondaryGoals
+            }
+          });
+          return normalized;
         } else {
           AsyncStorage.removeItem(STORAGE_KEYS.onboarding);
         }
         return next;
       });
     },
-    []
+    [userId]
   );
 
   const setAssessment = useCallback<React.Dispatch<React.SetStateAction<AssessmentProfile | null>>>(
@@ -343,13 +371,25 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const next = typeof updater === 'function' ? updater(previous) : updater;
         if (next) {
           AsyncStorage.setItem(STORAGE_KEYS.assessment, JSON.stringify(next));
+          void queueHealthEvent({
+            userId,
+            onboarding,
+            eventType: 'assessment_completed',
+            eventSource: 'mobile.assessment',
+            eventPayload: {
+              goal: next.goal,
+              stressLevel: next.stressLevel,
+              sleepQuality: next.sleepQuality,
+              physicalDistress: next.physicalDistress
+            }
+          });
         } else {
           AsyncStorage.removeItem(STORAGE_KEYS.assessment);
         }
         return next;
       });
     },
-    []
+    [onboarding, userId]
   );
 
   const setIsAuthenticated = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(
@@ -486,8 +526,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         persistCycleLogs(next);
         return next;
       });
+      void queueHealthEvent({
+        userId,
+        onboarding,
+        eventType: 'cycle_logged',
+        eventSource: 'mobile.cycle',
+        eventPayload: {
+          dateISO: normalizedISO,
+          flow: input.flow ?? null,
+          symptoms: input.symptoms,
+          notes: input.notes ?? ''
+        },
+        priority: 'medium'
+      });
     },
-    [persistCycleLogs]
+    [onboarding, persistCycleLogs, userId]
   );
 
   const getCycleDaySnapshot = useCallback<AppContextValue['getCycleDaySnapshot']>(
@@ -561,7 +614,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const requestFamilyConnection = useCallback<AppContextValue['requestFamilyConnection']>(
-    ({ code, memberName, relationship }) => {
+    ({ code, memberName, relationship, visibilityLevel = 'basic_support', contactMethod, contactValue }) => {
       const normalized = normalizeInviteCode(code);
       if (!validateInviteCode(normalized)) return { ok: false, reason: 'Invalid invite code format.' };
       const invite = familyInvites.find((item) => item.code === normalized && !item.revoked);
@@ -580,6 +633,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         status: 'pending_outgoing',
         inviteCode: normalized,
         permissions: defaultFamilyPermissions(),
+        visibilityLevel,
+        contactMethod,
+        contactValue,
         sharingPaused: false,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         lastCheckInISO: null,
@@ -591,7 +647,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         persistFamilyConnections(next);
         return next;
       });
-      return { ok: true };
+      return { ok: true, connectionId: connection.id };
     },
     [familyConnections, familyInvites, persistFamilyConnections]
   );
@@ -665,12 +721,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const sendFamilyPing = useCallback<AppContextValue['sendFamilyPing']>(
     async (connectionId, message) => {
+      const createdAtISO = new Date().toISOString();
       const event: FamilyEmergencyEvent = {
         id: `fam-evt-${Date.now()}`,
         connectionId,
         type: 'check_in_ping',
         message,
-        createdAtISO: new Date().toISOString(),
+        createdAtISO,
         delivery: 'sent'
       };
       setFamilyEmergencyEvents((previous) => {
@@ -682,18 +739,29 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         content: { title: 'Family check-in sent', body: message, sound: 'default', data: { type: 'family_ping', connectionId } },
         trigger: null
       });
+      void queueHealthEvent({
+        userId,
+        onboarding,
+        eventType: 'family_ping_sent',
+        eventSource: 'mobile.family',
+        eventPayload: {
+          connectionId,
+          message
+        }
+      });
     },
-    [persistFamilyEmergencyEvents]
+    [onboarding, persistFamilyEmergencyEvents, userId]
   );
 
   const triggerFamilySOS = useCallback<AppContextValue['triggerFamilySOS']>(
     async (connectionId, message = 'SOS: Please check in immediately.') => {
+      const createdAtISO = new Date().toISOString();
       const event: FamilyEmergencyEvent = {
         id: `fam-evt-${Date.now()}`,
         connectionId,
         type: 'sos',
         message,
-        createdAtISO: new Date().toISOString(),
+        createdAtISO,
         delivery: 'sent'
       };
       setFamilyEmergencyEvents((previous) => {
@@ -705,8 +773,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         content: { title: 'Emergency alert sent', body: message, sound: 'default', data: { type: 'family_sos', connectionId } },
         trigger: null
       });
+      void queueHealthEvent({
+        userId,
+        onboarding,
+        eventType: 'family_sos_triggered',
+        eventSource: 'mobile.family',
+        eventPayload: {
+          connectionId,
+          message
+        },
+        priority: 'high',
+        shouldEvaluateTicket: true
+      });
     },
-    [persistFamilyEmergencyEvents]
+    [onboarding, persistFamilyEmergencyEvents, userId]
   );
 
   const getFamilySummary = useCallback<AppContextValue['getFamilySummary']>(
@@ -746,8 +826,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         persistMedications(next);
         return next;
       });
+      void queueHealthEvent({
+        userId,
+        onboarding,
+        eventType: 'medication_added',
+        eventSource: 'mobile.medication',
+        eventPayload: {
+          medicationId: medication.id,
+          name: medication.name,
+          schedule: medication.schedule,
+          status: medication.status
+        },
+        priority: 'medium'
+      });
     },
-    [medicationPermissionGranted, persistMedications]
+    [medicationPermissionGranted, onboarding, persistMedications, userId]
   );
 
   const updateMedication = useCallback<AppContextValue['updateMedication']>(
@@ -834,8 +927,26 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         persistMedicationLogs(next);
         return next;
       });
+      const eventTypeByStatus: Record<Extract<MedicationLogStatus, 'taken' | 'snoozed' | 'skipped'>, 'medication_taken' | 'medication_snoozed' | 'medication_skipped'> = {
+        taken: 'medication_taken',
+        snoozed: 'medication_snoozed',
+        skipped: 'medication_skipped'
+      };
+      void queueHealthEvent({
+        userId,
+        onboarding,
+        eventType: eventTypeByStatus[status],
+        eventSource: 'mobile.medication',
+        eventPayload: {
+          medicationId,
+          medicationName: medication.name,
+          scheduledForISO,
+          snoozeMinutes: snoozeMinutes ?? null,
+          status
+        }
+      });
     },
-    [medications, persistMedicationLogs]
+    [medications, onboarding, persistMedicationLogs, userId]
   );
 
   useEffect(() => {
@@ -979,13 +1090,29 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
         return next;
       });
+      void queueHealthEvent({
+        userId,
+        onboarding,
+        eventType: 'daily_check_in_submitted',
+        eventSource: 'mobile.tracker',
+        eventPayload: nextCheckIn,
+        priority: checkIn.mood <= 2 ? 'medium' : 'low',
+        shouldEvaluateTicket: checkIn.mood <= 2
+      });
     },
-    [nudges, onboarding]
+    [nudges, onboarding, userId]
   );
 
   const addWearableSyncData = useCallback((payload: WearableSyncPayload) => {
     setWearableSyncData((previous) => [payload, ...previous].slice(0, 60));
-  }, []);
+    void queueHealthEvent({
+      userId,
+      onboarding,
+      eventType: 'wearable_synced',
+      eventSource: 'mobile.wearable',
+      eventPayload: payload
+    });
+  }, [onboarding, userId]);
 
   const logNudgeAction = useCallback((nudgeId: string, action: NudgeAction) => {
     setDecisionLogs((previous) => [

@@ -130,6 +130,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
       await verifySignupOtp(challengeId, otp);
       setOnboarding((previous) => ({
         name: name.trim() || previous?.name || 'Member',
+        dateOfBirthISO: previous?.dateOfBirthISO ?? new Date(1996, 0, 1).toISOString(),
+        calculatedAge: previous?.calculatedAge ?? 28,
         age: previous?.age ?? 28,
         ageBracket: previous?.ageBracket ?? '25-34',
         gender: previous?.gender ?? 'Prefer not to say',
@@ -137,18 +139,21 @@ export const SignUpScreen = ({ navigation }: Props) => {
         primaryConditions: previous?.primaryConditions ?? [],
         symptomTags: previous?.symptomTags ?? ['Fatigue'],
         healthGoals: previous?.healthGoals ?? ['Better Energy'],
+        primaryGoal: previous?.primaryGoal ?? previous?.healthGoals?.[0] ?? previous?.wellnessGoal,
+        secondaryGoals: previous?.secondaryGoals ?? [],
         wearablePreference: previous?.wearablePreference ?? 'later',
         careTrack: previous?.careTrack ?? 'Foundational Recovery Care',
-        matchedDietitianName: previous?.matchedDietitianName ?? 'Dr. Aisha Menon',
-        matchedDietitianSpecialty: previous?.matchedDietitianSpecialty ?? 'Clinical Nutrition & Habit Recovery',
+        assignedConsultantId: previous?.assignedConsultantId ?? null,
+        assignedConsultant: previous?.assignedConsultant ?? null,
+        matchedDietitianName: previous?.matchedDietitianName,
+        matchedDietitianSpecialty: previous?.matchedDietitianSpecialty,
         calendarProvider: previous?.calendarProvider ?? 'None',
         calendarPermissionGranted: previous?.calendarPermissionGranted ?? false,
         notificationPermissionGranted: previous?.notificationPermissionGranted ?? false,
-        createdAtISO: previous?.createdAtISO ?? new Date().toISOString(),
-        dateOfBirthISO: previous?.dateOfBirthISO
+        createdAtISO: previous?.createdAtISO ?? new Date().toISOString()
       }));
       setIsAuthenticated(true);
-      navigation.reset({ index: 0, routes: [{ name: 'OnboardingAssessment' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'OnboardingBasics' }] });
     } catch (e) {
       const err = e as AuthServiceError;
       setError(err.message);
@@ -198,8 +203,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
           </>
         ) : (
           <>
-            <Text style={[styles.verifyTitle, { color: themeColors.textPrimary }]}>Verify OTP</Text>
-            <Text style={[styles.verifySubTitle, { color: themeColors.textSecondary }]}>
+            <Text style={[styles.verifyTitle, { color: themeMode === 'light' ? '#000000' : '#FFFFFF' }]}>Verify OTP</Text>
+            <Text style={[styles.verifySubTitle, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>
               Enter the 6-digit code sent to {email.trim().toLowerCase()} and {mobileNumber.trim()}.
             </Text>
             <TextInput
@@ -228,16 +233,16 @@ export const SignUpScreen = ({ navigation }: Props) => {
                       focused && [styles.otpInputActive, { borderColor: themeColors.blueDark }]
                     ]}
                   >
-                    <Text style={[styles.otpDigit, { color: themeColors.textPrimary }]}>{digit || ''}</Text>
+                    <Text style={[styles.otpDigit, { color: themeMode === 'light' ? '#000000' : '#FFFFFF' }]}>{digit || ''}</Text>
                   </View>
                 );
               })}
             </Pressable>
 
-            <Text style={[styles.timerText, { color: themeColors.textSecondary }]}>
+            <Text style={[styles.timerText, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>
               {otpExpired ? 'OTP expired. Please resend.' : `Code expires in ${Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000))}s`}
             </Text>
-            <Text style={[styles.timerText, { color: themeColors.textSecondary }]}>Attempts remaining: {attemptsRemaining}</Text>
+            <Text style={[styles.timerText, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>Attempts remaining: {attemptsRemaining}</Text>
 
             {debugOtp ? <Text style={[styles.debugOtp, { color: themeColors.warning }]}>Dev OTP: {debugOtp}</Text> : null}
 
@@ -257,7 +262,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
         {error ? <Text style={[styles.errorText, { color: themeColors.danger }]}>{error}</Text> : null}
 
         <View style={styles.footerLine}>
-          <Text style={[styles.helper, { color: themeColors.textSecondary }]}>Already have an account? </Text>
+          <Text style={[styles.helper, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>Already have an account? </Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Go to sign in" onPress={() => navigation.navigate('SignIn')}>
             <Text style={[styles.link, { color: themeColors.blue }]}>Sign In</Text>
           </Pressable>

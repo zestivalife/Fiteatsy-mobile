@@ -26,6 +26,7 @@ const shareTypes: FamilyShareType[] = [
 export const FamilyDashboardScreen = () => {
   const navigation = useNavigation<Nav>();
   const {
+    themeMode,
     familyConnections,
     generateFamilyInvite,
     requestFamilyConnection,
@@ -35,6 +36,23 @@ export const FamilyDashboardScreen = () => {
     disconnectFamilyMember,
     getFamilySummary
   } = useAppContext();
+  const isLight = themeMode === 'light';
+  const ui = useMemo(
+    () => ({
+      textPrimary: isLight ? '#000000' : '#FFFFFF',
+      textSecondary: isLight ? '#334155' : '#FFFFFF',
+      cardBg: isLight ? '#FFFFFF' : '#131313',
+      cardRaised: isLight ? '#F8FAFC' : '#191919',
+      cardMuted: isLight ? '#F1F5F9' : '#151515',
+      border: isLight ? '#CBD5E1' : '#2B2B2B',
+      ctaBg: isLight ? '#59BE08' : '#59BE08',
+      ctaText: isLight ? '#000000' : '#000000',
+      subtleBtnBg: isLight ? '#EEF4EA' : '#1F2B12',
+      subtleBtnBorder: isLight ? '#77B83E' : '#4E8E1C',
+      modalOverlay: isLight ? 'rgba(15, 23, 42, 0.35)' : 'rgba(0, 0, 0, 0.65)'
+    }),
+    [isLight]
+  );
 
   const [connectOpen, setConnectOpen] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -66,38 +84,38 @@ export const FamilyDashboardScreen = () => {
   return (
     <Screen scroll>
       <AppBackButton onPress={() => navigation.goBack()} />
-      <Text style={styles.title}>Family Wellness Sharing</Text>
-      <Text style={styles.subtitle}>Support loved ones with permission-based wellness visibility.</Text>
+      <Text style={[styles.title, { color: ui.textPrimary }]}>Family Care</Text>
+      <Text style={[styles.subtitle, { color: ui.textSecondary }]}>Trusted recovery support with consent-based sharing.</Text>
 
-      <Pressable style={styles.connectBtn} onPress={() => setConnectOpen(true)}>
-        <Text style={styles.connectBtnText}>Connect Family</Text>
+      <Pressable style={[styles.connectBtn, { backgroundColor: ui.ctaBg, borderColor: ui.ctaBg }]} onPress={() => setConnectOpen(true)}>
+        <Text style={[styles.connectBtnText, { color: ui.ctaText }]}>Connect Family</Text>
       </Pressable>
 
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Pending requests</Text>
-        {pending.length === 0 ? <Text style={styles.empty}>No pending requests.</Text> : pending.map((item) => (
-          <View key={item.id} style={styles.memberCard}>
-            <Text style={styles.memberName}>{item.memberName}</Text>
-            <Text style={styles.memberMeta}>{relationshipLabel(item.relationship)} • {item.status.replace('_', ' ')}</Text>
+      <View style={[styles.sectionCard, { borderColor: ui.border, backgroundColor: ui.cardMuted }]}>
+        <Text style={[styles.sectionTitle, { color: ui.textPrimary }]}>Pending approvals</Text>
+        {pending.length === 0 ? <Text style={[styles.empty, { color: ui.textSecondary }]}>No pending requests.</Text> : pending.map((item) => (
+          <View key={item.id} style={[styles.memberCard, { borderColor: ui.border, backgroundColor: ui.cardBg }]}>
+            <Text style={[styles.memberName, { color: ui.textPrimary }]}>{item.memberName}</Text>
+            <Text style={[styles.memberMeta, { color: ui.textSecondary }]}>{relationshipLabel(item.relationship)} • {item.status.replace('_', ' ')}</Text>
             <View style={styles.row}>
-              <Pressable style={styles.smallBtn} onPress={() => approveFamilyConnection(item.id, item.permissions)}><Text style={styles.smallBtnText}>Approve</Text></Pressable>
-              <Pressable style={styles.smallBtn} onPress={() => rejectFamilyConnection(item.id)}><Text style={styles.smallBtnText}>Reject</Text></Pressable>
+              <Pressable style={[styles.smallBtn, { borderColor: ui.subtleBtnBorder, backgroundColor: ui.subtleBtnBg }]} onPress={() => approveFamilyConnection(item.id, item.permissions)}><Text style={[styles.smallBtnText, { color: ui.textPrimary }]}>Approve</Text></Pressable>
+              <Pressable style={[styles.smallBtn, { borderColor: ui.subtleBtnBorder, backgroundColor: ui.subtleBtnBg }]} onPress={() => rejectFamilyConnection(item.id)}><Text style={[styles.smallBtnText, { color: ui.textPrimary }]}>Reject</Text></Pressable>
             </View>
           </View>
         ))}
       </View>
 
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Connected members</Text>
-        {connected.length === 0 ? <Text style={styles.empty}>No family members connected yet.</Text> : connected.map((item) => {
+      <View style={[styles.sectionCard, { borderColor: ui.border, backgroundColor: ui.cardMuted }]}>
+        <Text style={[styles.sectionTitle, { color: ui.textPrimary }]}>Trusted people</Text>
+        {connected.length === 0 ? <Text style={[styles.empty, { color: ui.textSecondary }]}>No family members connected yet.</Text> : connected.map((item) => {
           const summary = getFamilySummary(item.id);
           return (
-            <Pressable key={item.id} style={styles.memberCard} onPress={() => navigation.navigate('FamilyMemberDetail', { connectionId: item.id })}>
-              <Text style={styles.memberName}>{item.memberName}</Text>
-              <Text style={styles.memberMeta}>{relationshipLabel(item.relationship)} • {item.lastCheckInISO ? `Last check-in ${new Date(item.lastCheckInISO).toLocaleDateString()}` : 'No recent check-in'}</Text>
-              <Text style={styles.summaryText}>{summary?.trendLabel ?? 'Sharing paused or not available.'}</Text>
+            <Pressable key={item.id} style={[styles.memberCard, { borderColor: ui.border, backgroundColor: ui.cardBg }]} onPress={() => navigation.navigate('FamilyMemberDetail', { connectionId: item.id })}>
+              <Text style={[styles.memberName, { color: ui.textPrimary }]}>{item.memberName}</Text>
+              <Text style={[styles.memberMeta, { color: ui.textSecondary }]}>{relationshipLabel(item.relationship)} • {item.lastCheckInISO ? `Last support check-in ${new Date(item.lastCheckInISO).toLocaleDateString()}` : 'No recent check-in'}</Text>
+              <Text style={[styles.summaryText, { color: ui.textSecondary }]}>{summary?.trendLabel ?? 'Sharing paused or not available.'}</Text>
               <View style={styles.rowBetween}>
-                <View style={styles.switchRow}><Text style={styles.switchText}>Pause sharing</Text><Switch value={item.sharingPaused} onValueChange={(v) => setFamilySharingPaused(item.id, v)} /></View>
+                <View style={styles.switchRow}><Text style={[styles.switchText, { color: ui.textSecondary }]}>Pause sharing</Text><Switch value={item.sharingPaused} onValueChange={(v) => setFamilySharingPaused(item.id, v)} /></View>
                 <Pressable onPress={() => disconnectFamilyMember(item.id)}><Text style={styles.disconnect}>Disconnect</Text></Pressable>
               </View>
             </Pressable>
@@ -106,31 +124,31 @@ export const FamilyDashboardScreen = () => {
       </View>
 
       <Modal visible={connectOpen} transparent animationType="slide" onRequestClose={() => setConnectOpen(false)}>
-        <View style={styles.overlay}>
+        <View style={[styles.overlay, { backgroundColor: ui.modalOverlay }]}>
           <Pressable style={styles.backdrop} onPress={() => setConnectOpen(false)} />
-          <View style={styles.sheet}>
-            <View style={styles.handle} />
-            <Text style={styles.sheetTitle}>Connect Family</Text>
+          <View style={[styles.sheet, { backgroundColor: ui.cardRaised, borderColor: ui.border }]}>
+            <View style={[styles.handle, { backgroundColor: ui.textSecondary }]} />
+            <Text style={[styles.sheetTitle, { color: ui.textPrimary }]}>Add Trusted Support</Text>
 
-            <Pressable style={styles.sheetAction} onPress={onGenerate}><Text style={styles.sheetActionText}>Generate Invite Code</Text></Pressable>
-            {latestInvite ? <Text style={styles.inviteCode}>Code: {latestInvite}</Text> : null}
+            <Pressable style={[styles.sheetAction, { borderColor: ui.subtleBtnBorder, backgroundColor: ui.subtleBtnBg }]} onPress={onGenerate}><Text style={[styles.sheetActionText, { color: ui.textPrimary }]}>Generate Invite Code</Text></Pressable>
+            {latestInvite ? <Text style={[styles.inviteCode, { color: ui.textPrimary }]}>Code: {latestInvite}</Text> : null}
 
-            <Text style={styles.label}>Enter Invite Code</Text>
-            <TextInput value={inviteCode} onChangeText={setInviteCode} placeholder="FIT-8X2KQ" placeholderTextColor={colors.textMuted} style={styles.input} autoCapitalize="characters" />
-            <TextInput value={memberName} onChangeText={setMemberName} placeholder="Member name" placeholderTextColor={colors.textMuted} style={styles.input} />
+            <Text style={[styles.label, { color: ui.textSecondary }]}>Enter Invite Code</Text>
+            <TextInput value={inviteCode} onChangeText={setInviteCode} placeholder="FIT-8X2KQ" placeholderTextColor={isLight ? '#64748B' : '#9CA3AF'} style={[styles.input, { borderColor: ui.border, backgroundColor: ui.cardBg, color: ui.textPrimary }]} autoCapitalize="characters" />
+            <TextInput value={memberName} onChangeText={setMemberName} placeholder="Member name" placeholderTextColor={isLight ? '#64748B' : '#9CA3AF'} style={[styles.input, { borderColor: ui.border, backgroundColor: ui.cardBg, color: ui.textPrimary }]} />
             <View style={styles.wrap}>
               {(['parent', 'child', 'spouse', 'caregiver', 'family_member'] as FamilyRelationshipType[]).map((value) => (
-                <Pressable key={value} style={[styles.chip, relationship === value && styles.chipActive]} onPress={() => setRelationship(value)}><Text style={styles.chipText}>{relationshipLabel(value)}</Text></Pressable>
+                <Pressable key={value} style={[styles.chip, { borderColor: ui.border, backgroundColor: ui.cardBg }, relationship === value && styles.chipActive]} onPress={() => setRelationship(value)}><Text style={[styles.chipText, { color: ui.textPrimary }]}>{relationshipLabel(value)}</Text></Pressable>
               ))}
             </View>
 
-            <Text style={styles.label}>Sharing permissions (consent-based)</Text>
+            <Text style={[styles.label, { color: ui.textSecondary }]}>Recovery visibility (consent-based)</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrap}>
-              {shareTypes.map((type) => <View key={type} style={styles.permissionTag}><Text style={styles.permissionTagText}>{shareTypeLabel(type)}</Text></View>)}
+              {shareTypes.map((type) => <View key={type} style={[styles.permissionTag, { borderColor: ui.border, backgroundColor: ui.cardBg }]}><Text style={[styles.permissionTagText, { color: ui.textSecondary }]}>{shareTypeLabel(type)}</Text></View>)}
             </ScrollView>
 
             {errorText ? <Text style={styles.error}>{errorText}</Text> : null}
-            <Pressable style={styles.sendBtn} onPress={onSendRequest}><Text style={styles.sendBtnText}>Send Connection Request</Text></Pressable>
+            <Pressable style={[styles.sendBtn, { backgroundColor: ui.ctaBg }]} onPress={onSendRequest}><Text style={[styles.sendBtnText, { color: ui.ctaText }]}>Send Connection Request</Text></Pressable>
           </View>
         </View>
       </Modal>

@@ -15,7 +15,9 @@ const vesselSize = 136;
 
 export const HydrationScreen = () => {
   const navigation = useNavigation();
-  const { wellness, setWellness } = useAppContext();
+  const { wellness, setWellness, themeMode } = useAppContext();
+  const isLight = themeMode === 'light';
+  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
   const progress = hydrationProgress(wellness.hydrationLiters, wellness.hydrationGoalLiters);
 
   const fillProgress = useRef(new Animated.Value(progress)).current;
@@ -214,14 +216,14 @@ export const HydrationScreen = () => {
     <Screen>
       <View style={styles.header}>
         <AppBackButton iconOnly onPress={() => navigation.goBack()} />
-        <Text style={styles.title}>Hydration</Text>
+        <Text style={[styles.title, { color: darkTextStrong }]}>Hydration</Text>
         <View style={styles.headerGhost} />
       </View>
 
-      <Text style={styles.subTitle}>
+      <Text style={[styles.subTitle, { color: darkTextStrong }]}>
         You Drank <Text style={styles.highlight}>{wellness.hydrationLiters.toFixed(1)}L</Text> Today
       </Text>
-      <Text style={styles.targetText}>Dietitian Target: {wellness.hydrationGoalLiters.toFixed(1)}L</Text>
+      <Text style={[styles.targetText, { color: darkTextStrong }]}>Dietitian Target: {wellness.hydrationGoalLiters.toFixed(1)}L</Text>
 
       <Card style={styles.circleCard}>
         <View style={styles.vessel}>
@@ -274,22 +276,22 @@ export const HydrationScreen = () => {
         </View>
       </Card>
 
-      <Text style={styles.prompt}>Add Current Intake</Text>
+      <Text style={[styles.prompt, { color: darkTextStrong }]}>Add Current Intake</Text>
       <View style={styles.chips}>
         {presetIntakes.map((value) => (
           <Pressable key={value} style={styles.chip} onPress={() => addIntake(value)}>
-            <Text style={styles.chipText}>{value} L</Text>
+            <Text style={[styles.chipText, { color: darkTextStrong }]}>{value} L</Text>
           </Pressable>
         ))}
       </View>
 
       <PrimaryButton title="Submit" onPress={submitCurrent} />
       <Pressable style={styles.resetButton} onPress={resetHydration}>
-        <Ionicons name="refresh" size={18} color={colors.textPrimary} />
-        <Text style={styles.resetText}>Reset Intake</Text>
+        <Ionicons name="refresh" size={18} color={darkTextStrong} />
+        <Text style={[styles.resetText, { color: darkTextStrong }]}>Reset Intake</Text>
       </Pressable>
 
-      <Text style={styles.footer}>
+      <Text style={[styles.footer, { color: darkTextStrong }]}>
         You still need {remainingHydration(wellness.hydrationLiters, wellness.hydrationGoalLiters).toFixed(1)}L to hit goal
       </Text>
     </Screen>
@@ -330,7 +332,7 @@ const styles = StyleSheet.create({
   },
   highlight: {
     color: '#60AF00',
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   targetText: {
     ...typography.caption,

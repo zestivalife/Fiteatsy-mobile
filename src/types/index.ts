@@ -62,20 +62,111 @@ export type HealthGoal =
 export type AgeBracket = '18-24' | '25-34' | '35-44' | '45-54' | '55+';
 export type WearablePreference = 'sync' | 'manual' | 'later';
 
+export type ConsultantAvailability = 'available_today' | 'next_24h' | 'this_week' | 'awaiting_schedule' | 'reassigning';
+export type HealthProfileVerificationState = 'self_reported' | 'verified' | 'consultant_verified' | 'lab_verified' | 'calculated';
+export type HealthProfileSectionKey = 'basic' | 'body' | 'lifestyle' | 'nutrition' | 'medical' | 'reports' | 'sharing';
+
+export type ConsultantProfile = {
+  id: string;
+  fullName: string;
+  profilePhotoUrl: string | null;
+  availability: ConsultantAvailability;
+  specialization: string;
+  lastConsultationISO: string | null;
+  nextAppointmentISO: string | null;
+  chatEnabled: boolean;
+  callEnabled: boolean;
+  whatsappNumber: string | null;
+  email: string | null;
+  assignedAtISO: string | null;
+  status: 'pending_assignment' | 'assigned' | 'reassigned';
+};
+
+export type ConsultantAssignmentHistoryEntry = {
+  id: string;
+  consultantId: string;
+  consultantName: string;
+  assignedAtISO: string;
+  assignedBy: string;
+  unassignedAtISO?: string | null;
+  reason?: string;
+};
+
 export type OnboardingProfile = {
   name: string;
-  dateOfBirthISO?: string;
+  dateOfBirthISO: string;
+  calculatedAge: number;
   age?: number;
-  gender?: AssessmentGender;
+  gender: AssessmentGender;
+  heightCm?: number;
+  currentWeightKg?: number;
+  goalWeightKg?: number;
+  waistCm?: number;
+  hipCm?: number;
+  neckCm?: number;
+  bodyFatPct?: number;
+  occupation?: string;
+  workingHoursLabel?: string;
+  shiftType?: string;
+  activityLevel?: string;
+  workMode?: string;
+  travelFrequency?: string;
+  occupationMode?: string;
+  dietType?: string;
+  regionalCuisine?: string;
+  preferredCuisines?: string[];
+  foodsLiked?: string[];
+  foodsDisliked?: string[];
+  foodAllergies?: string[];
+  foodIntolerances?: string[];
+  currentSupplements?: string[];
+  currentMedicines?: string[];
+  mealTimingPreference?: string;
+  cookingConfidence?: string;
+  wakeTime?: string;
+  breakfastTime?: string;
+  lunchTime?: string;
+  dinnerTime?: string;
+  sleepTime?: string;
+  mealsPerDay?: number;
+  waterIntakeLiters?: number;
+  sleepHours?: number;
+  sleepGoalHours?: number;
+  outsideFoodFrequency?: string;
+  cookingAtHome?: string;
+  whoCooks?: string;
+  smokingStatus?: string;
+  alcoholFrequency?: string;
+  exerciseFrequency?: string;
+  stressLevelLabel?: string;
   wellnessGoal?: HealthGoal;
   ageBracket: AgeBracket;
   primaryConditions: HealthCondition[];
+  previousConditions?: HealthCondition[];
+  familyHistoryConditions?: HealthCondition[];
   symptomTags: SymptomTag[];
   healthGoals: HealthGoal[];
+  primaryGoal?: HealthGoal;
+  secondaryGoals: HealthGoal[];
+  medicalNotes?: string;
+  pregnancyStatus?: string;
+  breastfeedingStatus?: string;
+  pcosStatus?: string;
+  thyroidStatus?: string;
+  diabetesStatus?: string;
+  hypertensionStatus?: string;
   wearablePreference: WearablePreference;
   careTrack: string;
-  matchedDietitianName: string;
-  matchedDietitianSpecialty: string;
+  assignedConsultantId: string | null;
+  assignedConsultant: ConsultantProfile | null;
+  consultantSharedReportIds?: string[];
+  shareMeasurementsWithConsultant?: boolean;
+  shareNutritionWithConsultant?: boolean;
+  shareMedicationWithConsultant?: boolean;
+  shareLifestyleWithConsultant?: boolean;
+  healthProfileSectionUpdatedAt?: Partial<Record<HealthProfileSectionKey, string>>;
+  matchedDietitianName?: string;
+  matchedDietitianSpecialty?: string;
   calendarProvider: CalendarProvider;
   calendarPermissionGranted: boolean;
   notificationPermissionGranted: boolean;
@@ -85,11 +176,13 @@ export type OnboardingProfile = {
   biggestChallenge?: CoreChallenge;
 };
 
+export type HealthProfile = OnboardingProfile;
+
 export type AssessmentProfile = {
   completedAtISO: string;
   goal: AssessmentGoal;
-  gender: AssessmentGender;
-  age: number;
+  gender?: AssessmentGender;
+  age?: number;
   heightCm: number;
   weightKg: number;
   mood: AssessmentMood;
@@ -332,6 +425,7 @@ export type CycleNotificationSettings = {
 export type FamilyRelationshipType = 'parent' | 'child' | 'spouse' | 'caregiver' | 'family_member';
 export type FamilyRole = 'primary_user' | 'connected_member';
 export type FamilyConnectionStatus = 'pending_outgoing' | 'pending_incoming' | 'connected' | 'rejected' | 'disconnected';
+export type FamilyVisibilityLevel = 'basic_support' | 'wellness_support';
 export type FamilyShareType =
   | 'medication_adherence'
   | 'wellness_checkins'
@@ -361,6 +455,9 @@ export type FamilyConnection = {
   status: FamilyConnectionStatus;
   inviteCode: string | null;
   permissions: FamilyPermissions;
+  visibilityLevel?: FamilyVisibilityLevel;
+  contactMethod?: 'phone' | 'whatsapp';
+  contactValue?: string;
   sharingPaused: boolean;
   timezone: string;
   lastCheckInISO: string | null;
@@ -381,8 +478,144 @@ export type FamilyWellnessSummary = {
 export type FamilyEmergencyEvent = {
   id: string;
   connectionId: string;
-  type: 'sos' | 'check_in_ping' | 'call_request';
+  type: 'sos' | 'check_in_ping' | 'call_request' | 'support_nudge';
   message: string;
   createdAtISO: string;
   delivery: 'sent' | 'failed';
+};
+
+export type PlatformEntityStatus = 'active' | 'inactive' | 'paused' | 'archived' | 'deleted';
+
+export type CareCaseStatus = 'draft' | 'active' | 'monitoring' | 'paused' | 'closed';
+
+export type RecoveryProgramRef = {
+  id: string;
+  title: string;
+  consultantId: string | null;
+  mentorId: string | null;
+  status: 'draft' | 'active' | 'paused' | 'completed';
+  createdAtISO: string;
+  updatedAtISO: string;
+};
+
+export type CareCaseRef = {
+  id: string;
+  userId: string;
+  healthProfileId: string;
+  recoveryProgramId: string;
+  title: string;
+  status: CareCaseStatus;
+  consultantAssignment: {
+    consultantId: string | null;
+    mentorId: string | null;
+    assignedAtISO: string | null;
+  };
+  assignmentHistory: ConsultantAssignmentHistoryEntry[];
+  createdAtISO: string;
+  updatedAtISO: string;
+  provisional: boolean;
+};
+
+export type HealthEventType =
+  | 'profile_created'
+  | 'profile_updated'
+  | 'assessment_completed'
+  | 'daily_check_in_submitted'
+  | 'wearable_synced'
+  | 'medication_added'
+  | 'medication_updated'
+  | 'medication_taken'
+  | 'medication_skipped'
+  | 'medication_snoozed'
+  | 'cycle_logged'
+  | 'family_ping_sent'
+  | 'family_sos_triggered';
+
+export type HealthEventSource =
+  | 'mobile.onboarding'
+  | 'mobile.assessment'
+  | 'mobile.tracker'
+  | 'mobile.wearable'
+  | 'mobile.medication'
+  | 'mobile.cycle'
+  | 'mobile.family';
+
+export type HealthEventDraft = {
+  id: string;
+  eventType: HealthEventType;
+  eventSource: HealthEventSource;
+  userId: string;
+  careCaseId: string;
+  occurredAtISO: string;
+  eventPayload: Record<string, unknown>;
+  priority: 'low' | 'medium' | 'high';
+  shouldCreateTimelineEntry: boolean;
+  shouldEvaluateTicket: boolean;
+  schemaVersion: number;
+};
+
+export type SyncQueueStatus = 'pending' | 'processing' | 'failed' | 'completed';
+
+export type SyncQueueItem = {
+  id: string;
+  entityType: 'health_event';
+  operation: 'enqueue';
+  status: SyncQueueStatus;
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAtISO: string | null;
+  createdAtISO: string;
+  updatedAtISO: string;
+  payload: HealthEventDraft;
+  lastError: string | null;
+};
+
+export type TimelineItemType =
+  | 'assessment'
+  | 'report'
+  | 'medication'
+  | 'cycle'
+  | 'wearable_sync'
+  | 'ticket'
+  | 'note'
+  | 'session'
+  | 'family';
+
+export type TimelineItem = {
+  id: string;
+  careCaseId: string;
+  type: TimelineItemType;
+  title: string;
+  occurredAtISO: string;
+  summary?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type HealthTicketRef = {
+  id: string;
+  careCaseId: string;
+  title: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  dueDateISO: string | null;
+};
+
+export type AttachmentRef = {
+  id: string;
+  careCaseId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: 'pending_upload' | 'uploaded' | 'processing' | 'failed';
+  uploadedAtISO: string | null;
+  signedUrl?: string | null;
+};
+
+export type DeviceSession = {
+  id: string;
+  deviceId: string;
+  platform: 'ios' | 'android' | 'web';
+  createdAtISO: string;
+  lastActiveAtISO: string;
+  status: 'active' | 'revoked';
 };

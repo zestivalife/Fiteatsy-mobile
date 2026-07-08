@@ -27,7 +27,9 @@ const totalDuration = cycleDuration * targetCycles;
 
 export const BreathingScreen = () => {
   const navigation = useNavigation();
-  const { setWellness } = useAppContext();
+  const { setWellness, themeMode } = useAppContext();
+  const isLight = themeMode === 'light';
+  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
   const [running, setRunning] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [cycleIndex, setCycleIndex] = useState(0);
@@ -158,7 +160,7 @@ export const BreathingScreen = () => {
         <Animated.View style={[styles.orb, { transform: [{ scale: orbScale }] }]} />
 
         <View style={styles.timerCenter}>
-          <Text style={styles.phaseLabel}>{completed ? 'Complete' : currentPhase.label}</Text>
+          <Text style={[styles.phaseLabel, { color: darkTextStrong }]}>{completed ? 'Complete' : currentPhase.label}</Text>
           <Text style={styles.time}>{completed ? '00:00' : secondsToClock(phaseRemaining)}</Text>
         </View>
       </View>
@@ -167,10 +169,10 @@ export const BreathingScreen = () => {
 
       <View style={styles.statsRow}>
         <View style={styles.statChip}>
-          <Text style={styles.statText}>Cycle {Math.min(targetCycles, cycleIndex + 1)}/{targetCycles}</Text>
+          <Text style={[styles.statText, { color: darkTextStrong }]}>Cycle {Math.min(targetCycles, cycleIndex + 1)}/{targetCycles}</Text>
         </View>
         <View style={styles.statChip}>
-          <Text style={styles.statText}>Calm Points {score}</Text>
+          <Text style={[styles.statText, { color: darkTextStrong }]}>Calm Points {score}</Text>
         </View>
       </View>
 
@@ -180,8 +182,8 @@ export const BreathingScreen = () => {
         </Pressable>
 
         <Pressable onPress={resetSession} style={styles.resetButton}>
-          <Ionicons name="refresh" color={colors.textPrimary} size={20} />
-          <Text style={styles.resetText}>Reset</Text>
+          <Ionicons name="refresh" color={darkTextStrong} size={20} />
+          <Text style={[styles.resetText, { color: darkTextStrong }]}>Reset</Text>
         </Pressable>
       </View>
 

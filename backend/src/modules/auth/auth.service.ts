@@ -172,3 +172,7 @@ export const verifyOtpChallenge = (challengeId: string, otp: string) => {
     }
   };
 };
+
+export const resetOtpChallengesForTests = () => {
+  challengeStore.clear();
+};

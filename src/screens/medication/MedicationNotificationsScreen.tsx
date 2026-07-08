@@ -3,30 +3,33 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
-import { colors, radius, spacing, typography } from '../../design/tokens';
+import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
 
 export const MedicationNotificationsScreen = () => {
   const navigation = useNavigation();
-  const { medicationPermissionGranted, requestMedicationPermission } = useAppContext();
+  const { medicationPermissionGranted, requestMedicationPermission, themeMode } = useAppContext();
+  const palette = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
+  const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
 
   return (
     <Screen>
       <View style={styles.container}>
         <AppBackButton onPress={() => navigation.goBack()} />
-        <Text style={styles.title}>Medication Notifications</Text>
-        <Text style={styles.body}>Enable notifications to receive actionable reminders with Taken, Snooze, and Skip options.</Text>
+        <Text style={[styles.title, { color: darkGraySurfaceText }]}>Medication Notifications</Text>
+        <Text style={[styles.body, { color: darkGraySurfaceText }]}>Enable notifications to receive actionable reminders with Taken, Snooze, and Skip options.</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>Permission status</Text>
-          <Text style={styles.value}>{medicationPermissionGranted ? 'Enabled' : 'Disabled'}</Text>
+        <View style={[styles.card, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
+          <Text style={[styles.label, { color: darkGraySurfaceText }]}>Permission status</Text>
+          <Text style={[styles.value, { color: darkGraySurfaceText }]}>{medicationPermissionGranted ? 'Enabled' : 'Disabled'}</Text>
         </View>
 
         <Pressable style={styles.button} onPress={requestMedicationPermission}>
           <Text style={styles.buttonText}>{medicationPermissionGranted ? 'Re-check Permission' : 'Enable Notifications'}</Text>
         </Pressable>
 
-        <Text style={styles.helper}>Snooze presets: 5, 10, 15, 30 minutes. Reminder sounds: Default, Soft, Bell, Medical alert.</Text>
+        <Text style={[styles.helper, { color: darkGraySurfaceText }]}>Snooze presets: 5, 10, 15, 30 minutes. Reminder sounds: Default, Soft, Bell, Medical alert.</Text>
       </View>
     </Screen>
   );

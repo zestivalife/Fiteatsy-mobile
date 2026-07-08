@@ -8,18 +8,23 @@ import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import { relationshipLabel, shareTypeLabel } from '../../services/familyConnectService';
 import { FamilyShareType } from '../../types';
+import { getThemeColors } from '../../design/tokens';
 
 export const FamilyMemberDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'FamilyMemberDetail'>>();
-  const { familyConnections, getFamilySummary, sendFamilyPing, triggerFamilySOS } = useAppContext();
+  const { familyConnections, getFamilySummary, sendFamilyPing, triggerFamilySOS, themeMode } = useAppContext();
   const connection = familyConnections.find((item) => item.id === route.params.connectionId);
+  const palette = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
+  const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
+  const secondaryText = isLight ? '#334155' : '#FFFFFF';
 
   if (!connection) {
     return (
       <Screen>
         <AppBackButton onPress={() => navigation.goBack()} />
-        <Text style={styles.empty}>Member not found.</Text>
+        <Text style={[styles.empty, { color: darkGraySurfaceText }]}>Member not found.</Text>
       </Screen>
     );
   }
@@ -33,34 +38,34 @@ export const FamilyMemberDetailScreen = () => {
   return (
     <Screen scroll>
       <AppBackButton onPress={() => navigation.goBack()} />
-      <Text style={styles.title}>{connection.memberName}</Text>
-      <Text style={styles.subtitle}>{relationshipLabel(connection.relationship)} • Supportive sharing</Text>
+      <Text style={[styles.title, { color: darkGraySurfaceText }]}>{connection.memberName}</Text>
+      <Text style={[styles.subtitle, { color: secondaryText }]}>{relationshipLabel(connection.relationship)} • Trusted support</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.section}>Wellness Summary</Text>
-        <Text style={styles.text}>{summary?.trendLabel ?? 'No summary available right now.'}</Text>
-        <Text style={styles.text}>Medication: {summary?.medicationAdherence.replace(/_/g, ' ') ?? 'unknown'}</Text>
-        <Text style={styles.text}>Check-in: {summary?.checkInStatus ?? 'pending'}</Text>
+      <View style={[styles.card, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardMuted }]}>
+        <Text style={[styles.section, { color: darkGraySurfaceText }]}>Recovery Summary</Text>
+        <Text style={[styles.text, { color: darkGraySurfaceText }]}>{summary?.trendLabel ?? 'No summary available right now.'}</Text>
+        <Text style={[styles.text, { color: darkGraySurfaceText }]}>Medication support: {summary?.medicationAdherence.replace(/_/g, ' ') ?? 'unknown'}</Text>
+        <Text style={[styles.text, { color: darkGraySurfaceText }]}>Check-in rhythm: {summary?.checkInStatus ?? 'pending'}</Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.section}>Shared Permissions</Text>
+      <View style={[styles.card, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardMuted }]}>
+        <Text style={[styles.section, { color: darkGraySurfaceText }]}>Shared Permissions</Text>
         {Object.entries(connection.permissions).map(([key, allowed]) => (
-          <Text key={key} style={styles.text}>{shareTypeLabel(key as FamilyShareType)}: {allowed ? 'Enabled' : 'Hidden'}</Text>
+          <Text key={key} style={[styles.text, { color: darkGraySurfaceText }]}>{shareTypeLabel(key as FamilyShareType)}: {allowed ? 'Enabled' : 'Hidden'}</Text>
         ))}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.section}>Quick Actions</Text>
+      <View style={[styles.card, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardMuted }]}>
+        <Text style={[styles.section, { color: darkGraySurfaceText }]}>Quick Actions</Text>
         <View style={styles.row}>
-          <Pressable style={styles.actionBtn} onPress={onCall}><Text style={styles.actionBtnText}>Call Member</Text></Pressable>
-          <Pressable style={styles.actionBtn} onPress={() => onMessage('How are you feeling?')}><Text style={styles.actionBtnText}>Check-in Ping</Text></Pressable>
+          <Pressable style={[styles.actionBtn, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={onCall}><Text style={[styles.actionBtnText, { color: darkGraySurfaceText }]}>Call Member</Text></Pressable>
+          <Pressable style={[styles.actionBtn, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => onMessage('How are you feeling?')}><Text style={[styles.actionBtnText, { color: darkGraySurfaceText }]}>Check-in Ping</Text></Pressable>
         </View>
         <View style={styles.row}>
-          <Pressable style={styles.actionBtn} onPress={() => onMessage('Did you take your medication?')}><Text style={styles.actionBtnText}>Medication Reminder</Text></Pressable>
-          <Pressable style={styles.actionBtn} onPress={() => onMessage('Call me when free.')}><Text style={styles.actionBtnText}>Call me when free</Text></Pressable>
+          <Pressable style={[styles.actionBtn, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => onMessage('Did you take your medication?')}><Text style={[styles.actionBtnText, { color: darkGraySurfaceText }]}>Medication Reminder</Text></Pressable>
+          <Pressable style={[styles.actionBtn, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => onMessage('Call me when free.')}><Text style={[styles.actionBtnText, { color: darkGraySurfaceText }]}>Call me when free</Text></Pressable>
         </View>
-        <Pressable style={styles.sosBtn} onPress={onSOS}><Text style={styles.sosBtnText}>Trigger SOS Alert</Text></Pressable>
+        <Pressable style={styles.sosBtn} onPress={onSOS}><Text style={[styles.sosBtnText, { color: darkGraySurfaceText }]}>Trigger SOS Alert</Text></Pressable>
       </View>
     </Screen>
   );

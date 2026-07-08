@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
-import { colors, radius, spacing, typography } from '../../design/tokens';
+import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
 
 const statusColor: Record<string, string> = {
@@ -18,9 +18,12 @@ const toDateOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 
 export const MedicationCalendarScreen = () => {
   const navigation = useNavigation();
-  const { getMedicationTimelineForDate } = useAppContext();
+  const { getMedicationTimelineForDate, themeMode } = useAppContext();
   const [cursor, setCursor] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
+  const palette = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
+  const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
 
   const days = useMemo(() => {
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -44,13 +47,13 @@ export const MedicationCalendarScreen = () => {
     <Screen>
       <AppBackButton onPress={() => navigation.goBack()} />
       <View style={styles.header}>
-        <Pressable onPress={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}><Text style={styles.nav}>{'<'}</Text></Pressable>
-        <Text style={styles.title}>{cursor.toLocaleString('default', { month: 'long' })} {cursor.getFullYear()}</Text>
-        <Pressable onPress={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}><Text style={styles.nav}>{'>'}</Text></Pressable>
+        <Pressable onPress={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}><Text style={[styles.nav, { color: darkGraySurfaceText }]}>{'<'}</Text></Pressable>
+        <Text style={[styles.title, { color: darkGraySurfaceText }]}>{cursor.toLocaleString('default', { month: 'long' })} {cursor.getFullYear()}</Text>
+        <Pressable onPress={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}><Text style={[styles.nav, { color: darkGraySurfaceText }]}>{'>'}</Text></Pressable>
       </View>
 
       <View style={styles.weekRow}>
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, idx) => <Text key={`${label}-${idx}`} style={styles.weekLabel}>{label}</Text>)}
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, idx) => <Text key={`${label}-${idx}`} style={[styles.weekLabel, { color: darkGraySurfaceText }]}>{label}</Text>)}
       </View>
 
       <View style={styles.grid}>
@@ -58,8 +61,8 @@ export const MedicationCalendarScreen = () => {
           const selected = toDateOnly(day).getTime() === toDateOnly(selectedDay).getTime();
           const status = statusForDay(day);
           return (
-            <Pressable key={day.toISOString()} style={[styles.dayCell, selected && styles.dayCellSelected]} onPress={() => setSelectedDay(day)}>
-              <Text style={styles.dayText}>{day.getDate()}</Text>
+            <Pressable key={day.toISOString()} style={[styles.dayCell, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, selected && styles.dayCellSelected]} onPress={() => setSelectedDay(day)}>
+              <Text style={[styles.dayText, { color: darkGraySurfaceText }]}>{day.getDate()}</Text>
               <View style={[styles.dot, { backgroundColor: statusColor[status] ?? colors.textMuted }]} />
             </Pressable>
           );
@@ -67,15 +70,15 @@ export const MedicationCalendarScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.logs}>
-        <Text style={styles.logsTitle}>Medication Logs</Text>
+        <Text style={[styles.logsTitle, { color: darkGraySurfaceText }]}>Medication Logs</Text>
         {selectedTimeline.length === 0 ? (
-          <Text style={styles.empty}>No logs for this date.</Text>
+          <Text style={[styles.empty, { color: darkGraySurfaceText }]}>No logs for this date.</Text>
         ) : (
           selectedTimeline.map((entry) => (
-            <View key={`${entry.medication.id}-${entry.scheduledForISO}`} style={styles.logCard}>
+            <View key={`${entry.medication.id}-${entry.scheduledForISO}`} style={[styles.logCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
               <View>
-                <Text style={styles.logName}>{entry.medication.name}</Text>
-                <Text style={styles.logTime}>{new Date(entry.scheduledForISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                <Text style={[styles.logName, { color: darkGraySurfaceText }]}>{entry.medication.name}</Text>
+                <Text style={[styles.logTime, { color: darkGraySurfaceText }]}>{new Date(entry.scheduledForISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
               </View>
               <View style={[styles.badge, { backgroundColor: statusColor[entry.status] ?? colors.info }]}>
                 <Text style={styles.badgeText}>{entry.status}</Text>

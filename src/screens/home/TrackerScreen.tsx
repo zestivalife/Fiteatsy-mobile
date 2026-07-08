@@ -130,8 +130,8 @@ const MetricSparkCard = ({
             <Text style={styles.metricIcon}>{icon}</Text>
           </View>
           <View style={styles.metricHeaderTextWrap}>
-            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#4A4A4A' }]} numberOfLines={1}>{title}</Text>
-            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#4A4A4A' }]} numberOfLines={1}>{subtitle}</Text>
+            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{title}</Text>
+            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{subtitle}</Text>
           </View>
         </View>
 
@@ -159,13 +159,13 @@ const MetricSparkCard = ({
           </View>
         </View>
 
-        <Animated.Text style={[styles.metricValue, { color: isLight ? '#000000' : '#4A4A4A' }, { transform: [{ scale: pulse }] }]}> 
+        <Animated.Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }, { transform: [{ scale: pulse }] }]}> 
           {selected ? selected.value : value} {unit}
         </Animated.Text>
-        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#4A4A4A' }]} numberOfLines={1}>
+        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#FFFFFF' }]} numberOfLines={1}>
           {signalState} • {recoveryImpact}
         </Text>
-        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#4A4A4A' }]} numberOfLines={1}>
+        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#FFFFFF' }]} numberOfLines={1}>
           {freshness} • Confidence {confidence}
         </Text>
       </Card>
@@ -224,8 +224,8 @@ const MetricBarsCard = ({
             <Text style={styles.metricIcon}>{icon}</Text>
           </View>
           <View style={styles.metricHeaderTextWrap}>
-            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#4A4A4A' }]} numberOfLines={1}>{title}</Text>
-            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#4A4A4A' }]} numberOfLines={1}>{subtitle}</Text>
+            <Text style={[styles.metricTitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{title}</Text>
+            <Text style={[styles.metricSubtitle, { color: isLight ? '#000000' : '#FFFFFF' }]} numberOfLines={1}>{subtitle}</Text>
           </View>
         </View>
 
@@ -256,13 +256,13 @@ const MetricBarsCard = ({
           })}
         </View>
 
-        <Text style={[styles.metricValue, { color: isLight ? '#000000' : '#4A4A4A' }]}>
+        <Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }]}>
           {bars[selectedBar]} {unit}
         </Text>
-        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#4A4A4A' }]} numberOfLines={1}>
+        <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#FFFFFF' }]} numberOfLines={1}>
           {signalState} • {recoveryImpact}
         </Text>
-        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#4A4A4A' }]} numberOfLines={1}>
+        <Text style={[styles.metricMetaSub, { color: isLight ? '#4B5563' : '#FFFFFF' }]} numberOfLines={1}>
           {freshness} • Confidence {confidence}
         </Text>
       </Card>
@@ -693,7 +693,7 @@ export const TrackerScreen = () => {
               <Text
                 style={[
                   styles.dayName,
-                  !active && { color: '#4A4A4A' },
+                  !active && { color: '#FFFFFF' },
                   active && styles.dayNameActive
                 ]}
               >
@@ -702,7 +702,7 @@ export const TrackerScreen = () => {
               <Text
                 style={[
                   styles.dayDate,
-                  !active && { color: '#4A4A4A' },
+                  !active && { color: '#FFFFFF' },
                   active && styles.dayDateActive
                 ]}
               >
@@ -825,7 +825,7 @@ const styles = StyleSheet.create({
     borderColor: colors.strokeStrong
   },
   tabTextDark: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   },
   tabButton: {
     flex: 1,
@@ -839,7 +839,7 @@ const styles = StyleSheet.create({
   tabText: {
     ...typography.bodyStrong,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     color: colors.textSecondary
   },
   tabTextActive: {
@@ -860,7 +860,7 @@ const styles = StyleSheet.create({
   rangeText: {
     ...typography.caption,
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     color: colors.textSecondary
   },
   rangeTextActive: {
@@ -894,12 +894,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 16,
     lineHeight: 22,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   summaryLabel: {
     ...typography.bodyStrong,
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     color: colors.textSecondary
   },
   summaryValueDark: {
@@ -954,27 +954,27 @@ const styles = StyleSheet.create({
   dayName: {
     ...typography.body,
     fontSize: 12,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   dayNameDark: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   },
   dayNameActive: {
-    color: '#4A4A4A',
-    fontWeight: '700'
+    color: '#FFFFFF',
+    fontFamily: 'Poppins_700Bold'
   },
   dayDate: {
     ...typography.section,
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     color: colors.textPrimary
   },
   dayDateDark: {
     color: colors.white
   },
   dayDateActive: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   },
   grid: {
     gap: spacing.xs
@@ -1035,10 +1035,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   metricTitleDark: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   },
   metricTitleLight: {
     color: '#000000'
@@ -1047,10 +1047,10 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     fontSize: 12,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   metricSubtitleDark: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   },
   metricSubtitleLight: {
     color: '#000000'
@@ -1105,7 +1105,7 @@ const styles = StyleSheet.create({
     ...typography.section,
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     color: colors.textPrimary,
     textAlign: 'center',
     marginTop: 10
@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
   metricMeta: {
     ...typography.caption,
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     lineHeight: 16,
     textAlign: 'center',
     marginTop: 6
@@ -1121,13 +1121,13 @@ const styles = StyleSheet.create({
   metricMetaSub: {
     ...typography.caption,
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     lineHeight: 16,
     textAlign: 'center',
     marginTop: 2
   },
   metricValueDark: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   },
   metricValueLight: {
     color: '#000000'
@@ -1144,21 +1144,21 @@ const styles = StyleSheet.create({
   insightTitle: {
     ...typography.bodyStrong,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     marginBottom: 4,
     color: '#000000'
   },
   insightTitleDark: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   },
   insightCopy: {
     ...typography.body,
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: 'Poppins_400Regular',
     color: '#000000'
   },
   insightCopyDark: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   },
   suggestionCard: {
     marginTop: spacing.xs
@@ -1185,7 +1185,7 @@ const styles = StyleSheet.create({
     color: '#000000'
   },
   suggestionTextDark: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   },
   insightSub: {
     ...typography.caption,
@@ -1194,6 +1194,6 @@ const styles = StyleSheet.create({
     color: '#000000'
   },
   insightSubDark: {
-    color: '#4A4A4A'
+    color: '#FFFFFF'
   }
 });

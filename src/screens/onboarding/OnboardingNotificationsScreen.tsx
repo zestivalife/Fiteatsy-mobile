@@ -13,14 +13,20 @@ type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingNotifications
 
 const fallbackProfile = (): OnboardingProfile => ({
   name: 'Member',
+  dateOfBirthISO: new Date(1996, 0, 1).toISOString(),
+  calculatedAge: 28,
+  age: 28,
+  gender: 'Prefer not to say',
   ageBracket: '25-34',
   primaryConditions: ['Gut Health'],
   symptomTags: ['Fatigue'],
   healthGoals: ['Better Energy'],
+  primaryGoal: 'Better Energy',
+  secondaryGoals: [],
   wearablePreference: 'manual',
   careTrack: 'Foundational Recovery Care',
-  matchedDietitianName: 'Dr. Aisha Menon',
-  matchedDietitianSpecialty: 'Clinical Nutrition & Habit Recovery',
+  assignedConsultantId: null,
+  assignedConsultant: null,
   calendarProvider: 'None',
   calendarPermissionGranted: false,
   notificationPermissionGranted: false,
@@ -31,6 +37,8 @@ export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
   const { onboarding, setOnboarding, setWearableSetupCompleted, themeMode } = useAppContext();
   const isLight = themeMode === 'light';
   const themeColors = getThemeColors(themeMode);
+  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
+  const darkTextSoft = isLight ? '#334155' : '#FFFFFF';
   const profile = onboarding ?? fallbackProfile();
 
   const allowNotifications = () => {
@@ -45,31 +53,28 @@ export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
       allowNotifications();
     }
     setWearableSetupCompleted(false);
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'SyncWearable' }]
-    });
+    navigation.navigate('OnboardingAssessment');
   };
 
   return (
     <Screen>
       <View style={styles.body}>
-        <Text style={[styles.kicker, { color: themeColors.blue }]}>Step 4 · Track & Transform</Text>
-        <Text style={[styles.title, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Your plan is ready</Text>
-        <Text style={[styles.subtitle, { color: isLight ? '#334155' : colors.textSecondary }]}>We will only remind you when it helps your recovery. No spam, no guilt, no noise.</Text>
+        <Text style={[styles.kicker, { color: themeColors.blue }]}>Step 3 · Track & Transform</Text>
+        <Text style={[styles.title, { color: darkTextStrong }]}>Your plan is ready</Text>
+        <Text style={[styles.subtitle, { color: darkTextSoft }]}>We will only remind you when it helps your recovery. No spam, no guilt, no noise.</Text>
 
         <LinearGradient colors={isLight ? ['#FFFFFF', '#EEF2F7'] : [colors.cardMuted, colors.cardMuted]} style={[styles.card, { borderColor: themeColors.stroke }]}>
-          <Text style={[styles.cardTitle, { color: isLight ? '#000000' : themeColors.textPrimary }]}>{profile.careTrack}</Text>
-          <Text style={[styles.cardCopy, { color: isLight ? '#334155' : colors.textSecondary }]}>Matched with {profile.matchedDietitianName}. Your dashboard will blend condition tracking, symptom recovery, hydration, nutrition guidance, and optional health-app sync.</Text>
+          <Text style={[styles.cardTitle, { color: darkTextStrong }]}>{profile.careTrack}</Text>
+          <Text style={[styles.cardCopy, { color: darkTextSoft }]}>Your consultant is assigned after subscription activation, recovery program creation, and care-case routing. Once assigned, the app will sync their profile, availability, appointments, and contact channels automatically.</Text>
         </LinearGradient>
 
         <Pressable style={[styles.permissionButton, { borderColor: themeColors.blue }]} onPress={allowNotifications}>
-          <Text style={[styles.permissionText, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Allow smart health reminders</Text>
+          <Text style={[styles.permissionText, { color: darkTextStrong }]}>Allow smart health reminders</Text>
         </Pressable>
       </View>
 
       <View style={styles.footer}>
-        <PrimaryButton title="Open my care dashboard" onPress={complete} />
+        <PrimaryButton title="Continue to health assessment" onPress={complete} />
       </View>
     </Screen>
   );

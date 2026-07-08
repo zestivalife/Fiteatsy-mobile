@@ -148,7 +148,9 @@ const chooseAiMove = (board: CellValue[]): number => {
 
 export const FocusScreen = () => {
   const navigation = useNavigation();
-  const { setWellness } = useAppContext();
+  const { setWellness, themeMode } = useAppContext();
+  const isLight = themeMode === 'light';
+  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
   const [activeTab, setActiveTab] = useState<FocusTab>('Sprint');
 
   const [running, setRunning] = useState(false);
@@ -435,26 +437,26 @@ export const FocusScreen = () => {
           <View style={styles.timerWrap}>
             <ProgressRing progress={progress} size={218} strokeWidth={9} />
             <View style={styles.timerCenter}>
-              <Text style={styles.phaseLabel}>{completed ? 'Complete' : 'Deep Work Sprint'}</Text>
+              <Text style={[styles.phaseLabel, { color: darkTextStrong }]}>{completed ? 'Complete' : 'Deep Work Sprint'}</Text>
               <Text style={styles.time}>{secondsToClock(remainingSeconds)}</Text>
             </View>
           </View>
 
           <View style={styles.scoreRow}>
             <View style={styles.scoreChip}>
-              <Text style={styles.scoreChipText}>Focus Points {focusPoints}</Text>
+              <Text style={[styles.scoreChipText, { color: darkTextStrong }]}>Focus Points {focusPoints}</Text>
             </View>
             <View style={styles.scoreChip}>
-              <Text style={styles.scoreChipText}>Streak {streak}</Text>
+              <Text style={[styles.scoreChipText, { color: darkTextStrong }]}>Streak {streak}</Text>
             </View>
           </View>
 
-          <Text style={styles.caption}>{scoreLabel}</Text>
+          <Text style={[styles.caption, { color: darkTextStrong }]}>{scoreLabel}</Text>
 
           {distractionVisible ? (
             <View style={styles.distractionCard}>
               <Text style={styles.distractionTitle}>Distraction Alert</Text>
-              <Text style={styles.distractionCopy}>A distraction popped up. Tap quickly to stay focused and earn points.</Text>
+              <Text style={[styles.distractionCopy, { color: darkTextStrong }]}>A distraction popped up. Tap quickly to stay focused and earn points.</Text>
               <Pressable style={styles.distractionButton} onPress={handleIgnoreDistraction}>
                 <Ionicons name="flash-outline" size={16} color={colors.white} />
                 <Text style={styles.distractionButtonText}>Ignore Distraction</Text>
@@ -466,7 +468,7 @@ export const FocusScreen = () => {
             {goals.map((goal) => (
               <Pressable key={goal.id} style={styles.goalItem} onPress={() => toggleGoal(goal.id)}>
                 <Ionicons name={goal.done ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={goal.done ? colors.success : colors.textMuted} />
-                <Text style={styles.goalText}>{goal.label}</Text>
+                <Text style={[styles.goalText, { color: darkTextStrong }]}>{goal.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -477,8 +479,8 @@ export const FocusScreen = () => {
             </Pressable>
 
             <Pressable onPress={resetSession} style={styles.resetButton}>
-              <Ionicons name="refresh" color={colors.textPrimary} size={20} />
-              <Text style={styles.resetText}>Reset</Text>
+              <Ionicons name="refresh" color={darkTextStrong} size={20} />
+              <Text style={[styles.resetText, { color: darkTextStrong }]}>Reset</Text>
             </Pressable>
           </View>
         </>
@@ -486,8 +488,8 @@ export const FocusScreen = () => {
 
       {activeTab === 'TicTacToe' ? (
         <View style={styles.gameBlock}>
-          <Text style={styles.gameTitle}>Focus Grid Challenge</Text>
-          <Text style={styles.gameCopy}>Win 3 in a row while staying present. Alternate turns to reset your brain.</Text>
+          <Text style={[styles.gameTitle, { color: darkTextStrong }]}>Focus Grid Challenge</Text>
+          <Text style={[styles.gameCopy, { color: darkTextStrong }]}>Win 3 in a row while staying present. Alternate turns to reset your brain.</Text>
 
           <View style={styles.board}>
             {board.map((cell, index) => (
@@ -510,27 +512,27 @@ export const FocusScreen = () => {
           </Text>
 
           <View style={styles.scoreRow}>
-            <View style={styles.scoreChip}><Text style={styles.scoreChipText}>You {xWins}</Text></View>
-            <View style={styles.scoreChip}><Text style={styles.scoreChipText}>AI {oWins}</Text></View>
-            <View style={styles.scoreChip}><Text style={styles.scoreChipText}>Draw {draws}</Text></View>
+            <View style={styles.scoreChip}><Text style={[styles.scoreChipText, { color: darkTextStrong }]}>You {xWins}</Text></View>
+            <View style={styles.scoreChip}><Text style={[styles.scoreChipText, { color: darkTextStrong }]}>AI {oWins}</Text></View>
+            <View style={styles.scoreChip}><Text style={[styles.scoreChipText, { color: darkTextStrong }]}>Draw {draws}</Text></View>
           </View>
 
           <Pressable style={styles.resetButton} onPress={resetBoard}>
-            <Ionicons name="refresh" color={colors.textPrimary} size={20} />
-            <Text style={styles.resetText}>New Round</Text>
+            <Ionicons name="refresh" color={darkTextStrong} size={20} />
+            <Text style={[styles.resetText, { color: darkTextStrong }]}>New Round</Text>
           </Pressable>
         </View>
       ) : null}
 
       {activeTab === 'Reflex' ? (
         <View style={styles.gameBlock}>
-          <Text style={styles.gameTitle}>Reflex Focus Tap</Text>
-          <Text style={styles.gameCopy}>Tap the glowing tile fast. This trains reaction and keeps your attention sharp.</Text>
+          <Text style={[styles.gameTitle, { color: darkTextStrong }]}>Reflex Focus Tap</Text>
+          <Text style={[styles.gameCopy, { color: darkTextStrong }]}>Tap the glowing tile fast. This trains reaction and keeps your attention sharp.</Text>
 
           <View style={styles.scoreRow}>
-            <View style={styles.scoreChip}><Text style={styles.scoreChipText}>Time {reflexTime}s</Text></View>
-            <View style={styles.scoreChip}><Text style={styles.scoreChipText}>Score {reflexScore}</Text></View>
-            <View style={styles.scoreChip}><Text style={styles.scoreChipText}>Best {bestScore}</Text></View>
+            <View style={styles.scoreChip}><Text style={[styles.scoreChipText, { color: darkTextStrong }]}>Time {reflexTime}s</Text></View>
+            <View style={styles.scoreChip}><Text style={[styles.scoreChipText, { color: darkTextStrong }]}>Score {reflexScore}</Text></View>
+            <View style={styles.scoreChip}><Text style={[styles.scoreChipText, { color: darkTextStrong }]}>Best {bestScore}</Text></View>
           </View>
 
           <View style={styles.reflexGrid}>
@@ -608,7 +610,7 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: colors.white,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   timerWrap: {
     marginTop: 24,

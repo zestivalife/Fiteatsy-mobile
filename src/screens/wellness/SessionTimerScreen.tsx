@@ -6,6 +6,7 @@ import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { ProgressRing } from '../../components/ProgressRing';
 import { colors, typography } from '../../design/tokens';
+import { useAppContext } from '../../state/AppContext';
 import { secondsToClock } from '../../utils/time';
 
 type Props = {
@@ -17,6 +18,9 @@ type Props = {
 
 export const SessionTimerScreen = ({ title, startSeconds, actionLabel, onComplete }: Props) => {
   const navigation = useNavigation();
+  const { themeMode } = useAppContext();
+  const isLight = themeMode === 'light';
+  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
   const [remainingSeconds, setRemainingSeconds] = useState(startSeconds);
   const [running, setRunning] = useState(false);
 
@@ -57,7 +61,7 @@ export const SessionTimerScreen = ({ title, startSeconds, actionLabel, onComplet
     <Screen>
       <View style={styles.header}>
         <AppBackButton iconOnly onPress={() => navigation.goBack()} />
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[styles.title, { color: darkTextStrong }]}>{title}</Text>
         <View style={styles.headerGhost} />
       </View>
       <View style={styles.timerWrap}>
@@ -72,12 +76,12 @@ export const SessionTimerScreen = ({ title, startSeconds, actionLabel, onComplet
           <Ionicons name={running ? 'pause' : 'play'} color={colors.white} size={26} />
         </Pressable>
         <Pressable onPress={reset} style={styles.resetButton}>
-          <Ionicons name="refresh" color={colors.textPrimary} size={20} />
-          <Text style={styles.resetText}>Reset</Text>
+          <Ionicons name="refresh" color={darkTextStrong} size={20} />
+          <Text style={[styles.resetText, { color: darkTextStrong }]}>Reset</Text>
         </Pressable>
       </View>
 
-      <Text style={styles.caption}>{actionLabel}</Text>
+      <Text style={[styles.caption, { color: darkTextStrong }]}>{actionLabel}</Text>
     </Screen>
   );
 };

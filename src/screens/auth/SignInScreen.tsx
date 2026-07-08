@@ -27,6 +27,8 @@ const isCorporateEmail = (email: string) => {
 export const SignInScreen = ({ navigation }: Props) => {
   const { setIsAuthenticated, onboarding, assessment, wearableSetupCompleted, themeMode } = useAppContext();
   const themeColors = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
+  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
   const [email, setEmail] = useState('care@fiteatsy.com');
   const [password, setPassword] = useState('Demo@123');
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +43,12 @@ export const SignInScreen = ({ navigation }: Props) => {
 
     setError(null);
     setIsAuthenticated(true);
-    if (!assessment) {
-      navigation.replace('OnboardingAssessment');
-      return;
-    }
     if (!onboarding) {
       navigation.replace('OnboardingBasics');
+      return;
+    }
+    if (!assessment) {
+      navigation.replace('OnboardingAssessment');
       return;
     }
     navigation.replace(wearableSetupCompleted ? 'Main' : 'SyncWearable');
@@ -56,9 +58,9 @@ export const SignInScreen = ({ navigation }: Props) => {
     <Screen>
       <View style={styles.container}>
         <View style={styles.form}>
-          <Text style={[styles.title, { color: themeColors.textPrimary }]}>Sign in</Text>
-          <Text style={[styles.subTitle, { color: themeColors.textSecondary }]}>Use your corporate email to continue.</Text>
-          <Text style={[styles.demoHint, { color: themeColors.textSecondary }]}>Demo: care@fiteatsy.com  |  Demo@123</Text>
+          <Text style={[styles.title, { color: darkTextStrong }]}>Sign in</Text>
+          <Text style={[styles.subTitle, { color: darkTextStrong }]}>Use your corporate email to continue.</Text>
+          <Text style={[styles.demoHint, { color: darkTextStrong }]}>Demo: care@fiteatsy.com  |  Demo@123</Text>
 
           <TextField
             label="Corporate Email"
@@ -81,7 +83,7 @@ export const SignInScreen = ({ navigation }: Props) => {
           <PrimaryButton title="Sign In" onPress={handleSignIn} disabled={!canSubmit} />
 
           <View style={styles.footerLine}>
-            <Text style={[styles.helper, { color: themeColors.textSecondary }]}>Don't have an account? </Text>
+            <Text style={[styles.helper, { color: darkTextStrong }]}>Don't have an account? </Text>
             <Pressable onPress={() => navigation.navigate('SignUp')}>
               <Text style={[styles.link, { color: themeColors.blue }]}>Sign Up</Text>
             </Pressable>

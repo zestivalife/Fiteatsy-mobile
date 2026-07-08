@@ -21,6 +21,8 @@ export const SearchScreen = () => {
   const navigation = useNavigation();
   const { themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
+  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
   const [query, setQuery] = useState('');
 
   const results = useMemo(() => {
@@ -34,20 +36,20 @@ export const SearchScreen = () => {
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: palette.textPrimary }]}>Search</Text>
+        <Text style={[styles.title, { color: darkTextStrong }]}>Search</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Close search" style={[styles.closeButton, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]} onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={18} color={palette.textPrimary} />
+          <Ionicons name="close" size={18} color={darkTextStrong} />
         </Pressable>
       </View>
       <View style={[styles.inputWrap, { borderColor: palette.stroke, backgroundColor: palette.cardRaised }]}>
-        <Ionicons name="search-outline" size={20} color={palette.textMuted} />
+        <Ionicons name="search-outline" size={20} color={darkTextStrong} />
         <TextInput
           accessibilityLabel="Search features and reports"
-          style={[styles.input, { color: palette.textPrimary }]}
+          style={[styles.input, { color: darkTextStrong }]}
           value={query}
           onChangeText={setQuery}
           placeholder="Search features, sessions, reports"
-          placeholderTextColor={palette.textMuted}
+          placeholderTextColor={darkTextStrong}
         />
       </View>
 
@@ -58,11 +60,11 @@ export const SearchScreen = () => {
         renderItem={({ item }) => (
           <Pressable accessibilityRole="button" accessibilityLabel={item}>
             <Card style={styles.resultCard}>
-              <Text style={styles.resultText}>{item}</Text>
+              <Text style={[styles.resultText, { color: darkTextStrong }]}>{item}</Text>
             </Card>
           </Pressable>
         )}
-        ListEmptyComponent={<Text style={[styles.empty, { color: palette.textSecondary }]}>No matches found</Text>}
+        ListEmptyComponent={<Text style={[styles.empty, { color: darkTextStrong }]}>No matches found</Text>}
       />
     </Screen>
   );
@@ -100,6 +102,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   input: {
+    ...typography.body,
     flex: 1,
     color: colors.textPrimary,
     fontSize: 16

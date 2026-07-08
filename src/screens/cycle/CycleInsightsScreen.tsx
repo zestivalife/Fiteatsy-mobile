@@ -1,9 +1,9 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
-import { colors, radius, spacing, typography } from '../../design/tokens';
+import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
 
 const confidenceLabel = {
@@ -14,34 +14,37 @@ const confidenceLabel = {
 
 export const CycleInsightsScreen = () => {
   const navigation = useNavigation();
-  const { getCycleInsights } = useAppContext();
+  const { getCycleInsights, themeMode } = useAppContext();
   const insights = getCycleInsights();
+  const palette = getThemeColors(themeMode);
+  const isLight = themeMode === 'light';
+  const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
 
   return (
     <Screen scroll>
       <AppBackButton onPress={() => navigation.goBack()} />
-      <Text style={styles.title}>Cycle Insights</Text>
-      <View style={styles.card}>
-        <Text style={styles.metric}>Average cycle length: {insights.averageCycleLengthDays} days</Text>
-        <Text style={styles.metric}>Average period duration: {insights.averagePeriodDurationDays} days</Text>
-        <Text style={styles.metric}>Prediction confidence: {confidenceLabel[insights.confidence]}</Text>
-        <Text style={styles.metric}>Consistency score: {insights.consistencyScore}/100</Text>
+      <Text style={[styles.title, { color: darkGraySurfaceText }]}>Cycle Insights</Text>
+      <View style={[styles.card, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardMuted }]}>
+        <Text style={[styles.metric, { color: darkGraySurfaceText }]}>Average cycle length: {insights.averageCycleLengthDays} days</Text>
+        <Text style={[styles.metric, { color: darkGraySurfaceText }]}>Average period duration: {insights.averagePeriodDurationDays} days</Text>
+        <Text style={[styles.metric, { color: darkGraySurfaceText }]}>Prediction confidence: {confidenceLabel[insights.confidence]}</Text>
+        <Text style={[styles.metric, { color: darkGraySurfaceText }]}>Consistency score: {insights.consistencyScore}/100</Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.section}>Common symptoms</Text>
+      <View style={[styles.card, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardMuted }]}>
+        <Text style={[styles.section, { color: darkGraySurfaceText }]}>Common symptoms</Text>
         {insights.commonSymptoms.length === 0 ? (
-          <Text style={styles.empty}>No symptom trends yet. Keep logging daily.</Text>
+          <Text style={[styles.empty, { color: darkGraySurfaceText }]}>No symptom trends yet. Keep logging daily.</Text>
         ) : (
           insights.commonSymptoms.map((item) => (
-            <Text key={item.symptom} style={styles.metric}>{item.symptom.replace('_', ' ')}: {item.count}</Text>
+            <Text key={item.symptom} style={[styles.metric, { color: darkGraySurfaceText }]}>{item.symptom.replace('_', ' ')}: {item.count}</Text>
           ))
         )}
       </View>
 
-      <View style={styles.noteCard}>
-        <Text style={styles.noteTitle}>Important</Text>
-        <Text style={styles.noteText}>These are probabilistic cycle insights based on your history, not diagnostic or guaranteed predictions.</Text>
+      <View style={[styles.noteCard, { borderColor: palette.warning, backgroundColor: isLight ? colors.warningSoft : palette.cardMuted }]}>
+        <Text style={[styles.noteTitle, { color: darkGraySurfaceText }]}>Important</Text>
+        <Text style={[styles.noteText, { color: darkGraySurfaceText }]}>These are probabilistic cycle insights based on your history, not diagnostic or guaranteed predictions.</Text>
       </View>
     </Screen>
   );

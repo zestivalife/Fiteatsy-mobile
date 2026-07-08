@@ -15,14 +15,20 @@ const providers: CalendarProvider[] = ['Google', 'Outlook'];
 
 const fallbackProfile = (): OnboardingProfile => ({
   name: 'Member',
+  dateOfBirthISO: new Date(1996, 0, 1).toISOString(),
+  calculatedAge: 28,
+  age: 28,
+  gender: 'Prefer not to say',
   ageBracket: '25-34',
   primaryConditions: ['Gut Health'],
   symptomTags: ['Fatigue'],
   healthGoals: ['Better Energy'],
+  primaryGoal: 'Better Energy',
+  secondaryGoals: [],
   wearablePreference: 'manual',
   careTrack: 'Foundational Recovery Care',
-  matchedDietitianName: 'Dr. Aisha Menon',
-  matchedDietitianSpecialty: 'Clinical Nutrition & Habit Recovery',
+  assignedConsultantId: null,
+  assignedConsultant: null,
   calendarProvider: 'None',
   calendarPermissionGranted: false,
   notificationPermissionGranted: false,
@@ -33,6 +39,8 @@ export const OnboardingCalendarScreen = ({ navigation }: Props) => {
   const { onboarding, setOnboarding, themeMode } = useAppContext();
   const isLight = themeMode === 'light';
   const themeColors = getThemeColors(themeMode);
+  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
+  const darkTextSoft = isLight ? '#334155' : '#FFFFFF';
   const selectedLightBg = isLight ? themeColors.blueDark : undefined;
   const profile = onboarding ?? fallbackProfile();
 
@@ -56,8 +64,8 @@ export const OnboardingCalendarScreen = ({ navigation }: Props) => {
     <Screen>
       <View style={styles.body}>
         <Text style={[styles.kicker, { color: themeColors.blue }]}>Step 3 · Personalized Guidance</Text>
-        <Text style={[styles.title, { color: isLight ? '#000000' : themeColors.textPrimary }]}>Connect your daily schedule</Text>
-        <Text style={[styles.subtitle, { color: isLight ? '#334155' : colors.textSecondary }]}>Optional, but helpful. We use your schedule only to place meals, walks, hydration, and recovery nudges at the right time.</Text>
+        <Text style={[styles.title, { color: darkTextStrong }]}>Connect your daily schedule</Text>
+        <Text style={[styles.subtitle, { color: darkTextSoft }]}>Optional, but helpful. We use your schedule only to place meals, walks, hydration, and recovery nudges at the right time.</Text>
 
         <View style={styles.list}>
           {providers.map((provider) => {
@@ -77,8 +85,8 @@ export const OnboardingCalendarScreen = ({ navigation }: Props) => {
                 onPress={() => selectProvider(provider)}
               >
                 <LinearGradient colors={isLight ? ['#FFFFFF', '#EEF2F7'] : [colors.cardMuted, colors.cardMuted]} style={styles.optionGradient}>
-                  <Text style={[styles.optionTitle, { color: isLight ? '#000000' : themeColors.textPrimary }, active && styles.optionTitleActive]}>{provider}</Text>
-                  <Text style={[styles.optionCopy, { color: isLight ? '#334155' : colors.textSecondary }]}>Time meals, hydration, supplements, and movement reminders around your real day.</Text>
+                  <Text style={[styles.optionTitle, { color: darkTextStrong }, active && styles.optionTitleActive]}>{provider}</Text>
+                  <Text style={[styles.optionCopy, { color: darkTextSoft }]}>Time meals, hydration, supplements, and movement reminders around your real day.</Text>
                 </LinearGradient>
               </Pressable>
             );
@@ -97,8 +105,8 @@ export const OnboardingCalendarScreen = ({ navigation }: Props) => {
             onPress={() => setOnboarding({ ...profile, calendarProvider: 'None', calendarPermissionGranted: false })}
           >
             <LinearGradient colors={isLight ? ['#FFFFFF', '#EEF2F7'] : [colors.cardMuted, colors.cardMuted]} style={styles.optionGradient}>
-              <Text style={[styles.optionTitle, { color: isLight ? '#000000' : themeColors.textPrimary }, profile.calendarProvider === 'None' && styles.optionTitleActive]}>Skip for now</Text>
-              <Text style={[styles.optionCopy, { color: isLight ? '#334155' : colors.textSecondary }]}>You can continue with manual planning and connect your schedule later.</Text>
+              <Text style={[styles.optionTitle, { color: darkTextStrong }, profile.calendarProvider === 'None' && styles.optionTitleActive]}>Skip for now</Text>
+              <Text style={[styles.optionCopy, { color: darkTextSoft }]}>You can continue with manual planning and connect your schedule later.</Text>
             </LinearGradient>
           </Pressable>
         </View>

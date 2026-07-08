@@ -128,3 +128,6 @@ export const verifyOtpChallenge = (challengeId, otp) => {
         }
     };
 };
+export const resetOtpChallengesForTests = () => {
+    challengeStore.clear();
+};

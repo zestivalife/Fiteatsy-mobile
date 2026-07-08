@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { analyzeReportBuffer } from './reports.service.js';
 import { addFeedback, attachReportAnalysis, completeUploadSession, createReportRecord, createUploadSession, deleteReport, getReport, getUploadSession, listReports, updateReportMetadata, updateReportStatus } from './reports.store.js';
+import { syncReportPipelineToPlatform } from '../platform/platform.service.js';
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 12 * 1024 * 1024 }
@@ -53,6 +54,7 @@ reportsRouter.post('/upload/init', (req, res) => {
         return res.status(413).json({ error: 'FILE_TOO_LARGE', message: 'Max upload size is 12MB.' });
     }
     const session = createUploadSession({ userId, fileName, mimeType, fileSize, source });
+    syncReportPipelineToPlatform(userId, session.id, 'uploaded', `Blood report upload initialized for ${fileName}`);
     return res.status(201).json({ uploadId: session.id, expiresAtISO: session.expiresAtISO, status: session.status });
 });
 reportsRouter.post('/upload/complete', (req, res) => {
@@ -205,8 +207,10 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
                 : undefined
         });
         currentReportId = record.id;
+        syncReportPipelineToPlatform(userId, record.id, 'uploaded', `Blood report uploaded: ${record.fileName}`);
         updateReportStatus(record.id, 'processing');
         const analysis = await analyzeReportBuffer(req.file.buffer, req.file.mimetype);
+        syncReportPipelineToPlatform(userId, record.id, 'ocr_completed', `OCR completed for ${record.fileName}`);
         const manualDate = typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : '';
         const manualLab = typeof req.body?.labName === 'string' ? req.body.labName.trim() : '';
         if (manualDate) {
@@ -216,6 +220,8 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
             analysis.labName = manualLab;
         }
         const saved = attachReportAnalysis(record.id, analysis);
+        syncReportPipelineToPlatform(userId, record.id, 'biomarkers_updated', `Biomarkers extracted from ${record.fileName}`);
+        syncReportPipelineToPlatform(userId, record.id, 'analysis_completed', `AI validation completed for ${record.fileName}`);
         return res.status(200).json({
             reportId: saved?.id,
             status: saved?.status,

@@ -138,6 +138,7 @@ export const SessionsScreen = () => {
   const { setWellness, themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
+  const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
   const [selectedKey, setSelectedKey] = useState<SessionType>('breathing_sync');
   const [lastResult, setLastResult] = useState<SessionResult | null>(null);
   const [statusMessage, setStatusMessage] = useState('Pick one guided session to support calm recovery today.');
@@ -470,12 +471,12 @@ export const SessionsScreen = () => {
 
   return (
     <Screen scroll contentStyle={styles.screenContent}>
-      <Text style={[styles.heading, { color: palette.textPrimary }]}>Sessions</Text>
-      <Text style={[styles.subheading, { color: palette.textSecondary }]}>Emotional Recovery & Brain Wellness</Text>
+      <Text style={[styles.heading, { color: darkGraySurfaceText }]}>Sessions</Text>
+      <Text style={[styles.subheading, { color: darkGraySurfaceText }]}>Emotional Recovery & Brain Wellness</Text>
 
       <Card style={[styles.infoCard, { borderColor: '#60AF00', backgroundColor: isLight ? 'rgba(96,175,0,0.10)' : 'rgba(96,175,0,0.08)' }]}>
-        <Text style={[styles.cardTitle, { color: palette.textPrimary }]}>Today’s Session Focus</Text>
-        <Text style={[styles.bodyText, { color: palette.textSecondary }]}>Choose one session. We’ll use interaction consistency to improve calm and stress recovery signals.</Text>
+        <Text style={[styles.cardTitle, { color: darkGraySurfaceText }]}>Today’s Session Focus</Text>
+        <Text style={[styles.bodyText, { color: darkGraySurfaceText }]}>Choose one session. We’ll use interaction consistency to improve calm and stress recovery signals.</Text>
       </Card>
 
       <SessionGroup
@@ -486,6 +487,7 @@ export const SessionsScreen = () => {
         onStart={runSession}
         isLight={isLight}
         palette={palette}
+        darkGraySurfaceText={darkGraySurfaceText}
         primaryActionLabels={{
           breathing_sync: 'Start Breathing',
           breathing_garden: 'Start Walk'
@@ -499,6 +501,7 @@ export const SessionsScreen = () => {
         onStart={runSession}
         isLight={isLight}
         palette={palette}
+        darkGraySurfaceText={darkGraySurfaceText}
       />
       <SessionGroup
         title="Cycle Wellness"
@@ -508,6 +511,7 @@ export const SessionsScreen = () => {
         onStart={runSession}
         isLight={isLight}
         palette={palette}
+        darkGraySurfaceText={darkGraySurfaceText}
       />
       <SessionGroup
         title="Emotional Balance"
@@ -517,21 +521,22 @@ export const SessionsScreen = () => {
         onStart={runSession}
         isLight={isLight}
         palette={palette}
+        darkGraySurfaceText={darkGraySurfaceText}
       />
 
       <Card style={[styles.statusCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.cardRaised }]}>
-        <Text style={[styles.cardTitle, { color: palette.textPrimary }]}>Session Interpretation</Text>
-        <Text style={[styles.bodyText, { color: palette.textSecondary }]}>{statusMessage}</Text>
+        <Text style={[styles.cardTitle, { color: darkGraySurfaceText }]}>Session Interpretation</Text>
+        <Text style={[styles.bodyText, { color: darkGraySurfaceText }]}>{statusMessage}</Text>
         {lastResult ? (
           <View style={styles.resultRow}>
-            <Text style={[styles.resultLabel, { color: palette.textSecondary }]}>Calm impact</Text>
-            <Text style={[styles.resultValue, { color: palette.textPrimary }]}>+{lastResult.calmImpact}</Text>
+            <Text style={[styles.resultLabel, { color: darkGraySurfaceText }]}>Calm impact</Text>
+            <Text style={[styles.resultValue, { color: darkGraySurfaceText }]}>+{lastResult.calmImpact}</Text>
           </View>
         ) : null}
         {lastResult ? (
           <View style={styles.resultRow}>
-            <Text style={[styles.resultLabel, { color: palette.textSecondary }]}>Stress recovery</Text>
-            <Text style={[styles.resultValue, { color: palette.textPrimary }]}>+{lastResult.stressRecoveryImpact}</Text>
+            <Text style={[styles.resultLabel, { color: darkGraySurfaceText }]}>Stress recovery</Text>
+            <Text style={[styles.resultValue, { color: darkGraySurfaceText }]}>+{lastResult.stressRecoveryImpact}</Text>
           </View>
         ) : null}
       </Card>
@@ -541,26 +546,26 @@ export const SessionsScreen = () => {
           <View style={[styles.modalCard, { borderColor: isLight ? '#CBD5E1' : '#3B4555', backgroundColor: isLight ? '#FFFFFF' : '#1A1E28' }]}>
             {activeExperience === 'mood_bloom' ? (
               <>
-                <Text style={styles.cardTitle}>Mood Bloom</Text>
-                <Text style={styles.bodyText}>Choose today’s emotional atmosphere.</Text>
+                <Text style={[styles.cardTitle, { color: darkGraySurfaceText }]}>Mood Bloom</Text>
+                <Text style={[styles.bodyText, { color: darkGraySurfaceText }]}>Choose today’s emotional atmosphere.</Text>
                 <View style={styles.rowWrap}>
                   {(['rose', 'lavender', 'peach', 'dusk'] as const).map((value) => (
                     <Pressable key={value} style={[styles.softChip, bloomColor === value && styles.softChipActive]} onPress={() => setBloomColor(value)}>
-                      <Text style={[styles.chipText, { color: palette.textPrimary }]}>{value}</Text>
+                      <Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{value}</Text>
                     </Pressable>
                   ))}
                 </View>
                 <View style={styles.rowWrap}>
                   {(['soft', 'gentle', 'deep'] as const).map((value) => (
                     <Pressable key={value} style={[styles.softChip, bloomSoftness === value && styles.softChipActive]} onPress={() => setBloomSoftness(value)}>
-                      <Text style={[styles.chipText, { color: palette.textPrimary }]}>{value}</Text>
+                      <Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{value}</Text>
                     </Pressable>
                   ))}
                 </View>
                 <View style={styles.rowWrap}>
                   {(['light', 'balanced', 'reflective'] as const).map((value) => (
                     <Pressable key={value} style={[styles.softChip, bloomTone === value && styles.softChipActive]} onPress={() => setBloomTone(value)}>
-                      <Text style={[styles.chipText, { color: palette.textPrimary }]}>{value}</Text>
+                      <Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{value}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -570,7 +575,7 @@ export const SessionsScreen = () => {
                 <View style={styles.rowWrap}>
                   {(['calm', 'heavy', 'emotional', 'balanced', 'drained', 'hopeful'] as const).map((value) => (
                     <Pressable key={value} style={[styles.softChip, bloomMood === value && styles.softChipActive]} onPress={() => setBloomMood(value)}>
-                      <Text style={[styles.chipText, { color: palette.textPrimary }]}>{value}</Text>
+                      <Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{value}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -582,8 +587,8 @@ export const SessionsScreen = () => {
 
             {activeExperience === 'emotional_color_flow' ? (
               <>
-                <Text style={styles.cardTitle}>Emotional Color Flow</Text>
-                <Text style={styles.bodyText}>Tap the atmosphere that feels closest right now.</Text>
+                <Text style={[styles.cardTitle, { color: darkGraySurfaceText }]}>Emotional Color Flow</Text>
+                <Text style={[styles.bodyText, { color: darkGraySurfaceText }]}>Tap the atmosphere that feels closest right now.</Text>
                 <View style={styles.orbRow}>
                   {[
                     { id: 'rose_haze', colors: ['#6A293D', '#321B2D'] as const },
@@ -599,15 +604,15 @@ export const SessionsScreen = () => {
                 <View style={styles.rowWrap}>
                   {(['calm', 'warmth', 'clarity', 'rest', 'focus'] as const).map((value) => (
                     <Pressable key={value} style={[styles.softChip, flowSecondary === value && styles.softChipActive]} onPress={() => setFlowSecondary(value)}>
-                      <Text style={[styles.chipText, { color: palette.textPrimary }]}>{value}</Text>
+                      <Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{value}</Text>
                     </Pressable>
                   ))}
                 </View>
-                <Text style={styles.bodyText}>Drag direction substitute: choose your direction.</Text>
+                <Text style={[styles.bodyText, { color: darkGraySurfaceText }]}>Drag direction substitute: choose your direction.</Text>
                 <View style={styles.rowWrap}>
                   {(['calm', 'warmth', 'clarity', 'rest', 'focus'] as const).map((value) => (
                     <Pressable key={value} style={[styles.softChip, flowDirection === value && styles.softChipActive]} onPress={() => setFlowDirection(value)}>
-                      <Text style={styles.chipText}>{value}</Text>
+                      <Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{value}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -619,8 +624,8 @@ export const SessionsScreen = () => {
 
             {activeExperience === 'energy_rhythm_match' ? (
               <>
-                <Text style={styles.cardTitle}>Energy Rhythm Match</Text>
-                <Text style={styles.bodyText}>Tap with the soft pulse. Keep a calm rhythm for 30-60 seconds.</Text>
+                <Text style={[styles.cardTitle, { color: darkGraySurfaceText }]}>Energy Rhythm Match</Text>
+                <Text style={[styles.bodyText, { color: darkGraySurfaceText }]}>Tap with the soft pulse. Keep a calm rhythm for 30-60 seconds.</Text>
                 <View style={[styles.rhythmPulse, rhythmPulse && styles.rhythmPulseActive]}>
                   <Text style={styles.previewText}>{Math.round(rhythmElapsed / 1000)}s</Text>
                 </View>
@@ -635,8 +640,8 @@ export const SessionsScreen = () => {
 
             {activeExperience === 'memory_pulse' ? (
               <>
-                <Text style={styles.cardTitle}>Memory Pulse</Text>
-                <Text style={styles.bodyText}>
+                <Text style={[styles.cardTitle, { color: darkGraySurfaceText }]}>Memory Pulse</Text>
+                <Text style={[styles.bodyText, { color: darkGraySurfaceText }]}>
                   {memoryPhase === 'observe' ? 'Watch the glow sequence.' : 'Repeat the sequence calmly.'} Failures: {memoryFailures}/3
                 </Text>
                 <View style={styles.memoryGrid}>
@@ -676,7 +681,8 @@ const SessionGroup = ({
   onStart,
   primaryActionLabels,
   isLight,
-  palette
+  palette,
+  darkGraySurfaceText
 }: {
   title: string;
   sessions: SessionConfig[];
@@ -686,6 +692,7 @@ const SessionGroup = ({
   primaryActionLabels?: Partial<Record<SessionType, string>>;
   isLight: boolean;
   palette: ReturnType<typeof getThemeColors>;
+  darkGraySurfaceText: string;
 }) => {
   return (
     <View style={styles.group}>
@@ -696,8 +703,8 @@ const SessionGroup = ({
         return (
           <Card key={session.key} style={[styles.sessionCard, { backgroundColor: isLight ? '#FFFFFF' : palette.cardRaised, borderColor: palette.stroke }, selected && [styles.sessionCardActive, { borderColor: '#60AF00', backgroundColor: isLight ? 'rgba(96,175,0,0.10)' : colors.blueSoft }]]}>
             <Pressable onPress={() => onSelect(session.key)} style={styles.sessionMeta}>
-              <Text style={[styles.sessionTitle, { color: palette.textPrimary }]}>{session.title}</Text>
-              <Text style={[styles.bodyText, { color: palette.textSecondary }]}>{session.subtitle}</Text>
+              <Text style={[styles.sessionTitle, { color: darkGraySurfaceText }]}>{session.title}</Text>
+              <Text style={[styles.bodyText, { color: darkGraySurfaceText }]}>{session.subtitle}</Text>
               <Text style={styles.impactText}>{session.impactLabel}</Text>
             </Pressable>
             <Pressable style={styles.sessionCTA} onPress={() => onStart(session)}>
@@ -790,7 +797,7 @@ const styles = StyleSheet.create({
     ...typography.bodyStrong,
     fontSize: 14,
     lineHeight: 20,
-    color: '#CCCCCC'
+    color: '#FFFFFF'
   },
   resultRow: {
     marginTop: 8,
@@ -843,7 +850,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontSize: 12,
     lineHeight: 18,
-    color: colors.textPrimary
+    color: '#FFFFFF'
   },
   bloomPreview: {
     height: 88,
@@ -856,7 +863,8 @@ const styles = StyleSheet.create({
   previewText: {
     ...typography.bodyStrong,
     fontSize: 14,
-    lineHeight: 20
+    lineHeight: 20,
+    color: '#FFFFFF'
   },
   orbRow: {
     flexDirection: 'row',

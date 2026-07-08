@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Animated,
@@ -72,6 +73,8 @@ type AnalysisReviewState = {
   goodParameters: ReportParameter[];
   attentionParameters: ReportParameter[];
 };
+
+const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
 
 const palette = {
   teal: '#2E6B00',
@@ -291,6 +294,7 @@ export const ReportsScreen = () => {
   const { wellness, onboarding, checkIns, themeMode } = useAppContext();
   const isLight = themeMode === 'light';
   const [reports, setReports] = useState<ReportItem[]>(seededReports);
+  const [sortMode, setSortMode] = useState<'latest' | 'oldest' | 'lab' | 'type'>('latest');
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [showProcessing, setShowProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
@@ -324,6 +328,19 @@ export const ReportsScreen = () => {
   const shimmer = useRef(new Animated.Value(0)).current;
 
   const latestReport = reports[0] ?? null;
+  const sortedReports = useMemo(() => {
+    const next = [...reports];
+    if (sortMode === 'oldest') {
+      return next.reverse();
+    }
+    if (sortMode === 'lab') {
+      return next.sort((a, b) => a.labName.localeCompare(b.labName));
+    }
+    if (sortMode === 'type') {
+      return next.sort((a, b) => (a.uploadSource ?? 'manual').localeCompare(b.uploadSource ?? 'manual'));
+    }
+    return next;
+  }, [reports, sortMode]);
   const overallScore = latestReport?.score ?? wellness.wellnessScore;
   const sectionHighlight = overallScore >= 80 ? colors.success : overallScore >= 60 ? colors.warning : colors.danger;
   const totalParams = latestReport?.parameters ?? 0;
@@ -340,6 +357,26 @@ export const ReportsScreen = () => {
     () => latestReport?.parametersData.filter((parameter) => parameter.status !== 'normal') ?? [],
     [latestReport]
   );
+
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(REPORT_HISTORY_STORAGE_KEY)
+      .then((raw) => {
+        if (!active || !raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setReports(parsed);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(REPORT_HISTORY_STORAGE_KEY, JSON.stringify(reports)).catch(() => undefined);
+  }, [reports]);
 
   const hydratePickedFile = async (
     uri: string,
@@ -907,7 +944,7 @@ export const ReportsScreen = () => {
       ) : null}
 
       <View style={styles.sectionHead}>
-        <Text style={[styles.sectionTitle, !isLight && styles.sectionTitleDark]}>Your Reports</Text>
+        <Text style={[styles.sectionTitle, !isLight && styles.sectionTitleDark]}>Report History</Text>
         <Pressable style={[styles.countChip, !isLight && styles.countChipDark]} onPress={() => setShowHistory((prev) => !prev)}>
           <Text style={styles.countChipText}>{showHistory ? 'Hide history' : `View history (${reportCountLabel})`}</Text>
         </Pressable>
@@ -915,7 +952,22 @@ export const ReportsScreen = () => {
 
       {showHistory ? (
         <View style={styles.reportList}>
-          {reports.map((report) => (
+          <View style={styles.sortRow}>
+            {[
+              ['latest', 'Latest'],
+              ['oldest', 'Oldest'],
+              ['lab', 'Lab'],
+              ['type', 'Type']
+            ].map(([key, label]) => {
+              const active = sortMode === key;
+              return (
+                <Pressable key={key} style={[styles.sortChip, active && styles.sortChipActive]} onPress={() => setSortMode(key as typeof sortMode)}>
+                  <Text style={[styles.sortChipText, active && styles.sortChipTextActive]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {sortedReports.map((report) => (
             <SwipeableReportCard
               key={report.id}
               report={report}
@@ -1201,7 +1253,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: palette.textDark
   },
   heroCard: {
@@ -1242,7 +1294,7 @@ const styles = StyleSheet.create({
   heroToggleText: {
     fontSize: 12,
     color: '#000000',
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -1260,7 +1312,7 @@ const styles = StyleSheet.create({
     fontSize: 56,
     marginTop: 4,
     lineHeight: 62,
-    fontWeight: '400'
+    fontFamily: 'Poppins_400Regular'
   },
   heroSub: {
     fontSize: 13,
@@ -1305,12 +1357,12 @@ const styles = StyleSheet.create({
   categoryName: {
     flex: 1,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: palette.textMid
   },
   categoryScoreBadge: {
     fontSize: 16,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   miniTrack: {
     height: 7,
@@ -1324,17 +1376,17 @@ const styles = StyleSheet.create({
   categoryScore: {
     marginTop: 4,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: palette.textDark
   },
   categoryCaption: {
     marginTop: 5,
     fontSize: 11,
-    fontWeight: '500',
+    fontFamily: 'Poppins_500Medium',
     color: colors.textMuted
   },
   categoryCaptionDark: {
-    color: colors.textMuted
+    color: colors.white
   },
   heroBottomRow: {
     marginTop: 12,
@@ -1351,7 +1403,7 @@ const styles = StyleSheet.create({
   seeAll: {
     fontSize: 12,
     color: palette.teal,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   nuetraCard: {
     borderRadius: 16,
@@ -1372,11 +1424,11 @@ const styles = StyleSheet.create({
   nuetraBadgeText: {
     color: colors.white,
     fontSize: 11,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   nuetraTitle: {
     fontSize: 17,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: '#000000',
     marginBottom: 6
   },
@@ -1389,7 +1441,7 @@ const styles = StyleSheet.create({
   askNuetra: {
     color: '#000000',
     fontSize: 13,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   shimmerBlock: {
     position: 'relative',
@@ -1419,7 +1471,7 @@ const styles = StyleSheet.create({
   },
   detailTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: palette.textDark,
     marginBottom: 10
   },
@@ -1443,12 +1495,12 @@ const styles = StyleSheet.create({
   parameterName: {
     color: palette.textDark,
     fontSize: 14,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   parameterValue: {
     color: palette.coral,
     fontSize: 14,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   parameterRange: {
     marginTop: 3,
@@ -1477,7 +1529,7 @@ const styles = StyleSheet.create({
   },
   actionPriority: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     color: palette.teal,
     backgroundColor: palette.tealLight,
     paddingHorizontal: 7,
@@ -1486,7 +1538,7 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: palette.textDark,
     flex: 1
   },
@@ -1499,7 +1551,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     color: palette.coral,
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   crossRow: {
     borderRadius: 12,
@@ -1527,7 +1579,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: palette.textDark
   },
   countChip: {
@@ -1539,7 +1591,7 @@ const styles = StyleSheet.create({
   countChipText: {
     color: palette.teal,
     fontSize: 12,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   reportList: {
     gap: 10
@@ -1563,7 +1615,7 @@ const styles = StyleSheet.create({
   deleteText: {
     color: colors.white,
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   reportRow: {
     flexDirection: 'row',
@@ -1586,7 +1638,7 @@ const styles = StyleSheet.create({
   reportAvatarText: {
     color: colors.white,
     fontSize: 12,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   reportMiddle: {
     flex: 1,
@@ -1594,7 +1646,7 @@ const styles = StyleSheet.create({
   },
   reportLab: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: palette.textDark
   },
   reportDate: {
@@ -1605,7 +1657,7 @@ const styles = StyleSheet.create({
   reportMeta: {
     fontSize: 12,
     marginTop: 2,
-    fontWeight: '500'
+    fontFamily: 'Poppins_500Medium'
   },
   metaBad: {
     color: palette.coral
@@ -1627,11 +1679,11 @@ const styles = StyleSheet.create({
   },
   scoreBadgeText: {
     fontSize: 17,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   trend: {
     fontSize: 16,
-    fontWeight: '700'
+    fontFamily: 'Poppins_700Bold'
   },
   trendUp: {
     color: '#60AF00'
@@ -1695,7 +1747,7 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 17,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: '#000000'
   },
   sheetSubtitle: {
@@ -1729,7 +1781,7 @@ const styles = StyleSheet.create({
   uploadMethodTitle: {
     marginTop: 6,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: '#000000',
     textAlign: 'center'
   },
@@ -1756,7 +1808,7 @@ const styles = StyleSheet.create({
   },
   uploadStatusTitle: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: colors.textPrimary
   },
   uploadStatusText: {
@@ -1788,7 +1840,7 @@ const styles = StyleSheet.create({
   },
   retryBtnText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: colors.danger
   },
   fieldWrap: {
@@ -1832,7 +1884,7 @@ const styles = StyleSheet.create({
   },
   pickerDoneText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: colors.textPrimary
   },
   inputText: {
@@ -1851,7 +1903,7 @@ const styles = StyleSheet.create({
   readonlyChipText: {
     color: colors.textPrimary,
     fontSize: 12,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   privacyRow: {
     marginTop: 4,
@@ -1878,7 +1930,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: colors.white,
     fontSize: 15,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   processingScreen: {
     flex: 1,
@@ -1901,7 +1953,7 @@ const styles = StyleSheet.create({
   },
   processingTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: palette.textDark,
     marginBottom: 14,
     textAlign: 'center'
@@ -1940,7 +1992,7 @@ const styles = StyleSheet.create({
   },
   stepTextActive: {
     color: palette.textDark,
-    fontWeight: '600'
+    fontFamily: 'Poppins_600SemiBold'
   },
   processingTrack: {
     width: '100%',
@@ -1971,7 +2023,7 @@ const styles = StyleSheet.create({
   },
   processingCancelText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: colors.textPrimary
   },
   reviewBackdrop: {
@@ -1991,7 +2043,7 @@ const styles = StyleSheet.create({
   },
   reviewTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     color: colors.textPrimary
   },
   reviewSubtitle: {
@@ -2007,13 +2059,13 @@ const styles = StyleSheet.create({
   reviewGood: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: colors.success
   },
   reviewBad: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: colors.danger
   },
   reviewList: {
@@ -2057,7 +2109,7 @@ const styles = StyleSheet.create({
   },
   reviewSecondaryText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
     color: colors.textSecondary
   },
   reviewPrimaryBtn: {
@@ -2070,7 +2122,7 @@ const styles = StyleSheet.create({
   },
   reviewPrimaryText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins_700Bold',
     color: colors.white
   },
   screenContentDark: {
@@ -2081,33 +2133,33 @@ const styles = StyleSheet.create({
     borderColor: colors.stroke
   },
   headerTitleDark: {
-    color: colors.textPrimary
+    color: colors.white
   },
   heroCardDark: {
     backgroundColor: colors.cardMuted,
     borderColor: colors.stroke
   },
   heroLabelDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   heroUpdatedDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   heroSubDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   heroToggleChipDark: {
     backgroundColor: '#151515',
     borderColor: colors.stroke
   },
   heroToggleTextDark: {
-    color: '#F5E1E1'
+    color: colors.white
   },
   dividerDark: {
     backgroundColor: '#2A2A2A'
   },
   categoryNameDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   miniTrackDark: {
     backgroundColor: '#2A2A2A'
@@ -2116,23 +2168,23 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   lastReportDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   seeAllDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   nuetraCardDark: {
     backgroundColor: colors.card,
     borderColor: colors.stroke
   },
   nuetraTitleDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   nuetraCopyDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   askNuetraDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   detailCardDark: {
     backgroundColor: '#151515',
@@ -2142,20 +2194,20 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   detailEmptyDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   parameterRowDark: {
     borderColor: colors.stroke,
     backgroundColor: '#151515'
   },
   parameterNameDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   parameterRangeDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   parameterInsightDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   actionCardDark: {
     borderColor: colors.stroke,
@@ -2165,23 +2217,49 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   actionDetailDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   crossRowDark: {
     backgroundColor: '#151515',
     borderColor: colors.stroke
   },
   crossConnectionDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   crossMetaDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   sectionTitleDark: {
     color: colors.white
   },
   countChipDark: {
     backgroundColor: '#151515'
+  },
+  sortRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12
+  },
+  sortChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D7DFE7',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  sortChipActive: {
+    borderColor: '#59BE08',
+    backgroundColor: '#EEF6E8'
+  },
+  sortChipText: {
+    color: '#475569',
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium'
+  },
+  sortChipTextActive: {
+    color: '#2E6B00'
   },
   reportRowDark: {
     borderColor: colors.stroke,
@@ -2191,7 +2269,7 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   reportDateDark: {
-    color: '#4A4A4A'
+    color: colors.white
   },
   reportMetaDark: {
     color: '#4A4A4A'

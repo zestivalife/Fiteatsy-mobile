@@ -128,12 +128,12 @@ export const SplashScreen = ({ navigation }: Props) => {
         return;
       }
 
-      if (!assessment) {
-        navigation.replace('OnboardingAssessment');
+      if (!onboarding) {
+        navigation.replace('OnboardingBasics');
         return;
       }
 
-      if (!onboarding) {
+      if (!assessment) {
         navigation.replace('OnboardingAssessment');
         return;
       }

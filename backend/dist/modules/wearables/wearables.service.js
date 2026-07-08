@@ -198,3 +198,7 @@ export const buildLiveSyncPayload = (params) => {
     };
     return { connection, payload };
 };
+export const resetWearablesStateForTests = () => {
+    connections.clear();
+    recordsByConnectionId.clear();
+};

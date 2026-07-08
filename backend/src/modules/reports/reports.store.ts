@@ -194,3 +194,7 @@ export const addFeedback = (
   return entry;
 };
 
+export const resetReportsStoreForTests = () => {
+  reports.clear();
+  uploads.clear();
+};
