@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { countClients } from '../../backend/src/modules/client/client.repository.js';
 import { getJson, postJson } from '../helpers/http.js';
 import { authHeaders } from '../helpers/auth.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
@@ -96,6 +97,9 @@ test('POST /v1/auth/signup/verify-otp issues a persisted session and GET /v1/aut
   assert.equal(me.response.status, 200);
   assert.equal(me.body.accountId, verified.body.user.id);
   assert.equal(me.body.user.email, 'asha@example.com');
+  assert.match(me.body.client.fiteatsyClientId, /^fc_[a-f0-9]{32}$/i);
+  assert.equal(me.body.client.status, 'active');
+  assert.equal('id' in me.body.client, false);
 });
 
 test('GET /v1/auth/me rejects missing and invalid bearer tokens', async () => {
@@ -148,4 +152,33 @@ test('verified signup resolves the same persisted account when the same contact 
   });
 
   assert.equal(firstVerify.body.user.id, secondVerify.body.user.id);
+  assert.equal(await countClients(), 1);
+});
+
+test('failed verification does not create a client and successful verification creates exactly one client', async () => {
+  const requested = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
+    name: 'Client Gate User',
+    email: 'client-gate@example.com',
+    mobileNumber: '+919876543299',
+  });
+
+  const invalid = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+    challengeId: requested.body.challengeId,
+    otp: '111111',
+  });
+  assert.equal(invalid.response.status, 401);
+  assert.equal(await countClients(), 0);
+
+  const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+    challengeId: requested.body.challengeId,
+    otp: requested.body.debugOtp,
+  });
+  assert.equal(verified.response.status, 200);
+  assert.equal(await countClients(), 1);
+
+  const me = await getJson(server.baseUrl, '/v1/auth/me', {
+    headers: authHeaders(verified.body.sessionToken)
+  });
+  assert.equal(me.response.status, 200);
+  assert.match(me.body.client.fiteatsyClientId, /^fc_[a-f0-9]{32}$/i);
 });

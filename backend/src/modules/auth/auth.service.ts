@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { createAuthSession, resolveVerifiedAccount } from './auth.repository.js';
+import { createAuthSession, resolveVerifiedAccountIdentity } from './auth.repository.js';
 import { isOtpDebugResponseEnabled } from '../../config/env.js';
 
 type SignupInput = {
@@ -170,7 +170,7 @@ export const verifyOtpChallenge = async (
   challenge.verified = true;
   challengeStore.delete(challengeId);
   try {
-    const user = await resolveVerifiedAccount({
+    const { user } = await resolveVerifiedAccountIdentity({
       name: challenge.user.name,
       email: challenge.user.email,
       mobileNumber: challenge.user.mobileNumber

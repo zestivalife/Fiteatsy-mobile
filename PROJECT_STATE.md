@@ -43,13 +43,21 @@
 ## Next Governed Milestone
 
 - Milestone: `M3 — Fiteatsy Client & Identity`
-- Current milestone state: `GOVERNANCE / DEFINITION`
-- Implementation status: `NOT YET AUTHORIZED`
+- Current milestone state: `M3 DEFINITION APPROVED`
+- Implementation status: `M3A — CLIENT IDENTITY FOUNDATION AUTHORIZED`
 
 ## Next Governance Gate
 
 The next gate is:
 
-`M3 Definition & Architecture Approval`
+`M3A — Client Identity Foundation Verification`
 
-Only after that gate may a separate implementation prompt authorize the first M3 implementation slice.
+Approved M3 decisions now on record:
+
+- `1 Account : 1 Client` for the M3 implementation model
+- Client is created deterministically after successful account verification
+- Client existence is separate from product activation/onboarding completion
+- `fiteatsy_client_id` is the stable external/domain identifier
+- Internal database IDs remain private
+- CAP-001 correlation remains separate from Fiteatsy client identity
+- Professional access remains outside `M3A`

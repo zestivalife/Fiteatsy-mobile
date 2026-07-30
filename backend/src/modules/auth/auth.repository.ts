@@ -1,5 +1,13 @@
 import crypto from 'node:crypto';
+import type { PoolClient } from 'pg';
 import { pool } from '../../db/pool.js';
+import {
+  createOrResolveClientForAccount,
+  resolveCurrentClientForAccount,
+  type PersistedClient
+} from '../client/client.repository.js';
+
+type Queryable = Pick<PoolClient, 'query'>;
 
 export type PersistedAuthUser = {
   id: string;
@@ -31,6 +39,7 @@ export type AuthenticatedAccount = {
   sessionExpiresAtISO: string;
   token: string;
   user: PersistedAuthUser;
+  client: PersistedClient;
 };
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -69,80 +78,120 @@ const mapSession = (row: Record<string, unknown>): PersistedAuthSession => ({
   lastUsedAtISO: toIso(row.last_used_at)
 });
 
-const findUserCandidates = async (email: string, mobileNumber: string) => {
-  const result = await pool.query(
+const isUniqueViolation = (error: unknown) =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  typeof (error as { code?: unknown }).code === 'string' &&
+  (error as { code: string }).code === '23505';
+
+const findUserCandidates = async (
+  email: string,
+  mobileNumber: string,
+  db: Queryable = pool,
+  options: { lockRows?: boolean } = {}
+) => {
+  const lockClause = options.lockRows ? 'for update' : '';
+  const result = await db.query(
     `
       select *
       from users
       where deleted_at is null
         and (email_normalized = $1 or mobile_number_normalized = $2)
       order by created_at asc
+      ${lockClause}
     `,
     [email, mobileNumber]
   );
   return result.rows.map((row) => mapUser(row));
 };
 
-export const resolveVerifiedAccount = async (input: {
+export const resolveVerifiedAccountIdentity = async (input: {
   name: string;
   email: string;
   mobileNumber: string;
 }) => {
   const normalizedEmail = normalizeEmail(input.email);
   const normalizedMobileNumber = normalizeMobileNumber(input.mobileNumber);
-  const candidates = await findUserCandidates(normalizedEmail, normalizedMobileNumber);
-  const distinctUserIds = Array.from(new Set(candidates.map((candidate) => candidate.id)));
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      const candidates = await findUserCandidates(normalizedEmail, normalizedMobileNumber, client, {
+        lockRows: true
+      });
+      const distinctUserIds = Array.from(new Set(candidates.map((candidate) => candidate.id)));
 
-  if (distinctUserIds.length > 1) {
-    const error = new Error('Multiple accounts already exist for the provided contact details.');
-    error.name = 'AUTH_CONTACT_CONFLICT';
-    throw error;
+      if (distinctUserIds.length > 1) {
+        const error = new Error('Multiple accounts already exist for the provided contact details.');
+        error.name = 'AUTH_CONTACT_CONFLICT';
+        throw error;
+      }
+
+      let user: PersistedAuthUser;
+      if (candidates.length === 0) {
+        const id = crypto.randomUUID();
+        const timestamp = now().toISOString();
+        const inserted = await client.query(
+          `
+            insert into users (
+              id,
+              name,
+              email_normalized,
+              mobile_number_normalized,
+              email_verified_at,
+              mobile_verified_at,
+              status,
+              version,
+              last_login_at,
+              created_at,
+              updated_at
+            ) values ($1, $2, $3, $4, $5, $6, 'active', 1, $5, $5, $5)
+            returning *
+          `,
+          [id, input.name.trim(), normalizedEmail, normalizedMobileNumber, timestamp, timestamp]
+        );
+        user = mapUser(inserted.rows[0]);
+      } else {
+        const existing = candidates[0];
+        const updated = await client.query(
+          `
+            update users
+            set
+              name = $2,
+              email_normalized = $3,
+              mobile_number_normalized = $4,
+              email_verified_at = coalesce(email_verified_at, $5),
+              mobile_verified_at = coalesce(mobile_verified_at, $5),
+              last_login_at = $5,
+              updated_at = $5,
+              version = version + 1
+            where id = $1
+            returning *
+          `,
+          [existing.id, input.name.trim(), normalizedEmail, normalizedMobileNumber, now().toISOString()]
+        );
+        user = mapUser(updated.rows[0]);
+      }
+
+      const resolvedClient = await createOrResolveClientForAccount(user.id, client);
+      await client.query('commit');
+      return {
+        user,
+        client: resolvedClient
+      };
+    } catch (error) {
+      await client.query('rollback');
+      if (isUniqueViolation(error)) {
+        continue;
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  if (candidates.length === 0) {
-    const id = crypto.randomUUID();
-    const timestamp = now().toISOString();
-    const inserted = await pool.query(
-      `
-        insert into users (
-          id,
-          name,
-          email_normalized,
-          mobile_number_normalized,
-          email_verified_at,
-          mobile_verified_at,
-          status,
-          version,
-          last_login_at,
-          created_at,
-          updated_at
-        ) values ($1, $2, $3, $4, $5, $6, 'active', 1, $5, $5, $5)
-        returning *
-      `,
-      [id, input.name.trim(), normalizedEmail, normalizedMobileNumber, timestamp, timestamp]
-    );
-    return mapUser(inserted.rows[0]);
-  }
-
-  const existing = candidates[0];
-  const updated = await pool.query(
-    `
-      update users
-      set
-        name = $2,
-        email_normalized = $3,
-        mobile_number_normalized = $4,
-        email_verified_at = coalesce(email_verified_at, $5),
-        mobile_verified_at = coalesce(mobile_verified_at, $5),
-        last_login_at = $5,
-        updated_at = $5,
-        version = version + 1
-      where id = $1
-      returning *
-    `,
-    [existing.id, input.name.trim(), normalizedEmail, normalizedMobileNumber, now().toISOString()]
-  );
-  return mapUser(updated.rows[0]);
+  throw new Error('Failed to resolve verified account identity after retrying.');
 };
 
 export const createAuthSession = async (
@@ -218,11 +267,14 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     now().toISOString()
   ]);
 
+  const currentClient = await resolveCurrentClientForAccount(String(row.user_id_value));
+
   return {
     accountId: String(row.user_id_value),
     sessionId: String(row.id),
     sessionExpiresAtISO: new Date(String(row.expires_at)).toISOString(),
     token,
+    client: currentClient,
     user: {
       id: String(row.user_id_value),
       name: String(row.name),

@@ -101,6 +101,10 @@ authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
     accountId: account.accountId,
     sessionId: account.sessionId,
     sessionExpiresAtISO: account.sessionExpiresAtISO,
+    client: {
+      fiteatsyClientId: account.client.fiteatsyClientId,
+      status: account.client.status
+    },
     user: {
       id: account.user.id,
       name: account.user.name,

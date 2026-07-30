@@ -1,7 +1,7 @@
 # M3 — Fiteatsy Client & Identity Definition Register
 
-**Status:** GOVERNANCE / DEFINITION  
-**Implementation Status:** NOT YET AUTHORIZED  
+**Status:** M3 DEFINITION APPROVED
+**Implementation Status:** `M3A — CLIENT IDENTITY FOUNDATION AUTHORIZED`
 **Applies To:** `M3 — Fiteatsy Client & Identity`
 
 ## Objective
@@ -23,8 +23,9 @@ The identity model must support future Consultant / Practitioner / CAP-001 integ
 ## M3 Definition State
 
 - next governed milestone after the accepted production baseline;
-- implementation not yet authorized;
-- first required gate: `M3 Definition & Architecture Approval`.
+- definition gate approved by Product Owner on 30 July 2026;
+- only `M3A — Client Identity Foundation` is implementation-authorized;
+- `M3B` and `M3C` remain unauthorized pending later governance.
 
 ## Decision Register
 
@@ -32,17 +33,17 @@ The identity model must support future Consultant / Practitioner / CAP-001 integ
 
 Status:
 
-- `PRODUCT OWNER DECISION REQUIRED`
+- `APPROVED`
 
 Options:
 
 1. `1 Account : 1 Client`
 2. `1 Account : Many Clients`
 
-Recommendation:
+Approved decision:
 
-- approve `1 Account : 1 Client` for the first M3 implementation slice;
-- treat family/dependants/caregivers as future explicit capability work rather than implicit cardinality expansion.
+- `1 Account : 1 Client` for the current M3 implementation model;
+- family/dependants/caregivers remain future explicit capability work, not implicit launch cardinality.
 
 Why:
 
@@ -78,7 +79,7 @@ Guard:
 
 Status:
 
-- `PARTIALLY RESOLVED`
+- `APPROVED FOR M3A`
 
 Resolved baseline semantics:
 
@@ -89,17 +90,11 @@ Resolved baseline semantics:
 - soft deletion/anonymisation: architecture must support them without silently inventing legal retention policy;
 - reactivation: must be explicit and auditable where applicable.
 
-Product Owner Decision Required:
-
-- exact event that creates/activates the first Fiteatsy Client at launch:
-  1. verified account creation;
-  2. first completed onboarding/health-profile activation step;
-  3. another explicitly approved trigger.
-
-Recommendation:
+Approved decision:
 
 - create the client deterministically at verified account completion;
-- use a lifecycle status model so “exists” and “active in product workflow” remain distinguishable.
+- keep client existence separate from onboarding completion or product activation;
+- use lifecycle/status modeling so “exists” and “activated in downstream workflow” remain distinguishable.
 
 ### D. Account vs Client Responsibility Boundary
 
@@ -175,7 +170,7 @@ Guards:
 
 Status:
 
-- `RECOMMENDED; NOT YET IMPLEMENTATION-AUTHORIZED`
+- `M3A AUTHORIZED; M3B/M3C REMAIN GOVERNED FUTURE SLICES`
 
 ### M3A — Client Identity Foundation
 
@@ -187,6 +182,10 @@ Status:
 - lifecycle baseline;
 - ownership resolution;
 - tests.
+
+Implementation authorization:
+
+- `AUTHORIZED` on 30 July 2026 by Product Owner.
 
 ### M3B — Existing Domain Ownership Transition
 
@@ -210,7 +209,7 @@ Dependency order:
 
 Status:
 
-- `DEFINED FOR GOVERNANCE; NOT IMPLEMENTED`
+- `DEFINED FOR IMPLEMENTATION IN M3A`
 
 Required strategy:
 
@@ -296,7 +295,7 @@ The M3 definition/architecture gate may pass only when:
 
 - governance conflict is removed;
 - M3 is explicitly identified as next;
-- M3 implementation remains explicitly unauthorized;
+- M3 implementation authorization is explicitly scoped to `M3A` only;
 - cardinality is approved or explicitly escalated;
 - client identifier strategy is defined;
 - lifecycle semantics are defined or explicitly escalated where product policy is required;
@@ -309,3 +308,16 @@ The M3 definition/architecture gate may pass only when:
 - recommended implementation decomposition is documented;
 - protected-baseline regression requirements are documented;
 - implementation acceptance criteria are measurable.
+
+## Product Owner Approval Record
+
+- approval date: `30 July 2026`
+- approved by: `Product Owner`
+- approved decisions:
+  - `1 Account : 1 Client` for M3
+  - client created after successful account verification
+  - client existence separated from product activation
+  - `fiteatsy_client_id` is the stable public/domain identifier
+  - internal database IDs remain private
+  - CAP-001 correlation remains separate
+  - professional access remains outside `M3A`

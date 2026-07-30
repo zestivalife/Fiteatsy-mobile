@@ -1,14 +1,23 @@
 # Fiteatsy — Open Decisions Register
 
-## Decisions Required Before M3 Implementation Authorization
+## M3 Decision Register Status
 
 ### OD-001 Account → Fiteatsy Client Cardinality
 Question:
 Can one Fiteatsy account own exactly one client profile at launch, or can it manage multiple client/dependant profiles?
 
+Resolution:
+`APPROVED` — `1 Account : 1 Client` for M3.
+
 ### OD-002 Active Fiteatsy Client Definition
 Question:
 At what event does a durable account become an active Fiteatsy Client?
+
+Resolution:
+`APPROVED` — create the Fiteatsy Client deterministically after successful account verification.
+
+Clarification:
+Client existence is separate from product activation and onboarding completion.
 
 ### OD-003 Deactivation
 Question:
@@ -20,13 +29,20 @@ What stable platform Person reference field is used across products?
 
 ## Governance Status
 
-These decisions are now part of the active:
+Resolved decisions are now part of the approved:
 
 `M3 — Fiteatsy Client & Identity`
 
-definition/governance gate.
+definition/architecture baseline.
 
-They must be resolved or explicitly escalated before M3 implementation begins.
+Current implementation authorization applies only to:
+
+`M3A — Client Identity Foundation`
+
+Still-open decisions that may affect later slices:
+
+- `OD-003 Deactivation`
+- `OD-004 CAP-001 Reference Naming`
 
 ## Later Decisions
 

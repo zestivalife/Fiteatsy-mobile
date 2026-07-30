@@ -11,6 +11,7 @@ const hasPattern = (pattern: RegExp) => pattern.test(schemaSql);
 
 test('database schema defines required platform tables for CRUD coverage', () => {
   for (const tableName of [
+    'fiteatsy_clients',
     'health_profiles',
     'recovery_programs',
     'care_cases',
@@ -32,6 +33,8 @@ test('database schema defines required platform tables for CRUD coverage', () =>
 });
 
 test('database schema includes foreign keys for healthcare ownership integrity', () => {
+  assert.equal(hasPattern(/account_user_id text not null unique references users\(id\) on delete cascade/i), true);
+  assert.equal(hasPattern(/fiteatsy_client_id text not null unique/i), true);
   assert.equal(hasPattern(/health_profile_id uuid not null references health_profiles/i), true);
   assert.equal(hasPattern(/recovery_program_id uuid not null references recovery_programs/i), true);
   assert.equal(hasPattern(/care_case_id uuid not null references care_cases/i), true);

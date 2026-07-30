@@ -17,8 +17,9 @@ The repository already contains:
 - `M0` through `M2` are historical/completed sequence items for the accepted backend baseline.
 - `G6 — Production Acceptance Gate` is complete.
 - The next governed milestone is `M3 — Fiteatsy Client & Identity`.
-- `M3` is currently open for `DEFINITION / GOVERNANCE` only.
-- `M3` implementation is not yet authorized.
+- `M3` definition/architecture is approved.
+- `M3A — Client Identity Foundation` is authorized.
+- `M3B` and `M3C` remain unauthorized pending later governance.
 
 ## Programme Sequence
 
@@ -113,8 +114,8 @@ Exit:
 
 Current state:
 
-- definition/governance approved as the next programme step;
-- implementation not yet authorized.
+- definition/architecture approved;
+- implementation authorized for `M3A` only.
 
 Recommended implementation decomposition after definition approval:
 

@@ -29,6 +29,23 @@ create table if not exists auth_sessions (
   ip_address text
 );
 
+create table if not exists fiteatsy_clients (
+  id text primary key,
+  fiteatsy_client_id text not null unique,
+  account_user_id text not null unique references users(id) on delete cascade,
+  status text not null default 'active',
+  version integer not null default 1,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+
+create unique index if not exists fiteatsy_clients_public_id_unique
+  on fiteatsy_clients (fiteatsy_client_id);
+
+create unique index if not exists fiteatsy_clients_account_user_id_unique
+  on fiteatsy_clients (account_user_id);
+
 create table if not exists daily_checkins (
   id bigserial primary key,
   user_id text not null references users(id),

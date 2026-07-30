@@ -9,7 +9,7 @@ export const resetBackendStateForTests = async () => {
   resetMigrationStateForTests();
   await migrateDatabase();
   resetOtpChallengesForTests();
-  await pool.query('truncate table auth_sessions, users restart identity cascade');
+  await pool.query('truncate table auth_sessions, fiteatsy_clients, users restart identity cascade');
   await resetPlatformStoreForTests();
   resetReportsStoreForTests();
   resetWearablesStateForTests();

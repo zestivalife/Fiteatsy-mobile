@@ -46,8 +46,8 @@ Repository/runtime facts must be re-verified at execution time.
 ## Next Governed Milestone
 
 - milestone: `M3 — Fiteatsy Client & Identity`
-- current state: `GOVERNANCE / DEFINITION`
-- implementation status: `NOT YET AUTHORIZED`
+- current state: `DEFINITION APPROVED`
+- implementation status: `M3A — CLIENT IDENTITY FOUNDATION AUTHORIZED`
 
 ## Known Verification Limitation
 
@@ -62,15 +62,15 @@ CURRENT
 Production Accepted Backend Baseline
   |
   v
-M3 Governance Harmonization + Definition
+M3 Definition Approved
   |
   v
-M3 Definition & Architecture Approval
+M3A — Client Identity Foundation
   |
   v
-Separate explicit authorization for first M3 implementation slice
+Implementation / Local Verification
 ```
 
 ## Do Not Skip Ahead
 
-Do not begin M3 implementation until a separate explicit instruction establishes scope, gate, acceptance criteria, and protected-baseline regression requirements.
+Do not begin `M3B` or `M3C` until a separate explicit instruction establishes scope, gate, acceptance criteria, and protected-baseline regression requirements.
