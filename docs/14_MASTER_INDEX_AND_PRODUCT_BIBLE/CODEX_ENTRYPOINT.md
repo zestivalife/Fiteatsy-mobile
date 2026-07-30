@@ -13,7 +13,7 @@ For every Fiteatsy engineering task:
 
 ## Current Next Task
 
-**M3 — Fiteatsy Client & Identity (Definition / Governance Only)**
+**M3B — Existing Domain Ownership Transition (Definition / Governance Only)**
 
 ### Read
 
@@ -30,15 +30,14 @@ For every Fiteatsy engineering task:
 
 ### Inspect
 
-Only identity/client-governance-relevant repository files, including as applicable:
+Only M3B-governance-relevant repository files, including as applicable:
 
 - backend auth/account persistence;
-- platform ownership persistence;
-- current schema/migrations;
-- mobile authenticated context assumptions;
-- current API ownership patterns;
-- tests that prove or assume ownership identity;
-- status/governance docs that still reference pre-production execution.
+- platform ownership persistence still using `user_id`;
+- current schema/migrations and M3A client correlation;
+- current API ownership and authorization patterns;
+- tests that prove or assume account-owned domain access;
+- status/governance docs that still treat M3B as implementation-ready.
 
 ### Do Not
 
@@ -46,7 +45,7 @@ Only identity/client-governance-relevant repository files, including as applicab
 - create migrations;
 - change production configuration;
 - change Railway resources;
-- begin M3 implementation;
+- begin M3B implementation;
 - refactor unrelated code.
 
 ### Output

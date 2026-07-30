@@ -1,7 +1,7 @@
 # M3 — Fiteatsy Client & Identity Definition Register
 
 **Status:** M3 DEFINITION APPROVED
-**Implementation Status:** `M3A — CLIENT IDENTITY FOUNDATION AUTHORIZED`
+**Implementation Status:** `M3A — PRODUCTION_ACCEPTED`
 **Applies To:** `M3 — Fiteatsy Client & Identity`
 
 ## Objective
@@ -24,7 +24,7 @@ The identity model must support future Consultant / Practitioner / CAP-001 integ
 
 - next governed milestone after the accepted production baseline;
 - definition gate approved by Product Owner on 30 July 2026;
-- only `M3A — Client Identity Foundation` is implementation-authorized;
+- `M3A — Client Identity Foundation` is production-accepted on 30 July 2026;
 - `M3B` and `M3C` remain unauthorized pending later governance.
 
 ## Decision Register
@@ -170,7 +170,7 @@ Guards:
 
 Status:
 
-- `M3A AUTHORIZED; M3B/M3C REMAIN GOVERNED FUTURE SLICES`
+- `M3A PRODUCTION_ACCEPTED; M3B/M3C REMAIN GOVERNED FUTURE SLICES`
 
 ### M3A — Client Identity Foundation
 
@@ -183,9 +183,10 @@ Status:
 - ownership resolution;
 - tests.
 
-Implementation authorization:
+Implementation / acceptance status:
 
 - `AUTHORIZED` on 30 July 2026 by Product Owner.
+- `PRODUCTION_ACCEPTED` on 30 July 2026 after migration, schema, backfill, and protected-baseline verification.
 
 ### M3B — Existing Domain Ownership Transition
 
@@ -321,3 +322,28 @@ The M3 definition/architecture gate may pass only when:
   - internal database IDs remain private
   - CAP-001 correlation remains separate
   - professional access remains outside `M3A`
+
+## M3A Production Acceptance Record
+
+- acceptance date: `30 July 2026`
+- accepted by: `Product Owner`
+- implementation commit: `141f405d38e8f93b663c84288f76ba59348f4a09`
+- Railway deployment: `a0db3b89`
+
+Observed Evidence:
+
+- production migration ledger includes `0002_m3a_client_identity_foundation.sql`
+- production table `fiteatsy_clients` exists with expected visible columns
+- production runtime remained healthy on `/health`, `/ready`, and `/v1/version`
+- protected auth and OTP baseline showed no regression
+- production dataset currently contains `0` users and `0` clients
+
+Inference:
+
+- migration `0002` was discovered, executed, and recorded as applied
+- zero-account production backfill completed correctly because no eligible production accounts existed
+
+Unverified / Deferred Runtime Evidence:
+
+- populated production account -> client mapping evidence does not yet exist
+- runtime inspection of live constraint/index metadata was not separately recorded during acceptance

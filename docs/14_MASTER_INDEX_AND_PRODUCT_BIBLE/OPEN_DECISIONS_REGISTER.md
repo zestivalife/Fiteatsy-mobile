@@ -44,6 +44,30 @@ Still-open decisions that may affect later slices:
 - `OD-003 Deactivation`
 - `OD-004 CAP-001 Reference Naming`
 
+## Post-M3A Status
+
+`M3A — Client Identity Foundation` is now `PRODUCTION_ACCEPTED`.
+
+The next candidate milestone is:
+
+`M3B — Existing Domain Ownership Transition`
+
+`M3B` is not implementation-authorized.
+
+## Product Owner Decisions Required Before M3B
+
+### OD-010 Ownership Cutover Scope
+Which `user_id`-owned domain surfaces move to client ownership in the first M3B slice, and which remain compatibility-bound temporarily?
+
+### OD-011 Compatibility Window
+How long must mixed account/client ownership remain supported for reads, writes, migrations, and rollback?
+
+### OD-012 Transitional Authorization Boundary
+What is the approved server-side access contract while both legacy `user_id` ownership and client-owned resources coexist, and what anti-IDOR controls are mandatory at each boundary?
+
+### OD-013 Rollback / Repair Expectation
+What rollback or repair guarantees are required if M3B ownership migration partially succeeds across health profiles, care cases, nutrition profiles, reports, or notifications?
+
 ## Later Decisions
 
 ### OD-005 Recovery Methodology v1

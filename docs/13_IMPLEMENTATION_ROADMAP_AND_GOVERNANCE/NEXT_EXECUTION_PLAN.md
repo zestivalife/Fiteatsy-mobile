@@ -6,7 +6,7 @@ Do not begin new feature implementation yet.
 
 The next engineering action is:
 
-`M3 — Fiteatsy Client & Identity Definition / Governance`
+`M3B — Existing Domain Ownership Transition Definition / Governance`
 
 This is documentation, architecture, sequencing and change-control work only.
 
@@ -14,28 +14,16 @@ It does not authorize migrations, backend implementation, mobile implementation,
 
 ## Current Definition / Governance Scope
 
-Codex should establish one authoritative M3 definition that:
+Codex should establish one authoritative M3B definition that:
 
-- resolves stale D0/pre-production “next task” instructions;
-- identifies M3 as the next governed milestone;
-- keeps M3 implementation explicitly unauthorized;
-- defines Account vs Client boundaries;
-- defines/recommends client identity and lifecycle strategy;
-- defines migration, API, and regression strategy;
-- identifies Product Owner decisions that still require approval.
+- identifies the exact ownership surfaces moving from direct `user_id` references to client-owned contracts;
+- defines compatibility, migration, rollback, and authorization strategy;
+- keeps `M3B` implementation explicitly unauthorized;
+- identifies Product Owner decisions still required before an ownership-transition prompt can be approved.
 
 ## Recommended Post-Definition Implementation Order
 
-After the M3 definition/architecture gate is approved:
-
-### M3A — Client Identity Foundation
-
-- client aggregate;
-- stable client identifier;
-- account/client relationship;
-- persistence/repository contracts;
-- lifecycle baseline;
-- protected-baseline regression suite.
+After the M3B definition/architecture gate is approved:
 
 ### M3B — Existing Domain Ownership Transition
 
@@ -62,4 +50,4 @@ Those steps remain useful historical evidence but are no longer the active next 
 
 ## Why This Order
 
-The production runtime foundation is now accepted, so the next meaningful risk boundary is identity/client architecture rather than another deployment-readiness pass.
+M3A is production-accepted, so the next meaningful risk boundary is controlled ownership transition rather than another client-identity foundation change.

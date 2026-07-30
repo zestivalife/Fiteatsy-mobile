@@ -4,7 +4,7 @@
 **Product Type:** Mobile-first health tracking, disease-management and recovery-support platform  
 **Primary Client:** Fiteatsy mobile user  
 **Professional Workspace:** Zestiva Consultant / Practitioner System  
-**Status:** Backend production runtime verified and accepted on 30 July 2026; M3 definition/architecture is approved; `M3A — Client Identity Foundation` is authorized; `M3B` and `M3C` remain future governed slices
+**Status:** Backend production runtime verified and accepted on 30 July 2026; `M3A — Client Identity Foundation` is production-accepted on 30 July 2026; `M3B` and `M3C` remain future governed slices
 
 ## 1. Product Mission
 
@@ -77,37 +77,40 @@ Accepted deployment facts:
 - service: `Fiteatsy Backend`
 - production URL: `https://fiteatsy-mobile-production.up.railway.app`
 - branch: `main`
-- Git SHA: `c79fd4604788808483366394d9729d52727415f1`
+- Git SHA: `141f405d38e8f93b663c84288f76ba59348f4a09`
 - environment: `production`
 - health/readiness/database connectivity verified
 - OTP debug exposure removed
-- previous migration packaging defect resolved
+- M3A migration `0002` recorded in the production migration ledger
+- production table `fiteatsy_clients` verified at the visible-column level
+- current production dataset verified as `0 users / 0 clients`
 
 The next engineering objective is not another feature build.
 
 The next objective is:
 
 ```text
-M3 — Fiteatsy Client & Identity
-          |
-          v
-Definition Approved
-          |
-          v
 M3A — Client Identity Foundation
           |
           v
-Implementation Authorized
+Production Accepted
+          |
+          v
+M3B — Existing Domain Ownership Transition
+          |
+          v
+Definition / Governance Review Required
 ```
 
-Known limitation:
+Known limitations:
 
-- full migration-ledger/schema inspection was not independently performed through the public API during production verification.
+- constraint/index metadata for `fiteatsy_clients` was not independently runtime-inspected during acceptance;
+- production currently has zero users and zero clients, so populated live evidence for account -> client mappings and live public-ID uniqueness remains deferred rather than blocked.
 
 Current governance rule:
 
-- M3 is the next governed milestone.
-- only `M3A — Client Identity Foundation` is currently authorized for implementation;
+- `M3A — Client Identity Foundation` is closed as `PRODUCTION_ACCEPTED`;
+- `M3B` is the next candidate milestone and is not yet authorized for implementation;
 - `M3B` ownership transition and `M3C` mobile integration remain out of scope until separately governed.
 
 ## 6. Engineering Rule
