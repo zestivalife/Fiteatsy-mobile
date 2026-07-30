@@ -13,8 +13,8 @@ test.after(async () => {
   await server.close();
 });
 
-test.beforeEach(() => {
-  resetTestState();
+test.beforeEach(async () => {
+  await resetTestState();
 });
 
 test('POST /v1/intelligence/priority returns 200 with one priority', async () => {

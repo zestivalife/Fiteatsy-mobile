@@ -34,3 +34,26 @@ The documents below are the official reference for product, architecture, engine
 ## Repository Rule
 
 When code, behavior, naming, or architecture conflicts with the docs above, the docs should be treated as the target state and reference point for future development, unless a newer decision is recorded in [17 Decision Log](/Users/l.paunikar/Desktop/fiteatsy-mobile/docs/17_DECISION_LOG.md).
+
+## CAP-011 Phase 1B Status
+
+### Implemented
+
+- PostgreSQL-backed account persistence for `users`
+- Durable opaque session persistence for `auth_sessions`
+- Bearer-token authentication for protected `/v1/platform/*`, `/v1/reports/*`, and authenticated wearable routes
+- PostgreSQL-backed health profile, nutrition profile, recovery program, care case, timeline, health event, ticket, and notification repositories
+- Mobile session restore/persist wiring using the existing AsyncStorage dependency plus centralized Bearer-token registration
+
+### Planned
+
+- Consultant synchronization and downstream practitioner workspace integration
+- Report binary/object storage redesign
+- Wearable subsystem persistence redesign
+- Broader mobile migration from local/offline caches to backend-owned resources
+
+### Blocked / Product Decision Required
+
+- External `fiteatsy_client_id` contract
+- Account-to-client cardinality
+- Deactivation and deletion semantics for durable accounts/client records

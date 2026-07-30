@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson, patchJson, postJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
@@ -13,19 +14,25 @@ test.after(async () => {
   await server.close();
 });
 
-test.beforeEach(() => {
-  resetTestState();
+test.beforeEach(async () => {
+  await resetTestState();
 });
 
 test('platform endpoints return 404 before health profile exists', async () => {
-  const profile = await getJson(server.baseUrl, '/v1/platform/health-profile?userId=no-profile');
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const profile = await getJson(server.baseUrl, '/v1/platform/health-profile?userId=no-profile', {
+    headers: authHeaders(session.token)
+  });
   assert.equal(profile.response.status, 404);
 
-  const careCase = await getJson(server.baseUrl, '/v1/platform/care-cases/current?userId=no-profile');
+  const careCase = await getJson(server.baseUrl, '/v1/platform/care-cases/current?userId=no-profile', {
+    headers: authHeaders(session.token)
+  });
   assert.equal(careCase.response.status, 404);
 });
 
 test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 200', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
   const patched = await patchJson(
     server.baseUrl,
     '/v1/platform/health-profile',
@@ -35,30 +42,41 @@ test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 
       heightCm: 164,
       currentWeightKg: 62,
     },
-    { headers: { 'x-user-id': 'platform-user' } }
+    { headers: authHeaders(session.token) }
   );
   assert.equal(patched.response.status, 200);
-  assert.equal(patched.body.profile.userId, 'platform-user');
+  assert.equal(patched.body.profile.userId, session.current.body.accountId);
 
-  const profile = await getJson(server.baseUrl, '/v1/platform/health-profile?userId=platform-user');
+  const profile = await getJson(server.baseUrl, '/v1/platform/health-profile?userId=platform-user', {
+    headers: authHeaders(session.token)
+  });
   assert.equal(profile.response.status, 200);
+  assert.equal(profile.body.profile.userId, session.current.body.accountId);
 
-  const completion = await getJson(server.baseUrl, '/v1/platform/health-profile/completion?userId=platform-user');
+  const completion = await getJson(server.baseUrl, '/v1/platform/health-profile/completion?userId=platform-user', {
+    headers: authHeaders(session.token)
+  });
   assert.equal(completion.response.status, 200);
 
-  const careCase = await getJson(server.baseUrl, '/v1/platform/care-cases/current?userId=platform-user');
+  const careCase = await getJson(server.baseUrl, '/v1/platform/care-cases/current?userId=platform-user', {
+    headers: authHeaders(session.token)
+  });
   assert.equal(careCase.response.status, 200);
 });
 
 test('PATCH /v1/platform/health-profile returns 400 for invalid body', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
   const { response, body } = await patchJson(server.baseUrl, '/v1/platform/health-profile', {
     heightCm: -10,
+  }, {
+    headers: authHeaders(session.token)
   });
   assert.equal(response.status, 400);
   assert.equal(body.error, 'INVALID_INPUT');
 });
 
 test('platform ticket, timeline, events, assignment, and notifications flow works', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
   const seeded = await patchJson(
     server.baseUrl,
     '/v1/platform/health-profile',
@@ -68,27 +86,38 @@ test('platform ticket, timeline, events, assignment, and notifications flow work
       heightCm: 175,
       currentWeightKg: 79,
     },
-    { headers: { 'x-user-id': 'care-user' } }
+    { headers: authHeaders(session.token) }
   );
   const careCaseId = seeded.body.careCase.id;
 
   const missing = await postJson(
     server.baseUrl,
     '/v1/platform/health-profile/request-missing-information',
-    { userId: 'care-user', requestedBy: 'consultant-9', fields: ['blood_reports'] }
+    { userId: 'spoofed-user', requestedBy: 'consultant-9', fields: ['blood_reports'] },
+    { headers: authHeaders(session.token) }
   );
   assert.equal(missing.response.status, 201);
 
   const assign = await postJson(server.baseUrl, `/v1/platform/care-cases/${careCaseId}/assign-consultant`, {
     consultantId: 'consultant-42',
     mentorId: 'mentor-4',
+  }, {
+    headers: authHeaders(session.token)
   });
   assert.equal(assign.response.status, 200);
 
-  const timeline = await getJson(server.baseUrl, `/v1/platform/care-cases/${careCaseId}/timeline`);
-  const events = await getJson(server.baseUrl, `/v1/platform/care-cases/${careCaseId}/events`);
-  const tickets = await getJson(server.baseUrl, `/v1/platform/care-cases/${careCaseId}/tickets`);
-  const notifications = await getJson(server.baseUrl, '/v1/platform/notifications?userId=care-user');
+  const timeline = await getJson(server.baseUrl, `/v1/platform/care-cases/${careCaseId}/timeline`, {
+    headers: authHeaders(session.token)
+  });
+  const events = await getJson(server.baseUrl, `/v1/platform/care-cases/${careCaseId}/events`, {
+    headers: authHeaders(session.token)
+  });
+  const tickets = await getJson(server.baseUrl, `/v1/platform/care-cases/${careCaseId}/tickets`, {
+    headers: authHeaders(session.token)
+  });
+  const notifications = await getJson(server.baseUrl, '/v1/platform/notifications?userId=care-user', {
+    headers: authHeaders(session.token)
+  });
 
   assert.equal(timeline.response.status, 200);
   assert.equal(events.response.status, 200);
@@ -100,10 +129,43 @@ test('platform ticket, timeline, events, assignment, and notifications flow work
 });
 
 test('platform assignment returns 404 for missing care case', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
   const { response } = await postJson(server.baseUrl, '/v1/platform/care-cases/missing-case/assign-consultant', {
     consultantId: 'consultant-42',
+  }, {
+    headers: authHeaders(session.token)
   });
   assert.equal(response.status, 404);
 });
 
-test.skip('platform routes should return 401 and 403 once role-based authorization is enabled');
+test('platform routes reject missing tokens and deny cross-account care-case access', async () => {
+  const missing = await getJson(server.baseUrl, '/v1/platform/health-profile');
+  assert.equal(missing.response.status, 401);
+
+  const owner = await createAuthenticatedSession(server.baseUrl, {
+    email: 'owner@example.com',
+    mobileNumber: '+919876543230'
+  });
+  const attacker = await createAuthenticatedSession(server.baseUrl, {
+    email: 'attacker@example.com',
+    mobileNumber: '+919876543231'
+  });
+  const seeded = await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    {
+      dateOfBirthISO: '1992-06-21T00:00:00.000Z',
+      gender: 'Male',
+      heightCm: 175,
+      currentWeightKg: 79
+    },
+    { headers: authHeaders(owner.token) }
+  );
+
+  const stolenTimeline = await getJson(
+    server.baseUrl,
+    `/v1/platform/care-cases/${seeded.body.careCase.id}/timeline`,
+    { headers: authHeaders(attacker.token) }
+  );
+  assert.equal(stolenTimeline.response.status, 404);
+});

@@ -12,8 +12,6 @@ import { WearableSyncPayload } from '../types';
 
 type HealthConnectMetricStatus = 'synced' | 'no_permission' | 'no_recent_data' | 'unsupported' | 'unavailable';
 
-const USER_ID = 'emp-demo-1';
-
 const DAY = 24 * 60 * 60 * 1000;
 const now = () => Date.now();
 
@@ -371,7 +369,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   }
 
   const payload: WearableSyncPayload = {
-    deviceId: `hc-${USER_ID}`,
+    deviceId: 'hc-local-device',
     brand: 'Other',
     model: 'Health Connect',
     provider: 'Health Connect',

@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import { createApp } from '../../backend/src/server.js';
+import { createApp, initializeBackend } from '../../backend/src/server.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
 
 export type TestServer = {
@@ -9,6 +9,7 @@ export type TestServer = {
 };
 
 export const startTestServer = async (): Promise<TestServer> => {
+  await initializeBackend();
   const app = createApp();
   const server = await new Promise<Server>((resolve, reject) => {
     const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
@@ -28,5 +29,5 @@ export const startTestServer = async (): Promise<TestServer> => {
 };
 
 export const resetTestState = () => {
-  resetBackendStateForTests();
+  return resetBackendStateForTests();
 };

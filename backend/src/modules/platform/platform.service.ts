@@ -6,7 +6,6 @@ import {
   getCareCaseById,
   getCareCaseByUserId,
   getHealthProfileByUserId,
-  getNutritionProfileByUserId,
   listHealthEvents,
   listHealthTickets,
   listNotificationsForUser,
@@ -29,25 +28,25 @@ const inferStage = (profile: HealthProfileRecord, reportCount: number, readiness
   return 'consultant_review';
 };
 
-export const upsertHealthProfile = (userId: string, patch: Partial<HealthProfileRecord>) => {
+export const upsertHealthProfile = async (userId: string, patch: Partial<HealthProfileRecord>) => {
   const calculatedAge = patch.dateOfBirthISO ? calculateAgeFromDob(patch.dateOfBirthISO) : undefined;
-  const profile = createOrUpdateHealthProfile(userId, {
+  const profile = await createOrUpdateHealthProfile(userId, {
     ...patch,
     ...(calculatedAge !== undefined ? { calculatedAge } : {}),
   });
   const reportCount = listReports(userId).length;
-  const nutrition = saveNutritionProfile(
+  const nutrition = await saveNutritionProfile(
     userId,
     profile.id,
     calculateNutritionProfileCompletion(profile, reportCount)
   );
-  const careCase = createCareCaseIfMissing(userId, profile.id);
+  const careCase = await createCareCaseIfMissing(userId, profile.id);
   const nextStage = inferStage(profile, reportCount, nutrition.readinessScore);
   if (careCase.currentStage !== nextStage) {
-    transitionCareCaseStage(careCase, nextStage, 'Profile completion and report availability recalculated.');
+    await transitionCareCaseStage(careCase, nextStage, 'Profile completion and report availability recalculated.');
   }
 
-  addTimelineEvent({
+  await addTimelineEvent({
     careCaseId: careCase.id,
     userId,
     kind: 'health_profile_updated',
@@ -59,7 +58,7 @@ export const upsertHealthProfile = (userId: string, patch: Partial<HealthProfile
       readinessScore: nutrition.readinessScore,
     },
   });
-  addHealthEvent({
+  await addHealthEvent({
     careCaseId: careCase.id,
     userId,
     type: 'health_profile_updated',
@@ -74,7 +73,7 @@ export const upsertHealthProfile = (userId: string, patch: Partial<HealthProfile
   });
 
   if (nutrition.missingFields.length > 0) {
-    createOperationalTicket(
+    await createOperationalTicket(
       careCase.id,
       userId,
       'missing_health_profile',
@@ -85,29 +84,29 @@ export const upsertHealthProfile = (userId: string, patch: Partial<HealthProfile
     );
   }
 
-  return { profile, nutrition, careCase: getCareCaseByUserId(userId) };
+  return { profile, nutrition, careCase: await getCareCaseByUserId(userId) };
 };
 
-export const getHealthProfileBundle = (userId: string) => {
-  const profile = getHealthProfileByUserId(userId);
+export const getHealthProfileBundle = async (userId: string) => {
+  const profile = await getHealthProfileByUserId(userId);
   if (!profile) return null;
   const reportCount = listReports(userId).length;
-  const nutrition = saveNutritionProfile(
+  const nutrition = await saveNutritionProfile(
     userId,
     profile.id,
     calculateNutritionProfileCompletion(profile, reportCount)
   );
-  const careCase = createCareCaseIfMissing(userId, profile.id);
+  const careCase = await createCareCaseIfMissing(userId, profile.id);
   return { profile, nutrition, careCase, reportCount };
 };
 
-export const requestMissingInformation = (userId: string, fields: string[], requestedBy: string) => {
-  const bundle = getHealthProfileBundle(userId);
+export const requestMissingInformation = async (userId: string, fields: string[], requestedBy: string) => {
+  const bundle = await getHealthProfileBundle(userId);
   if (!bundle) {
     throw new Error('Health profile not found');
   }
 
-  const ticket = createOperationalTicket(
+  const ticket = await createOperationalTicket(
     bundle.careCase.id,
     userId,
     'missing_health_profile',
@@ -117,7 +116,7 @@ export const requestMissingInformation = (userId: string, fields: string[], requ
     `Consultant requested: ${fields.join(', ')}`
   );
 
-  createNotificationRecord({
+  await createNotificationRecord({
     userId,
     careCaseId: bundle.careCase.id,
     channel: 'in_app',
@@ -126,7 +125,7 @@ export const requestMissingInformation = (userId: string, fields: string[], requ
     sentAtISO: nowIso(),
   });
 
-  addTimelineEvent({
+  await addTimelineEvent({
     careCaseId: bundle.careCase.id,
     userId,
     kind: 'notification_sent',
@@ -139,19 +138,19 @@ export const requestMissingInformation = (userId: string, fields: string[], requ
   return { ticket, requestedFields: fields };
 };
 
-export const listCareCaseTimeline = (careCaseId: string) => listTimelineEvents(careCaseId);
-export const listCareCaseEvents = (careCaseId: string) => listHealthEvents(careCaseId);
-export const listCareCaseTickets = (careCaseId: string) => listHealthTickets(careCaseId);
-export const listUserNotifications = (userId: string) => listNotificationsForUser(userId);
+export const listCareCaseTimeline = async (careCaseId: string) => listTimelineEvents(careCaseId);
+export const listCareCaseEvents = async (careCaseId: string) => listHealthEvents(careCaseId);
+export const listCareCaseTickets = async (careCaseId: string) => listHealthTickets(careCaseId);
+export const listUserNotifications = async (userId: string) => listNotificationsForUser(userId);
 
-export const assignConsultant = (careCaseId: string, consultantId: string, mentorId?: string | null) => {
-  const careCase = getCareCaseById(careCaseId);
+export const assignConsultant = async (careCaseId: string, consultantId: string, mentorId?: string | null) => {
+  const careCase = await getCareCaseById(careCaseId);
   if (!careCase) throw new Error('Care case not found');
-  const updated = updateCareCase(careCaseId, {
+  const updated = await updateCareCase(careCaseId, {
     assignedConsultantId: consultantId,
     assignedMentorId: mentorId ?? careCase.assignedMentorId,
   });
-  addTimelineEvent({
+  await addTimelineEvent({
     careCaseId,
     userId: careCase.userId,
     kind: 'consultant_assigned',
@@ -160,7 +159,7 @@ export const assignConsultant = (careCaseId: string, consultantId: string, mento
     eventTimeISO: nowIso(),
     metadata: { consultantId, mentorId: mentorId ?? null },
   });
-  createNotificationRecord({
+  await createNotificationRecord({
     userId: careCase.userId,
     careCaseId,
     channel: 'in_app',
@@ -171,18 +170,18 @@ export const assignConsultant = (careCaseId: string, consultantId: string, mento
   return updated;
 };
 
-export const syncReportPipelineToPlatform = (
+export const syncReportPipelineToPlatform = async (
   userId: string,
   reportId: string,
   stage: 'uploaded' | 'ocr_completed' | 'biomarkers_updated' | 'analysis_completed',
   detail: string
 ) => {
-  const bundle = getHealthProfileBundle(userId);
+  const bundle = await getHealthProfileBundle(userId);
   if (!bundle) {
-    const profile = createOrUpdateHealthProfile(userId, {});
-    createCareCaseIfMissing(userId, profile.id, 'new_client');
+    const profile = await createOrUpdateHealthProfile(userId, {});
+    await createCareCaseIfMissing(userId, profile.id, 'new_client');
   }
-  const nextBundle = getHealthProfileBundle(userId);
+  const nextBundle = await getHealthProfileBundle(userId);
   if (!nextBundle) return null;
 
   const kind =
@@ -192,7 +191,7 @@ export const syncReportPipelineToPlatform = (
         ? 'ocr_completed'
         : 'biomarkers_updated';
 
-  const timeline = addTimelineEvent({
+  const timeline = await addTimelineEvent({
     careCaseId: nextBundle.careCase.id,
     userId,
     kind,
@@ -202,7 +201,7 @@ export const syncReportPipelineToPlatform = (
     metadata: { reportId, stage },
   });
 
-  addHealthEvent({
+  await addHealthEvent({
     careCaseId: nextBundle.careCase.id,
     userId,
     type: kind,
@@ -212,7 +211,7 @@ export const syncReportPipelineToPlatform = (
     eventTimeISO: nowIso(),
   });
 
-  const recomputedNutrition = saveNutritionProfile(
+  const recomputedNutrition = await saveNutritionProfile(
     userId,
     nextBundle.profile.id,
     calculateNutritionProfileCompletion(nextBundle.profile, listReports(userId).length)
@@ -220,11 +219,11 @@ export const syncReportPipelineToPlatform = (
 
   const nextStage = inferStage(nextBundle.profile, listReports(userId).length, recomputedNutrition.readinessScore);
   if (nextBundle.careCase.currentStage !== nextStage) {
-    transitionCareCaseStage(nextBundle.careCase, nextStage, `Report pipeline advanced to ${stage}.`);
+    await transitionCareCaseStage(nextBundle.careCase, nextStage, `Report pipeline advanced to ${stage}.`);
   }
 
   if (stage === 'analysis_completed') {
-    createNotificationRecord({
+    await createNotificationRecord({
       userId,
       careCaseId: nextBundle.careCase.id,
       channel: 'in_app',

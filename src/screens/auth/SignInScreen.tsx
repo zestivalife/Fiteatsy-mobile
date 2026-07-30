@@ -25,7 +25,7 @@ const isCorporateEmail = (email: string) => {
 };
 
 export const SignInScreen = ({ navigation }: Props) => {
-  const { setIsAuthenticated, onboarding, assessment, wearableSetupCompleted, themeMode } = useAppContext();
+  const { themeMode } = useAppContext();
   const themeColors = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
   const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
@@ -42,16 +42,7 @@ export const SignInScreen = ({ navigation }: Props) => {
     }
 
     setError(null);
-    setIsAuthenticated(true);
-    if (!onboarding) {
-      navigation.replace('OnboardingBasics');
-      return;
-    }
-    if (!assessment) {
-      navigation.replace('OnboardingAssessment');
-      return;
-    }
-    navigation.replace(wearableSetupCompleted ? 'Main' : 'SyncWearable');
+    navigation.navigate('SignUp');
   };
 
   return (
@@ -59,8 +50,8 @@ export const SignInScreen = ({ navigation }: Props) => {
       <View style={styles.container}>
         <View style={styles.form}>
           <Text style={[styles.title, { color: darkTextStrong }]}>Sign in</Text>
-          <Text style={[styles.subTitle, { color: darkTextStrong }]}>Use your corporate email to continue.</Text>
-          <Text style={[styles.demoHint, { color: darkTextStrong }]}>Demo: care@fiteatsy.com  |  Demo@123</Text>
+          <Text style={[styles.subTitle, { color: darkTextStrong }]}>Corporate access routes through verified OTP in this build.</Text>
+          <Text style={[styles.demoHint, { color: darkTextStrong }]}>Enter your email, then continue to the OTP verification flow.</Text>
 
           <TextField
             label="Corporate Email"
@@ -80,7 +71,7 @@ export const SignInScreen = ({ navigation }: Props) => {
 
           {error ? <Text style={[styles.error, { color: themeColors.danger }]}>{error}</Text> : null}
 
-          <PrimaryButton title="Sign In" onPress={handleSignIn} disabled={!canSubmit} />
+          <PrimaryButton title="Continue to OTP" onPress={handleSignIn} disabled={!canSubmit} />
 
           <View style={styles.footerLine}>
             <Text style={[styles.helper, { color: darkTextStrong }]}>Don't have an account? </Text>

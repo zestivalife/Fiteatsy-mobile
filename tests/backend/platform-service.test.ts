@@ -10,12 +10,12 @@ import {
 import { createReportRecord } from '../../backend/src/modules/reports/reports.store.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
 
-test.beforeEach(() => {
-  resetBackendStateForTests();
+test.beforeEach(async () => {
+  await resetBackendStateForTests();
 });
 
-test('service layer upserts health profile and derives completion bundle', () => {
-  const bundle = upsertHealthProfile('svc-user', {
+test('service layer upserts health profile and derives completion bundle', async () => {
+  const bundle = await upsertHealthProfile('svc-user', {
     dateOfBirthISO: '1991-05-20T00:00:00.000Z',
     gender: 'Male',
     heightCm: 172,
@@ -57,17 +57,17 @@ test('service layer upserts health profile and derives completion bundle', () =>
   assert.ok(bundle.nutrition.completionPercent >= 90);
 });
 
-test('service layer creates missing information ticket and notification', () => {
-  upsertHealthProfile('missing-user', {});
-  const result = requestMissingInformation('missing-user', ['dateOfBirthISO', 'blood_reports'], 'consultant-1');
+test('service layer creates missing information ticket and notification', async () => {
+  await upsertHealthProfile('missing-user', {});
+  const result = await requestMissingInformation('missing-user', ['dateOfBirthISO', 'blood_reports'], 'consultant-1');
   assert.equal(result.requestedFields.length, 2);
-  const bundle = getHealthProfileBundle('missing-user');
+  const bundle = await getHealthProfileBundle('missing-user');
   assert.ok(bundle);
   assert.equal(bundle?.careCase.currentStage, 'health_profile_pending');
 });
 
-test('service layer syncs report pipeline milestones into care case timeline', () => {
-  upsertHealthProfile('report-user', {
+test('service layer syncs report pipeline milestones into care case timeline', async () => {
+  await upsertHealthProfile('report-user', {
     dateOfBirthISO: '1990-01-01T00:00:00.000Z',
     gender: 'Female',
     heightCm: 160,
@@ -79,22 +79,22 @@ test('service layer syncs report pipeline milestones into care case timeline', (
     mimeType: 'application/pdf',
     fileSize: 1024,
   });
-  const sync = syncReportPipelineToPlatform(
+  const sync = await syncReportPipelineToPlatform(
     'report-user',
     'rep_fake',
     'analysis_completed',
     'AI validation completed for baseline.pdf'
   );
   assert.ok(sync);
-  const bundle = getHealthProfileBundle('report-user');
+  const bundle = await getHealthProfileBundle('report-user');
   assert.ok(bundle);
   assert.equal(bundle?.careCase.currentStage, 'ready_for_consultant');
   assert.ok((bundle?.reportCount ?? 0) > 0);
 });
 
-test('service layer assigns consultant to care case', () => {
-  const bundle = upsertHealthProfile('assign-user', {});
-  const updated = assignConsultant(bundle.careCase.id, 'consultant-42', 'mentor-11');
+test('service layer assigns consultant to care case', async () => {
+  const bundle = await upsertHealthProfile('assign-user', {});
+  const updated = await assignConsultant(bundle.careCase.id, 'consultant-42', 'mentor-11');
   assert.equal(updated?.assignedConsultantId, 'consultant-42');
   assert.equal(updated?.assignedMentorId, 'mentor-11');
 });

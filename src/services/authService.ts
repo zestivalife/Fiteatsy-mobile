@@ -13,12 +13,36 @@ type ApiErrorCode =
   | 'OTP_INVALID'
   | 'OTP_RESEND_NOT_READY'
   | 'OTP_TOO_MANY_ATTEMPTS'
+  | 'AUTH_CONTACT_CONFLICT'
   | 'NETWORK_OFFLINE'
   | 'SERVER_ERROR';
+
+export type AuthSessionResponse = {
+  sessionToken: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    mobileNumber: string;
+  };
+};
+
+export type CurrentAuthSession = {
+  accountId: string;
+  sessionId: string;
+  sessionExpiresAtISO: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    mobileNumber: string;
+  };
+};
 
 export class AuthServiceError extends Error {
   code: ApiErrorCode;
   retryAfterSec?: number;
+
   constructor(code: ApiErrorCode, message: string, retryAfterSec?: number) {
     super(message);
     this.code = code;
@@ -38,126 +62,6 @@ const getApiBaseUrl = () => {
 
 const apiBaseUrl = getApiBaseUrl();
 
-type OfflineChallenge = {
-  challengeId: string;
-  name: string;
-  email: string;
-  mobileNumber: string;
-  otp: string;
-  expiresAtISO: string;
-  resendAvailableAtISO: string;
-  attemptsRemaining: number;
-};
-
-const offlineChallenges = new Map<string, OfflineChallenge>();
-
-const maskEmail = (email: string) => {
-  const [name, domain] = email.toLowerCase().split('@');
-  if (!name || !domain) return email;
-  const visible = name.slice(0, 2);
-  return `${visible}${'*'.repeat(Math.max(1, name.length - 2))}@${domain}`;
-};
-
-const maskMobile = (mobileNumber: string) => {
-  const digits = mobileNumber.replace(/\D/g, '');
-  if (digits.length < 4) return mobileNumber;
-  return `+${'*'.repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
-};
-
-const createOfflineChallenge = (params: SignupRequestParams): SignupOtpResponse => {
-  const now = Date.now();
-  const challengeId = `offline-${now}-${Math.random().toString(36).slice(2, 8)}`;
-  const otp = `${Math.floor(100000 + Math.random() * 900000)}`;
-  const expiresAtISO = new Date(now + 5 * 60 * 1000).toISOString();
-  const resendAvailableAtISO = new Date(now + 30 * 1000).toISOString();
-  offlineChallenges.set(challengeId, {
-    challengeId,
-    name: params.name.trim(),
-    email: params.email.trim().toLowerCase(),
-    mobileNumber: params.mobileNumber.trim(),
-    otp,
-    expiresAtISO,
-    resendAvailableAtISO,
-    attemptsRemaining: 5
-  });
-  return {
-    challengeId,
-    expiresAtISO,
-    resendAvailableAtISO,
-    attemptsRemaining: 5,
-    deliveryChannel: {
-      emailMasked: maskEmail(params.email),
-      mobileMasked: maskMobile(params.mobileNumber)
-    },
-    debugOtp: otp
-  };
-};
-
-const resendOfflineChallenge = (challengeId: string): SignupOtpResponse => {
-  const existing = offlineChallenges.get(challengeId);
-  if (!existing) {
-    throw new AuthServiceError('OTP_NOT_FOUND', 'OTP challenge not found. Please request a new OTP.');
-  }
-  const now = Date.now();
-  const nextResendAt = new Date(existing.resendAvailableAtISO).getTime();
-  if (now < nextResendAt) {
-    throw new AuthServiceError('OTP_RESEND_NOT_READY', 'Please wait before requesting another OTP.', Math.ceil((nextResendAt - now) / 1000));
-  }
-  const otp = `${Math.floor(100000 + Math.random() * 900000)}`;
-  const expiresAtISO = new Date(now + 5 * 60 * 1000).toISOString();
-  const resendAvailableAtISO = new Date(now + 30 * 1000).toISOString();
-  const updated: OfflineChallenge = {
-    ...existing,
-    otp,
-    expiresAtISO,
-    resendAvailableAtISO,
-    attemptsRemaining: 5
-  };
-  offlineChallenges.set(challengeId, updated);
-  return {
-    challengeId,
-    expiresAtISO,
-    resendAvailableAtISO,
-    attemptsRemaining: 5,
-    deliveryChannel: {
-      emailMasked: maskEmail(updated.email),
-      mobileMasked: maskMobile(updated.mobileNumber)
-    },
-    debugOtp: otp
-  };
-};
-
-const verifyOfflineChallenge = (challengeId: string, otp: string) => {
-  const challenge = offlineChallenges.get(challengeId);
-  if (!challenge) {
-    throw new AuthServiceError('OTP_NOT_FOUND', 'OTP challenge not found. Please request a new OTP.');
-  }
-  const now = Date.now();
-  if (now > new Date(challenge.expiresAtISO).getTime()) {
-    throw new AuthServiceError('OTP_EXPIRED', 'OTP expired. Please request a new OTP.');
-  }
-  if (challenge.attemptsRemaining <= 0) {
-    throw new AuthServiceError('OTP_TOO_MANY_ATTEMPTS', 'Too many failed attempts. Please resend OTP.');
-  }
-  if (challenge.otp !== otp.trim()) {
-    const updated: OfflineChallenge = {
-      ...challenge,
-      attemptsRemaining: challenge.attemptsRemaining - 1
-    };
-    offlineChallenges.set(challengeId, updated);
-    throw new AuthServiceError('OTP_INVALID', 'Invalid OTP. Please try again.');
-  }
-  offlineChallenges.delete(challengeId);
-  return {
-    sessionToken: `offline-session-${Date.now()}`,
-    user: {
-      name: challenge.name,
-      email: challenge.email,
-      mobileNumber: challenge.mobileNumber
-    }
-  };
-};
-
 const parseError = async (response: Response): Promise<never> => {
   let payload: { error?: ApiErrorCode; message?: string; retryAfterSec?: number } = {};
   try {
@@ -172,19 +76,29 @@ const parseError = async (response: Response): Promise<never> => {
   );
 };
 
-const post = async <T>(path: string, body: Record<string, string>): Promise<T> => {
+const requestJson = async <T>(
+  path: string,
+  init: RequestInit & { skipJsonBody?: boolean } = {}
+): Promise<T> => {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      ...init,
+      headers: {
+        ...(init.skipJsonBody ? {} : { 'Content-Type': 'application/json' }),
+        ...(init.headers ?? {})
+      }
     });
   } catch {
-    throw new AuthServiceError('NETWORK_OFFLINE', 'You appear to be offline. Please check internet and retry.');
+    throw new AuthServiceError('NETWORK_OFFLINE', 'Unable to reach the authentication service.');
   }
+
   if (!response.ok) {
     return parseError(response);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
   return (await response.json()) as T;
 };
@@ -202,28 +116,37 @@ export type SignupOtpResponse = {
 };
 
 export const requestSignupOtp = (params: SignupRequestParams) =>
-  post<SignupOtpResponse>('/v1/auth/signup/request-otp', params).catch((err) => {
-    if (err instanceof AuthServiceError && err.code === 'NETWORK_OFFLINE') {
-      return createOfflineChallenge(params);
-    }
-    throw err;
+  requestJson<SignupOtpResponse>('/v1/auth/signup/request-otp', {
+    method: 'POST',
+    body: JSON.stringify(params)
   });
 
 export const resendSignupOtp = (challengeId: string) =>
-  post<SignupOtpResponse>('/v1/auth/signup/resend-otp', { challengeId }).catch((err) => {
-    if (err instanceof AuthServiceError && err.code === 'NETWORK_OFFLINE' && challengeId.startsWith('offline-')) {
-      return resendOfflineChallenge(challengeId);
-    }
-    throw err;
+  requestJson<SignupOtpResponse>('/v1/auth/signup/resend-otp', {
+    method: 'POST',
+    body: JSON.stringify({ challengeId })
   });
 
 export const verifySignupOtp = (challengeId: string, otp: string) =>
-  post<{ sessionToken: string; user: { name: string; email: string; mobileNumber: string } }>('/v1/auth/signup/verify-otp', {
-    challengeId,
-    otp
-  }).catch((err) => {
-    if (err instanceof AuthServiceError && err.code === 'NETWORK_OFFLINE' && challengeId.startsWith('offline-')) {
-      return verifyOfflineChallenge(challengeId, otp);
-    }
-    throw err;
+  requestJson<AuthSessionResponse>('/v1/auth/signup/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify({ challengeId, otp })
+  });
+
+export const getCurrentAuthSession = (sessionToken: string) =>
+  requestJson<CurrentAuthSession>('/v1/auth/me', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${sessionToken}`
+    },
+    skipJsonBody: true
+  });
+
+export const logoutAuthSession = (sessionToken: string) =>
+  requestJson<void>('/v1/auth/logout', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({})
   });

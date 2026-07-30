@@ -1,11 +1,32 @@
 create table if not exists users (
   id text primary key,
   name text not null,
-  role text not null,
-  work_hours text not null,
-  biggest_challenge text not null,
-  calendar_provider text not null,
-  created_at timestamptz not null default now()
+  email_normalized text,
+  mobile_number_normalized text,
+  email_verified_at timestamptz,
+  mobile_verified_at timestamptz,
+  role text,
+  work_hours text,
+  biggest_challenge text,
+  calendar_provider text,
+  status text not null default 'active',
+  version integer not null default 1,
+  last_login_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+
+create table if not exists auth_sessions (
+  id text primary key,
+  user_id text not null references users(id),
+  token_hash text not null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  revoked_at timestamptz,
+  last_used_at timestamptz,
+  user_agent text,
+  ip_address text
 );
 
 create table if not exists daily_checkins (

@@ -7,6 +7,7 @@ import {
   getHealthApps,
   ingestHealthRecords
 } from './wearables.service.js';
+import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 
 const wearableSyncSchema = z.object({
   deviceId: z.string().min(1),
@@ -16,8 +17,7 @@ const wearableSyncSchema = z.object({
 
 const healthAppConnectSchema = z.object({
   appId: z.enum(['apple-health', 'health-connect', 'google-fit', 'samsung-health', 'fitbit']),
-  platform: z.enum(['ios', 'android']),
-  userId: z.string().min(1).max(120)
+  platform: z.enum(['ios', 'android'])
 });
 
 const healthRecordSchema = z.object({
@@ -41,14 +41,12 @@ const healthRecordSchema = z.object({
 });
 
 const ingestSchema = z.object({
-  userId: z.string().min(1).max(120),
   appId: z.enum(['apple-health', 'health-connect', 'google-fit', 'samsung-health', 'fitbit']),
   platform: z.enum(['ios', 'android']),
   records: z.array(healthRecordSchema).min(1).max(1000)
 });
 
 const liveSyncSchema = z.object({
-  userId: z.string().min(1).max(120),
   appId: z.enum(['apple-health', 'health-connect', 'google-fit', 'samsung-health', 'fitbit']).optional(),
   platform: z.enum(['ios', 'android']).optional()
 });
@@ -63,17 +61,22 @@ wearablesRouter.get('/health-apps', (req, res) => {
   });
 });
 
+wearablesRouter.use(requireAuthenticatedAccount);
+
 wearablesRouter.post('/connect-app', (req, res) => {
   const parse = healthAppConnectSchema.safeParse(req.body);
   if (!parse.success) {
     return res.status(400).json({
       error: 'invalid_payload',
-      message: 'appId, platform, and userId are required.'
+      message: 'appId and platform are required.'
     });
   }
 
   try {
-    const connection = connectHealthApp(parse.data);
+    const connection = connectHealthApp({
+      ...parse.data,
+      userId: getAuthenticatedAccount(req).accountId
+    });
     return res.status(200).json({
       connected: true,
       connectionId: connection.id,
@@ -92,7 +95,7 @@ wearablesRouter.post('/connect-app', (req, res) => {
 });
 
 wearablesRouter.get('/connections/:userId', (req, res) => {
-  const userId = req.params.userId;
+  const userId = getAuthenticatedAccount(req).accountId;
   return res.status(200).json({
     userId,
     connections: getConnections(userId)
@@ -104,11 +107,14 @@ wearablesRouter.post('/records/ingest', (req, res) => {
   if (!parse.success) {
     return res.status(400).json({
       error: 'invalid_payload',
-      message: 'userId, appId, platform, and records[] are required.'
+      message: 'appId, platform, and records[] are required.'
     });
   }
 
-  const result = ingestHealthRecords(parse.data);
+  const result = ingestHealthRecords({
+    ...parse.data,
+    userId: getAuthenticatedAccount(req).accountId
+  });
   return res.status(200).json(result);
 });
 
@@ -117,12 +123,15 @@ wearablesRouter.post('/sync/live', (req, res) => {
   if (!parse.success) {
     return res.status(400).json({
       error: 'invalid_payload',
-      message: 'userId is required for live sync.'
+      message: 'Optional appId/platform payload is invalid.'
     });
   }
 
   try {
-    const { connection, payload } = buildLiveSyncPayload(parse.data);
+    const { connection, payload } = buildLiveSyncPayload({
+      ...parse.data,
+      userId: getAuthenticatedAccount(req).accountId
+    });
     return res.status(200).json({
       connection,
       payload

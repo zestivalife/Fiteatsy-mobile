@@ -4,12 +4,12 @@ import { upsertHealthProfile } from '../../backend/src/modules/platform/platform
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
 import { createReportRecord } from '../../backend/src/modules/reports/reports.store.js';
 
-test.beforeEach(() => {
-  resetBackendStateForTests();
+test.beforeEach(async () => {
+  await resetBackendStateForTests();
 });
 
-test('validation engine keeps incomplete profiles below AI readiness threshold', () => {
-  const bundle = upsertHealthProfile('validation-incomplete', {
+test('validation engine keeps incomplete profiles below AI readiness threshold', async () => {
+  const bundle = await upsertHealthProfile('validation-incomplete', {
     gender: 'Female',
     heightCm: 160,
   });
@@ -18,14 +18,14 @@ test('validation engine keeps incomplete profiles below AI readiness threshold',
   assert.equal(bundle.careCase.currentStage, 'health_profile_pending');
 });
 
-test('validation engine upgrades complete profiles with reports into consultant workflow', () => {
+test('validation engine upgrades complete profiles with reports into consultant workflow', async () => {
   createReportRecord({
     userId: 'validation-ready',
     fileName: 'ready.pdf',
     mimeType: 'application/pdf',
     fileSize: 2048,
   });
-  const bundle = upsertHealthProfile('validation-ready', {
+  const bundle = await upsertHealthProfile('validation-ready', {
     dateOfBirthISO: '1988-04-19T00:00:00.000Z',
     gender: 'Male',
     heightCm: 174,

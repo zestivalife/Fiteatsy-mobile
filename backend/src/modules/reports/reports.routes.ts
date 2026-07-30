@@ -15,6 +15,7 @@ import {
   updateReportStatus
 } from './reports.store.js';
 import { syncReportPipelineToPlatform } from '../platform/platform.service.js';
+import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -22,9 +23,6 @@ const upload = multer({
 });
 
 export const reportsRouter = Router();
-
-const getUserId = (req: any) =>
-  String(req.header('x-user-id') || req.body?.userId || req.query?.userId || 'demo-user').trim();
 
 const toReportDto = (record: ReturnType<typeof getReport>) => {
   if (!record) return null;
@@ -55,8 +53,10 @@ reportsRouter.get('/supported-formats', (_req, res) => {
   });
 });
 
-reportsRouter.post('/upload/init', (req, res) => {
-  const userId = getUserId(req);
+reportsRouter.use(requireAuthenticatedAccount);
+
+reportsRouter.post('/upload/init', async (req, res) => {
+  const userId = getAuthenticatedAccount(req).accountId;
   const fileName = String(req.body?.fileName || '').trim();
   const mimeType = String(req.body?.mimeType || '').trim().toLowerCase();
   const fileSize = Number(req.body?.fileSize || 0);
@@ -76,20 +76,24 @@ reportsRouter.post('/upload/init', (req, res) => {
   }
 
   const session = createUploadSession({ userId, fileName, mimeType, fileSize, source });
-  syncReportPipelineToPlatform(userId, session.id, 'uploaded', `Blood report upload initialized for ${fileName}`);
+  await syncReportPipelineToPlatform(userId, session.id, 'uploaded', `Blood report upload initialized for ${fileName}`);
   return res.status(201).json({ uploadId: session.id, expiresAtISO: session.expiresAtISO, status: session.status });
 });
 
 reportsRouter.post('/upload/complete', (req, res) => {
   const uploadId = String(req.body?.uploadId || '').trim();
   if (!uploadId) return res.status(400).json({ error: 'MISSING_UPLOAD_ID', message: 'uploadId is required.' });
+  const currentSession = getUploadSession(uploadId);
+  if (currentSession && currentSession.userId !== getAuthenticatedAccount(req).accountId) {
+    return res.status(404).json({ error: 'UPLOAD_SESSION_NOT_FOUND', message: 'Upload session not found or expired.' });
+  }
   const session = completeUploadSession(uploadId);
   if (!session) return res.status(404).json({ error: 'UPLOAD_SESSION_NOT_FOUND', message: 'Upload session not found or expired.' });
   return res.status(200).json({ uploadId: session.id, status: session.status, expiresAtISO: session.expiresAtISO });
 });
 
 reportsRouter.get('/', (req, res) => {
-  const userId = getUserId(req);
+  const userId = getAuthenticatedAccount(req).accountId;
   const limit = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
   const offset = Math.max(0, Number(req.query.offset || 0));
   const items = listReports(userId);
@@ -98,7 +102,7 @@ reportsRouter.get('/', (req, res) => {
 });
 
 reportsRouter.get('/:reportId', (req, res) => {
-  const userId = getUserId(req);
+  const userId = getAuthenticatedAccount(req).accountId;
   const report = getReport(req.params.reportId);
   if (!report || report.userId !== userId) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
@@ -107,7 +111,7 @@ reportsRouter.get('/:reportId', (req, res) => {
 });
 
 reportsRouter.get('/:reportId/status', (req, res) => {
-  const userId = getUserId(req);
+  const userId = getAuthenticatedAccount(req).accountId;
   const report = getReport(req.params.reportId);
   if (!report || report.userId !== userId) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
@@ -121,7 +125,7 @@ reportsRouter.get('/:reportId/status', (req, res) => {
 });
 
 reportsRouter.patch('/:reportId/metadata', (req, res) => {
-  const userId = getUserId(req);
+  const userId = getAuthenticatedAccount(req).accountId;
   const report = getReport(req.params.reportId);
   if (!report || report.userId !== userId) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
@@ -138,7 +142,7 @@ reportsRouter.patch('/:reportId/metadata', (req, res) => {
 });
 
 reportsRouter.delete('/:reportId', (req, res) => {
-  const userId = getUserId(req);
+  const userId = getAuthenticatedAccount(req).accountId;
   const report = getReport(req.params.reportId);
   if (!report || report.userId !== userId) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
@@ -148,7 +152,7 @@ reportsRouter.delete('/:reportId', (req, res) => {
 });
 
 reportsRouter.post('/:reportId/feedback', (req, res) => {
-  const userId = getUserId(req);
+  const userId = getAuthenticatedAccount(req).accountId;
   const report = getReport(req.params.reportId);
   if (!report || report.userId !== userId) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
@@ -171,7 +175,7 @@ reportsRouter.post('/:reportId/reanalyze', (_req, res) => {
 });
 
 reportsRouter.get('/:reportId/comparison', (req, res) => {
-  const userId = getUserId(req);
+  const userId = getAuthenticatedAccount(req).accountId;
   const current = getReport(req.params.reportId);
   if (!current || current.userId !== userId) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Current report not found.' });
@@ -225,9 +229,13 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
       return res.status(415).json({ error: 'UNSUPPORTED_FILE', message: 'Only PDF and image reports are supported.' });
     }
 
-    const userId = getUserId(req);
+    const userId = getAuthenticatedAccount(req).accountId;
     const uploadId = typeof req.body?.uploadId === 'string' ? req.body.uploadId.trim() : '';
-    if (uploadId && !getUploadSession(uploadId)) {
+    const uploadSession = uploadId ? getUploadSession(uploadId) : null;
+    if (uploadId && !uploadSession) {
+      return res.status(404).json({ error: 'UPLOAD_SESSION_NOT_FOUND', message: 'uploadId is invalid or expired.' });
+    }
+    if (uploadSession && uploadSession.userId !== userId) {
       return res.status(404).json({ error: 'UPLOAD_SESSION_NOT_FOUND', message: 'uploadId is invalid or expired.' });
     }
 
@@ -244,10 +252,10 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
           : undefined
     });
     currentReportId = record.id;
-    syncReportPipelineToPlatform(userId, record.id, 'uploaded', `Blood report uploaded: ${record.fileName}`);
+    await syncReportPipelineToPlatform(userId, record.id, 'uploaded', `Blood report uploaded: ${record.fileName}`);
     updateReportStatus(record.id, 'processing');
     const analysis = await analyzeReportBuffer(req.file.buffer, req.file.mimetype);
-    syncReportPipelineToPlatform(userId, record.id, 'ocr_completed', `OCR completed for ${record.fileName}`);
+    await syncReportPipelineToPlatform(userId, record.id, 'ocr_completed', `OCR completed for ${record.fileName}`);
     const manualDate = typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : '';
     const manualLab = typeof req.body?.labName === 'string' ? req.body.labName.trim() : '';
     if (manualDate) {
@@ -257,8 +265,8 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
       analysis.labName = manualLab;
     }
     const saved = attachReportAnalysis(record.id, analysis);
-    syncReportPipelineToPlatform(userId, record.id, 'biomarkers_updated', `Biomarkers extracted from ${record.fileName}`);
-    syncReportPipelineToPlatform(userId, record.id, 'analysis_completed', `AI validation completed for ${record.fileName}`);
+    await syncReportPipelineToPlatform(userId, record.id, 'biomarkers_updated', `Biomarkers extracted from ${record.fileName}`);
+    await syncReportPipelineToPlatform(userId, record.id, 'analysis_completed', `AI validation completed for ${record.fileName}`);
     return res.status(200).json({
       reportId: saved?.id,
       status: saved?.status,

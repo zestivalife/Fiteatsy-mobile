@@ -61,8 +61,20 @@ import {
   normalizeInviteCode,
   validateInviteCode
 } from '../services/familyConnectService';
+import {
+  AuthServiceError,
+  getCurrentAuthSession,
+  logoutAuthSession,
+  type AuthSessionResponse,
+  type CurrentAuthSession
+} from '../services/authService';
+import { registerAccessTokenProvider } from '../services/apiClient';
 import { queueHealthEvent } from '../services/platformEventService';
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
+
+type StoredAuthSession = CurrentAuthSession & {
+  sessionToken: string;
+};
 
 type AppContextValue = {
   bootstrapped: boolean;
@@ -76,7 +88,9 @@ type AppContextValue = {
   setOnboarding: React.Dispatch<React.SetStateAction<OnboardingProfile | null>>;
   assessment: AssessmentProfile | null;
   setAssessment: React.Dispatch<React.SetStateAction<AssessmentProfile | null>>;
+  authSession: StoredAuthSession | null;
   isAuthenticated: boolean;
+  completeAuthentication: (session: AuthSessionResponse) => Promise<void>;
   setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
   checkIns: DailyCheckIn[];
   submitCheckIn: (checkIn: Omit<DailyCheckIn, 'dateISO'>) => void;
@@ -186,14 +200,13 @@ const safeParse = <T,>(raw: string | null, fallback: T): T => {
 };
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
-  const userId = 'emp-demo-1';
   const [bootstrapped, setBootstrapped] = useState(false);
   const [devices, setDevicesState] = useState<WearableDevice[]>(mockDevices);
   const [wellness, setWellnessState] = useState<WellnessSnapshot>(initialWellness);
   const [mood, setMood] = useState<MoodSelection | null>(null);
   const [onboarding, setOnboardingState] = useState<OnboardingProfile | null>(null);
   const [assessment, setAssessmentState] = useState<AssessmentProfile | null>(null);
-  const [isAuthenticated, setIsAuthenticatedState] = useState(false);
+  const [authSession, setAuthSessionState] = useState<StoredAuthSession | null>(null);
   const [checkIns, setCheckIns] = useState<DailyCheckIn[]>([]);
   const [priorityPlan, setPriorityPlan] = useState<PriorityPlan | null>(null);
   const [decisionLogs, setDecisionLogs] = useState<DecisionLog[]>([]);
@@ -215,6 +228,34 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [familyInvites, setFamilyInvites] = useState<FamilyInvite[]>([]);
   const [familyConnections, setFamilyConnections] = useState<FamilyConnection[]>([]);
   const [familyEmergencyEvents, setFamilyEmergencyEvents] = useState<FamilyEmergencyEvent[]>([]);
+  const userId = authSession?.accountId ?? '';
+  const isAuthenticated = authSession !== null;
+
+  const clearPersistedAuth = useCallback(() => {
+    setAuthSessionState(null);
+    AsyncStorage.removeItem(STORAGE_KEYS.auth);
+  }, []);
+
+  const persistAuthSession = useCallback((session: StoredAuthSession | null) => {
+    setAuthSessionState(session);
+    if (session) {
+      AsyncStorage.setItem(STORAGE_KEYS.auth, JSON.stringify(session));
+    } else {
+      AsyncStorage.removeItem(STORAGE_KEYS.auth);
+    }
+  }, []);
+
+  const completeAuthentication = useCallback(async (session: AuthSessionResponse) => {
+    const current = await getCurrentAuthSession(session.sessionToken);
+    persistAuthSession({
+      ...current,
+      sessionToken: session.sessionToken
+    });
+  }, [persistAuthSession]);
+
+  useEffect(() => {
+    registerAccessTokenProvider(() => authSession?.sessionToken ?? null);
+  }, [authSession]);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -270,7 +311,26 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           if (parsed && typeof parsed === 'object') setAssessmentState(parsed);
         }
         if (storedAuth) {
-          setIsAuthenticatedState(storedAuth === '1');
+          const parsed = safeParse<StoredAuthSession | null>(storedAuth, null);
+          if (parsed?.sessionToken) {
+            setAuthSessionState(parsed);
+            try {
+              const refreshed = await getCurrentAuthSession(parsed.sessionToken);
+              persistAuthSession({
+                ...refreshed,
+                sessionToken: parsed.sessionToken
+              });
+            } catch (error) {
+              if (
+                error instanceof AuthServiceError &&
+                (error.code === 'NETWORK_OFFLINE' || error.code === 'SERVER_ERROR')
+              ) {
+                setAuthSessionState(parsed);
+              } else {
+                clearPersistedAuth();
+              }
+            }
+          }
         }
         if (storedTheme === 'light' || storedTheme === 'dark') {
           setThemeModeState(storedTheme);
@@ -342,19 +402,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (next) {
           const normalized = normalizeOnboardingProfile(next);
           AsyncStorage.setItem(STORAGE_KEYS.onboarding, JSON.stringify(normalized));
-          void queueHealthEvent({
-            userId,
-            onboarding: normalized,
-            eventType: previous ? 'profile_updated' : 'profile_created',
-            eventSource: 'mobile.onboarding',
-            eventPayload: {
-              careTrack: normalized.careTrack,
-              gender: normalized.gender,
-              wearablePreference: normalized.wearablePreference,
-              primaryGoal: normalized.primaryGoal ?? null,
-              secondaryGoals: normalized.secondaryGoals
-            }
-          });
+          if (userId) {
+            void queueHealthEvent({
+              userId,
+              onboarding: normalized,
+              eventType: previous ? 'profile_updated' : 'profile_created',
+              eventSource: 'mobile.onboarding',
+              eventPayload: {
+                careTrack: normalized.careTrack,
+                gender: normalized.gender,
+                wearablePreference: normalized.wearablePreference,
+                primaryGoal: normalized.primaryGoal ?? null,
+                secondaryGoals: normalized.secondaryGoals
+              }
+            });
+          }
           return normalized;
         } else {
           AsyncStorage.removeItem(STORAGE_KEYS.onboarding);
@@ -371,18 +433,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const next = typeof updater === 'function' ? updater(previous) : updater;
         if (next) {
           AsyncStorage.setItem(STORAGE_KEYS.assessment, JSON.stringify(next));
-          void queueHealthEvent({
-            userId,
-            onboarding,
-            eventType: 'assessment_completed',
-            eventSource: 'mobile.assessment',
-            eventPayload: {
-              goal: next.goal,
-              stressLevel: next.stressLevel,
-              sleepQuality: next.sleepQuality,
-              physicalDistress: next.physicalDistress
-            }
-          });
+          if (userId) {
+            void queueHealthEvent({
+              userId,
+              onboarding,
+              eventType: 'assessment_completed',
+              eventSource: 'mobile.assessment',
+              eventPayload: {
+                goal: next.goal,
+                stressLevel: next.stressLevel,
+                sleepQuality: next.sleepQuality,
+                physicalDistress: next.physicalDistress
+              }
+            });
+          }
         } else {
           AsyncStorage.removeItem(STORAGE_KEYS.assessment);
         }
@@ -394,13 +458,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const setIsAuthenticated = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(
     (updater) => {
-      setIsAuthenticatedState((previous) => {
-        const next = typeof updater === 'function' ? updater(previous) : updater;
-        AsyncStorage.setItem(STORAGE_KEYS.auth, next ? '1' : '0');
-        return next;
-      });
+      const next = typeof updater === 'function' ? updater(authSession !== null) : updater;
+      if (!next) {
+        clearPersistedAuth();
+      }
     },
-    []
+    [authSession, clearPersistedAuth]
   );
 
   const setThemeMode = useCallback<React.Dispatch<React.SetStateAction<ThemeMode>>>(
@@ -526,19 +589,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         persistCycleLogs(next);
         return next;
       });
-      void queueHealthEvent({
-        userId,
-        onboarding,
-        eventType: 'cycle_logged',
-        eventSource: 'mobile.cycle',
-        eventPayload: {
-          dateISO: normalizedISO,
-          flow: input.flow ?? null,
-          symptoms: input.symptoms,
-          notes: input.notes ?? ''
-        },
-        priority: 'medium'
-      });
+      if (userId) {
+        void queueHealthEvent({
+          userId,
+          onboarding,
+          eventType: 'cycle_logged',
+          eventSource: 'mobile.cycle',
+          eventPayload: {
+            dateISO: normalizedISO,
+            flow: input.flow ?? null,
+            symptoms: input.symptoms,
+            notes: input.notes ?? ''
+          },
+          priority: 'medium'
+        });
+      }
     },
     [onboarding, persistCycleLogs, userId]
   );
@@ -739,16 +804,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         content: { title: 'Family check-in sent', body: message, sound: 'default', data: { type: 'family_ping', connectionId } },
         trigger: null
       });
-      void queueHealthEvent({
-        userId,
-        onboarding,
-        eventType: 'family_ping_sent',
-        eventSource: 'mobile.family',
-        eventPayload: {
-          connectionId,
-          message
-        }
-      });
+      if (userId) {
+        void queueHealthEvent({
+          userId,
+          onboarding,
+          eventType: 'family_ping_sent',
+          eventSource: 'mobile.family',
+          eventPayload: {
+            connectionId,
+            message
+          }
+        });
+      }
     },
     [onboarding, persistFamilyEmergencyEvents, userId]
   );
@@ -773,18 +840,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         content: { title: 'Emergency alert sent', body: message, sound: 'default', data: { type: 'family_sos', connectionId } },
         trigger: null
       });
-      void queueHealthEvent({
-        userId,
-        onboarding,
-        eventType: 'family_sos_triggered',
-        eventSource: 'mobile.family',
-        eventPayload: {
-          connectionId,
-          message
-        },
-        priority: 'high',
-        shouldEvaluateTicket: true
-      });
+      if (userId) {
+        void queueHealthEvent({
+          userId,
+          onboarding,
+          eventType: 'family_sos_triggered',
+          eventSource: 'mobile.family',
+          eventPayload: {
+            connectionId,
+            message
+          },
+          priority: 'high',
+          shouldEvaluateTicket: true
+        });
+      }
     },
     [onboarding, persistFamilyEmergencyEvents, userId]
   );
@@ -826,19 +895,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         persistMedications(next);
         return next;
       });
-      void queueHealthEvent({
-        userId,
-        onboarding,
-        eventType: 'medication_added',
-        eventSource: 'mobile.medication',
-        eventPayload: {
-          medicationId: medication.id,
-          name: medication.name,
-          schedule: medication.schedule,
-          status: medication.status
-        },
-        priority: 'medium'
-      });
+      if (userId) {
+        void queueHealthEvent({
+          userId,
+          onboarding,
+          eventType: 'medication_added',
+          eventSource: 'mobile.medication',
+          eventPayload: {
+            medicationId: medication.id,
+            name: medication.name,
+            schedule: medication.schedule,
+            status: medication.status
+          },
+          priority: 'medium'
+        });
+      }
     },
     [medicationPermissionGranted, onboarding, persistMedications, userId]
   );
@@ -932,19 +1003,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         snoozed: 'medication_snoozed',
         skipped: 'medication_skipped'
       };
-      void queueHealthEvent({
-        userId,
-        onboarding,
-        eventType: eventTypeByStatus[status],
-        eventSource: 'mobile.medication',
-        eventPayload: {
-          medicationId,
-          medicationName: medication.name,
-          scheduledForISO,
-          snoozeMinutes: snoozeMinutes ?? null,
-          status
-        }
-      });
+      if (userId) {
+        void queueHealthEvent({
+          userId,
+          onboarding,
+          eventType: eventTypeByStatus[status],
+          eventSource: 'mobile.medication',
+          eventPayload: {
+            medicationId,
+            medicationName: medication.name,
+            scheduledForISO,
+            snoozeMinutes: snoozeMinutes ?? null,
+            status
+          }
+        });
+      }
     },
     [medications, onboarding, persistMedicationLogs, userId]
   );
@@ -1090,28 +1163,32 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
         return next;
       });
-      void queueHealthEvent({
-        userId,
-        onboarding,
-        eventType: 'daily_check_in_submitted',
-        eventSource: 'mobile.tracker',
-        eventPayload: nextCheckIn,
-        priority: checkIn.mood <= 2 ? 'medium' : 'low',
-        shouldEvaluateTicket: checkIn.mood <= 2
-      });
+      if (userId) {
+        void queueHealthEvent({
+          userId,
+          onboarding,
+          eventType: 'daily_check_in_submitted',
+          eventSource: 'mobile.tracker',
+          eventPayload: nextCheckIn,
+          priority: checkIn.mood <= 2 ? 'medium' : 'low',
+          shouldEvaluateTicket: checkIn.mood <= 2
+        });
+      }
     },
     [nudges, onboarding, userId]
   );
 
   const addWearableSyncData = useCallback((payload: WearableSyncPayload) => {
     setWearableSyncData((previous) => [payload, ...previous].slice(0, 60));
-    void queueHealthEvent({
-      userId,
-      onboarding,
-      eventType: 'wearable_synced',
-      eventSource: 'mobile.wearable',
-      eventPayload: payload
-    });
+    if (userId) {
+      void queueHealthEvent({
+        userId,
+        onboarding,
+        eventType: 'wearable_synced',
+        eventSource: 'mobile.wearable',
+        eventPayload: payload
+      });
+    }
   }, [onboarding, userId]);
 
   const logNudgeAction = useCallback((nudgeId: string, action: NudgeAction) => {
@@ -1130,8 +1207,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const hasCheckedInToday = useMemo(() => checkIns.some((item) => toDayKey(item.dateISO) === todayKey()), [checkIns]);
 
   const logout = useCallback(() => {
+    if (authSession?.sessionToken) {
+      void logoutAuthSession(authSession.sessionToken).catch(() => undefined);
+    }
+    clearPersistedAuth();
     setMood(null);
-    setIsAuthenticated(false);
     setSelectedDeviceId(null);
     setWearableSetupCompleted(false);
     setCheckIns([]);
@@ -1146,7 +1226,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setFamilyInvites([]);
     setFamilyConnections([]);
     setFamilyEmergencyEvents([]);
-  }, [setIsAuthenticated, setSelectedDeviceId, setWearableSetupCompleted]);
+  }, [authSession, clearPersistedAuth, setSelectedDeviceId, setWearableSetupCompleted]);
 
   const value = useMemo(
     () => ({
@@ -1161,7 +1241,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setOnboarding,
       assessment,
       setAssessment,
+      authSession,
       isAuthenticated,
+      completeAuthentication,
       setIsAuthenticated,
       checkIns,
       submitCheckIn,
@@ -1214,12 +1296,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     [
       addWearableSyncData,
       assessment,
+      authSession,
       bootstrapped,
       checkIns,
       decisionLogs,
       devices,
       hasCheckedInToday,
       isAuthenticated,
+      completeAuthentication,
       logNudgeAction,
       logout,
       markMedicationAction,

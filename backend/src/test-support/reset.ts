@@ -1,11 +1,16 @@
+import { migrateDatabase, resetMigrationStateForTests } from '../db/migrator.js';
 import { resetOtpChallengesForTests } from '../modules/auth/auth.service.js';
 import { resetPlatformStoreForTests } from '../modules/platform/platform.store.js';
 import { resetReportsStoreForTests } from '../modules/reports/reports.store.js';
 import { resetWearablesStateForTests } from '../modules/wearables/wearables.service.js';
+import { pool } from '../db/pool.js';
 
-export const resetBackendStateForTests = () => {
+export const resetBackendStateForTests = async () => {
+  resetMigrationStateForTests();
+  await migrateDatabase();
   resetOtpChallengesForTests();
-  resetPlatformStoreForTests();
+  await pool.query('truncate table auth_sessions, users restart identity cascade');
+  await resetPlatformStoreForTests();
   resetReportsStoreForTests();
   resetWearablesStateForTests();
 };

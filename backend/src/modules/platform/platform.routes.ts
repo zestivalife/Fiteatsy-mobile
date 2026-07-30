@@ -10,9 +10,8 @@ import {
   requestMissingInformation,
   upsertHealthProfile,
 } from './platform.service.js';
-
-const getUserId = (req: any) =>
-  String(req.header('x-user-id') || req.body?.userId || req.query?.userId || 'demo-user').trim();
+import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
+import { getCareCaseById } from './platform.store.js';
 
 const healthProfilePatchSchema = z.object({
   dateOfBirthISO: z.string().datetime().optional(),
@@ -65,26 +64,27 @@ const assignConsultantSchema = z.object({
 });
 
 export const platformRouter = Router();
+platformRouter.use(requireAuthenticatedAccount);
 
-platformRouter.get('/health-profile', (req, res) => {
-  const bundle = getHealthProfileBundle(getUserId(req));
+platformRouter.get('/health-profile', async (req, res) => {
+  const bundle = await getHealthProfileBundle(getAuthenticatedAccount(req).accountId);
   if (!bundle) {
     return res.status(404).json({ error: 'HEALTH_PROFILE_NOT_FOUND' });
   }
   return res.status(200).json(bundle);
 });
 
-platformRouter.patch('/health-profile', (req, res) => {
+platformRouter.patch('/health-profile', async (req, res) => {
   const parsed = healthProfilePatchSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   }
-  const bundle = upsertHealthProfile(getUserId(req), parsed.data);
+  const bundle = await upsertHealthProfile(getAuthenticatedAccount(req).accountId, parsed.data);
   return res.status(200).json(bundle);
 });
 
-platformRouter.get('/health-profile/completion', (req, res) => {
-  const bundle = getHealthProfileBundle(getUserId(req));
+platformRouter.get('/health-profile/completion', async (req, res) => {
+  const bundle = await getHealthProfileBundle(getAuthenticatedAccount(req).accountId);
   if (!bundle) {
     return res.status(404).json({ error: 'HEALTH_PROFILE_NOT_FOUND' });
   }
@@ -97,52 +97,68 @@ platformRouter.get('/health-profile/completion', (req, res) => {
   });
 });
 
-platformRouter.post('/health-profile/request-missing-information', (req, res) => {
+platformRouter.post('/health-profile/request-missing-information', async (req, res) => {
   const parsed = requestMissingSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   }
   try {
-    const result = requestMissingInformation(getUserId(req), parsed.data.fields, parsed.data.requestedBy);
+    const result = await requestMissingInformation(getAuthenticatedAccount(req).accountId, parsed.data.fields, parsed.data.requestedBy);
     return res.status(201).json(result);
   } catch (error) {
     return res.status(404).json({ error: 'HEALTH_PROFILE_NOT_FOUND', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
-platformRouter.get('/care-cases/current', (req, res) => {
-  const bundle = getHealthProfileBundle(getUserId(req));
+platformRouter.get('/care-cases/current', async (req, res) => {
+  const bundle = await getHealthProfileBundle(getAuthenticatedAccount(req).accountId);
   if (!bundle) {
     return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND' });
   }
   return res.status(200).json(bundle.careCase);
 });
 
-platformRouter.post('/care-cases/:careCaseId/assign-consultant', (req, res) => {
+platformRouter.post('/care-cases/:careCaseId/assign-consultant', async (req, res) => {
   const parsed = assignConsultantSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   }
   try {
-    const updated = assignConsultant(req.params.careCaseId, parsed.data.consultantId, parsed.data.mentorId);
+    const careCase = await getCareCaseById(req.params.careCaseId);
+    if (!careCase || careCase.userId !== getAuthenticatedAccount(req).accountId) {
+      return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND', message: 'Care case not found.' });
+    }
+    const updated = await assignConsultant(req.params.careCaseId, parsed.data.consultantId, parsed.data.mentorId);
     return res.status(200).json(updated);
   } catch (error) {
     return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
-platformRouter.get('/care-cases/:careCaseId/timeline', (req, res) => {
-  return res.status(200).json({ items: listCareCaseTimeline(req.params.careCaseId) });
+platformRouter.get('/care-cases/:careCaseId/timeline', async (req, res) => {
+  const careCase = await getCareCaseById(req.params.careCaseId);
+  if (!careCase || careCase.userId !== getAuthenticatedAccount(req).accountId) {
+    return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND' });
+  }
+  return res.status(200).json({ items: await listCareCaseTimeline(req.params.careCaseId) });
 });
 
-platformRouter.get('/care-cases/:careCaseId/events', (req, res) => {
-  return res.status(200).json({ items: listCareCaseEvents(req.params.careCaseId) });
+platformRouter.get('/care-cases/:careCaseId/events', async (req, res) => {
+  const careCase = await getCareCaseById(req.params.careCaseId);
+  if (!careCase || careCase.userId !== getAuthenticatedAccount(req).accountId) {
+    return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND' });
+  }
+  return res.status(200).json({ items: await listCareCaseEvents(req.params.careCaseId) });
 });
 
-platformRouter.get('/care-cases/:careCaseId/tickets', (req, res) => {
-  return res.status(200).json({ items: listCareCaseTickets(req.params.careCaseId) });
+platformRouter.get('/care-cases/:careCaseId/tickets', async (req, res) => {
+  const careCase = await getCareCaseById(req.params.careCaseId);
+  if (!careCase || careCase.userId !== getAuthenticatedAccount(req).accountId) {
+    return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND' });
+  }
+  return res.status(200).json({ items: await listCareCaseTickets(req.params.careCaseId) });
 });
 
-platformRouter.get('/notifications', (req, res) => {
-  return res.status(200).json({ items: listUserNotifications(getUserId(req)) });
+platformRouter.get('/notifications', async (req, res) => {
+  return res.status(200).json({ items: await listUserNotifications(getAuthenticatedAccount(req).accountId) });
 });

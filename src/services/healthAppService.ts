@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { Linking, Platform } from 'react-native';
 import { WearableSyncPayload } from '../types';
+import { postJson } from './apiClient';
 import { syncFromHealthConnect } from './healthConnectService';
 
 export type HealthAppId = 'apple-health' | 'health-connect' | 'google-fit' | 'samsung-health' | 'fitbit';
@@ -70,21 +71,7 @@ export const connectHealthApp = async (appId: HealthAppId) => {
   }
 
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-  const response = await fetch(`${apiBaseUrl}/v1/wearables/connect-app`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      appId,
-      platform,
-      userId: 'emp-demo-1'
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error('health_app_connect_failed');
-  }
-
-  return (await response.json()) as {
+  return postJson<{
     connected: boolean;
     connectionId: string;
     appId: HealthAppId;
@@ -92,7 +79,12 @@ export const connectHealthApp = async (appId: HealthAppId) => {
     provider: string;
     connectedAtISO: string;
     status: 'connected' | 'paused';
-  };
+  }>('/v1/wearables/connect-app', {
+    appId,
+    platform
+  }).catch(() => {
+    throw new Error('health_app_connect_failed');
+  });
 };
 
 export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<WearableSyncPayload> => {
@@ -103,23 +95,12 @@ export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<Wearab
     return syncFromHealthConnect();
   }
 
-  const body = {
-    userId: 'emp-demo-1',
+  const payload = await postJson<{ payload: WearableSyncPayload }>('/v1/wearables/sync/live', {
     appId,
     platform
-  };
-
-  const response = await fetch(`${apiBaseUrl}/v1/wearables/sync/live`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
+  }).catch(() => {
     throw new Error('live_sync_failed');
-  }
-
-const payload = (await response.json()) as { payload: WearableSyncPayload };
+  });
   return payload.payload;
 };
 

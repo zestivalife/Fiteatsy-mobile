@@ -28,7 +28,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 const OTP_LENGTH = 6;
 
 export const SignUpScreen = ({ navigation }: Props) => {
-  const { setIsAuthenticated, setOnboarding, themeMode } = useAppContext();
+  const { completeAuthentication, setOnboarding, themeMode } = useAppContext();
   const themeColors = getThemeColors(themeMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -127,7 +127,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
     setError(null);
     setVerifying(true);
     try {
-      await verifySignupOtp(challengeId, otp);
+      const session = await verifySignupOtp(challengeId, otp);
+      await completeAuthentication(session);
       setOnboarding((previous) => ({
         name: name.trim() || previous?.name || 'Member',
         dateOfBirthISO: previous?.dateOfBirthISO ?? new Date(1996, 0, 1).toISOString(),
@@ -152,7 +153,6 @@ export const SignUpScreen = ({ navigation }: Props) => {
         notificationPermissionGranted: previous?.notificationPermissionGranted ?? false,
         createdAtISO: previous?.createdAtISO ?? new Date().toISOString()
       }));
-      setIsAuthenticated(true);
       navigation.reset({ index: 0, routes: [{ name: 'OnboardingBasics' }] });
     } catch (e) {
       const err = e as AuthServiceError;

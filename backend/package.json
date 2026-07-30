@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
+    "db:migrate": "tsx src/db/migrator.ts",
     "start": "node dist/server.js",
     "test:qa": "/bin/zsh -lc 'node --import tsx --test --test-concurrency=1 ../tests/api/*.test.ts ../tests/backend/*.test.ts ../tests/database/*.test.ts'"
   },

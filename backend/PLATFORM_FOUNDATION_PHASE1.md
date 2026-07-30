@@ -5,6 +5,8 @@ This sprint establishes the shared backend core for Fiteatsy Mobile and the Cons
 ## Implemented Core
 
 - Shared `Health Profile -> Nutrition Profile -> Recovery Program -> Care Case` backbone
+- PostgreSQL-backed account ownership foundation for `users`
+- Durable opaque session persistence for `auth_sessions`
 - Centralized backend calculation engine for:
   - Calculated age
   - BMI
@@ -74,7 +76,9 @@ These feed:
 
 ## Database Foundation
 
-`src/db/schema.sql` now includes Phase 1 shared platform tables for:
+Authoritative migrations now live under `src/db/migrations`.
+
+`src/db/schema.sql` remains a reference snapshot and includes Phase 1 shared platform tables for:
 
 - health profiles
 - recovery programs
@@ -96,7 +100,21 @@ Every new table includes status/version/audit/soft-delete fields.
 
 ## Current Scope Notes
 
-- This sprint adds the platform boundaries and integration flow in code.
-- Persistence for the new platform services currently uses in-memory stores in the backend module layer for fast incremental rollout.
-- Existing functionality remains intact.
-- Next sprint should replace the in-memory platform stores with PostgreSQL repositories and add automated tests plus OpenAPI documentation.
+### Implemented
+
+- Authenticated account ownership is enforced by Bearer-token middleware on protected platform/report/wearable routes.
+- Health profile, nutrition profile, recovery program, care case, timeline, health event, ticket, and notification persistence are PostgreSQL-backed.
+- Existing consultant assignment fields are preserved as legacy workflow references only.
+
+### Planned
+
+- Report-storage redesign
+- Wearable-storage redesign
+- Expanded mobile synchronization beyond auth/account/profile/care-case
+
+### Blocked / Requires Product Decision
+
+- External `fiteatsy_client_id` contract
+- Account-to-client cardinality
+- Deactivation semantics
+- Deletion semantics

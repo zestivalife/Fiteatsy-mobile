@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { createAuthSession, resolveVerifiedAccount } from './auth.repository.js';
+import { isOtpDebugResponseEnabled } from '../../config/env.js';
 
 type SignupInput = {
   name: string;
@@ -22,7 +24,8 @@ export type OtpDomainError = {
     | 'OTP_EXPIRED'
     | 'OTP_INVALID'
     | 'OTP_RESEND_NOT_READY'
-    | 'OTP_TOO_MANY_ATTEMPTS';
+    | 'OTP_TOO_MANY_ATTEMPTS'
+    | 'AUTH_CONTACT_CONFLICT';
   message: string;
   retryAfterSec?: number;
 };
@@ -93,7 +96,7 @@ export const createOtpChallenge = (input: SignupInput) => {
       emailMasked: user.email.replace(/(^.).+(@.*$)/, '$1***$2'),
       mobileMasked: user.mobileNumber.replace(/.(?=.{4})/g, '*')
     },
-    debugOtp: process.env.NODE_ENV === 'production' ? undefined : otp
+    debugOtp: isOtpDebugResponseEnabled() ? otp : undefined
   };
 };
 
@@ -123,11 +126,15 @@ export const resendOtpChallenge = (challengeId: string) => {
     expiresAtISO: new Date(challenge.expiresAtMs).toISOString(),
     resendAvailableAtISO: new Date(challenge.resendAvailableAtMs).toISOString(),
     attemptsRemaining: challenge.attemptsRemaining,
-    debugOtp: process.env.NODE_ENV === 'production' ? undefined : otp
+    debugOtp: isOtpDebugResponseEnabled() ? otp : undefined
   };
 };
 
-export const verifyOtpChallenge = (challengeId: string, otp: string) => {
+export const verifyOtpChallenge = async (
+  challengeId: string,
+  otp: string,
+  metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
+) => {
   pruneOldChallenges();
   const challenge = challengeStore.get(challengeId);
   if (!challenge) throw asDomainError({ code: 'OTP_NOT_FOUND', message: 'Challenge not found.' });
@@ -162,15 +169,32 @@ export const verifyOtpChallenge = (challengeId: string, otp: string) => {
 
   challenge.verified = true;
   challengeStore.delete(challengeId);
-
-  return {
-    sessionToken: crypto.randomUUID(),
-    user: {
+  try {
+    const user = await resolveVerifiedAccount({
       name: challenge.user.name,
       email: challenge.user.email,
       mobileNumber: challenge.user.mobileNumber
+    });
+    const { token } = await createAuthSession(user.id, metadata);
+
+    return {
+      sessionToken: token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email ?? challenge.user.email,
+        mobileNumber: user.mobileNumber ?? challenge.user.mobileNumber
+      }
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AUTH_CONTACT_CONFLICT') {
+      throw asDomainError({
+        code: 'AUTH_CONTACT_CONFLICT',
+        message: 'This email or mobile number is already linked to another account.'
+      });
     }
-  };
+    throw error;
+  }
 };
 
 export const resetOtpChallengesForTests = () => {

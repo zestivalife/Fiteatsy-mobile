@@ -1,6 +1,33 @@
 import { Pool } from 'pg';
 import { env } from '../config/env.js';
 
-export const pool = new Pool({
-  connectionString: env.databaseUrl
+let sharedPool: Pool | null = null;
+
+export const getPool = () => {
+  if (!sharedPool) {
+    sharedPool = new Pool({
+      connectionString: env.databaseUrl
+    });
+  }
+  return sharedPool;
+};
+
+export const pool = new Proxy({} as Pool, {
+  get(_target, property, receiver) {
+    const currentPool = getPool();
+    const value = Reflect.get(currentPool as unknown as object, property, receiver);
+    return typeof value === 'function' ? value.bind(currentPool) : value;
+  }
 });
+
+export const checkDatabaseReadiness = async () => {
+  const result = await getPool().query('select 1 as ok');
+  return Number(result.rows[0]?.ok ?? 0) === 1;
+};
+
+export const closePool = async () => {
+  if (!sharedPool) return;
+  const current = sharedPool;
+  sharedPool = null;
+  await current.end();
+};

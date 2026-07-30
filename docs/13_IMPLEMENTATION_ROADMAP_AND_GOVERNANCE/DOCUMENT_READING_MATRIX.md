@@ -1,0 +1,81 @@
+# Fiteatsy — Document Reading Matrix
+
+## Principle
+
+Codex should read only the authoritative packages relevant to the current task plus this governance package.
+
+## Deployment Task
+
+Read:
+- `03_BACKEND`
+- `04_DATABASE`
+- `11_DEPLOYMENT_AND_RAILWAY`
+- `12_SECURITY_PRIVACY_AND_GOVERNANCE`
+- `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE`
+
+## Fiteatsy Client / Identity Task
+
+Read:
+- `02_IDENTITY_AND_CLIENT`
+- `04_DATABASE`
+- `05_API`
+- `10_CONSULTANT_INTEGRATION` only for external-reference constraints
+- `12_SECURITY_PRIVACY_AND_GOVERNANCE`
+- `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE`
+
+## Health Data Task
+
+Read:
+- `02_IDENTITY_AND_CLIENT`
+- `04_DATABASE`
+- `05_API`
+- `06_HEALTH_DATA`
+- `12_SECURITY_PRIVACY_AND_GOVERNANCE`
+- `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE`
+
+## Reports / Biomarkers
+
+Read:
+- `04_DATABASE`
+- `05_API`
+- `07_MEDICAL_RECORDS_AND_BIOMARKERS`
+- `11_DEPLOYMENT_AND_RAILWAY` for storage/worker concerns
+- `12_SECURITY_PRIVACY_AND_GOVERNANCE`
+- `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE`
+
+## Medication
+
+Read:
+- `02_IDENTITY_AND_CLIENT`
+- `04_DATABASE`
+- `05_API`
+- `08_MEDICATION_AND_REMINDERS`
+- `12_SECURITY_PRIVACY_AND_GOVERNANCE`
+- `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE`
+
+## Recovery Intelligence
+
+Read:
+- `06_HEALTH_DATA`
+- `07_MEDICAL_RECORDS_AND_BIOMARKERS`
+- `09_RECOVERY_AND_HEALTH_INTELLIGENCE`
+- `12_SECURITY_PRIVACY_AND_GOVERNANCE`
+- `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE`
+
+## Consultant Integration
+
+Read:
+- `02_IDENTITY_AND_CLIENT`
+- `05_API`
+- `06_HEALTH_DATA`
+- `07_MEDICAL_RECORDS_AND_BIOMARKERS`
+- `09_RECOVERY_AND_HEALTH_INTELLIGENCE`
+- `10_CONSULTANT_INTEGRATION`
+- `12_SECURITY_PRIVACY_AND_GOVERNANCE`
+- `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE`
+
+Also read the frozen Consultant-side CAP-001/CAP-003 contracts relevant to that implementation.
+
+## Rule
+
+Do not automatically load every Fiteatsy document into every Codex task.
