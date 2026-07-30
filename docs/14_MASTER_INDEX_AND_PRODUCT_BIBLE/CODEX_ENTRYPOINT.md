@@ -13,7 +13,7 @@ For every Fiteatsy engineering task:
 
 ## Current Next Task
 
-**M3B — Existing Domain Ownership Transition (Definition / Governance Only)**
+**M3B — Existing Domain Ownership Transition (Product Owner Review / Governance Approval)**
 
 ### Read
 
@@ -30,14 +30,15 @@ For every Fiteatsy engineering task:
 
 ### Inspect
 
-Only M3B-governance-relevant repository files, including as applicable:
+Only M3B-governance-relevant repository files and the completed review package, including as applicable:
 
 - backend auth/account persistence;
 - platform ownership persistence still using `user_id`;
 - current schema/migrations and M3A client correlation;
 - current API ownership and authorization patterns;
 - tests that prove or assume account-owned domain access;
-- status/governance docs that still treat M3B as implementation-ready.
+- `docs/02_IDENTITY_AND_CLIENT/M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md`;
+- status/governance docs that still need to stay aligned to the M3B review gate.
 
 ### Do Not
 
@@ -45,7 +46,7 @@ Only M3B-governance-relevant repository files, including as applicable:
 - create migrations;
 - change production configuration;
 - change Railway resources;
-- begin M3B implementation;
+- begin M3B implementation without explicit Product Owner approval;
 - refactor unrelated code.
 
 ### Output

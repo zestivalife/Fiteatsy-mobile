@@ -1,7 +1,7 @@
 # M3 — Fiteatsy Client & Identity Definition Register
 
 **Status:** M3 DEFINITION APPROVED
-**Implementation Status:** `M3A — PRODUCTION_ACCEPTED`
+**Implementation Status:** `M3A — PRODUCTION_ACCEPTED; M3B DEFINITION READY FOR PRODUCT OWNER REVIEW`
 **Applies To:** `M3 — Fiteatsy Client & Identity`
 
 ## Objective
@@ -25,7 +25,8 @@ The identity model must support future Consultant / Practitioner / CAP-001 integ
 - next governed milestone after the accepted production baseline;
 - definition gate approved by Product Owner on 30 July 2026;
 - `M3A — Client Identity Foundation` is production-accepted on 30 July 2026;
-- `M3B` and `M3C` remain unauthorized pending later governance.
+- the `M3B` review package is now ready for Product Owner review;
+- `M3B` and `M3C` remain unauthorized for implementation pending later governance.
 
 ## Decision Register
 
@@ -64,9 +65,9 @@ Status:
 
 Architecture:
 
-- internal database primary key: UUID, stored only as an internal relational identifier;
+- internal database primary key: private `fiteatsy_clients.id`, currently stored as a `text` column carrying server-generated UUID-formatted values;
 - stable domain identifier: immutable server-generated `fiteatsy_client_id`;
-- public/API identifier: `fiteatsy_client_id`, not the internal UUID, when a client identifier must be exposed externally;
+- public/API identifier: `fiteatsy_client_id`, not the private internal client primary key, when a client identifier must be exposed externally;
 - generation mechanism: server-side opaque identifier with deterministic uniqueness guarantees;
 - mutability: immutable once created;
 - CAP-001 correlation: separate field/relationship; never overload `fiteatsy_client_id` as CAP-001 identity.
@@ -170,7 +171,7 @@ Guards:
 
 Status:
 
-- `M3A PRODUCTION_ACCEPTED; M3B/M3C REMAIN GOVERNED FUTURE SLICES`
+- `M3A PRODUCTION_ACCEPTED; M3B DEFINITION READY FOR PRODUCT OWNER REVIEW; M3B/M3C IMPLEMENTATION REMAINS GOVERNED FUTURE SLICES`
 
 ### M3A — Client Identity Foundation
 
@@ -193,7 +194,8 @@ Implementation / acceptance status:
 - controlled migration from direct account-owned domain references where required;
 - health profile ownership;
 - care-case/nutrition/report/notification compatibility;
-- transition safety and backfill execution.
+- transition safety and backfill execution;
+- see `M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md` for the reviewed target architecture.
 
 ### M3C — Mobile Client Context Integration
 
@@ -210,7 +212,7 @@ Dependency order:
 
 Status:
 
-- `DEFINED FOR IMPLEMENTATION IN M3A`
+- `REVIEWED FOR M3B ARCHITECTURE; NOT YET IMPLEMENTATION-AUTHORIZED`
 
 Required strategy:
 
@@ -218,7 +220,7 @@ Required strategy:
 2. use deterministic account → client correlation;
 3. make backfill idempotent;
 4. preserve uniqueness constraints;
-5. maintain compatibility while both account-linked and client-linked ownership may coexist during transition;
+5. keep any compatibility period brief and implementation-scoped rather than long-lived;
 6. migrate health profile, care case, nutrition, report, and notification ownership in controlled steps;
 7. verify backfill results before removing compatibility paths;
 8. define rollback handling for partial migration failure;
@@ -228,6 +230,7 @@ Required strategy:
 Guard:
 
 - M3 must not blindly switch production ownership without a backfill/verification plan.
+- Because production currently has zero users and zero clients, the reviewed recommendation is a direct ownership cutover before real production data exists, not a long-lived dual-ownership contract.
 
 ## API Contract Strategy
 

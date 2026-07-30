@@ -6,24 +6,31 @@ Do not begin new feature implementation yet.
 
 The next engineering action is:
 
-`M3B — Existing Domain Ownership Transition Definition / Governance`
+`M3B — Product Owner Review / Architecture Approval`
 
-This is documentation, architecture, sequencing and change-control work only.
+The definition package now exists and the next step is governance approval, not implementation.
 
-It does not authorize migrations, backend implementation, mobile implementation, or production changes.
+It still does not authorize migrations, backend implementation, mobile implementation, or production changes.
 
-## Current Definition / Governance Scope
+## Current Review Package
 
-Codex should establish one authoritative M3B definition that:
+The authoritative review package is:
+
+`docs/02_IDENTITY_AND_CLIENT/M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md`
+
+## Current Governance Scope
+
+The next governance action is to review and approve or amend the M3B definition that:
 
 - identifies the exact ownership surfaces moving from direct `user_id` references to client-owned contracts;
 - defines compatibility, migration, rollback, and authorization strategy;
+- recommends a direct cutover while production data remains empty;
 - keeps `M3B` implementation explicitly unauthorized;
 - identifies Product Owner decisions still required before an ownership-transition prompt can be approved.
 
 ## Recommended Post-Definition Implementation Order
 
-After the M3B definition/architecture gate is approved:
+After the M3B review/approval gate is approved:
 
 ### M3B — Existing Domain Ownership Transition
 
@@ -50,4 +57,4 @@ Those steps remain useful historical evidence but are no longer the active next 
 
 ## Why This Order
 
-M3A is production-accepted, so the next meaningful risk boundary is controlled ownership transition rather than another client-identity foundation change.
+M3A is production-accepted and the M3B review package is now complete, so the next meaningful risk boundary is Product Owner approval of the ownership transition before any code or schema work begins.

@@ -19,6 +19,14 @@
 - Acceptance date: `30 July 2026`
 - Railway deployment: `a0db3b89`
 
+## M3B Definition Status
+
+- Milestone: `M3B — Existing Domain Ownership Transition`
+- Definition status: `READY FOR PRODUCT OWNER REVIEW`
+- Scope type: `Governance / Architecture only`
+- Implementation authorized: `NO`
+- Review package: `docs/02_IDENTITY_AND_CLIENT/M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md`
+
 ## Acceptance Evidence
 
 - Runtime environment verified as `production`
@@ -82,13 +90,13 @@ Unverified / Deferred Runtime Evidence:
 
 - Milestone: `M3 — Fiteatsy Client & Identity`
 - Current milestone state: `M3A PRODUCTION ACCEPTED`
-- Next candidate status: `M3B — EXISTING DOMAIN OWNERSHIP TRANSITION NOT YET AUTHORIZED`
+- Next candidate status: `M3B — EXISTING DOMAIN OWNERSHIP TRANSITION DEFINITION READY FOR PRODUCT OWNER REVIEW`
 
 ## Next Governance Gate
 
 The next gate is:
 
-`M3B — Existing Domain Ownership Transition Definition / Architecture Review`
+`M3B — Product Owner Review / Architecture Approval`
 
 Approved M3 decisions now on record:
 
@@ -100,10 +108,11 @@ Approved M3 decisions now on record:
 - CAP-001 correlation remains separate from Fiteatsy client identity
 - Professional access remains outside `M3A`
 
-Before `M3B`, Product Owner decisions are still required for:
+Before `M3B` implementation, Product Owner decisions are still required for:
 
 - ownership cutover scope across `user_id`-owned health-domain records
-- backward-compatibility window for mixed account/client ownership
+- cutover timing now that production data is empty
+- deletion/deactivation semantics for client-owned health data
 - authorization and IDOR controls during transitional reads/writes
 - rollback expectations for ownership migration failure
 - CAP-001 and deactivation semantics that may affect downstream ownership contracts

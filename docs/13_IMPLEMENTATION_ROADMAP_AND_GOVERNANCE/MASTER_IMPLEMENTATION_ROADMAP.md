@@ -19,7 +19,8 @@ The repository already contains:
 - The next governed milestone is `M3 — Fiteatsy Client & Identity`.
 - `M3` definition/architecture is approved.
 - `M3A — Client Identity Foundation` is production-accepted.
-- `M3B` and `M3C` remain unauthorized pending later governance.
+- `M3B` definition is ready for Product Owner review.
+- `M3B` and `M3C` implementation remain unauthorized pending later governance.
 
 ## Programme Sequence
 
@@ -116,7 +117,7 @@ Current state:
 
 - definition/architecture approved;
 - `M3A` is closed as `PRODUCTION_ACCEPTED`;
-- `M3B` requires a separate definition/architecture review before any implementation work.
+- `M3B` definition/architecture review is complete and awaiting Product Owner approval before any implementation work.
 
 Recommended implementation decomposition after definition approval:
 

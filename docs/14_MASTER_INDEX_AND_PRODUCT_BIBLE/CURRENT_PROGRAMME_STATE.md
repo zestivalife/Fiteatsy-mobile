@@ -49,7 +49,7 @@ Repository/runtime facts must be re-verified at execution time.
 
 - milestone: `M3 — Fiteatsy Client & Identity`
 - current state: `M3A PRODUCTION_ACCEPTED`
-- next candidate status: `M3B — EXISTING DOMAIN OWNERSHIP TRANSITION NOT YET AUTHORIZED`
+- next candidate status: `M3B — EXISTING DOMAIN OWNERSHIP TRANSITION DEFINITION READY FOR PRODUCT OWNER REVIEW`
 
 ## Known Runtime Limitation
 
@@ -73,9 +73,9 @@ M3A — Client Identity Foundation
 Production Accepted
   |
   v
-M3B Definition / Architecture Review
+M3B Definition Ready for Product Owner Review
 ```
 
 ## Do Not Skip Ahead
 
-Do not begin `M3B` or `M3C` until a separate explicit instruction establishes scope, gate, acceptance criteria, and protected-baseline regression requirements.
+Do not begin `M3B` implementation or `M3C` until Product Owner approval establishes scope, gate, acceptance criteria, and protected-baseline regression requirements.
