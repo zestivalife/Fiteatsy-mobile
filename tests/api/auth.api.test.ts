@@ -112,6 +112,27 @@ test('GET /v1/auth/me rejects missing and invalid bearer tokens', async () => {
   assert.equal(invalid.response.status, 401);
 });
 
+test('GET /v1/auth/me does not expose the internal client primary key after M3B.1 schema changes', async () => {
+  const created = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
+    name: 'Private Client Id User',
+    email: 'private-client-id@example.com',
+    mobileNumber: '+919876543213',
+  });
+
+  const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+    challengeId: created.body.challengeId,
+    otp: created.body.debugOtp,
+  });
+  assert.equal(verified.response.status, 200);
+
+  const me = await getJson(server.baseUrl, '/v1/auth/me', {
+    headers: authHeaders(verified.body.sessionToken)
+  });
+  assert.equal(me.response.status, 200);
+  assert.equal(Object.prototype.hasOwnProperty.call(me.body.client, 'id'), false);
+  assert.match(me.body.client.fiteatsyClientId, /^fc_[a-f0-9]{32}$/i);
+});
+
 test('POST /v1/auth/logout revokes the session token', async () => {
   const created = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
     name: 'Revoked User',

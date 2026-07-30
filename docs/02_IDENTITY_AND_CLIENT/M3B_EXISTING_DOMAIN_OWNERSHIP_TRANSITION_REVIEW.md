@@ -1,9 +1,9 @@
 # M3B — Existing Domain Ownership Transition Review
 
-**Status:** `READY FOR PRODUCT OWNER REVIEW`  
+**Status:** `ARCHITECTURE APPROVED; M3B.1 IMPLEMENTED`
 **Date:** `30 July 2026`  
 **Applies To:** `M3B — Existing Domain Ownership Transition`  
-**Implementation Authorization:** `NO`
+**Implementation Authorization:** `M3B.1 ONLY`
 
 ## 1. Authoritative Baseline
 
@@ -37,6 +37,20 @@ Define the correct long-term ownership transition from account-oriented `user_id
 - blocking CAP-001 correlation;
 - blocking future CAP-003 professional access;
 - creating irreversible migration risk.
+
+## 2A. Locked Product Owner Decisions
+
+Applied on `30 July 2026`:
+
+- ownership cutover is approved now rather than deferred until after production data accumulates;
+- canonical internal direct ownership remains `client_id -> fiteatsy_clients.id`;
+- temporary compatibility is allowed only where technically necessary and is not the target architecture;
+- deactivated/suspended Clients retain historical domain data;
+- destructive cascading deletion from Client into longitudinal health-domain records is not approved;
+- migration failure policy is fail-closed;
+- CAP-001 remains a separate correlation boundary and not an ownership or authorization substitute;
+- CAP-003 professional access remains out of scope;
+- family/dependants remain out of scope for M3.
 
 ## 3. Current Ownership Architecture
 
@@ -430,6 +444,8 @@ Highest-risk implementation mistakes:
 - complete repair/rollback playbooks.
 
 ## 17. Product Owner Decisions Required
+
+The core M3B architecture decisions are now approved. Remaining decision items below are for later-slice detail, not for M3B.1 authorization.
 
 | Decision | Options | Recommended Option | Why | Consequence of Alternative | Blocking M3B Implementation? |
 |---|---|---|---|---|---|

@@ -1,7 +1,7 @@
 # M3 — Fiteatsy Client & Identity Definition Register
 
 **Status:** M3 DEFINITION APPROVED
-**Implementation Status:** `M3A — PRODUCTION_ACCEPTED; M3B DEFINITION READY FOR PRODUCT OWNER REVIEW`
+**Implementation Status:** `M3A — PRODUCTION_ACCEPTED; M3B ARCHITECTURE APPROVED; M3B.1 IMPLEMENTED LOCALLY`
 **Applies To:** `M3 — Fiteatsy Client & Identity`
 
 ## Objective
@@ -25,8 +25,9 @@ The identity model must support future Consultant / Practitioner / CAP-001 integ
 - next governed milestone after the accepted production baseline;
 - definition gate approved by Product Owner on 30 July 2026;
 - `M3A — Client Identity Foundation` is production-accepted on 30 July 2026;
-- the `M3B` review package is now ready for Product Owner review;
-- `M3B` and `M3C` remain unauthorized for implementation pending later governance.
+- the `M3B` architecture is approved by the Product Owner;
+- only `M3B.1 — Ownership Schema Foundation` is authorized and implemented in source;
+- `M3B.2`, `M3B.3`, `M3B.4`, and `M3C` remain unauthorized pending later governance.
 
 ## Decision Register
 
@@ -171,7 +172,7 @@ Guards:
 
 Status:
 
-- `M3A PRODUCTION_ACCEPTED; M3B DEFINITION READY FOR PRODUCT OWNER REVIEW; M3B/M3C IMPLEMENTATION REMAINS GOVERNED FUTURE SLICES`
+- `M3A PRODUCTION_ACCEPTED; M3B ARCHITECTURE APPROVED; ONLY M3B.1 IMPLEMENTED; LATER SLICES REMAIN GOVERNED`
 
 ### M3A — Client Identity Foundation
 
@@ -197,6 +198,11 @@ Implementation / acceptance status:
 - transition safety and backfill execution;
 - see `M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md` for the reviewed target architecture.
 
+Current authorization state:
+
+- `M3B.1 — Ownership Schema Foundation` is authorized.
+- `M3B.2`, `M3B.3`, and `M3B.4` are not authorized.
+
 ### M3C — Mobile Client Context Integration
 
 - mobile/backend client identity contract;
@@ -212,7 +218,7 @@ Dependency order:
 
 Status:
 
-- `REVIEWED FOR M3B ARCHITECTURE; NOT YET IMPLEMENTATION-AUTHORIZED`
+- `M3B.1 IMPLEMENTED FOR SCHEMA FOUNDATION; FULL OWNERSHIP TRANSITION STILL PENDING`
 
 Required strategy:
 
@@ -226,6 +232,11 @@ Required strategy:
 8. define rollback handling for partial migration failure;
 9. target zero/low downtime with additive-first changes;
 10. verify ownership integrity after migration.
+
+M3B.1 implementation note:
+
+- schema foundation adds canonical `client_id` columns and backfill paths for approved direct roots while preserving transitional `user_id` compatibility;
+- repository/runtime ownership conversion is deferred to `M3B.2`.
 
 Guard:
 

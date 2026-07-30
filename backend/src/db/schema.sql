@@ -46,29 +46,37 @@ create unique index if not exists fiteatsy_clients_public_id_unique
 create unique index if not exists fiteatsy_clients_account_user_id_unique
   on fiteatsy_clients (account_user_id);
 
+create unique index if not exists fiteatsy_clients_internal_owner_unique
+  on fiteatsy_clients (id, account_user_id);
+
 create table if not exists daily_checkins (
   id bigserial primary key,
   user_id text not null references users(id),
+  client_id text,
   checkin_date date not null,
   mood smallint not null check (mood between 1 and 5),
   energy smallint not null check (energy between 1 and 5),
   sleep_quality smallint not null check (sleep_quality between 1 and 5),
   created_at timestamptz not null default now(),
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
   unique (user_id, checkin_date)
 );
 
 create table if not exists ai_decision_logs (
   id bigserial primary key,
   user_id text not null references users(id),
+  client_id text,
   input_summary text not null,
   reasoning text not null,
   output_summary text not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );
 
 create table if not exists nudges (
   id text primary key,
   user_id text not null references users(id),
+  client_id text,
   type text not null,
   title text not null,
   body text not null,
@@ -76,7 +84,8 @@ create table if not exists nudges (
   action_minutes smallint not null,
   scheduled_at timestamptz not null,
   sent_at timestamptz,
-  status text not null default 'scheduled'
+  status text not null default 'scheduled',
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );
 
 create table if not exists family_connections (
@@ -111,6 +120,7 @@ create table if not exists family_support_events (
 create table if not exists health_profiles (
   id uuid primary key,
   user_id text not null references users(id),
+  client_id text,
   date_of_birth_iso timestamptz,
   calculated_age integer,
   gender text,
@@ -153,7 +163,8 @@ create table if not exists health_profiles (
   version integer not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );
 
 create table if not exists recovery_programs (
@@ -172,6 +183,7 @@ create table if not exists recovery_programs (
 create table if not exists care_cases (
   id uuid primary key,
   user_id text not null references users(id),
+  client_id text,
   health_profile_id uuid not null references health_profiles(id),
   recovery_program_id uuid not null references recovery_programs(id),
   assigned_consultant_id text,
@@ -183,12 +195,14 @@ create table if not exists care_cases (
   version integer not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );
 
 create table if not exists nutrition_profiles (
   id uuid primary key,
   user_id text not null references users(id),
+  client_id text,
   health_profile_id uuid not null references health_profiles(id),
   completion_percent integer not null default 0,
   readiness_score integer not null default 0,
@@ -199,7 +213,8 @@ create table if not exists nutrition_profiles (
   version integer not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );
 
 create table if not exists timeline_events (
@@ -256,6 +271,7 @@ create table if not exists lab_reports (
   id uuid primary key,
   care_case_id uuid references care_cases(id),
   user_id text not null references users(id),
+  client_id text,
   lab_name text,
   report_date timestamptz,
   source text,
@@ -266,7 +282,8 @@ create table if not exists lab_reports (
   version integer not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );
 
 create table if not exists biomarkers (
@@ -345,6 +362,7 @@ create table if not exists communications (
 create table if not exists notifications (
   id uuid primary key,
   user_id text not null references users(id),
+  client_id text,
   care_case_id uuid references care_cases(id),
   channel text not null,
   title text not null,
@@ -354,13 +372,15 @@ create table if not exists notifications (
   version integer not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );
 
 create table if not exists attachments (
   id uuid primary key,
   care_case_id uuid references care_cases(id),
   user_id text not null references users(id),
+  client_id text,
   parent_kind text not null,
   parent_id text not null,
   file_name text not null,
@@ -370,5 +390,48 @@ create table if not exists attachments (
   version integer not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );
+
+create unique index if not exists daily_checkins_client_date_unique
+  on daily_checkins (client_id, checkin_date)
+  where client_id is not null;
+
+create index if not exists ai_decision_logs_client_created_idx
+  on ai_decision_logs (client_id, created_at desc)
+  where client_id is not null;
+
+create index if not exists nudges_client_scheduled_idx
+  on nudges (client_id, scheduled_at desc)
+  where client_id is not null;
+
+create unique index if not exists health_profiles_active_client_unique
+  on health_profiles (client_id)
+  where client_id is not null
+    and deleted_at is null
+    and status = 'active';
+
+create unique index if not exists care_cases_active_client_unique
+  on care_cases (client_id)
+  where client_id is not null
+    and deleted_at is null
+    and status = 'active';
+
+create unique index if not exists nutrition_profiles_active_client_unique
+  on nutrition_profiles (client_id)
+  where client_id is not null
+    and deleted_at is null
+    and status = 'active';
+
+create index if not exists notifications_client_created_idx
+  on notifications (client_id, created_at desc)
+  where client_id is not null;
+
+create index if not exists lab_reports_client_report_date_idx
+  on lab_reports (client_id, report_date desc nulls last)
+  where client_id is not null;
+
+create index if not exists attachments_client_created_idx
+  on attachments (client_id, created_at desc)
+  where client_id is not null;

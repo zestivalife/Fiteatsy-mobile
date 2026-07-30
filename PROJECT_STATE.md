@@ -22,10 +22,17 @@
 ## M3B Definition Status
 
 - Milestone: `M3B — Existing Domain Ownership Transition`
-- Definition status: `READY FOR PRODUCT OWNER REVIEW`
-- Scope type: `Governance / Architecture only`
-- Implementation authorized: `NO`
+- Definition status: `ARCHITECTURE APPROVED`
+- Scope type: `Governance approved; phased implementation`
+- Implementation authorized: `M3B.1 ONLY`
 - Review package: `docs/02_IDENTITY_AND_CLIENT/M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md`
+
+## M3B.1 Status
+
+- Slice: `M3B.1 — Ownership Schema Foundation`
+- Implementation status: `IMPLEMENTED LOCALLY; PRODUCTION VERIFICATION PENDING`
+- Authorized scope: `Schema foundation only`
+- Explicitly not authorized: `M3B.2`, `M3B.3`, `M3B.4`, `M3C`
 
 ## Acceptance Evidence
 
@@ -90,13 +97,13 @@ Unverified / Deferred Runtime Evidence:
 
 - Milestone: `M3 — Fiteatsy Client & Identity`
 - Current milestone state: `M3A PRODUCTION ACCEPTED`
-- Next candidate status: `M3B — EXISTING DOMAIN OWNERSHIP TRANSITION DEFINITION READY FOR PRODUCT OWNER REVIEW`
+- Next candidate status: `M3B.1 — OWNERSHIP SCHEMA FOUNDATION IMPLEMENTED; VERIFICATION / ACCEPTANCE PENDING`
 
 ## Next Governance Gate
 
 The next gate is:
 
-`M3B — Product Owner Review / Architecture Approval`
+`M3B.1 — Production Verification / Acceptance`
 
 Approved M3 decisions now on record:
 
@@ -107,12 +114,14 @@ Approved M3 decisions now on record:
 - Internal database IDs remain private
 - CAP-001 correlation remains separate from Fiteatsy client identity
 - Professional access remains outside `M3A`
+- direct client ownership cutover is approved now, before meaningful production domain data accumulates
+- direct client-owned aggregate roots use canonical internal `client_id -> fiteatsy_clients.id`
+- client deactivation retains historical domain data
+- destructive cascading deletion from Client into longitudinal health data is prohibited
+- partial migration states must fail closed rather than broaden authorization
 
-Before `M3B` implementation, Product Owner decisions are still required for:
+Before `M3B.2+`, Product Owner decisions still remain relevant for later slices, but are not authorization to begin them:
 
-- ownership cutover scope across `user_id`-owned health-domain records
-- cutover timing now that production data is empty
-- deletion/deactivation semantics for client-owned health data
-- authorization and IDOR controls during transitional reads/writes
-- rollback expectations for ownership migration failure
-- CAP-001 and deactivation semantics that may affect downstream ownership contracts
+- CAP-001 reference naming
+- later deactivation UX/reactivation workflow
+- later retention/anonymisation policy detail beyond the non-destructive baseline

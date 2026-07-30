@@ -37,7 +37,7 @@ definition/architecture baseline.
 
 Current implementation authorization applies only to:
 
-`M3A — Client Identity Foundation`
+`M3B.1 — Ownership Schema Foundation`
 
 Still-open decisions that may affect later slices:
 
@@ -52,9 +52,9 @@ The next candidate milestone is:
 
 `M3B — Existing Domain Ownership Transition`
 
-`M3B` definition is now `READY FOR PRODUCT OWNER REVIEW`.
+`M3B` architecture is now `APPROVED`.
 
-`M3B` is not implementation-authorized.
+Only `M3B.1 — Ownership Schema Foundation` is implementation-authorized.
 
 ## Product Owner Decisions Required Before M3B
 
@@ -64,11 +64,17 @@ Which `user_id`-owned domain surfaces move to client ownership in the first M3B 
 Recommended review outcome:
 Move persisted client-domain roots in the first M3B implementation slice, while keeping family/social account-sharing tables and non-persisted runtime stores out of scope.
 
+Resolution:
+`APPROVED` — implement approved direct-root schema foundations now; keep family/social and non-persisted runtime surfaces out of M3B.1.
+
 ### OD-011 Compatibility Window
 How long must mixed account/client ownership remain supported for reads, writes, migrations, and rollback?
 
 Recommended review outcome:
 Do not adopt a long-lived compatibility window. Use a brief implementation-scoped transition only, then remove redundant account ownership after verification.
+
+Resolution:
+`APPROVED` — temporary compatibility is allowed only where technically necessary; it is not the target architecture.
 
 ### OD-012 Transitional Authorization Boundary
 What is the approved server-side access contract while both legacy `user_id` ownership and client-owned resources coexist, and what anti-IDOR controls are mandatory at each boundary?
@@ -76,11 +82,17 @@ What is the approved server-side access contract while both legacy `user_id` own
 Recommended review outcome:
 Canonical access should be `Bearer Session -> Account -> Current Client -> Owned Resource`, with server-derived current-client resolution and no trust in caller-supplied client IDs for ordinary user APIs.
 
+Resolution:
+`APPROVED` — canonical ownership path is locked; partial migration states must fail closed rather than broaden authorization.
+
 ### OD-013 Rollback / Repair Expectation
 What rollback or repair guarantees are required if M3B ownership migration partially succeeds across health profiles, care cases, nutrition profiles, reports, or notifications?
 
 Recommended review outcome:
 Require additive-first rollout, explicit integrity queries, fail-closed authorization on mismatches, and a repair path before destructive compatibility removal.
+
+Resolution:
+`APPROVED` — additive-first, integrity-checkable, rollback/repair-aware migration is mandatory.
 
 ### OD-014 Client Data Deletion Semantics
 What deletion/anonymisation behavior is approved for client-owned health-domain records once ownership moves off account-oriented `user_id` fields?
@@ -88,11 +100,17 @@ What deletion/anonymisation behavior is approved for client-owned health-domain 
 Recommended review outcome:
 Approve a non-destructive first-step model unless Product Owner/privacy policy explicitly authorizes stronger delete semantics.
 
+Resolution:
+`APPROVED` — destructive cascade deletion from Client into longitudinal health-domain data is not approved.
+
 ### OD-015 Deactivated Client Access Semantics
 What reads, writes, and recovery behaviors remain allowed when a Client is deactivated or soft-deleted?
 
 Recommended review outcome:
 Fail closed on protected writes by default and require explicit Product Owner approval for any retained read access.
+
+Resolution:
+`APPROVED BASELINE` — deactivated/suspended Clients retain historical data; mutation restriction is a later runtime authorization concern beyond M3B.1.
 
 ## Later Decisions
 

@@ -4,7 +4,7 @@
 **Product Type:** Mobile-first health tracking, disease-management and recovery-support platform  
 **Primary Client:** Fiteatsy mobile user  
 **Professional Workspace:** Zestiva Consultant / Practitioner System  
-**Status:** Backend production runtime verified and accepted on 30 July 2026; `M3A — Client Identity Foundation` is production-accepted on 30 July 2026; `M3B` definition is ready for Product Owner review; `M3B` and `M3C` implementation remain future governed slices
+**Status:** Backend production runtime verified and accepted on 30 July 2026; `M3A — Client Identity Foundation` is production-accepted on 30 July 2026; `M3B` architecture is approved; `M3B.1 — Ownership Schema Foundation` is implemented at source; `M3B.2+` and `M3C` remain future governed slices
 
 ## 1. Product Mission
 
@@ -110,9 +110,9 @@ Known limitations:
 Current governance rule:
 
 - `M3A — Client Identity Foundation` is closed as `PRODUCTION_ACCEPTED`;
-- `M3B` definition review is complete and ready for Product Owner review;
-- `M3B` is the next candidate milestone and is not yet authorized for implementation;
-- `M3B` ownership transition and `M3C` mobile integration remain out of scope until separately governed.
+- `M3B` architecture is approved;
+- only `M3B.1 — Ownership Schema Foundation` is implemented;
+- `M3B.2`, `M3B.3`, `M3B.4`, and `M3C` remain out of scope until separately governed.
 
 ## 6. Engineering Rule
 

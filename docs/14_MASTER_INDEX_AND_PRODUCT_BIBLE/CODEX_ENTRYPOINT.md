@@ -13,7 +13,7 @@ For every Fiteatsy engineering task:
 
 ## Current Next Task
 
-**M3B — Existing Domain Ownership Transition (Product Owner Review / Governance Approval)**
+**M3B.1 — Ownership Schema Foundation (Production Verification / Acceptance)**
 
 ### Read
 
@@ -30,15 +30,14 @@ For every Fiteatsy engineering task:
 
 ### Inspect
 
-Only M3B-governance-relevant repository files and the completed review package, including as applicable:
+Only M3B.1-relevant repository files and evidence surfaces, including as applicable:
 
-- backend auth/account persistence;
-- platform ownership persistence still using `user_id`;
-- current schema/migrations and M3A client correlation;
-- current API ownership and authorization patterns;
-- tests that prove or assume account-owned domain access;
+- backend schema and migrations;
+- `fiteatsy_clients` and current account-to-client correlation;
+- approved direct-root tables with new `client_id` compatibility columns;
+- tests proving schema contract, migration packaging, and protected auth/runtime behavior;
 - `docs/02_IDENTITY_AND_CLIENT/M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md`;
-- status/governance docs that still need to stay aligned to the M3B review gate.
+- status/governance docs that must stay aligned to the M3B.1 verification gate.
 
 ### Do Not
 
@@ -46,25 +45,21 @@ Only M3B-governance-relevant repository files and the completed review package, 
 - create migrations;
 - change production configuration;
 - change Railway resources;
-- begin M3B implementation without explicit Product Owner approval;
+- begin `M3B.2`, `M3B.3`, `M3B.4`, or `M3C` without explicit Product Owner approval;
 - refactor unrelated code.
 
 ### Output
 
 Report:
 
-- authoritative accepted production baseline;
-- last completed gate;
-- M3 definition/governance status;
-- M3 decisions resolved vs escalated;
-- recommended M3 implementation decomposition;
-- migration strategy;
-- API ownership strategy;
-- security/regression requirements;
-- protected-baseline risks;
+- M3B.1 deployment identity and running commit;
+- migration packaging/runtime evidence;
+- public health/readiness/version evidence;
+- what was and was not directly verified about the new ownership schema;
+- protected-baseline regression status;
 - Git state.
 
-Then stop for Product Owner / architecture approval before implementation.
+Then stop for production acceptance evidence or the next explicit implementation authorization.
 
 ## Historical / Superseded Instruction
 

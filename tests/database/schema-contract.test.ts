@@ -35,6 +35,8 @@ test('database schema defines required platform tables for CRUD coverage', () =>
 test('database schema includes foreign keys for healthcare ownership integrity', () => {
   assert.equal(hasPattern(/account_user_id text not null unique references users\(id\) on delete cascade/i), true);
   assert.equal(hasPattern(/fiteatsy_client_id text not null unique/i), true);
+  assert.equal(hasPattern(/create unique index if not exists fiteatsy_clients_internal_owner_unique/i), true);
+  assert.equal(hasPattern(/foreign key \(client_id, user_id\) references fiteatsy_clients\(id, account_user_id\) on delete restrict/i), true);
   assert.equal(hasPattern(/health_profile_id uuid not null references health_profiles/i), true);
   assert.equal(hasPattern(/recovery_program_id uuid not null references recovery_programs/i), true);
   assert.equal(hasPattern(/care_case_id uuid not null references care_cases/i), true);
