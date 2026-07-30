@@ -43,6 +43,12 @@ Repository/runtime facts must be re-verified at execution time.
 - authentication guards verified
 - previous migration packaging/runtime defect resolved
 
+## Next Governed Milestone
+
+- milestone: `M3 — Fiteatsy Client & Identity`
+- current state: `GOVERNANCE / DEFINITION`
+- implementation status: `NOT YET AUTHORIZED`
+
 ## Known Verification Limitation
 
 Full migration-ledger and schema-object inspection was not independently performed through the public API, so acceptance relies on Railway deployment evidence plus live runtime verification rather than direct SQL-ledger inspection.
@@ -56,12 +62,15 @@ CURRENT
 Production Accepted Backend Baseline
   |
   v
-Governance Close-Out / Change Control
+M3 Governance Harmonization + Definition
   |
   v
-Explicit instruction for next milestone
+M3 Definition & Architecture Approval
+  |
+  v
+Separate explicit authorization for first M3 implementation slice
 ```
 
 ## Do Not Skip Ahead
 
-Do not begin the next milestone until a new explicit instruction establishes scope, gate, and acceptance criteria.
+Do not begin M3 implementation until a separate explicit instruction establishes scope, gate, acceptance criteria, and protected-baseline regression requirements.

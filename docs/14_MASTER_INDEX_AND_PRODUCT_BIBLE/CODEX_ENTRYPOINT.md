@@ -13,9 +13,66 @@ For every Fiteatsy engineering task:
 
 ## Current Next Task
 
-**D0 — Railway Deployment Readiness Audit**
+**M3 — Fiteatsy Client & Identity (Definition / Governance Only)**
 
 ### Read
+
+- `14_MASTER_INDEX_AND_PRODUCT_BIBLE/FITEATSY_PRODUCT_BIBLE.md`
+- `14_MASTER_INDEX_AND_PRODUCT_BIBLE/CURRENT_PROGRAMME_STATE.md`
+- `14_MASTER_INDEX_AND_PRODUCT_BIBLE/OPEN_DECISIONS_REGISTER.md`
+- `02_IDENTITY_AND_CLIENT/`
+- `04_DATABASE/`
+- `05_API/`
+- `10_CONSULTANT_INTEGRATION/` only for external-reference constraints
+- `12_SECURITY_PRIVACY_AND_GOVERNANCE/`
+- `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE/`
+- `PROJECT_STATE.md`
+
+### Inspect
+
+Only identity/client-governance-relevant repository files, including as applicable:
+
+- backend auth/account persistence;
+- platform ownership persistence;
+- current schema/migrations;
+- mobile authenticated context assumptions;
+- current API ownership patterns;
+- tests that prove or assume ownership identity;
+- status/governance docs that still reference pre-production execution.
+
+### Do Not
+
+- implement application code;
+- create migrations;
+- change production configuration;
+- change Railway resources;
+- begin M3 implementation;
+- refactor unrelated code.
+
+### Output
+
+Report:
+
+- authoritative accepted production baseline;
+- last completed gate;
+- M3 definition/governance status;
+- M3 decisions resolved vs escalated;
+- recommended M3 implementation decomposition;
+- migration strategy;
+- API ownership strategy;
+- security/regression requirements;
+- protected-baseline risks;
+- Git state.
+
+Then stop for Product Owner / architecture approval before implementation.
+
+## Historical / Superseded Instruction
+
+The following instruction is historical and no longer the active next task after production acceptance:
+
+**D0 — Railway Deployment Readiness Audit**
+
+### Historical Read
 
 - `14_MASTER_INDEX_AND_PRODUCT_BIBLE/FITEATSY_PRODUCT_BIBLE.md`
 - `14_MASTER_INDEX_AND_PRODUCT_BIBLE/CURRENT_PROGRAMME_STATE.md`
@@ -23,45 +80,3 @@ For every Fiteatsy engineering task:
 - relevant deployment/security portions of `12_SECURITY_PRIVACY_AND_GOVERNANCE/`
 - `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE/NEXT_EXECUTION_PLAN.md`
 - `13_IMPLEMENTATION_ROADMAP_AND_GOVERNANCE/CODEX_EXECUTION_PROTOCOL.md`
-
-### Inspect
-
-Only deployment-relevant repository files, including as applicable:
-
-- root/backend `package.json`;
-- backend entrypoint;
-- database pool/migrator;
-- environment configuration;
-- Docker/Railway config if present;
-- health/readiness/version routes;
-- CORS;
-- `.gitignore`;
-- deployment docs/config.
-
-### Do Not
-
-- implement features;
-- change schema;
-- create Railway resources;
-- change Git state;
-- refactor unrelated code;
-- re-audit all product domains.
-
-### Output
-
-Report:
-
-- exact backend root;
-- build command;
-- start command;
-- runtime/Node requirements;
-- required environment variables;
-- database assumptions;
-- migration behaviour;
-- health/readiness/version status;
-- CORS status;
-- production blockers;
-- minimal required preparation changes;
-- Git state.
-
-Then stop for Product Owner approval.

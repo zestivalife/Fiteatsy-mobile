@@ -10,7 +10,15 @@ The repository already contains:
 - durable session/authentication foundation;
 - existing health/wearable/report/platform modules;
 - legacy/local mobile state that still requires migration;
-- no verified Railway deployment yet.
+- Railway production deployment accepted.
+
+## Current Programme Marker
+
+- `M0` through `M2` are historical/completed sequence items for the accepted backend baseline.
+- `G6 — Production Acceptance Gate` is complete.
+- The next governed milestone is `M3 — Fiteatsy Client & Identity`.
+- `M3` is currently open for `DEFINITION / GOVERNANCE` only.
+- `M3` implementation is not yet authorized.
 
 ## Programme Sequence
 
@@ -102,6 +110,17 @@ Exit:
 - ownership mapping;
 - CAP-001 correlation contract prepared;
 - migrations/API/tests.
+
+Current state:
+
+- definition/governance approved as the next programme step;
+- implementation not yet authorized.
+
+Recommended implementation decomposition after definition approval:
+
+- `M3A — Client Identity Foundation`
+- `M3B — Existing Domain Ownership Transition`
+- `M3C — Mobile Client Context Integration`
 
 ## M4 — Core Backend / API Stabilisation
 

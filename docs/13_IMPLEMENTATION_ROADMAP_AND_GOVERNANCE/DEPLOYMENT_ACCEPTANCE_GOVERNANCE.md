@@ -58,3 +58,11 @@ Freeze progression if deployed runtime does not match expected source/migration 
 - health/readiness/database evidence passed
 - OTP debug exposure was removed before acceptance
 - limitation retained: migration ledger and full schema inspection were not independently exposed through the public API
+
+## Post-Acceptance Rule
+
+After `PRODUCTION_ACCEPTED`:
+
+- deployment remediation is historical unless a new runtime defect appears;
+- the next programme step must be named explicitly through governance/change control;
+- pre-production readiness instructions must be marked historical/superseded, not left as the active next task.

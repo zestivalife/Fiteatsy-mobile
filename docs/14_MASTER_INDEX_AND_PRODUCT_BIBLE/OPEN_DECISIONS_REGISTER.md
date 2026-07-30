@@ -1,6 +1,6 @@
 # Fiteatsy — Open Decisions Register
 
-## Decisions Required Before Phase 1C Freeze
+## Decisions Required Before M3 Implementation Authorization
 
 ### OD-001 Account → Fiteatsy Client Cardinality
 Question:
@@ -17,6 +17,16 @@ What does deactivation mean for app access, data retention and Consultant projec
 ### OD-004 CAP-001 Reference Naming
 Question:
 What stable platform Person reference field is used across products?
+
+## Governance Status
+
+These decisions are now part of the active:
+
+`M3 — Fiteatsy Client & Identity`
+
+definition/governance gate.
+
+They must be resolved or explicitly escalated before M3 implementation begins.
 
 ## Later Decisions
 

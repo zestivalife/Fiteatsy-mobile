@@ -4,7 +4,7 @@
 **Product Type:** Mobile-first health tracking, disease-management and recovery-support platform  
 **Primary Client:** Fiteatsy mobile user  
 **Professional Workspace:** Zestiva Consultant / Practitioner System  
-**Status:** Backend production runtime verified and accepted on 30 July 2026; next work remains governance-controlled
+**Status:** Backend production runtime verified and accepted on 30 July 2026; M3 definition/governance is the next approved programme step; M3 implementation is not yet authorized
 
 ## 1. Product Mission
 
@@ -88,18 +88,26 @@ The next engineering objective is not another feature build.
 The next objective is:
 
 ```text
-Governance Close-Out
+M3 — Fiteatsy Client & Identity
           |
           v
-Change Control Review
+Definition / Governance
           |
           v
-Explicit instruction for next milestone
+M3 Definition & Architecture Approval
+          |
+          v
+Separate explicit authorization for first M3 implementation slice
 ```
 
 Known limitation:
 
 - full migration-ledger/schema inspection was not independently performed through the public API during production verification.
+
+Current governance rule:
+
+- M3 is the next governed milestone.
+- M3 implementation remains explicitly unauthorized until the definition/architecture gate is approved.
 
 ## 6. Engineering Rule
 

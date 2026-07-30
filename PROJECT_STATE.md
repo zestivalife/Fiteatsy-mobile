@@ -40,8 +40,16 @@
 - Full schema-object inspection was not independently performed through the public API
 - Migration packaging and runtime startup were verified through Railway deployment evidence plus live health/readiness/runtime checks
 
+## Next Governed Milestone
+
+- Milestone: `M3 — Fiteatsy Client & Identity`
+- Current milestone state: `GOVERNANCE / DEFINITION`
+- Implementation status: `NOT YET AUTHORIZED`
+
 ## Next Governance Gate
 
-No new implementation milestone is approved by this document.
+The next gate is:
 
-The next gate is explicit instruction for the next milestone after production-governance close-out and change-control review.
+`M3 Definition & Architecture Approval`
+
+Only after that gate may a separate implementation prompt authorize the first M3 implementation slice.
