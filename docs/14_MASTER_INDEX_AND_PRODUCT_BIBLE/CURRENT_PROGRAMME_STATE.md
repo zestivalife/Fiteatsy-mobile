@@ -1,6 +1,6 @@
 # Fiteatsy — Current Programme State
 
-**Baseline Date:** July 2026
+**Baseline Date:** 30 July 2026
 
 ## Repository
 
@@ -26,11 +26,26 @@ Repository/runtime facts must be re-verified at execution time.
 - architecture documentation rebuilt;
 - Consultant integration boundary defined;
 - Railway target architecture defined;
-- security and delivery governance defined.
+- security and delivery governance defined;
+- Railway production deployment verified;
+- Railway production deployment accepted by Product Owner.
 
-## Not Yet Accepted as Runtime Complete
+## Accepted Runtime State
 
-Phase 1B is not yet staging/runtime verified because the previous local test run could not connect to PostgreSQL.
+- service: `Fiteatsy Backend`
+- production URL: `https://fiteatsy-mobile-production.up.railway.app`
+- branch: `main`
+- running Git commit: `c79fd4604788808483366394d9729d52727415f1`
+- runtime environment verified as `production`
+- `/health` verified
+- `/ready` verified with PostgreSQL ready
+- public OTP debug exposure removed
+- authentication guards verified
+- previous migration packaging/runtime defect resolved
+
+## Known Verification Limitation
+
+Full migration-ledger and schema-object inspection was not independently performed through the public API, so acceptance relies on Railway deployment evidence plus live runtime verification rather than direct SQL-ledger inspection.
 
 ## Immediate Next State
 
@@ -38,15 +53,15 @@ Phase 1B is not yet staging/runtime verified because the previous local test run
 CURRENT
   |
   v
-D0 Railway Readiness Audit
+Production Accepted Backend Baseline
   |
   v
-Railway Staging
+Governance Close-Out / Change Control
   |
   v
-Phase 1B Staging Verification
+Explicit instruction for next milestone
 ```
 
 ## Do Not Skip Ahead
 
-Avoid large M5-M9 implementation work before M1/M2 foundations are verified.
+Do not begin the next milestone until a new explicit instruction establishes scope, gate, and acceptance criteria.

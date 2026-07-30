@@ -4,7 +4,7 @@
 **Product Type:** Mobile-first health tracking, disease-management and recovery-support platform  
 **Primary Client:** Fiteatsy mobile user  
 **Professional Workspace:** Zestiva Consultant / Practitioner System  
-**Status:** Architecture baseline established; deployment/runtime foundation next
+**Status:** Backend production runtime verified and accepted on 30 July 2026; next work remains governance-controlled
 
 ## 1. Product Mission
 
@@ -70,22 +70,36 @@ Fiteatsy Backend
 
 Architecture/documentation foundation is established.
 
+The current backend production runtime has been technically verified and explicitly accepted by the Product Owner.
+
+Accepted deployment facts:
+
+- service: `Fiteatsy Backend`
+- production URL: `https://fiteatsy-mobile-production.up.railway.app`
+- branch: `main`
+- Git SHA: `c79fd4604788808483366394d9729d52727415f1`
+- environment: `production`
+- health/readiness/database connectivity verified
+- OTP debug exposure removed
+- previous migration packaging defect resolved
+
 The next engineering objective is not another feature build.
 
 The next objective is:
 
 ```text
-Railway Deployment Readiness Audit
+Governance Close-Out
           |
           v
-Staging Railway + PostgreSQL
+Change Control Review
           |
           v
-Close Phase 1B Runtime Verification
-          |
-          v
-Fiteatsy Client / Identity Phase 1C
+Explicit instruction for next milestone
 ```
+
+Known limitation:
+
+- full migration-ledger/schema inspection was not independently performed through the public API during production verification.
 
 ## 6. Engineering Rule
 
