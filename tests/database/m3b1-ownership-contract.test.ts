@@ -12,6 +12,16 @@ const migrationSql = fs.readFileSync(
   'utf8'
 );
 
+const phase1bSql = fs.readFileSync(
+  '/Users/l.paunikar/Desktop/fiteatsy-mobile/backend/src/db/migrations/0001_phase1b_persistence_foundation.sql',
+  'utf8'
+);
+
+const m3aSql = fs.readFileSync(
+  '/Users/l.paunikar/Desktop/fiteatsy-mobile/backend/src/db/migrations/0002_m3a_client_identity_foundation.sql',
+  'utf8'
+);
+
 const getTableBlock = (sql: string, tableName: string) => {
   const match = sql.match(
     new RegExp(`create table if not exists ${tableName} \\(([\\s\\S]*?)\\n\\);`, 'i')
@@ -19,17 +29,31 @@ const getTableBlock = (sql: string, tableName: string) => {
   return match?.[1] ?? '';
 };
 
+const extractCreatedTables = (sql: string) =>
+  Array.from(sql.matchAll(/create table if not exists ([a-z_]+)/gi)).map((match) => match[1]);
+
+const extractReferencedTables = (sql: string) => {
+  const refs = new Set<string>();
+  for (const pattern of [
+    /alter table\s+([a-z_]+)/gi,
+    /update\s+([a-z_]+)/gi,
+    /from\s+([a-z_]+)/gi,
+    /join\s+([a-z_]+)/gi,
+    /on\s+([a-z_]+)\s*\(/gi
+  ]) {
+    for (const match of sql.matchAll(pattern)) {
+      refs.add(match[1]);
+    }
+  }
+  return refs;
+};
+
 test('M3B.1 schema adds canonical client ownership only to approved direct-root tables', () => {
   for (const tableName of [
-    'daily_checkins',
-    'ai_decision_logs',
-    'nudges',
     'health_profiles',
     'care_cases',
     'nutrition_profiles',
-    'lab_reports',
-    'notifications',
-    'attachments'
+    'notifications'
   ]) {
     const block = getTableBlock(schemaSql, tableName);
     assert.match(block, /client_id text/i);
@@ -50,10 +74,14 @@ test('M3B.1 leaves parent-derived tables without redundant client ownership colu
     'diet_plans',
     'diet_plan_versions',
     'clinical_memory',
-    'communications'
+    'communications',
+    'daily_checkins',
+    'ai_decision_logs',
+    'nudges',
+    'lab_reports',
+    'attachments'
   ]) {
-    const block = getTableBlock(schemaSql, tableName);
-    assert.doesNotMatch(block, /client_id text/i);
+    assert.doesNotMatch(migrationSql, new RegExp(`\\b${tableName}\\b`, 'i'));
   }
 });
 
@@ -74,26 +102,6 @@ test('M3B.1 migration backfills direct-root client ownership through account_use
     migrationSql,
     /update notifications n[\s\S]*?from fiteatsy_clients c[\s\S]*?n\.user_id = c\.account_user_id/i
   );
-  assert.match(
-    migrationSql,
-    /update lab_reports lr[\s\S]*?from fiteatsy_clients c[\s\S]*?lr\.user_id = c\.account_user_id/i
-  );
-  assert.match(
-    migrationSql,
-    /update attachments a[\s\S]*?from fiteatsy_clients c[\s\S]*?a\.user_id = c\.account_user_id/i
-  );
-  assert.match(
-    migrationSql,
-    /update daily_checkins dc[\s\S]*?from fiteatsy_clients c[\s\S]*?dc\.user_id = c\.account_user_id/i
-  );
-  assert.match(
-    migrationSql,
-    /update ai_decision_logs adl[\s\S]*?from fiteatsy_clients c[\s\S]*?adl\.user_id = c\.account_user_id/i
-  );
-  assert.match(
-    migrationSql,
-    /update nudges n[\s\S]*?from fiteatsy_clients c[\s\S]*?n\.user_id = c\.account_user_id/i
-  );
 });
 
 test('M3B.1 migration uses retention-safe referential actions and integrity checks', () => {
@@ -103,9 +111,26 @@ test('M3B.1 migration uses retention-safe referential actions and integrity chec
   );
   assert.equal(
     (migrationSql.match(/references fiteatsy_clients \(id, account_user_id\)\s+on delete restrict/gi) ?? [])
-      .length >= 9,
+      .length >= 4,
     true
   );
   assert.match(migrationSql, /raise exception 'M3B\.1 backfill failed: health_profiles contains rows without resolvable client ownership'/i);
-  assert.match(migrationSql, /raise exception 'M3B\.1 backfill failed: attachments contains rows without resolvable client ownership'/i);
+  assert.match(migrationSql, /raise exception 'M3B\.1 backfill failed: notifications contains rows without resolvable client ownership'/i);
+});
+
+test('M3B.1 migration references only tables that exist in the 0001 + 0002 baseline', () => {
+  const baselineTables = new Set([
+    ...extractCreatedTables(phase1bSql),
+    ...extractCreatedTables(m3aSql)
+  ]);
+  const allowedNonBaselineRefs = new Set(['pg_constraint']);
+
+  const unsupportedRefs = Array.from(extractReferencedTables(migrationSql)).filter(
+    (tableName) =>
+      tableName.length > 1 &&
+      !baselineTables.has(tableName) &&
+      !allowedNonBaselineRefs.has(tableName)
+  );
+
+  assert.deepEqual(unsupportedRefs, []);
 });
