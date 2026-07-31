@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { createOtpChallenge, resendOtpChallenge, verifyOtpChallenge } from './auth.service.js';
+import { getAuthenticatedAccount, requireAuthenticatedAccount } from './auth.middleware.js';
+import { revokeAuthSession } from './auth.repository.js';
 const signupRequestSchema = z.object({
     name: z.string().trim().min(2).max(80),
     email: z.string().trim().email().max(180),
@@ -20,6 +22,8 @@ const toHttpStatus = (code) => {
         return 410;
     if (code === 'OTP_INVALID')
         return 401;
+    if (code === 'AUTH_CONTACT_CONFLICT')
+        return 409;
     if (code === 'OTP_RESEND_NOT_READY' || code === 'OTP_TOO_MANY_ATTEMPTS')
         return 429;
     return 400;
@@ -57,7 +61,7 @@ authRouter.post('/signup/resend-otp', (req, res) => {
         });
     }
 });
-authRouter.post('/signup/verify-otp', (req, res) => {
+authRouter.post('/signup/verify-otp', async (req, res) => {
     const parsed = otpVerifySchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({
@@ -66,7 +70,10 @@ authRouter.post('/signup/verify-otp', (req, res) => {
         });
     }
     try {
-        const result = verifyOtpChallenge(parsed.data.challengeId, parsed.data.otp);
+        const result = await verifyOtpChallenge(parsed.data.challengeId, parsed.data.otp, {
+            userAgent: req.header('user-agent') ?? null,
+            ipAddress: req.ip || null
+        });
         return res.status(200).json(result);
     }
     catch (error) {
@@ -77,4 +84,27 @@ authRouter.post('/signup/verify-otp', (req, res) => {
             retryAfterSec: domainError.retryAfterSec ?? undefined
         });
     }
+});
+authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
+    const account = getAuthenticatedAccount(req);
+    return res.status(200).json({
+        accountId: account.accountId,
+        sessionId: account.sessionId,
+        sessionExpiresAtISO: account.sessionExpiresAtISO,
+        client: {
+            fiteatsyClientId: account.client.fiteatsyClientId,
+            status: account.client.status
+        },
+        user: {
+            id: account.user.id,
+            name: account.user.name,
+            email: account.user.email,
+            mobileNumber: account.user.mobileNumber
+        }
+    });
+});
+authRouter.post('/logout', requireAuthenticatedAccount, async (req, res) => {
+    const account = getAuthenticatedAccount(req);
+    await revokeAuthSession(account.sessionId);
+    return res.status(204).send();
 });

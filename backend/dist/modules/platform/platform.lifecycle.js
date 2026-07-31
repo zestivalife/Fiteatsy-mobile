@@ -17,16 +17,17 @@ export const validateStageTransition = (from, to) => {
     const nextIndex = stageOrder.indexOf(to);
     return nextIndex >= currentIndex && nextIndex - currentIndex <= 2;
 };
-export const transitionCareCaseStage = (careCase, nextStage, detail) => {
+export const transitionCareCaseStage = async (careCase, nextStage, detail) => {
     if (!validateStageTransition(careCase.currentStage, nextStage)) {
         throw new Error(`Invalid care case transition from ${careCase.currentStage} to ${nextStage}`);
     }
-    const updated = updateCareCase(careCase.id, {
+    const previousStage = careCase.currentStage;
+    const updated = await updateCareCase(careCase.id, {
         previousStage: careCase.currentStage,
         currentStage: nextStage,
         lastTransitionAtISO: nowIso(),
     });
-    const timeline = addTimelineEvent({
+    const timeline = await addTimelineEvent({
         careCaseId: careCase.id,
         userId: careCase.userId,
         kind: 'stage_changed',
@@ -34,24 +35,24 @@ export const transitionCareCaseStage = (careCase, nextStage, detail) => {
         detail,
         eventTimeISO: nowIso(),
         metadata: {
-            previousStage: careCase.currentStage,
+            previousStage,
             nextStage,
         },
     });
-    addHealthEvent({
+    await addHealthEvent({
         careCaseId: careCase.id,
         userId: careCase.userId,
         type: 'stage_changed',
-        summary: `Care case changed from ${careCase.currentStage} to ${nextStage}`,
+        summary: `Care case changed from ${previousStage} to ${nextStage}`,
         payload: {
-            previousStage: careCase.currentStage,
+            previousStage,
             nextStage,
             detail,
         },
         replayKey: `${careCase.id}:${nextStage}:${timeline.id}`,
         eventTimeISO: nowIso(),
     });
-    createNotificationRecord({
+    await createNotificationRecord({
         userId: careCase.userId,
         careCaseId: careCase.id,
         channel: 'in_app',
@@ -61,8 +62,8 @@ export const transitionCareCaseStage = (careCase, nextStage, detail) => {
     });
     return updated;
 };
-export const createOperationalTicket = (careCaseId, userId, type, priority, ownerId, dueAtISO, reason) => {
-    const timeline = addTimelineEvent({
+export const createOperationalTicket = async (careCaseId, userId, type, priority, ownerId, dueAtISO, reason) => {
+    const timeline = await addTimelineEvent({
         careCaseId,
         userId,
         kind: 'ticket_created',
@@ -71,7 +72,7 @@ export const createOperationalTicket = (careCaseId, userId, type, priority, owne
         eventTimeISO: nowIso(),
         metadata: { type, priority, dueAtISO },
     });
-    addHealthEvent({
+    await addHealthEvent({
         careCaseId,
         userId,
         type: 'ticket_created',
