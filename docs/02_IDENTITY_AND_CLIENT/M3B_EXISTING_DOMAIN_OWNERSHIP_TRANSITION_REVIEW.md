@@ -1,20 +1,24 @@
 # M3B — Existing Domain Ownership Transition Review
 
-**Status:** `ARCHITECTURE APPROVED; M3B.1 IMPLEMENTED`
-**Date:** `30 July 2026`  
+**Status:** `ARCHITECTURE APPROVED; M3B.1 — PRODUCTION_ACCEPTED`
+**Date:** `1 August 2026`  
 **Applies To:** `M3B — Existing Domain Ownership Transition`  
-**Implementation Authorization:** `M3B.1 ONLY`
+**Implementation Authorization:** `M3B.1 CLOSED; M3B.2+ NOT AUTHORIZED`
 
 ## 1. Authoritative Baseline
 
 - `M3A — Client Identity Foundation` is `PRODUCTION_ACCEPTED`.
-- Production runtime commit: `141f405d38e8f93b663c84288f76ba59348f4a09`.
-- Governance close-out baseline commit: `29959dcb8e6433ce65007e9527afc577e96de4ef`.
+- Production runtime commit: `49c2276dd1bd46b428eea37885961895806c672d`.
+- Accepted M3B.1 implementation commit: `49c2276dd1bd46b428eea37885961895806c672d`.
 - Branch: `main`.
-- Production deployment: `a0db3b89`.
+- Production deployment: `728a9f03`.
 - Production environment: `production`.
 - Production evidence confirms `users = 0` and `fiteatsy_clients = 0`.
 - Production evidence confirms migration `0002_m3a_client_identity_foundation.sql` is recorded/applied.
+- Production evidence confirms migration `0003_m3b1_ownership_schema_foundation.sql` is recorded/applied at `2026-07-31 10:47:25`.
+- Production schema evidence confirms `client_id` is present in `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`.
+- Railway build/startup evidence confirms `Copied 3 migration file(s) to /app/dist/db/migrations`.
+- The earlier startup failure caused by `daily_checkins` schema drift is resolved.
 
 M3A established:
 
@@ -77,6 +81,11 @@ Observed repository facts:
 
 ## 4. Ownership Inventory
 
+Authoritative production note:
+
+- the accepted M3B.1 direct-root schema scope is limited to the persisted tables that actually exist in the deployed `0001 + 0002` migration baseline;
+- surfaces that are described below as longer-term ownership targets are not automatically part of the accepted M3B.1 production scope unless their persistence exists in that baseline.
+
 | Domain / Table | Current Owner Field | Current Owner Entity | Desired Owner Entity | Requires Migration? | Authorization Impact | API Impact | Compatibility Requirement | Risk Level | M3B In Scope? | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `auth_sessions` | `user_id` | Account | Account | No | None if unchanged | None | None | Low | No | Security/session identity, not client-domain ownership. |
@@ -89,16 +98,16 @@ Observed repository facts:
 | `health_events` | `user_id` and `care_case_id` | Account + parent | Parent-derived via care case | Yes | High | Low | None after parent ownership cutover | Medium | Yes | Should inherit ownership from care case. |
 | `health_tickets` | `user_id`, `care_case_id`, `owner_id` | Account + parent + assignee | Parent-derived via care case | Yes | High | Low | None after parent ownership cutover | High | Yes | `owner_id` is assignee, not domain owner. |
 | `notifications` | `user_id`, optional `care_case_id` | Account | Client | Yes | Medium | Low | Short transition only | Medium | Yes | Some notifications are care-case-adjacent, some are client-wide. |
-| `lab_reports` | `user_id`, optional `care_case_id` | Account | Client | Yes | Medium | Medium | Short transition only | Medium | Yes | Persisted schema exists even though active runtime module is still limited. |
+| `lab_reports` | `user_id`, optional `care_case_id` | Account | Client | Yes | Medium | Medium | Short transition only | Medium | Deferred | Deferred from accepted M3B.1 because this persisted surface is not present in the deployed `0001 + 0002` production baseline. |
 | `biomarkers` | `user_id`, optional `report_id`, optional `care_case_id` | Account + parent candidates | Parent-derived; client fallback only if needed | Yes | Medium | Low | None after parent cutover | Medium | Yes | Prefer derivation from report/case instead of redundant client FK when possible. |
 | `diet_plans` | `user_id`, `care_case_id` | Account + parent | Parent-derived via care case | Yes | Medium | Low | None after parent cutover | Medium | Yes | Direct owner field appears redundant. |
 | `diet_plan_versions` | `diet_plan_id`, `generated_by` | Parent + actor | Parent-derived | No direct owner migration | Low | None | None | Low | Yes | `generated_by` is actor/audit, not client owner. |
 | `clinical_memory` | `user_id`, `care_case_id` | Account + parent | Parent-derived via care case | Yes | Medium | Low | None after parent cutover | Medium | Yes | Should inherit from care case. |
 | `communications` | `user_id`, `care_case_id` | Account + parent | Parent-derived via care case | Yes | Medium | Low | None after parent cutover | Medium | Yes | Keep communication actor metadata separate from ownership. |
-| `attachments` | `user_id`, optional `care_case_id` | Account | Client or parent-derived | Yes | Medium | Low | Short transition only | Medium | Yes | Final owner path depends on attachment parent contract. |
-| `daily_checkins` | `user_id` | Account | Client | Yes | Medium | Low | None if migrated early | Low | Yes | Persisted table exists; route ownership currently not active. |
-| `ai_decision_logs` | `user_id` | Account | Client | Yes | Medium | Low | None if migrated early | Low | Yes | Longitudinal AI audit should follow client-owned health context. |
-| `nudges` | `user_id` | Account | Client | Yes | Medium | Low | None if migrated early | Low | Yes | Scheduled health-domain nudges should follow client ownership. |
+| `attachments` | `user_id`, optional `care_case_id` | Account | Client or parent-derived | Yes | Medium | Low | Short transition only | Medium | Deferred | Deferred from accepted M3B.1 because this persisted surface is not present in the deployed `0001 + 0002` production baseline. |
+| `daily_checkins` | `user_id` | Account | Client | Yes | Medium | Low | None if migrated early | Low | Deferred | Removed from corrected `0003` because it does not exist in the deployed `0001 + 0002` production baseline. |
+| `ai_decision_logs` | `user_id` | Account | Client | Yes | Medium | Low | None if migrated early | Low | Deferred | Deferred from accepted M3B.1 because this persisted surface is not present in the deployed `0001 + 0002` production baseline. |
+| `nudges` | `user_id` | Account | Client | Yes | Medium | Low | None if migrated early | Low | Deferred | Deferred from accepted M3B.1 because this persisted surface is not present in the deployed `0001 + 0002` production baseline. |
 | `family_connections` | `owner_user_id`, `connected_user_id` | Account/social | Account/social | No in M3B | Medium | None | Existing account model retained | Medium | No | Family/caregiver semantics are future explicit capability work. |
 | `family_visibility_settings` | `owner_user_id`, `viewer_user_id` | Account/social | Account/social | No in M3B | Medium | None | Existing account model retained | Medium | No | Access-sharing capability, not core client-domain ownership. |
 | `family_support_events` | `owner_user_id`, `viewer_user_id` | Account/social | Account/social | No in M3B | Medium | None | Existing account model retained | Medium | No | Future governed family scope. |
@@ -261,11 +270,11 @@ when a client identifier must be exposed externally.
 | `care_cases` | `user_id -> users.id` plus `health_profile_id` | `client_id -> fiteatsy_clients.id` plus `health_profile_id` | `NOT NULL` | `fiteatsy_clients.id` | Product Owner review required | index `(client_id, status)` and `(health_profile_id)` | add `client_id`, backfill from profile/account mapping |
 | `nutrition_profiles` | `user_id -> users.id` plus `health_profile_id` | `client_id -> fiteatsy_clients.id` plus `health_profile_id` | `NOT NULL` | `fiteatsy_clients.id` | Product Owner review required | unique active nutrition profile per client if intended | add `client_id`, backfill, then remove `user_id` |
 | `notifications` | `user_id -> users.id` | `client_id -> fiteatsy_clients.id` | `NOT NULL` for client-wide notifications | `fiteatsy_clients.id` | Product Owner review required | index `(client_id, created_at desc)` | backfill from account-client mapping |
-| `lab_reports` | `user_id -> users.id` | `client_id -> fiteatsy_clients.id`, retain optional `care_case_id` | `NOT NULL` if client-owned root | `fiteatsy_clients.id` | Product Owner review required | index by `client_id`, `care_case_id`, `report_date` | backfill from account-client mapping |
-| `attachments` | `user_id -> users.id` | `client_id` or parent-derived by `parent_kind` / `care_case_id` | Mixed; requires design choice | `fiteatsy_clients.id` if direct | Product Owner review required | parent-scope indexes required | defer exact shape to M3B implementation design |
-| `daily_checkins` | `user_id -> users.id` | `client_id -> fiteatsy_clients.id` | `NOT NULL` | `fiteatsy_clients.id` | Product Owner review required | preserve uniqueness by `(client_id, checkin_date)` | straightforward backfill |
-| `ai_decision_logs` | `user_id -> users.id` | `client_id -> fiteatsy_clients.id` | `NOT NULL` | `fiteatsy_clients.id` | Product Owner review required | index by `client_id, created_at` | straightforward backfill |
-| `nudges` | `user_id -> users.id` | `client_id -> fiteatsy_clients.id` | `NOT NULL` | `fiteatsy_clients.id` | Product Owner review required | index by `client_id, scheduled_at` | straightforward backfill |
+| `lab_reports` | `user_id -> users.id` | `client_id -> fiteatsy_clients.id`, retain optional `care_case_id` | `NOT NULL` if client-owned root | `fiteatsy_clients.id` | Product Owner review required | index by `client_id`, `care_case_id`, `report_date` | deferred beyond accepted M3B.1 until authoritative persistence exists in the migration chain |
+| `attachments` | `user_id -> users.id` | `client_id` or parent-derived by `parent_kind` / `care_case_id` | Mixed; requires design choice | `fiteatsy_clients.id` if direct | Product Owner review required | parent-scope indexes required | deferred beyond accepted M3B.1 until authoritative persistence exists in the migration chain |
+| `daily_checkins` | `user_id -> users.id` | `client_id -> fiteatsy_clients.id` | `NOT NULL` | `fiteatsy_clients.id` | Product Owner review required | preserve uniqueness by `(client_id, checkin_date)` | deferred beyond accepted M3B.1 until authoritative persistence exists in the migration chain |
+| `ai_decision_logs` | `user_id -> users.id` | `client_id -> fiteatsy_clients.id` | `NOT NULL` | `fiteatsy_clients.id` | Product Owner review required | index by `client_id, created_at` | deferred beyond accepted M3B.1 until authoritative persistence exists in the migration chain |
+| `nudges` | `user_id -> users.id` | `client_id -> fiteatsy_clients.id` | `NOT NULL` | `fiteatsy_clients.id` | Product Owner review required | index by `client_id, scheduled_at` | deferred beyond accepted M3B.1 until authoritative persistence exists in the migration chain |
 | `timeline_events` | `user_id -> users.id` and `care_case_id` | parent-derived via `care_case_id` | N/A | N/A | parent governs | index by `care_case_id, event_time` | remove redundant `user_id` after case cutover |
 | `health_events` | `user_id -> users.id` and `care_case_id` | parent-derived via `care_case_id` | N/A | N/A | parent governs | index by `care_case_id, event_time` | remove redundant `user_id` after case cutover |
 | `health_tickets` | `user_id -> users.id` and `care_case_id` | parent-derived via `care_case_id`; keep `owner_id` as assignee | N/A | N/A | parent governs | index by `care_case_id, ticket_status` | remove redundant `user_id` after case cutover |
@@ -426,6 +435,8 @@ Highest-risk implementation mistakes:
 - add canonical client-owned and parent-derived schema paths;
 - add indexes/constraints;
 - define integrity queries.
+- accepted production scope is the direct-root schema foundation for `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`;
+- deferred persistence/ownership surfaces remain part of the long-term architecture but were intentionally excluded from corrected migration `0003` because they do not exist in the deployed `0001 + 0002` baseline.
 
 ### M3B.2 — Repository and Authorization Transition
 

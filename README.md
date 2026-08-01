@@ -52,8 +52,9 @@ When code, behavior, naming, or architecture conflicts with the docs above, the 
 - Wearable subsystem persistence redesign
 - Broader mobile migration from local/offline caches to backend-owned resources
 
-### Blocked / Product Decision Required
+### Governance State
 
-- External `fiteatsy_client_id` contract
-- Account-to-client cardinality
-- Deactivation and deletion semantics for durable accounts/client records
+- `M3A — Client Identity Foundation` is `PRODUCTION_ACCEPTED`
+- `M3B` architecture is approved
+- `M3B.1 — Ownership Schema Foundation` is `PRODUCTION_ACCEPTED`
+- `M3B.2`, `M3B.3`, `M3B.4`, and `M3C` remain separately governed and are not implementation-authorized by this repository baseline

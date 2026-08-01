@@ -6,9 +6,9 @@ Do not begin new feature implementation yet.
 
 The next engineering action is:
 
-`M3B.1 — Production Verification / Acceptance`
+`M3B.2 — Repository and Authorization Transition (Definition / Readiness Review)`
 
-The schema-foundation implementation now exists and the next step is deployment/runtime verification plus acceptance evidence.
+The schema-foundation implementation is now production-accepted. The next step is a tightly scoped definition/readiness review for the repository and authorization transition, not implementation.
 
 It does not authorize `M3B.2`, `M3B.3`, `M3B.4`, mobile ownership conversion, or professional-access work.
 
@@ -18,23 +18,24 @@ The authoritative architecture package remains:
 
 `docs/02_IDENTITY_AND_CLIENT/M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md`
 
-The currently implemented slice is:
+The accepted slice is:
 
 `M3B.1 — Ownership Schema Foundation`
 
 ## Current Governance Scope
 
-The next governance action is to verify and accept the M3B.1 slice that:
+The next governance action is to define and readiness-review the M3B.2 slice that:
 
-- identifies the exact ownership surfaces moving from direct `user_id` references to client-owned contracts;
-- adds canonical `client_id` ownership columns for approved direct roots;
-- backfills through `account_user_id -> fiteatsy_clients.id`;
-- preserves transitional `user_id` compatibility without authorizing the repository transition;
-- keeps `M3B.2+` explicitly unauthorized.
+- confirms exactly which repositories and services still enforce `user_id` ownership;
+- locks the conversion order to server-derived current-client ownership;
+- defines object-level authorization and anti-IDOR behavior during the transition;
+- confirms fail-closed handling for missing or mismatched client ownership;
+- preserves protected auth/session/current-client regressions as mandatory gates;
+- keeps `M3B.2+` explicitly unauthorized for implementation.
 
 ## Recommended Post-Definition Implementation Order
 
-After M3B.1 is production-verified and accepted:
+After M3B.2 is defined and explicitly authorized:
 
 ### M3B.2 — Repository & Authorization Transition
 
@@ -70,4 +71,4 @@ Those steps remain useful historical evidence but are no longer the active next 
 
 ## Why This Order
 
-M3A is production-accepted and the first M3B slice is now implemented, so the next meaningful risk boundary is verifying the live schema foundation before authorizing the repository/runtime transition.
+M3A and M3B.1 are production-accepted, so the next meaningful risk boundary is correctly defining the repository/runtime ownership cutover before authorizing implementation.

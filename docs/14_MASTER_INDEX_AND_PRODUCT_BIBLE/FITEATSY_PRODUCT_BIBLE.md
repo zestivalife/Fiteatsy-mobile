@@ -4,7 +4,7 @@
 **Product Type:** Mobile-first health tracking, disease-management and recovery-support platform  
 **Primary Client:** Fiteatsy mobile user  
 **Professional Workspace:** Zestiva Consultant / Practitioner System  
-**Status:** Backend production runtime verified and accepted on 30 July 2026; `M3A — Client Identity Foundation` is production-accepted on 30 July 2026; `M3B` architecture is approved; `M3B.1 — Ownership Schema Foundation` is implemented at source; `M3B.2+` and `M3C` remain future governed slices
+**Status:** Backend production runtime verified and accepted on 30 July 2026; `M3A — Client Identity Foundation` is production-accepted on 30 July 2026; `M3B` architecture is approved; `M3B.1 — Ownership Schema Foundation` is production-accepted on 1 August 2026; `M3B.2+` and `M3C` remain future governed slices
 
 ## 1. Product Mission
 
@@ -77,12 +77,13 @@ Accepted deployment facts:
 - service: `Fiteatsy Backend`
 - production URL: `https://fiteatsy-mobile-production.up.railway.app`
 - branch: `main`
-- Git SHA: `141f405d38e8f93b663c84288f76ba59348f4a09`
+- Git SHA: `49c2276dd1bd46b428eea37885961895806c672d`
 - environment: `production`
 - health/readiness/database connectivity verified
 - OTP debug exposure removed
 - M3A migration `0002` recorded in the production migration ledger
-- production table `fiteatsy_clients` verified at the visible-column level
+- M3B.1 migration `0003` recorded in the production migration ledger
+- M3B.1 direct-root schema verified for `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`
 - current production dataset verified as `0 users / 0 clients`
 
 The next engineering objective is not another feature build.
@@ -96,10 +97,16 @@ M3A — Client Identity Foundation
 Production Accepted
           |
           v
-M3B — Existing Domain Ownership Transition
+M3B.1 — Ownership Schema Foundation
           |
           v
-Definition / Governance Review Required
+Production Accepted
+          |
+          v
+M3B.2 — Repository and Authorization Transition
+          |
+          v
+Definition / Readiness Review Required
 ```
 
 Known limitations:
@@ -111,7 +118,9 @@ Current governance rule:
 
 - `M3A — Client Identity Foundation` is closed as `PRODUCTION_ACCEPTED`;
 - `M3B` architecture is approved;
-- only `M3B.1 — Ownership Schema Foundation` is implemented;
+- `M3B.1 — Ownership Schema Foundation` is closed as `PRODUCTION_ACCEPTED`;
+- accepted M3B.1 production scope is limited to direct-root persisted ownership surfaces that exist in the deployed `0001 + 0002` baseline: `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`;
+- deferred persistence/ownership surfaces remain future governed work until authoritative persistence exists: `daily_checkins`, `ai_decision_logs`, `nudges`, `lab_reports`, `attachments`;
 - `M3B.2`, `M3B.3`, `M3B.4`, and `M3C` remain out of scope until separately governed.
 
 ## 6. Engineering Rule

@@ -35,9 +35,9 @@ Resolved decisions are now part of the approved:
 
 definition/architecture baseline.
 
-Current implementation authorization applies only to:
+Current implementation authorization does not extend beyond the accepted M3B.1 close-out.
 
-`M3B.1 — Ownership Schema Foundation`
+`M3B.1 — Ownership Schema Foundation` is now `PRODUCTION_ACCEPTED`.
 
 Still-open decisions that may affect later slices:
 
@@ -54,9 +54,9 @@ The next candidate milestone is:
 
 `M3B` architecture is now `APPROVED`.
 
-Only `M3B.1 — Ownership Schema Foundation` is implementation-authorized.
+No later-slice M3B implementation is currently authorized.
 
-## Product Owner Decisions Required Before M3B
+## Product Owner Decisions Required Before Later M3B Slices
 
 ### OD-010 Ownership Cutover Scope
 Which `user_id`-owned domain surfaces move to client ownership in the first M3B slice, and which remain compatibility-bound temporarily?

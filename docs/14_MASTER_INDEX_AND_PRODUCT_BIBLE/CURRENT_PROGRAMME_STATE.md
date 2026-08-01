@@ -1,6 +1,6 @@
 # Fiteatsy — Current Programme State
 
-**Baseline Date:** 30 July 2026
+**Baseline Date:** 1 August 2026
 
 ## Repository
 
@@ -35,25 +35,29 @@ Repository/runtime facts must be re-verified at execution time.
 - service: `Fiteatsy Backend`
 - production URL: `https://fiteatsy-mobile-production.up.railway.app`
 - branch: `main`
-- running Git commit: `141f405d38e8f93b663c84288f76ba59348f4a09`
+- running Git commit: `49c2276dd1bd46b428eea37885961895806c672d`
 - runtime environment verified as `production`
 - `/health` verified
 - `/ready` verified with PostgreSQL ready
 - public OTP debug exposure removed
 - authentication guards verified
 - direct production migration ledger now includes `0002_m3a_client_identity_foundation.sql`
-- direct production schema evidence confirms table `fiteatsy_clients`
+- direct production migration ledger now includes `0003_m3b1_ownership_schema_foundation.sql`
+- direct production schema evidence confirms `client_id` in `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`
 - direct production data evidence shows `users = 0` and `fiteatsy_clients = 0`
+- Railway deployment `728a9f03` is the accepted M3B.1 production deployment
 
 ## Next Governed Milestone
 
 - milestone: `M3 — Fiteatsy Client & Identity`
-- current state: `M3A PRODUCTION_ACCEPTED`
-- next candidate status: `M3B.1 — OWNERSHIP SCHEMA FOUNDATION IMPLEMENTED; VERIFICATION / ACCEPTANCE PENDING`
+- current state: `M3B.1 PRODUCTION_ACCEPTED`
+- next candidate status: `M3B.2 — REPOSITORY AND AUTHORIZATION TRANSITION DEFINITION / READINESS REVIEW REQUIRED`
 
 ## Known Runtime Limitation
 
 Production currently contains zero users and zero clients, so populated live evidence for real account -> client mappings, live uniqueness behavior, and real client lifecycle states remains deferred rather than blocked.
+
+M3B.1 also intentionally deferred ownership/persistence surfaces that are not present in the deployed `0001 + 0002` migration baseline: `daily_checkins`, `ai_decision_logs`, `nudges`, `lab_reports`, and `attachments`.
 
 ## Immediate Next State
 
@@ -76,10 +80,10 @@ Production Accepted
 M3B Architecture Approved
   |
   v
-M3B.1 Implemented
+M3B.1 Production Accepted
   |
   v
-Production Verification / Acceptance Pending
+M3B.2 Definition / Readiness Review Required
 ```
 
 ## Do Not Skip Ahead

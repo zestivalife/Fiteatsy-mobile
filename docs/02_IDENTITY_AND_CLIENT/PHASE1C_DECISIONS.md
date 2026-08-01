@@ -1,7 +1,7 @@
 # M3 — Fiteatsy Client & Identity Definition Register
 
 **Status:** M3 DEFINITION APPROVED
-**Implementation Status:** `M3A — PRODUCTION_ACCEPTED; M3B ARCHITECTURE APPROVED; M3B.1 IMPLEMENTED LOCALLY`
+**Implementation Status:** `M3A — PRODUCTION_ACCEPTED; M3B ARCHITECTURE APPROVED; M3B.1 — PRODUCTION_ACCEPTED`
 **Applies To:** `M3 — Fiteatsy Client & Identity`
 
 ## Objective
@@ -26,7 +26,7 @@ The identity model must support future Consultant / Practitioner / CAP-001 integ
 - definition gate approved by Product Owner on 30 July 2026;
 - `M3A — Client Identity Foundation` is production-accepted on 30 July 2026;
 - the `M3B` architecture is approved by the Product Owner;
-- only `M3B.1 — Ownership Schema Foundation` is authorized and implemented in source;
+- `M3B.1 — Ownership Schema Foundation` is production-accepted;
 - `M3B.2`, `M3B.3`, `M3B.4`, and `M3C` remain unauthorized pending later governance.
 
 ## Decision Register
@@ -172,7 +172,7 @@ Guards:
 
 Status:
 
-- `M3A PRODUCTION_ACCEPTED; M3B ARCHITECTURE APPROVED; ONLY M3B.1 IMPLEMENTED; LATER SLICES REMAIN GOVERNED`
+- `M3A PRODUCTION_ACCEPTED; M3B ARCHITECTURE APPROVED; M3B.1 PRODUCTION_ACCEPTED; LATER SLICES REMAIN GOVERNED`
 
 ### M3A — Client Identity Foundation
 
@@ -200,7 +200,7 @@ Implementation / acceptance status:
 
 Current authorization state:
 
-- `M3B.1 — Ownership Schema Foundation` is authorized.
+- `M3B.1 — Ownership Schema Foundation` is closed as `PRODUCTION_ACCEPTED`.
 - `M3B.2`, `M3B.3`, and `M3B.4` are not authorized.
 
 ### M3C — Mobile Client Context Integration
@@ -218,7 +218,7 @@ Dependency order:
 
 Status:
 
-- `M3B.1 IMPLEMENTED FOR SCHEMA FOUNDATION; FULL OWNERSHIP TRANSITION STILL PENDING`
+- `M3B.1 PRODUCTION_ACCEPTED FOR SCHEMA FOUNDATION; FULL REPOSITORY / AUTHORIZATION TRANSITION STILL PENDING`
 
 Required strategy:
 
@@ -235,7 +235,8 @@ Required strategy:
 
 M3B.1 implementation note:
 
-- schema foundation adds canonical `client_id` columns and backfill paths for approved direct roots while preserving transitional `user_id` compatibility;
+- accepted schema foundation adds canonical `client_id` columns and backfill paths for approved direct roots while preserving transitional `user_id` compatibility;
+- accepted production scope is limited to the direct-root tables that exist in the deployed `0001 + 0002` persistence baseline: `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`;
 - repository/runtime ownership conversion is deferred to `M3B.2`.
 
 Guard:
@@ -361,3 +362,32 @@ Unverified / Deferred Runtime Evidence:
 
 - populated production account -> client mapping evidence does not yet exist
 - runtime inspection of live constraint/index metadata was not separately recorded during acceptance
+
+## M3B.1 Production Acceptance Record
+
+- acceptance date: `1 August 2026`
+- accepted by: `Product Owner`
+- implementation commit: `49c2276dd1bd46b428eea37885961895806c672d`
+- Railway deployment: `728a9f03`
+
+Observed Evidence:
+
+- `GET /v1/version` reported environment `production` and commit `49c2276dd1bd46b428eea37885961895806c672d`
+- Railway build/startup evidence reported `Copied 3 migration file(s) to /app/dist/db/migrations`
+- production migration ledger includes `0003_m3b1_ownership_schema_foundation.sql`
+- `0003` applied at `2026-07-31 10:47:25`
+- production schema evidence confirms `client_id` is present in `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`
+- the earlier startup failure caused by `daily_checkins` schema drift is resolved
+- protected baseline remained healthy on `/health`, `/ready`, and `/v1/version`
+- production dataset remains `0` users and `0` clients
+
+Inference:
+
+- migration `0003` was packaged, discovered, executed, and recorded as applied
+- the corrected migration now matches the actual migration-derived production baseline established by `0001 + 0002`
+- because production currently contains no applicable rows, no populated ownership backfill was required
+
+Known Limitation:
+
+- populated ownership-transition behavior is not yet evidenced in production because the accepted baseline still contains `0` users and `0` clients
+- deferred persistence/ownership surfaces remain outside the accepted M3B.1 production scope until authoritative persistence exists: `daily_checkins`, `ai_decision_logs`, `nudges`, `lab_reports`, `attachments`

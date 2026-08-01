@@ -1,6 +1,6 @@
 # Fiteatsy — Project State
 
-**Last Updated:** 30 July 2026  
+**Last Updated:** 1 August 2026  
 **Status:** PRODUCTION_ACCEPTED  
 **Approved By:** Product Owner
 
@@ -9,7 +9,7 @@
 - Service: Fiteatsy Backend
 - Production URL: `https://fiteatsy-mobile-production.up.railway.app`
 - Branch: `main`
-- Running Git commit: `141f405d38e8f93b663c84288f76ba59348f4a09`
+- Running Git commit: `49c2276dd1bd46b428eea37885961895806c672d`
 - Deployment status: Railway production deployment verified and accepted
 
 ## M3A Milestone Status
@@ -24,13 +24,15 @@
 - Milestone: `M3B — Existing Domain Ownership Transition`
 - Definition status: `ARCHITECTURE APPROVED`
 - Scope type: `Governance approved; phased implementation`
-- Implementation authorized: `M3B.1 ONLY`
+- Accepted slice: `M3B.1 ONLY`
 - Review package: `docs/02_IDENTITY_AND_CLIENT/M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md`
 
 ## M3B.1 Status
 
 - Slice: `M3B.1 — Ownership Schema Foundation`
-- Implementation status: `IMPLEMENTED LOCALLY; PRODUCTION VERIFICATION PENDING`
+- Implementation status: `PRODUCTION_ACCEPTED`
+- Acceptance date: `1 August 2026`
+- Railway deployment: `728a9f03`
 - Authorized scope: `Schema foundation only`
 - Explicitly not authorized: `M3B.2`, `M3B.3`, `M3B.4`, `M3C`
 
@@ -39,27 +41,23 @@
 - Runtime environment verified as `production`
 - `GET /health` returned `200`
 - `GET /ready` returned `200` with `checks.database = "ready"`
-- `GET /v1/version` returned Git commit `141f405d38e8f93b663c84288f76ba59348f4a09`
-- Railway build packaged both production migrations:
-  `Copied 2 migration file(s) to /app/dist/db/migrations`
+- `GET /v1/version` returned Git commit `49c2276dd1bd46b428eea37885961895806c672d`
+- Railway build packaged all accepted production migrations:
+  `Copied 3 migration file(s) to /app/dist/db/migrations`
 - Direct production migration ledger evidence confirmed:
   - `0001_phase1b_persistence_foundation.sql`
   - `0002_m3a_client_identity_foundation.sql`
   - `0002` applied at `2026-07-30 21:02:56`
-- Direct production schema evidence confirmed table `fiteatsy_clients` exists with visible columns:
-  - `id`
-  - `fiteatsy_client_id`
-  - `account_user_id`
-  - `status`
-  - `version`
-  - `created_at`
-  - `updated_at`
-  - `deleted_at`
+  - `0003_m3b1_ownership_schema_foundation.sql`
+  - `0003` applied at `2026-07-31 10:47:25`
+- Direct production schema evidence confirmed `client_id` is present in the four authoritative M3B.1 direct-root tables:
+  - `health_profiles`
+  - `care_cases`
+  - `nutrition_profiles`
+  - `notifications`
 - Direct production data evidence confirmed:
   - `users` row count = `0`
   - `fiteatsy_clients` row count = `0`
-  - eligible backfill count = `0`
-  - observed backfill result = `0`
 - OTP debug exposure removed from public `POST /v1/auth/signup/request-otp`
 - Authentication guards verified:
   - `/v1/auth/me` without bearer token -> `401 AUTH_REQUIRED`
@@ -72,38 +70,44 @@
 - Railway runtime environment corrected from staging semantics to production semantics
 - Public OTP debug exposure removed after production environment correction
 - Production runtime now reports the expected environment and commit identity
+- Earlier M3B.1 startup failure caused by `daily_checkins` schema drift is resolved
+- Corrected migration `0003` now operates only on persisted direct-root tables that exist in the production migration chain
 
 ## Evidence Classification
 
 Observed Evidence:
 
-- production runtime serves commit `141f405d38e8f93b663c84288f76ba59348f4a09`
+- production runtime serves commit `49c2276dd1bd46b428eea37885961895806c672d`
 - migration `0002_m3a_client_identity_foundation.sql` is recorded in production `schema_migrations`
+- migration `0003_m3b1_ownership_schema_foundation.sql` is recorded in production `schema_migrations`
 - production table `fiteatsy_clients` exists with the expected visible columns
+- production direct-root ownership tables `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications` expose `client_id`
 - current production dataset contains `0` users and `0` clients
 
 Inference:
 
 - migration `0002` was discovered and executed successfully because it appears in the production migration ledger
-- current zero-account production dataset required zero backfill rows
+- migration `0003` was packaged, discovered, executed, and recorded because it appears in the production migration ledger with an applied timestamp
+- current zero-account production dataset required zero populated ownership-transition rows
 
 Unverified / Deferred Runtime Evidence:
 
-- production constraint/index metadata for `fiteatsy_clients` was not independently runtime-inspected
-- populated production evidence for a real account -> client pair does not yet exist
-- populated production evidence for live `1:1` mappings, public-ID uniqueness, and real client lifecycle states remains deferred until production data exists
+- full production constraint/index metadata for all M3B.1 ownership surfaces was not independently runtime-inspected during close-out
+- populated production evidence for a real account -> client pair still does not exist
+- populated ownership-transition behavior remains deferred until production contains applicable rows
+- deferred persistence/ownership surfaces were not migrated in M3B.1 because they are not present in the deployed `0001 + 0002` baseline: `daily_checkins`, `ai_decision_logs`, `nudges`, `lab_reports`, `attachments`
 
 ## Next Governed Milestone
 
 - Milestone: `M3 — Fiteatsy Client & Identity`
-- Current milestone state: `M3A PRODUCTION ACCEPTED`
-- Next candidate status: `M3B.1 — OWNERSHIP SCHEMA FOUNDATION IMPLEMENTED; VERIFICATION / ACCEPTANCE PENDING`
+- Current milestone state: `M3B.1 PRODUCTION_ACCEPTED`
+- Next candidate status: `M3B.2 — REPOSITORY AND AUTHORIZATION TRANSITION DEFINITION / READINESS REVIEW REQUIRED`
 
 ## Next Governance Gate
 
 The next gate is:
 
-`M3B.1 — Production Verification / Acceptance`
+`M3B.2 — Definition / Readiness Review`
 
 Approved M3 decisions now on record:
 

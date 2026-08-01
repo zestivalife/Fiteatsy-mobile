@@ -13,7 +13,7 @@ For every Fiteatsy engineering task:
 
 ## Current Next Task
 
-**M3B.1 — Ownership Schema Foundation (Production Verification / Acceptance)**
+**M3B.2 — Repository and Authorization Transition (Definition / Readiness Review)**
 
 ### Read
 
@@ -30,14 +30,14 @@ For every Fiteatsy engineering task:
 
 ### Inspect
 
-Only M3B.1-relevant repository files and evidence surfaces, including as applicable:
+Only M3B.2-definition-relevant repository files and governance surfaces, including as applicable:
 
-- backend schema and migrations;
-- `fiteatsy_clients` and current account-to-client correlation;
-- approved direct-root tables with new `client_id` compatibility columns;
-- tests proving schema contract, migration packaging, and protected auth/runtime behavior;
+- repository/service files that still enforce `user_id` ownership;
+- current account-to-client and current-client resolution paths;
+- protected auth/session/current-client flows that must not regress;
+- the accepted M3B.1 schema foundation and deferred-surface boundaries;
 - `docs/02_IDENTITY_AND_CLIENT/M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md`;
-- status/governance docs that must stay aligned to the M3B.1 verification gate.
+- status/governance docs that must stay aligned to the M3B.2 readiness gate.
 
 ### Do Not
 
@@ -45,21 +45,20 @@ Only M3B.1-relevant repository files and evidence surfaces, including as applica
 - create migrations;
 - change production configuration;
 - change Railway resources;
-- begin `M3B.2`, `M3B.3`, `M3B.4`, or `M3C` without explicit Product Owner approval;
+- begin `M3B.2`, `M3B.3`, `M3B.4`, or `M3C` implementation without explicit Product Owner approval;
 - refactor unrelated code.
 
 ### Output
 
 Report:
 
-- M3B.1 deployment identity and running commit;
-- migration packaging/runtime evidence;
-- public health/readiness/version evidence;
-- what was and was not directly verified about the new ownership schema;
-- protected-baseline regression status;
+- the exact repository/service ownership surfaces still using `user_id`;
+- the approved and deferred M3B.1 boundary the next slice must respect;
+- the protected-baseline regression requirements for M3B.2;
+- the implementation order, fail-closed expectations, and anti-IDOR requirements;
 - Git state.
 
-Then stop for production acceptance evidence or the next explicit implementation authorization.
+Then stop for Product Owner authorization or the next explicit implementation instruction.
 
 ## Historical / Superseded Instruction
 
