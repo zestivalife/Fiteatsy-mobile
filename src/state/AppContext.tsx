@@ -71,7 +71,6 @@ import {
 import { registerAccessTokenProvider } from '../services/apiClient';
 import { queueHealthEvent } from '../services/platformEventService';
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
-import { type DevelopmentUser } from '../data/developmentUsers';
 
 type StoredAuthSession = CurrentAuthSession & {
   sessionToken: string;
@@ -92,7 +91,6 @@ type AppContextValue = {
   authSession: StoredAuthSession | null;
   isAuthenticated: boolean;
   completeAuthentication: (session: AuthSessionResponse) => Promise<void>;
-  completeDevelopmentAuthentication: (user: DevelopmentUser) => void;
   setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
   checkIns: DailyCheckIn[];
   submitCheckIn: (checkIn: Omit<DailyCheckIn, 'dateISO'>) => void;
@@ -255,27 +253,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, [persistAuthSession]);
 
-  const completeDevelopmentAuthentication = useCallback((user: DevelopmentUser) => {
-    if (!__DEV__) {
-      return;
-    }
-
-    setAuthSessionState({
-      accountId: user.id,
-      sessionId: `dev_session_${user.id}`,
-      sessionToken: `dev_token_${user.id}`,
-      sessionExpiresAtISO: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-      client: user.client,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        mobileNumber: user.mobileNumber
-      }
-    });
-    AsyncStorage.removeItem(STORAGE_KEYS.auth);
-  }, []);
-
   useEffect(() => {
     registerAccessTokenProvider(() => authSession?.sessionToken ?? null);
   }, [authSession]);
@@ -333,9 +310,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const parsed = safeParse<AssessmentProfile | null>(storedAssessment, null);
           if (parsed && typeof parsed === 'object') setAssessmentState(parsed);
         }
-        if (storedAuth && __DEV__) {
-          AsyncStorage.removeItem(STORAGE_KEYS.auth);
-        } else if (storedAuth) {
+        if (storedAuth) {
           const parsed = safeParse<StoredAuthSession | null>(storedAuth, null);
           if (parsed?.sessionToken) {
             setAuthSessionState(parsed);
@@ -1232,7 +1207,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const hasCheckedInToday = useMemo(() => checkIns.some((item) => toDayKey(item.dateISO) === todayKey()), [checkIns]);
 
   const logout = useCallback(() => {
-    if (authSession?.sessionToken && !authSession.sessionId.startsWith('dev_session_')) {
+    if (authSession?.sessionToken) {
       void logoutAuthSession(authSession.sessionToken).catch(() => undefined);
     }
     clearPersistedAuth();
@@ -1269,7 +1244,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       authSession,
       isAuthenticated,
       completeAuthentication,
-      completeDevelopmentAuthentication,
       setIsAuthenticated,
       checkIns,
       submitCheckIn,
@@ -1330,7 +1304,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       hasCheckedInToday,
       isAuthenticated,
       completeAuthentication,
-      completeDevelopmentAuthentication,
       logNudgeAction,
       logout,
       markMedicationAction,

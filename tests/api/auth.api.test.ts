@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { countClients } from '../../backend/src/modules/client/client.repository.js';
+import { setOtpGeneratorForTests } from '../../backend/src/modules/auth/auth.service.js';
 import { getJson, postJson } from '../helpers/http.js';
 import { authHeaders } from '../helpers/auth.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
-const originalOtpDebugFlag = process.env.OTP_DEBUG_RESPONSE_ENABLED;
 const originalNodeEnv = process.env.NODE_ENV;
+const TEST_OTP = '654321';
 
 test.before(async () => {
   server = await startTestServer();
@@ -17,20 +18,17 @@ test.after(async () => {
   if (server) {
     await server.close();
   }
-  if (originalOtpDebugFlag === undefined) delete process.env.OTP_DEBUG_RESPONSE_ENABLED;
-  else process.env.OTP_DEBUG_RESPONSE_ENABLED = originalOtpDebugFlag;
-
   if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
   else process.env.NODE_ENV = originalNodeEnv;
 });
 
 test.beforeEach(async () => {
   process.env.NODE_ENV = 'test';
-  process.env.OTP_DEBUG_RESPONSE_ENABLED = 'true';
   await resetTestState();
+  setOtpGeneratorForTests(() => TEST_OTP);
 });
 
-test('POST /v1/auth/signup/request-otp returns 201 with debug OTP when explicitly enabled outside production', async () => {
+test('POST /v1/auth/signup/request-otp returns 201 without exposing OTP debug material', async () => {
   const { response, body } = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
     name: 'Asha Sharma',
     email: 'asha@example.com',
@@ -38,7 +36,7 @@ test('POST /v1/auth/signup/request-otp returns 201 with debug OTP when explicitl
   });
   assert.equal(response.status, 201);
   assert.match(body.challengeId, /^[-a-z0-9]+$/i);
-  assert.match(body.debugOtp, /^[0-9]{6}$/);
+  assert.equal(body.debugOtp, undefined);
 });
 
 test('POST /v1/auth/signup/request-otp returns 400 for invalid signup payload', async () => {
@@ -84,7 +82,7 @@ test('POST /v1/auth/signup/verify-otp issues a persisted session and GET /v1/aut
 
   const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
     challengeId: created.body.challengeId,
-    otp: created.body.debugOtp,
+    otp: TEST_OTP,
   });
   assert.equal(verified.response.status, 200);
   assert.match(verified.body.sessionToken, /^[-a-z0-9]+$/i);
@@ -121,7 +119,7 @@ test('GET /v1/auth/me does not expose the internal client primary key after M3B.
 
   const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
     challengeId: created.body.challengeId,
-    otp: created.body.debugOtp,
+    otp: TEST_OTP,
   });
   assert.equal(verified.response.status, 200);
 
@@ -141,7 +139,7 @@ test('POST /v1/auth/logout revokes the session token', async () => {
   });
   const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
     challengeId: created.body.challengeId,
-    otp: created.body.debugOtp,
+    otp: TEST_OTP,
   });
 
   const logout = await postJson(server.baseUrl, '/v1/auth/logout', {}, {
@@ -164,12 +162,12 @@ test('verified signup resolves the same persisted account when the same contact 
   const firstRequest = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', identity);
   const firstVerify = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
     challengeId: firstRequest.body.challengeId,
-    otp: firstRequest.body.debugOtp
+    otp: TEST_OTP
   });
   const secondRequest = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', identity);
   const secondVerify = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
     challengeId: secondRequest.body.challengeId,
-    otp: secondRequest.body.debugOtp
+    otp: TEST_OTP
   });
 
   assert.equal(firstVerify.body.user.id, secondVerify.body.user.id);
@@ -192,7 +190,7 @@ test('failed verification does not create a client and successful verification c
 
   const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
     challengeId: requested.body.challengeId,
-    otp: requested.body.debugOtp,
+    otp: TEST_OTP,
   });
   assert.equal(verified.response.status, 200);
   assert.equal(await countClients(), 1);

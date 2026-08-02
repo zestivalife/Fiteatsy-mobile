@@ -6,7 +6,6 @@ const LOCAL_DATABASE_FALLBACK = 'postgres://postgres:postgres@localhost:5432/nue
 const SERVICE_NAME = 'fiteatsy-backend';
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const packageJsonPath = path.join(backendRoot, 'package.json');
-const parseBoolean = (value) => /^(1|true|yes|on)$/i.test(value?.trim() ?? '');
 const readPackageVersion = () => {
     try {
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
@@ -49,15 +48,6 @@ const resolveEnvironment = () => readNodeEnv() || readEnvironmentName() || 'deve
 const resolveGitCommit = () => process.env.GIT_COMMIT?.trim() ||
     process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
     'unknown';
-export const isOtpDebugResponseEnabled = () => {
-    if (readNodeEnv().toLowerCase() === 'production')
-        return false;
-    return parseBoolean(process.env.OTP_DEBUG_RESPONSE_ENABLED);
-};
-export const isDevelopmentOtpBypassEnabled = () => {
-    const nodeEnv = readNodeEnv().toLowerCase();
-    return !isRailwayRuntime() && (nodeEnv === '' || nodeEnv === 'development');
-};
 export const env = {
     get serviceName() {
         return SERVICE_NAME;
@@ -92,10 +82,4 @@ export const env = {
     get pingmateLanguage() {
         return process.env.PINGMATE_LANGUAGE?.trim() || 'en';
     },
-    get otpDebugResponseEnabled() {
-        return isOtpDebugResponseEnabled();
-    },
-    get developmentOtpBypassEnabled() {
-        return isDevelopmentOtpBypassEnabled();
-    }
 };

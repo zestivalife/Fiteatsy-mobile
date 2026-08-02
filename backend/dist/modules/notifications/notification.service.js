@@ -1,7 +1,7 @@
-import { env, isOtpDebugResponseEnabled } from '../../config/env.js';
+import { env } from '../../config/env.js';
 import { createPingMateProvider } from './pingmate.provider.js';
 import { OtpDeliveryError } from './notification.types.js';
-const LOCAL_PROVIDER_NAME = 'local-debug';
+const TEST_PROVIDER_NAME = 'test-noop';
 let whatsappProvider = createPingMateProvider();
 export const setWhatsappProviderForTests = (provider) => {
     whatsappProvider = provider;
@@ -11,7 +11,7 @@ export const resetWhatsappProviderForTests = () => {
 };
 const shouldSkipExternalOtpDelivery = () => {
     const environment = env.environment.toLowerCase();
-    return environment === 'test' || isOtpDebugResponseEnabled();
+    return environment === 'test';
 };
 const logDeliveryResult = (challengeId, userId, result) => {
     console.info('OTP delivery result', {
@@ -41,7 +41,7 @@ export const NotificationService = {
         if (shouldSkipExternalOtpDelivery()) {
             const result = {
                 status: 'skipped',
-                provider: LOCAL_PROVIDER_NAME,
+                provider: TEST_PROVIDER_NAME,
                 latencyMs: 0
             };
             logDeliveryResult(input.challengeId, input.userId, result);

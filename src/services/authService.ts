@@ -118,7 +118,6 @@ export type SignupOtpResponse = {
     emailMasked: string;
     mobileMasked: string;
   };
-  debugOtp?: string;
 };
 
 export const requestSignupOtp = (params: SignupRequestParams) =>

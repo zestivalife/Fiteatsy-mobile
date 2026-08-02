@@ -1,12 +1,11 @@
 import crypto from 'node:crypto';
 import { env } from '../../config/env.js';
 import { OtpDeliveryError, type OtpDeliveryResult, type SendOtpInput, type WhatsappProvider } from './notification.types.js';
+import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 
 type FetchLike = typeof fetch;
 
 const PINGMATE_PROVIDER_NAME = 'pingmate';
-
-const normalizeWhatsappRecipient = (mobileNumber: string) => mobileNumber.replace(/\D/g, '');
 
 const buildCopyCodePayload = (otp: string) => `otp${otp}`;
 
@@ -26,7 +25,7 @@ const getProviderRequestId = (response: Response) => {
 };
 
 const sanitizeProviderBody = (body: string, input: SendOtpInput) => {
-  const normalizedPhone = normalizeWhatsappRecipient(input.mobileNumber);
+  const normalizedPhone = normalizeCanonicalPhoneNumber(input.mobileNumber);
   return body
     .replaceAll(input.otp, '[REDACTED_OTP]')
     .replaceAll(input.mobileNumber, '[REDACTED_PHONE]')
@@ -61,7 +60,7 @@ export class PingMateProvider implements WhatsappProvider {
     const apiKey = env.pingmateApiKey;
     const baseUrl = env.pingmateBaseUrl.replace(/\/+$/, '');
     const requestUrl = `${baseUrl}/messages/send`;
-    const normalizedRecipient = normalizeWhatsappRecipient(input.mobileNumber);
+    const normalizedRecipient = normalizeCanonicalPhoneNumber(input.mobileNumber);
     const requestPayload = {
       to: normalizedRecipient,
       message: {

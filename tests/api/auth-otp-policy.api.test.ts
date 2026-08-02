@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../../backend/src/server.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
-import { resetOtpChallengesForTests } from '../../backend/src/modules/auth/auth.service.js';
+import { resetOtpChallengesForTests, setOtpGeneratorForTests } from '../../backend/src/modules/auth/auth.service.js';
 import { resetWhatsappProviderForTests, setWhatsappProviderForTests } from '../../backend/src/modules/notifications/notification.service.js';
 import { authHeaders } from '../helpers/auth.js';
 import { getJson, postJson } from '../helpers/http.js';
@@ -100,7 +100,7 @@ test('non-production does not expose debug OTP without explicit opt-in', async (
   );
 });
 
-test('non-production exposes debug OTP only when explicit opt-in is enabled', async () => {
+test('non-production does not expose debug OTP even when legacy opt-in is set', async () => {
   await withEnv(
     {
       NODE_ENV: 'staging',
@@ -112,7 +112,7 @@ test('non-production exposes debug OTP only when explicit opt-in is enabled', as
       const { response, body } = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', signupPayload);
       try {
         assert.equal(response.status, 201);
-        assert.match(body.debugOtp, /^[0-9]{6}$/);
+        assert.equal(body.debugOtp, undefined);
       } finally {
         await server.close();
       }
@@ -120,7 +120,7 @@ test('non-production exposes debug OTP only when explicit opt-in is enabled', as
   );
 });
 
-test('local development issues fixed OTP 123456 and rejects any other OTP', async () => {
+test('local development does not issue fixed OTP 123456 or expose debug OTP', async () => {
   await withEnv(
     {
       NODE_ENV: 'development',
@@ -128,11 +128,11 @@ test('local development issues fixed OTP 123456 and rejects any other OTP', asyn
       RAILWAY_SERVICE_ID: undefined,
       RAILWAY_ENVIRONMENT_ID: undefined,
       RAILWAY_ENVIRONMENT_NAME: undefined,
-      RAILWAY_ENVIRONMENT: undefined,
-      OTP_DEBUG_RESPONSE_ENABLED: 'true'
+      RAILWAY_ENVIRONMENT: undefined
     },
     async () => {
       useSuccessfulOtpDeliveryProvider();
+      setOtpGeneratorForTests(() => '654321');
       const server = await startAppServer(createApp());
       const requested = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
         ...signupPayload,
@@ -142,11 +142,11 @@ test('local development issues fixed OTP 123456 and rejects any other OTP', asyn
 
       try {
         assert.equal(requested.response.status, 201);
-        assert.equal(requested.body.debugOtp, '123456');
+        assert.equal(requested.body.debugOtp, undefined);
 
         const invalid = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
           challengeId: requested.body.challengeId,
-          otp: '654321'
+          otp: '123456'
         });
         assert.equal(invalid.response.status, 401);
         assert.equal(invalid.body.error, 'OTP_INVALID');
@@ -157,7 +157,7 @@ test('local development issues fixed OTP 123456 and rejects any other OTP', asyn
   );
 });
 
-test('local development fixed OTP still creates a persisted session and current client', async (t) => {
+test('OTP verification creates a persisted session and current client without public debug OTP', async (t) => {
   await withEnv(
     {
       NODE_ENV: 'development',
@@ -165,12 +165,12 @@ test('local development fixed OTP still creates a persisted session and current 
       RAILWAY_SERVICE_ID: undefined,
       RAILWAY_ENVIRONMENT_ID: undefined,
       RAILWAY_ENVIRONMENT_NAME: undefined,
-      RAILWAY_ENVIRONMENT: undefined,
-      OTP_DEBUG_RESPONSE_ENABLED: 'true'
+      RAILWAY_ENVIRONMENT: undefined
     },
     async () => {
       try {
         await resetBackendStateForTests();
+        setOtpGeneratorForTests(() => '654321');
       } catch (error) {
         if (isConnectionRefused(error)) {
           t.skip('Local PostgreSQL is unavailable; session/client verification requires the test database.');
@@ -188,10 +188,10 @@ test('local development fixed OTP still creates a persisted session and current 
 
       try {
         assert.equal(requested.response.status, 201);
-        assert.equal(requested.body.debugOtp, '123456');
+        assert.equal(requested.body.debugOtp, undefined);
         const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
           challengeId: requested.body.challengeId,
-          otp: '123456'
+          otp: '654321'
         });
         assert.equal(verified.response.status, 200);
         assert.match(verified.body.sessionToken, /^[-a-z0-9]+$/i);
@@ -213,11 +213,11 @@ test('local development fixed OTP still creates a persisted session and current 
 test('production rejects development fixed OTP when it was not the generated challenge OTP', async () => {
   await withEnv(
     {
-      NODE_ENV: 'production',
-      OTP_DEBUG_RESPONSE_ENABLED: 'true'
+      NODE_ENV: 'production'
     },
     async () => {
       useSuccessfulOtpDeliveryProvider();
+      setOtpGeneratorForTests(() => '654321');
       const server = await startAppServer(createApp());
       const requested = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
         ...signupPayload,

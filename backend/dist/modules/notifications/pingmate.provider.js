@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import { env } from '../../config/env.js';
 import { OtpDeliveryError } from './notification.types.js';
+import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 const PINGMATE_PROVIDER_NAME = 'pingmate';
-const normalizeWhatsappRecipient = (mobileNumber) => mobileNumber.replace(/\D/g, '');
 const buildCopyCodePayload = (otp) => `otp${otp}`;
 const providerRequestIdHeaders = [
     'x-request-id',
@@ -19,7 +19,7 @@ const getProviderRequestId = (response) => {
     return null;
 };
 const sanitizeProviderBody = (body, input) => {
-    const normalizedPhone = normalizeWhatsappRecipient(input.mobileNumber);
+    const normalizedPhone = normalizeCanonicalPhoneNumber(input.mobileNumber);
     return body
         .replaceAll(input.otp, '[REDACTED_OTP]')
         .replaceAll(input.mobileNumber, '[REDACTED_PHONE]')
@@ -46,7 +46,7 @@ export class PingMateProvider {
         const apiKey = env.pingmateApiKey;
         const baseUrl = env.pingmateBaseUrl.replace(/\/+$/, '');
         const requestUrl = `${baseUrl}/messages/send`;
-        const normalizedRecipient = normalizeWhatsappRecipient(input.mobileNumber);
+        const normalizedRecipient = normalizeCanonicalPhoneNumber(input.mobileNumber);
         const requestPayload = {
             to: normalizedRecipient,
             message: {

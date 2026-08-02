@@ -5,7 +5,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getThemeColors } from '../design/tokens';
 import { RootStackParamList, MainTabParamList } from './types';
 import { SplashScreen } from '../screens/auth/SplashScreen';
-import { DevUserPickerScreen } from '../screens/auth/DevUserPickerScreen';
 import { OnboardingBasicsScreen } from '../screens/onboarding/OnboardingBasicsScreen';
 import { OnboardingCalendarScreen } from '../screens/onboarding/OnboardingCalendarScreen';
 import { OnboardingNotificationsScreen } from '../screens/onboarding/OnboardingNotificationsScreen';
@@ -70,7 +69,6 @@ const MainTabs = () => {
 export const AppNavigation = () => {
   const { isAuthenticated, themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
-  const shouldUseDevelopmentAuthGate = __DEV__ && !isAuthenticated;
   const navTheme = {
     ...DefaultTheme,
     colors: {
@@ -85,7 +83,7 @@ export const AppNavigation = () => {
   };
 
   return (
-    <NavigationContainer key={shouldUseDevelopmentAuthGate ? 'dev-auth' : 'app'} theme={navTheme}>
+    <NavigationContainer theme={navTheme}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
@@ -93,44 +91,37 @@ export const AppNavigation = () => {
           animationDuration: 240,
           gestureEnabled: true
         }}
-        initialRouteName={shouldUseDevelopmentAuthGate ? 'DevUserPicker' : 'Splash'}
+        initialRouteName="Splash"
       >
-        {shouldUseDevelopmentAuthGate ? (
-          <Stack.Screen name="DevUserPicker" component={DevUserPickerScreen} />
-        ) : (
-          <>
-            <Stack.Screen name="Splash" component={SplashScreen} />
-            <Stack.Screen name="OnboardingBasics" component={OnboardingBasicsScreen} />
-            <Stack.Screen name="OnboardingCalendar" component={OnboardingCalendarScreen} />
-            <Stack.Screen name="OnboardingNotifications" component={OnboardingNotificationsScreen} />
-            <Stack.Screen name="OnboardingAssessment" component={OnboardingAssessmentScreen} />
-            <Stack.Screen name="DevUserPicker" component={DevUserPickerScreen} />
-            <Stack.Screen name="SignIn" component={SignInScreen} />
-            <Stack.Screen name="SignUp" component={SignUpScreen} />
-            <Stack.Screen name="SyncWearable" component={SyncWearableScreen} />
-            <Stack.Screen name="SyncSuccess" component={SyncSuccessScreen} />
-            <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen name="TrackerDetail" component={TrackerDetailScreen} />
-            <Stack.Screen name="FocusSession" component={FocusScreen} />
-            <Stack.Screen name="BreathingSession" component={BreathingScreen} />
-            <Stack.Screen name="MovementSession" component={MovementScreen} />
-            <Stack.Screen name="HydrationSession" component={HydrationScreen} />
-            <Stack.Screen name="Leadership" component={LeadershipScreen} />
-            <Stack.Screen name="Search" component={SearchScreen} />
-            <Stack.Screen name="Notifications" component={NotificationsScreen} />
-            <Stack.Screen name="Profile" component={ProfileScreen} />
-            <Stack.Screen name="ConnectedMetrics" component={ConnectedMetricsScreen} />
-            <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
-            <Stack.Screen name="MedicationForm" component={MedicationFormScreen} />
-            <Stack.Screen name="MedicationCalendar" component={MedicationCalendarScreen} />
-            <Stack.Screen name="MedicationNotifications" component={MedicationNotificationsScreen} />
-            <Stack.Screen name="CycleCalendar" component={CycleCalendarScreen} />
-            <Stack.Screen name="CycleInsights" component={CycleInsightsScreen} />
-            <Stack.Screen name="CycleNotifications" component={CycleNotificationsScreen} />
-            <Stack.Screen name="FamilyDashboard" component={FamilyDashboardScreen} />
-            <Stack.Screen name="FamilyMemberDetail" component={FamilyMemberDetailScreen} />
-          </>
-        )}
+        <Stack.Screen name="Splash" component={SplashScreen} />
+        <Stack.Screen name="OnboardingBasics" component={OnboardingBasicsScreen} />
+        <Stack.Screen name="OnboardingCalendar" component={OnboardingCalendarScreen} />
+        <Stack.Screen name="OnboardingNotifications" component={OnboardingNotificationsScreen} />
+        <Stack.Screen name="OnboardingAssessment" component={OnboardingAssessmentScreen} />
+        <Stack.Screen name="SignIn" component={SignInScreen} />
+        <Stack.Screen name="SignUp" component={SignUpScreen} />
+        <Stack.Screen name="SyncWearable" component={SyncWearableScreen} />
+        <Stack.Screen name="SyncSuccess" component={SyncSuccessScreen} />
+        <Stack.Screen name="Main" component={MainTabs} />
+        <Stack.Screen name="TrackerDetail" component={TrackerDetailScreen} />
+        <Stack.Screen name="FocusSession" component={FocusScreen} />
+        <Stack.Screen name="BreathingSession" component={BreathingScreen} />
+        <Stack.Screen name="MovementSession" component={MovementScreen} />
+        <Stack.Screen name="HydrationSession" component={HydrationScreen} />
+        <Stack.Screen name="Leadership" component={LeadershipScreen} />
+        <Stack.Screen name="Search" component={SearchScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="ConnectedMetrics" component={ConnectedMetricsScreen} />
+        <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
+        <Stack.Screen name="MedicationForm" component={MedicationFormScreen} />
+        <Stack.Screen name="MedicationCalendar" component={MedicationCalendarScreen} />
+        <Stack.Screen name="MedicationNotifications" component={MedicationNotificationsScreen} />
+        <Stack.Screen name="CycleCalendar" component={CycleCalendarScreen} />
+        <Stack.Screen name="CycleInsights" component={CycleInsightsScreen} />
+        <Stack.Screen name="CycleNotifications" component={CycleNotificationsScreen} />
+        <Stack.Screen name="FamilyDashboard" component={FamilyDashboardScreen} />
+        <Stack.Screen name="FamilyMemberDetail" component={FamilyMemberDetailScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -5,7 +5,8 @@ import {
   buildOtpForTests,
   buildOtpHashForTests,
   expireOtpChallengeForTests,
-  resetOtpChallengesForTests
+  resetOtpChallengesForTests,
+  setOtpGeneratorForTests
 } from '../../backend/src/modules/auth/auth.service.js';
 import { createPingMateProvider } from '../../backend/src/modules/notifications/pingmate.provider.js';
 import { OtpDeliveryError } from '../../backend/src/modules/notifications/notification.types.js';
@@ -241,10 +242,10 @@ test('OTP request returns OTP_DELIVERY_FAILED when provider delivery fails', asy
 test('OTP expiry rejects verification without creating a session', async () => {
   await withEnv(
     {
-      NODE_ENV: 'test',
-      OTP_DEBUG_RESPONSE_ENABLED: 'true'
+      NODE_ENV: 'test'
     },
     async () => {
+      setOtpGeneratorForTests(() => '654321');
       const server = await startAppServer(createApp());
       try {
         const requested = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', signupPayload);
@@ -253,7 +254,7 @@ test('OTP expiry rejects verification without creating a session', async () => {
 
         const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
           challengeId: requested.body.challengeId,
-          otp: requested.body.debugOtp
+          otp: '654321'
         });
         assert.equal(verified.response.status, 410);
         assert.equal(verified.body.error, 'OTP_EXPIRED');
@@ -267,8 +268,7 @@ test('OTP expiry rejects verification without creating a session', async () => {
 test('OTP request rate limit allows five requests per hour per mobile number', async () => {
   await withEnv(
     {
-      NODE_ENV: 'test',
-      OTP_DEBUG_RESPONSE_ENABLED: 'true'
+      NODE_ENV: 'test'
     },
     async () => {
       const server = await startAppServer(createApp());

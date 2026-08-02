@@ -1,22 +1,21 @@
 import crypto from 'node:crypto';
 import { createAuthSession, resolveVerifiedAccountIdentity } from './auth.repository.js';
-import { isDevelopmentOtpBypassEnabled, isOtpDebugResponseEnabled } from '../../config/env.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { OtpDeliveryError } from '../notifications/notification.types.js';
+import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 const OTP_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 30 * 1000;
 const OTP_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const OTP_REQUEST_LIMIT_PER_HOUR = 5;
 const MAX_ATTEMPTS = 5;
 const ACTIVE_CHALLENGE_LIMIT = 5_000;
-const DEVELOPMENT_OTP = '123456';
 const challengeStore = new Map();
 const otpRequestTimestampsByMobile = new Map();
 export const buildOtpHashForTests = (challengeId, otp) => crypto.createHash('sha256').update(`${challengeId}:${otp}`).digest('hex');
-export const buildOtpForTests = () => {
-    if (isDevelopmentOtpBypassEnabled())
-        return DEVELOPMENT_OTP;
-    return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+let otpGenerator = () => String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+export const buildOtpForTests = () => otpGenerator();
+export const setOtpGeneratorForTests = (generator) => {
+    otpGenerator = generator ?? (() => String(crypto.randomInt(0, 1_000_000)).padStart(6, '0'));
 };
 const now = () => Date.now();
 const pruneOldChallenges = () => {
@@ -80,7 +79,7 @@ export const createOtpChallenge = async (input) => {
     const user = {
         name: input.name.trim(),
         email: input.email.trim().toLowerCase(),
-        mobileNumber: input.mobileNumber.trim()
+        mobileNumber: normalizeCanonicalPhoneNumber(input.mobileNumber)
     };
     assertOtpRequestQuota(user.mobileNumber);
     const { challenge, otp } = createOrReplaceChallenge(user);
@@ -103,8 +102,7 @@ export const createOtpChallenge = async (input) => {
         deliveryChannel: {
             emailMasked: user.email.replace(/(^.).+(@.*$)/, '$1***$2'),
             mobileMasked: user.mobileNumber.replace(/.(?=.{4})/g, '*')
-        },
-        debugOtp: isOtpDebugResponseEnabled() ? otp : undefined
+        }
     };
 };
 export const resendOtpChallenge = async (challengeId) => {
@@ -143,8 +141,7 @@ export const resendOtpChallenge = async (challengeId) => {
         challengeId: challenge.challengeId,
         expiresAtISO: new Date(challenge.expiresAtMs).toISOString(),
         resendAvailableAtISO: new Date(challenge.resendAvailableAtMs).toISOString(),
-        attemptsRemaining: challenge.attemptsRemaining,
-        debugOtp: isOtpDebugResponseEnabled() ? otp : undefined
+        attemptsRemaining: challenge.attemptsRemaining
     };
 };
 export const verifyOtpChallenge = async (challengeId, otp, metadata = {}) => {
@@ -207,6 +204,7 @@ export const verifyOtpChallenge = async (challengeId, otp, metadata = {}) => {
 export const resetOtpChallengesForTests = () => {
     challengeStore.clear();
     otpRequestTimestampsByMobile.clear();
+    setOtpGeneratorForTests(null);
 };
 export const expireOtpChallengeForTests = (challengeId) => {
     const challenge = challengeStore.get(challengeId);
