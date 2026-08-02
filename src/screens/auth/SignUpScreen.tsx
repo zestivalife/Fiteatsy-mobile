@@ -26,6 +26,7 @@ import {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 const OTP_LENGTH = 6;
+const DEVELOPMENT_OTP = '123456';
 
 export const SignUpScreen = ({ navigation }: Props) => {
   const { completeAuthentication, setOnboarding, themeMode } = useAppContext();
@@ -244,6 +245,25 @@ export const SignUpScreen = ({ navigation }: Props) => {
             </Text>
             <Text style={[styles.timerText, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>Attempts remaining: {attemptsRemaining}</Text>
 
+            {__DEV__ ? (
+              <View
+                style={[
+                  styles.devOtpNote,
+                  {
+                    backgroundColor: themeMode === 'light' ? '#FFF7D6' : '#2A2412',
+                    borderColor: themeMode === 'light' ? '#E4B93A' : '#D6A82E'
+                  }
+                ]}
+              >
+                <Text style={[styles.devOtpTitle, { color: themeMode === 'light' ? '#4A3700' : '#FFE8A3' }]}>
+                  Development Mode
+                </Text>
+                <Text style={[styles.devOtpBody, { color: themeMode === 'light' ? '#4A3700' : '#FFF2BD' }]}>
+                  Use OTP: {DEVELOPMENT_OTP}
+                </Text>
+              </View>
+            ) : null}
+
             {debugOtp ? <Text style={[styles.debugOtp, { color: themeColors.warning }]}>Dev OTP: {debugOtp}</Text> : null}
 
             <PrimaryButton title={verifying ? 'Verifying...' : 'Verify OTP'} onPress={verifyOtp} disabled={!canVerify} />
@@ -320,6 +340,20 @@ const styles = StyleSheet.create({
     ...typography.caption
   },
   debugOtp: {
+    ...typography.caption
+  },
+  devOtpNote: {
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 2
+  },
+  devOtpTitle: {
+    ...typography.caption,
+    fontFamily: 'Poppins_700Bold'
+  },
+  devOtpBody: {
     ...typography.caption
   },
   secondaryBtn: {

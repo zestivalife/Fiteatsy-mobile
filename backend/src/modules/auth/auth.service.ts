@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { createAuthSession, resolveVerifiedAccountIdentity } from './auth.repository.js';
-import { isOtpDebugResponseEnabled } from '../../config/env.js';
+import { isDevelopmentOtpBypassEnabled, isOtpDebugResponseEnabled } from '../../config/env.js';
 
 type SignupInput = {
   name: string;
@@ -34,6 +34,7 @@ const OTP_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 30 * 1000;
 const MAX_ATTEMPTS = 5;
 const ACTIVE_CHALLENGE_LIMIT = 5_000;
+const DEVELOPMENT_OTP = '123456';
 
 const challengeStore = new Map<string, OtpChallenge>();
 
@@ -41,6 +42,7 @@ const buildOtpHash = (challengeId: string, otp: string) =>
   crypto.createHash('sha256').update(`${challengeId}:${otp}`).digest('hex');
 
 const buildOtp = () => {
+  if (isDevelopmentOtpBypassEnabled()) return DEVELOPMENT_OTP;
   return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
 };
 

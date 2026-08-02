@@ -69,6 +69,11 @@ export const isOtpDebugResponseEnabled = () => {
   return parseBoolean(process.env.OTP_DEBUG_RESPONSE_ENABLED);
 };
 
+export const isDevelopmentOtpBypassEnabled = () => {
+  const nodeEnv = readNodeEnv().toLowerCase();
+  return !isRailwayRuntime() && (nodeEnv === '' || nodeEnv === 'development');
+};
+
 export const env = {
   get serviceName() {
     return SERVICE_NAME;
@@ -93,5 +98,8 @@ export const env = {
   },
   get otpDebugResponseEnabled() {
     return isOtpDebugResponseEnabled();
+  },
+  get developmentOtpBypassEnabled() {
+    return isDevelopmentOtpBypassEnabled();
   }
 };

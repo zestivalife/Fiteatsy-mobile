@@ -1,15 +1,6 @@
 create unique index if not exists fiteatsy_clients_internal_owner_unique
   on fiteatsy_clients (id, account_user_id);
 
-alter table daily_checkins
-  add column if not exists client_id text;
-
-alter table ai_decision_logs
-  add column if not exists client_id text;
-
-alter table nudges
-  add column if not exists client_id text;
-
 alter table health_profiles
   add column if not exists client_id text;
 
