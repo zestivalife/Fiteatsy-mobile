@@ -3,7 +3,7 @@ import { env } from '../../config/env.js';
 import { OtpDeliveryError } from './notification.types.js';
 const PINGMATE_PROVIDER_NAME = 'pingmate';
 const normalizeWhatsappRecipient = (mobileNumber) => mobileNumber.replace(/\D/g, '');
-const buildCopyCodePayload = (otp) => `https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp${otp}`;
+const buildCopyCodePayload = (otp) => `otp${otp}`;
 const providerRequestIdHeaders = [
     'x-request-id',
     'x-correlation-id',
@@ -25,6 +25,7 @@ const sanitizeProviderBody = (body, input) => {
         .replaceAll(input.mobileNumber, '[REDACTED_PHONE]')
         .replaceAll(normalizedPhone, '[REDACTED_PHONE]');
 };
+const sanitizePayload = (payload, input) => JSON.parse(sanitizeProviderBody(JSON.stringify(payload), input));
 const logPingMateRequest = (details) => {
     console.info('PingMate OTP request', details);
 };
@@ -46,6 +47,22 @@ export class PingMateProvider {
         const baseUrl = env.pingmateBaseUrl.replace(/\/+$/, '');
         const requestUrl = `${baseUrl}/messages/send`;
         const normalizedRecipient = normalizeWhatsappRecipient(input.mobileNumber);
+        const requestPayload = {
+            to: normalizedRecipient,
+            message: {
+                message_type: 'template',
+                template_name: env.pingmateTemplate,
+                template_language: env.pingmateLanguage,
+                body_variables: [input.otp],
+                buttons: [
+                    {
+                        button_type: 'url',
+                        button_index: 0,
+                        button_payload: buildCopyCodePayload(input.otp)
+                    }
+                ]
+            }
+        };
         const requestSummary = {
             correlationId,
             requestUrl,
@@ -60,7 +77,8 @@ export class PingMateProvider {
             buttonCount: 1,
             buttonType: 'url',
             buttonIndex: 0,
-            copyCodeUrlShape: 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp[REDACTED_OTP]'
+            buttonPayloadShape: 'otp[REDACTED_OTP]',
+            outboundRequestBody: JSON.stringify(sanitizePayload(requestPayload, input))
         };
         logPingMateRequest(requestSummary);
         if (!apiKey) {
@@ -82,22 +100,7 @@ export class PingMateProvider {
                     'Content-Type': 'application/json',
                     'X-API-Key': apiKey
                 },
-                body: JSON.stringify({
-                    to: normalizedRecipient,
-                    message: {
-                        message_type: 'template',
-                        template_name: env.pingmateTemplate,
-                        template_language: env.pingmateLanguage,
-                        body_variables: [input.otp],
-                        buttons: [
-                            {
-                                button_type: 'url',
-                                button_index: 0,
-                                button_payload: buildCopyCodePayload(input.otp)
-                            }
-                        ]
-                    }
-                })
+                body: JSON.stringify(requestPayload)
             });
         }
         catch (error) {

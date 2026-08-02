@@ -106,19 +106,18 @@ test('PingMate provider sends the required WhatsApp template payload without har
       assert.equal(body.message.message_type, 'template');
       assert.equal(body.message.template_name, 'auth_otp');
       assert.equal(body.message.template_language, 'en');
-      assert.equal(
-        body.message.buttons[0].button_payload,
-        'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp123456'
-      );
+      assert.equal(body.message.buttons[0].button_payload, 'otp123456');
       assert.deepEqual(body.message.buttons[0], {
         button_type: 'url',
         button_index: 0,
-        button_payload: 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp123456'
+        button_payload: 'otp123456'
       });
 
       const serializedLogs = JSON.stringify(capturedLogs);
       assert.match(serializedLogs, /PingMate OTP request/);
       assert.match(serializedLogs, /PingMate OTP response/);
+      assert.match(serializedLogs, /outboundRequestBody/);
+      assert.match(serializedLogs, /otp\[REDACTED_OTP\]/);
       assert.match(serializedLogs, /provider-request-1/);
       assert.doesNotMatch(serializedLogs, /test-pingmate-key/);
       assert.doesNotMatch(serializedLogs, /123456/);
