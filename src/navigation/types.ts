@@ -7,6 +7,7 @@ export type RootStackParamList = {
   OnboardingCalendar: undefined;
   OnboardingNotifications: undefined;
   OnboardingAssessment: undefined;
+  DevUserPicker: undefined;
   SignIn: undefined;
   SignUp: undefined;
   SyncWearable: { autoSync?: boolean } | undefined;

@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getThemeColors } from '../design/tokens';
 import { RootStackParamList, MainTabParamList } from './types';
 import { SplashScreen } from '../screens/auth/SplashScreen';
+import { DevUserPickerScreen } from '../screens/auth/DevUserPickerScreen';
 import { OnboardingBasicsScreen } from '../screens/onboarding/OnboardingBasicsScreen';
 import { OnboardingCalendarScreen } from '../screens/onboarding/OnboardingCalendarScreen';
 import { OnboardingNotificationsScreen } from '../screens/onboarding/OnboardingNotificationsScreen';
@@ -98,6 +99,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="OnboardingCalendar" component={OnboardingCalendarScreen} />
         <Stack.Screen name="OnboardingNotifications" component={OnboardingNotificationsScreen} />
         <Stack.Screen name="OnboardingAssessment" component={OnboardingAssessmentScreen} />
+        <Stack.Screen name="DevUserPicker" component={DevUserPickerScreen} />
         <Stack.Screen name="SignIn" component={SignInScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="SyncWearable" component={SyncWearableScreen} />

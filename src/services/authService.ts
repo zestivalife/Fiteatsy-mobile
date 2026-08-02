@@ -31,6 +31,10 @@ export type CurrentAuthSession = {
   accountId: string;
   sessionId: string;
   sessionExpiresAtISO: string;
+  client: {
+    fiteatsyClientId: string;
+    status: string;
+  };
   user: {
     id: string;
     name: string;

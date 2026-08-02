@@ -124,7 +124,7 @@ export const SplashScreen = ({ navigation }: Props) => {
       navigated.current = true;
 
       if (!isAuthenticated) {
-        navigation.replace('SignIn');
+        navigation.replace(__DEV__ ? 'DevUserPicker' : 'SignIn');
         return;
       }
 
