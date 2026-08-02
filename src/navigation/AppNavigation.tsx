@@ -85,7 +85,7 @@ export const AppNavigation = () => {
   };
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer key={shouldUseDevelopmentAuthGate ? 'dev-auth' : 'app'} theme={navTheme}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
