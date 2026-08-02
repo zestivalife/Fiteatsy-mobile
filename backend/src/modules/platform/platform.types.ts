@@ -14,6 +14,11 @@ export type AuthUserSession = {
   sessionId: string;
 };
 
+export type ClientOwnershipContext = {
+  accountId: string;
+  clientId: string;
+};
+
 export type HealthProfileSectionKey =
   | 'basic_information'
   | 'body_composition'
@@ -26,6 +31,7 @@ export type HealthProfileSectionKey =
 export type HealthProfileRecord = AuditFields & {
   id: string;
   userId: string;
+  clientId: string | null;
   dateOfBirthISO: string | null;
   calculatedAge: number | null;
   gender: string | null;
@@ -69,6 +75,7 @@ export type HealthProfileRecord = AuditFields & {
 export type NutritionProfileRecord = AuditFields & {
   id: string;
   userId: string;
+  clientId: string | null;
   healthProfileId: string;
   completionPercent: number;
   readinessScore: number;
@@ -98,6 +105,7 @@ export type CareCaseStage =
 export type CareCaseRecord = AuditFields & {
   id: string;
   userId: string;
+  clientId: string | null;
   healthProfileId: string;
   recoveryProgramId: string;
   assignedConsultantId: string | null;
@@ -178,6 +186,7 @@ export type NotificationChannel = 'push' | 'in_app' | 'email' | 'whatsapp';
 export type NotificationRecord = AuditFields & {
   id: string;
   userId: string;
+  clientId: string | null;
   careCaseId: string | null;
   channel: NotificationChannel;
   title: string;

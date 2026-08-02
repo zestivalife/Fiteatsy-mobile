@@ -1,6 +1,6 @@
 # Fiteatsy — Current Programme State
 
-**Baseline Date:** 1 August 2026
+**Baseline Date:** 2 August 2026
 
 ## Repository
 
@@ -50,8 +50,18 @@ Repository/runtime facts must be re-verified at execution time.
 ## Next Governed Milestone
 
 - milestone: `M3 — Fiteatsy Client & Identity`
-- current state: `M3B.1 PRODUCTION_ACCEPTED`
-- next candidate status: `M3B.2 — REPOSITORY AND AUTHORIZATION TRANSITION DEFINITION / READINESS REVIEW REQUIRED`
+- current state: `M3B.2 IMPLEMENTED_PENDING_VERIFICATION`
+- next candidate status: `M3B.2 — DB-BACKED REGRESSION AND PRODUCTION VERIFICATION REQUIRED`
+
+## M3B.2 Implementation State
+
+- M3B.2 has switched the platform direct-root runtime ownership path from caller/account supplied IDs to server-resolved current-client ownership.
+- Runtime ownership chain is now bearer token -> account -> current client -> `resource.client_id` for `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`.
+- Platform care-case object routes now deny cross-client access with `403 CARE_CASE_FORBIDDEN`.
+- Internal `client_id` remains private and is stripped from platform API DTOs; existing public contracts remain account-compatible.
+- Reports remain a deferred M3B.3 persistence surface; only report pipeline side effects into platform state now carry current-client ownership.
+- Verification completed: `npx tsc --noEmit`, backend `npm run build`, migration packaging with `Copied 3 migration file(s)`, and DB-independent M3B.1 ownership contract tests.
+- Verification pending: DB-backed repository/service/API regression tests, blocked locally by PostgreSQL `ECONNREFUSED`.
 
 ## Known Runtime Limitation
 
@@ -83,9 +93,9 @@ M3B Architecture Approved
 M3B.1 Production Accepted
   |
   v
-M3B.2 Definition / Readiness Review Required
+M3B.2 Implemented / Verification Required
 ```
 
 ## Do Not Skip Ahead
 
-Do not begin `M3B.2`, `M3B.3`, `M3B.4`, or `M3C` until a separate explicit instruction establishes scope, gate, acceptance criteria, and protected-baseline regression requirements.
+Do not begin `M3B.3`, `M3B.4`, or `M3C` until M3B.2 has completed DB-backed regression verification, production verification, and Product Owner acceptance.

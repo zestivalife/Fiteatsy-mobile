@@ -9,6 +9,10 @@ const upload = multer({
     limits: { fileSize: 12 * 1024 * 1024 }
 });
 export const reportsRouter = Router();
+const currentOwner = (account) => ({
+    accountId: account.accountId,
+    clientId: account.client.id
+});
 const toReportDto = (record) => {
     if (!record)
         return null;
@@ -39,7 +43,9 @@ reportsRouter.get('/supported-formats', (_req, res) => {
 });
 reportsRouter.use(requireAuthenticatedAccount);
 reportsRouter.post('/upload/init', async (req, res) => {
-    const userId = getAuthenticatedAccount(req).accountId;
+    const account = getAuthenticatedAccount(req);
+    const owner = currentOwner(account);
+    const userId = owner.accountId;
     const fileName = String(req.body?.fileName || '').trim();
     const mimeType = String(req.body?.mimeType || '').trim().toLowerCase();
     const fileSize = Number(req.body?.fileSize || 0);
@@ -55,7 +61,7 @@ reportsRouter.post('/upload/init', async (req, res) => {
         return res.status(413).json({ error: 'FILE_TOO_LARGE', message: 'Max upload size is 12MB.' });
     }
     const session = createUploadSession({ userId, fileName, mimeType, fileSize, source });
-    await syncReportPipelineToPlatform(userId, session.id, 'uploaded', `Blood report upload initialized for ${fileName}`);
+    await syncReportPipelineToPlatform(owner, session.id, 'uploaded', `Blood report upload initialized for ${fileName}`);
     return res.status(201).json({ uploadId: session.id, expiresAtISO: session.expiresAtISO, status: session.status });
 });
 reportsRouter.post('/upload/complete', (req, res) => {
@@ -195,7 +201,9 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
         if (!mime.includes('pdf') && !mime.includes('image')) {
             return res.status(415).json({ error: 'UNSUPPORTED_FILE', message: 'Only PDF and image reports are supported.' });
         }
-        const userId = getAuthenticatedAccount(req).accountId;
+        const account = getAuthenticatedAccount(req);
+        const owner = currentOwner(account);
+        const userId = owner.accountId;
         const uploadId = typeof req.body?.uploadId === 'string' ? req.body.uploadId.trim() : '';
         const uploadSession = uploadId ? getUploadSession(uploadId) : null;
         if (uploadId && !uploadSession) {
@@ -216,10 +224,10 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
                 : undefined
         });
         currentReportId = record.id;
-        await syncReportPipelineToPlatform(userId, record.id, 'uploaded', `Blood report uploaded: ${record.fileName}`);
+        await syncReportPipelineToPlatform(owner, record.id, 'uploaded', `Blood report uploaded: ${record.fileName}`);
         updateReportStatus(record.id, 'processing');
         const analysis = await analyzeReportBuffer(req.file.buffer, req.file.mimetype);
-        await syncReportPipelineToPlatform(userId, record.id, 'ocr_completed', `OCR completed for ${record.fileName}`);
+        await syncReportPipelineToPlatform(owner, record.id, 'ocr_completed', `OCR completed for ${record.fileName}`);
         const manualDate = typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : '';
         const manualLab = typeof req.body?.labName === 'string' ? req.body.labName.trim() : '';
         if (manualDate) {
@@ -229,8 +237,8 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
             analysis.labName = manualLab;
         }
         const saved = attachReportAnalysis(record.id, analysis);
-        await syncReportPipelineToPlatform(userId, record.id, 'biomarkers_updated', `Biomarkers extracted from ${record.fileName}`);
-        await syncReportPipelineToPlatform(userId, record.id, 'analysis_completed', `AI validation completed for ${record.fileName}`);
+        await syncReportPipelineToPlatform(owner, record.id, 'biomarkers_updated', `Biomarkers extracted from ${record.fileName}`);
+        await syncReportPipelineToPlatform(owner, record.id, 'analysis_completed', `AI validation completed for ${record.fileName}`);
         return res.status(200).json({
             reportId: saved?.id,
             status: saved?.status,

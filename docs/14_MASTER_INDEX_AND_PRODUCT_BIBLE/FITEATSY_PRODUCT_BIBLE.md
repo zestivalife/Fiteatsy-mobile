@@ -4,7 +4,7 @@
 **Product Type:** Mobile-first health tracking, disease-management and recovery-support platform  
 **Primary Client:** Fiteatsy mobile user  
 **Professional Workspace:** Zestiva Consultant / Practitioner System  
-**Status:** Backend production runtime verified and accepted on 30 July 2026; `M3A — Client Identity Foundation` is production-accepted on 30 July 2026; `M3B` architecture is approved; `M3B.1 — Ownership Schema Foundation` is production-accepted on 1 August 2026; `M3B.2+` and `M3C` remain future governed slices
+**Status:** Backend production runtime verified and accepted on 30 July 2026; `M3A — Client Identity Foundation` is production-accepted on 30 July 2026; `M3B` architecture is approved; `M3B.1 — Ownership Schema Foundation` is production-accepted on 1 August 2026; `M3B.2 — Repository and Authorization Transition` is implemented and pending verification; `M3B.3+` and `M3C` remain future governed slices
 
 ## 1. Product Mission
 
@@ -106,22 +106,24 @@ Production Accepted
 M3B.2 — Repository and Authorization Transition
           |
           v
-Definition / Readiness Review Required
+DB-backed Regression / Production Verification Required
 ```
 
 Known limitations:
 
 - constraint/index metadata for `fiteatsy_clients` was not independently runtime-inspected during acceptance;
 - production currently has zero users and zero clients, so populated live evidence for account -> client mappings and live public-ID uniqueness remains deferred rather than blocked.
+- M3B.2 local DB-backed API/repository/service verification remains pending until PostgreSQL is reachable in the local verification environment.
 
 Current governance rule:
 
 - `M3A — Client Identity Foundation` is closed as `PRODUCTION_ACCEPTED`;
 - `M3B` architecture is approved;
 - `M3B.1 — Ownership Schema Foundation` is closed as `PRODUCTION_ACCEPTED`;
+- `M3B.2 — Repository and Authorization Transition` is implemented but not production-accepted;
 - accepted M3B.1 production scope is limited to direct-root persisted ownership surfaces that exist in the deployed `0001 + 0002` baseline: `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`;
 - deferred persistence/ownership surfaces remain future governed work until authoritative persistence exists: `daily_checkins`, `ai_decision_logs`, `nudges`, `lab_reports`, `attachments`;
-- `M3B.2`, `M3B.3`, `M3B.4`, and `M3C` remain out of scope until separately governed.
+- `M3B.3`, `M3B.4`, and `M3C` remain out of scope until separately governed.
 
 ## 6. Engineering Rule
 

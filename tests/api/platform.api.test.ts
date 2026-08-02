@@ -11,7 +11,7 @@ test.before(async () => {
 });
 
 test.after(async () => {
-  await server.close();
+  await server?.close();
 });
 
 test.beforeEach(async () => {
@@ -46,12 +46,16 @@ test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 
   );
   assert.equal(patched.response.status, 200);
   assert.equal(patched.body.profile.userId, session.current.body.accountId);
+  assert.equal('clientId' in patched.body.profile, false);
+  assert.equal('clientId' in patched.body.nutrition, false);
+  assert.equal('clientId' in patched.body.careCase, false);
 
   const profile = await getJson(server.baseUrl, '/v1/platform/health-profile?userId=platform-user', {
     headers: authHeaders(session.token)
   });
   assert.equal(profile.response.status, 200);
   assert.equal(profile.body.profile.userId, session.current.body.accountId);
+  assert.equal('clientId' in profile.body.profile, false);
 
   const completion = await getJson(server.baseUrl, '/v1/platform/health-profile/completion?userId=platform-user', {
     headers: authHeaders(session.token)
@@ -126,6 +130,8 @@ test('platform ticket, timeline, events, assignment, and notifications flow work
   assert.ok(timeline.body.items.length > 0);
   assert.ok(tickets.body.items.length > 0);
   assert.ok(notifications.body.items.length > 0);
+  assert.equal('clientId' in assign.body, false);
+  assert.equal('clientId' in notifications.body.items[0], false);
 });
 
 test('platform assignment returns 404 for missing care case', async () => {
@@ -138,7 +144,7 @@ test('platform assignment returns 404 for missing care case', async () => {
   assert.equal(response.status, 404);
 });
 
-test('platform routes reject missing tokens and deny cross-account care-case access', async () => {
+test('platform routes reject missing tokens and forbid cross-client care-case access', async () => {
   const missing = await getJson(server.baseUrl, '/v1/platform/health-profile');
   assert.equal(missing.response.status, 401);
 
@@ -167,5 +173,6 @@ test('platform routes reject missing tokens and deny cross-account care-case acc
     `/v1/platform/care-cases/${seeded.body.careCase.id}/timeline`,
     { headers: authHeaders(attacker.token) }
   );
-  assert.equal(stolenTimeline.response.status, 404);
+  assert.equal(stolenTimeline.response.status, 403);
+  assert.equal(stolenTimeline.body.error, 'CARE_CASE_FORBIDDEN');
 });

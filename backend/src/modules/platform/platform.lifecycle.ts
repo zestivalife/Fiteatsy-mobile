@@ -31,8 +31,12 @@ export const transitionCareCaseStage = async (
     throw new Error(`Invalid care case transition from ${careCase.currentStage} to ${nextStage}`);
   }
 
+  if (!careCase.clientId) {
+    throw new Error('Care case is missing client ownership.');
+  }
+
   const previousStage = careCase.currentStage;
-  const updated = await updateCareCase(careCase.id, {
+  const updated = await updateCareCase(careCase.id, careCase.clientId, {
     previousStage: careCase.currentStage,
     currentStage: nextStage,
     lastTransitionAtISO: nowIso(),
@@ -67,6 +71,7 @@ export const transitionCareCaseStage = async (
 
   await createNotificationRecord({
     userId: careCase.userId,
+    clientId: careCase.clientId,
     careCaseId: careCase.id,
     channel: 'in_app',
     title: 'Care plan updated',

@@ -35,7 +35,7 @@ Resolved decisions are now part of the approved:
 
 definition/architecture baseline.
 
-Current implementation authorization does not extend beyond the accepted M3B.1 close-out.
+Current implementation authorization extends through the M3B.2 repository and authorization transition only; acceptance remains pending verification.
 
 `M3B.1 — Ownership Schema Foundation` is now `PRODUCTION_ACCEPTED`.
 
@@ -54,7 +54,7 @@ The next candidate milestone is:
 
 `M3B` architecture is now `APPROVED`.
 
-No later-slice M3B implementation is currently authorized.
+No M3B.3+ implementation is currently authorized.
 
 ## Product Owner Decisions Required Before Later M3B Slices
 

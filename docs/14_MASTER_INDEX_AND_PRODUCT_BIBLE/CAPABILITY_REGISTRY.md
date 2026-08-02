@@ -4,7 +4,7 @@
 |---|---|---|
 | Mobile Application | Fiteatsy | Existing |
 | Authentication / Session | Fiteatsy + CAP-001 integration future | Production baseline accepted; protected capability |
-| Fiteatsy Client | Fiteatsy/CAP-011 | M3 definition approved; `M3A — Client Identity Foundation` production-accepted; `M3B` architecture approved; `M3B.1` schema foundation production-accepted; broader ownership transition/mobile integration still pending and `M3B.2` is not yet implementation-authorized |
+| Fiteatsy Client | Fiteatsy/CAP-011 | M3 definition approved; `M3A — Client Identity Foundation` production-accepted; `M3B` architecture approved; `M3B.1` schema foundation production-accepted; `M3B.2` repository and authorization transition implemented pending DB-backed/production verification; `M3B.3+` and mobile integration remain unauthorized |
 | PostgreSQL Persistence | Fiteatsy | Production baseline accepted; protected capability |
 | Health App / Wearable Ingestion | Fiteatsy | Existing partial mobile integration; canonical backend implementation pending |
 | Longitudinal Health Data | Fiteatsy | Planned |

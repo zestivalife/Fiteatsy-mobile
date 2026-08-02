@@ -1,5 +1,5 @@
 import { listReports } from '../reports/reports.store.js';
-import { createCareCaseIfMissing, createNotificationRecord, createOrUpdateHealthProfile, getCareCaseById, getCareCaseByUserId, getHealthProfileByUserId, listHealthEvents, listHealthTickets, listNotificationsForUser, listTimelineEvents, saveNutritionProfile, addTimelineEvent, addHealthEvent, updateCareCase, } from './platform.store.js';
+import { createCareCaseIfMissing, createNotificationRecord, createOrUpdateHealthProfile, getCareCaseById, getCareCaseByClientId, getHealthProfileByClientId, listHealthEvents, listHealthTickets, listNotificationsForClient, listTimelineEvents, saveNutritionProfile, addTimelineEvent, addHealthEvent, updateCareCase, } from './platform.store.js';
 import { calculateAgeFromDob, calculateNutritionProfileCompletion } from './platform.calculations.js';
 import { createOperationalTicket, transitionCareCaseStage } from './platform.lifecycle.js';
 const nowIso = () => new Date().toISOString();
@@ -12,22 +12,22 @@ const inferStage = (profile, reportCount, readinessScore) => {
         return 'ready_for_consultant';
     return 'consultant_review';
 };
-export const upsertHealthProfile = async (userId, patch) => {
+export const upsertHealthProfile = async (owner, patch) => {
     const calculatedAge = patch.dateOfBirthISO ? calculateAgeFromDob(patch.dateOfBirthISO) : undefined;
-    const profile = await createOrUpdateHealthProfile(userId, {
+    const profile = await createOrUpdateHealthProfile(owner, {
         ...patch,
         ...(calculatedAge !== undefined ? { calculatedAge } : {}),
     });
-    const reportCount = listReports(userId).length;
-    const nutrition = await saveNutritionProfile(userId, profile.id, calculateNutritionProfileCompletion(profile, reportCount));
-    const careCase = await createCareCaseIfMissing(userId, profile.id);
+    const reportCount = listReports(owner.accountId).length;
+    const nutrition = await saveNutritionProfile(owner, profile.id, calculateNutritionProfileCompletion(profile, reportCount));
+    const careCase = await createCareCaseIfMissing(owner, profile.id);
     const nextStage = inferStage(profile, reportCount, nutrition.readinessScore);
     if (careCase.currentStage !== nextStage) {
         await transitionCareCaseStage(careCase, nextStage, 'Profile completion and report availability recalculated.');
     }
     await addTimelineEvent({
         careCaseId: careCase.id,
-        userId,
+        userId: owner.accountId,
         kind: 'health_profile_updated',
         title: 'Health profile updated',
         detail: 'Shared health profile values were refreshed.',
@@ -39,7 +39,7 @@ export const upsertHealthProfile = async (userId, patch) => {
     });
     await addHealthEvent({
         careCaseId: careCase.id,
-        userId,
+        userId: owner.accountId,
         type: 'health_profile_updated',
         summary: 'Health profile updated',
         payload: {
@@ -51,27 +51,28 @@ export const upsertHealthProfile = async (userId, patch) => {
         eventTimeISO: nowIso(),
     });
     if (nutrition.missingFields.length > 0) {
-        await createOperationalTicket(careCase.id, userId, 'missing_health_profile', nutrition.readinessScore < 60 ? 'high' : 'medium', profile.assignedConsultantId, null, `Missing profile fields: ${nutrition.missingFields.join(', ')}`);
+        await createOperationalTicket(careCase.id, owner.accountId, 'missing_health_profile', nutrition.readinessScore < 60 ? 'high' : 'medium', profile.assignedConsultantId, null, `Missing profile fields: ${nutrition.missingFields.join(', ')}`);
     }
-    return { profile, nutrition, careCase: await getCareCaseByUserId(userId) };
+    return { profile, nutrition, careCase: await getCareCaseByClientId(owner.clientId) };
 };
-export const getHealthProfileBundle = async (userId) => {
-    const profile = await getHealthProfileByUserId(userId);
+export const getHealthProfileBundle = async (owner) => {
+    const profile = await getHealthProfileByClientId(owner.clientId);
     if (!profile)
         return null;
-    const reportCount = listReports(userId).length;
-    const nutrition = await saveNutritionProfile(userId, profile.id, calculateNutritionProfileCompletion(profile, reportCount));
-    const careCase = await createCareCaseIfMissing(userId, profile.id);
+    const reportCount = listReports(owner.accountId).length;
+    const nutrition = await saveNutritionProfile(owner, profile.id, calculateNutritionProfileCompletion(profile, reportCount));
+    const careCase = await createCareCaseIfMissing(owner, profile.id);
     return { profile, nutrition, careCase, reportCount };
 };
-export const requestMissingInformation = async (userId, fields, requestedBy) => {
-    const bundle = await getHealthProfileBundle(userId);
+export const requestMissingInformation = async (owner, fields, requestedBy) => {
+    const bundle = await getHealthProfileBundle(owner);
     if (!bundle) {
         throw new Error('Health profile not found');
     }
-    const ticket = await createOperationalTicket(bundle.careCase.id, userId, 'missing_health_profile', 'medium', requestedBy, null, `Consultant requested: ${fields.join(', ')}`);
+    const ticket = await createOperationalTicket(bundle.careCase.id, owner.accountId, 'missing_health_profile', 'medium', requestedBy, null, `Consultant requested: ${fields.join(', ')}`);
     await createNotificationRecord({
-        userId,
+        userId: owner.accountId,
+        clientId: owner.clientId,
         careCaseId: bundle.careCase.id,
         channel: 'in_app',
         title: 'Consultant requested more information',
@@ -80,7 +81,7 @@ export const requestMissingInformation = async (userId, fields, requestedBy) => 
     });
     await addTimelineEvent({
         careCaseId: bundle.careCase.id,
-        userId,
+        userId: owner.accountId,
         kind: 'notification_sent',
         title: 'Missing information requested',
         detail: `Requested by ${requestedBy}: ${fields.join(', ')}`,
@@ -92,12 +93,17 @@ export const requestMissingInformation = async (userId, fields, requestedBy) => 
 export const listCareCaseTimeline = async (careCaseId) => listTimelineEvents(careCaseId);
 export const listCareCaseEvents = async (careCaseId) => listHealthEvents(careCaseId);
 export const listCareCaseTickets = async (careCaseId) => listHealthTickets(careCaseId);
-export const listUserNotifications = async (userId) => listNotificationsForUser(userId);
-export const assignConsultant = async (careCaseId, consultantId, mentorId) => {
+export const listClientNotifications = async (owner) => listNotificationsForClient(owner.clientId);
+export const assignConsultant = async (owner, careCaseId, consultantId, mentorId) => {
     const careCase = await getCareCaseById(careCaseId);
     if (!careCase)
         throw new Error('Care case not found');
-    const updated = await updateCareCase(careCaseId, {
+    if (careCase.clientId !== owner.clientId) {
+        const error = new Error('Care case does not belong to current client.');
+        error.name = 'CARE_CASE_FORBIDDEN';
+        throw error;
+    }
+    const updated = await updateCareCase(careCaseId, owner.clientId, {
         assignedConsultantId: consultantId,
         assignedMentorId: mentorId ?? careCase.assignedMentorId,
     });
@@ -112,6 +118,7 @@ export const assignConsultant = async (careCaseId, consultantId, mentorId) => {
     });
     await createNotificationRecord({
         userId: careCase.userId,
+        clientId: owner.clientId,
         careCaseId,
         channel: 'in_app',
         title: 'Consultant assigned',
@@ -120,13 +127,13 @@ export const assignConsultant = async (careCaseId, consultantId, mentorId) => {
     });
     return updated;
 };
-export const syncReportPipelineToPlatform = async (userId, reportId, stage, detail) => {
-    const bundle = await getHealthProfileBundle(userId);
+export const syncReportPipelineToPlatform = async (owner, reportId, stage, detail) => {
+    const bundle = await getHealthProfileBundle(owner);
     if (!bundle) {
-        const profile = await createOrUpdateHealthProfile(userId, {});
-        await createCareCaseIfMissing(userId, profile.id, 'new_client');
+        const profile = await createOrUpdateHealthProfile(owner, {});
+        await createCareCaseIfMissing(owner, profile.id, 'new_client');
     }
-    const nextBundle = await getHealthProfileBundle(userId);
+    const nextBundle = await getHealthProfileBundle(owner);
     if (!nextBundle)
         return null;
     const kind = stage === 'uploaded'
@@ -136,7 +143,7 @@ export const syncReportPipelineToPlatform = async (userId, reportId, stage, deta
             : 'biomarkers_updated';
     const timeline = await addTimelineEvent({
         careCaseId: nextBundle.careCase.id,
-        userId,
+        userId: owner.accountId,
         kind,
         title: detail,
         detail,
@@ -145,21 +152,22 @@ export const syncReportPipelineToPlatform = async (userId, reportId, stage, deta
     });
     await addHealthEvent({
         careCaseId: nextBundle.careCase.id,
-        userId,
+        userId: owner.accountId,
         type: kind,
         summary: detail,
         payload: { reportId, stage },
         replayKey: `${nextBundle.careCase.id}:${reportId}:${stage}:${timeline.id}`,
         eventTimeISO: nowIso(),
     });
-    const recomputedNutrition = await saveNutritionProfile(userId, nextBundle.profile.id, calculateNutritionProfileCompletion(nextBundle.profile, listReports(userId).length));
-    const nextStage = inferStage(nextBundle.profile, listReports(userId).length, recomputedNutrition.readinessScore);
+    const recomputedNutrition = await saveNutritionProfile(owner, nextBundle.profile.id, calculateNutritionProfileCompletion(nextBundle.profile, listReports(owner.accountId).length));
+    const nextStage = inferStage(nextBundle.profile, listReports(owner.accountId).length, recomputedNutrition.readinessScore);
     if (nextBundle.careCase.currentStage !== nextStage) {
         await transitionCareCaseStage(nextBundle.careCase, nextStage, `Report pipeline advanced to ${stage}.`);
     }
     if (stage === 'analysis_completed') {
         await createNotificationRecord({
-            userId,
+            userId: owner.accountId,
+            clientId: owner.clientId,
             careCaseId: nextBundle.careCase.id,
             channel: 'in_app',
             title: 'Blood report processed',

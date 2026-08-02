@@ -1,9 +1,9 @@
 # M3B — Existing Domain Ownership Transition Review
 
-**Status:** `ARCHITECTURE APPROVED; M3B.1 — PRODUCTION_ACCEPTED`
-**Date:** `1 August 2026`  
+**Status:** `ARCHITECTURE APPROVED; M3B.1 — PRODUCTION_ACCEPTED; M3B.2 — IMPLEMENTED_PENDING_VERIFICATION`
+**Date:** `2 August 2026`
 **Applies To:** `M3B — Existing Domain Ownership Transition`  
-**Implementation Authorization:** `M3B.1 CLOSED; M3B.2+ NOT AUTHORIZED`
+**Implementation Authorization:** `M3B.1 CLOSED; M3B.2 IMPLEMENTED FOR VERIFICATION; M3B.3+ NOT AUTHORIZED`
 
 ## 1. Authoritative Baseline
 
@@ -443,6 +443,11 @@ Highest-risk implementation mistakes:
 - switch platform persistence and authorization to Client ownership;
 - preserve auth/session baseline;
 - add negative IDOR and mismatch tests.
+- implementation now derives owner context from the authenticated account's server-resolved current client;
+- platform repositories query/write direct roots by `client_id` while preserving `user_id` as the account-link column required by the M3B.1 compatibility FK;
+- public platform API DTOs strip internal `clientId`;
+- cross-client care-case object access returns `403 CARE_CASE_FORBIDDEN`;
+- local DB-backed verification remains pending because PostgreSQL was unavailable during local testing (`ECONNREFUSED`).
 
 ### M3B.3 — Persisted Domain Surface Alignment
 

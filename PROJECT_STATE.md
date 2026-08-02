@@ -1,7 +1,7 @@
 # Fiteatsy — Project State
 
-**Last Updated:** 1 August 2026  
-**Status:** PRODUCTION_ACCEPTED  
+**Last Updated:** 2 August 2026
+**Status:** M3B.2_IMPLEMENTED_PENDING_VERIFICATION
 **Approved By:** Product Owner
 
 ## Current Production Runtime
@@ -25,6 +25,7 @@
 - Definition status: `ARCHITECTURE APPROVED`
 - Scope type: `Governance approved; phased implementation`
 - Accepted slice: `M3B.1 ONLY`
+- Implemented slice pending verification: `M3B.2 — Repository & Authorization Transition`
 - Review package: `docs/02_IDENTITY_AND_CLIENT/M3B_EXISTING_DOMAIN_OWNERSHIP_TRANSITION_REVIEW.md`
 
 ## M3B.1 Status
@@ -34,7 +35,20 @@
 - Acceptance date: `1 August 2026`
 - Railway deployment: `728a9f03`
 - Authorized scope: `Schema foundation only`
-- Explicitly not authorized: `M3B.2`, `M3B.3`, `M3B.4`, `M3C`
+- Explicitly not authorized: `M3B.3`, `M3B.4`, `M3C`
+
+## M3B.2 Status
+
+- Slice: `M3B.2 — Repository & Authorization Transition`
+- Implementation status: `IMPLEMENTED_PENDING_VERIFICATION`
+- Implementation date: `2 August 2026`
+- Authorized scope: `Repository/service/API authorization transition for M3B.1 direct-root persisted surfaces`
+- Direct-root tables now used by runtime ownership checks: `health_profiles`, `care_cases`, `nutrition_profiles`, `notifications`
+- Canonical runtime ownership: authenticated bearer token -> account -> server-resolved current client -> `resource.client_id`
+- Public API contract: unchanged; internal `client_id` is not exposed in platform response DTOs
+- Cross-client care-case object access: fail closed with `403 CARE_CASE_FORBIDDEN`
+- Reports persistence remains temporary/in-memory and account-keyed pending `M3B.3`; only report-to-platform side effects now pass server-derived current-client ownership into platform persistence
+- Verification status: TypeScript compile, backend build, migration packaging, and DB-independent migration contract tests passed; DB-backed API/repository/service tests are pending because local PostgreSQL was unavailable (`ECONNREFUSED`)
 
 ## Acceptance Evidence
 
@@ -100,14 +114,14 @@ Unverified / Deferred Runtime Evidence:
 ## Next Governed Milestone
 
 - Milestone: `M3 — Fiteatsy Client & Identity`
-- Current milestone state: `M3B.1 PRODUCTION_ACCEPTED`
-- Next candidate status: `M3B.2 — REPOSITORY AND AUTHORIZATION TRANSITION DEFINITION / READINESS REVIEW REQUIRED`
+- Current milestone state: `M3B.2 IMPLEMENTED_PENDING_VERIFICATION`
+- Next candidate status: `M3B.2 — DB-BACKED REGRESSION AND PRODUCTION VERIFICATION REQUIRED`
 
 ## Next Governance Gate
 
 The next gate is:
 
-`M3B.2 — Definition / Readiness Review`
+`M3B.2 — Verification / Production Acceptance`
 
 Approved M3 decisions now on record:
 
@@ -124,7 +138,7 @@ Approved M3 decisions now on record:
 - destructive cascading deletion from Client into longitudinal health data is prohibited
 - partial migration states must fail closed rather than broaden authorization
 
-Before `M3B.2+`, Product Owner decisions still remain relevant for later slices, but are not authorization to begin them:
+Before `M3B.3+`, Product Owner decisions still remain relevant for later slices, but are not authorization to begin them:
 
 - CAP-001 reference naming
 - later deactivation UX/reactivation workflow

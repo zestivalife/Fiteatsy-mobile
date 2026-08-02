@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Request, Response, Router } from 'express';
 import { z } from 'zod';
 import {
   assignConsultant,
@@ -6,12 +6,13 @@ import {
   listCareCaseEvents,
   listCareCaseTickets,
   listCareCaseTimeline,
-  listUserNotifications,
+  listClientNotifications,
   requestMissingInformation,
   upsertHealthProfile,
 } from './platform.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { getCareCaseById } from './platform.store.js';
+import { CareCaseRecord, ClientOwnershipContext, HealthProfileRecord, NotificationRecord, NutritionProfileRecord } from './platform.types.js';
 
 const healthProfilePatchSchema = z.object({
   dateOfBirthISO: z.string().datetime().optional(),
@@ -66,12 +67,57 @@ const assignConsultantSchema = z.object({
 export const platformRouter = Router();
 platformRouter.use(requireAuthenticatedAccount);
 
+const currentOwner = (req: Request): ClientOwnershipContext => {
+  const account = getAuthenticatedAccount(req);
+  return { accountId: account.accountId, clientId: account.client.id };
+};
+
+const withoutInternalClientId = <T extends { clientId?: unknown }>(record: T) => {
+  const { clientId: _clientId, ...publicRecord } = record;
+  return publicRecord;
+};
+
+const bundleDto = (bundle: {
+  profile: HealthProfileRecord;
+  nutrition: NutritionProfileRecord;
+  careCase: CareCaseRecord | null;
+  reportCount?: number;
+}) => {
+  const dto = {
+    profile: withoutInternalClientId(bundle.profile),
+    nutrition: withoutInternalClientId(bundle.nutrition),
+    careCase: bundle.careCase ? withoutInternalClientId(bundle.careCase) : null,
+    ...(bundle.reportCount === undefined ? {} : { reportCount: bundle.reportCount }),
+  };
+  return dto;
+};
+
+const careCaseDto = (careCase: CareCaseRecord) => withoutInternalClientId(careCase);
+const notificationDto = (notification: NotificationRecord) => withoutInternalClientId(notification);
+
+const requireOwnedCareCase = async (
+  req: Request,
+  res: Response,
+  careCaseId: string
+) => {
+  const careCase = await getCareCaseById(careCaseId);
+  if (!careCase) {
+    res.status(404).json({ error: 'CARE_CASE_NOT_FOUND', message: 'Care case not found.' });
+    return null;
+  }
+  if (careCase.clientId !== currentOwner(req).clientId) {
+    res.status(403).json({ error: 'CARE_CASE_FORBIDDEN', message: 'Care case does not belong to the current client.' });
+    return null;
+  }
+  return careCase;
+};
+
 platformRouter.get('/health-profile', async (req, res) => {
-  const bundle = await getHealthProfileBundle(getAuthenticatedAccount(req).accountId);
+  const bundle = await getHealthProfileBundle(currentOwner(req));
   if (!bundle) {
     return res.status(404).json({ error: 'HEALTH_PROFILE_NOT_FOUND' });
   }
-  return res.status(200).json(bundle);
+  return res.status(200).json(bundleDto(bundle));
 });
 
 platformRouter.patch('/health-profile', async (req, res) => {
@@ -79,12 +125,12 @@ platformRouter.patch('/health-profile', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   }
-  const bundle = await upsertHealthProfile(getAuthenticatedAccount(req).accountId, parsed.data);
-  return res.status(200).json(bundle);
+  const bundle = await upsertHealthProfile(currentOwner(req), parsed.data);
+  return res.status(200).json(bundleDto(bundle));
 });
 
 platformRouter.get('/health-profile/completion', async (req, res) => {
-  const bundle = await getHealthProfileBundle(getAuthenticatedAccount(req).accountId);
+  const bundle = await getHealthProfileBundle(currentOwner(req));
   if (!bundle) {
     return res.status(404).json({ error: 'HEALTH_PROFILE_NOT_FOUND' });
   }
@@ -103,7 +149,7 @@ platformRouter.post('/health-profile/request-missing-information', async (req, r
     return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   }
   try {
-    const result = await requestMissingInformation(getAuthenticatedAccount(req).accountId, parsed.data.fields, parsed.data.requestedBy);
+    const result = await requestMissingInformation(currentOwner(req), parsed.data.fields, parsed.data.requestedBy);
     return res.status(201).json(result);
   } catch (error) {
     return res.status(404).json({ error: 'HEALTH_PROFILE_NOT_FOUND', message: error instanceof Error ? error.message : 'Unknown error' });
@@ -111,11 +157,11 @@ platformRouter.post('/health-profile/request-missing-information', async (req, r
 });
 
 platformRouter.get('/care-cases/current', async (req, res) => {
-  const bundle = await getHealthProfileBundle(getAuthenticatedAccount(req).accountId);
+  const bundle = await getHealthProfileBundle(currentOwner(req));
   if (!bundle) {
     return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND' });
   }
-  return res.status(200).json(bundle.careCase);
+  return res.status(200).json(bundle.careCase ? careCaseDto(bundle.careCase) : null);
 });
 
 platformRouter.post('/care-cases/:careCaseId/assign-consultant', async (req, res) => {
@@ -124,41 +170,40 @@ platformRouter.post('/care-cases/:careCaseId/assign-consultant', async (req, res
     return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   }
   try {
-    const careCase = await getCareCaseById(req.params.careCaseId);
-    if (!careCase || careCase.userId !== getAuthenticatedAccount(req).accountId) {
-      return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND', message: 'Care case not found.' });
+    const careCase = await requireOwnedCareCase(req, res, req.params.careCaseId);
+    if (!careCase) return;
+    const updated = await assignConsultant(currentOwner(req), req.params.careCaseId, parsed.data.consultantId, parsed.data.mentorId);
+    if (!updated) {
+      return res.status(403).json({ error: 'CARE_CASE_FORBIDDEN', message: 'Care case does not belong to the current client.' });
     }
-    const updated = await assignConsultant(req.params.careCaseId, parsed.data.consultantId, parsed.data.mentorId);
-    return res.status(200).json(updated);
+    return res.status(200).json(careCaseDto(updated));
   } catch (error) {
+    if (error instanceof Error && error.name === 'CARE_CASE_FORBIDDEN') {
+      return res.status(403).json({ error: 'CARE_CASE_FORBIDDEN', message: error.message });
+    }
     return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
 platformRouter.get('/care-cases/:careCaseId/timeline', async (req, res) => {
-  const careCase = await getCareCaseById(req.params.careCaseId);
-  if (!careCase || careCase.userId !== getAuthenticatedAccount(req).accountId) {
-    return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND' });
-  }
+  const careCase = await requireOwnedCareCase(req, res, req.params.careCaseId);
+  if (!careCase) return;
   return res.status(200).json({ items: await listCareCaseTimeline(req.params.careCaseId) });
 });
 
 platformRouter.get('/care-cases/:careCaseId/events', async (req, res) => {
-  const careCase = await getCareCaseById(req.params.careCaseId);
-  if (!careCase || careCase.userId !== getAuthenticatedAccount(req).accountId) {
-    return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND' });
-  }
+  const careCase = await requireOwnedCareCase(req, res, req.params.careCaseId);
+  if (!careCase) return;
   return res.status(200).json({ items: await listCareCaseEvents(req.params.careCaseId) });
 });
 
 platformRouter.get('/care-cases/:careCaseId/tickets', async (req, res) => {
-  const careCase = await getCareCaseById(req.params.careCaseId);
-  if (!careCase || careCase.userId !== getAuthenticatedAccount(req).accountId) {
-    return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND' });
-  }
+  const careCase = await requireOwnedCareCase(req, res, req.params.careCaseId);
+  if (!careCase) return;
   return res.status(200).json({ items: await listCareCaseTickets(req.params.careCaseId) });
 });
 
 platformRouter.get('/notifications', async (req, res) => {
-  return res.status(200).json({ items: await listUserNotifications(getAuthenticatedAccount(req).accountId) });
+  const items = await listClientNotifications(currentOwner(req));
+  return res.status(200).json({ items: items.map(notificationDto) });
 });

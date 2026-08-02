@@ -31,6 +31,7 @@ const mapAuditFields = (row) => ({
 const mapHealthProfile = (row) => ({
     id: String(row.id),
     userId: String(row.user_id),
+    clientId: row.client_id == null ? null : String(row.client_id),
     dateOfBirthISO: toIso(row.date_of_birth_iso),
     calculatedAge: row.calculated_age == null ? null : Number(row.calculated_age),
     gender: row.gender == null ? null : String(row.gender),
@@ -74,6 +75,7 @@ const mapHealthProfile = (row) => ({
 const mapNutritionProfile = (row) => ({
     id: String(row.id),
     userId: String(row.user_id),
+    clientId: row.client_id == null ? null : String(row.client_id),
     healthProfileId: String(row.health_profile_id),
     completionPercent: Number(row.completion_percent),
     readinessScore: Number(row.readiness_score),
@@ -87,6 +89,7 @@ const mapNutritionProfile = (row) => ({
 const mapCareCase = (row) => ({
     id: String(row.id),
     userId: String(row.user_id),
+    clientId: row.client_id == null ? null : String(row.client_id),
     healthProfileId: String(row.health_profile_id),
     recoveryProgramId: String(row.recovery_program_id),
     assignedConsultantId: row.assigned_consultant_id == null ? null : String(row.assigned_consultant_id),
@@ -134,6 +137,7 @@ const mapHealthTicket = (row) => ({
 const mapNotification = (row) => ({
     id: String(row.id),
     userId: String(row.user_id),
+    clientId: row.client_id == null ? null : String(row.client_id),
     careCaseId: row.care_case_id == null ? null : String(row.care_case_id),
     channel: String(row.channel),
     title: String(row.title),
@@ -141,9 +145,10 @@ const mapNotification = (row) => ({
     sentAtISO: toIso(row.sent_at),
     ...mapAuditFields(row)
 });
-const buildHealthProfileDefaults = (userId) => ({
+const buildHealthProfileDefaults = (owner) => ({
     id: crypto.randomUUID(),
-    userId,
+    userId: owner.accountId,
+    clientId: owner.clientId,
     dateOfBirthISO: null,
     calculatedAge: null,
     gender: null,
@@ -188,21 +193,21 @@ const buildHealthProfileDefaults = (userId) => ({
     version: 1,
     status: 'active'
 });
-export const getHealthProfileByUserId = async (userId) => {
+export const getHealthProfileByClientId = async (clientId) => {
     const result = await pool.query(`
       select *
       from health_profiles
-      where user_id = $1
+      where client_id = $1
         and deleted_at is null
         and status = 'active'
       limit 1
-    `, [userId]);
+    `, [clientId]);
     if (result.rowCount === 0)
         return null;
     return mapHealthProfile(result.rows[0]);
 };
-export const createOrUpdateHealthProfile = async (userId, patch) => {
-    const existing = await getHealthProfileByUserId(userId);
+export const createOrUpdateHealthProfile = async (owner, patch) => {
+    const existing = await getHealthProfileByClientId(owner.clientId);
     const next = existing
         ? {
             ...existing,
@@ -210,13 +215,13 @@ export const createOrUpdateHealthProfile = async (userId, patch) => {
             updatedAtISO: nowIso()
         }
         : {
-            ...buildHealthProfileDefaults(userId),
+            ...buildHealthProfileDefaults(owner),
             ...patch
         };
     if (!existing) {
         const inserted = await pool.query(`
         insert into health_profiles (
-          id, user_id, date_of_birth_iso, calculated_age, gender, height_cm, current_weight_kg, goal_weight_kg,
+          id, user_id, client_id, date_of_birth_iso, calculated_age, gender, height_cm, current_weight_kg, goal_weight_kg,
           waist_cm, hip_cm, neck_cm, body_fat_pct, occupation, working_hours_label, shift_type, activity_level,
           work_mode, travel_frequency, diet_type, regional_cuisine, foods_liked, foods_disliked, food_allergies,
           food_intolerances, current_supplements, current_medicines, wake_time, breakfast_time, lunch_time,
@@ -224,18 +229,19 @@ export const createOrUpdateHealthProfile = async (userId, patch) => {
           who_cooks, primary_conditions, wellness_goals, assigned_consultant_id, assigned_mentor_id, status,
           version, created_at, updated_at, deleted_at
         ) values (
-          $1, $2, $3, $4, $5, $6, $7, $8,
-          $9, $10, $11, $12, $13, $14, $15, $16,
-          $17, $18, $19, $20, $21::jsonb, $22::jsonb, $23::jsonb,
-          $24::jsonb, $25::jsonb, $26::jsonb, $27, $28, $29,
-          $30, $31, $32, $33, $34, $35,
-          $36, $37::jsonb, $38::jsonb, $39, $40, $41,
-          1, $42, $42, null
+          $1, $2, $3, $4, $5, $6, $7, $8, $9,
+          $10, $11, $12, $13, $14, $15, $16, $17,
+          $18, $19, $20, $21, $22::jsonb, $23::jsonb, $24::jsonb,
+          $25::jsonb, $26::jsonb, $27::jsonb, $28, $29, $30,
+          $31, $32, $33, $34, $35, $36,
+          $37, $38::jsonb, $39::jsonb, $40, $41, $42,
+          1, $43, $43, null
         )
         returning *
       `, [
             next.id,
             next.userId,
+            next.clientId,
             next.dateOfBirthISO,
             next.calculatedAge,
             next.gender,
@@ -324,6 +330,7 @@ export const createOrUpdateHealthProfile = async (userId, patch) => {
         updated_at = $41,
         version = version + 1
       where id = $1
+        and client_id = $42
       returning *
     `, [
         next.id,
@@ -366,25 +373,29 @@ export const createOrUpdateHealthProfile = async (userId, patch) => {
         next.assignedConsultantId,
         next.assignedMentorId,
         next.status,
-        nowIso()
+        nowIso(),
+        owner.clientId
     ]);
+    if (updated.rowCount === 0) {
+        throw new Error('Health profile ownership mismatch.');
+    }
     return mapHealthProfile(updated.rows[0]);
 };
-export const getNutritionProfileByUserId = async (userId) => {
+export const getNutritionProfileByClientId = async (clientId) => {
     const result = await pool.query(`
       select *
       from nutrition_profiles
-      where user_id = $1
+      where client_id = $1
         and deleted_at is null
         and status = 'active'
       limit 1
-    `, [userId]);
+    `, [clientId]);
     if (result.rowCount === 0)
         return null;
     return mapNutritionProfile(result.rows[0]);
 };
-export const saveNutritionProfile = async (userId, healthProfileId, payload) => {
-    const existing = await getNutritionProfileByUserId(userId);
+export const saveNutritionProfile = async (owner, healthProfileId, payload) => {
+    const existing = await getNutritionProfileByClientId(owner.clientId);
     const next = existing
         ? {
             ...existing,
@@ -394,7 +405,8 @@ export const saveNutritionProfile = async (userId, healthProfileId, payload) => 
         }
         : {
             id: crypto.randomUUID(),
-            userId,
+            userId: owner.accountId,
+            clientId: owner.clientId,
             healthProfileId,
             ...payload,
             createdAtISO: nowIso(),
@@ -406,16 +418,17 @@ export const saveNutritionProfile = async (userId, healthProfileId, payload) => 
     if (!existing) {
         const inserted = await pool.query(`
         insert into nutrition_profiles (
-          id, user_id, health_profile_id, completion_percent, readiness_score, ai_ready, missing_fields,
+          id, user_id, client_id, health_profile_id, completion_percent, readiness_score, ai_ready, missing_fields,
           section_scores, status, version, created_at, updated_at, deleted_at
         ) values (
-          $1, $2, $3, $4, $5, $6, $7::jsonb,
-          $8::jsonb, $9, 1, $10, $10, null
+          $1, $2, $3, $4, $5, $6, $7, $8::jsonb,
+          $9::jsonb, $10, 1, $11, $11, null
         )
         returning *
       `, [
             next.id,
             next.userId,
+            next.clientId,
             next.healthProfileId,
             next.completionPercent,
             next.readinessScore,
@@ -440,6 +453,7 @@ export const saveNutritionProfile = async (userId, healthProfileId, payload) => 
         updated_at = $9,
         version = version + 1
       where id = $1
+        and client_id = $10
       returning *
     `, [
         next.id,
@@ -450,8 +464,12 @@ export const saveNutritionProfile = async (userId, healthProfileId, payload) => 
         JSON.stringify(next.missingFields),
         JSON.stringify(next.sectionScores),
         next.status,
-        nowIso()
+        nowIso(),
+        owner.clientId
     ]);
+    if (updated.rowCount === 0) {
+        throw new Error('Nutrition profile ownership mismatch.');
+    }
     return mapNutritionProfile(updated.rows[0]);
 };
 const getRecoveryProgramByHealthProfileId = async (healthProfileId) => {
@@ -479,15 +497,15 @@ const createRecoveryProgramIfMissing = async (healthProfileId, stage) => {
     `, [crypto.randomUUID(), healthProfileId, stage, nowIso()]);
     return String(inserted.rows[0].id);
 };
-export const getCareCaseByUserId = async (userId) => {
+export const getCareCaseByClientId = async (clientId) => {
     const result = await pool.query(`
       select *
       from care_cases
-      where user_id = $1
+      where client_id = $1
         and deleted_at is null
         and status = 'active'
       limit 1
-    `, [userId]);
+    `, [clientId]);
     if (result.rowCount === 0)
         return null;
     return mapCareCase(result.rows[0]);
@@ -504,26 +522,26 @@ export const getCareCaseById = async (careCaseId) => {
         return null;
     return mapCareCase(result.rows[0]);
 };
-export const createCareCaseIfMissing = async (userId, healthProfileId, stage = 'new_client') => {
-    const existing = await getCareCaseByUserId(userId);
+export const createCareCaseIfMissing = async (owner, healthProfileId, stage = 'new_client') => {
+    const existing = await getCareCaseByClientId(owner.clientId);
     if (existing)
         return existing;
     const recoveryProgramId = await createRecoveryProgramIfMissing(healthProfileId, stage);
     const inserted = await pool.query(`
       insert into care_cases (
-        id, user_id, health_profile_id, recovery_program_id, assigned_consultant_id, assigned_mentor_id,
+        id, user_id, client_id, health_profile_id, recovery_program_id, assigned_consultant_id, assigned_mentor_id,
         current_stage, previous_stage, last_transition_at, status, version, created_at, updated_at, deleted_at
       ) values (
-        $1, $2, $3, $4, null, null,
-        $5, null, $6, 'active', 1, $6, $6, null
+        $1, $2, $3, $4, $5, null, null,
+        $6, null, $7, 'active', 1, $7, $7, null
       )
       returning *
-    `, [crypto.randomUUID(), userId, healthProfileId, recoveryProgramId, stage, nowIso()]);
+    `, [crypto.randomUUID(), owner.accountId, owner.clientId, healthProfileId, recoveryProgramId, stage, nowIso()]);
     return mapCareCase(inserted.rows[0]);
 };
-export const updateCareCase = async (careCaseId, patch) => {
+export const updateCareCase = async (careCaseId, clientId, patch) => {
     const existing = await getCareCaseById(careCaseId);
-    if (!existing)
+    if (!existing || existing.clientId !== clientId)
         return null;
     const next = {
         ...existing,
@@ -544,6 +562,7 @@ export const updateCareCase = async (careCaseId, patch) => {
         updated_at = $10,
         version = version + 1
       where id = $1
+        and client_id = $11
       returning *
     `, [
         next.id,
@@ -555,8 +574,11 @@ export const updateCareCase = async (careCaseId, patch) => {
         next.previousStage,
         next.lastTransitionAtISO,
         next.status,
-        next.updatedAtISO
+        next.updatedAtISO,
+        clientId
     ]);
+    if (updated.rowCount === 0)
+        return null;
     return mapCareCase(updated.rows[0]);
 };
 export const addTimelineEvent = async (input) => {
@@ -708,16 +730,17 @@ export const createNotificationRecord = async (input) => {
     const createdAtISO = nowIso();
     const inserted = await pool.query(`
       insert into notifications (
-        id, user_id, care_case_id, channel, title, body, sent_at,
+        id, user_id, client_id, care_case_id, channel, title, body, sent_at,
         status, version, created_at, updated_at, deleted_at
       ) values (
-        $1, $2, $3, $4, $5, $6, $7,
-        'active', 1, $8, $8, null
+        $1, $2, $3, $4, $5, $6, $7, $8,
+        'active', 1, $9, $9, null
       )
       returning *
     `, [
         crypto.randomUUID(),
         input.userId,
+        input.clientId,
         input.careCaseId,
         input.channel,
         input.title,
@@ -727,14 +750,14 @@ export const createNotificationRecord = async (input) => {
     ]);
     return mapNotification(inserted.rows[0]);
 };
-export const listNotificationsForUser = async (userId) => {
+export const listNotificationsForClient = async (clientId) => {
     const result = await pool.query(`
       select *
       from notifications
-      where user_id = $1
+      where client_id = $1
         and deleted_at is null
       order by created_at desc
-    `, [userId]);
+    `, [clientId]);
     return result.rows.map((row) => mapNotification(row));
 };
 export const resetPlatformStoreForTests = async () => {

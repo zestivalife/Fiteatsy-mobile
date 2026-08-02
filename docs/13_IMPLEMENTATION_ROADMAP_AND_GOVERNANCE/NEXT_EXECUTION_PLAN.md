@@ -6,11 +6,11 @@ Do not begin new feature implementation yet.
 
 The next engineering action is:
 
-`M3B.2 — Repository and Authorization Transition (Definition / Readiness Review)`
+`M3B.2 — Repository and Authorization Transition (DB-backed Regression / Production Verification)`
 
-The schema-foundation implementation is now production-accepted. The next step is a tightly scoped definition/readiness review for the repository and authorization transition, not implementation.
+The schema-foundation implementation is production-accepted, and the M3B.2 repository/authorization transition has been implemented locally. The next step is verification, not M3B.3 implementation.
 
-It does not authorize `M3B.2`, `M3B.3`, `M3B.4`, mobile ownership conversion, or professional-access work.
+It does not authorize `M3B.3`, `M3B.4`, mobile ownership conversion, or professional-access work.
 
 ## Current Authorized Scope
 
@@ -22,26 +22,24 @@ The accepted slice is:
 
 `M3B.1 — Ownership Schema Foundation`
 
+The implemented-but-not-yet-accepted slice is:
+
+`M3B.2 — Repository & Authorization Transition`
+
 ## Current Governance Scope
 
-The next governance action is to define and readiness-review the M3B.2 slice that:
+The next governance action is to verify the M3B.2 slice that:
 
-- confirms exactly which repositories and services still enforce `user_id` ownership;
-- locks the conversion order to server-derived current-client ownership;
-- defines object-level authorization and anti-IDOR behavior during the transition;
-- confirms fail-closed handling for missing or mismatched client ownership;
-- preserves protected auth/session/current-client regressions as mandatory gates;
-- keeps `M3B.2+` explicitly unauthorized for implementation.
+- confirms DB-backed repositories write and query `client_id` for `health_profiles`, `care_cases`, `nutrition_profiles`, and `notifications`;
+- confirms object-level authorization fails closed on cross-client care-case access;
+- confirms public responses do not expose internal `client_id`;
+- confirms auth/session/current-client regressions remain protected;
+- captures production runtime evidence before Product Owner acceptance;
+- keeps `M3B.3+` explicitly unauthorized for implementation.
 
-## Recommended Post-Definition Implementation Order
+## Recommended Post-Verification Implementation Order
 
-After M3B.2 is defined and explicitly authorized:
-
-### M3B.2 — Repository & Authorization Transition
-
-- repository/service ownership conversion from account to Client;
-- server-side client authorization enforcement on owned resources;
-- negative IDOR and mismatch regression coverage.
+After M3B.2 is DB-verified, production-verified, and explicitly accepted:
 
 ### M3B.3 — Persisted Domain Surface Alignment
 
@@ -71,4 +69,4 @@ Those steps remain useful historical evidence but are no longer the active next 
 
 ## Why This Order
 
-M3A and M3B.1 are production-accepted, so the next meaningful risk boundary is correctly defining the repository/runtime ownership cutover before authorizing implementation.
+M3A and M3B.1 are production-accepted, and M3B.2 is implemented but not yet accepted. The next meaningful risk boundary is DB-backed proof that runtime ownership and anti-IDOR behavior now follow server-derived current-client ownership before any broader persistence alignment begins.

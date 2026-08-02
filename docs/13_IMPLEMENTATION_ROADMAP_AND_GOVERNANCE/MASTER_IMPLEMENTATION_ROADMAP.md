@@ -21,7 +21,8 @@ The repository already contains:
 - `M3A — Client Identity Foundation` is production-accepted.
 - `M3B` architecture is approved.
 - `M3B.1 — Ownership Schema Foundation` is production-accepted.
-- `M3B.2`, `M3B.3`, `M3B.4`, and `M3C` implementation remain unauthorized pending later governance.
+- `M3B.2 — Repository & Authorization Transition` is implemented and pending DB-backed regression plus production verification.
+- `M3B.3`, `M3B.4`, and `M3C` implementation remain unauthorized pending later governance.
 
 ## Programme Sequence
 
@@ -120,6 +121,7 @@ Current state:
 - `M3A` is closed as `PRODUCTION_ACCEPTED`;
 - `M3B` architecture is approved;
 - `M3B.1` is closed as `PRODUCTION_ACCEPTED` for schema foundation only;
+- `M3B.2` is implemented for platform direct-root repository/authorization transition and requires verification before acceptance;
 - later M3B slices still require explicit authorization.
 
 Recommended implementation decomposition after definition approval:
