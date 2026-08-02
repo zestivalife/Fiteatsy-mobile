@@ -56,6 +56,35 @@ export class AuthServiceError extends Error {
   }
 }
 
+const AUTH_LOG_PREFIX = '[AuthService]';
+const REDACTED = '[REDACTED]';
+
+const sanitizeAuthPayload = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeAuthPayload);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
+        const normalizedKey = key.toLowerCase();
+        if (
+          normalizedKey.includes('authorization') ||
+          normalizedKey.includes('token') ||
+          normalizedKey === 'otp' ||
+          normalizedKey.includes('phonenumber') ||
+          normalizedKey.includes('mobile')
+        ) {
+          return [key, REDACTED];
+        }
+        return [key, sanitizeAuthPayload(entry)];
+      })
+    );
+  }
+
+  return value;
+};
+
 const getApiBaseUrl = () => {
   const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
   if (fromExtra) return fromExtra;
@@ -68,11 +97,25 @@ const getApiBaseUrl = () => {
 
 const apiBaseUrl = getApiBaseUrl();
 
-const parseError = async (response: Response): Promise<never> => {
+const parseError = async (response: Response, url: string): Promise<never> => {
   let payload: { error?: ApiErrorCode; message?: string; retryAfterSec?: number } = {};
+  let responseText = '';
   try {
-    payload = (await response.json()) as typeof payload;
-  } catch {
+    responseText = await response.text();
+    payload = responseText ? (JSON.parse(responseText) as typeof payload) : {};
+    console.warn(`${AUTH_LOG_PREFIX} ERROR RESPONSE`, {
+      url,
+      status: response.status,
+      responseJson: sanitizeAuthPayload(payload)
+    });
+  } catch (error) {
+    console.error(`${AUTH_LOG_PREFIX} ERROR RESPONSE PARSE FAILED`, {
+      url,
+      status: response.status,
+      responseText,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     payload = {};
   }
   throw new AuthServiceError(
@@ -87,26 +130,59 @@ const requestJson = async <T>(
   init: RequestInit & { skipJsonBody?: boolean } = {}
 ): Promise<T> => {
   let response: Response;
+  const url = `${apiBaseUrl}${path}`;
+  const method = init.method ?? 'GET';
+  console.log(`${AUTH_LOG_PREFIX} REQUEST`, { apiBaseUrl, url, method });
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, {
+    response = await fetch(url, {
       ...init,
       headers: {
         ...(init.skipJsonBody ? {} : { 'Content-Type': 'application/json' }),
         ...(init.headers ?? {})
       }
     });
-  } catch {
-    throw new AuthServiceError('NETWORK_OFFLINE', 'Unable to reach the authentication service.');
+  } catch (error) {
+    console.error(`${AUTH_LOG_PREFIX} FETCH FAILED`, {
+      apiBaseUrl,
+      url,
+      method,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    throw new AuthServiceError('NETWORK_OFFLINE', `Unable to reach the authentication service at ${apiBaseUrl}.`);
   }
 
+  console.log(`${AUTH_LOG_PREFIX} RESPONSE STATUS`, { url, status: response.status });
+
   if (!response.ok) {
-    return parseError(response);
+    return parseError(response, url);
   }
 
   if (response.status === 204) {
+    console.log(`${AUTH_LOG_PREFIX} RESPONSE EMPTY`, { url, status: response.status });
     return undefined as T;
   }
-  return (await response.json()) as T;
+
+  let responseText = '';
+  try {
+    responseText = await response.text();
+    const payload = (responseText ? JSON.parse(responseText) : undefined) as T;
+    console.log(`${AUTH_LOG_PREFIX} RESPONSE JSON`, {
+      url,
+      status: response.status,
+      responseJson: sanitizeAuthPayload(payload)
+    });
+    return payload;
+  } catch (error) {
+    console.error(`${AUTH_LOG_PREFIX} RESPONSE PARSE FAILED`, {
+      url,
+      status: response.status,
+      responseText,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    throw new AuthServiceError('SERVER_ERROR', 'Authentication service returned an unreadable response.');
+  }
 };
 
 export type SignupOtpResponse = {

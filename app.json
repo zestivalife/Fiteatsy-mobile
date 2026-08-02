@@ -40,6 +40,7 @@
       "favicon": "./src/assets/favicon.png"
     },
     "extra": {
+      "apiBaseUrl": "https://fiteatsy-mobile-production.up.railway.app",
       "eas": {
         "projectId": "70254234-571c-4351-87d9-33e8f851dde1"
       }

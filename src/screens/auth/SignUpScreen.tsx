@@ -105,6 +105,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
     try {
       phone = normalizePhoneNumber(selectedCountry.dialCode, nationalNumber);
     } catch (phoneError) {
+      console.error('[SignUpScreen] PHONE NORMALIZATION FAILED', {
+        errorMessage: phoneError instanceof Error ? phoneError.message : String(phoneError),
+        stack: phoneError instanceof Error ? phoneError.stack : undefined
+      });
       setError(phoneError instanceof Error ? phoneError.message : 'Enter a valid phone number.');
       return;
     }
@@ -123,6 +127,12 @@ export const SignUpScreen = ({ navigation }: Props) => {
       setTimeout(() => hiddenOtpRef.current?.focus(), 120);
     } catch (e) {
       const err = e as AuthServiceError;
+      console.error('[SignUpScreen] OTP REQUEST FAILED', {
+        errorMessage: err.message,
+        code: err.code,
+        retryAfterSec: err.retryAfterSec,
+        stack: err.stack
+      });
       setError(err.message);
     } finally {
       setLoading(false);
@@ -140,6 +150,12 @@ export const SignUpScreen = ({ navigation }: Props) => {
       setTimeout(() => hiddenOtpRef.current?.focus(), 120);
     } catch (e) {
       const err = e as AuthServiceError;
+      console.error('[SignUpScreen] OTP RESEND FAILED', {
+        errorMessage: err.message,
+        code: err.code,
+        retryAfterSec: err.retryAfterSec,
+        stack: err.stack
+      });
       setError(err.message);
       if (typeof err.retryAfterSec === 'number') {
         setResendAtMs(Date.now() + err.retryAfterSec * 1000);
@@ -180,9 +196,23 @@ export const SignUpScreen = ({ navigation }: Props) => {
         notificationPermissionGranted: previous?.notificationPermissionGranted ?? false,
         createdAtISO: previous?.createdAtISO ?? new Date().toISOString()
       }));
-      navigation.reset({ index: 0, routes: [{ name: 'OnboardingBasics' }] });
+      try {
+        navigation.reset({ index: 0, routes: [{ name: 'OnboardingBasics' }] });
+      } catch (navigationError) {
+        console.error('[SignUpScreen] OTP VERIFY NAVIGATION FAILED', {
+          errorMessage: navigationError instanceof Error ? navigationError.message : String(navigationError),
+          stack: navigationError instanceof Error ? navigationError.stack : undefined
+        });
+        throw navigationError;
+      }
     } catch (e) {
       const err = e as AuthServiceError;
+      console.error('[SignUpScreen] OTP VERIFY FAILED', {
+        errorMessage: err.message,
+        code: err.code,
+        retryAfterSec: err.retryAfterSec,
+        stack: err.stack
+      });
       setError(err.message);
       if (err.code === 'OTP_EXPIRED') {
         setOtp('');
