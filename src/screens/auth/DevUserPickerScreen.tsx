@@ -10,24 +10,10 @@ import { getThemeColors, radius, shadows, spacing, typography } from '../../desi
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DevUserPicker'>;
 
-const getNextRoute = ({
-  onboarding,
-  assessment,
-  wearableSetupCompleted
-}: Pick<ReturnType<typeof useAppContext>, 'onboarding' | 'assessment' | 'wearableSetupCompleted'>): keyof RootStackParamList => {
-  if (!onboarding) return 'OnboardingBasics';
-  if (!assessment) return 'OnboardingAssessment';
-  if (!wearableSetupCompleted) return 'SyncWearable';
-  return 'Main';
-};
-
 export const DevUserPickerScreen = ({ navigation }: Props) => {
   const {
-    assessment,
     completeDevelopmentAuthentication,
-    onboarding,
-    themeMode,
-    wearableSetupCompleted
+    themeMode
   } = useAppContext();
   const palette = getThemeColors(themeMode);
   const [selectedUser, setSelectedUser] = useState<DevelopmentUser>(DEVELOPMENT_USERS[0]);
@@ -39,21 +25,6 @@ export const DevUserPickerScreen = ({ navigation }: Props) => {
 
   const continueWithUser = () => {
     completeDevelopmentAuthentication(selectedUser);
-    const nextRoute = getNextRoute({ onboarding, assessment, wearableSetupCompleted });
-
-    if (nextRoute === 'OnboardingBasics') {
-      navigation.replace('OnboardingBasics');
-      return;
-    }
-    if (nextRoute === 'OnboardingAssessment') {
-      navigation.replace('OnboardingAssessment');
-      return;
-    }
-    if (nextRoute === 'SyncWearable') {
-      navigation.replace('SyncWearable');
-      return;
-    }
-    navigation.replace('Main');
   };
 
   return (
