@@ -22,14 +22,16 @@ const toHttpStatus = (code) => {
         return 410;
     if (code === 'OTP_INVALID')
         return 401;
+    if (code === 'OTP_DELIVERY_FAILED')
+        return 502;
     if (code === 'AUTH_CONTACT_CONFLICT')
         return 409;
-    if (code === 'OTP_RESEND_NOT_READY' || code === 'OTP_TOO_MANY_ATTEMPTS')
+    if (code === 'OTP_RESEND_NOT_READY' || code === 'OTP_TOO_MANY_ATTEMPTS' || code === 'OTP_RATE_LIMITED')
         return 429;
     return 400;
 };
 export const authRouter = Router();
-authRouter.post('/signup/request-otp', (req, res) => {
+authRouter.post('/signup/request-otp', async (req, res) => {
     const parsed = signupRequestSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({
@@ -37,10 +39,20 @@ authRouter.post('/signup/request-otp', (req, res) => {
             details: parsed.error.flatten()
         });
     }
-    const result = createOtpChallenge(parsed.data);
-    return res.status(201).json(result);
+    try {
+        const result = await createOtpChallenge(parsed.data);
+        return res.status(201).json(result);
+    }
+    catch (error) {
+        const domainError = error;
+        return res.status(toHttpStatus(domainError.code)).json({
+            error: domainError.code,
+            message: domainError.message,
+            retryAfterSec: domainError.retryAfterSec ?? undefined
+        });
+    }
 });
-authRouter.post('/signup/resend-otp', (req, res) => {
+authRouter.post('/signup/resend-otp', async (req, res) => {
     const parsed = otpResendSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({
@@ -49,7 +61,7 @@ authRouter.post('/signup/resend-otp', (req, res) => {
         });
     }
     try {
-        const result = resendOtpChallenge(parsed.data.challengeId);
+        const result = await resendOtpChallenge(parsed.data.challengeId);
         return res.status(200).json(result);
     }
     catch (error) {

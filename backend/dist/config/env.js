@@ -80,6 +80,18 @@ export const env = {
     get openAiApiKey() {
         return process.env.OPENAI_API_KEY?.trim() ?? '';
     },
+    get pingmateApiKey() {
+        return process.env.PINGMATE_API_KEY?.trim() ?? '';
+    },
+    get pingmateBaseUrl() {
+        return process.env.PINGMATE_BASE_URL?.trim() || 'https://pingmate.app/api/v1';
+    },
+    get pingmateTemplate() {
+        return process.env.PINGMATE_TEMPLATE?.trim() || 'auth_otp';
+    },
+    get pingmateLanguage() {
+        return process.env.PINGMATE_LANGUAGE?.trim() || 'en';
+    },
     get otpDebugResponseEnabled() {
         return isOtpDebugResponseEnabled();
     },

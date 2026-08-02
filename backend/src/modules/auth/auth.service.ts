@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import { createAuthSession, resolveVerifiedAccountIdentity } from './auth.repository.js';
 import { isDevelopmentOtpBypassEnabled, isOtpDebugResponseEnabled } from '../../config/env.js';
+import { NotificationService } from '../notifications/notification.service.js';
+import { OtpDeliveryError } from '../notifications/notification.types.js';
 
 type SignupInput = {
   name: string;
@@ -23,6 +25,8 @@ export type OtpDomainError = {
     | 'OTP_NOT_FOUND'
     | 'OTP_EXPIRED'
     | 'OTP_INVALID'
+    | 'OTP_DELIVERY_FAILED'
+    | 'OTP_RATE_LIMITED'
     | 'OTP_RESEND_NOT_READY'
     | 'OTP_TOO_MANY_ATTEMPTS'
     | 'AUTH_CONTACT_CONFLICT';
@@ -32,16 +36,19 @@ export type OtpDomainError = {
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 30 * 1000;
+const OTP_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const OTP_REQUEST_LIMIT_PER_HOUR = 5;
 const MAX_ATTEMPTS = 5;
 const ACTIVE_CHALLENGE_LIMIT = 5_000;
 const DEVELOPMENT_OTP = '123456';
 
 const challengeStore = new Map<string, OtpChallenge>();
+const otpRequestTimestampsByMobile = new Map<string, number[]>();
 
-const buildOtpHash = (challengeId: string, otp: string) =>
+export const buildOtpHashForTests = (challengeId: string, otp: string) =>
   crypto.createHash('sha256').update(`${challengeId}:${otp}`).digest('hex');
 
-const buildOtp = () => {
+export const buildOtpForTests = () => {
   if (isDevelopmentOtpBypassEnabled()) return DEVELOPMENT_OTP;
   return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
 };
@@ -65,30 +72,70 @@ const asDomainError = (error: OtpDomainError): OtpDomainError => error;
 
 const createOrReplaceChallenge = (user: SignupInput) => {
   const challengeId = crypto.randomUUID();
-  const otp = buildOtp();
+  const otp = buildOtpForTests();
   const expiresAtMs = now() + OTP_TTL_MS;
   const resendAvailableAtMs = now() + RESEND_COOLDOWN_MS;
   const challenge: OtpChallenge = {
     challengeId,
     user,
-    otpHash: buildOtpHash(challengeId, otp),
+    otpHash: buildOtpHashForTests(challengeId, otp),
     expiresAtMs,
     resendAvailableAtMs,
     attemptsRemaining: MAX_ATTEMPTS,
     verified: false
   };
-  challengeStore.set(challengeId, challenge);
   return { challenge, otp };
 };
 
-export const createOtpChallenge = (input: SignupInput) => {
+const normalizeRateLimitKey = (mobileNumber: string) => mobileNumber.replace(/\D/g, '');
+
+const assertOtpRequestQuota = (mobileNumber: string) => {
+  const current = now();
+  const key = normalizeRateLimitKey(mobileNumber);
+  const recentRequests = (otpRequestTimestampsByMobile.get(key) ?? []).filter(
+    (timestamp) => current - timestamp < OTP_RATE_LIMIT_WINDOW_MS
+  );
+  if (recentRequests.length >= OTP_REQUEST_LIMIT_PER_HOUR) {
+    otpRequestTimestampsByMobile.set(key, recentRequests);
+    throw asDomainError({
+      code: 'OTP_RATE_LIMITED',
+      message: 'Too many OTP requests. Please try again later.',
+      retryAfterSec: Math.ceil((OTP_RATE_LIMIT_WINDOW_MS - (current - recentRequests[0])) / 1000)
+    });
+  }
+  recentRequests.push(current);
+  otpRequestTimestampsByMobile.set(key, recentRequests);
+};
+
+const deliveryFailureToDomainError = (error: unknown): OtpDomainError => {
+  if (error instanceof OtpDeliveryError) {
+    return {
+      code: 'OTP_DELIVERY_FAILED',
+      message: 'Unable to deliver OTP. Please try again shortly.'
+    };
+  }
+  throw error;
+};
+
+export const createOtpChallenge = async (input: SignupInput) => {
   pruneOldChallenges();
   const user = {
     name: input.name.trim(),
     email: input.email.trim().toLowerCase(),
     mobileNumber: input.mobileNumber.trim()
   };
+  assertOtpRequestQuota(user.mobileNumber);
   const { challenge, otp } = createOrReplaceChallenge(user);
+  try {
+    await NotificationService.sendOTP({
+      challengeId: challenge.challengeId,
+      mobileNumber: user.mobileNumber,
+      otp
+    });
+  } catch (error) {
+    throw asDomainError(deliveryFailureToDomainError(error));
+  }
+  challengeStore.set(challenge.challengeId, challenge);
   return {
     challengeId: challenge.challengeId,
     expiresAtISO: new Date(challenge.expiresAtMs).toISOString(),
@@ -102,7 +149,7 @@ export const createOtpChallenge = (input: SignupInput) => {
   };
 };
 
-export const resendOtpChallenge = (challengeId: string) => {
+export const resendOtpChallenge = async (challengeId: string) => {
   pruneOldChallenges();
   const challenge = challengeStore.get(challengeId);
   if (!challenge) throw asDomainError({ code: 'OTP_NOT_FOUND', message: 'Challenge not found.' });
@@ -117,8 +164,20 @@ export const resendOtpChallenge = (challengeId: string) => {
     });
   }
 
-  const otp = buildOtp();
-  challenge.otpHash = buildOtpHash(challenge.challengeId, otp);
+  assertOtpRequestQuota(challenge.user.mobileNumber);
+  const otp = buildOtpForTests();
+  const nextOtpHash = buildOtpHashForTests(challenge.challengeId, otp);
+  try {
+    await NotificationService.sendOTP({
+      challengeId: challenge.challengeId,
+      mobileNumber: challenge.user.mobileNumber,
+      otp
+    });
+  } catch (error) {
+    throw asDomainError(deliveryFailureToDomainError(error));
+  }
+
+  challenge.otpHash = nextOtpHash;
   challenge.resendAvailableAtMs = current + RESEND_COOLDOWN_MS;
   challenge.expiresAtMs = current + OTP_TTL_MS;
   challenge.attemptsRemaining = MAX_ATTEMPTS;
@@ -155,7 +214,7 @@ export const verifyOtpChallenge = async (
     });
   }
 
-  const matches = buildOtpHash(challengeId, otp) === challenge.otpHash;
+  const matches = buildOtpHashForTests(challengeId, otp) === challenge.otpHash;
   if (!matches) {
     challenge.attemptsRemaining -= 1;
     throw asDomainError({
@@ -201,4 +260,12 @@ export const verifyOtpChallenge = async (
 
 export const resetOtpChallengesForTests = () => {
   challengeStore.clear();
+  otpRequestTimestampsByMobile.clear();
+};
+
+export const expireOtpChallengeForTests = (challengeId: string) => {
+  const challenge = challengeStore.get(challengeId);
+  if (challenge) {
+    challenge.expiresAtMs = now() - 1;
+  }
 };

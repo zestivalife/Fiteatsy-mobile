@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../../backend/src/server.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
+import { resetOtpChallengesForTests } from '../../backend/src/modules/auth/auth.service.js';
+import { resetWhatsappProviderForTests, setWhatsappProviderForTests } from '../../backend/src/modules/notifications/notification.service.js';
 import { authHeaders } from '../helpers/auth.js';
 import { getJson, postJson } from '../helpers/http.js';
 import { startAppServer } from '../helpers/appServer.js';
@@ -17,13 +19,30 @@ const withEnv = async (
     else process.env[key] = value;
   }
   try {
+    resetOtpChallengesForTests();
+    resetWhatsappProviderForTests();
     await run();
   } finally {
+    resetOtpChallengesForTests();
+    resetWhatsappProviderForTests();
     for (const [key, value] of previous.entries()) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
   }
+};
+
+const useSuccessfulOtpDeliveryProvider = () => {
+  setWhatsappProviderForTests({
+    async sendOtp() {
+      return {
+        status: 'sent',
+        provider: 'test-whatsapp',
+        providerResponseCode: 200,
+        latencyMs: 1
+      };
+    }
+  });
 };
 
 const signupPayload = {
@@ -48,6 +67,7 @@ test('production never exposes debug OTP even if explicitly enabled', async () =
       OTP_DEBUG_RESPONSE_ENABLED: 'true'
     },
     async () => {
+      useSuccessfulOtpDeliveryProvider();
       const server = await startAppServer(createApp());
       const { response, body } = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', signupPayload);
       try {
@@ -67,6 +87,7 @@ test('non-production does not expose debug OTP without explicit opt-in', async (
       OTP_DEBUG_RESPONSE_ENABLED: undefined
     },
     async () => {
+      useSuccessfulOtpDeliveryProvider();
       const server = await startAppServer(createApp());
       const { response, body } = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', signupPayload);
       try {
@@ -86,6 +107,7 @@ test('non-production exposes debug OTP only when explicit opt-in is enabled', as
       OTP_DEBUG_RESPONSE_ENABLED: 'true'
     },
     async () => {
+      useSuccessfulOtpDeliveryProvider();
       const server = await startAppServer(createApp());
       const { response, body } = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', signupPayload);
       try {
@@ -110,6 +132,7 @@ test('local development issues fixed OTP 123456 and rejects any other OTP', asyn
       OTP_DEBUG_RESPONSE_ENABLED: 'true'
     },
     async () => {
+      useSuccessfulOtpDeliveryProvider();
       const server = await startAppServer(createApp());
       const requested = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
         ...signupPayload,
@@ -194,6 +217,7 @@ test('production rejects development fixed OTP when it was not the generated cha
       OTP_DEBUG_RESPONSE_ENABLED: 'true'
     },
     async () => {
+      useSuccessfulOtpDeliveryProvider();
       const server = await startAppServer(createApp());
       const requested = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
         ...signupPayload,
