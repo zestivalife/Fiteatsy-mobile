@@ -67,22 +67,38 @@ test('PingMate provider sends the required WhatsApp template payload without har
     async () => {
       let capturedUrl = '';
       let capturedInit: RequestInit | undefined;
+      const capturedLogs: unknown[] = [];
+      const originalInfo = console.info;
+      console.info = (...args: unknown[]) => {
+        capturedLogs.push(args);
+      };
       const provider = createPingMateProvider(async (url, init) => {
         capturedUrl = String(url);
         capturedInit = init;
-        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        return new Response(JSON.stringify({ ok: true, id: 'provider-message-1' }), {
+          status: 200,
+          headers: { 'x-request-id': 'provider-request-1' }
+        });
       });
 
-      const result = await provider.sendOtp({
-        challengeId: 'challenge-id',
-        mobileNumber: '+91 98765 43210',
-        otp: '123456'
-      });
+      let result;
+      try {
+        result = await provider.sendOtp({
+          challengeId: 'challenge-id',
+          mobileNumber: '+91 98765 43210',
+          otp: '123456'
+        });
+      } finally {
+        console.info = originalInfo;
+      }
 
       assert.equal(result.status, 'sent');
       assert.equal(result.providerResponseCode, 200);
+      assert.equal(result.providerRequestId, 'provider-request-1');
       assert.equal(capturedUrl, 'https://pingmate.test/api/v1/messages/send');
       assert.equal((capturedInit?.headers as Record<string, string>)['X-API-Key'], 'test-pingmate-key');
+      assert.equal((capturedInit?.headers as Record<string, string>)['Content-Type'], 'application/json');
+      assert.equal(capturedInit?.method, 'POST');
 
       const body = JSON.parse(String(capturedInit?.body));
       assert.equal(body.to, '919876543210');
@@ -94,6 +110,81 @@ test('PingMate provider sends the required WhatsApp template payload without har
         body.message.buttons[0].button_payload,
         'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp123456'
       );
+      assert.deepEqual(body.message.buttons[0], {
+        button_type: 'url',
+        button_index: 0,
+        button_payload: 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp123456'
+      });
+
+      const serializedLogs = JSON.stringify(capturedLogs);
+      assert.match(serializedLogs, /PingMate OTP request/);
+      assert.match(serializedLogs, /PingMate OTP response/);
+      assert.match(serializedLogs, /provider-request-1/);
+      assert.doesNotMatch(serializedLogs, /test-pingmate-key/);
+      assert.doesNotMatch(serializedLogs, /123456/);
+      assert.doesNotMatch(serializedLogs, /919876543210/);
+    }
+  );
+});
+
+test('PingMate provider logs sanitized provider rejection bodies for diagnostics', async () => {
+  await withEnv(
+    {
+      PINGMATE_API_KEY: 'test-pingmate-key',
+      PINGMATE_BASE_URL: 'https://pingmate.test/api/v1',
+      PINGMATE_TEMPLATE: 'auth_otp',
+      PINGMATE_LANGUAGE: 'en'
+    },
+    async () => {
+      const capturedWarnings: unknown[] = [];
+      const capturedInfo: unknown[] = [];
+      const originalWarn = console.warn;
+      const originalInfo = console.info;
+      console.warn = (...args: unknown[]) => {
+        capturedWarnings.push(args);
+      };
+      console.info = (...args: unknown[]) => {
+        capturedInfo.push(args);
+      };
+      const provider = createPingMateProvider(async () =>
+        new Response(
+          JSON.stringify({
+            error: 'Template auth_otp rejected for 919876543210 with otp 123456'
+          }),
+          {
+            status: 422,
+            headers: { 'x-request-id': 'provider-reject-1' }
+          }
+        )
+      );
+
+      try {
+        await assert.rejects(
+          () =>
+            provider.sendOtp({
+              challengeId: 'challenge-id',
+              mobileNumber: '+91 98765 43210',
+              otp: '123456'
+            }),
+          (error: unknown) =>
+            error instanceof OtpDeliveryError &&
+            error.providerResponseCode === 422 &&
+            error.providerRequestId === 'provider-reject-1' &&
+            error.providerResponseBody?.includes('[REDACTED_OTP]') === true &&
+            error.providerResponseBody?.includes('[REDACTED_PHONE]') === true
+        );
+      } finally {
+        console.warn = originalWarn;
+        console.info = originalInfo;
+      }
+
+      const serializedLogs = JSON.stringify([...capturedInfo, ...capturedWarnings]);
+      assert.match(serializedLogs, /provider-reject-1/);
+      assert.match(serializedLogs, /\[REDACTED_OTP\]/);
+      assert.match(serializedLogs, /\[REDACTED_PHONE\]/);
+      assert.doesNotMatch(serializedLogs, /test-pingmate-key/);
+      assert.doesNotMatch(serializedLogs, /123456/);
+      assert.doesNotMatch(serializedLogs, /919876543210/);
     }
   );
 });

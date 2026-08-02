@@ -26,6 +26,7 @@ const logDeliveryResult = (challengeId: string, userId: string | null | undefine
     deliveryStatus: result.status,
     provider: result.provider,
     providerResponseCode: result.providerResponseCode ?? null,
+    providerRequestId: result.providerRequestId ?? null,
     latencyMs: result.latencyMs
   });
 };
@@ -37,6 +38,8 @@ const logDeliveryFailure = (challengeId: string, userId: string | null | undefin
     deliveryStatus: 'failed',
     provider: error.provider,
     providerResponseCode: error.providerResponseCode ?? null,
+    providerRequestId: error.providerRequestId ?? null,
+    providerResponseBody: error.providerResponseBody ?? null,
     latencyMs: error.latencyMs
   });
 };

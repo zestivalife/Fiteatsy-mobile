@@ -20,6 +20,7 @@ const logDeliveryResult = (challengeId, userId, result) => {
         deliveryStatus: result.status,
         provider: result.provider,
         providerResponseCode: result.providerResponseCode ?? null,
+        providerRequestId: result.providerRequestId ?? null,
         latencyMs: result.latencyMs
     });
 };
@@ -30,6 +31,8 @@ const logDeliveryFailure = (challengeId, userId, error) => {
         deliveryStatus: 'failed',
         provider: error.provider,
         providerResponseCode: error.providerResponseCode ?? null,
+        providerRequestId: error.providerRequestId ?? null,
+        providerResponseBody: error.providerResponseBody ?? null,
         latencyMs: error.latencyMs
     });
 };
