@@ -72,7 +72,11 @@ type AnalysisReviewState = {
   actionPlan: NuetraActionItem[];
   goodParameters: ReportParameter[];
   attentionParameters: ReportParameter[];
+  biomarkerObservations: NonNullable<ReportAnalysisResponse['biomarkerObservations']>;
+  healthScores: NonNullable<ReportAnalysisResponse['healthScores']>;
 };
+
+type ProcessingPhase = 'uploading' | 'processing' | 'extraction' | 'validation' | 'completed' | 'failed';
 
 const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
 
@@ -298,7 +302,9 @@ export const ReportsScreen = () => {
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [showProcessing, setShowProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const [processingPhase, setProcessingPhase] = useState<ProcessingPhase>('uploading');
+  const [processingPercent, setProcessingPercent] = useState(0);
+  const [processingMessage, setProcessingMessage] = useState('Uploading Report');
   const [showHistory, setShowHistory] = useState(false);
 
   const [reportDate, setReportDate] = useState('15 Mar 2026');
@@ -324,6 +330,7 @@ export const ReportsScreen = () => {
   const [crossInsights, setCrossInsights] = useState<NuetraCrossInsight[]>([]);
   const [heroExpanded, setHeroExpanded] = useState(true);
   const heroAnim = useRef(new Animated.Value(1)).current;
+  const activeUploadController = useRef<AbortController | null>(null);
 
   const shimmer = useRef(new Animated.Value(0)).current;
 
@@ -357,6 +364,44 @@ export const ReportsScreen = () => {
     () => latestReport?.parametersData.filter((parameter) => parameter.status !== 'normal') ?? [],
     [latestReport]
   );
+  const biomarkerTrends = useMemo(() => {
+    if (reports.length < 2 || !latestReport) return [];
+    const previous = reports.find((report) => report.id !== latestReport.id);
+    if (!previous) return [];
+    return latestReport.parametersData
+      .map((current) => {
+        const prior = previous.parametersData.find((item) => item.name.toLowerCase() === current.name.toLowerCase());
+        if (!prior) return null;
+        const delta = current.value - prior.value;
+        const improved =
+          current.status === 'normal' && prior.status !== 'normal'
+            ? true
+            : current.status !== 'normal' && prior.status === 'normal'
+              ? false
+              : Math.abs(delta) < 0.01
+                ? null
+                : current.status === 'high'
+                  ? delta < 0
+                  : current.status === 'low'
+                    ? delta > 0
+                    : null;
+        return {
+          name: current.name,
+          current,
+          prior,
+          delta,
+          label: improved == null ? 'Stable' : improved ? 'Improved' : 'Needs monitoring'
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 5) as Array<{
+        name: string;
+        current: ReportParameter;
+        prior: ReportParameter;
+        delta: number;
+        label: string;
+      }>;
+  }, [latestReport, reports]);
 
   useEffect(() => {
     let active = true;
@@ -540,6 +585,9 @@ export const ReportsScreen = () => {
     setUploadError(null);
     setUploadType(selectedUpload.source);
     setAnalysisLaunching(true);
+    setProcessingPhase('uploading');
+    setProcessingPercent(8);
+    setProcessingMessage('Uploading Report');
     setShowUploadSheet(false);
     setShowProcessing(true);
   };
@@ -653,32 +701,22 @@ export const ReportsScreen = () => {
     }
 
     setProcessingStep(0);
-    progressAnim.setValue(0);
-
-    Animated.timing(progressAnim, {
-      toValue: 1,
-      duration: 5200,
-      useNativeDriver: false
-    }).start();
-
-    const interval = setInterval(() => {
-      setProcessingStep((prev) => {
-        if (prev >= 3) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 1300);
-
+    setProcessingPhase('uploading');
+    setProcessingPercent(8);
+    setProcessingMessage('Uploading Report');
     let cancelled = false;
+    const controller = new AbortController();
+    activeUploadController.current = controller;
     const failSafeTimeout = setTimeout(() => {
       if (cancelled) return;
+      controller.abort();
+      setProcessingPhase('failed');
+      setProcessingMessage('Processing failed. Analysis is taking too long.');
       setShowProcessing(false);
       setAnalysisLaunching(false);
       setShowUploadSheet(true);
       setUploadError('Analysis is taking too long. Please retry. If issue continues, restart backend and app.');
-    }, 35000);
+    }, 45000);
 
     const execute = async () => {
       try {
@@ -688,10 +726,23 @@ export const ReportsScreen = () => {
           fileName: selectedUpload.name,
           mimeType: selectedUpload.mimeType,
           reportDate,
-          labName
+          labName,
+          signal: controller.signal,
+          onProgress: (event) => {
+            if (cancelled) return;
+            setProcessingPhase(event.stage);
+            setProcessingPercent(event.percent);
+            setProcessingMessage(event.message);
+            const nextStep = event.stage === 'uploading' ? 0 : event.stage === 'processing' ? 1 : event.stage === 'extraction' ? 2 : 3;
+            setProcessingStep(nextStep);
+          }
         });
 
         if (cancelled) return;
+        setProcessingPhase('completed');
+        setProcessingPercent(100);
+        setProcessingMessage('Report analysis completed.');
+        setProcessingStep(4);
         setReportDate(analysis.reportDate);
         setLabName(analysis.labName);
 
@@ -720,14 +771,18 @@ export const ReportsScreen = () => {
         };
 
         const prevText = previous ? `Compared with ${previous.date} (${previous.labName}), ` : '';
-        const comparisonSummary = `${prevText}${analysis.summary}`;
+        const comparisonSummary = previous
+          ? `${prevText}${analysis.summary}`
+          : 'This is your first health report. Future reports will be compared against this baseline.';
         setAnalysisReview({
           report: newReport,
           summary: analysis.summary,
           comparisonSummary,
           actionPlan: analysis.actionPlan.map((item) => ({ ...item, requiresDoctor: false })),
           goodParameters: analysis.parameters.filter((parameter) => parameter.status === 'normal'),
-          attentionParameters: analysis.parameters.filter((parameter) => parameter.status !== 'normal')
+          attentionParameters: analysis.parameters.filter((parameter) => parameter.status !== 'normal'),
+          biomarkerObservations: analysis.biomarkerObservations ?? [],
+          healthScores: analysis.healthScores ?? []
         });
         setShowAnalysisReview(true);
         setShowProcessing(false);
@@ -737,11 +792,14 @@ export const ReportsScreen = () => {
         setShowUploadSheet(false);
       } catch (error) {
         if (cancelled) return;
+        setProcessingPhase('failed');
+        setProcessingMessage('Processing failed');
         setShowProcessing(false);
         setAnalysisLaunching(false);
         setShowUploadSheet(true);
         setUploadError(error instanceof Error ? error.message : 'Analysis failed. Please retry with a clear report.');
       } finally {
+        activeUploadController.current = null;
         clearTimeout(failSafeTimeout);
       }
     };
@@ -749,10 +807,13 @@ export const ReportsScreen = () => {
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      controller.abort();
+      if (activeUploadController.current === controller) {
+        activeUploadController.current = null;
+      }
       clearTimeout(failSafeTimeout);
     };
-  }, [labName, progressAnim, reportDate, reports, selectedUpload, showProcessing]);
+  }, [showProcessing]);
 
   const onDatePicked = (_event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android') {
@@ -769,11 +830,6 @@ export const ReportsScreen = () => {
     );
   };
 
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%']
-  });
-
   const shimmerTranslate = shimmer.interpolate({
     inputRange: [0, 1],
     outputRange: [-220, 220]
@@ -781,10 +837,11 @@ export const ReportsScreen = () => {
 
   const reportCountLabel = `${reports.length}`;
   const stepText = [
-    'Reading your report...',
-    'Extracting all parameters...',
-    'Benchmarking your values...',
-    'Generating your health summary...'
+    'Uploading Report',
+    'Processing health information...',
+    'Extracting health parameters...',
+    'Validating extracted health information...',
+    'Report analysis completed.'
   ];
 
   return (
@@ -987,6 +1044,43 @@ export const ReportsScreen = () => {
         </Card>
       ) : null}
 
+      {biomarkerTrends.length > 0 ? (
+        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
+          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Biomarker Trend Chart</Text>
+          {biomarkerTrends.map((trend) => {
+            const maxValue = Math.max(Math.abs(trend.prior.value), Math.abs(trend.current.value), 1);
+            const previousWidth = Math.max(10, Math.min(100, (Math.abs(trend.prior.value) / maxValue) * 100));
+            const currentWidth = Math.max(10, Math.min(100, (Math.abs(trend.current.value) / maxValue) * 100));
+            const positive = trend.label === 'Improved';
+            return (
+              <View key={trend.name} style={[styles.trendChartRow, !isLight && styles.trendChartRowDark]}>
+                <View style={styles.trendChartHead}>
+                  <Text style={[styles.trendChartName, !isLight && styles.trendChartNameDark]}>{trend.name}</Text>
+                  <Text style={[styles.trendChartBadge, positive ? styles.trendChartBadgeGood : styles.trendChartBadgeWatch]}>
+                    {trend.label}
+                  </Text>
+                </View>
+                <View style={styles.trendBarLine}>
+                  <Text style={[styles.trendBarLabel, !isLight && styles.trendBarLabelDark]}>{trend.prior.value} {trend.prior.unit}</Text>
+                  <View style={styles.trendTrack}><View style={[styles.trendPreviousFill, { width: `${previousWidth}%` }]} /></View>
+                </View>
+                <View style={styles.trendBarLine}>
+                  <Text style={[styles.trendBarLabel, !isLight && styles.trendBarLabelDark]}>{trend.current.value} {trend.current.unit}</Text>
+                  <View style={styles.trendTrack}><View style={[styles.trendCurrentFill, { width: `${currentWidth}%` }]} /></View>
+                </View>
+              </View>
+            );
+          })}
+        </Card>
+      ) : latestReport ? (
+        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
+          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Biomarker Trend Chart</Text>
+          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
+            This is your first health report. Future reports will be compared against this baseline.
+          </Text>
+        </Card>
+      ) : null}
+
       {!showUploadSheet && !showProcessing ? (
         <Pressable style={[styles.fab, { backgroundColor: sectionHighlight }]} onPress={() => setShowUploadSheet(true)}>
           <Ionicons name="cloud-upload-outline" size={24} color={colors.white} />
@@ -1126,9 +1220,18 @@ export const ReportsScreen = () => {
         <View style={styles.processingScreen}>
           <View style={styles.processingCenter}>
             <View style={styles.processingLogo}>
-              <MaterialCommunityIcons name="brain" size={36} color={colors.white} />
+              {processingPhase === 'uploading' ? (
+                <Ionicons name="cloud-upload-outline" size={34} color={colors.white} />
+              ) : processingPhase === 'completed' ? (
+                <Ionicons name="checkmark" size={36} color={colors.white} />
+              ) : processingPhase === 'failed' ? (
+                <Ionicons name="warning-outline" size={34} color={colors.white} />
+              ) : (
+                <MaterialCommunityIcons name="brain" size={36} color={colors.white} />
+              )}
             </View>
-            <Text style={styles.processingTitle}>Fiteatsy is reading your report</Text>
+            <Text style={styles.processingTitle}>{processingMessage}</Text>
+            <Text style={styles.processingStatusText}>Status: {processingPhase === 'extraction' ? 'EXTRACTION_COMPLETED' : processingPhase === 'validation' ? 'VALIDATION_PENDING' : processingPhase.toUpperCase()}</Text>
 
             <View style={styles.processingSteps}>
               {stepText.map((step, index) => {
@@ -1147,14 +1250,24 @@ export const ReportsScreen = () => {
               })}
             </View>
 
+            {processingPhase === 'extraction' || processingPhase === 'validation' || processingPhase === 'completed' ? (
+              <View style={styles.findingCard}>
+                <Text style={styles.findingTitle}>Finding</Text>
+                {['HbA1c', 'Vitamin B12', 'Vitamin D', 'Lipid Profile'].map((item) => (
+                  <Text key={item} style={styles.findingText}>• {item}</Text>
+                ))}
+              </View>
+            ) : null}
+
             <View style={styles.processingTrack}>
-              <Animated.View style={[styles.processingFill, { width: progressWidth }]} />
+              <View style={[styles.processingFill, { width: `${processingPercent}%` }]} />
             </View>
-            <Text style={styles.processingHint}>This takes about 15–20 seconds</Text>
+            <Text style={styles.processingHint}>{processingPercent}% complete · This can take 15–45 seconds for large reports.</Text>
             <ActivityIndicator color={palette.purple} style={{ marginTop: 8 }} />
             <Pressable
               style={styles.processingCancelBtn}
               onPress={() => {
+                activeUploadController.current?.abort();
                 setShowProcessing(false);
                 setAnalysisLaunching(false);
                 setShowUploadSheet(true);
@@ -1207,6 +1320,28 @@ export const ReportsScreen = () => {
             )}
 
             <Text style={styles.reviewSummaryText}>{analysisReview?.summary}</Text>
+
+            {analysisReview?.biomarkerObservations.length ? (
+              <View style={styles.reviewList}>
+                <Text style={styles.reviewSectionTitle}>Extracted biomarkers</Text>
+                {analysisReview.biomarkerObservations.slice(0, 6).map((item) => (
+                  <Text key={item.id} style={styles.reviewListItem}>
+                    • {item.biomarkerName}: {Math.round(item.confidence * 100)}% confidence · {item.validationStatus}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+
+            {analysisReview?.healthScores.length ? (
+              <View style={styles.reviewList}>
+                <Text style={styles.reviewSectionTitle}>Health score updates</Text>
+                {analysisReview.healthScores.map((item) => (
+                  <Text key={item.scoreType} style={styles.reviewListItem}>
+                    • {item.scoreType}: {item.scoreValue ?? 'insufficient data'} · {Math.round(item.confidence * 100)}% confidence
+                  </Text>
+                ))}
+              </View>
+            ) : null}
 
             <View style={styles.reviewActions}>
               <Pressable
@@ -1570,6 +1705,80 @@ const styles = StyleSheet.create({
   crossMeta: {
     fontSize: 12,
     color: '#000000'
+  },
+  trendChartRow: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    marginBottom: 8
+  },
+  trendChartRowDark: {
+    backgroundColor: colors.cardRaised,
+    borderColor: colors.strokeStrong
+  },
+  trendChartHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 8
+  },
+  trendChartName: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'Poppins_700Bold',
+    color: palette.textDark
+  },
+  trendChartNameDark: {
+    color: colors.white
+  },
+  trendChartBadge: {
+    borderRadius: 100,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    fontSize: 11,
+    fontFamily: 'Poppins_700Bold'
+  },
+  trendChartBadgeGood: {
+    color: palette.teal,
+    backgroundColor: palette.tealLight
+  },
+  trendChartBadgeWatch: {
+    color: palette.amber,
+    backgroundColor: palette.amberLight
+  },
+  trendBarLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 5
+  },
+  trendBarLabel: {
+    width: 78,
+    fontSize: 11,
+    color: palette.textMid
+  },
+  trendBarLabelDark: {
+    color: colors.white
+  },
+  trendTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 100,
+    backgroundColor: colors.surfaceTint,
+    overflow: 'hidden'
+  },
+  trendPreviousFill: {
+    height: '100%',
+    borderRadius: 100,
+    backgroundColor: colors.textMuted
+  },
+  trendCurrentFill: {
+    height: '100%',
+    borderRadius: 100,
+    backgroundColor: palette.teal
   },
   sectionHead: {
     flexDirection: 'row',
@@ -1955,8 +2164,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: 'Poppins_600SemiBold',
     color: palette.textDark,
-    marginBottom: 14,
+    marginBottom: 6,
     textAlign: 'center'
+  },
+  processingStatusText: {
+    marginBottom: 14,
+    fontSize: 12,
+    color: palette.textLight,
+    fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: 0.3
   },
   processingSteps: {
     width: '100%',
@@ -1993,6 +2209,27 @@ const styles = StyleSheet.create({
   stepTextActive: {
     color: palette.textDark,
     fontFamily: 'Poppins_600SemiBold'
+  },
+  findingCard: {
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14
+  },
+  findingTitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins_700Bold',
+    color: palette.textDark,
+    marginBottom: 4
+  },
+  findingText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: palette.textMid
   },
   processingTrack: {
     width: '100%',
@@ -2079,6 +2316,12 @@ const styles = StyleSheet.create({
   reviewListItem: {
     fontSize: 12,
     lineHeight: 18,
+    color: colors.textPrimary
+  },
+  reviewSectionTitle: {
+    marginBottom: 5,
+    fontSize: 12,
+    fontFamily: 'Poppins_700Bold',
     color: colors.textPrimary
   },
   reviewAllGood: {

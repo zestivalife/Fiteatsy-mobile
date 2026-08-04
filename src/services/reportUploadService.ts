@@ -5,6 +5,8 @@ import { buildAuthorizationHeaders } from './apiClient';
 type CategoryScores = Record<'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins', number>;
 
 export type ReportAnalysisResponse = {
+  reportId?: string;
+  status?: string;
   reportDate: string;
   labName: string;
   parameters: ReportParameter[];
@@ -12,6 +14,21 @@ export type ReportAnalysisResponse = {
   categoryScores: CategoryScores;
   summary: string;
   actionPlan: Array<{ priority: number; title: string; detail: string }>;
+  biomarkerObservations?: Array<{
+    id: string;
+    biomarkerId: string;
+    biomarkerName: string;
+    validationStatus: string;
+    confidence: number;
+    notes: string[];
+  }>;
+  healthScores?: Array<{
+    scoreType: string;
+    scoreValue: number | null;
+    scoreStatus: string;
+    confidence: number;
+    calculatedAtISO: string;
+  }>;
 };
 
 const API_PORT = 4001;
@@ -47,6 +64,8 @@ export const uploadAndAnalyzeReport = async (params: {
   mimeType: string;
   reportDate?: string;
   labName?: string;
+  signal?: AbortSignal;
+  onProgress?: (event: { stage: 'uploading' | 'processing' | 'extraction' | 'validation'; percent: number; message: string }) => void;
 }): Promise<ReportAnalysisResponse> => {
   const form = new FormData();
   form.append('reportFile', {
@@ -60,7 +79,10 @@ export const uploadAndAnalyzeReport = async (params: {
   let lastError = 'network_error';
   for (const baseUrl of getBaseUrls()) {
     const controller = new AbortController();
+    const abortFromCaller = () => controller.abort();
+    params.signal?.addEventListener('abort', abortFromCaller, { once: true });
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    params.onProgress?.({ stage: 'uploading', percent: 12, message: 'Uploading Report' });
     try {
       const response = await fetch(`${baseUrl}/v1/reports/analyze`, {
         method: 'POST',
@@ -69,21 +91,31 @@ export const uploadAndAnalyzeReport = async (params: {
         signal: controller.signal
       });
       clearTimeout(timeout);
+      params.signal?.removeEventListener('abort', abortFromCaller);
+      params.onProgress?.({ stage: 'processing', percent: 45, message: 'Report uploaded successfully. Processing health information...' });
       if (!response.ok) {
         const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
         lastError = payload.message ?? payload.error ?? `HTTP_${response.status}`;
         continue;
       }
-      return (await response.json()) as ReportAnalysisResponse;
+      params.onProgress?.({ stage: 'extraction', percent: 70, message: 'Extracting health parameters...' });
+      const data = (await response.json()) as ReportAnalysisResponse;
+      params.onProgress?.({ stage: 'validation', percent: 92, message: 'Validating extracted health information...' });
+      params.onProgress?.({ stage: 'validation', percent: 100, message: 'Report analysis completed.' });
+      return data;
     } catch (error) {
       clearTimeout(timeout);
+      params.signal?.removeEventListener('abort', abortFromCaller);
       lastError = error instanceof Error ? error.message : 'network_error';
       if (error instanceof Error && error.name === 'AbortError') {
-        lastError = 'REQUEST_TIMEOUT';
+        lastError = params.signal?.aborted ? 'REQUEST_CANCELLED' : 'REQUEST_TIMEOUT';
       }
     }
   }
 
+  if (lastError.includes('REQUEST_CANCELLED')) {
+    throw new Error('Analysis cancelled. You can retry when ready.');
+  }
   if (lastError.includes('UPLOAD_SESSION_NOT_FOUND')) {
     throw new Error('Upload session expired. Please pick the file again and retry.');
   }
