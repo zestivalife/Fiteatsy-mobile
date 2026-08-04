@@ -267,40 +267,95 @@ create table if not exists health_tickets (
   deleted_at timestamptz
 );
 
-create table if not exists lab_reports (
-  id uuid primary key,
-  care_case_id uuid references care_cases(id),
+create table if not exists health_reports (
+  id text primary key,
   user_id text not null references users(id),
-  client_id text,
+  client_id text not null,
+  report_type text not null default 'medical_report',
+  storage_object_ref text not null,
+  original_filename text not null,
+  mime_type text not null,
+  file_size integer not null,
+  upload_source text,
+  processing_status text not null default 'UPLOADED',
+  report_date text,
   lab_name text,
-  report_date timestamptz,
-  source text,
-  storage_path text,
-  ocr_status text not null default 'queued',
-  processing_progress jsonb not null default '{}'::jsonb,
-  status text not null default 'active',
-  version integer not null default 1,
+  error text,
+  analysis_version integer not null default 1,
+  analysis jsonb,
+  feedback jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );
 
-create table if not exists biomarkers (
-  id uuid primary key,
-  report_id uuid references lab_reports(id),
-  care_case_id uuid references care_cases(id),
+create table if not exists health_report_upload_sessions (
+  id text primary key,
   user_id text not null references users(id),
-  biomarker_name text not null,
-  biomarker_value numeric(10,3),
-  biomarker_unit text,
-  reference_range text,
-  trend_direction text,
-  status text not null default 'active',
-  version integer not null default 1,
+  client_id text not null,
+  file_name text not null,
+  mime_type text not null,
+  file_size integer not null,
+  upload_source text,
+  storage_object_ref text not null,
+  status text not null default 'initialized',
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  deleted_at timestamptz
+  expires_at timestamptz not null,
+  completed_at timestamptz,
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
+);
+
+create table if not exists health_observations (
+  id text primary key,
+  user_id text not null references users(id),
+  client_id text not null,
+  metric_type text not null,
+  value numeric not null,
+  unit text not null,
+  measured_at timestamptz not null,
+  source_provider text not null,
+  source_record_id text,
+  sync_key text not null,
+  quality_status text not null default 'accepted',
+  created_at timestamptz not null default now(),
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
+);
+
+create table if not exists biomarkers (
+  id text primary key,
+  canonical_name text not null unique,
+  aliases jsonb not null default '[]'::jsonb,
+  category text not null,
+  standard_unit text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists biomarker_observations (
+  id text primary key,
+  user_id text not null references users(id),
+  client_id text not null,
+  biomarker_id text not null references biomarkers(id),
+  source_report_id text references health_reports(id) on delete set null,
+  value numeric not null,
+  unit text not null,
+  test_date date not null,
+  confidence numeric(5,4) not null,
+  validation_status text not null default 'pending',
+  created_at timestamptz not null default now(),
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
+);
+
+create table if not exists processing_jobs (
+  id text primary key,
+  client_id text not null references fiteatsy_clients(id) on delete restrict,
+  report_id text references health_reports(id) on delete cascade,
+  job_type text not null,
+  status text not null default 'queued',
+  error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists diet_plans (
@@ -428,9 +483,18 @@ create index if not exists notifications_client_created_idx
   on notifications (client_id, created_at desc)
   where client_id is not null;
 
-create index if not exists lab_reports_client_report_date_idx
-  on lab_reports (client_id, report_date desc nulls last)
-  where client_id is not null;
+create index if not exists health_reports_client_created_idx
+  on health_reports (client_id, created_at desc)
+  where deleted_at is null;
+
+create unique index if not exists health_observations_client_sync_key_unique
+  on health_observations (client_id, sync_key);
+
+create index if not exists biomarker_observations_client_test_date_idx
+  on biomarker_observations (client_id, test_date desc);
+
+create index if not exists processing_jobs_client_created_idx
+  on processing_jobs (client_id, created_at desc);
 
 create index if not exists attachments_client_created_idx
   on attachments (client_id, created_at desc)

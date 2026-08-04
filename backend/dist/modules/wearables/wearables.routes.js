@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { buildLiveSyncPayload, connectHealthApp, getConnections, getHealthApps, ingestHealthRecords } from './wearables.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
+import { ingestHealthObservations } from '../health/health-observations.repository.js';
 const wearableSyncSchema = z.object({
     deviceId: z.string().min(1),
     brand: z.enum(['Apple', 'Samsung', 'Xiaomi', 'Amazfit', 'GoBOLT', 'Other']),
@@ -85,7 +86,22 @@ wearablesRouter.get('/connections/:userId', (req, res) => {
         connections: getConnections(userId)
     });
 });
-wearablesRouter.post('/records/ingest', (req, res) => {
+const unitByMetric = {
+    steps: 'count',
+    sleep_minutes: 'min',
+    resting_heart_rate: 'bpm',
+    hydration_ml: 'ml',
+    active_minutes: 'min',
+    mindfulness_minutes: 'min',
+    hrv_ms: 'ms',
+    calories_kcal: 'kcal',
+    workout_minutes: 'min',
+    stress_score: 'score',
+    cycle_day: 'day',
+    spo2_pct: '%',
+    respiratory_rate_brpm: 'brpm'
+};
+wearablesRouter.post('/records/ingest', async (req, res) => {
     const parse = ingestSchema.safeParse(req.body);
     if (!parse.success) {
         return res.status(400).json({
@@ -93,11 +109,31 @@ wearablesRouter.post('/records/ingest', (req, res) => {
             message: 'appId, platform, and records[] are required.'
         });
     }
+    const account = getAuthenticatedAccount(req);
     const result = ingestHealthRecords({
         ...parse.data,
-        userId: getAuthenticatedAccount(req).accountId
+        userId: account.accountId
     });
-    return res.status(200).json(result);
+    const durable = await ingestHealthObservations({
+        accountId: account.accountId,
+        clientId: account.client.id
+    }, parse.data.records.map((record) => ({
+        metricType: record.type,
+        value: record.value,
+        unit: unitByMetric[record.type] ?? 'unknown',
+        measuredAtISO: record.recordedAtISO,
+        sourceProvider: parse.data.appId,
+        sourceRecordId: `${parse.data.appId}:${record.type}:${record.recordedAtISO}`,
+        syncKey: `${parse.data.appId}:${record.type}:${record.recordedAtISO}`
+    })));
+    return res.status(200).json({
+        ...result,
+        durableObservations: {
+            accepted: durable.accepted.length,
+            duplicate: durable.duplicate.length,
+            rejected: durable.rejected.length
+        }
+    });
 });
 wearablesRouter.post('/sync/live', (req, res) => {
     const parse = liveSyncSchema.safeParse(req.body);

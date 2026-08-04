@@ -17,11 +17,14 @@ import {
 import { syncReportPipelineToPlatform } from '../platform/platform.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
+import { createProcessingJob, updateProcessingJobStatus } from '../processing/processing-jobs.repository.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 12 * 1024 * 1024 }
 });
+
+const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 export const reportsRouter = Router();
 
@@ -30,7 +33,9 @@ const currentOwner = (account: ReturnType<typeof getAuthenticatedAccount>): Clie
   clientId: account.client.id
 });
 
-const toReportDto = (record: ReturnType<typeof getReport>) => {
+const reportOwner = (owner: ClientOwnershipContext) => ({ userId: owner.accountId, clientId: owner.clientId });
+
+const toReportDto = (record: Awaited<ReturnType<typeof getReport>>) => {
   if (!record) return null;
   return {
     id: record.id,
@@ -51,9 +56,12 @@ const toReportDto = (record: ReturnType<typeof getReport>) => {
   };
 };
 
+const ownsReport = (record: Awaited<ReturnType<typeof getReport>>, owner: ClientOwnershipContext) =>
+  Boolean(record && record.userId === owner.accountId && record.clientId === owner.clientId);
+
 reportsRouter.get('/supported-formats', (_req, res) => {
   res.json({
-    formats: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+    formats: allowedMimeTypes,
     maxUploadBytes: 12 * 1024 * 1024,
     recommendedImage: { maxWidth: 2000, minWidth: 1200, preferred: 'jpeg' }
   });
@@ -62,9 +70,7 @@ reportsRouter.get('/supported-formats', (_req, res) => {
 reportsRouter.use(requireAuthenticatedAccount);
 
 reportsRouter.post('/upload/init', async (req, res) => {
-  const account = getAuthenticatedAccount(req);
-  const owner = currentOwner(account);
-  const userId = owner.accountId;
+  const owner = currentOwner(getAuthenticatedAccount(req));
   const fileName = String(req.body?.fileName || '').trim();
   const mimeType = String(req.body?.mimeType || '').trim().toLowerCase();
   const fileSize = Number(req.body?.fileSize || 0);
@@ -73,72 +79,66 @@ reportsRouter.post('/upload/init', async (req, res) => {
   if (!fileName || !mimeType || !Number.isFinite(fileSize) || fileSize <= 0) {
     return res.status(400).json({ error: 'INVALID_UPLOAD_METADATA', message: 'fileName, mimeType, fileSize are required.' });
   }
-
-  const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-  if (!allowed.includes(mimeType)) {
+  if (!allowedMimeTypes.includes(mimeType)) {
     return res.status(415).json({ error: 'UNSUPPORTED_FILE', message: 'Only PDF/JPEG/PNG/WebP reports are supported.' });
   }
-
   if (fileSize > 12 * 1024 * 1024) {
     return res.status(413).json({ error: 'FILE_TOO_LARGE', message: 'Max upload size is 12MB.' });
   }
 
-  const session = createUploadSession({ userId, fileName, mimeType, fileSize, source });
+  const session = await createUploadSession({ ...reportOwner(owner), fileName, mimeType, fileSize, source });
   await syncReportPipelineToPlatform(owner, session.id, 'uploaded', `Blood report upload initialized for ${fileName}`);
   return res.status(201).json({ uploadId: session.id, expiresAtISO: session.expiresAtISO, status: session.status });
 });
 
-reportsRouter.post('/upload/complete', (req, res) => {
+reportsRouter.post('/upload/complete', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
   const uploadId = String(req.body?.uploadId || '').trim();
   if (!uploadId) return res.status(400).json({ error: 'MISSING_UPLOAD_ID', message: 'uploadId is required.' });
-  const currentSession = getUploadSession(uploadId);
-  if (currentSession && currentSession.userId !== getAuthenticatedAccount(req).accountId) {
-    return res.status(404).json({ error: 'UPLOAD_SESSION_NOT_FOUND', message: 'Upload session not found or expired.' });
-  }
-  const session = completeUploadSession(uploadId);
+  const session = await completeUploadSession(uploadId, reportOwner(owner));
   if (!session) return res.status(404).json({ error: 'UPLOAD_SESSION_NOT_FOUND', message: 'Upload session not found or expired.' });
   return res.status(200).json({ uploadId: session.id, status: session.status, expiresAtISO: session.expiresAtISO });
 });
 
-reportsRouter.get('/', (req, res) => {
-  const userId = getAuthenticatedAccount(req).accountId;
+reportsRouter.get('/', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
   const limit = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
   const offset = Math.max(0, Number(req.query.offset || 0));
-  const items = listReports(userId);
+  const items = await listReports(reportOwner(owner));
   const page = items.slice(offset, offset + limit).map(toReportDto);
   return res.status(200).json({ total: items.length, limit, offset, items: page });
 });
 
-reportsRouter.get('/:reportId', (req, res) => {
-  const userId = getAuthenticatedAccount(req).accountId;
-  const report = getReport(req.params.reportId);
-  if (!report || report.userId !== userId) {
+reportsRouter.get('/:reportId', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const report = await getReport(req.params.reportId);
+  if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
   return res.status(200).json(toReportDto(report));
 });
 
-reportsRouter.get('/:reportId/status', (req, res) => {
-  const userId = getAuthenticatedAccount(req).accountId;
-  const report = getReport(req.params.reportId);
-  if (!report || report.userId !== userId) {
+reportsRouter.get('/:reportId/status', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const report = await getReport(req.params.reportId);
+  if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
   return res.status(200).json({
-    reportId: report.id,
-    status: report.status,
-    updatedAtISO: report.updatedAtISO,
-    error: report.error
+    reportId: report!.id,
+    status: report!.status,
+    updatedAtISO: report!.updatedAtISO,
+    error: report!.error
   });
 });
 
-reportsRouter.patch('/:reportId/metadata', (req, res) => {
-  const userId = getAuthenticatedAccount(req).accountId;
-  const report = getReport(req.params.reportId);
-  if (!report || report.userId !== userId) {
+reportsRouter.patch('/:reportId/metadata', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const report = await getReport(req.params.reportId);
+  if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
-  const patched = updateReportMetadata(report.id, {
+  const patched = await updateReportMetadata(report!.id, reportOwner(owner), {
     labName: typeof req.body?.labName === 'string' ? req.body.labName.trim() : undefined,
     reportDate: typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : undefined,
     source:
@@ -149,25 +149,25 @@ reportsRouter.patch('/:reportId/metadata', (req, res) => {
   return res.status(200).json(toReportDto(patched));
 });
 
-reportsRouter.delete('/:reportId', (req, res) => {
-  const userId = getAuthenticatedAccount(req).accountId;
-  const report = getReport(req.params.reportId);
-  if (!report || report.userId !== userId) {
+reportsRouter.delete('/:reportId', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const report = await getReport(req.params.reportId);
+  if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
-  deleteReport(report.id);
+  await deleteReport(report!.id, reportOwner(owner));
   return res.status(204).send();
 });
 
-reportsRouter.post('/:reportId/feedback', (req, res) => {
-  const userId = getAuthenticatedAccount(req).accountId;
-  const report = getReport(req.params.reportId);
-  if (!report || report.userId !== userId) {
+reportsRouter.post('/:reportId/feedback', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const report = await getReport(req.params.reportId);
+  if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
   const note = String(req.body?.note || '').trim();
   if (!note) return res.status(400).json({ error: 'MISSING_NOTE', message: 'Feedback note is required.' });
-  const feedback = addFeedback(report.id, {
+  const feedback = await addFeedback(report!.id, reportOwner(owner), {
     note,
     correctedLabName: typeof req.body?.correctedLabName === 'string' ? req.body.correctedLabName.trim() : undefined,
     correctedReportDate: typeof req.body?.correctedReportDate === 'string' ? req.body.correctedReportDate.trim() : undefined
@@ -182,32 +182,32 @@ reportsRouter.post('/:reportId/reanalyze', (_req, res) => {
   });
 });
 
-reportsRouter.get('/:reportId/comparison', (req, res) => {
-  const userId = getAuthenticatedAccount(req).accountId;
-  const current = getReport(req.params.reportId);
-  if (!current || current.userId !== userId) {
+reportsRouter.get('/:reportId/comparison', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const current = await getReport(req.params.reportId);
+  if (!ownsReport(current, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Current report not found.' });
   }
   const previousReportId = String(req.query.previousReportId || '').trim();
   if (!previousReportId) {
     return res.status(400).json({ error: 'MISSING_PREVIOUS_REPORT_ID', message: 'previousReportId is required.' });
   }
-  const previous = getReport(previousReportId);
-  if (!previous || previous.userId !== userId) {
+  const previous = await getReport(previousReportId);
+  if (!ownsReport(previous, owner)) {
     return res.status(404).json({ error: 'PREVIOUS_REPORT_NOT_FOUND', message: 'Previous report not found.' });
   }
-  if (!current.analysis || !previous.analysis) {
+  if (!current!.analysis || !previous!.analysis) {
     return res.status(409).json({ error: 'ANALYSIS_NOT_READY', message: 'Both reports must have completed analysis.' });
   }
 
-  const scoreDelta = current.analysis.score - previous.analysis.score;
-  const currentAbnormal = current.analysis.parameters.filter((item) => item.status !== 'normal').length;
-  const previousAbnormal = previous.analysis.parameters.filter((item) => item.status !== 'normal').length;
+  const scoreDelta = current!.analysis.score - previous!.analysis.score;
+  const currentAbnormal = current!.analysis.parameters.filter((item) => item.status !== 'normal').length;
+  const previousAbnormal = previous!.analysis.parameters.filter((item) => item.status !== 'normal').length;
   const abnormalDelta = currentAbnormal - previousAbnormal;
 
   return res.status(200).json({
-    currentReportId: current.id,
-    previousReportId: previous.id,
+    currentReportId: current!.id,
+    previousReportId: previous!.id,
     scoreDelta,
     abnormalDelta,
     summary:
@@ -217,8 +217,8 @@ reportsRouter.get('/:reportId/comparison', (req, res) => {
           ? `Recovery score dropped by ${Math.abs(scoreDelta)} points; review adherence and follow-up recommendations.`
           : 'Recovery score is unchanged; continue routine and monitor follow-up markers.',
     details: {
-      currentScore: current.analysis.score,
-      previousScore: previous.analysis.score,
+      currentScore: current!.analysis.score,
+      previousScore: previous!.analysis.score,
       currentAbnormal,
       previousAbnormal
     }
@@ -227,6 +227,7 @@ reportsRouter.get('/:reportId/comparison', (req, res) => {
 
 reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => {
   let currentReportId: string | null = null;
+  let currentJobId: string | null = null;
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'MISSING_FILE', message: 'Please upload a PDF or image report file.' });
@@ -237,20 +238,15 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
       return res.status(415).json({ error: 'UNSUPPORTED_FILE', message: 'Only PDF and image reports are supported.' });
     }
 
-    const account = getAuthenticatedAccount(req);
-    const owner = currentOwner(account);
-    const userId = owner.accountId;
+    const owner = currentOwner(getAuthenticatedAccount(req));
     const uploadId = typeof req.body?.uploadId === 'string' ? req.body.uploadId.trim() : '';
-    const uploadSession = uploadId ? getUploadSession(uploadId) : null;
+    const uploadSession = uploadId ? await getUploadSession(uploadId, reportOwner(owner)) : null;
     if (uploadId && !uploadSession) {
       return res.status(404).json({ error: 'UPLOAD_SESSION_NOT_FOUND', message: 'uploadId is invalid or expired.' });
     }
-    if (uploadSession && uploadSession.userId !== userId) {
-      return res.status(404).json({ error: 'UPLOAD_SESSION_NOT_FOUND', message: 'uploadId is invalid or expired.' });
-    }
 
-    const record = createReportRecord({
-      userId,
+    const record = await createReportRecord({
+      ...reportOwner(owner),
       fileName: req.file.originalname || `report-${Date.now()}`,
       mimeType: req.file.mimetype,
       fileSize: req.file.size,
@@ -259,22 +255,27 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
       source:
         req.body?.source === 'camera' || req.body?.source === 'gallery' || req.body?.source === 'pdf'
           ? req.body.source
-          : undefined
+          : uploadSession?.source,
+      storageObjectRef: uploadSession?.storageObjectRef
     });
     currentReportId = record.id;
+    const processingJob = await createProcessingJob({
+      clientId: owner.clientId,
+      reportId: record.id,
+      jobType: 'report_analysis',
+      status: 'processing'
+    });
+    currentJobId = processingJob.id;
     await syncReportPipelineToPlatform(owner, record.id, 'uploaded', `Blood report uploaded: ${record.fileName}`);
-    updateReportStatus(record.id, 'processing');
+    await updateReportStatus(record.id, 'PROCESSING');
     const analysis = await analyzeReportBuffer(req.file.buffer, req.file.mimetype);
     await syncReportPipelineToPlatform(owner, record.id, 'ocr_completed', `OCR completed for ${record.fileName}`);
     const manualDate = typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : '';
     const manualLab = typeof req.body?.labName === 'string' ? req.body.labName.trim() : '';
-    if (manualDate) {
-      analysis.reportDate = manualDate;
-    }
-    if (manualLab) {
-      analysis.labName = manualLab;
-    }
-    const saved = attachReportAnalysis(record.id, analysis);
+    if (manualDate) analysis.reportDate = manualDate;
+    if (manualLab) analysis.labName = manualLab;
+    const saved = await attachReportAnalysis(record.id, analysis);
+    await updateProcessingJobStatus(processingJob.id, 'completed');
     await syncReportPipelineToPlatform(owner, record.id, 'biomarkers_updated', `Biomarkers extracted from ${record.fileName}`);
     await syncReportPipelineToPlatform(owner, record.id, 'analysis_completed', `AI validation completed for ${record.fileName}`);
     return res.status(200).json({
@@ -285,7 +286,10 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to analyze this report file.';
     if (currentReportId) {
-      updateReportStatus(currentReportId, 'failed', message);
+      await updateReportStatus(currentReportId, 'FAILED', message);
+    }
+    if (currentJobId) {
+      await updateProcessingJobStatus(currentJobId, 'failed', message);
     }
     return res.status(422).json({
       error: 'ANALYSIS_FAILED',

@@ -19,8 +19,12 @@ test('database schema defines required platform tables for CRUD coverage', () =>
     'timeline_events',
     'health_events',
     'health_tickets',
-    'lab_reports',
+    'health_reports',
+    'health_report_upload_sessions',
+    'health_observations',
     'biomarkers',
+    'biomarker_observations',
+    'processing_jobs',
     'diet_plans',
     'diet_plan_versions',
     'clinical_memory',
@@ -40,7 +44,9 @@ test('database schema includes foreign keys for healthcare ownership integrity',
   assert.equal(hasPattern(/health_profile_id uuid not null references health_profiles/i), true);
   assert.equal(hasPattern(/recovery_program_id uuid not null references recovery_programs/i), true);
   assert.equal(hasPattern(/care_case_id uuid not null references care_cases/i), true);
-  assert.equal(hasPattern(/report_id uuid references lab_reports/i), true);
+  assert.equal(hasPattern(/source_report_id text references health_reports/i), true);
+  assert.equal(hasPattern(/report_id text references health_reports/i), true);
+  assert.equal(hasPattern(/create unique index if not exists health_observations_client_sync_key_unique/i), true);
 });
 
 test('database schema includes soft delete and versioning fields', () => {

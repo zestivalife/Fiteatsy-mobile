@@ -1,0 +1,136 @@
+import crypto from 'node:crypto';
+import { pool } from '../../db/pool.js';
+import { ClientOwnershipContext } from '../platform/platform.types.js';
+
+export type HealthObservationInput = {
+  metricType: string;
+  value: number;
+  unit: string;
+  measuredAtISO: string;
+  sourceProvider: string;
+  sourceRecordId?: string | null;
+  syncKey?: string | null;
+  qualityStatus?: 'accepted' | 'estimated';
+};
+
+export type HealthObservationRecord = {
+  id: string;
+  userId: string;
+  clientId: string;
+  metricType: string;
+  value: number;
+  unit: string;
+  measuredAtISO: string;
+  sourceProvider: string;
+  sourceRecordId: string | null;
+  syncKey: string;
+  qualityStatus: string;
+  createdAtISO: string;
+};
+
+const rowToObservation = (row: Record<string, unknown>): HealthObservationRecord => ({
+  id: String(row.id),
+  userId: String(row.user_id),
+  clientId: String(row.client_id),
+  metricType: String(row.metric_type),
+  value: Number(row.value),
+  unit: String(row.unit),
+  measuredAtISO: new Date(String(row.measured_at)).toISOString(),
+  sourceProvider: String(row.source_provider),
+  sourceRecordId: row.source_record_id == null ? null : String(row.source_record_id),
+  syncKey: String(row.sync_key),
+  qualityStatus: String(row.quality_status),
+  createdAtISO: new Date(String(row.created_at)).toISOString()
+});
+
+const buildSyncKey = (owner: ClientOwnershipContext, observation: HealthObservationInput) =>
+  observation.syncKey?.trim() ||
+  [
+    owner.clientId,
+    observation.sourceProvider.trim().toLowerCase(),
+    observation.sourceRecordId?.trim() || observation.metricType.trim().toLowerCase(),
+    observation.measuredAtISO,
+    observation.unit.trim().toLowerCase()
+  ].join(':');
+
+export const ingestHealthObservations = async (owner: ClientOwnershipContext, observations: HealthObservationInput[]) => {
+  const accepted: HealthObservationRecord[] = [];
+  const duplicate: Array<{ syncKey: string; metricType: string }> = [];
+  const rejected: Array<{ metricType: string; reason: string }> = [];
+
+  for (const observation of observations) {
+    const measuredAt = new Date(observation.measuredAtISO);
+    if (!Number.isFinite(observation.value) || Number.isNaN(measuredAt.getTime())) {
+      rejected.push({ metricType: observation.metricType, reason: 'Invalid value or measuredAtISO.' });
+      continue;
+    }
+
+    const id = `hobs_${crypto.randomUUID()}`;
+    const syncKey = buildSyncKey(owner, observation);
+    const result = await pool.query(
+      `
+        insert into health_observations (
+          id, user_id, client_id, metric_type, value, unit, measured_at, source_provider,
+          source_record_id, sync_key, quality_status
+        )
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        on conflict (client_id, sync_key) do nothing
+        returning *
+      `,
+      [
+        id,
+        owner.accountId,
+        owner.clientId,
+        observation.metricType,
+        observation.value,
+        observation.unit,
+        observation.measuredAtISO,
+        observation.sourceProvider,
+        observation.sourceRecordId ?? null,
+        syncKey,
+        observation.qualityStatus ?? 'accepted'
+      ]
+    );
+
+    if (result.rows[0]) {
+      accepted.push(rowToObservation(result.rows[0]));
+    } else {
+      duplicate.push({ syncKey, metricType: observation.metricType });
+    }
+  }
+
+  return { accepted, duplicate, rejected };
+};
+
+export const listHealthObservations = async (
+  owner: ClientOwnershipContext,
+  filters: { metricType?: string; limit: number; offset: number }
+) => {
+  const result = await pool.query(
+    `
+      select *
+      from health_observations
+      where user_id = $1
+        and client_id = $2
+        and ($3::text is null or metric_type = $3)
+      order by measured_at desc, created_at desc
+      limit $4 offset $5
+    `,
+    [owner.accountId, owner.clientId, filters.metricType ?? null, filters.limit, filters.offset]
+  );
+  return result.rows.map(rowToObservation);
+};
+
+export const countHealthObservations = async (owner: ClientOwnershipContext, metricType?: string) => {
+  const result = await pool.query(
+    `
+      select count(*)::int as total
+      from health_observations
+      where user_id = $1
+        and client_id = $2
+        and ($3::text is null or metric_type = $3)
+    `,
+    [owner.accountId, owner.clientId, metricType ?? null]
+  );
+  return Number(result.rows[0]?.total ?? 0);
+};

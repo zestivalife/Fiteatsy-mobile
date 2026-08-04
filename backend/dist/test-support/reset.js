@@ -12,6 +12,6 @@ export const resetBackendStateForTests = async () => {
     resetWhatsappProviderForTests();
     await pool.query('truncate table auth_sessions, fiteatsy_clients, users restart identity cascade');
     await resetPlatformStoreForTests();
-    resetReportsStoreForTests();
+    await resetReportsStoreForTests();
     resetWearablesStateForTests();
 };

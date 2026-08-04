@@ -12,6 +12,8 @@ import { wearablesRouter } from './modules/wearables/wearables.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { reportsRouter } from './modules/reports/reports.routes.js';
 import { platformRouter } from './modules/platform/platform.routes.js';
+import { healthRouter } from './modules/health/health.routes.js';
+import { biomarkersRouter } from './modules/biomarkers/biomarkers.routes.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -76,6 +78,8 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/wearables', wearablesRouter);
   app.use('/v1/auth', authRouter);
   app.use('/v1/reports', reportsRouter);
+  app.use('/v1/health', healthRouter);
+  app.use('/v1/biomarkers', biomarkersRouter);
   app.use('/v1/platform', platformRouter);
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const message = error instanceof Error ? error.message : 'Internal server error';

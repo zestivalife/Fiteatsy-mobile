@@ -1,4 +1,4 @@
-import { listReports } from '../reports/reports.store.js';
+import { countReports } from '../reports/reports.store.js';
 import { createCareCaseIfMissing, createNotificationRecord, createOrUpdateHealthProfile, getCareCaseById, getCareCaseByClientId, getHealthProfileByClientId, listHealthEvents, listHealthTickets, listNotificationsForClient, listTimelineEvents, saveNutritionProfile, addTimelineEvent, addHealthEvent, updateCareCase, } from './platform.store.js';
 import { calculateAgeFromDob, calculateNutritionProfileCompletion } from './platform.calculations.js';
 import { createOperationalTicket, transitionCareCaseStage } from './platform.lifecycle.js';
@@ -18,7 +18,7 @@ export const upsertHealthProfile = async (owner, patch) => {
         ...patch,
         ...(calculatedAge !== undefined ? { calculatedAge } : {}),
     });
-    const reportCount = listReports(owner.accountId).length;
+    const reportCount = await countReports({ userId: owner.accountId, clientId: owner.clientId });
     const nutrition = await saveNutritionProfile(owner, profile.id, calculateNutritionProfileCompletion(profile, reportCount));
     const careCase = await createCareCaseIfMissing(owner, profile.id);
     const nextStage = inferStage(profile, reportCount, nutrition.readinessScore);
@@ -59,7 +59,7 @@ export const getHealthProfileBundle = async (owner) => {
     const profile = await getHealthProfileByClientId(owner.clientId);
     if (!profile)
         return null;
-    const reportCount = listReports(owner.accountId).length;
+    const reportCount = await countReports({ userId: owner.accountId, clientId: owner.clientId });
     const nutrition = await saveNutritionProfile(owner, profile.id, calculateNutritionProfileCompletion(profile, reportCount));
     const careCase = await createCareCaseIfMissing(owner, profile.id);
     return { profile, nutrition, careCase, reportCount };
@@ -159,8 +159,9 @@ export const syncReportPipelineToPlatform = async (owner, reportId, stage, detai
         replayKey: `${nextBundle.careCase.id}:${reportId}:${stage}:${timeline.id}`,
         eventTimeISO: nowIso(),
     });
-    const recomputedNutrition = await saveNutritionProfile(owner, nextBundle.profile.id, calculateNutritionProfileCompletion(nextBundle.profile, listReports(owner.accountId).length));
-    const nextStage = inferStage(nextBundle.profile, listReports(owner.accountId).length, recomputedNutrition.readinessScore);
+    const reportCount = await countReports({ userId: owner.accountId, clientId: owner.clientId });
+    const recomputedNutrition = await saveNutritionProfile(owner, nextBundle.profile.id, calculateNutritionProfileCompletion(nextBundle.profile, reportCount));
+    const nextStage = inferStage(nextBundle.profile, reportCount, recomputedNutrition.readinessScore);
     if (nextBundle.careCase.currentStage !== nextStage) {
         await transitionCareCaseStage(nextBundle.careCase, nextStage, `Report pipeline advanced to ${stage}.`);
     }
