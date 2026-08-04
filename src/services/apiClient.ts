@@ -46,6 +46,11 @@ const buildHeaders = (headers?: HeadersInit) => {
   };
 };
 
+export const buildAuthorizationHeaders = (): Record<string, string> => {
+  const token = accessTokenProvider?.();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const toErrorCode = (status: number): ApiClientErrorCode => {
   if (status === 401) return 'UNAUTHORIZED';
   if (status === 403) return 'FORBIDDEN';

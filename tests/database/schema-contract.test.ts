@@ -25,6 +25,7 @@ test('database schema defines required platform tables for CRUD coverage', () =>
     'biomarkers',
     'biomarker_observations',
     'processing_jobs',
+    'health_scores',
     'diet_plans',
     'diet_plan_versions',
     'clinical_memory',
@@ -47,12 +48,23 @@ test('database schema includes foreign keys for healthcare ownership integrity',
   assert.equal(hasPattern(/source_report_id text references health_reports/i), true);
   assert.equal(hasPattern(/report_id text references health_reports/i), true);
   assert.equal(hasPattern(/create unique index if not exists health_observations_client_sync_key_unique/i), true);
+  assert.equal(hasPattern(/foreign key \(client_id, user_id\) references fiteatsy_clients/i), true);
 });
 
 test('database schema includes soft delete and versioning fields', () => {
   assert.equal(hasPattern(/status text not null default 'active'/i), true);
   assert.equal(hasPattern(/version integer not null default 1/i), true);
   assert.equal(hasPattern(/deleted_at timestamptz/i), true);
+});
+
+test('database schema defines traceable health intelligence scores', () => {
+  assert.equal(hasPattern(/create table if not exists health_scores/i), true);
+  assert.equal(hasPattern(/score_type text not null/i), true);
+  assert.equal(hasPattern(/score_value integer/i), true);
+  assert.equal(hasPattern(/score_status text not null default 'insufficient_data'/i), true);
+  assert.equal(hasPattern(/input_summary jsonb not null default/i), true);
+  assert.equal(hasPattern(/calculation_version text not null/i), true);
+  assert.equal(hasPattern(/check \(score_type in \('nutrition', 'clinical', 'activity', 'recovery', 'overall'\)\)/i), true);
 });
 
 test.skip('database CRUD runtime validation is pending a live PostgreSQL test database');

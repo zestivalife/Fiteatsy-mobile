@@ -287,7 +287,8 @@ create table if not exists health_reports (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,
-  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
+  check (processing_status in ('UPLOADED', 'PROCESSING', 'EXTRACTION_COMPLETED', 'VALIDATION_PENDING', 'COMPLETED', 'FAILED', 'REVIEW_REQUIRED'))
 );
 
 create table if not exists health_report_upload_sessions (
@@ -343,8 +344,12 @@ create table if not exists biomarker_observations (
   test_date date not null,
   confidence numeric(5,4) not null,
   validation_status text not null default 'pending',
+  source_location text,
+  reference_range text,
   created_at timestamptz not null default now(),
-  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
+  check (validation_status in ('pending', 'validated', 'rejected', 'review_required')),
+  check (confidence >= 0 and confidence <= 1)
 );
 
 create table if not exists processing_jobs (
@@ -355,7 +360,26 @@ create table if not exists processing_jobs (
   status text not null default 'queued',
   error text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  check (status in ('queued', 'processing', 'extraction_completed', 'validation_pending', 'completed', 'failed', 'review_required'))
+);
+
+create table if not exists health_scores (
+  id text primary key,
+  user_id text not null references users(id),
+  client_id text not null,
+  score_type text not null,
+  score_value integer,
+  score_status text not null default 'insufficient_data',
+  confidence numeric(5,4) not null default 0,
+  input_summary jsonb not null default '{}'::jsonb,
+  calculated_at timestamptz not null default now(),
+  calculation_version text not null,
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
+  check (score_type in ('nutrition', 'clinical', 'activity', 'recovery', 'overall')),
+  check (score_status in ('calculated', 'insufficient_data')),
+  check (score_value is null or (score_value >= 0 and score_value <= 100)),
+  check (confidence >= 0 and confidence <= 1)
 );
 
 create table if not exists diet_plans (
@@ -495,6 +519,12 @@ create index if not exists biomarker_observations_client_test_date_idx
 
 create index if not exists processing_jobs_client_created_idx
   on processing_jobs (client_id, created_at desc);
+
+create index if not exists health_scores_client_calculated_idx
+  on health_scores (client_id, calculated_at desc);
+
+create index if not exists health_scores_client_type_calculated_idx
+  on health_scores (client_id, score_type, calculated_at desc);
 
 create index if not exists attachments_client_created_idx
   on attachments (client_id, created_at desc)

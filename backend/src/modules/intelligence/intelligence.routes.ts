@@ -15,8 +15,42 @@ import {
   generateTrackerImprovement,
   generateTrackerMetricCoaching
 } from './nuetra.service.js';
+import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
+import { ClientOwnershipContext } from '../platform/platform.types.js';
+import {
+  HealthScoreType,
+  listHealthScoreHistory,
+  listLatestHealthScores
+} from './health-scores.repository.js';
+import { calculateHealthScores } from './health-calculation-engine.js';
 
 export const intelligenceRouter = Router();
+
+const currentOwner = (account: ReturnType<typeof getAuthenticatedAccount>): ClientOwnershipContext => ({
+  accountId: account.accountId,
+  clientId: account.client.id
+});
+
+const toScoreDto = (score: Awaited<ReturnType<typeof listLatestHealthScores>>[number], fiteatsyClientId: string) => ({
+  id: score.id,
+  fiteatsyClientId,
+  scoreType: score.scoreType,
+  scoreValue: score.scoreValue,
+  scoreStatus: score.scoreStatus,
+  confidence: score.confidence,
+  inputSummary: score.inputSummary,
+  calculatedAtISO: score.calculatedAtISO,
+  calculationVersion: score.calculationVersion
+});
+
+const getScoreValue = (scores: Awaited<ReturnType<typeof listLatestHealthScores>>, scoreType: HealthScoreType) =>
+  scores.find((score) => score.scoreType === scoreType)?.scoreValue ?? null;
+
+const getAggregateConfidence = (scores: Awaited<ReturnType<typeof listLatestHealthScores>>) => {
+  const calculated = scores.filter((score) => score.scoreStatus === 'calculated');
+  if (calculated.length === 0) return 0;
+  return Number((calculated.reduce((sum, score) => sum + score.confidence, 0) / calculated.length).toFixed(4));
+};
 
 const reportParameterSchema = z.object({
   name: z.string().min(1),
@@ -91,6 +125,56 @@ const trackerImprovementSchema = z.object({
       wellnessScore: z.number().optional()
     })
     .optional()
+});
+
+intelligenceRouter.get('/scores', requireAuthenticatedAccount, async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const owner = currentOwner(account);
+  let scores = await listLatestHealthScores(owner);
+  if (scores.length === 0) {
+    scores = await calculateHealthScores(owner);
+  }
+  return res.status(200).json({
+    total: scores.length,
+    items: scores.map((score) => toScoreDto(score, account.client.fiteatsyClientId))
+  });
+});
+
+intelligenceRouter.get('/scores/history', requireAuthenticatedAccount, async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const owner = currentOwner(account);
+  const limit = Math.max(1, Math.min(200, Number(req.query.limit || 50)));
+  const offset = Math.max(0, Number(req.query.offset || 0));
+  const scoreType =
+    typeof req.query.scoreType === 'string' && ['nutrition', 'clinical', 'activity', 'recovery', 'overall'].includes(req.query.scoreType)
+      ? (req.query.scoreType as HealthScoreType)
+      : undefined;
+  const items = await listHealthScoreHistory(owner, { scoreType, limit, offset });
+  return res.status(200).json({
+    total: items.length,
+    limit,
+    offset,
+    items: items.map((score) => toScoreDto(score, account.client.fiteatsyClientId))
+  });
+});
+
+intelligenceRouter.get('/summary', requireAuthenticatedAccount, async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const owner = currentOwner(account);
+  let scores = await listLatestHealthScores(owner);
+  if (scores.length === 0) {
+    scores = await calculateHealthScores(owner);
+  }
+  return res.status(200).json({
+    recoveryScore: getScoreValue(scores, 'recovery'),
+    nutritionScore: getScoreValue(scores, 'nutrition'),
+    clinicalScore: getScoreValue(scores, 'clinical'),
+    activityScore: getScoreValue(scores, 'activity'),
+    overallScore: getScoreValue(scores, 'overall'),
+    confidence: getAggregateConfidence(scores),
+    status: scores.some((score) => score.scoreStatus === 'calculated') ? 'calculated' : 'insufficient_data',
+    calculatedAtISO: scores[0]?.calculatedAtISO ?? null
+  });
 });
 
 intelligenceRouter.post('/priority', (req, res) => {

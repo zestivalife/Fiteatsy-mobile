@@ -2,7 +2,14 @@ import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import { ReportAnalysisResult } from './reports.service.js';
 
-export type ReportStatus = 'UPLOADED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'REVIEW_REQUIRED';
+export type ReportStatus =
+  | 'UPLOADED'
+  | 'PROCESSING'
+  | 'EXTRACTION_COMPLETED'
+  | 'VALIDATION_PENDING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'REVIEW_REQUIRED';
 
 export type ReportRecord = {
   id: string;

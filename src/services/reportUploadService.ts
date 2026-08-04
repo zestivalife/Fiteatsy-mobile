@@ -1,5 +1,6 @@
 import { NativeModules } from 'react-native';
 import { ReportParameter } from './nuetraService';
+import { buildAuthorizationHeaders } from './apiClient';
 
 type CategoryScores = Record<'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins', number>;
 
@@ -63,6 +64,7 @@ export const uploadAndAnalyzeReport = async (params: {
     try {
       const response = await fetch(`${baseUrl}/v1/reports/analyze`, {
         method: 'POST',
+        headers: buildAuthorizationHeaders(),
         body: form,
         signal: controller.signal
       });

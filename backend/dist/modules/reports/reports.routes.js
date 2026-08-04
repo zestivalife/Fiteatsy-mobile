@@ -5,6 +5,7 @@ import { addFeedback, attachReportAnalysis, completeUploadSession, createReportR
 import { syncReportPipelineToPlatform } from '../platform/platform.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { createProcessingJob, updateProcessingJobStatus } from '../processing/processing-jobs.repository.js';
+import { persistReportIntelligence } from './report-intelligence.pipeline.js';
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 12 * 1024 * 1024 }
@@ -229,6 +230,8 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
         await syncReportPipelineToPlatform(owner, record.id, 'uploaded', `Blood report uploaded: ${record.fileName}`);
         await updateReportStatus(record.id, 'PROCESSING');
         const analysis = await analyzeReportBuffer(req.file.buffer, req.file.mimetype);
+        await updateReportStatus(record.id, 'EXTRACTION_COMPLETED');
+        await updateProcessingJobStatus(processingJob.id, 'extraction_completed');
         await syncReportPipelineToPlatform(owner, record.id, 'ocr_completed', `OCR completed for ${record.fileName}`);
         const manualDate = typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : '';
         const manualLab = typeof req.body?.labName === 'string' ? req.body.labName.trim() : '';
@@ -236,6 +239,9 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
             analysis.reportDate = manualDate;
         if (manualLab)
             analysis.labName = manualLab;
+        await updateReportStatus(record.id, 'VALIDATION_PENDING');
+        await updateProcessingJobStatus(processingJob.id, 'validation_pending');
+        const intelligence = await persistReportIntelligence(owner, record.id, analysis);
         const saved = await attachReportAnalysis(record.id, analysis);
         await updateProcessingJobStatus(processingJob.id, 'completed');
         await syncReportPipelineToPlatform(owner, record.id, 'biomarkers_updated', `Biomarkers extracted from ${record.fileName}`);
@@ -243,6 +249,14 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
         return res.status(200).json({
             reportId: saved?.id,
             status: saved?.status,
+            biomarkerObservations: intelligence.observations,
+            healthScores: intelligence.scores.map((score) => ({
+                scoreType: score.scoreType,
+                scoreValue: score.scoreValue,
+                scoreStatus: score.scoreStatus,
+                confidence: score.confidence,
+                calculatedAtISO: score.calculatedAtISO
+            })),
             ...analysis
         });
     }

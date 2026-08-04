@@ -26,6 +26,8 @@ const toBiomarkerObservationDto = (observation: BiomarkerObservationRecord, fite
   testDate: observation.testDate,
   confidence: observation.confidence,
   validationStatus: observation.validationStatus,
+  sourceLocation: observation.sourceLocation,
+  referenceRange: observation.referenceRange,
   createdAtISO: observation.createdAtISO
 });
 

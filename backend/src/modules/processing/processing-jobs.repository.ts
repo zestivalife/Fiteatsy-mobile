@@ -1,7 +1,14 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 
-export type ProcessingJobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'review_required';
+export type ProcessingJobStatus =
+  | 'queued'
+  | 'processing'
+  | 'extraction_completed'
+  | 'validation_pending'
+  | 'completed'
+  | 'failed'
+  | 'review_required';
 
 export type ProcessingJobRecord = {
   id: string;

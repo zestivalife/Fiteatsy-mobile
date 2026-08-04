@@ -103,10 +103,76 @@ test('GET /v1/biomarkers and /v1/biomarkers/history return client-owned biomarke
   assert.equal(history.body.items[0].userId, undefined);
 });
 
+test('GET /v1/intelligence/scores calculates traceable scores from validated client data', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  await postJson(server.baseUrl, '/v1/health/observations:batch', {
+    observations: [
+      {
+        metricType: 'steps',
+        value: 9200,
+        unit: 'count',
+        measuredAtISO: '2026-08-04T06:00:00.000Z',
+        sourceProvider: 'health-connect',
+        sourceRecordId: 'hc-score-steps-1',
+        syncKey: 'hc-score-steps-1'
+      },
+      {
+        metricType: 'sleep_minutes',
+        value: 430,
+        unit: 'min',
+        measuredAtISO: '2026-08-04T06:00:00.000Z',
+        sourceProvider: 'health-connect',
+        sourceRecordId: 'hc-score-sleep-1',
+        syncKey: 'hc-score-sleep-1'
+      }
+    ]
+  }, {
+    headers: authHeaders(session.token)
+  });
+  const biomarker = await upsertBiomarker({
+    canonicalName: 'Vitamin D',
+    aliases: ['25-OH Vitamin D'],
+    category: 'Nutrition',
+    standardUnit: 'ng/mL'
+  });
+  const client = await getClientByAccountUserId(session.current.body.accountId);
+  assert.ok(client);
+  await createBiomarkerObservation({
+    accountId: session.current.body.accountId,
+    clientId: client.id
+  }, {
+    biomarkerId: biomarker.id,
+    value: 34,
+    unit: 'ng/mL',
+    testDate: '2026-08-04',
+    confidence: 0.9,
+    validationStatus: 'validated',
+    referenceRange: '30-100'
+  });
+
+  const scores = await getJson(server.baseUrl, '/v1/intelligence/scores', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(scores.response.status, 200);
+  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'nutrition' && item.scoreStatus === 'calculated'), true);
+  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'activity' && item.scoreStatus === 'calculated'), true);
+  assert.equal(scores.body.items[0].clientId, undefined);
+  assert.equal(scores.body.items[0].inputSummary != null, true);
+
+  const summary = await getJson(server.baseUrl, '/v1/intelligence/summary', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(summary.response.status, 200);
+  assert.equal(summary.body.status, 'calculated');
+});
+
 test('foundation endpoints reject missing auth', async () => {
   const health = await getJson(server.baseUrl, '/v1/health/observations');
   assert.equal(health.response.status, 401);
 
   const biomarkers = await getJson(server.baseUrl, '/v1/biomarkers');
   assert.equal(biomarkers.response.status, 401);
+
+  const scores = await getJson(server.baseUrl, '/v1/intelligence/scores');
+  assert.equal(scores.response.status, 401);
 });
