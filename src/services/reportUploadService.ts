@@ -1,6 +1,6 @@
 import { NativeModules } from 'react-native';
 import { ReportParameter } from './nuetraService';
-import { buildAuthorizationHeaders } from './apiClient';
+import { apiBaseUrl, buildAuthorizationHeaders } from './apiClient';
 
 type CategoryScores = Record<'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins', number>;
 
@@ -84,10 +84,22 @@ const getBundlerHost = () => {
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
 
+const safeHeaderSummary = (headers: Record<string, string>) => ({
+  hasAuthorization: Boolean(headers.Authorization),
+  headerKeys: Object.keys(headers)
+});
+
+const logReportDebug = (event: string, payload: Record<string, unknown>) => {
+  console.log(`[ReportsUpload] ${event}`, payload);
+};
+
+const isTerminalHttpError = (error: unknown) => error instanceof Error && error.message.startsWith('REPORT_API_HTTP_');
+
 const getBaseUrls = () => {
   const envBase = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
   const host = getBundlerHost();
   return unique([
+    apiBaseUrl,
     envBase ?? '',
     host ? `http://${host}:${String(API_PORT)}` : '',
     `http://localhost:${String(API_PORT)}`,
@@ -114,16 +126,27 @@ const parseJson = async <T>(response: Response): Promise<T> => {
 };
 
 const requestJson = async <T>(baseUrl: string, path: string, options?: RequestInit): Promise<T> => {
+  const authHeaders = buildAuthorizationHeaders();
+  logReportDebug('request:start', {
+    url: `${baseUrl}${path}`,
+    method: options?.method ?? 'GET',
+    headers: safeHeaderSummary(authHeaders)
+  });
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers: {
-      ...buildAuthorizationHeaders(),
+      ...authHeaders,
       ...(options?.headers ?? {})
     }
   });
   const payload = await parseJson<T & { message?: string; error?: string }>(response).catch(() => ({} as T & { message?: string; error?: string }));
+  logReportDebug('request:response', {
+    url: `${baseUrl}${path}`,
+    status: response.status,
+    payload
+  });
   if (!response.ok) {
-    throw new Error(payload.message ?? payload.error ?? `HTTP_${response.status}`);
+    throw new Error(`REPORT_API_HTTP_${response.status}: ${payload.message ?? payload.error ?? 'Request failed.'}`);
   }
   return payload as T;
 };
@@ -151,12 +174,15 @@ const statusToProgress = (status: string): { stage: UploadProgressStage; percent
 
 export const listAnalyzedReports = async (): Promise<ReportDto[]> => {
   let lastError = 'network_error';
+  logReportDebug('history:start', { baseUrls: getBaseUrls() });
   for (const baseUrl of getBaseUrls()) {
     try {
       const payload = await requestJson<{ items: ReportDto[] }>(baseUrl, '/v1/reports?limit=50');
       return payload.items ?? [];
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'network_error';
+      logReportDebug('history:failure', { baseUrl, error: lastError });
+      if (isTerminalHttpError(error)) throw error;
     }
   }
   throw new Error(lastError);
@@ -164,12 +190,15 @@ export const listAnalyzedReports = async (): Promise<ReportDto[]> => {
 
 export const listBiomarkerHistory = async (): Promise<BiomarkerHistoryItem[]> => {
   let lastError = 'network_error';
+  logReportDebug('biomarkers:start', { baseUrls: getBaseUrls() });
   for (const baseUrl of getBaseUrls()) {
     try {
       const payload = await requestJson<{ items: BiomarkerHistoryItem[] }>(baseUrl, '/v1/biomarkers/history?limit=200');
       return payload.items ?? [];
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'network_error';
+      logReportDebug('biomarkers:failure', { baseUrl, error: lastError });
+      if (isTerminalHttpError(error)) throw error;
     }
   }
   throw new Error(lastError);
@@ -196,6 +225,14 @@ export const uploadAndAnalyzeReport = async (params: {
   if (params.source) form.append('source', params.source);
 
   let lastError = 'network_error';
+  logReportDebug('upload:start', {
+    baseUrls: getBaseUrls(),
+    mimeType: params.mimeType,
+    source: params.source,
+    hasFileName: Boolean(params.fileName),
+    hasReportDate: Boolean(params.reportDate),
+    hasLabName: Boolean(params.labName)
+  });
   for (const baseUrl of getBaseUrls()) {
     const controller = new AbortController();
     const abortFromCaller = () => controller.abort();
@@ -203,9 +240,22 @@ export const uploadAndAnalyzeReport = async (params: {
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     params.onProgress?.({ stage: 'uploading', percent: 12, message: 'Uploading Report', status: 'UPLOADING' });
     try {
+      const authHeaders = buildAuthorizationHeaders();
+      logReportDebug('upload:request', {
+        url: `${baseUrl}/v1/reports/analyze/start`,
+        method: 'POST',
+        headers: safeHeaderSummary(authHeaders),
+        payload: {
+          mimeType: params.mimeType,
+          source: params.source,
+          hasFileName: Boolean(params.fileName),
+          hasReportDate: Boolean(params.reportDate),
+          hasLabName: Boolean(params.labName)
+        }
+      });
       const response = await fetch(`${baseUrl}/v1/reports/analyze/start`, {
         method: 'POST',
-        headers: buildAuthorizationHeaders(),
+        headers: authHeaders,
         body: form,
         signal: controller.signal
       });
@@ -214,9 +264,12 @@ export const uploadAndAnalyzeReport = async (params: {
         () => ({} as { reportId?: string; status?: string; message?: string; error?: string })
       );
       if (!response.ok || !startPayload.reportId) {
-        lastError = startPayload.message ?? startPayload.error ?? `HTTP_${response.status}`;
+        lastError = `REPORT_API_HTTP_${response.status}: ${startPayload.message ?? startPayload.error ?? 'Upload start failed.'}`;
+        logReportDebug('upload:response-failed', { baseUrl, status: response.status, payload: startPayload });
+        if (!response.ok) throw new Error(lastError);
         continue;
       }
+      logReportDebug('upload:response-ok', { baseUrl, status: response.status, reportId: startPayload.reportId, reportStatus: startPayload.status });
 
       params.onProgress?.({
         stage: 'uploaded',
@@ -234,6 +287,12 @@ export const uploadAndAnalyzeReport = async (params: {
           { signal: params.signal }
         );
         const progress = statusToProgress(statusPayload.status);
+        logReportDebug('poll:status', {
+          baseUrl,
+          reportId: statusPayload.reportId,
+          status: statusPayload.status,
+          error: statusPayload.error
+        });
         params.onProgress?.({
           stage: progress.stage,
           percent: progress.percent,
@@ -250,6 +309,11 @@ export const uploadAndAnalyzeReport = async (params: {
           if (!report.analysis) {
             throw new Error('Report completed but analysis payload is missing.');
           }
+          logReportDebug('result:fetched', {
+            reportId: report.id,
+            status: report.status,
+            parameterCount: report.analysis.parameters.length
+          });
           return {
             ...report.analysis,
             reportId: report.id,
@@ -264,6 +328,8 @@ export const uploadAndAnalyzeReport = async (params: {
       if (error instanceof Error && error.name === 'AbortError') {
         lastError = params.signal?.aborted ? 'REQUEST_CANCELLED' : 'REQUEST_TIMEOUT';
       }
+      logReportDebug('upload:error', { baseUrl, error: lastError });
+      if (isTerminalHttpError(error)) throw error;
     } finally {
       params.signal?.removeEventListener('abort', abortFromCaller);
     }
@@ -280,6 +346,9 @@ export const uploadAndAnalyzeReport = async (params: {
   }
   if (lastError.includes('Failed to fetch') || lastError.includes('Network request failed') || lastError === 'network_error') {
     throw new Error('Could not reach analysis server. Check backend is running and phone/simulator can access it.');
+  }
+  if (lastError.includes('REPORT_API_HTTP_401')) {
+    throw new Error('Authentication is required before uploading reports. Please sign in again and retry.');
   }
   throw new Error(`Analysis failed: ${lastError}`);
 };

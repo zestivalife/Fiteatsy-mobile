@@ -39,13 +39,27 @@ const toReportDto = (record) => {
     };
 };
 const ownsReport = (record, owner) => Boolean(record && record.userId === owner.accountId && record.clientId === owner.clientId);
+const logReportRuntime = (event, payload) => {
+    console.log(`[ReportsRuntime] ${event}`, payload);
+};
 const analyzeAndPersistReport = async (input) => {
+    logReportRuntime('processing:start', {
+        reportId: input.reportId,
+        processingJobId: input.processingJobId,
+        mimeType: input.mimeType
+    });
     await syncReportPipelineToPlatform(input.owner, input.reportId, 'uploaded', `Blood report uploaded: ${input.fileName}`);
     await updateReportStatus(input.reportId, 'PROCESSING');
     await updateProcessingJobStatus(input.processingJobId, 'processing');
+    logReportRuntime('processing:status', { reportId: input.reportId, status: 'PROCESSING' });
     const analysis = await analyzeReportBuffer(input.fileBuffer, input.mimeType);
     await updateReportStatus(input.reportId, 'EXTRACTION_COMPLETED');
     await updateProcessingJobStatus(input.processingJobId, 'extraction_completed');
+    logReportRuntime('processing:status', {
+        reportId: input.reportId,
+        status: 'EXTRACTION_COMPLETED',
+        parameterCount: analysis.parameters.length
+    });
     await syncReportPipelineToPlatform(input.owner, input.reportId, 'ocr_completed', `OCR completed for ${input.fileName}`);
     if (input.manualDate)
         analysis.reportDate = input.manualDate;
@@ -53,9 +67,16 @@ const analyzeAndPersistReport = async (input) => {
         analysis.labName = input.manualLab;
     await updateReportStatus(input.reportId, 'VALIDATION_PENDING');
     await updateProcessingJobStatus(input.processingJobId, 'validation_pending');
+    logReportRuntime('processing:status', { reportId: input.reportId, status: 'VALIDATION_PENDING' });
     const intelligence = await persistReportIntelligence(input.owner, input.reportId, analysis);
     const saved = await attachReportAnalysis(input.reportId, analysis);
     await updateProcessingJobStatus(input.processingJobId, 'completed');
+    logReportRuntime('processing:completed', {
+        reportId: input.reportId,
+        status: saved?.status,
+        observationCount: intelligence.observations.length,
+        scoreCount: intelligence.scores.length
+    });
     await syncReportPipelineToPlatform(input.owner, input.reportId, 'biomarkers_updated', `Biomarkers extracted from ${input.fileName}`);
     await syncReportPipelineToPlatform(input.owner, input.reportId, 'analysis_completed', `AI validation completed for ${input.fileName}`);
     return {
@@ -131,6 +152,11 @@ reportsRouter.get('/:reportId/status', async (req, res) => {
     if (!ownsReport(report, owner)) {
         return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
     }
+    logReportRuntime('status:returned', {
+        reportId: report.id,
+        status: report.status,
+        hasError: Boolean(report.error)
+    });
     return res.status(200).json({
         reportId: report.id,
         status: report.status,
@@ -228,9 +254,16 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
     let currentJobId = null;
     try {
         if (!req.file) {
+            logReportRuntime('upload:start:missing-file', { authenticated: Boolean(getAuthenticatedAccount(req)) });
             return res.status(400).json({ error: 'MISSING_FILE', message: 'Please upload a PDF or image report file.' });
         }
         const mime = req.file.mimetype.toLowerCase();
+        logReportRuntime('upload:start:received', {
+            mimeType: req.file.mimetype,
+            fileSize: req.file.size,
+            source: req.body?.source,
+            hasUploadId: typeof req.body?.uploadId === 'string' && Boolean(req.body.uploadId.trim())
+        });
         if (!mime.includes('pdf') && !mime.includes('image')) {
             return res.status(415).json({ error: 'UNSUPPORTED_FILE', message: 'Only PDF and image reports are supported.' });
         }
@@ -260,6 +293,12 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
             status: 'queued'
         });
         currentJobId = processingJob.id;
+        logReportRuntime('upload:start:created', {
+            reportId: record.id,
+            processingJobId: processingJob.id,
+            status: record.status,
+            clientScoped: Boolean(owner.clientId)
+        });
         const fileBuffer = Buffer.from(req.file.buffer);
         const manualDate = typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : '';
         const manualLab = typeof req.body?.labName === 'string' ? req.body.labName.trim() : '';
@@ -274,6 +313,7 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
             manualLab
         }).catch(async (error) => {
             const message = error instanceof Error ? error.message : 'Unable to analyze this report file.';
+            logReportRuntime('processing:failed', { reportId: record.id, processingJobId: processingJob.id, message });
             await updateReportStatus(record.id, 'FAILED', message);
             await updateProcessingJobStatus(processingJob.id, 'failed', message);
         });
