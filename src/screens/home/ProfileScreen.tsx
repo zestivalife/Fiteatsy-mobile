@@ -161,6 +161,12 @@ export const ProfileScreen = ({ navigation }: Props) => {
           <Text style={[styles.metricsLinkText, { color: palette.blue }]}>View Connected Metrics</Text>
           <Ionicons name="chevron-forward" size={14} color={palette.blue} />
         </Pressable>
+        {__DEV__ ? (
+          <Pressable style={styles.metricsLink} onPress={() => navigation.navigate('HealthSyncDebug')}>
+            <Text style={[styles.metricsLinkText, { color: palette.warning }]}>Open Health Sync Debug</Text>
+            <Ionicons name="bug-outline" size={14} color={palette.warning} />
+          </Pressable>
+        ) : null}
       </Card>
 
       <Card>

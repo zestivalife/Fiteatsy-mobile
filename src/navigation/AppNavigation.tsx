@@ -28,6 +28,7 @@ import { SearchScreen } from '../screens/home/SearchScreen';
 import { NotificationsScreen } from '../screens/home/NotificationsScreen';
 import { ProfileScreen } from '../screens/home/ProfileScreen';
 import { ConnectedMetricsScreen } from '../screens/sync/ConnectedMetricsScreen';
+import { HealthSyncDebugScreen } from '../screens/sync/HealthSyncDebugScreen';
 import { ReportsChatScreen } from '../screens/home/ReportsChatScreen';
 import { MedicationFormScreen } from '../screens/medication/MedicationFormScreen';
 import { MedicationCalendarScreen } from '../screens/medication/MedicationCalendarScreen';
@@ -113,6 +114,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="ConnectedMetrics" component={ConnectedMetricsScreen} />
+        {__DEV__ ? <Stack.Screen name="HealthSyncDebug" component={HealthSyncDebugScreen} /> : null}
         <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
         <Stack.Screen name="MedicationForm" component={MedicationFormScreen} />
         <Stack.Screen name="MedicationCalendar" component={MedicationCalendarScreen} />

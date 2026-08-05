@@ -42,6 +42,12 @@ export type HealthSyncResult = {
   wellness: WellnessSnapshot;
 };
 
+export type HealthObservationDto = HealthObservationDraft & {
+  id: string;
+  fiteatsyClientId: string;
+  createdAtISO: string;
+};
+
 const deriveObservations = (payload: WearableSyncPayload): HealthObservationDraft[] => payload.observations ?? [];
 
 const scoreOrExisting = (value: number | null | undefined, existing: number) =>
@@ -76,6 +82,11 @@ export const wellnessFromHealthScores = (
 };
 
 export const getHealthSyncStatus = () => apiFetch<HealthSyncStatus>('/v1/health/sync/status');
+
+export const getLatestHealthObservations = (limit = 10) =>
+  apiFetch<{ total: number; limit: number; offset: number; items: HealthObservationDto[] }>(
+    `/v1/health/observations?limit=${encodeURIComponent(String(limit))}`
+  );
 
 export const runHealthSync = async (
   appId: HealthAppId,
