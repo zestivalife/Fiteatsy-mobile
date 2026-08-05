@@ -342,6 +342,38 @@ export const HomeScreen = () => {
   }), [isLight]);
 
   const connectedDevice = devices.find((d) => d.id === selectedDeviceId) ?? null;
+  const latestHealthSync = wearableSyncData[0] ?? null;
+  const latestHealthMetrics = latestHealthSync?.dataQuality.connectedMetrics ?? {};
+  const syncedHealthDomainCount = ['steps', 'sleep', 'heart_rate', 'hrv', 'workouts'].filter(
+    (key) => latestHealthMetrics[key as keyof typeof latestHealthMetrics] === 'synced'
+  ).length;
+  const healthSyncHomeState = !selectedDeviceId
+    ? {
+        title: 'Connect Health Data',
+        body: 'Unlock Activity, Sleep, Calm, and Recovery scores from real Health Connect signals.',
+        badge: 'Not connected',
+        icon: 'link-outline' as const
+      }
+    : syncedHealthDomainCount === 0
+      ? {
+          title: 'Health Data Needs Signals',
+          body: 'Health Connect is linked, but Fiteatsy needs recent records before showing intelligence.',
+          badge: 'INSUFFICIENT_DATA',
+          icon: 'information-circle-outline' as const
+        }
+      : syncedHealthDomainCount < 4
+        ? {
+            title: 'Partial Health Intelligence',
+            body: `${syncedHealthDomainCount}/5 signal groups synced. Missing domains stay out of score claims.`,
+            badge: 'Partial sync',
+            icon: 'analytics-outline' as const
+          }
+        : {
+            title: 'Health Intelligence Active',
+            body: 'Backend-calculated scores are using your latest connected health observations.',
+            badge: 'Active',
+            icon: 'pulse-outline' as const
+          };
 
   const todayTimeline = useMemo(() => getMedicationTimelineForDate(new Date().toISOString()), [getMedicationTimelineForDate, medications]);
   const todayISO = new Date().toISOString();
@@ -800,6 +832,22 @@ export const HomeScreen = () => {
           <View style={styles.lowerTag}><Text style={styles.lowerTagText} numberOfLines={1}>{recoveryIntel.isCalibrating ? 'Calibration' : heroState}</Text></View>
         </View>
       </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${healthSyncHomeState.title}. ${healthSyncHomeState.body}`}
+        style={[styles.healthSyncCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
+        onPress={() => navigation.navigate('SyncWearable')}
+      >
+        <View style={styles.healthSyncHeader}>
+          <View style={styles.healthSyncTitleRow}>
+            <Ionicons name={healthSyncHomeState.icon} size={19} color={isLight ? '#087B6C' : '#66FCF1'} />
+            <Text style={[styles.healthSyncTitle, { color: ui.textPrimary }]}>{healthSyncHomeState.title}</Text>
+          </View>
+          <Text style={[styles.healthSyncBadge, { color: isLight ? '#087B6C' : '#66FCF1' }]}>{healthSyncHomeState.badge}</Text>
+        </View>
+        <Text style={[styles.healthSyncBody, { color: ui.textSecondary }]}>{healthSyncHomeState.body}</Text>
+        <Text style={styles.healthSyncLink}>{selectedDeviceId ? 'Sync now +' : 'Connect now +'}</Text>
+      </Pressable>
       <View style={styles.lowerRow}>
         <Pressable style={[styles.lowerCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]} onPress={() => setMedicationOpen(true)}>
           <View style={styles.lowerCardTop}>
@@ -1661,6 +1709,46 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
     width: 20,
     textAlign: 'center'
+  },
+  healthSyncCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    gap: 8,
+    marginBottom: 12
+  },
+  healthSyncHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10
+  },
+  healthSyncTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1
+  },
+  healthSyncTitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins_700Bold',
+    flex: 1
+  },
+  healthSyncBadge: {
+    fontSize: 11,
+    fontFamily: 'Poppins_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
+  },
+  healthSyncBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: 'Poppins_400Regular'
+  },
+  healthSyncLink: {
+    color: '#59BE08',
+    fontSize: 13,
+    fontFamily: 'Poppins_700Bold'
   },
   lowerRow: {
     flexDirection: 'row',

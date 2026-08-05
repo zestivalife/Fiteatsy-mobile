@@ -81,6 +81,60 @@ export type HealthConnectRuntimeDiagnostics = {
   };
 };
 
+export type HealthConnectPermissionPreparation = {
+  grantedCount: number;
+  requestedCount: number;
+  permissionStates: HealthConnectRuntimeDiagnostics['permissionStates'];
+};
+
+export const requestHealthConnectPermissionsOnly = async (): Promise<HealthConnectPermissionPreparation> => {
+  if (Platform.OS !== 'android') {
+    throw new Error('health_connect_unsupported_platform');
+  }
+
+  let sdkStatus: number;
+  try {
+    sdkStatus = await getSdkStatus();
+  } catch {
+    throw new Error('health_connect_status_failed');
+  }
+  if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
+    throw new Error(`health_connect_unavailable_${sdkStatus}`);
+  }
+
+  let initialized = false;
+  try {
+    initialized = await initialize();
+  } catch {
+    throw new Error('health_connect_initialize_failed');
+  }
+  if (!initialized) {
+    throw new Error('health_connect_initialize_failed');
+  }
+
+  try {
+    await requestPermission(permissionList);
+  } catch {
+    throw new Error('health_connect_permission_flow_failed');
+  }
+
+  const granted = (await getGrantedPermissions()) as Array<Permission>;
+  const grantedSet = new Set(granted.map((permission) => toPermissionKey(permission as Permission)));
+  const permissionStates = {
+    Steps: hasPermission(grantedSet, 'Steps'),
+    SleepSession: hasPermission(grantedSet, 'SleepSession'),
+    RestingHeartRate: hasPermission(grantedSet, 'RestingHeartRate'),
+    HeartRateVariabilityRmssd: hasPermission(grantedSet, 'HeartRateVariabilityRmssd'),
+    ExerciseSession: hasPermission(grantedSet, 'ExerciseSession')
+  };
+
+  return {
+    grantedCount: Object.values(permissionStates).filter(Boolean).length,
+    requestedCount: permissionList.length,
+    permissionStates
+  };
+};
+
 export const getHealthConnectRuntimeDiagnostics = async (): Promise<HealthConnectRuntimeDiagnostics> => {
   const base: HealthConnectRuntimeDiagnostics = {
     platform: Platform.OS,

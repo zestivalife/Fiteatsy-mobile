@@ -9,7 +9,7 @@ import { Screen } from '../../components/Screen';
 import { getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { getHealthConnectRuntimeDiagnostics, HealthConnectRuntimeDiagnostics } from '../../services/healthConnectService';
-import { getHealthScoreSummary, HealthScoreSummary } from '../../services/healthIntelligenceService';
+import { getHealthScores, HealthScore, getHealthScoreSummary, HealthScoreSummary } from '../../services/healthIntelligenceService';
 import {
   getHealthSyncStatus,
   getLatestHealthObservations,
@@ -51,6 +51,12 @@ const countDiagnosticsRecords = (diagnostics: HealthConnectRuntimeDiagnostics | 
 
 const scoreText = (value: number | null | undefined) => (typeof value === 'number' ? String(value) : 'INSUFFICIENT_DATA');
 
+const formatInputSummary = (inputSummary: Record<string, unknown>) => {
+  const keys = Object.keys(inputSummary);
+  if (keys.length === 0) return 'No input summary recorded';
+  return keys.slice(0, 4).map((key) => `${key}: ${String(inputSummary[key])}`).join(' • ');
+};
+
 export const HealthSyncDebugScreen = ({ navigation }: Props) => {
   const {
     themeMode,
@@ -64,6 +70,7 @@ export const HealthSyncDebugScreen = ({ navigation }: Props) => {
   const [syncStatus, setSyncStatus] = useState<HealthSyncStatus | null>(null);
   const [observations, setObservations] = useState<HealthObservationDto[]>([]);
   const [scores, setScores] = useState<HealthScoreSummary | null>(null);
+  const [detailedScores, setDetailedScores] = useState<HealthScore[]>([]);
   const [stats, setStats] = useState<SyncStats>({ recordsRead: 0, recordsSent: 0, recordsStored: 0 });
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -73,16 +80,18 @@ export const HealthSyncDebugScreen = ({ navigation }: Props) => {
     setLoading(true);
     setError(null);
     try {
-      const [nextDiagnostics, nextStatus, nextObservations, nextScores] = await Promise.all([
+      const [nextDiagnostics, nextStatus, nextObservations, nextScores, nextDetailedScores] = await Promise.all([
         getHealthConnectRuntimeDiagnostics(),
         getHealthSyncStatus(),
         getLatestHealthObservations(10),
-        getHealthScoreSummary()
+        getHealthScoreSummary(),
+        getHealthScores()
       ]);
       setDiagnostics(nextDiagnostics);
       setSyncStatus(nextStatus);
       setObservations(nextObservations.items);
       setScores(nextScores);
+      setDetailedScores(nextDetailedScores.items);
       setStats((previous) => ({
         recordsRead: countDiagnosticsRecords(nextDiagnostics),
         recordsSent: previous.recordsSent,
@@ -148,6 +157,15 @@ export const HealthSyncDebugScreen = ({ navigation }: Props) => {
       : Platform.OS === 'ios'
         ? statusLabel(syncStatus?.appleHealth.status)
         : 'NOT_SUPPORTED';
+  const pipelineRows = [
+    { label: 'Health Platform', status: platformStatus === 'CONNECTED' ? 'OK' : platformStatus },
+    { label: 'Mobile Sync', status: diagnostics && countDiagnosticsRecords(diagnostics) > 0 ? 'OK' : 'WAITING_FOR_RECORDS' },
+    { label: 'API', status: syncStatus ? 'OK' : 'UNKNOWN' },
+    { label: 'Backend', status: syncStatus ? 'OK' : 'UNKNOWN' },
+    { label: 'Database', status: syncStatus && syncStatus.recordsSynced > 0 ? 'OK' : 'WAITING_FOR_STORED_RECORDS' },
+    { label: 'Calculation Engine', status: scores?.status === 'calculated' ? 'OK' : 'INSUFFICIENT_DATA' },
+    { label: 'Homepage', status: scores?.status === 'calculated' ? 'READY' : 'CALIBRATING' }
+  ];
 
   return (
     <Screen scroll>
@@ -246,6 +264,35 @@ export const HealthSyncDebugScreen = ({ navigation }: Props) => {
           <ScoreTile label="Calm Score" value={scoreText(scores?.calmScore)} />
           <ScoreTile label="Recovery Score" value={scoreText(scores?.recoveryScore)} />
         </View>
+      </Card>
+
+      <Card>
+        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Calculation Inputs</Text>
+        {detailedScores.length === 0 ? (
+          <Text style={[styles.body, { color: palette.textSecondary }]}>No backend calculation records found for this client.</Text>
+        ) : (
+          detailedScores.map((score) => (
+            <View key={score.id} style={[styles.observationRow, { borderColor: palette.stroke }]}>
+              <Text style={[styles.observationMetric, { color: palette.textPrimary }]}>{score.scoreType}</Text>
+              <Text style={[styles.observationValue, { color: palette.textSecondary }]}>
+                {score.scoreStatus} • confidence {score.confidence}
+              </Text>
+              <Text style={[styles.observationMeta, { color: palette.textSecondary }]}>{formatInputSummary(score.inputSummary)}</Text>
+            </View>
+          ))
+        )}
+      </Card>
+
+      <Card>
+        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Pipeline Status</Text>
+        {pipelineRows.map((row) => (
+          <View key={row.label} style={styles.row}>
+            <Text style={[styles.label, { color: palette.textSecondary }]}>{row.label}</Text>
+            <Text style={[styles.value, { color: row.status === 'OK' || row.status === 'READY' ? palette.success : palette.textPrimary }]}>
+              {row.status}
+            </Text>
+          </View>
+        ))}
       </Card>
 
       <PrimaryButton title={syncing ? 'Syncing Real Data...' : 'Run Real Health Connect Sync'} onPress={runRealSync} disabled={syncing} />
