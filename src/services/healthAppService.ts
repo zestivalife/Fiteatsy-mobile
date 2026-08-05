@@ -1,7 +1,6 @@
-import Constants from 'expo-constants';
 import { Linking, Platform } from 'react-native';
 import { WearableSyncPayload } from '../types';
-import { postJson } from './apiClient';
+import { apiFetch, postJson } from './apiClient';
 import { syncFromHealthConnect } from './healthConnectService';
 
 export type HealthAppId = 'apple-health' | 'health-connect' | 'google-fit' | 'samsung-health' | 'fitbit';
@@ -24,18 +23,6 @@ const fallbackApps: HealthAppOption[] = [
   { id: 'health-connect', label: 'Health Connect', subtitle: 'Android unified recovery signals' }
 ];
 
-const getApiBaseUrl = () => {
-  const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
-  if (fromExtra) return fromExtra;
-
-  const hostUri = Constants.expoConfig?.hostUri ?? '';
-  const host = hostUri.split(':')[0];
-  if (!host) return 'http://localhost:4001';
-  return `http://${host}:4001`;
-};
-
-const apiBaseUrl = getApiBaseUrl();
-
 export const getAvailableHealthApps = async (): Promise<HealthAppOption[]> => {
   if (Platform.OS === 'android') {
     return [{ id: 'health-connect', label: 'Health Connect', subtitle: 'Android unified recovery signals' }];
@@ -43,11 +30,7 @@ export const getAvailableHealthApps = async (): Promise<HealthAppOption[]> => {
 
   try {
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-    const response = await fetch(`${apiBaseUrl}/v1/wearables/health-apps?platform=${platform}`);
-    if (!response.ok) {
-      throw new Error('failed_health_app_fetch');
-    }
-    const payload = (await response.json()) as { apps?: HealthAppOption[] };
+    const payload = await apiFetch<{ apps?: HealthAppOption[] }>(`/v1/wearables/health-apps?platform=${platform}`);
     if (Array.isArray(payload.apps) && payload.apps.length > 0) {
       return payload.apps;
     }

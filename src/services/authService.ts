@@ -1,4 +1,4 @@
-import Constants from 'expo-constants';
+import { apiBaseUrl } from './apiClient';
 
 type SignupRequestParams = {
   name: string;
@@ -84,18 +84,6 @@ const sanitizeAuthPayload = (value: unknown): unknown => {
 
   return value;
 };
-
-const getApiBaseUrl = () => {
-  const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
-  if (fromExtra) return fromExtra;
-
-  const hostUri = Constants.expoConfig?.hostUri ?? '';
-  const host = hostUri.split(':')[0];
-  if (!host) return 'http://localhost:4001';
-  return `http://${host}:4001`;
-};
-
-const apiBaseUrl = getApiBaseUrl();
 
 const parseError = async (response: Response, url: string): Promise<never> => {
   let payload: { error?: ApiErrorCode; message?: string; retryAfterSec?: number } = {};

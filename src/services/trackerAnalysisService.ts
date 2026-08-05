@@ -1,3 +1,5 @@
+import { postJson } from './apiClient';
+
 export type TrackerTab = 'health' | 'wellness';
 
 export type TrackerAnalysisInput = {
@@ -67,8 +69,6 @@ export type TrackerSectionImprovementResult = {
   generatedAtISO: string;
   model: string;
 };
-
-const apiBaseUrl = 'http://localhost:4001';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -217,22 +217,10 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T
 
 export const getTrackerAnalysis = async (input: TrackerAnalysisInput): Promise<TrackerAnalysisResult> => {
   try {
-    const response = await withTimeout(
-      fetch(`${apiBaseUrl}/v1/intelligence/tracker-analysis`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(input)
-      }),
+    return await withTimeout(
+      postJson<TrackerAnalysisResult>('/v1/intelligence/tracker-analysis', input),
       3200
     );
-
-    if (!response.ok) {
-      throw new Error(`tracker analysis failed: ${response.status}`);
-    }
-
-    return (await response.json()) as TrackerAnalysisResult;
   } catch {
     return buildFallbackAnalysis(input);
   }
@@ -242,22 +230,10 @@ export const getTrackerImprovementInsights = async (
   input: TrackerSectionImprovementInput
 ): Promise<TrackerSectionImprovementResult> => {
   try {
-    const response = await withTimeout(
-      fetch(`${apiBaseUrl}/v1/intelligence/tracker-improvement`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(input)
-      }),
+    const data = await withTimeout(
+      postJson<TrackerSectionImprovementResult>('/v1/intelligence/tracker-improvement', input),
       3800
     );
-
-    if (!response.ok) {
-      throw new Error(`tracker improvement failed: ${response.status}`);
-    }
-
-    const data = (await response.json()) as TrackerSectionImprovementResult;
     if (!data.summary || !Array.isArray(data.suggestions) || data.suggestions.length === 0) {
       return buildFallbackSectionImprovement(input);
     }

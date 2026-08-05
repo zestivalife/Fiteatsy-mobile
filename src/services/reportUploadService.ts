@@ -1,4 +1,3 @@
-import { NativeModules } from 'react-native';
 import { ReportParameter } from './nuetraService';
 import { apiBaseUrl, buildAuthorizationHeaders } from './apiClient';
 
@@ -66,21 +65,9 @@ export type ReportDto = {
 
 type UploadProgressStage = 'uploading' | 'uploaded' | 'processing' | 'extraction' | 'validation' | 'completed' | 'failed';
 
-const API_PORT = 4001;
 const REQUEST_TIMEOUT_MS = 30000;
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 120000;
-
-const getBundlerHost = () => {
-  const scriptURL = NativeModules?.SourceCode?.scriptURL as string | undefined;
-  if (!scriptURL) return null;
-  try {
-    const parsed = new URL(scriptURL);
-    return parsed.hostname || null;
-  } catch {
-    return null;
-  }
-};
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
 
@@ -96,15 +83,7 @@ const logReportDebug = (event: string, payload: Record<string, unknown>) => {
 const isTerminalHttpError = (error: unknown) => error instanceof Error && error.message.startsWith('REPORT_API_HTTP_');
 
 const getBaseUrls = () => {
-  const envBase = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-  const host = getBundlerHost();
-  return unique([
-    apiBaseUrl,
-    envBase ?? '',
-    host ? `http://${host}:${String(API_PORT)}` : '',
-    `http://localhost:${String(API_PORT)}`,
-    `http://127.0.0.1:${String(API_PORT)}`
-  ]);
+  return unique([apiBaseUrl]);
 };
 
 const sleep = (ms: number, signal?: AbortSignal) =>

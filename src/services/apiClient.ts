@@ -20,13 +20,13 @@ export class ApiClientError extends Error {
 }
 
 export const getApiBaseUrl = () => {
+  const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (fromEnv) return fromEnv;
+
   const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
   if (fromExtra) return fromExtra;
 
-  const hostUri = Constants.expoConfig?.hostUri ?? '';
-  const host = hostUri.split(':')[0];
-  if (!host) return 'http://localhost:4001';
-  return `http://${host}:4001`;
+  throw new Error('Fiteatsy API base URL is not configured.');
 };
 
 export const apiBaseUrl = getApiBaseUrl();

@@ -1,19 +1,9 @@
 import { WearableDevice, WearableSyncPayload, WellnessSnapshot } from '../types';
 import { initialWellness } from '../data/mock';
 import { recalculateWellness } from '../utils/wellness';
-import Constants from 'expo-constants';
+import { postJson } from './apiClient';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const getApiBaseUrl = () => {
-  const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
-  if (fromExtra) return fromExtra;
-  const hostUri = Constants.expoConfig?.hostUri ?? '';
-  const host = hostUri.split(':')[0];
-  if (!host) return 'http://localhost:4001';
-  return `http://${host}:4001`;
-};
-
-const apiBaseUrl = getApiBaseUrl();
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -93,31 +83,6 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T
   }
 };
 
-const buildMockPayload = (device: WearableDevice): WearableSyncPayload => {
-  const seed = device.id.length + device.brand.length + new Date().getDate();
-  return {
-    deviceId: device.id,
-    brand: device.brand,
-    model: device.model,
-    provider: device.brand === 'GoBOLT' ? 'gobolt-local' : 'wearable-local',
-    syncedAtISO: new Date().toISOString(),
-    source: 'mock',
-    metrics: {
-      heartRateAvg: 62 + (seed % 22),
-      sleepHours: Number((6.1 + (seed % 23) / 10).toFixed(1)),
-      hydrationLiters: Number((1.8 + (seed % 12) / 10).toFixed(1)),
-      focusMinutes: 22 + (seed % 56),
-      breathingMinutes: 4 + (seed % 18),
-      movementMinutes: 28 + (seed % 72)
-    },
-    dataQuality: {
-      confidence: 0.74,
-      isEstimated: true,
-      warnings: ['Live wearable API unavailable. Synced using device-estimated baseline data.']
-    }
-  };
-};
-
 export const syncWearableData = async (device: WearableDevice): Promise<{ wellness: WellnessSnapshot; payload: WearableSyncPayload }> => {
   const body = {
     deviceId: device.id,
@@ -125,27 +90,12 @@ export const syncWearableData = async (device: WearableDevice): Promise<{ wellne
     model: device.model
   };
 
-  let payload: WearableSyncPayload;
-  try {
-    const response = await withTimeout(
-      fetch(`${apiBaseUrl}/v1/wearables/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      }),
+  const payload = validateAndNormalizePayload(
+    await withTimeout(
+      postJson<WearableSyncPayload>('/v1/wearables/sync', body),
       5000
-    );
-
-    if (!response.ok) {
-      throw new Error(`Wearable sync failed: ${response.status}`);
-    }
-
-    payload = validateAndNormalizePayload((await response.json()) as WearableSyncPayload);
-  } catch {
-    payload = buildMockPayload(device);
-  }
+    )
+  );
 
   return {
     payload,
