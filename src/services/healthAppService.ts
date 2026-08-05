@@ -41,18 +41,6 @@ export const getAvailableHealthApps = async (): Promise<HealthAppOption[]> => {
 };
 
 export const connectHealthApp = async (appId: HealthAppId) => {
-  if (Platform.OS === 'android' && appId === 'health-connect') {
-    return {
-      connected: true,
-      connectionId: `health-connect-${Date.now()}`,
-      appId: 'health-connect' as const,
-      appName: 'Health Connect',
-      provider: 'Health Connect',
-      connectedAtISO: new Date().toISOString(),
-      status: 'connected' as const
-    };
-  }
-
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   return postJson<{
     connected: boolean;
@@ -78,13 +66,7 @@ export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<Wearab
     return syncFromHealthConnect();
   }
 
-  const payload = await postJson<{ payload: WearableSyncPayload }>('/v1/wearables/sync/live', {
-    appId,
-    platform
-  }).catch(() => {
-    throw new Error('live_sync_failed');
-  });
-  return payload.payload;
+  throw new Error('apple_health_native_reader_not_available');
 };
 
 export const openHealthConnectPlayStore = async () => {

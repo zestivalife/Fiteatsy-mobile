@@ -173,7 +173,13 @@ wearablesRouter.post('/sync/live', (req, res) => {
       connection,
       payload
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'insufficient_data') {
+      return res.status(409).json({
+        error: 'INSUFFICIENT_DATA',
+        message: 'No real health records have been ingested for this health connection yet.'
+      });
+    }
     return res.status(404).json({
       error: 'connection_not_found',
       message: 'No connected health app found for this user.'
@@ -190,27 +196,8 @@ wearablesRouter.post('/sync', (req, res) => {
     });
   }
 
-  const payload = {
-    deviceId: parse.data.deviceId,
-    brand: parse.data.brand,
-    model: parse.data.model,
-    provider: 'Legacy Adapter',
-    syncedAtISO: new Date().toISOString(),
-    source: 'api' as const,
-    metrics: {
-      heartRateAvg: 72,
-      sleepHours: 7.1,
-      hydrationLiters: 2.4,
-      focusMinutes: 20,
-      breathingMinutes: 9,
-      movementMinutes: 17
-    },
-    dataQuality: {
-      confidence: 0.82,
-      isEstimated: true,
-      warnings: ['Legacy sync endpoint used. Migrate to /v1/wearables/sync/live for connected health apps.']
-    }
-  };
-
-  return res.status(200).json(payload);
+  return res.status(410).json({
+    error: 'LEGACY_SYNC_REMOVED',
+    message: 'Legacy device sync no longer returns estimated health values. Use /v1/health/observations:batch with real platform records.'
+  });
 });

@@ -11,11 +11,9 @@ import { useAppContext } from '../../state/AppContext';
 import {
   classifyRecoveryConnectionState,
   openHealthConnectPlayStore,
-  syncConnectedHealthApp,
   type RecoveryConnectionState
 } from '../../services/healthAppService';
-import { recalculateWellness } from '../../utils/wellness';
-import { initialWellness } from '../../data/mock';
+import { runHealthSync } from '../../services/healthSyncManager';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SyncWearable'>;
 
@@ -60,6 +58,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     onboarding,
     setOnboarding,
     addWearableSyncData,
+    wellness,
     setWellness
   } = useAppContext();
 
@@ -143,32 +142,24 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         setStatusBody('Reading sleep, activity, and heart recovery data securely from your device.');
       }
 
-      const payload = await syncConnectedHealthApp('health-connect');
-      addWearableSyncData(payload);
+      const result = await runHealthSync('health-connect', wellness);
+      addWearableSyncData(result.payload);
       setSelectedDeviceId('health-connect');
 
-      const state = classifyRecoveryConnectionState(payload);
+      const state = classifyRecoveryConnectionState(result.payload);
       if (isMountedRef.current) {
         setConnectionState(state);
         setStatusTitle(stateCopy[state].title);
-        setStatusBody(stateCopy[state].description);
+        setStatusBody(
+          `${stateCopy[state].description} ${result.accepted} new records synced, ${result.duplicate} duplicates skipped.`
+        );
       }
 
-      const connectedMetrics = payload.dataQuality.connectedMetrics ?? {};
+      const connectedMetrics = result.payload.dataQuality.connectedMetrics ?? {};
       const syncedCount = Object.values(connectedMetrics).filter((status) => status === 'synced').length;
 
       if (syncedCount > 0) {
-        setWellness(
-          recalculateWellness({
-            ...initialWellness,
-            heartRateAvg: payload.metrics.heartRateAvg,
-            sleepHours: payload.metrics.sleepHours,
-            hydrationLiters: payload.metrics.hydrationLiters,
-            focusMinutes: payload.metrics.focusMinutes,
-            breathingMinutes: payload.metrics.breathingMinutes,
-            movementMinutes: payload.metrics.movementMinutes
-          })
-        );
+        setWellness(result.wellness);
       }
 
       if (state !== 'permission_missing') {
@@ -187,6 +178,12 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
           setStatusTitle('Recovery Connection Paused');
           setStatusBody('Recovery connection is temporarily unavailable. Please retry in a moment.');
         }
+      } else if (message.includes('INSUFFICIENT_DATA')) {
+        if (isMountedRef.current) {
+          setConnectionState('no_recent_data');
+          setStatusTitle('No Recent Recovery Signals');
+          setStatusBody('Permissions are connected, but no recent Health Connect records were available to sync.');
+        }
       } else {
         if (isMountedRef.current) {
           setStatusTitle('Recovery Signals Pending');
@@ -202,7 +199,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         setIsRunning(false);
       }
     }
-  }, [addWearableSyncData, completeOnboardingFlow, setSelectedDeviceId, setWellness]);
+  }, [addWearableSyncData, completeOnboardingFlow, setSelectedDeviceId, setWellness, wellness]);
 
   // Stability guard:
   // avoid auto-triggering Health Connect permission/data reads during

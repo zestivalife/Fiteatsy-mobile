@@ -1,0 +1,114 @@
+import { HealthObservationDraft, WearableSyncPayload, WellnessSnapshot } from '../types';
+import { recalculateWellness } from '../utils/wellness';
+import { apiFetch, postJson } from './apiClient';
+import { HealthAppId, syncConnectedHealthApp } from './healthAppService';
+import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceService';
+
+export type HealthSyncConnectionState =
+  | 'NOT_CONNECTED'
+  | 'REQUESTING_PERMISSION'
+  | 'CONNECTED'
+  | 'DENIED'
+  | 'ERROR'
+  | 'NOT_SUPPORTED'
+  | 'INSUFFICIENT_DATA';
+
+export type HealthSyncStatus = {
+  fiteatsyClientId: string;
+  overallStatus: HealthSyncConnectionState;
+  lastSyncISO: string | null;
+  recordsSynced: number;
+  appleHealth: {
+    status: HealthSyncConnectionState;
+    lastSyncISO: string | null;
+    recordsSynced: number;
+  };
+  healthConnect: {
+    status: HealthSyncConnectionState;
+    lastSyncISO: string | null;
+    recordsSynced: number;
+  };
+  sources: Record<string, { recordsSynced: number; lastSyncISO: string | null }>;
+};
+
+export type HealthSyncResult = {
+  payload: WearableSyncPayload;
+  observations: HealthObservationDraft[];
+  accepted: number;
+  duplicate: number;
+  rejected: number;
+  scores: HealthScoreSummary;
+  status: HealthSyncStatus;
+  wellness: WellnessSnapshot;
+};
+
+const deriveObservations = (payload: WearableSyncPayload): HealthObservationDraft[] => payload.observations ?? [];
+
+const scoreOrExisting = (value: number | null | undefined, existing: number) =>
+  typeof value === 'number' && Number.isFinite(value) ? value : existing;
+
+export const wellnessFromHealthScores = (
+  previous: WellnessSnapshot,
+  payload: WearableSyncPayload,
+  scores: HealthScoreSummary
+): WellnessSnapshot => {
+  const next = recalculateWellness({
+    ...previous,
+    heartRateAvg: payload.metrics.heartRateAvg > 0 ? payload.metrics.heartRateAvg : previous.heartRateAvg,
+    sleepHours: payload.metrics.sleepHours > 0 ? payload.metrics.sleepHours : previous.sleepHours,
+    movementMinutes: payload.metrics.movementMinutes > 0 ? payload.metrics.movementMinutes : previous.movementMinutes,
+    focusMinutes: payload.metrics.focusMinutes > 0 ? payload.metrics.focusMinutes : previous.focusMinutes,
+    breathingMinutes: payload.metrics.breathingMinutes > 0 ? payload.metrics.breathingMinutes : previous.breathingMinutes,
+    hydrationLiters: payload.metrics.hydrationLiters > 0 ? payload.metrics.hydrationLiters : previous.hydrationLiters,
+    recoveryScore: scoreOrExisting(scores.recoveryScore, previous.recoveryScore),
+    nourishmentScore: scoreOrExisting(scores.nutritionScore, previous.nourishmentScore),
+    wellnessScore: scoreOrExisting(scores.overallScore, previous.wellnessScore),
+    stressScore: scores.calmScore == null ? previous.stressScore : Math.max(0, 100 - scores.calmScore)
+  });
+
+  return {
+    ...next,
+    recoveryScore: scoreOrExisting(scores.recoveryScore, next.recoveryScore),
+    nourishmentScore: scoreOrExisting(scores.nutritionScore, next.nourishmentScore),
+    wellnessScore: scoreOrExisting(scores.overallScore, next.wellnessScore),
+    stressScore: scores.calmScore == null ? next.stressScore : Math.max(0, 100 - scores.calmScore)
+  };
+};
+
+export const getHealthSyncStatus = () => apiFetch<HealthSyncStatus>('/v1/health/sync/status');
+
+export const runHealthSync = async (
+  appId: HealthAppId,
+  previousWellness: WellnessSnapshot
+): Promise<HealthSyncResult> => {
+  const payload = await syncConnectedHealthApp(appId);
+  const observations = deriveObservations(payload);
+
+  if (observations.length === 0) {
+    throw new Error('INSUFFICIENT_DATA');
+  }
+
+  const ingest = await postJson<{
+    accepted: number;
+    duplicate: number;
+    rejected: number;
+  }>('/v1/health/observations:batch', {
+    observations
+  });
+
+  const [scores, status] = await Promise.all([
+    getHealthScoreSummary(),
+    getHealthSyncStatus()
+  ]);
+
+  return {
+    payload,
+    observations,
+    accepted: ingest.accepted,
+    duplicate: ingest.duplicate,
+    rejected: ingest.rejected,
+    scores,
+    status,
+    wellness: wellnessFromHealthScores(previousWellness, payload, scores)
+  };
+};

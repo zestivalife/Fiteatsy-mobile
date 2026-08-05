@@ -1,7 +1,7 @@
 import { apiFetch } from './apiClient';
 
 export type HealthScoreStatus = 'calculated' | 'insufficient_data';
-export type HealthScoreType = 'nutrition' | 'clinical' | 'activity' | 'recovery' | 'overall';
+export type HealthScoreType = 'nutrition' | 'clinical' | 'activity' | 'sleep' | 'calm' | 'recovery' | 'overall';
 
 export type HealthScore = {
   id: string;
@@ -20,6 +20,8 @@ export type HealthScoreSummary = {
   nutritionScore: number | null;
   clinicalScore: number | null;
   activityScore: number | null;
+  sleepScore: number | null;
+  calmScore: number | null;
   overallScore: number | null;
   confidence: number;
   status: HealthScoreStatus;

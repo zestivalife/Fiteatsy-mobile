@@ -8,7 +8,7 @@ import {
   requestPermission,
   type Permission
 } from 'react-native-health-connect';
-import { WearableSyncPayload } from '../types';
+import { HealthObservationDraft, WearableSyncPayload } from '../types';
 
 type HealthConnectMetricStatus = 'synced' | 'no_permission' | 'no_recent_data' | 'unsupported' | 'unavailable';
 
@@ -262,6 +262,21 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   };
 
   const end = toIso(now());
+  const observations: HealthObservationDraft[] = [];
+  const addObservation = (metricType: string, value: number | null, unit: string, measuredAtISO: string) => {
+    if (value == null || !Number.isFinite(value) || value <= 0) return;
+    const rounded = Number(value.toFixed(metricType === 'sleep_minutes' ? 0 : 2));
+    observations.push({
+      metricType,
+      value: rounded,
+      unit,
+      measuredAtISO,
+      sourceProvider: 'health_connect',
+      sourceRecordId: `health_connect:${metricType}:${measuredAtISO}`,
+      syncKey: `health_connect:${metricType}:${measuredAtISO}:${rounded}:${unit}`,
+      qualityStatus: 'accepted'
+    });
+  };
 
   let stepCount = 0;
   if (connectedMetrics.sleep !== 'no_permission') {
@@ -296,6 +311,8 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
     stepCount = sum(valid.map((record) => record.count ?? 0));
     if (stepCount > 0) {
       connectedMetrics.steps = 'synced';
+      const latestStepISO = valid.at(-1)?.endTime ?? end;
+      addObservation('steps', stepCount, 'count', latestStepISO);
       console.info('[HealthConnect] Steps read success:', stepCount);
     } else {
       connectedMetrics.steps = 'no_recent_data';
@@ -316,6 +333,8 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   );
   if (hasPermission(grantedSet, 'SleepSession')) {
     connectedMetrics.sleep = sleepMinutes > 0 ? 'synced' : 'no_recent_data';
+    const latestSleepISO = sleepRecords.filter((record) => within(record.endTime, DAY * 2)).at(-1)?.endTime ?? end;
+    addObservation('sleep_minutes', sleepMinutes, 'min', latestSleepISO);
     console.info('[HealthConnect] Sleep read', connectedMetrics.sleep, sleepMinutes);
   }
 
@@ -328,6 +347,8 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   const heartRateAvg = avg(hrValues);
   if (hasPermission(grantedSet, 'RestingHeartRate')) {
     connectedMetrics.heart_rate = heartRateAvg ? 'synced' : 'no_recent_data';
+    const latestHrISO = hrRecords.filter((record) => within(record.time, DAY * 7)).at(-1)?.time ?? end;
+    addObservation('resting_heart_rate', heartRateAvg, 'bpm', latestHrISO);
     console.info('[HealthConnect] RestingHeartRate read', connectedMetrics.heart_rate, heartRateAvg ?? null);
   }
 
@@ -340,6 +361,8 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   const hrvAvg = avg(hrvValues);
   if (hasPermission(grantedSet, 'HeartRateVariabilityRmssd')) {
     connectedMetrics.hrv = hrvAvg ? 'synced' : 'no_recent_data';
+    const latestHrvISO = hrvRecords.filter((record) => within(record.time, DAY * 7)).at(-1)?.time ?? end;
+    addObservation('hrv_ms', hrvAvg, 'ms', latestHrvISO);
     console.info('[HealthConnect] HRV read', connectedMetrics.hrv, hrvAvg ?? null);
   }
 
@@ -357,13 +380,19 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
 
   if (hasPermission(grantedSet, 'ExerciseSession')) {
     connectedMetrics.workouts = workoutMinutes > 0 ? 'synced' : 'no_recent_data';
+    const latestWorkoutISO = workoutRecords.filter((record) => within(record.endTime, DAY * 7)).at(-1)?.endTime ?? end;
+    addObservation('workout_minutes', workoutMinutes, 'min', latestWorkoutISO);
+    addObservation('active_minutes', workoutMinutes, 'min', latestWorkoutISO);
     console.info('[HealthConnect] ExerciseSession read', connectedMetrics.workouts, workoutMinutes);
   }
 
   // Calories are derived from exercise sessions in this scoped implementation only.
   connectedMetrics.calories = connectedMetrics.workouts === 'synced' ? 'synced' : connectedMetrics.workouts;
+  if (workoutMinutes > 0) {
+    addObservation('active_energy', Math.round(workoutMinutes * 6), 'kcal', end);
+  }
 
-  const realSyncedCount = Object.values(connectedMetrics).filter((status) => status === 'synced').length;
+  const realSyncedCount = observations.length;
   if (realSyncedCount === 0) {
     console.warn('[HealthConnect] No real metric synced.');
   }
@@ -403,7 +432,8 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
         Cycle: null,
         Nutrition: null
       }
-    }
+    },
+    observations
   };
 
   return payload;

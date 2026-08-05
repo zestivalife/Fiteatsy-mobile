@@ -294,6 +294,18 @@ export type WearableSyncPayload = {
       Nutrition: number | null;
     };
   };
+  observations?: HealthObservationDraft[];
+};
+
+export type HealthObservationDraft = {
+  metricType: string;
+  value: number;
+  unit: string;
+  measuredAtISO: string;
+  sourceProvider: string;
+  sourceRecordId?: string;
+  syncKey?: string;
+  qualityStatus?: 'accepted' | 'estimated';
 };
 
 export type WellnessSnapshot = {

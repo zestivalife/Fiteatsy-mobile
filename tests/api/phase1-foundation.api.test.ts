@@ -156,6 +156,8 @@ test('GET /v1/intelligence/scores calculates traceable scores from validated cli
   assert.equal(scores.response.status, 200);
   assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'nutrition' && item.scoreStatus === 'calculated'), true);
   assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'activity' && item.scoreStatus === 'calculated'), true);
+  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'sleep' && item.scoreStatus === 'calculated'), true);
+  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'calm' && item.scoreStatus === 'calculated'), true);
   assert.equal(scores.body.items[0].clientId, undefined);
   assert.equal(scores.body.items[0].inputSummary != null, true);
 
@@ -164,6 +166,44 @@ test('GET /v1/intelligence/scores calculates traceable scores from validated cli
   });
   assert.equal(summary.response.status, 200);
   assert.equal(summary.body.status, 'calculated');
+  assert.equal(typeof summary.body.sleepScore, 'number');
+  assert.equal(typeof summary.body.calmScore, 'number');
+});
+
+test('GET /v1/health/sync/status reports durable sync state without internal ownership ids', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const empty = await getJson(server.baseUrl, '/v1/health/sync/status', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(empty.response.status, 200);
+  assert.equal(empty.body.overallStatus, 'NOT_CONNECTED');
+  assert.equal(empty.body.recordsSynced, 0);
+
+  await postJson(server.baseUrl, '/v1/health/observations:batch', {
+    observations: [
+      {
+        metricType: 'steps',
+        value: 7400,
+        unit: 'count',
+        measuredAtISO: '2026-08-05T06:00:00.000Z',
+        sourceProvider: 'health_connect',
+        sourceRecordId: 'hc-status-steps-1',
+        syncKey: 'hc-status-steps-1'
+      }
+    ]
+  }, {
+    headers: authHeaders(session.token)
+  });
+
+  const status = await getJson(server.baseUrl, '/v1/health/sync/status', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(status.response.status, 200);
+  assert.equal(status.body.overallStatus, 'CONNECTED');
+  assert.equal(status.body.healthConnect.status, 'CONNECTED');
+  assert.equal(status.body.recordsSynced, 1);
+  assert.equal(status.body.clientId, undefined);
+  assert.equal(status.body.userId, undefined);
 });
 
 test('foundation endpoints reject missing auth', async () => {

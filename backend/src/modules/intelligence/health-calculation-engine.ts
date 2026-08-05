@@ -45,6 +45,8 @@ const scoreObservation = (metricType: string, value: number) => {
       return clamp(Math.round((value / 70) * 100));
     case 'resting_heart_rate':
       return clamp(Math.round(100 - Math.abs(value - 62) * 2));
+    case 'stress_score':
+      return clamp(Math.round(100 - value));
     case 'hydration_ml':
       return clamp(Math.round((value / 2500) * 100));
     default:
@@ -84,8 +86,12 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
   const activityObservations = recentObservations.filter((item) =>
     ['steps', 'active_minutes', 'workout_minutes'].includes(item.metricType)
   );
+  const sleepObservations = recentObservations.filter((item) => item.metricType === 'sleep_minutes');
+  const calmObservations = recentObservations.filter((item) =>
+    ['hrv_ms', 'resting_heart_rate', 'sleep_minutes', 'stress_score'].includes(item.metricType)
+  );
   const recoveryObservations = recentObservations.filter((item) =>
-    ['sleep_minutes', 'hrv_ms', 'resting_heart_rate'].includes(item.metricType)
+    ['sleep_minutes', 'hrv_ms', 'resting_heart_rate', 'active_minutes', 'workout_minutes'].includes(item.metricType)
   );
 
   const scores: HealthScoreInput[] = [];
@@ -133,13 +139,46 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
       : insufficient('activity', 'No activity observations are available.')
   );
   scores.push(
+    sleepObservations.length
+      ? {
+          scoreType: 'sleep',
+          scoreValue: average(sleepObservations.map((item) => scoreObservation(item.metricType, item.value))),
+          scoreStatus: 'calculated',
+          confidence: 0.78,
+          inputSummary: {
+            healthObservationIds: sleepObservations.map((item) => item.id),
+            calculationRule: 'Sleep score compares observed sleep minutes against a 7.5 hour target and does not synthesize missing sleep data.'
+          },
+          calculationVersion: CALCULATION_VERSION
+        }
+      : insufficient('sleep', 'No sleep observations are available.')
+  );
+  scores.push(
+    calmObservations.length
+      ? {
+          scoreType: 'calm',
+          scoreValue: average(calmObservations.map((item) => scoreObservation(item.metricType, item.value))),
+          scoreStatus: 'calculated',
+          confidence: 0.72,
+          inputSummary: {
+            healthObservationIds: calmObservations.map((item) => item.id),
+            calculationRule: 'Calm score uses HRV, resting heart rate, sleep, and stress observations when present.'
+          },
+          calculationVersion: CALCULATION_VERSION
+        }
+      : insufficient('calm', 'No HRV, resting heart rate, sleep, or stress observations are available.')
+  );
+  scores.push(
     recoveryObservations.length
       ? {
           scoreType: 'recovery',
           scoreValue: average(recoveryObservations.map((item) => scoreObservation(item.metricType, item.value))),
           scoreStatus: 'calculated',
           confidence: 0.7,
-          inputSummary: { healthObservationIds: recoveryObservations.map((item) => item.id) },
+          inputSummary: {
+            healthObservationIds: recoveryObservations.map((item) => item.id),
+            calculationRule: 'Recovery score combines sleep, HRV, resting heart rate, and recent activity load inputs.'
+          },
           calculationVersion: CALCULATION_VERSION
         }
       : insufficient('recovery', 'No recovery observations are available.')

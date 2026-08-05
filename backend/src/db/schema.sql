@@ -377,7 +377,7 @@ create table if not exists health_scores (
   calculated_at timestamptz not null default now(),
   calculation_version text not null,
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
-  check (score_type in ('nutrition', 'clinical', 'activity', 'recovery', 'overall')),
+  check (score_type in ('nutrition', 'clinical', 'activity', 'sleep', 'calm', 'recovery', 'overall')),
   check (score_status in ('calculated', 'insufficient_data')),
   check (score_value is null or (score_value >= 0 and score_value <= 100)),
   check (confidence >= 0 and confidence <= 1)

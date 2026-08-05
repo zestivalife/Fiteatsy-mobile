@@ -125,20 +125,10 @@ const supportedMetricsByApp: Record<
   fitbit: new Set(['sleep', 'heart_rate', 'hrv', 'calories', 'workouts', 'stress', 'respiratory_rate'])
 };
 
-const baselineByBrand: Record<WearableBrand, WearableSyncPayload['metrics']> = {
-  Apple: { heartRateAvg: 69, sleepHours: 7.6, hydrationLiters: 2.7, focusMinutes: 26, breathingMinutes: 12, movementMinutes: 20, hrvMs: 41, caloriesKcal: 620, workoutMinutes: 34, stressScore: null, cyclePhase: null, spo2Pct: 97, respiratoryRateBrpm: 14 },
-  Samsung: { heartRateAvg: 71, sleepHours: 7.2, hydrationLiters: 2.5, focusMinutes: 22, breathingMinutes: 10, movementMinutes: 18, hrvMs: 38, caloriesKcal: 570, workoutMinutes: 30, stressScore: 48, cyclePhase: null, spo2Pct: 96, respiratoryRateBrpm: null },
-  Xiaomi: { heartRateAvg: 73, sleepHours: 6.9, hydrationLiters: 2.3, focusMinutes: 19, breathingMinutes: 8, movementMinutes: 16, hrvMs: null, caloriesKcal: 520, workoutMinutes: 25, stressScore: null, cyclePhase: null, spo2Pct: null, respiratoryRateBrpm: null },
-  Amazfit: { heartRateAvg: 72, sleepHours: 7.1, hydrationLiters: 2.4, focusMinutes: 20, breathingMinutes: 9, movementMinutes: 17, hrvMs: null, caloriesKcal: 540, workoutMinutes: 28, stressScore: null, cyclePhase: null, spo2Pct: null, respiratoryRateBrpm: null },
-  GoBOLT: { heartRateAvg: 72, sleepHours: 7.1, hydrationLiters: 2.4, focusMinutes: 20, breathingMinutes: 9, movementMinutes: 17, hrvMs: null, caloriesKcal: 540, workoutMinutes: 28, stressScore: null, cyclePhase: null, spo2Pct: null, respiratoryRateBrpm: null },
-  Other: { heartRateAvg: 72, sleepHours: 7, hydrationLiters: 2.4, focusMinutes: 20, breathingMinutes: 9, movementMinutes: 16, hrvMs: null, caloriesKcal: 520, workoutMinutes: 24, stressScore: null, cyclePhase: null, spo2Pct: null, respiratoryRateBrpm: null }
-};
-
 const connections = new Map<string, HealthConnection>();
 const recordsByConnectionId = new Map<string, HealthMetricRecord[]>();
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const jitter = (seed: number, variance: number) => (Math.random() - 0.5) * variance + seed;
 
 const getBrandForApp = (platform: HealthPlatform, appId: HealthAppId): WearableBrand => {
   const app = healthAppsByPlatform[platform].find((item) => item.id === appId);
@@ -208,25 +198,7 @@ export const ingestHealthRecords = (params: {
   };
 };
 
-const aggregateLiveMetrics = (records: HealthMetricRecord[], base: WearableSyncPayload['metrics']): WearableSyncPayload['metrics'] => {
-  if (records.length === 0) {
-    return {
-      heartRateAvg: Math.round(clamp(jitter(base.heartRateAvg, 6), 52, 110)),
-      sleepHours: Number(clamp(jitter(base.sleepHours, 1.2), 4.5, 9.5).toFixed(1)),
-      hydrationLiters: Number(clamp(jitter(base.hydrationLiters, 0.8), 0.8, 5).toFixed(1)),
-      focusMinutes: Math.round(clamp(jitter(base.focusMinutes, 12), 5, 90)),
-      breathingMinutes: Math.round(clamp(jitter(base.breathingMinutes, 8), 2, 40)),
-      movementMinutes: Math.round(clamp(jitter(base.movementMinutes, 18), 5, 120)),
-      hrvMs: base.hrvMs,
-      caloriesKcal: base.caloriesKcal,
-      workoutMinutes: base.workoutMinutes,
-      stressScore: base.stressScore,
-      cyclePhase: base.cyclePhase,
-      spo2Pct: base.spo2Pct,
-      respiratoryRateBrpm: base.respiratoryRateBrpm
-    };
-  }
-
+const aggregateLiveMetrics = (records: HealthMetricRecord[]): WearableSyncPayload['metrics'] => {
   const now = Date.now();
   const lookbackMs = 24 * 60 * 60 * 1000;
   const recent = records.filter((item) => now - +new Date(item.recordedAtISO) <= lookbackMs);
@@ -261,12 +233,12 @@ const aggregateLiveMetrics = (records: HealthMetricRecord[], base: WearableSyncP
             : 'luteal';
 
   return {
-    heartRateAvg: Math.round(clamp(resting ?? jitter(base.heartRateAvg, 5), 48, 115)),
-    sleepHours: Number(clamp((sleepMinutes > 0 ? sleepMinutes / 60 : base.sleepHours), 3.5, 10).toFixed(1)),
-    hydrationLiters: Number(clamp((hydrationMl > 0 ? hydrationMl / 1000 : base.hydrationLiters), 0.7, 5.5).toFixed(1)),
-    focusMinutes: Math.round(clamp(focusMinutes ?? base.focusMinutes, 5, 120)),
-    breathingMinutes: Math.round(clamp(breathingMinutes > 0 ? breathingMinutes : base.breathingMinutes, 2, 60)),
-    movementMinutes: Math.round(clamp(activeMinutes > 0 ? activeMinutes : base.movementMinutes, 5, 180)),
+    heartRateAvg: resting == null ? 0 : Math.round(clamp(resting, 48, 115)),
+    sleepHours: sleepMinutes > 0 ? Number(clamp(sleepMinutes / 60, 0, 10).toFixed(1)) : 0,
+    hydrationLiters: hydrationMl > 0 ? Number(clamp(hydrationMl / 1000, 0, 5.5).toFixed(1)) : 0,
+    focusMinutes: Math.round(clamp(focusMinutes ?? 0, 0, 120)),
+    breathingMinutes: Math.round(clamp(breathingMinutes, 0, 60)),
+    movementMinutes: Math.round(clamp(activeMinutes, 0, 180)),
     hrvMs: hrv == null ? null : Math.round(clamp(hrv, 10, 180)),
     caloriesKcal: calories > 0 ? Math.round(clamp(calories, 20, 7000)) : null,
     workoutMinutes: workoutMinutes > 0 ? Math.round(clamp(workoutMinutes, 1, 360)) : null,
@@ -289,22 +261,26 @@ export const buildLiveSyncPayload = (params: { userId: string; appId?: HealthApp
 
   const brand = getBrandForApp(connection.platform, connection.appId);
   const records = recordsByConnectionId.get(connection.id) ?? [];
-  const metrics = aggregateLiveMetrics(records, baselineByBrand[brand]);
+  if (records.length === 0) {
+    throw new Error('insufficient_data');
+  }
+
+  const metrics = aggregateLiveMetrics(records);
   const supported = supportedMetricsByApp[connection.appId];
   const recent = records.filter((item) => Date.now() - +new Date(item.recordedAtISO) <= 24 * 60 * 60 * 1000);
   const has = (type: HealthMetricRecord['type']) => recent.some((item) => item.type === type && item.value > 0);
 
   const connectedMetrics: WearableSyncPayload['dataQuality']['connectedMetrics'] = {
-    sleep: !supported.has('sleep') ? 'unsupported' : has('sleep_minutes') ? 'synced' : records.length === 0 ? 'estimated' : 'missing',
-    steps: !supported.has('workouts') ? (supported.has('calories') ? 'missing' : 'unsupported') : has('steps') ? 'synced' : records.length === 0 ? 'estimated' : 'missing',
-    heart_rate: !supported.has('heart_rate') ? 'unsupported' : has('resting_heart_rate') ? 'synced' : records.length === 0 ? 'estimated' : 'missing',
-    hrv: !supported.has('hrv') ? 'unsupported' : has('hrv_ms') ? 'synced' : records.length === 0 ? 'estimated' : 'missing',
-    calories: !supported.has('calories') ? 'unsupported' : has('calories_kcal') ? 'synced' : records.length === 0 ? 'estimated' : 'missing',
-    workouts: !supported.has('workouts') ? 'unsupported' : has('workout_minutes') ? 'synced' : records.length === 0 ? 'estimated' : 'missing',
-    stress: !supported.has('stress') ? 'unsupported' : has('stress_score') ? 'synced' : records.length === 0 ? 'estimated' : 'missing',
-    cycle: !supported.has('cycle') ? 'unsupported' : has('cycle_day') ? 'synced' : records.length === 0 ? 'estimated' : 'missing',
-    spo2: !supported.has('spo2') ? 'unsupported' : has('spo2_pct') ? 'synced' : records.length === 0 ? 'estimated' : 'missing',
-    respiratory_rate: !supported.has('respiratory_rate') ? 'unsupported' : has('respiratory_rate_brpm') ? 'synced' : records.length === 0 ? 'estimated' : 'missing'
+    sleep: !supported.has('sleep') ? 'unsupported' : has('sleep_minutes') ? 'synced' : 'missing',
+    steps: !supported.has('workouts') ? (supported.has('calories') ? 'missing' : 'unsupported') : has('steps') ? 'synced' : 'missing',
+    heart_rate: !supported.has('heart_rate') ? 'unsupported' : has('resting_heart_rate') ? 'synced' : 'missing',
+    hrv: !supported.has('hrv') ? 'unsupported' : has('hrv_ms') ? 'synced' : 'missing',
+    calories: !supported.has('calories') ? 'unsupported' : has('calories_kcal') ? 'synced' : 'missing',
+    workouts: !supported.has('workouts') ? 'unsupported' : has('workout_minutes') ? 'synced' : 'missing',
+    stress: !supported.has('stress') ? 'unsupported' : has('stress_score') ? 'synced' : 'missing',
+    cycle: !supported.has('cycle') ? 'unsupported' : has('cycle_day') ? 'synced' : 'missing',
+    spo2: !supported.has('spo2') ? 'unsupported' : has('spo2_pct') ? 'synced' : 'missing',
+    respiratory_rate: !supported.has('respiratory_rate') ? 'unsupported' : has('respiratory_rate_brpm') ? 'synced' : 'missing'
   };
 
   const normalizedDomains: WearableSyncPayload['dataQuality']['normalizedDomains'] = {
@@ -325,9 +301,9 @@ export const buildLiveSyncPayload = (params: { userId: string; appId?: HealthApp
     source: 'api',
     metrics,
     dataQuality: {
-      confidence: records.length > 0 ? 0.95 : 0.86,
-      isEstimated: records.length === 0,
-      warnings: records.length === 0 ? ['No live records yet. Using provider baseline until records are ingested.'] : [],
+      confidence: 0.95,
+      isEstimated: false,
+      warnings: [],
       connectedMetrics,
       normalizedDomains
     }

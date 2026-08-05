@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 
-export type HealthScoreType = 'nutrition' | 'clinical' | 'activity' | 'recovery' | 'overall';
+export type HealthScoreType = 'nutrition' | 'clinical' | 'activity' | 'sleep' | 'calm' | 'recovery' | 'overall';
 export type HealthScoreStatus = 'calculated' | 'insufficient_data';
 
 export type HealthScoreRecord = {

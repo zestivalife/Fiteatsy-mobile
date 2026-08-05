@@ -146,7 +146,8 @@ intelligenceRouter.get('/scores/history', requireAuthenticatedAccount, async (re
   const limit = Math.max(1, Math.min(200, Number(req.query.limit || 50)));
   const offset = Math.max(0, Number(req.query.offset || 0));
   const scoreType =
-    typeof req.query.scoreType === 'string' && ['nutrition', 'clinical', 'activity', 'recovery', 'overall'].includes(req.query.scoreType)
+    typeof req.query.scoreType === 'string' &&
+    ['nutrition', 'clinical', 'activity', 'sleep', 'calm', 'recovery', 'overall'].includes(req.query.scoreType)
       ? (req.query.scoreType as HealthScoreType)
       : undefined;
   const items = await listHealthScoreHistory(owner, { scoreType, limit, offset });
@@ -170,6 +171,8 @@ intelligenceRouter.get('/summary', requireAuthenticatedAccount, async (req, res)
     nutritionScore: getScoreValue(scores, 'nutrition'),
     clinicalScore: getScoreValue(scores, 'clinical'),
     activityScore: getScoreValue(scores, 'activity'),
+    sleepScore: getScoreValue(scores, 'sleep'),
+    calmScore: getScoreValue(scores, 'calm'),
     overallScore: getScoreValue(scores, 'overall'),
     confidence: getAggregateConfidence(scores),
     status: scores.some((score) => score.scoreStatus === 'calculated') ? 'calculated' : 'insufficient_data',

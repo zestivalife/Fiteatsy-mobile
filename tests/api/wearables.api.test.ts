@@ -64,7 +64,8 @@ test('wearables endpoints support app discovery, connect, ingest, live sync, and
     brand: 'Apple',
     model: 'Watch',
   });
-  assert.equal(legacy.response.status, 200);
+  assert.equal(legacy.response.status, 410);
+  assert.equal(legacy.body.error, 'LEGACY_SYNC_REMOVED');
 });
 
 test('wearables endpoints return 400 and 404 on invalid or missing connection payloads', async () => {
@@ -93,6 +94,25 @@ test('wearables endpoints return 400 and 404 on invalid or missing connection pa
     headers: authHeaders(session.token)
   });
   assert.equal(invalidIngest.response.status, 400);
+});
+
+test('live sync does not synthesize health values when a connection has no ingested records', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  await postJson(server.baseUrl, '/v1/wearables/connect-app', {
+    appId: 'apple-health',
+    platform: 'ios'
+  }, {
+    headers: authHeaders(session.token)
+  });
+
+  const live = await postJson(server.baseUrl, '/v1/wearables/sync/live', {
+    appId: 'apple-health',
+    platform: 'ios'
+  }, {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(live.response.status, 409);
+  assert.equal(live.body.error, 'INSUFFICIENT_DATA');
 });
 
 test('wearables routes reject missing tokens and deny cross-account connection reads', async () => {
