@@ -67,6 +67,15 @@ test('database schema defines traceable health intelligence scores', () => {
   assert.equal(hasPattern(/check \(score_type in \('nutrition', 'clinical', 'activity', 'recovery', 'overall'\)\)/i), true);
 });
 
+test('database schema preserves report-to-biomarker extraction lineage', () => {
+  assert.equal(hasPattern(/create table if not exists biomarker_observations/i), true);
+  assert.equal(hasPattern(/client_id text not null/i), true);
+  assert.equal(hasPattern(/source_report_id text references health_reports\(id\) on delete set null/i), true);
+  assert.equal(hasPattern(/original_parameter_name text/i), true);
+  assert.equal(hasPattern(/validation_status text not null default 'pending'/i), true);
+  assert.equal(hasPattern(/reference_range text/i), true);
+});
+
 test.skip('database CRUD runtime validation is pending a live PostgreSQL test database');
 test.skip('database rollback semantics are pending a live PostgreSQL test database');
 test.skip('database transaction semantics are pending a live PostgreSQL test database');

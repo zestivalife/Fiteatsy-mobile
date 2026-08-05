@@ -60,6 +60,47 @@ const toReportDto = (record: Awaited<ReturnType<typeof getReport>>) => {
 const ownsReport = (record: Awaited<ReturnType<typeof getReport>>, owner: ClientOwnershipContext) =>
   Boolean(record && record.userId === owner.accountId && record.clientId === owner.clientId);
 
+const analyzeAndPersistReport = async (input: {
+  owner: ClientOwnershipContext;
+  reportId: string;
+  processingJobId: string;
+  fileName: string;
+  fileBuffer: Buffer;
+  mimeType: string;
+  manualDate?: string;
+  manualLab?: string;
+}) => {
+  await syncReportPipelineToPlatform(input.owner, input.reportId, 'uploaded', `Blood report uploaded: ${input.fileName}`);
+  await updateReportStatus(input.reportId, 'PROCESSING');
+  await updateProcessingJobStatus(input.processingJobId, 'processing');
+  const analysis = await analyzeReportBuffer(input.fileBuffer, input.mimeType);
+  await updateReportStatus(input.reportId, 'EXTRACTION_COMPLETED');
+  await updateProcessingJobStatus(input.processingJobId, 'extraction_completed');
+  await syncReportPipelineToPlatform(input.owner, input.reportId, 'ocr_completed', `OCR completed for ${input.fileName}`);
+  if (input.manualDate) analysis.reportDate = input.manualDate;
+  if (input.manualLab) analysis.labName = input.manualLab;
+  await updateReportStatus(input.reportId, 'VALIDATION_PENDING');
+  await updateProcessingJobStatus(input.processingJobId, 'validation_pending');
+  const intelligence = await persistReportIntelligence(input.owner, input.reportId, analysis);
+  const saved = await attachReportAnalysis(input.reportId, analysis);
+  await updateProcessingJobStatus(input.processingJobId, 'completed');
+  await syncReportPipelineToPlatform(input.owner, input.reportId, 'biomarkers_updated', `Biomarkers extracted from ${input.fileName}`);
+  await syncReportPipelineToPlatform(input.owner, input.reportId, 'analysis_completed', `AI validation completed for ${input.fileName}`);
+  return {
+    reportId: saved?.id,
+    status: saved?.status,
+    biomarkerObservations: intelligence.observations,
+    healthScores: intelligence.scores.map((score) => ({
+      scoreType: score.scoreType,
+      scoreValue: score.scoreValue,
+      scoreStatus: score.scoreStatus,
+      confidence: score.confidence,
+      calculatedAtISO: score.calculatedAtISO
+    })),
+    ...analysis
+  };
+};
+
 reportsRouter.get('/supported-formats', (_req, res) => {
   res.json({
     formats: allowedMimeTypes,
@@ -226,6 +267,87 @@ reportsRouter.get('/:reportId/comparison', async (req, res) => {
   });
 });
 
+reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, res) => {
+  let currentReportId: string | null = null;
+  let currentJobId: string | null = null;
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'MISSING_FILE', message: 'Please upload a PDF or image report file.' });
+    }
+
+    const mime = req.file.mimetype.toLowerCase();
+    if (!mime.includes('pdf') && !mime.includes('image')) {
+      return res.status(415).json({ error: 'UNSUPPORTED_FILE', message: 'Only PDF and image reports are supported.' });
+    }
+
+    const owner = currentOwner(getAuthenticatedAccount(req));
+    const uploadId = typeof req.body?.uploadId === 'string' ? req.body.uploadId.trim() : '';
+    const uploadSession = uploadId ? await getUploadSession(uploadId, reportOwner(owner)) : null;
+    if (uploadId && !uploadSession) {
+      return res.status(404).json({ error: 'UPLOAD_SESSION_NOT_FOUND', message: 'uploadId is invalid or expired.' });
+    }
+
+    const record = await createReportRecord({
+      ...reportOwner(owner),
+      fileName: req.file.originalname || `report-${Date.now()}`,
+      mimeType: req.file.mimetype,
+      fileSize: req.file.size,
+      reportDate: typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : undefined,
+      labName: typeof req.body?.labName === 'string' ? req.body.labName.trim() : undefined,
+      source:
+        req.body?.source === 'camera' || req.body?.source === 'gallery' || req.body?.source === 'pdf'
+          ? req.body.source
+          : uploadSession?.source,
+      storageObjectRef: uploadSession?.storageObjectRef
+    });
+    currentReportId = record.id;
+    const processingJob = await createProcessingJob({
+      clientId: owner.clientId,
+      reportId: record.id,
+      jobType: 'report_analysis',
+      status: 'queued'
+    });
+    currentJobId = processingJob.id;
+    const fileBuffer = Buffer.from(req.file.buffer);
+    const manualDate = typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : '';
+    const manualLab = typeof req.body?.labName === 'string' ? req.body.labName.trim() : '';
+
+    void analyzeAndPersistReport({
+      owner,
+      reportId: record.id,
+      processingJobId: processingJob.id,
+      fileName: record.fileName,
+      fileBuffer,
+      mimeType: req.file.mimetype,
+      manualDate,
+      manualLab
+    }).catch(async (error) => {
+      const message = error instanceof Error ? error.message : 'Unable to analyze this report file.';
+      await updateReportStatus(record.id, 'FAILED', message);
+      await updateProcessingJobStatus(processingJob.id, 'failed', message);
+    });
+
+    return res.status(202).json({
+      reportId: record.id,
+      processingJobId: processingJob.id,
+      status: record.status,
+      message: 'Report uploaded successfully. Processing health information...'
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to start report analysis.';
+    if (currentReportId) {
+      await updateReportStatus(currentReportId, 'FAILED', message);
+    }
+    if (currentJobId) {
+      await updateProcessingJobStatus(currentJobId, 'failed', message);
+    }
+    return res.status(422).json({
+      error: 'ANALYSIS_START_FAILED',
+      message
+    });
+  }
+});
+
 reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => {
   let currentReportId: string | null = null;
   let currentJobId: string | null = null;
@@ -267,36 +389,19 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
       status: 'processing'
     });
     currentJobId = processingJob.id;
-    await syncReportPipelineToPlatform(owner, record.id, 'uploaded', `Blood report uploaded: ${record.fileName}`);
-    await updateReportStatus(record.id, 'PROCESSING');
-    const analysis = await analyzeReportBuffer(req.file.buffer, req.file.mimetype);
-    await updateReportStatus(record.id, 'EXTRACTION_COMPLETED');
-    await updateProcessingJobStatus(processingJob.id, 'extraction_completed');
-    await syncReportPipelineToPlatform(owner, record.id, 'ocr_completed', `OCR completed for ${record.fileName}`);
     const manualDate = typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : '';
     const manualLab = typeof req.body?.labName === 'string' ? req.body.labName.trim() : '';
-    if (manualDate) analysis.reportDate = manualDate;
-    if (manualLab) analysis.labName = manualLab;
-    await updateReportStatus(record.id, 'VALIDATION_PENDING');
-    await updateProcessingJobStatus(processingJob.id, 'validation_pending');
-    const intelligence = await persistReportIntelligence(owner, record.id, analysis);
-    const saved = await attachReportAnalysis(record.id, analysis);
-    await updateProcessingJobStatus(processingJob.id, 'completed');
-    await syncReportPipelineToPlatform(owner, record.id, 'biomarkers_updated', `Biomarkers extracted from ${record.fileName}`);
-    await syncReportPipelineToPlatform(owner, record.id, 'analysis_completed', `AI validation completed for ${record.fileName}`);
-    return res.status(200).json({
-      reportId: saved?.id,
-      status: saved?.status,
-      biomarkerObservations: intelligence.observations,
-      healthScores: intelligence.scores.map((score) => ({
-        scoreType: score.scoreType,
-        scoreValue: score.scoreValue,
-        scoreStatus: score.scoreStatus,
-        confidence: score.confidence,
-        calculatedAtISO: score.calculatedAtISO
-      })),
-      ...analysis
+    const payload = await analyzeAndPersistReport({
+      owner,
+      reportId: record.id,
+      processingJobId: processingJob.id,
+      fileName: record.fileName,
+      fileBuffer: req.file.buffer,
+      mimeType: req.file.mimetype,
+      manualDate,
+      manualLab
     });
+    return res.status(200).json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to analyze this report file.';
     if (currentReportId) {

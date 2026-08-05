@@ -344,6 +344,7 @@ create table if not exists biomarker_observations (
   test_date date not null,
   confidence numeric(5,4) not null,
   validation_status text not null default 'pending',
+  original_parameter_name text,
   source_location text,
   reference_range text,
   created_at timestamptz not null default now(),

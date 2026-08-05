@@ -90,7 +90,8 @@ const parseParameters = (text) => {
 const parseParametersFromAiJson = (raw) => {
     try {
         const json = JSON.parse(raw);
-        return json
+        const parameters = Array.isArray(json) ? json : Array.isArray(json.parameters) ? json.parameters : [];
+        return parameters
             .filter((item) => item && item.name && Number.isFinite(item.value))
             .map((item) => {
             const category = categorize(item.category || item.name);

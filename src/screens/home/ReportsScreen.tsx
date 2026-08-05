@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Animated,
@@ -38,7 +37,14 @@ import {
   ReportParameter
 } from '../../services/nuetraService';
 import { useAppContext } from '../../state/AppContext';
-import { ReportAnalysisResponse, uploadAndAnalyzeReport } from '../../services/reportUploadService';
+import {
+  BiomarkerHistoryItem,
+  listAnalyzedReports,
+  listBiomarkerHistory,
+  ReportAnalysisResponse,
+  ReportDto,
+  uploadAndAnalyzeReport
+} from '../../services/reportUploadService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type CategoryKey = 'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins';
@@ -76,9 +82,7 @@ type AnalysisReviewState = {
   healthScores: NonNullable<ReportAnalysisResponse['healthScores']>;
 };
 
-type ProcessingPhase = 'uploading' | 'processing' | 'extraction' | 'validation' | 'completed' | 'failed';
-
-const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
+type ProcessingPhase = 'uploading' | 'uploaded' | 'processing' | 'extraction' | 'validation' | 'completed' | 'failed';
 
 const palette = {
   teal: '#2E6B00',
@@ -103,43 +107,6 @@ const categoryMeta: Array<{ key: CategoryKey; icon: keyof typeof Ionicons.glyphM
   { key: 'Organs', icon: 'heart', color: colors.pink },
   { key: 'Thyroid', icon: 'leaf', color: colors.blueDark },
   { key: 'Vitamins', icon: 'sunny', color: colors.warning }
-];
-
-const seedParameters = (): ReportParameter[] => [
-  { name: 'Vitamin D', value: 18, unit: 'ng/mL', status: 'low', referenceRange: '30-100', category: 'Vitamins' },
-  { name: 'HbA1c', value: 5.9, unit: '%', status: 'high', referenceRange: '4.0-5.6', category: 'Metabolic' },
-  { name: 'LDL Cholesterol', value: 141, unit: 'mg/dL', status: 'high', referenceRange: '<100', category: 'Metabolic' },
-  { name: 'Hemoglobin', value: 13.8, unit: 'g/dL', status: 'normal', referenceRange: '13.0-17.0', category: 'Blood' },
-  { name: 'TSH', value: 2.6, unit: 'mIU/L', status: 'normal', referenceRange: '0.4-4.0', category: 'Thyroid' },
-  { name: 'Creatinine', value: 0.93, unit: 'mg/dL', status: 'normal', referenceRange: '0.7-1.3', category: 'Organs' },
-  { name: 'HDL Cholesterol', value: 42, unit: 'mg/dL', status: 'normal', referenceRange: '>40', category: 'Metabolic' }
-];
-
-const seededReports: ReportItem[] = [
-  {
-    id: 'rep-1',
-    labName: 'Dr. Lal PathLabs',
-    date: '15 Mar 2026',
-    parameters: 47,
-    abnormal: 3,
-    score: 78,
-    trend: 'up',
-    categoryScores: { Blood: 82, Metabolic: 69, Organs: 80, Thyroid: 74, Vitamins: 63 },
-    parametersData: seedParameters()
-  },
-  {
-    id: 'rep-2',
-    labName: 'Metropolis Labs',
-    date: '20 Feb 2026',
-    parameters: 39,
-    abnormal: 4,
-    score: 71,
-    trend: 'down',
-    categoryScores: { Blood: 76, Metabolic: 62, Organs: 73, Thyroid: 70, Vitamins: 64 },
-    parametersData: seedParameters().map((param) =>
-      param.name === 'Vitamin D' ? { ...param, value: 16 } : param.name === 'HbA1c' ? { ...param, value: 6.1 } : param
-    )
-  }
 ];
 
 const scoreColor = (score: number) => {
@@ -191,6 +158,55 @@ const buildCategoryScores = (parameters: ReportParameter[]): Record<CategoryKey,
     Thyroid: Math.round(grouped.Thyroid.reduce((a, b) => a + b, 0) / Math.max(1, grouped.Thyroid.length)),
     Vitamins: Math.round(grouped.Vitamins.reduce((a, b) => a + b, 0) / Math.max(1, grouped.Vitamins.length))
   };
+};
+
+const toReportItem = (
+  analysis: ReportAnalysisResponse,
+  fallback: { id?: string; source?: 'camera' | 'gallery' | 'pdf'; createdAtISO?: string } = {},
+  previous?: ReportItem | null
+): ReportItem => {
+  const abnormal = analysis.parameters.filter((parameter) => parameter.status !== 'normal').length;
+  const trend: ReportItem['trend'] = previous
+    ? analysis.score > previous.score
+      ? 'up'
+      : analysis.score < previous.score
+        ? 'down'
+        : 'flat'
+    : 'flat';
+  return {
+    id: analysis.reportId ?? fallback.id ?? `rep-${Date.now()}`,
+    labName: analysis.labName,
+    date: analysis.reportDate,
+    parameters: analysis.parameters.length,
+    abnormal,
+    score: analysis.score,
+    trend,
+    categoryScores: analysis.categoryScores ?? buildCategoryScores(analysis.parameters),
+    parametersData: analysis.parameters,
+    uploadSource: fallback.source,
+    uploadedAtISO: fallback.createdAtISO ?? new Date().toISOString()
+  };
+};
+
+const reportDtoToItem = (report: ReportDto, previous?: ReportItem | null) => {
+  if (!report.analysis || report.status !== 'COMPLETED') return null;
+  return toReportItem(
+    {
+      ...report.analysis,
+      reportId: report.id,
+      status: report.status
+    },
+    { id: report.id, source: report.source, createdAtISO: report.createdAtISO },
+    previous
+  );
+};
+
+const buildTrendLabel = (current: BiomarkerHistoryItem, prior: BiomarkerHistoryItem) => {
+  const delta = current.value - prior.value;
+  if (Math.abs(delta) < 0.01) return 'Stable';
+  if (current.validationStatus === 'validated' && prior.validationStatus !== 'validated') return 'Improved';
+  if (current.validationStatus !== 'validated' && prior.validationStatus === 'validated') return 'Needs monitoring';
+  return delta < 0 ? 'Improved' : 'Needs monitoring';
 };
 
 const buildSpecificFallbackSummary = (parameters: ReportParameter[], userName?: string) => {
@@ -297,7 +313,10 @@ export const ReportsScreen = () => {
   const navigation = useNavigation<Nav>();
   const { wellness, onboarding, checkIns, themeMode } = useAppContext();
   const isLight = themeMode === 'light';
-  const [reports, setReports] = useState<ReportItem[]>(seededReports);
+  const [reports, setReports] = useState<ReportItem[]>([]);
+  const [biomarkerHistory, setBiomarkerHistory] = useState<BiomarkerHistoryItem[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [reportsLoadError, setReportsLoadError] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'latest' | 'oldest' | 'lab' | 'type'>('latest');
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [showProcessing, setShowProcessing] = useState(false);
@@ -365,63 +384,62 @@ export const ReportsScreen = () => {
     [latestReport]
   );
   const biomarkerTrends = useMemo(() => {
-    if (reports.length < 2 || !latestReport) return [];
-    const previous = reports.find((report) => report.id !== latestReport.id);
-    if (!previous) return [];
-    return latestReport.parametersData
-      .map((current) => {
-        const prior = previous.parametersData.find((item) => item.name.toLowerCase() === current.name.toLowerCase());
-        if (!prior) return null;
-        const delta = current.value - prior.value;
-        const improved =
-          current.status === 'normal' && prior.status !== 'normal'
-            ? true
-            : current.status !== 'normal' && prior.status === 'normal'
-              ? false
-              : Math.abs(delta) < 0.01
-                ? null
-                : current.status === 'high'
-                  ? delta < 0
-                  : current.status === 'low'
-                    ? delta > 0
-                    : null;
+    const grouped = new Map<string, BiomarkerHistoryItem[]>();
+    biomarkerHistory.forEach((item) => {
+      const key = item.biomarkerId || item.biomarkerName;
+      grouped.set(key, [...(grouped.get(key) ?? []), item]);
+    });
+
+    return Array.from(grouped.values())
+      .map((items) => {
+        const sorted = [...items].sort((a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime());
+        const current = sorted[0];
+        const prior = sorted[1];
+        if (!current || !prior) return null;
         return {
-          name: current.name,
+          name: current.biomarkerName,
           current,
           prior,
-          delta,
-          label: improved == null ? 'Stable' : improved ? 'Improved' : 'Needs monitoring'
+          delta: current.value - prior.value,
+          label: buildTrendLabel(current, prior)
         };
       })
       .filter(Boolean)
       .slice(0, 5) as Array<{
         name: string;
-        current: ReportParameter;
-        prior: ReportParameter;
+        current: BiomarkerHistoryItem;
+        prior: BiomarkerHistoryItem;
         delta: number;
         label: string;
       }>;
-  }, [latestReport, reports]);
+  }, [biomarkerHistory]);
+
+  const refreshReportData = async () => {
+    setReportsLoadError(null);
+    const [reportDtos, history] = await Promise.all([listAnalyzedReports(), listBiomarkerHistory()]);
+    const hydratedReports = reportDtos.reduce<ReportItem[]>((acc, dto) => {
+      const item = reportDtoToItem(dto, acc[0] ?? null);
+      return item ? [...acc, item] : acc;
+    }, []);
+    setReports(hydratedReports);
+    setBiomarkerHistory(history);
+  };
 
   useEffect(() => {
     let active = true;
-    AsyncStorage.getItem(REPORT_HISTORY_STORAGE_KEY)
-      .then((raw) => {
-        if (!active || !raw) return;
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setReports(parsed);
-        }
+    setReportsLoading(true);
+    refreshReportData()
+      .catch((error) => {
+        if (!active) return;
+        setReportsLoadError(error instanceof Error ? error.message : 'Unable to load report history.');
       })
-      .catch(() => undefined);
+      .finally(() => {
+        if (active) setReportsLoading(false);
+      });
     return () => {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    AsyncStorage.setItem(REPORT_HISTORY_STORAGE_KEY, JSON.stringify(reports)).catch(() => undefined);
-  }, [reports]);
 
   const hydratePickedFile = async (
     uri: string,
@@ -594,7 +612,7 @@ export const ReportsScreen = () => {
 
   const applyAnalysisReview = () => {
     if (!analysisReview) return;
-    setReports((prev) => [analysisReview.report, ...prev]);
+    setReports((prev) => [analysisReview.report, ...prev.filter((item) => item.id !== analysisReview.report.id)]);
     setLatestComparisonSummary(analysisReview.comparisonSummary);
     setNuetraSummary(analysisReview.summary);
     setActionPlan(analysisReview.actionPlan);
@@ -716,7 +734,7 @@ export const ReportsScreen = () => {
       setAnalysisLaunching(false);
       setShowUploadSheet(true);
       setUploadError('Analysis is taking too long. Please retry. If issue continues, restart backend and app.');
-    }, 45000);
+    }, 125000);
 
     const execute = async () => {
       try {
@@ -725,6 +743,7 @@ export const ReportsScreen = () => {
           fileUri: selectedUpload.uri,
           fileName: selectedUpload.name,
           mimeType: selectedUpload.mimeType,
+          source: selectedUpload.source,
           reportDate,
           labName,
           signal: controller.signal,
@@ -733,7 +752,16 @@ export const ReportsScreen = () => {
             setProcessingPhase(event.stage);
             setProcessingPercent(event.percent);
             setProcessingMessage(event.message);
-            const nextStep = event.stage === 'uploading' ? 0 : event.stage === 'processing' ? 1 : event.stage === 'extraction' ? 2 : 3;
+            const nextStep =
+              event.stage === 'uploading'
+                ? 0
+                : event.stage === 'uploaded' || event.stage === 'processing'
+                  ? 1
+                  : event.stage === 'extraction'
+                    ? 2
+                    : event.stage === 'completed'
+                      ? 4
+                      : 3;
             setProcessingStep(nextStep);
           }
         });
@@ -747,28 +775,7 @@ export const ReportsScreen = () => {
         setLabName(analysis.labName);
 
         const previous = reports[0] ?? null;
-        const abnormal = analysis.parameters.filter((parameter) => parameter.status !== 'normal').length;
-        const trend: ReportItem['trend'] = previous
-          ? analysis.score > previous.score
-            ? 'up'
-            : analysis.score < previous.score
-              ? 'down'
-              : 'flat'
-          : 'flat';
-
-        const newReport: ReportItem = {
-          id: `rep-${Date.now()}`,
-          labName: analysis.labName,
-          date: analysis.reportDate,
-          parameters: analysis.parameters.length,
-          abnormal,
-          score: analysis.score,
-          trend,
-          categoryScores: analysis.categoryScores,
-          parametersData: analysis.parameters,
-          uploadSource: selectedUpload.source,
-          uploadedAtISO: new Date().toISOString()
-        };
+        const newReport = toReportItem(analysis, { id: analysis.reportId, source: selectedUpload.source }, previous);
 
         const prevText = previous ? `Compared with ${previous.date} (${previous.labName}), ` : '';
         const comparisonSummary = previous
@@ -785,6 +792,7 @@ export const ReportsScreen = () => {
           healthScores: analysis.healthScores ?? []
         });
         setShowAnalysisReview(true);
+        refreshReportData().catch(() => undefined);
         setShowProcessing(false);
         setAnalysisLaunching(false);
         setUploadType(null);
@@ -838,7 +846,7 @@ export const ReportsScreen = () => {
   const reportCountLabel = `${reports.length}`;
   const stepText = [
     'Uploading Report',
-    'Processing health information...',
+    'Report uploaded successfully. Processing health information...',
     'Extracting health parameters...',
     'Validating extracted health information...',
     'Report analysis completed.'
@@ -921,7 +929,21 @@ export const ReportsScreen = () => {
             </>
           ) : null}
         </Card>
-      ) : null}
+      ) : reportsLoading ? (
+        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
+          <ActivityIndicator size="small" color={isLight ? palette.teal : sectionHighlight} />
+          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Loading report history</Text>
+          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>Checking your completed health reports and biomarkers...</Text>
+        </Card>
+      ) : (
+        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
+          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>No health reports yet</Text>
+          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
+            Upload your first report to create a real biomarker baseline. No demo biomarkers are shown here.
+          </Text>
+          {reportsLoadError ? <Text style={styles.uploadErrorText}>History sync: {reportsLoadError}</Text> : null}
+        </Card>
+      )}
 
       <Card style={[styles.nuetraCard, !isLight && styles.nuetraCardDark]}>
         <View style={styles.nuetraBadge}>
@@ -937,7 +959,9 @@ export const ReportsScreen = () => {
             <Animated.View style={[styles.shimmerSweep, { transform: [{ translateX: shimmerTranslate }] }]} />
           </View>
         ) : (
-          <Text style={[styles.nuetraCopy, !isLight && styles.nuetraCopyDark]}>{nuetraSummary}</Text>
+          <Text style={[styles.nuetraCopy, !isLight && styles.nuetraCopyDark]}>
+            {latestReport ? nuetraSummary : 'Upload a report to unlock a health summary based on your own extracted biomarkers.'}
+          </Text>
         )}
 
         <Pressable
@@ -1034,6 +1058,11 @@ export const ReportsScreen = () => {
               highlightColor={sectionHighlight}
             />
           ))}
+          {sortedReports.length === 0 ? (
+            <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
+              No completed reports are available yet. Upload a report to start your timeline.
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -1134,10 +1163,11 @@ export const ReportsScreen = () => {
 
               {selectedUpload ? (
                 <View style={styles.uploadStatusCard}>
-                  <Text style={styles.uploadStatusTitle}>Ready to analyze</Text>
+                  <Text style={styles.uploadStatusTitle}>Ready to upload</Text>
                   <Text style={styles.uploadStatusText}>
                     {selectedUpload.name} · {bytesToLabel(selectedUpload.sizeBytes)} · {selectedUpload.source.toUpperCase()}
                   </Text>
+                  <Text style={styles.uploadStatusText}>Review the file details, then tap Upload Report to start analysis.</Text>
                 </View>
               ) : null}
 
@@ -1209,7 +1239,7 @@ export const ReportsScreen = () => {
                 style={[styles.primaryBtn, (!selectedUpload || uploadBusy || analysisLaunching) && styles.primaryBtnDisabled]}
                 onPress={startAnalysis}
               >
-                <Text style={styles.primaryBtnText}>{analysisLaunching ? 'Starting analysis...' : 'Start Analysis'}</Text>
+                <Text style={styles.primaryBtnText}>{analysisLaunching ? 'Starting upload...' : 'Upload Report'}</Text>
               </Pressable>
             </ScrollView>
           </View>
@@ -1231,7 +1261,9 @@ export const ReportsScreen = () => {
               )}
             </View>
             <Text style={styles.processingTitle}>{processingMessage}</Text>
-            <Text style={styles.processingStatusText}>Status: {processingPhase === 'extraction' ? 'EXTRACTION_COMPLETED' : processingPhase === 'validation' ? 'VALIDATION_PENDING' : processingPhase.toUpperCase()}</Text>
+            <Text style={styles.processingStatusText}>
+              Status: {processingPhase === 'uploaded' ? 'UPLOADED' : processingPhase === 'extraction' ? 'EXTRACTION_COMPLETED' : processingPhase === 'validation' ? 'VALIDATION_PENDING' : processingPhase.toUpperCase()}
+            </Text>
 
             <View style={styles.processingSteps}>
               {stepText.map((step, index) => {
@@ -1252,8 +1284,8 @@ export const ReportsScreen = () => {
 
             {processingPhase === 'extraction' || processingPhase === 'validation' || processingPhase === 'completed' ? (
               <View style={styles.findingCard}>
-                <Text style={styles.findingTitle}>Finding</Text>
-                {['HbA1c', 'Vitamin B12', 'Vitamin D', 'Lipid Profile'].map((item) => (
+                <Text style={styles.findingTitle}>Extraction checks</Text>
+                {['Reading visible report rows', 'Mapping original names to biomarkers', 'Validating values, units, and ranges'].map((item) => (
                   <Text key={item} style={styles.findingText}>• {item}</Text>
                 ))}
               </View>

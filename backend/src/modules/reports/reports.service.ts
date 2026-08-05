@@ -109,16 +109,28 @@ const parseParameters = (text: string): ParsedParameter[] => {
 
 const parseParametersFromAiJson = (raw: string): ParsedParameter[] => {
   try {
-    const json = JSON.parse(raw) as Array<{
-      name: string;
-      value: number;
-      unit?: string;
-      referenceRange?: string;
-      category?: string;
-      status?: string;
-    }>;
+    const json = JSON.parse(raw) as
+      | Array<{
+          name: string;
+          value: number;
+          unit?: string;
+          referenceRange?: string;
+          category?: string;
+          status?: string;
+        }>
+      | {
+          parameters?: Array<{
+            name: string;
+            value: number;
+            unit?: string;
+            referenceRange?: string;
+            category?: string;
+            status?: string;
+          }>;
+        };
+    const parameters = Array.isArray(json) ? json : Array.isArray(json.parameters) ? json.parameters : [];
 
-    return json
+    return parameters
       .filter((item) => item && item.name && Number.isFinite(item.value))
       .map((item) => {
         const category = categorize(item.category || item.name);

@@ -17,6 +17,7 @@ const toBiomarkerObservationDto = (observation, fiteatsyClientId) => ({
     testDate: observation.testDate,
     confidence: observation.confidence,
     validationStatus: observation.validationStatus,
+    originalParameterName: observation.originalParameterName,
     sourceLocation: observation.sourceLocation,
     referenceRange: observation.referenceRange,
     createdAtISO: observation.createdAtISO

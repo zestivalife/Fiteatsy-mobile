@@ -33,6 +33,7 @@ const rowToObservation = (row) => ({
     testDate: new Date(String(row.test_date)).toISOString().slice(0, 10),
     confidence: Number(row.confidence),
     validationStatus: String(row.validation_status),
+    originalParameterName: row.original_parameter_name == null ? null : String(row.original_parameter_name),
     sourceLocation: row.source_location == null ? null : String(row.source_location),
     referenceRange: row.reference_range == null ? null : String(row.reference_range),
     createdAtISO: new Date(String(row.created_at)).toISOString()
@@ -58,9 +59,9 @@ export const createBiomarkerObservation = async (owner, input) => {
       with inserted as (
         insert into biomarker_observations (
           id, user_id, client_id, biomarker_id, source_report_id, value, unit, test_date,
-          confidence, validation_status, source_location, reference_range
+          confidence, validation_status, original_parameter_name, source_location, reference_range
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         returning *
       )
       select inserted.*, b.canonical_name
@@ -77,6 +78,7 @@ export const createBiomarkerObservation = async (owner, input) => {
         input.testDate,
         input.confidence,
         input.validationStatus ?? 'pending',
+        input.originalParameterName ?? null,
         input.sourceLocation ?? null,
         input.referenceRange ?? null
     ]);

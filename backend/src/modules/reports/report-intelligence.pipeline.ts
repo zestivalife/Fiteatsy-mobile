@@ -3,29 +3,34 @@ import { calculateHealthScores } from '../intelligence/health-calculation-engine
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { ReportAnalysisResult, ParsedParameter } from './reports.service.js';
 
-const aliasMap: Record<string, string[]> = {
-  hba1c: ['Hb A1C', 'Glycated Hemoglobin', 'Hemoglobin A1c'],
-  glucose: ['Fasting Glucose', 'Blood Sugar', 'FBS'],
-  tsh: ['Thyroid Stimulating Hormone'],
-  creatinine: ['Serum Creatinine'],
-  hemoglobin: ['Hb'],
-  cholesterol: ['Total Cholesterol'],
-  ldl: ['LDL Cholesterol'],
-  hdl: ['HDL Cholesterol'],
-  triglyceride: ['Triglycerides'],
-  'vitamin d': ['25-OH Vitamin D', 'Vitamin D3'],
-  'vitamin b12': ['B12', 'Cobalamin']
-};
+const aliasGroups = [
+  { canonicalName: 'HbA1c', aliases: ['Hb A1C', 'HBA1C', 'Glycated Hemoglobin', 'Glycated Haemoglobin', 'Glycosylated Hemoglobin', 'Glycosylated Haemoglobin', 'Hemoglobin A1c', 'Haemoglobin A1c'] },
+  { canonicalName: 'Fasting Glucose', aliases: ['Glucose Fasting', 'Blood Sugar Fasting', 'FBS', 'Fasting Blood Sugar'] },
+  { canonicalName: 'TSH', aliases: ['Thyroid Stimulating Hormone'] },
+  { canonicalName: 'Creatinine', aliases: ['Serum Creatinine'] },
+  { canonicalName: 'Hemoglobin', aliases: ['Hb', 'Haemoglobin'] },
+  { canonicalName: 'Total Cholesterol', aliases: ['Cholesterol'] },
+  { canonicalName: 'LDL Cholesterol', aliases: ['LDL'] },
+  { canonicalName: 'HDL Cholesterol', aliases: ['HDL'] },
+  { canonicalName: 'Triglycerides', aliases: ['Triglyceride', 'TG'] },
+  { canonicalName: 'Vitamin D', aliases: ['25-OH Vitamin D', '25 Hydroxy Vitamin D', 'Vitamin D3'] },
+  { canonicalName: 'Vitamin B12', aliases: ['B12', 'Cobalamin'] }
+];
 
 const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 const canonicalName = (rawName: string) => {
   const normalized = normalizeName(rawName);
-  const match = Object.entries(aliasMap).find(([key, aliases]) =>
-    normalized === key || aliases.some((alias) => normalizeName(alias) === normalized)
+  const match = aliasGroups.find((group) =>
+    normalized === normalizeName(group.canonicalName) || group.aliases.some((alias) => normalizeName(alias) === normalized)
   );
-  if (match) return match[0].replace(/\b\w/g, (letter) => letter.toUpperCase());
+  if (match) return match.canonicalName;
   return rawName.trim().replace(/\s+/g, ' ');
+};
+
+const aliasesForCanonicalName = (name: string, originalName: string) => {
+  const group = aliasGroups.find((item) => normalizeName(item.canonicalName) === normalizeName(name));
+  return [originalName, name, ...(group?.aliases ?? [])].filter((value, index, values) => values.indexOf(value) === index);
 };
 
 const mapCategory = (parameter: ParsedParameter) => {
@@ -80,7 +85,7 @@ export const persistReportIntelligence = async (
     const name = canonicalName(parameter.name);
     const biomarker = await upsertBiomarker({
       canonicalName: name,
-      aliases: [parameter.name, ...(aliasMap[normalizeName(name)] ?? [])].filter((value, index, values) => values.indexOf(value) === index),
+      aliases: aliasesForCanonicalName(name, parameter.name),
       category: mapCategory(parameter),
       standardUnit: parameter.unit || 'unspecified'
     });
@@ -93,6 +98,7 @@ export const persistReportIntelligence = async (
       testDate,
       confidence: validation.confidence,
       validationStatus: validation.status,
+      originalParameterName: parameter.name,
       sourceLocation: parameter.name,
       referenceRange: parameter.referenceRange
     });
@@ -100,6 +106,7 @@ export const persistReportIntelligence = async (
       id: observation.id,
       biomarkerId: biomarker.id,
       biomarkerName: biomarker.canonicalName,
+      originalParameterName: observation.originalParameterName,
       validationStatus: observation.validationStatus,
       confidence: observation.confidence,
       notes: validation.notes
