@@ -281,6 +281,7 @@ create table if not exists health_reports (
   report_date text,
   lab_name text,
   error text,
+  document_hash text,
   analysis_version integer not null default 1,
   analysis jsonb,
   feedback jsonb not null default '[]'::jsonb,
@@ -288,8 +289,14 @@ create table if not exists health_reports (
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
-  check (processing_status in ('UPLOADED', 'PROCESSING', 'EXTRACTION_COMPLETED', 'VALIDATION_PENDING', 'COMPLETED', 'FAILED', 'REVIEW_REQUIRED'))
+  check (processing_status in ('UPLOADED', 'PROCESSING', 'EXTRACTED', 'EXTRACTION_COMPLETED', 'VALIDATION_PENDING', 'VALIDATED', 'PRIORITIZED', 'SCORED', 'PUBLISHED', 'COMPLETED', 'FAILED', 'REVIEW_REQUIRED'))
 );
+
+create unique index if not exists health_reports_client_document_hash_active_unique
+  on health_reports (client_id, document_hash)
+  where document_hash is not null
+    and deleted_at is null
+    and processing_status <> 'FAILED';
 
 create table if not exists health_report_upload_sessions (
   id text primary key,

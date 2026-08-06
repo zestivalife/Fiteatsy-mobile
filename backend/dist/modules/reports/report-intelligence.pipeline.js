@@ -1,5 +1,6 @@
 import { createBiomarkerObservation, upsertBiomarker } from '../biomarkers/biomarkers.repository.js';
 import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
+import { biomarkerDimension, biomarkerTier, canonicalBiomarkerName } from './report-governance.js';
 const aliasGroups = [
     { canonicalName: 'HbA1c', aliases: ['Hb A1C', 'HBA1C', 'Glycated Hemoglobin', 'Glycated Haemoglobin', 'Glycosylated Hemoglobin', 'Glycosylated Haemoglobin', 'Hemoglobin A1c', 'Haemoglobin A1c'] },
     { canonicalName: 'Fasting Glucose', aliases: ['Glucose Fasting', 'Blood Sugar Fasting', 'FBS', 'Fasting Blood Sugar'] },
@@ -15,6 +16,9 @@ const aliasGroups = [
 ];
 const normalizeName = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const canonicalName = (rawName) => {
+    const governedName = canonicalBiomarkerName(rawName);
+    if (governedName !== rawName.trim().replace(/\s+/g, ' '))
+        return governedName;
     const normalized = normalizeName(rawName);
     const match = aliasGroups.find((group) => normalized === normalizeName(group.canonicalName) || group.aliases.some((alias) => normalizeName(alias) === normalized));
     if (match)
@@ -26,6 +30,9 @@ const aliasesForCanonicalName = (name, originalName) => {
     return [originalName, name, ...(group?.aliases ?? [])].filter((value, index, values) => values.indexOf(value) === index);
 };
 const mapCategory = (parameter) => {
+    const governedDimension = biomarkerDimension(parameter.canonicalName ?? parameter.name, '');
+    if (governedDimension && governedDimension !== parameter.category)
+        return governedDimension;
     const name = parameter.name.toLowerCase();
     if (/vitamin|b12|folate|ferritin|iron|calcium|magnesium|albumin|protein/.test(name))
         return 'Nutrition';
@@ -66,8 +73,12 @@ const validateParameter = (parameter) => {
         notes.push('Reference range is missing.');
     const range = parseReferenceRange(parameter.referenceRange);
     const hasRange = typeof range.min === 'number' || typeof range.max === 'number';
-    const status = notes.length > 0 || !hasRange ? 'review_required' : 'validated';
-    const confidence = status === 'validated' ? 0.9 : 0.55;
+    const plausible = Math.abs(parameter.value) < 100000;
+    if (!plausible)
+        notes.push('Value is outside clinical plausibility bounds.');
+    const status = notes.length > 0 || !hasRange || !plausible ? 'review_required' : 'validated';
+    const baseConfidence = parameter.extractionConfidence ?? 0.85;
+    const confidence = status === 'validated' ? Math.min(0.98, baseConfidence) : Math.min(0.6, baseConfidence);
     return { status, confidence, notes };
 };
 const testDateFromAnalysis = (analysis) => {
@@ -107,9 +118,10 @@ export const persistReportIntelligence = async (owner, reportId, analysis) => {
             originalParameterName: observation.originalParameterName,
             validationStatus: observation.validationStatus,
             confidence: observation.confidence,
+            tier: biomarkerTier(biomarker.canonicalName),
             notes: validation.notes
         });
     }
-    const scores = await calculateHealthScores(owner);
+    const scores = analysis.qualityGate.canScore ? await calculateHealthScores(owner) : [];
     return { observations, scores };
 };

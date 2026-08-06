@@ -55,7 +55,7 @@ type ReportItem = {
   date: string;
   parameters: number;
   abnormal: number;
-  score: number;
+  score: number | null;
   trend: 'up' | 'down' | 'flat';
   categoryScores: Record<CategoryKey, number>;
   parametersData: ReportParameter[];
@@ -109,7 +109,10 @@ const categoryMeta: Array<{ key: CategoryKey; icon: keyof typeof Ionicons.glyphM
   { key: 'Vitamins', icon: 'sunny', color: colors.warning }
 ];
 
-const scoreColor = (score: number) => {
+const scoreColor = (score: number | null) => {
+  if (score == null) {
+    return palette.textMid;
+  }
   if (score >= 80) {
     return palette.teal;
   }
@@ -119,7 +122,10 @@ const scoreColor = (score: number) => {
   return palette.coral;
 };
 
-const scorePillBg = (score: number) => {
+const scorePillBg = (score: number | null) => {
+  if (score == null) {
+    return '#E2E8F0';
+  }
   if (score >= 80) {
     return palette.tealLight;
   }
@@ -167,11 +173,13 @@ const toReportItem = (
 ): ReportItem => {
   const abnormal = analysis.parameters.filter((parameter) => parameter.status !== 'normal').length;
   const trend: ReportItem['trend'] = previous
-    ? analysis.score > previous.score
-      ? 'up'
-      : analysis.score < previous.score
-        ? 'down'
-        : 'flat'
+    ? analysis.score != null && previous.score != null
+      ? analysis.score > previous.score
+        ? 'up'
+        : analysis.score < previous.score
+          ? 'down'
+          : 'flat'
+      : 'flat'
     : 'flat';
   return {
     id: analysis.reportId ?? fallback.id ?? `rep-${Date.now()}`,
@@ -189,7 +197,7 @@ const toReportItem = (
 };
 
 const reportDtoToItem = (report: ReportDto, previous?: ReportItem | null) => {
-  if (!report.analysis || report.status !== 'COMPLETED') return null;
+  if (!report.analysis || (report.status !== 'COMPLETED' && report.status !== 'PUBLISHED')) return null;
   return toReportItem(
     {
       ...report.analysis,
@@ -291,7 +299,7 @@ const SwipeableReportCard = ({
 
           <View style={styles.reportRight}>
             <View style={[styles.scoreBadge, { backgroundColor: scorePillBg(report.score) }]}>
-              <Text style={[styles.scoreBadgeText, { color: scoreColor(report.score) }]}>{report.score}</Text>
+              <Text style={[styles.scoreBadgeText, { color: scoreColor(report.score) }]}>{report.score ?? 'Review'}</Text>
             </View>
             <Text
               style={[

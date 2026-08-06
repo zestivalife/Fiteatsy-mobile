@@ -8,6 +8,7 @@ import {
   createReportRecord,
   createUploadSession,
   deleteReport,
+  findActiveReportByDocumentHash,
   getReport,
   getUploadSession,
   listReports,
@@ -19,6 +20,7 @@ import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/au
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { createProcessingJob, updateProcessingJobStatus } from '../processing/processing-jobs.repository.js';
 import { persistReportIntelligence } from './report-intelligence.pipeline.js';
+import { documentHash } from './report-governance.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -52,6 +54,9 @@ const toReportDto = (record: Awaited<ReturnType<typeof getReport>>) => {
     updatedAtISO: record.updatedAtISO,
     error: record.error,
     analysisVersion: record.analysisVersion,
+    document: record.analysis?.document,
+    qualityGate: record.analysis?.qualityGate,
+    healthAssessment: record.analysis?.healthAssessment,
     analysis: record.analysis,
     feedback: record.feedback
   };
@@ -84,11 +89,11 @@ const analyzeAndPersistReport = async (input: {
   await updateProcessingJobStatus(input.processingJobId, 'processing');
   logReportRuntime('processing:status', { reportId: input.reportId, status: 'PROCESSING' });
   const analysis = await analyzeReportBuffer(input.fileBuffer, input.mimeType);
-  await updateReportStatus(input.reportId, 'EXTRACTION_COMPLETED');
+  await updateReportStatus(input.reportId, 'EXTRACTED');
   await updateProcessingJobStatus(input.processingJobId, 'extraction_completed');
   logReportRuntime('processing:status', {
     reportId: input.reportId,
-    status: 'EXTRACTION_COMPLETED',
+    status: 'EXTRACTED',
     parameterCount: analysis.parameters.length
   });
   await syncReportPipelineToPlatform(input.owner, input.reportId, 'ocr_completed', `OCR completed for ${input.fileName}`);
@@ -98,16 +103,31 @@ const analyzeAndPersistReport = async (input: {
   await updateProcessingJobStatus(input.processingJobId, 'validation_pending');
   logReportRuntime('processing:status', { reportId: input.reportId, status: 'VALIDATION_PENDING' });
   const intelligence = await persistReportIntelligence(input.owner, input.reportId, analysis);
+  await updateReportStatus(input.reportId, 'VALIDATED');
+  logReportRuntime('processing:status', { reportId: input.reportId, status: 'VALIDATED' });
+  await updateReportStatus(input.reportId, 'PRIORITIZED');
+  logReportRuntime('processing:status', {
+    reportId: input.reportId,
+    status: 'PRIORITIZED',
+    coreBiomarkers: analysis.qualityGate.coreBiomarkers
+  });
+  if (analysis.qualityGate.canScore) {
+    await updateReportStatus(input.reportId, 'SCORED');
+    logReportRuntime('processing:status', { reportId: input.reportId, status: 'SCORED' });
+  }
   const saved = await attachReportAnalysis(input.reportId, analysis);
-  await updateProcessingJobStatus(input.processingJobId, 'completed');
+  await updateProcessingJobStatus(input.processingJobId, analysis.qualityGate.canPublish ? 'completed' : 'review_required', saved?.error);
   logReportRuntime('processing:completed', {
     reportId: input.reportId,
     status: saved?.status,
     observationCount: intelligence.observations.length,
-    scoreCount: intelligence.scores.length
+    scoreCount: intelligence.scores.length,
+    qualityGate: analysis.qualityGate.status
   });
-  await syncReportPipelineToPlatform(input.owner, input.reportId, 'biomarkers_updated', `Biomarkers extracted from ${input.fileName}`);
-  await syncReportPipelineToPlatform(input.owner, input.reportId, 'analysis_completed', `AI validation completed for ${input.fileName}`);
+  if (analysis.qualityGate.canPublish) {
+    await syncReportPipelineToPlatform(input.owner, input.reportId, 'biomarkers_updated', `Biomarkers extracted from ${input.fileName}`);
+    await syncReportPipelineToPlatform(input.owner, input.reportId, 'analysis_completed', `AI validation completed for ${input.fileName}`);
+  }
   return {
     reportId: saved?.id,
     status: saved?.status,
@@ -197,7 +217,11 @@ reportsRouter.get('/:reportId/status', async (req, res) => {
     reportId: report!.id,
     status: report!.status,
     updatedAtISO: report!.updatedAtISO,
-    error: report!.error
+    error: report!.error,
+    document: report!.analysis?.document,
+    qualityGate: report!.analysis?.qualityGate,
+    healthAssessment: report!.analysis?.healthAssessment,
+    processingTimeline: report!.analysis?.extractionAttempts
   });
 });
 
@@ -268,6 +292,9 @@ reportsRouter.get('/:reportId/comparison', async (req, res) => {
   if (!current!.analysis || !previous!.analysis) {
     return res.status(409).json({ error: 'ANALYSIS_NOT_READY', message: 'Both reports must have completed analysis.' });
   }
+  if (current!.analysis.score == null || previous!.analysis.score == null) {
+    return res.status(409).json({ error: 'ANALYSIS_NOT_PUBLISHED', message: 'Both reports must pass the quality gate before comparison.' });
+  }
 
   const scoreDelta = current!.analysis.score - previous!.analysis.score;
   const currentAbnormal = current!.analysis.parameters.filter((item) => item.status !== 'normal').length;
@@ -315,6 +342,18 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
     }
 
     const owner = currentOwner(getAuthenticatedAccount(req));
+    const fileBuffer = Buffer.from(req.file.buffer);
+    const hash = documentHash(fileBuffer);
+    const duplicate = await findActiveReportByDocumentHash(reportOwner(owner), hash);
+    if (duplicate) {
+      logReportRuntime('upload:start:duplicate', { reportId: duplicate.id, status: duplicate.status });
+      return res.status(200).json({
+        reportId: duplicate.id,
+        status: duplicate.status,
+        duplicate: true,
+        message: 'Existing report detected. Reusing the current processing result.'
+      });
+    }
     const uploadId = typeof req.body?.uploadId === 'string' ? req.body.uploadId.trim() : '';
     const uploadSession = uploadId ? await getUploadSession(uploadId, reportOwner(owner)) : null;
     if (uploadId && !uploadSession) {
@@ -332,7 +371,8 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
         req.body?.source === 'camera' || req.body?.source === 'gallery' || req.body?.source === 'pdf'
           ? req.body.source
           : uploadSession?.source,
-      storageObjectRef: uploadSession?.storageObjectRef
+      storageObjectRef: uploadSession?.storageObjectRef,
+      documentHash: hash
     });
     currentReportId = record.id;
     const processingJob = await createProcessingJob({
@@ -348,7 +388,6 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
       status: record.status,
       clientScoped: Boolean(owner.clientId)
     });
-    const fileBuffer = Buffer.from(req.file.buffer);
     const manualDate = typeof req.body?.reportDate === 'string' ? req.body.reportDate.trim() : '';
     const manualLab = typeof req.body?.labName === 'string' ? req.body.labName.trim() : '';
 
@@ -403,6 +442,27 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
     }
 
     const owner = currentOwner(getAuthenticatedAccount(req));
+    const hash = documentHash(req.file.buffer);
+    const duplicate = await findActiveReportByDocumentHash(reportOwner(owner), hash);
+    if (duplicate?.analysis) {
+      logReportRuntime('upload:sync:duplicate', { reportId: duplicate.id, status: duplicate.status });
+      return res.status(200).json({
+        reportId: duplicate.id,
+        status: duplicate.status,
+        duplicate: true,
+        biomarkerObservations: [],
+        healthScores: [],
+        ...duplicate.analysis
+      });
+    }
+    if (duplicate && !duplicate.analysis) {
+      return res.status(409).json({
+        error: 'DUPLICATE_PROCESSING',
+        message: 'This report is already being processed.',
+        reportId: duplicate.id,
+        status: duplicate.status
+      });
+    }
     const uploadId = typeof req.body?.uploadId === 'string' ? req.body.uploadId.trim() : '';
     const uploadSession = uploadId ? await getUploadSession(uploadId, reportOwner(owner)) : null;
     if (uploadId && !uploadSession) {
@@ -420,7 +480,8 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
         req.body?.source === 'camera' || req.body?.source === 'gallery' || req.body?.source === 'pdf'
           ? req.body.source
           : uploadSession?.source,
-      storageObjectRef: uploadSession?.storageObjectRef
+      storageObjectRef: uploadSession?.storageObjectRef,
+      documentHash: hash
     });
     currentReportId = record.id;
     const processingJob = await createProcessingJob({

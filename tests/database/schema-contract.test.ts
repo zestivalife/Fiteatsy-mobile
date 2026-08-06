@@ -76,6 +76,17 @@ test('database schema preserves report-to-biomarker extraction lineage', () => {
   assert.equal(hasPattern(/reference_range text/i), true);
 });
 
+test('database schema enforces medical report intelligence governance gates', () => {
+  assert.equal(hasPattern(/document_hash text/i), true);
+  assert.equal(hasPattern(/'EXTRACTED'/i), true);
+  assert.equal(hasPattern(/'VALIDATED'/i), true);
+  assert.equal(hasPattern(/'PRIORITIZED'/i), true);
+  assert.equal(hasPattern(/'SCORED'/i), true);
+  assert.equal(hasPattern(/'PUBLISHED'/i), true);
+  assert.equal(hasPattern(/health_reports_client_document_hash_active_unique/i), true);
+  assert.equal(hasPattern(/on health_reports \(client_id, document_hash\)/i), true);
+});
+
 test.skip('database CRUD runtime validation is pending a live PostgreSQL test database');
 test.skip('database rollback semantics are pending a live PostgreSQL test database');
 test.skip('database transaction semantics are pending a live PostgreSQL test database');

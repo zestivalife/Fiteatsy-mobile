@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { deleteRequest, getJson, patchJson, postJson } from '../helpers/http.js';
-import { buildMultipartReportForm } from '../helpers/reportFixtures.js';
+import { buildLabReportPdf, buildMultipartReportForm } from '../helpers/reportFixtures.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
@@ -175,6 +175,70 @@ test('report comparison and reanalyze endpoints return expected 200, 400, 404, a
     { headers: authHeaders(session.token) }
   );
   assert.equal(reanalyze.response.status, 501);
+});
+
+test('duplicate report upload reuses the existing published report', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const first = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
+    method: 'POST',
+    headers: authHeaders(session.token),
+    body: buildMultipartReportForm({ reportName: 'duplicate.pdf' }),
+  });
+  const firstBody = await first.json();
+  assert.equal(first.status, 200);
+  assert.equal(firstBody.status, 'PUBLISHED');
+
+  const second = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
+    method: 'POST',
+    headers: authHeaders(session.token),
+    body: buildMultipartReportForm({ reportName: 'duplicate-again.pdf' }),
+  });
+  const secondBody = await second.json();
+  assert.equal(second.status, 200);
+  assert.equal(secondBody.duplicate, true);
+  assert.equal(secondBody.reportId, firstBody.reportId);
+
+  const list = await getJson(server.baseUrl, '/v1/reports?limit=50', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(list.response.status, 200);
+  assert.equal(list.body.total, 1);
+});
+
+test('incomplete extraction requires review and is excluded from published report history', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const form = new FormData();
+  form.set(
+    'reportFile',
+    new Blob(
+      [
+        buildLabReportPdf([
+          'Tiny Lab',
+          '14 Mar 2026',
+          'Glucose 98 mg/dL 70-110',
+        ]),
+      ],
+      { type: 'application/pdf' }
+    ),
+    'incomplete.pdf'
+  );
+
+  const analyzed = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
+    method: 'POST',
+    headers: authHeaders(session.token),
+    body: form,
+  });
+  const analyzedBody = await analyzed.json();
+  assert.equal(analyzed.status, 200);
+  assert.equal(analyzedBody.status, 'REVIEW_REQUIRED');
+  assert.equal(analyzedBody.score, null);
+  assert.equal(analyzedBody.qualityGate.canScore, false);
+
+  const list = await getJson(server.baseUrl, '/v1/reports?limit=50', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(list.response.status, 200);
+  assert.equal(list.body.total, 0);
 });
 
 test('POST /v1/reports/analyze returns 400 without a file', async () => {

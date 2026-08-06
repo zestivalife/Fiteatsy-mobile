@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { PDFParse } from 'pdf-parse';
 import { env } from '../../config/env.js';
+import { buildExtractionGovernance, canonicalBiomarkerName, classifyDocument } from './report-governance.js';
 const AI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
 const aiClient = env.openAiApiKey ? new OpenAI({ apiKey: env.openAiApiKey }) : null;
 const normalizeWhitespace = (value) => value.replace(/\s+/g, ' ').trim();
@@ -72,11 +73,15 @@ const parseParameters = (text) => {
         const referenceRange = normalizeWhitespace(match[4]);
         out.push({
             name,
+            canonicalName: canonicalBiomarkerName(name),
             value,
             unit,
             referenceRange,
             category: categorize(name),
-            status: inferStatus(value, referenceRange)
+            status: inferStatus(value, referenceRange),
+            pageNumber: 1,
+            sectionName: 'Detected table row',
+            extractionConfidence: 0.9
         });
     }
     // de-dup by name and keep first parsed occurrence
@@ -101,11 +106,15 @@ const parseParametersFromAiJson = (raw) => {
                 : inferStatus(Number(item.value), referenceRange);
             return {
                 name: normalizeWhitespace(item.name),
+                canonicalName: canonicalBiomarkerName(item.name),
                 value: Number(item.value),
                 unit: normalizeWhitespace(item.unit ?? ''),
                 referenceRange,
                 category,
-                status
+                status,
+                pageNumber: 1,
+                sectionName: 'Vision extraction',
+                extractionConfidence: 0.82
             };
         });
     }
@@ -219,17 +228,40 @@ export const analyzeReportBuffer = async (buffer, mimeType) => {
     if (parameters.length === 0) {
         throw new Error('No analyzable parameters found in this report. Please upload a clearer PDF/image report.');
     }
+    const reportDate = aiDate ??
+        findDate(text) ??
+        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const labName = aiLab ?? findLabName(text) ?? 'Uploaded Lab Report';
+    const document = classifyDocument({
+        text,
+        mimeType,
+        parameterCount: parameters.length,
+        labName
+    });
+    const governance = buildExtractionGovernance(text, parameters, document);
     const categoryScores = buildCategoryScores(parameters);
-    const score = Math.round((categoryScores.Blood + categoryScores.Metabolic + categoryScores.Organs + categoryScores.Thyroid + categoryScores.Vitamins) / 5);
+    const score = governance.qualityGate.canScore
+        ? Math.round((categoryScores.Blood + categoryScores.Metabolic + categoryScores.Organs + categoryScores.Thyroid + categoryScores.Vitamins) / 5)
+        : null;
     return {
-        reportDate: aiDate ??
-            findDate(text) ??
-            new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-        labName: aiLab ?? findLabName(text) ?? 'Uploaded Lab Report',
+        reportDate,
+        labName,
         parameters,
         score,
         categoryScores,
-        summary: buildSummary(parameters),
-        actionPlan: buildActionPlan(parameters)
+        summary: governance.qualityGate.canPublish
+            ? buildSummary(parameters)
+            : `Analysis incomplete. ${governance.qualityGate.detectedBiomarkers} biomarkers detected and ${governance.qualityGate.coreBiomarkers}/32 core markers identified. Please retry with a clearer full report or submit for review.`,
+        actionPlan: governance.qualityGate.canPublish
+            ? buildActionPlan(parameters)
+            : [
+                {
+                    priority: 1,
+                    title: 'Retry upload or request review',
+                    detail: governance.qualityGate.reasons[0] ?? 'The report did not meet the clinical confidence gate for health intelligence.'
+                }
+            ],
+        document,
+        ...governance
     };
 };

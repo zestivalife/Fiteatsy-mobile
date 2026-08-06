@@ -26,10 +26,37 @@ export type ReportAnalysisResponse = {
   reportDate: string;
   labName: string;
   parameters: ReportParameter[];
-  score: number;
+  score: number | null;
   categoryScores: CategoryScores;
   summary: string;
   actionPlan: Array<{ priority: number; title: string; detail: string }>;
+  document?: {
+    documentType: string;
+    supported: boolean;
+    labName: string;
+    pageCount: number;
+    imageQuality: string;
+    confidence: number;
+  };
+  qualityGate?: {
+    status: 'PUBLISHABLE' | 'REVIEW_REQUIRED';
+    canScore: boolean;
+    canPublish: boolean;
+    confidence: number;
+    extractionConfidence: number;
+    validationConfidence: number;
+    biomarkerCompleteness: number;
+    detectedBiomarkers: number;
+    validatedBiomarkers: number;
+    coreBiomarkers: number;
+    failedBiomarkers: string[];
+    reasons: string[];
+  };
+  healthAssessment?: {
+    markerLabel: string;
+    confidenceLabel: 'High' | 'Medium' | 'Needs Review';
+    healthAreas: string[];
+  };
   biomarkerObservations?: Array<{
     id: string;
     biomarkerId: string;
@@ -137,11 +164,19 @@ const statusToProgress = (status: string): { stage: UploadProgressStage; percent
     case 'PROCESSING':
       return { stage: 'processing', percent: 52, message: 'Processing health information...', step: 'PROCESSING' };
     case 'EXTRACTION_COMPLETED':
+    case 'EXTRACTED':
       return { stage: 'extraction', percent: 74, message: 'Extracting health parameters...', step: 'EXTRACTION_COMPLETED' };
     case 'VALIDATION_PENDING':
       return { stage: 'validation', percent: 88, message: 'Validating extracted health information...', step: 'VALIDATION_PENDING' };
+    case 'VALIDATED':
+      return { stage: 'validation', percent: 92, message: 'Confirming health markers...', step: 'VALIDATED' };
+    case 'PRIORITIZED':
+      return { stage: 'validation', percent: 96, message: 'Prioritizing health impact...', step: 'PRIORITIZED' };
+    case 'SCORED':
+      return { stage: 'validation', percent: 98, message: 'Generating intelligence...', step: 'SCORED' };
     case 'COMPLETED':
-      return { stage: 'completed', percent: 100, message: 'Report analysis completed.', step: 'COMPLETED' };
+    case 'PUBLISHED':
+      return { stage: 'completed', percent: 100, message: 'Report analysis completed.', step: 'PUBLISHED' };
     case 'REVIEW_REQUIRED':
       return { stage: 'failed', percent: 100, message: 'Manual review is required before results can be shown.', step: 'REVIEW_REQUIRED' };
     case 'FAILED':
@@ -281,7 +316,7 @@ export const uploadAndAnalyzeReport = async (params: {
         if (statusPayload.status === 'FAILED' || statusPayload.status === 'REVIEW_REQUIRED') {
           throw new Error(statusPayload.error ?? progress.message);
         }
-        if (statusPayload.status === 'COMPLETED') {
+        if (statusPayload.status === 'COMPLETED' || statusPayload.status === 'PUBLISHED') {
           const report = await requestJson<ReportDto>(baseUrl, `/v1/reports/${encodeURIComponent(startPayload.reportId)}`, {
             signal: params.signal
           });

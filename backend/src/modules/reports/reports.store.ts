@@ -5,11 +5,17 @@ import { ReportAnalysisResult } from './reports.service.js';
 export type ReportStatus =
   | 'UPLOADED'
   | 'PROCESSING'
-  | 'EXTRACTION_COMPLETED'
+  | 'EXTRACTED'
   | 'VALIDATION_PENDING'
-  | 'COMPLETED'
+  | 'VALIDATED'
+  | 'PRIORITIZED'
+  | 'SCORED'
+  | 'PUBLISHED'
   | 'FAILED'
-  | 'REVIEW_REQUIRED';
+  | 'REVIEW_REQUIRED'
+  // Backward-compatible status retained for already-deployed records.
+  | 'EXTRACTION_COMPLETED'
+  | 'COMPLETED';
 
 export type ReportRecord = {
   id: string;
@@ -27,6 +33,7 @@ export type ReportRecord = {
   labName?: string;
   source?: 'camera' | 'gallery' | 'pdf';
   error?: string;
+  documentHash?: string;
   analysis?: ReportAnalysisResult;
   analysisVersion: number;
   feedback: Array<{
@@ -85,6 +92,7 @@ const rowToReport = (row: Record<string, unknown>): ReportRecord => ({
       ? row.upload_source
       : undefined,
   error: row.error == null ? undefined : String(row.error),
+  documentHash: row.document_hash == null ? undefined : String(row.document_hash),
   analysis: parseJson<ReportAnalysisResult | undefined>(row.analysis, undefined),
   analysisVersion: Number(row.analysis_version),
   feedback: parseJson<ReportRecord['feedback']>(row.feedback, [])
@@ -176,15 +184,16 @@ export const createReportRecord = async (input: {
   source?: 'camera' | 'gallery' | 'pdf';
   storageObjectRef?: string;
   reportType?: string;
+  documentHash?: string;
 }) => {
   const id = `rep_${crypto.randomUUID()}`;
   const result = await pool.query(
     `
       insert into health_reports (
         id, user_id, client_id, report_type, storage_object_ref, original_filename, mime_type,
-        file_size, upload_source, processing_status, report_date, lab_name
+        file_size, upload_source, processing_status, report_date, lab_name, document_hash
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'UPLOADED', $10, $11)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'UPLOADED', $10, $11, $12)
       returning *
     `,
     [
@@ -198,10 +207,29 @@ export const createReportRecord = async (input: {
       input.fileSize,
       input.source ?? null,
       input.reportDate ?? null,
-      input.labName ?? null
+      input.labName ?? null,
+      input.documentHash ?? null
     ]
   );
   return rowToReport(result.rows[0]);
+};
+
+export const findActiveReportByDocumentHash = async (owner: { userId: string; clientId: string }, hash: string) => {
+  const result = await pool.query(
+    `
+      select *
+      from health_reports
+      where user_id = $1
+        and client_id = $2
+        and document_hash = $3
+        and deleted_at is null
+        and processing_status <> 'FAILED'
+      order by created_at desc
+      limit 1
+    `,
+    [owner.userId, owner.clientId, hash]
+  );
+  return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };
 
 export const updateReportStatus = async (reportId: string, status: ReportStatus, error?: string) => {
@@ -219,6 +247,7 @@ export const updateReportStatus = async (reportId: string, status: ReportStatus,
 };
 
 export const attachReportAnalysis = async (reportId: string, analysis: ReportAnalysisResult) => {
+  const nextStatus: ReportStatus = analysis.qualityGate.canPublish ? 'PUBLISHED' : 'REVIEW_REQUIRED';
   const result = await pool.query(
     `
       update health_reports
@@ -226,14 +255,21 @@ export const attachReportAnalysis = async (reportId: string, analysis: ReportAna
         analysis = $2::jsonb,
         report_date = $3,
         lab_name = $4,
-        processing_status = 'COMPLETED',
-        error = null,
+        processing_status = $5,
+        error = $6,
         updated_at = now()
       where id = $1
         and deleted_at is null
       returning *
     `,
-    [reportId, JSON.stringify(analysis), analysis.reportDate, analysis.labName]
+    [
+      reportId,
+      JSON.stringify(analysis),
+      analysis.reportDate,
+      analysis.labName,
+      nextStatus,
+      analysis.qualityGate.canPublish ? null : analysis.qualityGate.reasons.join(' ')
+    ]
   );
   return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };
@@ -258,6 +294,7 @@ export const listReports = async (owner: { userId: string; clientId: string }) =
       from health_reports
       where user_id = $1
         and client_id = $2
+        and processing_status = 'PUBLISHED'
         and deleted_at is null
       order by created_at desc
     `,
@@ -273,6 +310,7 @@ export const countReports = async (owner: { userId: string; clientId: string }) 
       from health_reports
       where user_id = $1
         and client_id = $2
+        and processing_status = 'PUBLISHED'
         and deleted_at is null
     `,
     [owner.userId, owner.clientId]

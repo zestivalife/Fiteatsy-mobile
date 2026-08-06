@@ -1,24 +1,64 @@
 import OpenAI from 'openai';
 import { PDFParse } from 'pdf-parse';
 import { env } from '../../config/env.js';
+import { buildExtractionGovernance, canonicalBiomarkerName, classifyDocument } from './report-governance.js';
 
 export type ParsedParameter = {
   name: string;
+  canonicalName?: string;
   value: number;
   unit: string;
   referenceRange: string;
   category: 'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins';
   status: 'normal' | 'low' | 'high';
+  pageNumber?: number;
+  sectionName?: string;
+  extractionConfidence?: number;
 };
 
 export type ReportAnalysisResult = {
   reportDate: string;
   labName: string;
   parameters: ParsedParameter[];
-  score: number;
+  score: number | null;
   categoryScores: Record<'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins', number>;
   summary: string;
   actionPlan: Array<{ priority: number; title: string; detail: string }>;
+  document: {
+    documentType: string;
+    supported: boolean;
+    labName: string;
+    pageCount: number;
+    imageQuality: string;
+    confidence: number;
+  };
+  extractionAttempts: Array<{
+    attempt: number;
+    strategy: string;
+    parameterCount: number;
+    confidence: number;
+    rescanRecommended: boolean;
+    notes: string[];
+  }>;
+  qualityGate: {
+    status: 'PUBLISHABLE' | 'REVIEW_REQUIRED';
+    canScore: boolean;
+    canPublish: boolean;
+    confidence: number;
+    extractionConfidence: number;
+    validationConfidence: number;
+    biomarkerCompleteness: number;
+    detectedBiomarkers: number;
+    validatedBiomarkers: number;
+    coreBiomarkers: number;
+    failedBiomarkers: string[];
+    reasons: string[];
+  };
+  healthAssessment: {
+    markerLabel: string;
+    confidenceLabel: 'High' | 'Medium' | 'Needs Review';
+    healthAreas: string[];
+  };
 };
 
 const AI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
@@ -91,11 +131,15 @@ const parseParameters = (text: string): ParsedParameter[] => {
     const referenceRange = normalizeWhitespace(match[4]);
     out.push({
       name,
+      canonicalName: canonicalBiomarkerName(name),
       value,
       unit,
       referenceRange,
       category: categorize(name),
-      status: inferStatus(value, referenceRange)
+      status: inferStatus(value, referenceRange),
+      pageNumber: 1,
+      sectionName: 'Detected table row',
+      extractionConfidence: 0.9
     });
   }
 
@@ -140,11 +184,15 @@ const parseParametersFromAiJson = (raw: string): ParsedParameter[] => {
           : inferStatus(Number(item.value), referenceRange);
         return {
           name: normalizeWhitespace(item.name),
+          canonicalName: canonicalBiomarkerName(item.name),
           value: Number(item.value),
           unit: normalizeWhitespace(item.unit ?? ''),
           referenceRange,
           category,
-          status
+          status,
+          pageNumber: 1,
+          sectionName: 'Vision extraction',
+          extractionConfidence: 0.82
         };
       });
   } catch {
@@ -271,21 +319,44 @@ export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Pro
     throw new Error('No analyzable parameters found in this report. Please upload a clearer PDF/image report.');
   }
 
+  const reportDate =
+    aiDate ??
+    findDate(text) ??
+    new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const labName = aiLab ?? findLabName(text) ?? 'Uploaded Lab Report';
+  const document = classifyDocument({
+    text,
+    mimeType,
+    parameterCount: parameters.length,
+    labName
+  });
+  const governance = buildExtractionGovernance(text, parameters, document);
   const categoryScores = buildCategoryScores(parameters);
-  const score = Math.round(
-    (categoryScores.Blood + categoryScores.Metabolic + categoryScores.Organs + categoryScores.Thyroid + categoryScores.Vitamins) / 5
-  );
+  const score = governance.qualityGate.canScore
+    ? Math.round(
+        (categoryScores.Blood + categoryScores.Metabolic + categoryScores.Organs + categoryScores.Thyroid + categoryScores.Vitamins) / 5
+      )
+    : null;
 
   return {
-    reportDate:
-      aiDate ??
-      findDate(text) ??
-      new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-    labName: aiLab ?? findLabName(text) ?? 'Uploaded Lab Report',
+    reportDate,
+    labName,
     parameters,
     score,
     categoryScores,
-    summary: buildSummary(parameters),
-    actionPlan: buildActionPlan(parameters)
+    summary: governance.qualityGate.canPublish
+      ? buildSummary(parameters)
+      : `Analysis incomplete. ${governance.qualityGate.detectedBiomarkers} biomarkers detected and ${governance.qualityGate.coreBiomarkers}/32 core markers identified. Please retry with a clearer full report or submit for review.`,
+    actionPlan: governance.qualityGate.canPublish
+      ? buildActionPlan(parameters)
+      : [
+          {
+            priority: 1,
+            title: 'Retry upload or request review',
+            detail: governance.qualityGate.reasons[0] ?? 'The report did not meet the clinical confidence gate for health intelligence.'
+          }
+        ],
+    document,
+    ...governance
   };
 };
