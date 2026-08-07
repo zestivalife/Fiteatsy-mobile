@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { PDFParse } from 'pdf-parse';
 import { env } from '../../config/env.js';
-import { buildExtractionGovernance, canonicalBiomarkerName, classifyDocument } from './report-governance.js';
+import { buildExtractionGovernance, canonicalBiomarkerName, classifyDocument, CORE_BIOMARKERS } from './report-governance.js';
 
 export type ParsedParameter = {
   name: string;
@@ -13,6 +13,7 @@ export type ParsedParameter = {
   status: 'normal' | 'low' | 'high';
   pageNumber?: number;
   sectionName?: string;
+  extractionMethod?: string;
   extractionConfidence?: number;
 };
 
@@ -48,18 +49,33 @@ export type ReportAnalysisResult = {
     extractionConfidence: number;
     validationConfidence: number;
     biomarkerCompleteness: number;
+    tier1ExtractionConfidence?: number;
+    tier1Coverage?: number;
+    tier1RequiredCoverage?: number;
     expectedBiomarkers: { min: number; max: number; basis: string };
     detectedBiomarkers: number;
     validatedBiomarkers: number;
     coreBiomarkers: number;
+    validatedCoreBiomarkers?: number;
+    tier2Biomarkers?: number;
+    tier3Biomarkers?: number;
     failedBiomarkers: string[];
+    rejectedBiomarkers?: Array<{
+      biomarker_name: string;
+      tier: 1 | 2 | 3;
+      reason: string;
+      validation_status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+    }>;
     missingCriticalBiomarkers: string[];
     conflicts: string[];
     evidenceTraceability: Array<{
-      biomarker: string;
-      pageNumber: number;
-      sectionName: string;
-      confidence: number;
+      biomarker_name: string;
+      value: number;
+      unit: string;
+      source_page: number;
+      extraction_method: string;
+      confidence_score: number;
+      validation_status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
     }>;
     freshness: {
       label: string;
@@ -128,13 +144,139 @@ const inferStatus = (value: number, range: string): ParsedParameter['status'] =>
   return 'normal';
 };
 
+const ignoredLabTextPattern =
+  /\b(?:interpretation|impression|comment|note|methodology|method|sample|specimen|address|phone|email|www|footer|page\s+\d+|validated by|reported by|registered office|reference ranges? may vary)\b/i;
+
+const looksLikeTableRow = (line: string) =>
+  !ignoredLabTextPattern.test(line) &&
+  /\d/.test(line) &&
+  /\b(?:mg\/dL|g\/dL|ng\/mL|pg\/mL|mIU\/L|µIU\/mL|uIU\/mL|IU\/L|U\/L|%|cells\/µL|10\^?3|lakhs?|million|mmol\/L|mL\/min|ratio)\b/i.test(line);
+
+const groupedTableNames = [
+  ...CORE_BIOMARKERS,
+  'Glucose',
+  'Glucose Fasting',
+  'Glycosylated Hemoglobin (HbA1c)',
+  'SGPT',
+  'SGOT',
+  'SGOT/AST',
+  'SGPT/ALT',
+  'Bilirubin Total',
+  'Blood Urea',
+  'Bun',
+  'eGFR (CKD-EPI)',
+  'V.L.D.L Cholesterol',
+  'C-Reactive Protein (CRP), Quantitative',
+  'CRP (Quantitative)',
+  'High Sensitivity C-Reactive Protein (Hs-CRP)',
+  'Vitamin - B12',
+  'Vitamin D 25 - Hydroxy',
+  'Thyroid Stimulating Hormone (Ultrasensitive)',
+  'Gamma Glutamyl Transferase (GGT)',
+  'TLC',
+  'RBC Count',
+  'PCV',
+  'MCV',
+  'MCH',
+  'MCHC',
+  'RDW (CV)',
+  'Neutrophils',
+  'Lymphocytes',
+  'Monocytes',
+  'Eosinophils',
+  'Basophils',
+  'Platelet Count',
+  'Alkaline Phosphatase',
+  'Total Protein',
+  'Globulin',
+  'Calcium Serum',
+  'Sodium',
+  'Potassium',
+  'Chloride',
+  'TIBC,(Total Iron Binding Capacity)',
+  'Triiodothyronine (T3)',
+  'Total Thyroxine (T4)'
+];
+
+const isKnownBiomarkerLabel = (line: string) => {
+  if (ignoredLabTextPattern.test(line)) return false;
+  return groupedTableNames.some((name) => normalizeWhitespace(name).toLowerCase() === line.toLowerCase());
+};
+
+const isMethodOrSectionLine = (line: string) =>
+  /^(?:calculated|hplc|cmia|urease|uricase|ferene|immunoturbidimetry|immunoturbidimetric|hexokinase|enzymatic|colorimetric|biuret|arsenazo|ise-|electrical impedance|laser based|cyanide free|kinetic|glycerol|accelerator|para-nitrophenyl|diazo|diazonium)/i.test(line);
+
+const parseValueUnitRange = (line: string) => {
+  const match = line.match(
+    /^(-?\d+(?:\.\d+)?)\s+(.+?)\s+((?:<?|>?|>=?|<=?)\s*-?\d+(?:\.\d+)?(?:\s*(?:-|–)\s*-?\d+(?:\.\d+)?)?|up to\s+\d+(?:\.\d+)?|Deficient\s+<\s*\d+(?:\.\d+)?|Normal Or High:\s*>=\s*\d+(?:\.\d+)?)/i
+  );
+  if (!match) return null;
+  return {
+    value: Number(match[1]),
+    unit: normalizeWhitespace(match[2]),
+    referenceRange: normalizeWhitespace(match[3].replace(/^Normal Or High:\s*/i, ''))
+  };
+};
+
+const parseGroupedTableParameters = (lines: string[]): ParsedParameter[] => {
+  const out: ParsedParameter[] = [];
+  const inlineNames = [...groupedTableNames].sort((a, b) => b.length - a.length);
+  for (let index = 0; index < lines.length; index += 1) {
+    const name = lines[index];
+    const inlineName = inlineNames.find((candidate) => name.toLowerCase().startsWith(`${candidate.toLowerCase()} `));
+    if (inlineName) {
+      const parsed = parseValueUnitRange(name.slice(inlineName.length).trim());
+      if (parsed && Number.isFinite(parsed.value)) {
+        out.push({
+          name: inlineName,
+          canonicalName: canonicalBiomarkerName(inlineName),
+          value: parsed.value,
+          unit: parsed.unit,
+          referenceRange: parsed.referenceRange,
+          category: categorize(inlineName),
+          status: inferStatus(parsed.value, parsed.referenceRange),
+          pageNumber: Math.max(1, Math.ceil(index / 45)),
+          sectionName: 'Inline PDF table row',
+          extractionMethod: 'pdf_inline_table_scan',
+          extractionConfidence: 0.95
+        });
+      }
+    }
+    if (!isKnownBiomarkerLabel(name)) continue;
+    for (let offset = 1; offset <= 3 && index + offset < lines.length; offset += 1) {
+      const candidate = lines[index + offset];
+      if (ignoredLabTextPattern.test(candidate)) break;
+      if (isKnownBiomarkerLabel(candidate)) break;
+      if (offset === 1 && !isMethodOrSectionLine(candidate) && !parseValueUnitRange(candidate)) continue;
+      const parsed = parseValueUnitRange(candidate);
+      if (!parsed || !Number.isFinite(parsed.value)) continue;
+      out.push({
+        name,
+        canonicalName: canonicalBiomarkerName(name),
+        value: parsed.value,
+        unit: parsed.unit,
+        referenceRange: parsed.referenceRange,
+        category: categorize(name),
+        status: inferStatus(parsed.value, parsed.referenceRange),
+        pageNumber: Math.max(1, Math.ceil(index / 45)),
+        sectionName: 'Grouped PDF table row',
+        extractionMethod: 'pdf_grouped_table_scan',
+        extractionConfidence: 0.97
+      });
+      break;
+    }
+  }
+  return out;
+};
+
 const parseParameters = (text: string): ParsedParameter[] => {
   const lines = text.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
-  const out: ParsedParameter[] = [];
+  const out: ParsedParameter[] = parseGroupedTableParameters(lines);
   const linePattern =
     /^([A-Za-z][A-Za-z0-9 ()/+%-]{2,50})\s+(-?\d+(?:\.\d+)?)\s*([A-Za-z/%µ]+)?\s+(<?\s*-?\d+(?:\.\d+)?\s*(?:-|–)\s*-?\d+(?:\.\d+)?|<\s*-?\d+(?:\.\d+)?|>\s*-?\d+(?:\.\d+)?)/;
 
   for (const line of lines) {
+    if (!looksLikeTableRow(line)) continue;
     const match = line.match(linePattern);
     if (!match) continue;
     const name = normalizeWhitespace(match[1]);
@@ -151,8 +293,9 @@ const parseParameters = (text: string): ParsedParameter[] => {
       category: categorize(name),
       status: inferStatus(value, referenceRange),
       pageNumber: 1,
-      sectionName: 'Detected table row',
-      extractionConfidence: 0.9
+      sectionName: 'Detected PDF table row',
+      extractionMethod: 'pdf_table_row_scan',
+      extractionConfidence: 0.96
     });
   }
 
@@ -168,29 +311,35 @@ const parseParametersFallback = (text: string): ParsedParameter[] => {
   const lines = text.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
   const out: ParsedParameter[] = [];
   const knownNames = [
-    'HbA1c',
+    ...CORE_BIOMARKERS,
     'Glucose',
     'Fasting Glucose',
-    'Total Cholesterol',
     'LDL',
     'HDL',
-    'Triglycerides',
-    'Creatinine',
-    'Urea',
-    'Uric Acid',
-    'ALT',
-    'AST',
-    'Vitamin B12',
-    'Vitamin D',
-    'Hemoglobin',
-    'TSH',
-    'Platelets',
-    'WBC',
-    'Ferritin',
-    'Iron'
+    'SGPT',
+    'SGOT',
+    'RBC',
+    'Hematocrit',
+    'MCV',
+    'MCH',
+    'MCHC',
+    'RDW',
+    'Neutrophils',
+    'Lymphocytes',
+    'Monocytes',
+    'Eosinophils',
+    'Basophils',
+    'Sodium',
+    'Potassium',
+    'Chloride',
+    'Calcium',
+    'Protein',
+    'Globulin',
+    'ALP'
   ];
 
   for (const line of lines) {
+    if (ignoredLabTextPattern.test(line)) continue;
     const matchedName = knownNames.find((name) => new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(line));
     if (!matchedName) continue;
     const valueMatch = line.match(/(-?\d+(?:\.\d+)?)/);
@@ -210,6 +359,7 @@ const parseParametersFallback = (text: string): ParsedParameter[] => {
       status: inferStatus(value, referenceRange),
       pageNumber: 1,
       sectionName: 'Secondary extraction pass',
+      extractionMethod: 'pdf_secondary_known_marker_scan',
       extractionConfidence: rangeMatch ? 0.78 : 0.62
     });
   }
@@ -263,6 +413,7 @@ const parseParametersFromAiJson = (raw: string): ParsedParameter[] => {
           status,
           pageNumber: 1,
           sectionName: 'Vision extraction',
+          extractionMethod: 'vision_structured_json',
           extractionConfidence: 0.82
         };
       });
