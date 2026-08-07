@@ -52,11 +52,14 @@ export type ReportAnalysisResult = {
     tier1ExtractionConfidence?: number;
     tier1Coverage?: number;
     tier1RequiredCoverage?: number;
+    reportContexts?: string[];
+    requiredTier1Biomarkers?: string[];
     expectedBiomarkers: { min: number; max: number; basis: string };
     detectedBiomarkers: number;
     validatedBiomarkers: number;
     coreBiomarkers: number;
     validatedCoreBiomarkers?: number;
+    validatedRequiredTier1Biomarkers?: number;
     tier2Biomarkers?: number;
     tier3Biomarkers?: number;
     failedBiomarkers: string[];
@@ -557,20 +560,18 @@ export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Pro
       rescanRecommended: primaryParameters.length < 8,
       notes: primaryParameters.length < 8 ? ['Primary extraction found too few biomarkers; running secondary extraction pass.'] : []
     });
-    const secondaryParameters = primaryParameters.length < 8 ? parseParametersFallback(text) : [];
-    if (secondaryParameters.length > 0 || primaryParameters.length < 8) {
-      extractionAttempts.push({
-        attempt: 2,
-        strategy: 'pdf_secondary_known_marker_scan',
-        parameterCount: secondaryParameters.length,
-        confidence: Number((secondaryParameters.length === 0 ? 0 : Math.min(0.82, 0.5 + Math.min(secondaryParameters.length, 25) / 100)).toFixed(2)),
-        rescanRecommended: secondaryParameters.length < 8,
-        notes:
-          secondaryParameters.length === 0
-            ? ['Secondary extraction did not find additional reliable biomarkers.']
-            : ['Secondary extraction added known biomarker candidates for validation.']
-      });
-    }
+    const secondaryParameters = parseParametersFallback(text);
+    extractionAttempts.push({
+      attempt: 2,
+      strategy: 'pdf_secondary_known_marker_scan',
+      parameterCount: secondaryParameters.length,
+      confidence: Number((secondaryParameters.length === 0 ? 0 : Math.min(0.82, 0.5 + Math.min(secondaryParameters.length, 25) / 100)).toFixed(2)),
+      rescanRecommended: primaryParameters.length < 8 && secondaryParameters.length < 8,
+      notes:
+        secondaryParameters.length === 0
+          ? ['Secondary extraction did not find additional reliable biomarkers.']
+          : ['Secondary extraction cross-checked known biomarker candidates before validation.']
+    });
     parameters = mergeParameters(primaryParameters, secondaryParameters);
   } else {
     const imageResult = await parseImageViaAi(buffer);

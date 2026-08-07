@@ -46,13 +46,37 @@ export type ReportAnalysisResponse = {
     extractionConfidence: number;
     validationConfidence: number;
     biomarkerCompleteness: number;
+    tier1ExtractionConfidence?: number;
+    tier1Coverage?: number;
+    tier1RequiredCoverage?: number;
+    reportContexts?: string[];
+    requiredTier1Biomarkers?: string[];
     expectedBiomarkers?: { min: number; max: number; basis: string };
     detectedBiomarkers: number;
     validatedBiomarkers: number;
     coreBiomarkers: number;
+    validatedCoreBiomarkers?: number;
+    validatedRequiredTier1Biomarkers?: number;
+    tier2Biomarkers?: number;
+    tier3Biomarkers?: number;
     failedBiomarkers: string[];
+    rejectedBiomarkers?: Array<{
+      biomarker_name: string;
+      tier: 1 | 2 | 3;
+      reason: string;
+      validation_status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+    }>;
     missingCriticalBiomarkers?: string[];
     conflicts?: string[];
+    evidenceTraceability?: Array<{
+      biomarker_name: string;
+      value: number;
+      unit: string;
+      source_page: number;
+      extraction_method: string;
+      confidence_score: number;
+      validation_status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+    }>;
     reasons: string[];
   };
   healthAssessment?: {
@@ -167,7 +191,7 @@ const statusToProgress = (status: string): { stage: UploadProgressStage; percent
     case 'PROCESSING':
       return { stage: 'processing', percent: 45, message: 'Reading document...', step: 'PROCESSING' };
     case 'DOCUMENT_ANALYSIS_COMPLETED':
-      return { stage: 'processing', percent: 58, message: 'Detecting report structure...', step: 'DOCUMENT_ANALYSIS_COMPLETED' };
+      return { stage: 'processing', percent: 58, message: 'Understanding pages and report structure...', step: 'DOCUMENT_ANALYSIS_COMPLETED' };
     case 'EXTRACTION_COMPLETED':
     case 'EXTRACTED':
       return { stage: 'extraction', percent: 74, message: 'Extracting health parameters...', step: 'EXTRACTION_COMPLETED' };
@@ -178,10 +202,10 @@ const statusToProgress = (status: string): { stage: UploadProgressStage; percent
       return { stage: 'validation', percent: 88, message: 'Validating extracted values...', step: 'VALIDATION_COMPLETED' };
     case 'PRIORITIZATION_COMPLETED':
     case 'PRIORITIZED':
-      return { stage: 'validation', percent: 94, message: 'Checking health markers...', step: 'PRIORITIZATION_COMPLETED' };
+      return { stage: 'validation', percent: 94, message: 'Calculating health impact...', step: 'PRIORITIZATION_COMPLETED' };
     case 'SCORE_GENERATED':
     case 'SCORED':
-      return { stage: 'validation', percent: 98, message: 'Generating health assessment...', step: 'SCORE_GENERATED' };
+      return { stage: 'validation', percent: 98, message: 'Generating intelligence...', step: 'SCORE_GENERATED' };
     case 'COMPLETED':
     case 'PUBLISHED':
       return { stage: 'completed', percent: 100, message: 'Report analysis completed.', step: 'PUBLISHED' };
@@ -190,7 +214,7 @@ const statusToProgress = (status: string): { stage: UploadProgressStage; percent
     case 'INSUFFICIENT_DATA':
       return { stage: 'failed', percent: 100, message: 'Insufficient report data. Replace with a clearer or complete report.', step: 'INSUFFICIENT_DATA' };
     case 'FAILED':
-      return { stage: 'failed', percent: 100, message: 'Processing failed.', step: 'FAILED' };
+      return { stage: 'failed', percent: 100, message: 'Processing failed because the backend could not complete analysis.', step: 'FAILED' };
     default:
       return { stage: 'processing', percent: 45, message: 'Processing health information...', step: status };
   }

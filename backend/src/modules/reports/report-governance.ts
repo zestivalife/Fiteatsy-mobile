@@ -61,7 +61,6 @@ const TIER_1_BIOMARKERS = [
   'WBC',
   'Platelets'
 ] as const;
-const MINIMUM_TIER_1_BIOMARKERS = Math.ceil(TIER_1_BIOMARKERS.length * TIER_1_REQUIRED_COVERAGE);
 
 const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -75,7 +74,7 @@ const coreAliases: Array<{ canonicalName: string; aliases: string[]; dimension: 
   { canonicalName: 'LDL Cholesterol', aliases: ['LDL'], dimension: 'Metabolic' },
   { canonicalName: 'Total Cholesterol', aliases: ['Cholesterol'], dimension: 'Metabolic' },
   { canonicalName: 'Creatinine', aliases: ['Serum Creatinine'], dimension: 'Kidney' },
-  { canonicalName: 'eGFR', aliases: ['Estimated GFR'], dimension: 'Kidney' },
+  { canonicalName: 'eGFR', aliases: ['Estimated GFR', 'eGFR CKD EPI', 'eGFR (CKD-EPI)', 'CKD-EPI'], dimension: 'Kidney' },
   { canonicalName: 'Urea', aliases: ['Blood Urea'], dimension: 'Kidney' },
   { canonicalName: 'BUN', aliases: ['Blood Urea Nitrogen'], dimension: 'Kidney' },
   { canonicalName: 'Uric Acid', aliases: ['Serum Uric Acid'], dimension: 'Kidney' },
@@ -156,19 +155,81 @@ const hasSupportedDocumentSignal = (text: string, parameters: ParsedParameter[])
   /\b(lab|labs|laboratory|diagnostic|diagnostics|pathology|blood|serum|plasma|cbc|lipid|thyroid|vitamin|glucose|hba1c)\b/i.test(text) ||
   parameters.length >= 5;
 
-const sectionSignals: Array<{ key: string; pattern: RegExp; expected: number }> = [
-  { key: 'cbc', pattern: /\b(cbc|complete blood count|hemogram|haemogram|wbc|rbc|platelet)\b/i, expected: 14 },
-  { key: 'lipid', pattern: /\b(lipid|cholesterol|triglyceride|hdl|ldl|vldl)\b/i, expected: 8 },
-  { key: 'diabetes', pattern: /\b(hba1c|glycated|glucose|fasting sugar|insulin|homa)\b/i, expected: 5 },
-  { key: 'liver', pattern: /\b(liver|sgpt|sgot|alt|ast|bilirubin|albumin|ggt|alp)\b/i, expected: 9 },
-  { key: 'kidney', pattern: /\b(kidney|renal|creatinine|urea|bun|egfr|uric acid)\b/i, expected: 8 },
-  { key: 'thyroid', pattern: /\b(thyroid|tsh|t3|t4|ft3|ft4)\b/i, expected: 5 },
-  { key: 'vitamins', pattern: /\b(vitamin|b12|d3|25-oh|ferritin|iron)\b/i, expected: 7 }
+const sectionSignals: Array<{ key: string; pattern: RegExp; expected: number; requiredTier1: readonly string[] }> = [
+  {
+    key: 'cbc',
+    pattern: /\b(cbc|complete blood count|hemogram|haemogram|wbc|rbc|platelet|hemoglobin)\b/i,
+    expected: 14,
+    requiredTier1: ['Hemoglobin', 'WBC', 'Platelets']
+  },
+  {
+    key: 'lipid',
+    pattern: /\b(lipid|cholesterol|triglyceride|hdl|ldl|vldl)\b/i,
+    expected: 8,
+    requiredTier1: ['Triglycerides', 'HDL Cholesterol', 'LDL Cholesterol', 'Total Cholesterol']
+  },
+  {
+    key: 'diabetes',
+    pattern: /\b(hba1c|glycated|glycosylated|glucose|fasting sugar|insulin|homa)\b/i,
+    expected: 5,
+    requiredTier1: ['HbA1c', 'Fasting Glucose']
+  },
+  {
+    key: 'liver',
+    pattern: /\b(liver|sgpt|sgot|alt|ast|bilirubin|albumin|ggt|alp)\b/i,
+    expected: 9,
+    requiredTier1: ['ALT', 'AST', 'Bilirubin', 'Albumin']
+  },
+  {
+    key: 'kidney',
+    pattern: /\b(kidney|renal|creatinine|urea|bun|egfr|uric acid)\b/i,
+    expected: 8,
+    requiredTier1: ['Creatinine', 'eGFR', 'Urea', 'Uric Acid']
+  },
+  {
+    key: 'thyroid',
+    pattern: /\b(thyroid|tsh|t3|t4|ft3|ft4)\b/i,
+    expected: 5,
+    requiredTier1: ['TSH']
+  },
+  {
+    key: 'vitamins',
+    pattern: /\b(vitamin|b12|d3|25-oh|ferritin|iron)\b/i,
+    expected: 7,
+    requiredTier1: ['Vitamin B12', 'Vitamin D', 'Ferritin', 'Iron']
+  }
 ];
 
 const detectSections = (text: string, parameters: ParsedParameter[]) => {
   const evidence = `${text}\n${parameters.map((item) => item.name).join('\n')}`;
   return sectionSignals.filter((section) => section.pattern.test(evidence)).map((section) => section.key);
+};
+
+const resolveRequiredTier1Biomarkers = (
+  document: ReportAnalysisResult['document'],
+  sections: string[],
+  parameters: ParsedParameter[]
+) => {
+  const explicitRequirements = new Set<string>();
+  for (const section of sectionSignals) {
+    if (sections.includes(section.key)) {
+      section.requiredTier1.forEach((name) => explicitRequirements.add(name));
+    }
+  }
+
+  const extractedTier1 = parameters
+    .map((parameter) => canonicalBiomarkerName(parameter.name))
+    .filter((name) => biomarkerTier(name) === 1);
+
+  if (document.documentType === 'full_body_checkup' || sections.length >= 5 || extractedTier1.length >= 18) {
+    TIER_1_BIOMARKERS.forEach((name) => explicitRequirements.add(name));
+  }
+
+  if (explicitRequirements.size === 0) {
+    extractedTier1.slice(0, 5).forEach((name) => explicitRequirements.add(name));
+  }
+
+  return Array.from(explicitRequirements);
 };
 
 const estimateExpectedRange = (
@@ -324,40 +385,46 @@ export const buildExtractionGovernance = (
   const validationConfidence = parameters.length === 0 ? 0 : validationConfidenceTotal / parameters.length;
   const tier1ValidationConfidence = tier1Count === 0 ? 0 : tier1ValidationConfidenceTotal / tier1Count;
   const completeness = validatedCore.size / TIER_1_BIOMARKERS.length;
-  const confidence = Number(((tier1ExtractionConfidence * 0.45) + (tier1ValidationConfidence * 0.35) + (completeness * 0.2)).toFixed(2));
-  const criticalPresent =
-    canonicalCore.has('HbA1c') ||
-    canonicalCore.has('Fasting Glucose') ||
-    canonicalCore.has('Hemoglobin') ||
-    canonicalCore.has('TSH') ||
-    canonicalCore.has('LDL Cholesterol');
-  const missingCriticalBiomarkers = ['HbA1c', 'Fasting Glucose', 'Hemoglobin', 'TSH', 'LDL Cholesterol'].filter(
-    (name) => !canonicalCore.has(name)
-  );
   const sections = detectSections(text, parameters);
   const expectedBiomarkers = estimateExpectedRange(document, sections, parameters);
+  const requiredTier1Biomarkers = resolveRequiredTier1Biomarkers(document, sections, parameters);
+  const requiredTier1Count = requiredTier1Biomarkers.length;
+  const validatedRequiredTier1 = requiredTier1Biomarkers.filter((name) => validatedCore.has(name));
+  const presentRequiredTier1 = requiredTier1Biomarkers.filter((name) => canonicalCore.has(name));
+  const requiredTier1Coverage = requiredTier1Count === 0 ? 0 : validatedRequiredTier1.length / requiredTier1Count;
+  const requiredTier1Confidence =
+    presentRequiredTier1.length === 0
+      ? 0
+      : parameters
+          .filter((parameter) => presentRequiredTier1.includes(canonicalBiomarkerName(parameter.name)))
+          .reduce((sum, parameter) => sum + (parameter.extractionConfidence ?? 0.75), 0) / presentRequiredTier1.length;
+  const confidence = Number(
+    ((requiredTier1Confidence * 0.45) + (tier1ValidationConfidence * 0.35) + (requiredTier1Coverage * 0.2)).toFixed(2)
+  );
+  const criticalPresent = presentRequiredTier1.length > 0;
+  const missingCriticalBiomarkers = requiredTier1Biomarkers.filter((name) => !canonicalCore.has(name));
 
   const reasons: string[] = [];
   if (!document.supported) reasons.push('Unsupported or non-medical document.');
-  if (parameters.length < 8) reasons.push(`Only ${parameters.length} biomarkers detected; minimum document quality gate is 8.`);
+  if (parameters.length < 3) reasons.push(`Only ${parameters.length} biomarkers detected; minimum document quality gate is 3.`);
   if (canonicalCore.size < 3) reasons.push(`Only ${canonicalCore.size}/32 Tier 1 health-impact biomarkers detected; minimum quality gate is 3.`);
   if (!criticalPresent) reasons.push('No critical clinical marker was confidently identified.');
-  if (tier1ExtractionConfidence < 0.9) {
-    reasons.push(`Tier 1 extraction confidence ${extractionConfidence} is below publish threshold 0.90.`);
+  if (requiredTier1Confidence < 0.9) {
+    reasons.push(`Required Tier 1 extraction confidence ${Number(requiredTier1Confidence.toFixed(2))} is below publish threshold 0.90.`);
   }
-  if (validatedCore.size < MINIMUM_TIER_1_BIOMARKERS) {
+  if (requiredTier1Coverage < TIER_1_REQUIRED_COVERAGE) {
     reasons.push(
-      `Validated ${validatedCore.size}/${TIER_1_BIOMARKERS.length} Tier 1 health-impact biomarkers; minimum required coverage is ${MINIMUM_TIER_1_BIOMARKERS}/${TIER_1_BIOMARKERS.length}.`
+      `Validated ${validatedRequiredTier1.length}/${requiredTier1Count} report-scope Tier 1 biomarkers; minimum required coverage is ${TIER_1_REQUIRED_COVERAGE}.`
     );
   }
   if (criticalValidationFailures.length > 0) reasons.push('Critical health-impact biomarker validation failed.');
   if (conflicts.length > 0 && criticalValidationFailures.length > 0) reasons.push('Conflicting Tier 1 biomarker values require manual review.');
 
   const rescanRequired =
-    parameters.length < 8 ||
+    parameters.length < 3 ||
     canonicalCore.size < 3 ||
-    tier1ExtractionConfidence < 0.9 ||
-    validatedCore.size < MINIMUM_TIER_1_BIOMARKERS ||
+    requiredTier1Confidence < 0.9 ||
+    requiredTier1Coverage < TIER_1_REQUIRED_COVERAGE ||
     criticalValidationFailures.length > 0;
 
   const canPublish = document.supported && reasons.length === 0;
@@ -378,17 +445,20 @@ export const buildExtractionGovernance = (
       canScore: canPublish,
       canPublish,
       confidence,
-      extractionConfidence,
+      extractionConfidence: Number(requiredTier1Confidence.toFixed(2)),
       validationConfidence: Number(validationConfidence.toFixed(2)),
-      biomarkerCompleteness: Number(completeness.toFixed(2)),
-      tier1ExtractionConfidence: extractionConfidence,
-      tier1Coverage: Number(completeness.toFixed(2)),
+      biomarkerCompleteness: Number(requiredTier1Coverage.toFixed(2)),
+      tier1ExtractionConfidence: Number(requiredTier1Confidence.toFixed(2)),
+      tier1Coverage: Number(requiredTier1Coverage.toFixed(2)),
       tier1RequiredCoverage: TIER_1_REQUIRED_COVERAGE,
+      reportContexts: sections,
+      requiredTier1Biomarkers,
       expectedBiomarkers,
       detectedBiomarkers: parameters.length,
       validatedBiomarkers: validatedCount,
       coreBiomarkers: canonicalCore.size,
       validatedCoreBiomarkers: validatedCore.size,
+      validatedRequiredTier1Biomarkers: validatedRequiredTier1.length,
       tier2Biomarkers: tier2Biomarkers.size,
       tier3Biomarkers: tier3Biomarkers.size,
       failedBiomarkers,
@@ -415,7 +485,7 @@ export const buildExtractionGovernance = (
       reasons
     },
     healthAssessment: {
-      markerLabel: `${validatedCore.size} Tier 1 Health Markers Analysed`,
+      markerLabel: `${validatedRequiredTier1.length} Required Health Markers Analysed`,
       confidenceLabel: confidence >= 0.85 ? 'High' : confidence >= 0.7 ? 'Medium' : 'Needs Review',
       healthAreas: Array.from(new Set(Array.from(canonicalCore).map((name) => biomarkerDimension(name, 'Metabolic'))))
     }

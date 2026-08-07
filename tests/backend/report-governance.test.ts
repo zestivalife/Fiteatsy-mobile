@@ -122,6 +122,44 @@ test('report governance allows publishable multi-core clinical extraction', () =
   assert.equal(governance.qualityGate.tier1ExtractionConfidence, 0.96);
 });
 
+test('report governance is context-aware for CBC-only reports', () => {
+  const parameters = [parameter('Hemoglobin'), parameter('TLC'), parameter('Platelet Count')];
+  const document = classifyDocument({
+    text: 'HealthLab Diagnostics complete blood count CBC hemogram report',
+    mimeType: 'application/pdf',
+    parameterCount: parameters.length,
+    labName: 'HealthLab Diagnostics'
+  });
+  const governance = buildExtractionGovernance('HealthLab Diagnostics complete blood count CBC hemogram report', parameters, document);
+
+  assert.equal(governance.qualityGate.canPublish, true);
+  assert.equal(governance.qualityGate.status, 'PUBLISHABLE');
+  assert.deepEqual(governance.qualityGate.reportContexts, ['cbc']);
+  assert.deepEqual(governance.qualityGate.requiredTier1Biomarkers, ['Hemoglobin', 'WBC', 'Platelets']);
+  assert.equal(governance.qualityGate.validatedRequiredTier1Biomarkers, 3);
+});
+
+test('report governance is context-aware for kidney-only reports', () => {
+  const parameters = [parameter('Serum Creatinine'), parameter('eGFR (CKD-EPI)'), parameter('Blood Urea'), parameter('Serum Uric Acid')];
+  const document = classifyDocument({
+    text: 'HealthLab Diagnostics renal kidney profile creatinine urea egfr uric acid report',
+    mimeType: 'application/pdf',
+    parameterCount: parameters.length,
+    labName: 'HealthLab Diagnostics'
+  });
+  const governance = buildExtractionGovernance(
+    'HealthLab Diagnostics renal kidney profile creatinine urea egfr uric acid report',
+    parameters,
+    document
+  );
+
+  assert.equal(governance.qualityGate.canPublish, true);
+  assert.equal(governance.qualityGate.status, 'PUBLISHABLE');
+  assert.deepEqual(governance.qualityGate.reportContexts, ['kidney']);
+  assert.deepEqual(governance.qualityGate.requiredTier1Biomarkers, ['Creatinine', 'eGFR', 'Urea', 'Uric Acid']);
+  assert.equal(governance.qualityGate.validatedRequiredTier1Biomarkers, 4);
+});
+
 test('report governance does not block publish because secondary biomarkers need review', () => {
   const parameters = [
     ...CORE_BIOMARKERS.map((name) => parameter(name)),
@@ -148,6 +186,7 @@ test('report governance does not block publish because secondary biomarkers need
 test('core biomarker dictionary normalizes common lab aliases', () => {
   assert.equal(canonicalBiomarkerName('Glycosylated Hemoglobin'), 'HbA1c');
   assert.equal(canonicalBiomarkerName('SGPT'), 'ALT');
+  assert.equal(canonicalBiomarkerName('eGFR (CKD-EPI)'), 'eGFR');
   assert.equal(canonicalBiomarkerName('Cobalamin'), 'Vitamin B12');
   assert.equal(CORE_BIOMARKERS.length, 32);
 });
