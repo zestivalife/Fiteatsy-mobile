@@ -62,11 +62,24 @@ const TIER_1_BIOMARKERS = [
   'Platelets'
 ] as const;
 
-const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const normalizeName = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/\b(?:serum|plasma|whole blood|edta)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 
 const coreAliases: Array<{ canonicalName: string; aliases: string[]; dimension: string }> = [
-  { canonicalName: 'HbA1c', aliases: ['Hb A1c', 'Glycated Hemoglobin', 'Glycosylated Hemoglobin', 'Glycosylated Hemoglobin HbA1c'], dimension: 'Metabolic' },
-  { canonicalName: 'Fasting Glucose', aliases: ['Glucose', 'Glucose Fasting', 'FBS', 'Blood Sugar Fasting'], dimension: 'Metabolic' },
+  {
+    canonicalName: 'HbA1c',
+    aliases: ['Hb A1c', 'HbA1C', 'Glycated Hemoglobin', 'Glycosylated Hemoglobin', 'Glycosylated Hemoglobin HbA1c'],
+    dimension: 'Metabolic'
+  },
+  {
+    canonicalName: 'Fasting Glucose',
+    aliases: ['Glucose', 'Glucose Fasting', 'Glucose Fasting F', 'GLUCOSE FASTING (F), PLASMA', 'FBS', 'Blood Sugar Fasting'],
+    dimension: 'Metabolic'
+  },
   { canonicalName: 'Insulin', aliases: ['Fasting Insulin'], dimension: 'Metabolic' },
   { canonicalName: 'HOMA-IR', aliases: ['HOMA IR', 'HOMA'], dimension: 'Metabolic' },
   { canonicalName: 'Triglycerides', aliases: ['Triglyceride', 'TG'], dimension: 'Metabolic' },
@@ -78,7 +91,11 @@ const coreAliases: Array<{ canonicalName: string; aliases: string[]; dimension: 
   { canonicalName: 'Urea', aliases: ['Blood Urea'], dimension: 'Kidney' },
   { canonicalName: 'BUN', aliases: ['Blood Urea Nitrogen'], dimension: 'Kidney' },
   { canonicalName: 'Uric Acid', aliases: ['Serum Uric Acid'], dimension: 'Kidney' },
-  { canonicalName: 'ALT', aliases: ['SGPT', 'SGPT ALT', 'SGPT/ALT', 'Alanine Aminotransferase'], dimension: 'Liver' },
+  {
+    canonicalName: 'ALT',
+    aliases: ['SGPT', 'SGPT ALT', 'SGPT/ALT', 'Alanine Aminotransferase', 'SGPT Alanine Aminotransferase ALT'],
+    dimension: 'Liver'
+  },
   { canonicalName: 'AST', aliases: ['SGOT', 'SGOT AST', 'SGOT/AST', 'Aspartate Aminotransferase'], dimension: 'Liver' },
   { canonicalName: 'GGT', aliases: ['Gamma GT', 'Gamma Glutamyl Transferase', 'Gamma Glutamyl Transferase GGT'], dimension: 'Liver' },
   { canonicalName: 'Bilirubin', aliases: ['Total Bilirubin', 'Bilirubin Total'], dimension: 'Liver' },
@@ -93,14 +110,22 @@ const coreAliases: Array<{ canonicalName: string; aliases: string[]; dimension: 
   { canonicalName: 'Ferritin', aliases: ['Serum Ferritin'], dimension: 'Nutrition' },
   { canonicalName: 'Iron', aliases: ['Serum Iron'], dimension: 'Nutrition' },
   { canonicalName: 'Hemoglobin', aliases: ['Hb', 'Haemoglobin'], dimension: 'Nutrition' },
-  { canonicalName: 'TSH', aliases: ['Thyroid Stimulating Hormone', 'Thyroid Stimulating Hormone Ultrasensitive'], dimension: 'Thyroid/Blood Context' },
+  {
+    canonicalName: 'TSH',
+    aliases: ['Thyroid Stimulating Hormone', 'Thyroid Stimulating Hormone Ultrasensitive', 'TSH Thyroid Stimulating Hormone'],
+    dimension: 'Thyroid/Blood Context'
+  },
   { canonicalName: 'Free T4', aliases: ['FT4'], dimension: 'Thyroid/Blood Context' },
-  { canonicalName: 'WBC', aliases: ['White Blood Cells', 'White Blood Cell Count', 'TLC'], dimension: 'Thyroid/Blood Context' },
+  {
+    canonicalName: 'WBC',
+    aliases: ['White Blood Cells', 'White Blood Cell Count', 'TLC', 'Total Leukocyte Count', 'Total Leukocyte Count TLC', 'Total Leucocyte Count', 'Total Leucocyte Count TLC'],
+    dimension: 'Thyroid/Blood Context'
+  },
   { canonicalName: 'Platelets', aliases: ['Platelet Count'], dimension: 'Thyroid/Blood Context' }
 ];
 
 const supportingAliases: Array<{ canonicalName: string; aliases: string[]; dimension: string }> = [
-  { canonicalName: 'RBC', aliases: ['Red Blood Cells', 'Red Blood Cell Count'], dimension: 'Blood' },
+  { canonicalName: 'RBC', aliases: ['Red Blood Cells', 'Red Blood Cell Count', 'RBC Count'], dimension: 'Blood' },
   { canonicalName: 'Hematocrit', aliases: ['HCT', 'Packed Cell Volume', 'PCV'], dimension: 'Blood' },
   { canonicalName: 'MCV', aliases: ['Mean Corpuscular Volume'], dimension: 'Blood' },
   { canonicalName: 'MCH', aliases: ['Mean Corpuscular Hemoglobin'], dimension: 'Blood' },
@@ -115,6 +140,12 @@ const supportingAliases: Array<{ canonicalName: string; aliases: string[]; dimen
   { canonicalName: 'Potassium', aliases: ['K'], dimension: 'Electrolytes' },
   { canonicalName: 'Chloride', aliases: ['Cl'], dimension: 'Electrolytes' },
   { canonicalName: 'Calcium', aliases: ['Serum Calcium', 'Calcium Serum'], dimension: 'Nutrition' },
+  { canonicalName: 'Phosphorus', aliases: ['Serum Phosphorus', 'Phosphorus Serum'], dimension: 'Electrolytes' },
+  {
+    canonicalName: 'Estimated Average Glucose',
+    aliases: ['Estimated average glucose', 'Estimated average glucose eAG', 'eAG', 'Mean Plasma Glucose', 'Average Glucose'],
+    dimension: 'Metabolic'
+  },
   { canonicalName: 'Protein', aliases: ['Total Protein'], dimension: 'Liver' },
   { canonicalName: 'Globulin', aliases: ['Serum Globulin'], dimension: 'Liver' },
   { canonicalName: 'ALP', aliases: ['Alkaline Phosphatase'], dimension: 'Liver' },
@@ -220,8 +251,17 @@ const resolveRequiredTier1Biomarkers = (
   const extractedTier1 = parameters
     .map((parameter) => canonicalBiomarkerName(parameter.name))
     .filter((name) => biomarkerTier(name) === 1);
+  const observedTier1 = new Set(extractedTier1);
 
-  if (document.documentType === 'full_body_checkup' || sections.length >= 5 || extractedTier1.length >= 18) {
+  if (!(document.documentType === 'full_body_checkup' && (document.pageCount >= 8 || observedTier1.size >= 12))) {
+    for (const name of Array.from(explicitRequirements)) {
+      if (!observedTier1.has(name)) {
+        explicitRequirements.delete(name);
+      }
+    }
+  }
+
+  if (document.documentType === 'full_body_checkup' && (document.pageCount >= 8 || observedTier1.size >= 12)) {
     TIER_1_BIOMARKERS.forEach((name) => explicitRequirements.add(name));
   }
 
@@ -259,6 +299,11 @@ const plausibleRanges: Array<{ pattern: RegExp; min: number; max: number; unitPa
   { pattern: /^egfr$/i, min: 1, max: 200 },
   { pattern: /urea|bun/i, min: 1, max: 300 },
   { pattern: /uric acid/i, min: 0.5, max: 30 },
+  { pattern: /sodium/i, min: 90, max: 190 },
+  { pattern: /potassium/i, min: 1, max: 9 },
+  { pattern: /chloride/i, min: 70, max: 140 },
+  { pattern: /calcium/i, min: 4, max: 18 },
+  { pattern: /phosphorus/i, min: 0.5, max: 12 },
   { pattern: /^alt$|^ast$|^ggt$/i, min: 1, max: 2000 },
   { pattern: /bilirubin/i, min: 0, max: 40 },
   { pattern: /albumin/i, min: 0.5, max: 8 },
@@ -392,12 +437,20 @@ export const buildExtractionGovernance = (
   const validatedRequiredTier1 = requiredTier1Biomarkers.filter((name) => validatedCore.has(name));
   const presentRequiredTier1 = requiredTier1Biomarkers.filter((name) => canonicalCore.has(name));
   const requiredTier1Coverage = requiredTier1Count === 0 ? 0 : validatedRequiredTier1.length / requiredTier1Count;
+  const confidenceByRequiredBiomarker = new Map<string, number>();
+  for (const parameter of parameters) {
+    const canonicalName = canonicalBiomarkerName(parameter.name);
+    if (!presentRequiredTier1.includes(canonicalName)) continue;
+    confidenceByRequiredBiomarker.set(
+      canonicalName,
+      Math.max(confidenceByRequiredBiomarker.get(canonicalName) ?? 0, parameter.extractionConfidence ?? 0.75)
+    );
+  }
   const requiredTier1Confidence =
-    presentRequiredTier1.length === 0
+    confidenceByRequiredBiomarker.size === 0
       ? 0
-      : parameters
-          .filter((parameter) => presentRequiredTier1.includes(canonicalBiomarkerName(parameter.name)))
-          .reduce((sum, parameter) => sum + (parameter.extractionConfidence ?? 0.75), 0) / presentRequiredTier1.length;
+      : Array.from(confidenceByRequiredBiomarker.values()).reduce((sum, confidenceValue) => sum + confidenceValue, 0) /
+        confidenceByRequiredBiomarker.size;
   const confidence = Number(
     ((requiredTier1Confidence * 0.45) + (tier1ValidationConfidence * 0.35) + (requiredTier1Coverage * 0.2)).toFixed(2)
   );

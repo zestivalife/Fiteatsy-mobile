@@ -160,6 +160,54 @@ test('report governance is context-aware for kidney-only reports', () => {
   assert.equal(governance.qualityGate.validatedRequiredTier1Biomarkers, 4);
 });
 
+test('report governance allows narrow diabetes, kidney, and electrolyte reports without unrelated full-body markers', () => {
+  const parameters = [
+    parameter('HbA1c', 7.3),
+    {
+      ...parameter('Estimated average glucose (eAG)', 162.8),
+      unit: 'mg/dL',
+      referenceRange: 'Not specified',
+      extractionConfidence: 0.62
+    },
+    parameter('Blood Urea-Serum', 30.4),
+    parameter('Creatinine-Serum', 1),
+    {
+      ...parameter('Sodium-Serum', 147),
+      unit: 'mmol/L',
+      referenceRange: '136-145'
+    },
+    {
+      ...parameter('Potassium-Serum', 4.7),
+      unit: 'mmol/L',
+      referenceRange: '3.6-5.2'
+    },
+    {
+      ...parameter('Chloride-Serum', 109),
+      unit: 'mmol/L',
+      referenceRange: '100-108'
+    }
+  ];
+  parameters[0].unit = '%';
+  parameters[0].referenceRange = '4.5-6.4';
+  const document = classifyDocument({
+    text: 'Lab report HbA1c estimated average glucose kidney function test creatinine blood urea sodium potassium chloride',
+    mimeType: 'application/pdf',
+    parameterCount: parameters.length,
+    labName: 'HealthLab Diagnostics'
+  });
+  const governance = buildExtractionGovernance(
+    'Lab report HbA1c estimated average glucose kidney function test creatinine blood urea sodium potassium chloride',
+    parameters,
+    document
+  );
+
+  assert.equal(governance.qualityGate.canPublish, true);
+  assert.equal(governance.qualityGate.status, 'PUBLISHABLE');
+  assert.deepEqual(governance.qualityGate.requiredTier1Biomarkers, ['HbA1c', 'Creatinine', 'Urea']);
+  assert.equal(governance.qualityGate.validatedRequiredTier1Biomarkers, 3);
+  assert.equal(governance.qualityGate.missingCriticalBiomarkers.length, 0);
+});
+
 test('report governance does not block publish because secondary biomarkers need review', () => {
   const parameters = [
     ...CORE_BIOMARKERS.map((name) => parameter(name)),

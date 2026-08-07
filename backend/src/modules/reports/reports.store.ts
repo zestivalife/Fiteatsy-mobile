@@ -228,7 +228,7 @@ export const findActiveReportByDocumentHash = async (owner: { userId: string; cl
         and client_id = $2
         and document_hash = $3
         and deleted_at is null
-        and processing_status <> 'FAILED'
+        and processing_status not in ('FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA')
       order by created_at desc
       limit 1
     `,

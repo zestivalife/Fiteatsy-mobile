@@ -126,6 +126,11 @@ const analyzeAndPersistReport = async (input: {
   }
   const saved = await attachReportAnalysis(input.reportId, analysis);
   await updateProcessingJobStatus(input.processingJobId, analysis.qualityGate.canPublish ? 'completed' : 'review_required', saved?.error);
+  logReportRuntime('processing:debug-trace', {
+    reportId: input.reportId,
+    fileName: input.fileName,
+    debugTrace: analysis.debugTrace
+  });
   logReportRuntime('processing:completed', {
     reportId: input.reportId,
     status: saved?.status,

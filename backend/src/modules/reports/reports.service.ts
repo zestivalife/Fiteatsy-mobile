@@ -91,6 +91,18 @@ export type ReportAnalysisResult = {
     confidenceLabel: 'High' | 'Medium' | 'Needs Review';
     healthAreas: string[];
   };
+  debugTrace?: {
+    pagesProcessed: number;
+    totalPages: number;
+    detectedContext: string[];
+    extractedBiomarkers: number;
+    requiredBiomarkers: number;
+    validatedBiomarkers: number;
+    rejectedBiomarkers: number;
+    confidence: number;
+    finalState: string;
+    failedReasons: string[];
+  };
 };
 
 const AI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
@@ -148,7 +160,7 @@ const inferStatus = (value: number, range: string): ParsedParameter['status'] =>
 };
 
 const ignoredLabTextPattern =
-  /\b(?:interpretation|impression|comment|note|methodology|method|sample|specimen|address|phone|email|www|footer|page\s+\d+|validated by|reported by|registered office|reference ranges? may vary)\b/i;
+  /\b(?:interpretation|impression|comment|note|methodology|method|sample|specimen|address|phone|email|www|footer|page\s+\d+|validated by|reported by|registered office|reference ranges? may vary|anaemic|anaemia|anemia|thalassemia|trait|probability|likelihood)\b/i;
 
 const looksLikeTableRow = (line: string) =>
   !ignoredLabTextPattern.test(line) &&
@@ -160,8 +172,10 @@ const groupedTableNames = [
   'Glucose',
   'Glucose Fasting',
   'Glycosylated Hemoglobin (HbA1c)',
+  'Estimated average glucose (eAG)',
   'SGPT',
   'SGOT',
+  'SGPT; ALANINE AMINOTRANSFERASE (ALT), SERUM',
   'SGOT/AST',
   'SGPT/ALT',
   'Bilirubin Total',
@@ -177,6 +191,8 @@ const groupedTableNames = [
   'Thyroid Stimulating Hormone (Ultrasensitive)',
   'Gamma Glutamyl Transferase (GGT)',
   'TLC',
+  'Total Leukocyte Count (TLC)',
+  'Total Leucocyte Count (TLC)',
   'RBC Count',
   'PCV',
   'MCV',
@@ -193,13 +209,29 @@ const groupedTableNames = [
   'Total Protein',
   'Globulin',
   'Calcium Serum',
+  'Calcium-Serum',
+  'Phosphorus-Serum',
+  'Sodium-Serum',
+  'Potassium-Serum',
+  'Chloride-Serum',
   'Sodium',
   'Potassium',
   'Chloride',
   'TIBC,(Total Iron Binding Capacity)',
   'Triiodothyronine (T3)',
-  'Total Thyroxine (T4)'
+  'Total Thyroxine (T4)',
+  'GLUCOSE FASTING (F), PLASMA',
+  'TSH (THYROID STIMULATING HORMONE), SERUM'
 ];
+
+const knownNameMatchesLine = (name: string, line: string) => {
+  const normalizedName = normalizeWhitespace(name).toLowerCase();
+  const normalizedLine = normalizeWhitespace(line).toLowerCase();
+  if (normalizedName.includes('(') || normalizedName.includes(')')) {
+    return normalizedLine === normalizedName || normalizedLine.includes(normalizedName);
+  }
+  return new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(line);
+};
 
 const isKnownBiomarkerLabel = (line: string) => {
   if (ignoredLabTextPattern.test(line)) return false;
@@ -209,8 +241,20 @@ const isKnownBiomarkerLabel = (line: string) => {
 const isMethodOrSectionLine = (line: string) =>
   /^(?:calculated|hplc|cmia|urease|uricase|ferene|immunoturbidimetry|immunoturbidimetric|hexokinase|enzymatic|colorimetric|biuret|arsenazo|ise-|electrical impedance|laser based|cyanide free|kinetic|glycerol|accelerator|para-nitrophenyl|diazo|diazonium)/i.test(line);
 
+const normalizeRepeatedLeadingValues = (line: string) => {
+  const first = line.match(/^(-?\d+(?:\.\d+)?)(?:\s+|$)/);
+  if (!first) return line;
+  let remaining = line.slice(first[0].length).trimStart();
+  const repeatedValuePattern = new RegExp(`^${first[1].replace('.', '\\.')}\\s+`);
+  while (repeatedValuePattern.test(remaining)) {
+    remaining = remaining.replace(repeatedValuePattern, '').trimStart();
+  }
+  return `${first[1]} ${remaining}`.trim();
+};
+
 const parseValueUnitRange = (line: string) => {
-  const match = line.match(
+  const normalizedLine = normalizeRepeatedLeadingValues(line);
+  const match = normalizedLine.match(
     /^(-?\d+(?:\.\d+)?)\s+(.+?)\s+((?:<?|>?|>=?|<=?)\s*-?\d+(?:\.\d+)?(?:\s*(?:-|–)\s*-?\d+(?:\.\d+)?)?|up to\s+\d+(?:\.\d+)?|Deficient\s+<\s*\d+(?:\.\d+)?|Normal Or High:\s*>=\s*\d+(?:\.\d+)?)/i
   );
   if (!match) return null;
@@ -219,6 +263,30 @@ const parseValueUnitRange = (line: string) => {
     unit: normalizeWhitespace(match[2]),
     referenceRange: normalizeWhitespace(match[3].replace(/^Normal Or High:\s*/i, ''))
   };
+};
+
+const boundedRangePattern = String.raw`(?:(?:<|>|>=|<=)\s*-?\d+(?:\.\d+)?|-?\d+(?:\.\d+)?\s*(?:-|–)\s*-?\d+(?:\.\d+)?)`;
+
+const parseRangeUnitResult = (line: string) => {
+  const rangeFirst = line.match(new RegExp(`^(${boundedRangePattern})\\s+(.+?)\\s+(-?\\d+(?:\\.\\d+)?)$`, 'i'));
+  if (rangeFirst) {
+    return {
+      value: Number(rangeFirst[3]),
+      unit: normalizeWhitespace(rangeFirst[2]),
+      referenceRange: normalizeWhitespace(rangeFirst[1])
+    };
+  }
+
+  const unitFirst = line.match(new RegExp(`^([A-Za-zµμ/%][A-Za-z0-9/%µμ^./-]*)\\s+(${boundedRangePattern})\\s+(-?\\d+(?:\\.\\d+)?)$`, 'i'));
+  if (unitFirst) {
+    return {
+      value: Number(unitFirst[3]),
+      unit: normalizeWhitespace(unitFirst[1]),
+      referenceRange: normalizeWhitespace(unitFirst[2])
+    };
+  }
+
+  return null;
 };
 
 const parseGroupedTableParameters = (lines: string[]): ParsedParameter[] => {
@@ -250,8 +318,8 @@ const parseGroupedTableParameters = (lines: string[]): ParsedParameter[] => {
       const candidate = lines[index + offset];
       if (ignoredLabTextPattern.test(candidate)) break;
       if (isKnownBiomarkerLabel(candidate)) break;
-      if (offset === 1 && !isMethodOrSectionLine(candidate) && !parseValueUnitRange(candidate)) continue;
-      const parsed = parseValueUnitRange(candidate);
+      if (offset === 1 && !isMethodOrSectionLine(candidate) && !parseRangeUnitResult(candidate) && !parseValueUnitRange(candidate)) continue;
+      const parsed = parseRangeUnitResult(candidate) ?? parseValueUnitRange(candidate);
       if (!parsed || !Number.isFinite(parsed.value)) continue;
       out.push({
         name,
@@ -314,6 +382,8 @@ const parseParametersFallback = (text: string): ParsedParameter[] => {
   const lines = text.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
   const out: ParsedParameter[] = [];
   const knownNames = [
+    'Estimated average glucose (eAG)',
+    'Estimated average glucose',
     ...CORE_BIOMARKERS,
     'Glucose',
     'Fasting Glucose',
@@ -343,7 +413,7 @@ const parseParametersFallback = (text: string): ParsedParameter[] => {
 
   for (const line of lines) {
     if (ignoredLabTextPattern.test(line)) continue;
-    const matchedName = knownNames.find((name) => new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(line));
+    const matchedName = knownNames.find((name) => knownNameMatchesLine(name, line));
     if (!matchedName) continue;
     const valueMatch = line.match(/(-?\d+(?:\.\d+)?)/);
     if (!valueMatch) continue;
@@ -469,11 +539,14 @@ const buildActionPlan = (parameters: ParsedParameter[]) => {
   }));
 };
 
-const extractTextFromPdf = async (buffer: Buffer): Promise<string> => {
+const extractTextFromPdf = async (buffer: Buffer): Promise<{ text: string; pageCount: number }> => {
   const parser = new PDFParse({ data: buffer });
   try {
     const textResult = await parser.getText();
-    return textResult.text ?? '';
+    return {
+      text: textResult.text ?? '',
+      pageCount: textResult.total || Math.max(1, textResult.pages.length)
+    };
   } finally {
     await parser.destroy();
   }
@@ -544,13 +617,16 @@ const mergeParameters = (primary: ParsedParameter[], secondary: ParsedParameter[
 export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Promise<ReportAnalysisResult> => {
   const isPdf = mimeType.toLowerCase().includes('pdf');
   let text = '';
+  let pdfPageCount: number | null = null;
   let parameters: ParsedParameter[] = [];
   let aiDate: string | null = null;
   let aiLab: string | null = null;
   let extractionAttempts: ReportAnalysisResult['extractionAttempts'] = [];
 
   if (isPdf) {
-    text = await extractTextFromPdf(buffer);
+    const pdfText = await extractTextFromPdf(buffer);
+    text = pdfText.text;
+    pdfPageCount = pdfText.pageCount;
     const primaryParameters = parseParameters(text);
     extractionAttempts.push({
       attempt: 1,
@@ -599,6 +675,9 @@ export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Pro
     parameterCount: parameters.length,
     labName
   });
+  if (isPdf) {
+    document.pageCount = pdfPageCount ?? document.pageCount;
+  }
   const governance = buildExtractionGovernance(text, parameters, document);
   const governanceAttempt = governance.extractionAttempts[0];
   const governedAttempts =
@@ -637,6 +716,18 @@ export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Pro
         ],
     document,
     ...governance,
-    extractionAttempts: governedAttempts
+    extractionAttempts: governedAttempts,
+    debugTrace: {
+      pagesProcessed: document.pageCount,
+      totalPages: document.pageCount,
+      detectedContext: governance.qualityGate.reportContexts ?? [],
+      extractedBiomarkers: governance.qualityGate.detectedBiomarkers,
+      requiredBiomarkers: governance.qualityGate.requiredTier1Biomarkers?.length ?? 0,
+      validatedBiomarkers: governance.qualityGate.validatedRequiredTier1Biomarkers ?? 0,
+      rejectedBiomarkers: governance.qualityGate.rejectedBiomarkers?.length ?? 0,
+      confidence: governance.qualityGate.confidence,
+      finalState: governance.qualityGate.canPublish ? 'PUBLISHED' : governance.qualityGate.status,
+      failedReasons: governance.qualityGate.reasons
+    }
   };
 };
