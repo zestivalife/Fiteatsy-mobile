@@ -205,6 +205,46 @@ test('duplicate report upload reuses the existing published report', async () =>
   assert.equal(list.body.total, 1);
 });
 
+test('async report analysis publishes through status polling and detail fetch', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const started = await fetch(`${server.baseUrl}/v1/reports/analyze/start`, {
+    method: 'POST',
+    headers: authHeaders(session.token),
+    body: buildMultipartReportForm({ reportName: 'async-poll.pdf' }),
+  });
+  const startedBody = await started.json();
+  assert.equal(started.status, 202);
+  assert.equal(typeof startedBody.reportId, 'string');
+
+  let terminalStatus = '';
+  let statusBody: Record<string, any> = {};
+  const terminalStatuses = new Set(['PUBLISHED', 'COMPLETED', 'FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA']);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const status = await getJson(server.baseUrl, `/v1/reports/${startedBody.reportId}/status`, {
+      headers: authHeaders(session.token)
+    });
+    assert.equal(status.response.status, 200);
+    statusBody = status.body;
+    if (terminalStatuses.has(status.body.status)) {
+      terminalStatus = status.body.status;
+      break;
+    }
+  }
+
+  assert.equal(terminalStatus, 'PUBLISHED');
+  assert.equal(statusBody.qualityGate?.canPublish, true);
+  assert.equal(statusBody.qualityGate?.canScore, true);
+
+  const detail = await getJson(server.baseUrl, `/v1/reports/${startedBody.reportId}`, {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(detail.response.status, 200);
+  assert.equal(detail.body.status, 'PUBLISHED');
+  assert.equal(detail.body.analysis.qualityGate.canPublish, true);
+  assert.equal(detail.body.analysis.debugTrace.finalState, 'PUBLISHED');
+});
+
 test('incomplete extraction requires review and is excluded from published report history', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const form = new FormData();

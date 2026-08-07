@@ -106,6 +106,7 @@ export type ReportAnalysisResult = {
 };
 
 const AI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
+const AI_VISION_TIMEOUT_MS = 25000;
 const aiClient = env.openAiApiKey ? new OpenAI({ apiKey: env.openAiApiKey }) : null;
 
 const normalizeWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
@@ -445,9 +446,24 @@ const parseParametersFallback = (text: string): ParsedParameter[] => {
   return Array.from(unique.values());
 };
 
+const extractJsonPayload = (raw: string) => {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('```')) {
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fenced?.[1]) return fenced[1].trim();
+  }
+  const firstObject = trimmed.indexOf('{');
+  const lastObject = trimmed.lastIndexOf('}');
+  if (firstObject >= 0 && lastObject > firstObject) return trimmed.slice(firstObject, lastObject + 1);
+  const firstArray = trimmed.indexOf('[');
+  const lastArray = trimmed.lastIndexOf(']');
+  if (firstArray >= 0 && lastArray > firstArray) return trimmed.slice(firstArray, lastArray + 1);
+  return trimmed;
+};
+
 const parseParametersFromAiJson = (raw: string): ParsedParameter[] => {
   try {
-    const json = JSON.parse(raw) as
+    const json = JSON.parse(extractJsonPayload(raw)) as
       | Array<{
           name: string;
           value: number;
@@ -552,7 +568,24 @@ const extractTextFromPdf = async (buffer: Buffer): Promise<{ text: string; pageC
   }
 };
 
-const parseImageViaAi = async (buffer: Buffer): Promise<{
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+  let timeout: NodeJS.Timeout | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+};
+
+const parseImageViaAi = async (
+  buffer: Buffer,
+  mimeType: string
+): Promise<{
   reportDate: string | null;
   labName: string | null;
   parameters: ParsedParameter[];
@@ -567,32 +600,42 @@ const parseImageViaAi = async (buffer: Buffer): Promise<{
     };
   }
 
-  const dataUrl = `data:image/jpeg;base64,${buffer.toString('base64')}`;
-  const completion = await aiClient.chat.completions.create({
-    model: AI_MODEL,
-    max_tokens: 800,
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You extract lab report data. Return strict JSON with keys reportDate, labName, parameters. parameters is array of {name,value,unit,referenceRange,status,category}. status must be normal/low/high when possible.'
-      },
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Extract all readable lab parameters from this report image. Do not add fake values.' },
-          { type: 'image_url', image_url: { url: dataUrl } }
-        ]
-      }
-    ]
-  });
+  const safeMimeType = mimeType.toLowerCase().includes('png')
+    ? 'image/png'
+    : mimeType.toLowerCase().includes('webp')
+      ? 'image/webp'
+      : 'image/jpeg';
+  const dataUrl = `data:${safeMimeType};base64,${buffer.toString('base64')}`;
+  const completion = await withTimeout(
+    aiClient.chat.completions.create({
+      model: AI_MODEL,
+      max_tokens: 800,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You extract lab report data. Return strict JSON with keys reportDate, labName, parameters. parameters is array of {name,value,unit,referenceRange,status,category}. status must be normal/low/high when possible. Never infer or invent missing values.'
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Extract all readable lab parameters from this report image. Do not add fake values.' },
+            { type: 'image_url', image_url: { url: dataUrl } }
+          ]
+        }
+      ]
+    }),
+    AI_VISION_TIMEOUT_MS,
+    'Vision extraction'
+  );
 
   const content = completion.choices[0]?.message?.content?.trim() ?? '';
   const parsed = parseParametersFromAiJson(content);
   let reportDate: string | null = null;
   let labName: string | null = null;
   try {
-    const json = JSON.parse(content) as { reportDate?: string; labName?: string };
+    const json = JSON.parse(extractJsonPayload(content)) as { reportDate?: string; labName?: string };
     reportDate = typeof json.reportDate === 'string' ? json.reportDate : null;
     labName = typeof json.labName === 'string' ? json.labName : null;
   } catch {
@@ -650,7 +693,7 @@ export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Pro
     });
     parameters = mergeParameters(primaryParameters, secondaryParameters);
   } else {
-    const imageResult = await parseImageViaAi(buffer);
+    const imageResult = await parseImageViaAi(buffer, mimeType);
     aiDate = imageResult.reportDate;
     aiLab = imageResult.labName;
     parameters = imageResult.parameters;

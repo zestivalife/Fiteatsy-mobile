@@ -120,6 +120,7 @@ export type ReportDto = {
 type UploadProgressStage = 'uploading' | 'uploaded' | 'processing' | 'extraction' | 'validation' | 'completed' | 'failed';
 
 const REQUEST_TIMEOUT_MS = 30000;
+const STATUS_REQUEST_TIMEOUT_MS = 20000;
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 120000;
 
@@ -142,6 +143,12 @@ const getBaseUrls = () => {
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      const error = new Error('Aborted');
+      error.name = 'AbortError';
+      reject(error);
+      return;
+    }
     const timeout = setTimeout(resolve, ms);
     const onAbort = () => {
       clearTimeout(timeout);
@@ -158,30 +165,46 @@ const parseJson = async <T>(response: Response): Promise<T> => {
   return JSON.parse(raw) as T;
 };
 
-const requestJson = async <T>(baseUrl: string, path: string, options?: RequestInit): Promise<T> => {
+const requestJson = async <T>(baseUrl: string, path: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> => {
+  const { timeoutMs, signal, ...fetchOptions } = options ?? {};
   const authHeaders = buildAuthorizationHeaders();
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs ?? STATUS_REQUEST_TIMEOUT_MS);
+  signal?.addEventListener('abort', abortFromCaller, { once: true });
   logReportDebug('request:start', {
     url: `${baseUrl}${path}`,
-    method: options?.method ?? 'GET',
+    method: fetchOptions.method ?? 'GET',
     headers: safeHeaderSummary(authHeaders)
   });
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers: {
-      ...authHeaders,
-      ...(options?.headers ?? {})
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      ...fetchOptions,
+      signal: controller.signal,
+      headers: {
+        ...authHeaders,
+        ...(fetchOptions.headers ?? {})
+      }
+    });
+    const payload = await parseJson<T & { message?: string; error?: string }>(response).catch(() => ({} as T & { message?: string; error?: string }));
+    logReportDebug('request:response', {
+      url: `${baseUrl}${path}`,
+      status: response.status,
+      payload
+    });
+    if (!response.ok) {
+      throw new Error(`REPORT_API_HTTP_${response.status}: ${payload.message ?? payload.error ?? 'Request failed.'}`);
     }
-  });
-  const payload = await parseJson<T & { message?: string; error?: string }>(response).catch(() => ({} as T & { message?: string; error?: string }));
-  logReportDebug('request:response', {
-    url: `${baseUrl}${path}`,
-    status: response.status,
-    payload
-  });
-  if (!response.ok) {
-    throw new Error(`REPORT_API_HTTP_${response.status}: ${payload.message ?? payload.error ?? 'Request failed.'}`);
+    return payload as T;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(signal?.aborted ? 'REQUEST_CANCELLED' : 'REQUEST_TIMEOUT');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', abortFromCaller);
   }
-  return payload as T;
 };
 
 const statusToProgress = (status: string): { stage: UploadProgressStage; percent: number; message: string; step: string } => {

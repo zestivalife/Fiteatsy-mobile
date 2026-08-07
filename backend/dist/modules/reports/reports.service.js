@@ -3,6 +3,7 @@ import { PDFParse } from 'pdf-parse';
 import { env } from '../../config/env.js';
 import { buildExtractionGovernance, canonicalBiomarkerName, classifyDocument, CORE_BIOMARKERS } from './report-governance.js';
 const AI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
+const AI_VISION_TIMEOUT_MS = 25000;
 const aiClient = env.openAiApiKey ? new OpenAI({ apiKey: env.openAiApiKey }) : null;
 const normalizeWhitespace = (value) => value.replace(/\s+/g, ' ').trim();
 const findLabName = (text) => {
@@ -335,9 +336,26 @@ const parseParametersFallback = (text) => {
     }
     return Array.from(unique.values());
 };
+const extractJsonPayload = (raw) => {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('```')) {
+        const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (fenced?.[1])
+            return fenced[1].trim();
+    }
+    const firstObject = trimmed.indexOf('{');
+    const lastObject = trimmed.lastIndexOf('}');
+    if (firstObject >= 0 && lastObject > firstObject)
+        return trimmed.slice(firstObject, lastObject + 1);
+    const firstArray = trimmed.indexOf('[');
+    const lastArray = trimmed.lastIndexOf(']');
+    if (firstArray >= 0 && lastArray > firstArray)
+        return trimmed.slice(firstArray, lastArray + 1);
+    return trimmed;
+};
 const parseParametersFromAiJson = (raw) => {
     try {
-        const json = JSON.parse(raw);
+        const json = JSON.parse(extractJsonPayload(raw));
         const parameters = Array.isArray(json) ? json : Array.isArray(json.parameters) ? json.parameters : [];
         return parameters
             .filter((item) => item && item.name && Number.isFinite(item.value))
@@ -420,7 +438,22 @@ const extractTextFromPdf = async (buffer) => {
         await parser.destroy();
     }
 };
-const parseImageViaAi = async (buffer) => {
+const withTimeout = async (promise, timeoutMs, label) => {
+    let timeout = null;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise((_resolve, reject) => {
+                timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+            })
+        ]);
+    }
+    finally {
+        if (timeout)
+            clearTimeout(timeout);
+    }
+};
+const parseImageViaAi = async (buffer, mimeType) => {
     if (!aiClient) {
         return {
             reportDate: null,
@@ -429,14 +462,20 @@ const parseImageViaAi = async (buffer) => {
             notes: ['Backend image extraction provider is not configured; report requires retry with PDF or manual review.']
         };
     }
-    const dataUrl = `data:image/jpeg;base64,${buffer.toString('base64')}`;
-    const completion = await aiClient.chat.completions.create({
+    const safeMimeType = mimeType.toLowerCase().includes('png')
+        ? 'image/png'
+        : mimeType.toLowerCase().includes('webp')
+            ? 'image/webp'
+            : 'image/jpeg';
+    const dataUrl = `data:${safeMimeType};base64,${buffer.toString('base64')}`;
+    const completion = await withTimeout(aiClient.chat.completions.create({
         model: AI_MODEL,
         max_tokens: 800,
+        response_format: { type: 'json_object' },
         messages: [
             {
                 role: 'system',
-                content: 'You extract lab report data. Return strict JSON with keys reportDate, labName, parameters. parameters is array of {name,value,unit,referenceRange,status,category}. status must be normal/low/high when possible.'
+                content: 'You extract lab report data. Return strict JSON with keys reportDate, labName, parameters. parameters is array of {name,value,unit,referenceRange,status,category}. status must be normal/low/high when possible. Never infer or invent missing values.'
             },
             {
                 role: 'user',
@@ -446,13 +485,13 @@ const parseImageViaAi = async (buffer) => {
                 ]
             }
         ]
-    });
+    }), AI_VISION_TIMEOUT_MS, 'Vision extraction');
     const content = completion.choices[0]?.message?.content?.trim() ?? '';
     const parsed = parseParametersFromAiJson(content);
     let reportDate = null;
     let labName = null;
     try {
-        const json = JSON.parse(content);
+        const json = JSON.parse(extractJsonPayload(content));
         reportDate = typeof json.reportDate === 'string' ? json.reportDate : null;
         labName = typeof json.labName === 'string' ? json.labName : null;
     }
@@ -507,7 +546,7 @@ export const analyzeReportBuffer = async (buffer, mimeType) => {
         parameters = mergeParameters(primaryParameters, secondaryParameters);
     }
     else {
-        const imageResult = await parseImageViaAi(buffer);
+        const imageResult = await parseImageViaAi(buffer, mimeType);
         aiDate = imageResult.reportDate;
         aiLab = imageResult.labName;
         parameters = imageResult.parameters;
