@@ -289,7 +289,7 @@ create table if not exists health_reports (
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
-  check (processing_status in ('UPLOADED', 'PROCESSING', 'EXTRACTED', 'EXTRACTION_COMPLETED', 'VALIDATION_PENDING', 'VALIDATED', 'PRIORITIZED', 'SCORED', 'PUBLISHED', 'COMPLETED', 'FAILED', 'REVIEW_REQUIRED'))
+  check (processing_status in ('UPLOADED', 'PROCESSING', 'DOCUMENT_ANALYSIS_COMPLETED', 'EXTRACTION_COMPLETED', 'VALIDATION_COMPLETED', 'PRIORITIZATION_COMPLETED', 'SCORE_GENERATED', 'PUBLISHED', 'FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA', 'EXTRACTED', 'VALIDATION_PENDING', 'VALIDATED', 'PRIORITIZED', 'SCORED', 'COMPLETED'))
 );
 
 create unique index if not exists health_reports_client_document_hash_active_unique

@@ -5,6 +5,11 @@ import { ReportAnalysisResult } from './reports.service.js';
 export type ReportStatus =
   | 'UPLOADED'
   | 'PROCESSING'
+  | 'DOCUMENT_ANALYSIS_COMPLETED'
+  | 'EXTRACTION_COMPLETED'
+  | 'VALIDATION_COMPLETED'
+  | 'PRIORITIZATION_COMPLETED'
+  | 'SCORE_GENERATED'
   | 'EXTRACTED'
   | 'VALIDATION_PENDING'
   | 'VALIDATED'
@@ -13,8 +18,8 @@ export type ReportStatus =
   | 'PUBLISHED'
   | 'FAILED'
   | 'REVIEW_REQUIRED'
+  | 'INSUFFICIENT_DATA'
   // Backward-compatible status retained for already-deployed records.
-  | 'EXTRACTION_COMPLETED'
   | 'COMPLETED';
 
 export type ReportRecord = {
@@ -247,7 +252,11 @@ export const updateReportStatus = async (reportId: string, status: ReportStatus,
 };
 
 export const attachReportAnalysis = async (reportId: string, analysis: ReportAnalysisResult) => {
-  const nextStatus: ReportStatus = analysis.qualityGate.canPublish ? 'PUBLISHED' : 'REVIEW_REQUIRED';
+  const nextStatus: ReportStatus = analysis.qualityGate.canPublish
+    ? 'PUBLISHED'
+    : analysis.qualityGate.status === 'INSUFFICIENT_DATA'
+      ? 'INSUFFICIENT_DATA'
+      : 'REVIEW_REQUIRED';
   const result = await pool.query(
     `
       update health_reports

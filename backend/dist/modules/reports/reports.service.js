@@ -92,6 +92,65 @@ const parseParameters = (text) => {
     }
     return Array.from(unique.values());
 };
+const parseParametersFallback = (text) => {
+    const lines = text.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
+    const out = [];
+    const knownNames = [
+        'HbA1c',
+        'Glucose',
+        'Fasting Glucose',
+        'Total Cholesterol',
+        'LDL',
+        'HDL',
+        'Triglycerides',
+        'Creatinine',
+        'Urea',
+        'Uric Acid',
+        'ALT',
+        'AST',
+        'Vitamin B12',
+        'Vitamin D',
+        'Hemoglobin',
+        'TSH',
+        'Platelets',
+        'WBC',
+        'Ferritin',
+        'Iron'
+    ];
+    for (const line of lines) {
+        const matchedName = knownNames.find((name) => new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(line));
+        if (!matchedName)
+            continue;
+        const valueMatch = line.match(/(-?\d+(?:\.\d+)?)/);
+        if (!valueMatch)
+            continue;
+        const rangeMatch = line.match(/(\d+(?:\.\d+)?\s*(?:-|–)\s*\d+(?:\.\d+)?|<\s*\d+(?:\.\d+)?|>\s*\d+(?:\.\d+)?)/);
+        const unitMatch = line.match(/\d+(?:\.\d+)?\s*([A-Za-z/%µ]+)\b/);
+        const value = Number(valueMatch[1]);
+        if (!Number.isFinite(value))
+            continue;
+        const referenceRange = normalizeWhitespace(rangeMatch?.[1] ?? 'Not specified');
+        out.push({
+            name: matchedName,
+            canonicalName: canonicalBiomarkerName(matchedName),
+            value,
+            unit: normalizeWhitespace(unitMatch?.[1] ?? ''),
+            referenceRange,
+            category: categorize(matchedName),
+            status: inferStatus(value, referenceRange),
+            pageNumber: 1,
+            sectionName: 'Secondary extraction pass',
+            extractionConfidence: rangeMatch ? 0.78 : 0.62
+        });
+    }
+    const unique = new Map();
+    for (const p of out) {
+        const key = canonicalBiomarkerName(p.name).toLowerCase();
+        if (!unique.has(key))
+            unique.set(key, p);
+    }
+    return Array.from(unique.values());
+};
 const parseParametersFromAiJson = (raw) => {
     try {
         const json = JSON.parse(raw);
@@ -175,7 +234,12 @@ const extractTextFromPdf = async (buffer) => {
 };
 const parseImageViaAi = async (buffer) => {
     if (!aiClient) {
-        throw new Error('Image analysis requires AI service configuration. Please upload a PDF or enable backend AI key.');
+        return {
+            reportDate: null,
+            labName: null,
+            parameters: [],
+            notes: ['Backend image extraction provider is not configured; report requires retry with PDF or manual review.']
+        };
     }
     const dataUrl = `data:image/jpeg;base64,${buffer.toString('base64')}`;
     const completion = await aiClient.chat.completions.create({
@@ -207,7 +271,18 @@ const parseImageViaAi = async (buffer) => {
     catch {
         // no-op
     }
-    return { reportDate, labName, parameters: parsed };
+    return { reportDate, labName, parameters: parsed, notes: [] };
+};
+const mergeParameters = (primary, secondary) => {
+    const merged = new Map();
+    for (const parameter of [...primary, ...secondary]) {
+        const key = canonicalBiomarkerName(parameter.name).toLowerCase();
+        const existing = merged.get(key);
+        if (!existing || (parameter.extractionConfidence ?? 0) > (existing.extractionConfidence ?? 0)) {
+            merged.set(key, parameter);
+        }
+    }
+    return Array.from(merged.values());
 };
 export const analyzeReportBuffer = async (buffer, mimeType) => {
     const isPdf = mimeType.toLowerCase().includes('pdf');
@@ -215,18 +290,46 @@ export const analyzeReportBuffer = async (buffer, mimeType) => {
     let parameters = [];
     let aiDate = null;
     let aiLab = null;
+    let extractionAttempts = [];
     if (isPdf) {
         text = await extractTextFromPdf(buffer);
-        parameters = parseParameters(text);
+        const primaryParameters = parseParameters(text);
+        extractionAttempts.push({
+            attempt: 1,
+            strategy: 'pdf_text_table_scan',
+            parameterCount: primaryParameters.length,
+            confidence: Number((primaryParameters.length === 0 ? 0 : Math.min(0.98, 0.62 + Math.min(primaryParameters.length, 40) / 120)).toFixed(2)),
+            rescanRecommended: primaryParameters.length < 8,
+            notes: primaryParameters.length < 8 ? ['Primary extraction found too few biomarkers; running secondary extraction pass.'] : []
+        });
+        const secondaryParameters = primaryParameters.length < 8 ? parseParametersFallback(text) : [];
+        if (secondaryParameters.length > 0 || primaryParameters.length < 8) {
+            extractionAttempts.push({
+                attempt: 2,
+                strategy: 'pdf_secondary_known_marker_scan',
+                parameterCount: secondaryParameters.length,
+                confidence: Number((secondaryParameters.length === 0 ? 0 : Math.min(0.82, 0.5 + Math.min(secondaryParameters.length, 25) / 100)).toFixed(2)),
+                rescanRecommended: secondaryParameters.length < 8,
+                notes: secondaryParameters.length === 0
+                    ? ['Secondary extraction did not find additional reliable biomarkers.']
+                    : ['Secondary extraction added known biomarker candidates for validation.']
+            });
+        }
+        parameters = mergeParameters(primaryParameters, secondaryParameters);
     }
     else {
         const imageResult = await parseImageViaAi(buffer);
         aiDate = imageResult.reportDate;
         aiLab = imageResult.labName;
         parameters = imageResult.parameters;
-    }
-    if (parameters.length === 0) {
-        throw new Error('No analyzable parameters found in this report. Please upload a clearer PDF/image report.');
+        extractionAttempts.push({
+            attempt: 1,
+            strategy: 'vision_structured_json',
+            parameterCount: parameters.length,
+            confidence: Number((parameters.length === 0 ? 0 : Math.min(0.82, 0.52 + Math.min(parameters.length, 25) / 100)).toFixed(2)),
+            rescanRecommended: parameters.length < 8,
+            notes: imageResult.notes
+        });
     }
     const reportDate = aiDate ??
         findDate(text) ??
@@ -239,6 +342,14 @@ export const analyzeReportBuffer = async (buffer, mimeType) => {
         labName
     });
     const governance = buildExtractionGovernance(text, parameters, document);
+    const governanceAttempt = governance.extractionAttempts[0];
+    const governedAttempts = extractionAttempts.length > 0
+        ? extractionAttempts.map((attempt, index) => ({
+            ...attempt,
+            rescanRecommended: attempt.rescanRecommended || (index === extractionAttempts.length - 1 ? governanceAttempt?.rescanRecommended ?? false : false),
+            notes: Array.from(new Set([...attempt.notes, ...(index === extractionAttempts.length - 1 ? governanceAttempt?.notes ?? [] : [])]))
+        }))
+        : governance.extractionAttempts;
     const categoryScores = buildCategoryScores(parameters);
     const score = governance.qualityGate.canScore
         ? Math.round((categoryScores.Blood + categoryScores.Metabolic + categoryScores.Organs + categoryScores.Thyroid + categoryScores.Vitamins) / 5)
@@ -262,6 +373,7 @@ export const analyzeReportBuffer = async (buffer, mimeType) => {
                 }
             ],
         document,
-        ...governance
+        ...governance,
+        extractionAttempts: governedAttempts
     };
 };

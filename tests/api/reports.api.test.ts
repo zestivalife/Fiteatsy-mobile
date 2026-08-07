@@ -230,7 +230,7 @@ test('incomplete extraction requires review and is excluded from published repor
   });
   const analyzedBody = await analyzed.json();
   assert.equal(analyzed.status, 200);
-  assert.equal(analyzedBody.status, 'REVIEW_REQUIRED');
+  assert.equal(analyzedBody.status, 'INSUFFICIENT_DATA');
   assert.equal(analyzedBody.score, null);
   assert.equal(analyzedBody.qualityGate.canScore, false);
 
@@ -239,6 +239,25 @@ test('incomplete extraction requires review and is excluded from published repor
   });
   assert.equal(list.response.status, 200);
   assert.equal(list.body.total, 0);
+});
+
+test('image report without a configured vision provider is safely gated instead of failing upload', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const form = new FormData();
+  form.set('reportFile', new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: 'image/png' }), 'camera.png');
+
+  const analyzed = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
+    method: 'POST',
+    headers: authHeaders(session.token),
+    body: form,
+  });
+  const analyzedBody = await analyzed.json();
+
+  assert.equal(analyzed.status, 200);
+  assert.equal(analyzedBody.status, 'INSUFFICIENT_DATA');
+  assert.equal(analyzedBody.score, null);
+  assert.equal(analyzedBody.qualityGate.canPublish, false);
+  assert.match(analyzedBody.qualityGate.reasons.join(' '), /Unsupported|Only 0 biomarkers/);
 });
 
 test('POST /v1/reports/analyze returns 400 without a file', async () => {

@@ -39,17 +39,20 @@ export type ReportAnalysisResponse = {
     confidence: number;
   };
   qualityGate?: {
-    status: 'PUBLISHABLE' | 'REVIEW_REQUIRED';
+    status: 'PUBLISHABLE' | 'REVIEW_REQUIRED' | 'INSUFFICIENT_DATA';
     canScore: boolean;
     canPublish: boolean;
     confidence: number;
     extractionConfidence: number;
     validationConfidence: number;
     biomarkerCompleteness: number;
+    expectedBiomarkers?: { min: number; max: number; basis: string };
     detectedBiomarkers: number;
     validatedBiomarkers: number;
     coreBiomarkers: number;
     failedBiomarkers: string[];
+    missingCriticalBiomarkers?: string[];
+    conflicts?: string[];
     reasons: string[];
   };
   healthAssessment?: {
@@ -160,25 +163,32 @@ const requestJson = async <T>(baseUrl: string, path: string, options?: RequestIn
 const statusToProgress = (status: string): { stage: UploadProgressStage; percent: number; message: string; step: string } => {
   switch (status) {
     case 'UPLOADED':
-      return { stage: 'uploaded', percent: 35, message: 'Report uploaded successfully. Processing health information...', step: 'UPLOADED' };
+      return { stage: 'uploaded', percent: 30, message: 'Uploading report...', step: 'UPLOADED' };
     case 'PROCESSING':
-      return { stage: 'processing', percent: 52, message: 'Processing health information...', step: 'PROCESSING' };
+      return { stage: 'processing', percent: 45, message: 'Reading document...', step: 'PROCESSING' };
+    case 'DOCUMENT_ANALYSIS_COMPLETED':
+      return { stage: 'processing', percent: 58, message: 'Detecting report structure...', step: 'DOCUMENT_ANALYSIS_COMPLETED' };
     case 'EXTRACTION_COMPLETED':
     case 'EXTRACTED':
       return { stage: 'extraction', percent: 74, message: 'Extracting health parameters...', step: 'EXTRACTION_COMPLETED' };
     case 'VALIDATION_PENDING':
-      return { stage: 'validation', percent: 88, message: 'Validating extracted health information...', step: 'VALIDATION_PENDING' };
+      return { stage: 'validation', percent: 84, message: 'Validating extracted values...', step: 'VALIDATION_PENDING' };
+    case 'VALIDATION_COMPLETED':
     case 'VALIDATED':
-      return { stage: 'validation', percent: 92, message: 'Confirming health markers...', step: 'VALIDATED' };
+      return { stage: 'validation', percent: 88, message: 'Validating extracted values...', step: 'VALIDATION_COMPLETED' };
+    case 'PRIORITIZATION_COMPLETED':
     case 'PRIORITIZED':
-      return { stage: 'validation', percent: 96, message: 'Prioritizing health impact...', step: 'PRIORITIZED' };
+      return { stage: 'validation', percent: 94, message: 'Checking health markers...', step: 'PRIORITIZATION_COMPLETED' };
+    case 'SCORE_GENERATED':
     case 'SCORED':
-      return { stage: 'validation', percent: 98, message: 'Generating intelligence...', step: 'SCORED' };
+      return { stage: 'validation', percent: 98, message: 'Generating health assessment...', step: 'SCORE_GENERATED' };
     case 'COMPLETED':
     case 'PUBLISHED':
       return { stage: 'completed', percent: 100, message: 'Report analysis completed.', step: 'PUBLISHED' };
     case 'REVIEW_REQUIRED':
       return { stage: 'failed', percent: 100, message: 'Manual review is required before results can be shown.', step: 'REVIEW_REQUIRED' };
+    case 'INSUFFICIENT_DATA':
+      return { stage: 'failed', percent: 100, message: 'Insufficient report data. Replace with a clearer or complete report.', step: 'INSUFFICIENT_DATA' };
     case 'FAILED':
       return { stage: 'failed', percent: 100, message: 'Processing failed.', step: 'FAILED' };
     default:
@@ -313,7 +323,7 @@ export const uploadAndAnalyzeReport = async (params: {
           message: statusPayload.error ? `${progress.message} ${statusPayload.error}` : progress.message,
           status: progress.step
         });
-        if (statusPayload.status === 'FAILED' || statusPayload.status === 'REVIEW_REQUIRED') {
+        if (statusPayload.status === 'FAILED' || statusPayload.status === 'REVIEW_REQUIRED' || statusPayload.status === 'INSUFFICIENT_DATA') {
           throw new Error(statusPayload.error ?? progress.message);
         }
         if (statusPayload.status === 'COMPLETED' || statusPayload.status === 'PUBLISHED') {

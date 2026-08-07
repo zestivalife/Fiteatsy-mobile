@@ -78,10 +78,12 @@ test('database schema preserves report-to-biomarker extraction lineage', () => {
 
 test('database schema enforces medical report intelligence governance gates', () => {
   assert.equal(hasPattern(/document_hash text/i), true);
-  assert.equal(hasPattern(/'EXTRACTED'/i), true);
-  assert.equal(hasPattern(/'VALIDATED'/i), true);
-  assert.equal(hasPattern(/'PRIORITIZED'/i), true);
-  assert.equal(hasPattern(/'SCORED'/i), true);
+  assert.equal(hasPattern(/'DOCUMENT_ANALYSIS_COMPLETED'/i), true);
+  assert.equal(hasPattern(/'EXTRACTION_COMPLETED'/i), true);
+  assert.equal(hasPattern(/'VALIDATION_COMPLETED'/i), true);
+  assert.equal(hasPattern(/'PRIORITIZATION_COMPLETED'/i), true);
+  assert.equal(hasPattern(/'SCORE_GENERATED'/i), true);
+  assert.equal(hasPattern(/'INSUFFICIENT_DATA'/i), true);
   assert.equal(hasPattern(/'PUBLISHED'/i), true);
   assert.equal(hasPattern(/health_reports_client_document_hash_active_unique/i), true);
   assert.equal(hasPattern(/on health_reports \(client_id, document_hash\)/i), true);

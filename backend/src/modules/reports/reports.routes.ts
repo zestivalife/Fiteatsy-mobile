@@ -89,31 +89,40 @@ const analyzeAndPersistReport = async (input: {
   await updateProcessingJobStatus(input.processingJobId, 'processing');
   logReportRuntime('processing:status', { reportId: input.reportId, status: 'PROCESSING' });
   const analysis = await analyzeReportBuffer(input.fileBuffer, input.mimeType);
-  await updateReportStatus(input.reportId, 'EXTRACTED');
+  await updateReportStatus(input.reportId, 'DOCUMENT_ANALYSIS_COMPLETED');
+  logReportRuntime('processing:status', {
+    reportId: input.reportId,
+    status: 'DOCUMENT_ANALYSIS_COMPLETED',
+    documentType: analysis.document.documentType,
+    supported: analysis.document.supported
+  });
+  await updateReportStatus(input.reportId, 'EXTRACTION_COMPLETED');
   await updateProcessingJobStatus(input.processingJobId, 'extraction_completed');
   logReportRuntime('processing:status', {
     reportId: input.reportId,
-    status: 'EXTRACTED',
+    status: 'EXTRACTION_COMPLETED',
     parameterCount: analysis.parameters.length
   });
   await syncReportPipelineToPlatform(input.owner, input.reportId, 'ocr_completed', `OCR completed for ${input.fileName}`);
   if (input.manualDate) analysis.reportDate = input.manualDate;
   if (input.manualLab) analysis.labName = input.manualLab;
-  await updateReportStatus(input.reportId, 'VALIDATION_PENDING');
   await updateProcessingJobStatus(input.processingJobId, 'validation_pending');
-  logReportRuntime('processing:status', { reportId: input.reportId, status: 'VALIDATION_PENDING' });
-  const intelligence = await persistReportIntelligence(input.owner, input.reportId, analysis);
-  await updateReportStatus(input.reportId, 'VALIDATED');
-  logReportRuntime('processing:status', { reportId: input.reportId, status: 'VALIDATED' });
-  await updateReportStatus(input.reportId, 'PRIORITIZED');
+  await updateReportStatus(input.reportId, 'VALIDATION_COMPLETED');
   logReportRuntime('processing:status', {
     reportId: input.reportId,
-    status: 'PRIORITIZED',
+    status: 'VALIDATION_COMPLETED',
+    validationConfidence: analysis.qualityGate.validationConfidence
+  });
+  const intelligence = await persistReportIntelligence(input.owner, input.reportId, analysis);
+  await updateReportStatus(input.reportId, 'PRIORITIZATION_COMPLETED');
+  logReportRuntime('processing:status', {
+    reportId: input.reportId,
+    status: 'PRIORITIZATION_COMPLETED',
     coreBiomarkers: analysis.qualityGate.coreBiomarkers
   });
   if (analysis.qualityGate.canScore) {
-    await updateReportStatus(input.reportId, 'SCORED');
-    logReportRuntime('processing:status', { reportId: input.reportId, status: 'SCORED' });
+    await updateReportStatus(input.reportId, 'SCORE_GENERATED');
+    logReportRuntime('processing:status', { reportId: input.reportId, status: 'SCORE_GENERATED' });
   }
   const saved = await attachReportAnalysis(input.reportId, analysis);
   await updateProcessingJobStatus(input.processingJobId, analysis.qualityGate.canPublish ? 'completed' : 'review_required', saved?.error);

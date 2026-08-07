@@ -33,8 +33,35 @@ test('report governance blocks scoring for incomplete extraction', () => {
 
   assert.equal(governance.qualityGate.canScore, false);
   assert.equal(governance.qualityGate.canPublish, false);
-  assert.equal(governance.qualityGate.status, 'REVIEW_REQUIRED');
+  assert.equal(governance.qualityGate.status, 'INSUFFICIENT_DATA');
   assert.match(governance.qualityGate.reasons.join(' '), /minimum quality gate/);
+});
+
+test('report governance rejects clinically implausible extracted values', () => {
+  const parameters = [
+    parameter('HbA1c', 77),
+    parameter('Glucose', 98),
+    parameter('Total Cholesterol', 180),
+    parameter('LDL', 120),
+    parameter('HDL', 45),
+    parameter('Triglycerides', 150),
+    parameter('Creatinine', 0.9),
+    parameter('Hemoglobin', 14),
+    parameter('TSH', 2.4)
+  ];
+  parameters[0].unit = '%';
+  parameters[0].referenceRange = '4-5.6';
+  const document = classifyDocument({
+    text: 'HealthLab Diagnostics HbA1c Glucose lipid kidney thyroid report',
+    mimeType: 'application/pdf',
+    parameterCount: parameters.length,
+    labName: 'HealthLab Diagnostics'
+  });
+  const governance = buildExtractionGovernance('HealthLab Diagnostics HbA1c Glucose lipid kidney thyroid report', parameters, document);
+
+  assert.equal(governance.qualityGate.canScore, false);
+  assert.equal(governance.qualityGate.status, 'REVIEW_REQUIRED');
+  assert.match(governance.qualityGate.failedBiomarkers.join(' '), /HbA1c value 77/);
 });
 
 test('report governance allows publishable multi-core clinical extraction', () => {

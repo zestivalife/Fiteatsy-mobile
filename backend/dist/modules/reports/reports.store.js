@@ -142,7 +142,11 @@ export const updateReportStatus = async (reportId, status, error) => {
     return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };
 export const attachReportAnalysis = async (reportId, analysis) => {
-    const nextStatus = analysis.qualityGate.canPublish ? 'PUBLISHED' : 'REVIEW_REQUIRED';
+    const nextStatus = analysis.qualityGate.canPublish
+        ? 'PUBLISHED'
+        : analysis.qualityGate.status === 'INSUFFICIENT_DATA'
+            ? 'INSUFFICIENT_DATA'
+            : 'REVIEW_REQUIRED';
     const result = await pool.query(`
       update health_reports
       set

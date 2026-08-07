@@ -332,6 +332,7 @@ export const ReportsScreen = () => {
   const [processingPhase, setProcessingPhase] = useState<ProcessingPhase>('uploading');
   const [processingPercent, setProcessingPercent] = useState(0);
   const [processingMessage, setProcessingMessage] = useState('Uploading Report');
+  const [processingStatus, setProcessingStatus] = useState('UPLOADED');
   const [showHistory, setShowHistory] = useState(false);
 
   const [reportDate, setReportDate] = useState('15 Mar 2026');
@@ -614,6 +615,7 @@ export const ReportsScreen = () => {
     setProcessingPhase('uploading');
     setProcessingPercent(8);
     setProcessingMessage('Uploading Report');
+    setProcessingStatus('UPLOADED');
     setShowUploadSheet(false);
     setShowProcessing(true);
   };
@@ -730,6 +732,7 @@ export const ReportsScreen = () => {
     setProcessingPhase('uploading');
     setProcessingPercent(8);
     setProcessingMessage('Uploading Report');
+    setProcessingStatus('UPLOADED');
     let cancelled = false;
     const controller = new AbortController();
     activeUploadController.current = controller;
@@ -760,16 +763,19 @@ export const ReportsScreen = () => {
             setProcessingPhase(event.stage);
             setProcessingPercent(event.percent);
             setProcessingMessage(event.message);
-            const nextStep =
-              event.stage === 'uploading'
-                ? 0
-                : event.stage === 'uploaded' || event.stage === 'processing'
-                  ? 1
-                  : event.stage === 'extraction'
-                    ? 2
-                    : event.stage === 'completed'
-                      ? 4
-                      : 3;
+            setProcessingStatus(event.status ?? event.stage.toUpperCase());
+            const statusStep: Record<string, number> = {
+              UPLOADED: 0,
+              PROCESSING: 1,
+              DOCUMENT_ANALYSIS_COMPLETED: 2,
+              EXTRACTION_COMPLETED: 3,
+              VALIDATION_PENDING: 4,
+              VALIDATION_COMPLETED: 4,
+              PRIORITIZATION_COMPLETED: 5,
+              SCORE_GENERATED: 6,
+              PUBLISHED: 6
+            };
+            const nextStep = statusStep[event.status ?? ''] ?? (event.stage === 'failed' ? 4 : 1);
             setProcessingStep(nextStep);
           }
         });
@@ -778,7 +784,8 @@ export const ReportsScreen = () => {
         setProcessingPhase('completed');
         setProcessingPercent(100);
         setProcessingMessage('Report analysis completed.');
-        setProcessingStep(4);
+        setProcessingStatus('PUBLISHED');
+        setProcessingStep(6);
         setReportDate(analysis.reportDate);
         setLabName(analysis.labName);
 
@@ -810,6 +817,7 @@ export const ReportsScreen = () => {
         if (cancelled) return;
         setProcessingPhase('failed');
         setProcessingMessage('Processing failed');
+        setProcessingStatus('FAILED');
         setShowProcessing(false);
         setAnalysisLaunching(false);
         setShowUploadSheet(true);
@@ -853,11 +861,13 @@ export const ReportsScreen = () => {
 
   const reportCountLabel = `${reports.length}`;
   const stepText = [
-    'Uploading Report',
-    'Report uploaded successfully. Processing health information...',
-    'Extracting health parameters...',
-    'Validating extracted health information...',
-    'Report analysis completed.'
+    'Uploading report',
+    'Reading document',
+    'Detecting report structure',
+    'Scanning pages and extracting health parameters',
+    'Validating extracted values',
+    'Checking health markers',
+    'Generating health assessment'
   ];
 
   return (
@@ -1270,7 +1280,7 @@ export const ReportsScreen = () => {
             </View>
             <Text style={styles.processingTitle}>{processingMessage}</Text>
             <Text style={styles.processingStatusText}>
-              Status: {processingPhase === 'uploaded' ? 'UPLOADED' : processingPhase === 'extraction' ? 'EXTRACTION_COMPLETED' : processingPhase === 'validation' ? 'VALIDATION_PENDING' : processingPhase.toUpperCase()}
+              Status: {processingStatus}
             </Text>
 
             <View style={styles.processingSteps}>
