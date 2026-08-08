@@ -12,20 +12,23 @@ test.before(async () => {
 });
 
 test.after(async () => {
-  await server.close();
+  await server?.close();
 });
 
 test.beforeEach(async () => {
+  if (!server) return;
   await resetTestState();
 });
 
 test('GET /v1/reports/supported-formats returns 200', async () => {
+  assert.ok(server);
   const { response, body } = await getJson(server.baseUrl, '/v1/reports/supported-formats');
   assert.equal(response.status, 200);
   assert.equal(Array.isArray(body.formats), true);
 });
 
 test('upload init and complete validate metadata, 201, 400, 404, 413, and 415 paths', async () => {
+  assert.ok(server);
   const session = await createAuthenticatedSession(server.baseUrl);
   const created = await postJson(server.baseUrl, '/v1/reports/upload/init', {
     fileName: 'report.pdf',

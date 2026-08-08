@@ -6,6 +6,9 @@ const AI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
 const AI_VISION_TIMEOUT_MS = 25000;
 const aiClient = env.openAiApiKey ? new OpenAI({ apiKey: env.openAiApiKey }) : null;
 const normalizeWhitespace = (value) => value.replace(/\s+/g, ' ').trim();
+const normalizeUnit = (value) => normalizeWhitespace(value)
+    .replace(/[´`'’]\s*L\b/g, 'µL')
+    .replace(/μ/g, 'µ');
 const findLabName = (text) => {
     const lines = text
         .split('\n')
@@ -26,7 +29,7 @@ const findDate = (text) => {
     return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 const categorize = (name) => {
-    const n = name.toLowerCase();
+    const n = `${name} ${canonicalBiomarkerName(name)}`.toLowerCase();
     if (/hba1c|glucose|cholesterol|triglyceride|hdl|ldl|vldl|insulin/i.test(n))
         return 'Metabolic';
     if (/hemoglobin|wbc|rbc|platelet|hematocrit|mcv/i.test(n))
@@ -150,7 +153,7 @@ const parseValueUnitRange = (line) => {
         return null;
     return {
         value: Number(match[1]),
-        unit: normalizeWhitespace(match[2]),
+        unit: normalizeUnit(match[2]),
         referenceRange: normalizeWhitespace(match[3].replace(/^Normal Or High:\s*/i, ''))
     };
 };
@@ -160,7 +163,7 @@ const parseRangeUnitResult = (line) => {
     if (rangeFirst) {
         return {
             value: Number(rangeFirst[3]),
-            unit: normalizeWhitespace(rangeFirst[2]),
+            unit: normalizeUnit(rangeFirst[2]),
             referenceRange: normalizeWhitespace(rangeFirst[1])
         };
     }
@@ -168,7 +171,7 @@ const parseRangeUnitResult = (line) => {
     if (unitFirst) {
         return {
             value: Number(unitFirst[3]),
-            unit: normalizeWhitespace(unitFirst[1]),
+            unit: normalizeUnit(unitFirst[1]),
             referenceRange: normalizeWhitespace(unitFirst[2])
         };
     }
@@ -318,7 +321,7 @@ const parseParametersFallback = (text) => {
             name: matchedName,
             canonicalName: canonicalBiomarkerName(matchedName),
             value,
-            unit: normalizeWhitespace(unitMatch?.[1] ?? ''),
+            unit: normalizeUnit(unitMatch?.[1] ?? ''),
             referenceRange,
             category: categorize(matchedName),
             status: inferStatus(value, referenceRange),
@@ -369,7 +372,7 @@ const parseParametersFromAiJson = (raw) => {
                 name: normalizeWhitespace(item.name),
                 canonicalName: canonicalBiomarkerName(item.name),
                 value: Number(item.value),
-                unit: normalizeWhitespace(item.unit ?? ''),
+                unit: normalizeUnit(item.unit ?? ''),
                 referenceRange,
                 category,
                 status,
