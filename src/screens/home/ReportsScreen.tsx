@@ -197,7 +197,7 @@ const toReportItem = (
 };
 
 const reportDtoToItem = (report: ReportDto, previous?: ReportItem | null) => {
-  if (!report.analysis || (report.status !== 'COMPLETED' && report.status !== 'PUBLISHED')) return null;
+  if (!report.analysis || (report.status !== 'COMPLETED' && report.status !== 'PUBLISHED' && report.status !== 'PARTIALLY_VALIDATED')) return null;
   return toReportItem(
     {
       ...report.analysis,
@@ -773,7 +773,8 @@ export const ReportsScreen = () => {
               VALIDATION_COMPLETED: 4,
               PRIORITIZATION_COMPLETED: 5,
               SCORE_GENERATED: 6,
-              PUBLISHED: 6
+              PUBLISHED: 6,
+              PARTIALLY_VALIDATED: 6
             };
             const nextStep = statusStep[event.status ?? ''] ?? (event.stage === 'failed' ? 4 : 1);
             setProcessingStep(nextStep);
@@ -783,8 +784,10 @@ export const ReportsScreen = () => {
         if (cancelled) return;
         setProcessingPhase('completed');
         setProcessingPercent(100);
-        setProcessingMessage('Report analysis completed.');
-        setProcessingStatus('PUBLISHED');
+        setProcessingMessage(
+          analysis.status === 'PARTIALLY_VALIDATED' ? 'Report analysed. Some biomarkers need review.' : 'Report analysis completed.'
+        );
+        setProcessingStatus(analysis.status === 'PARTIALLY_VALIDATED' ? 'PARTIALLY_VALIDATED' : 'PUBLISHED');
         setProcessingStep(6);
         setReportDate(analysis.reportDate);
         setLabName(analysis.labName);

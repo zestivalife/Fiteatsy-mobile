@@ -221,7 +221,7 @@ test('async report analysis publishes through status polling and detail fetch', 
 
   let terminalStatus = '';
   let statusBody: Record<string, any> = {};
-  const terminalStatuses = new Set(['PUBLISHED', 'COMPLETED', 'FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA']);
+  const terminalStatuses = new Set(['PUBLISHED', 'PARTIALLY_VALIDATED', 'COMPLETED', 'FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA']);
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 50));
     const status = await getJson(server.baseUrl, `/v1/reports/${startedBody.reportId}/status`, {
@@ -248,7 +248,7 @@ test('async report analysis publishes through status polling and detail fetch', 
   assert.equal(detail.body.analysis.debugTrace.finalState, 'PUBLISHED');
 });
 
-test('incomplete extraction requires review and is excluded from published report history', async () => {
+test('partial extraction publishes validated biomarkers and keeps review context visible', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const form = new FormData();
   form.set(
@@ -273,15 +273,17 @@ test('incomplete extraction requires review and is excluded from published repor
   });
   const analyzedBody = await analyzed.json();
   assert.equal(analyzed.status, 200);
-  assert.equal(analyzedBody.status, 'INSUFFICIENT_DATA');
-  assert.equal(analyzedBody.score, null);
-  assert.equal(analyzedBody.qualityGate.canScore, false);
+  assert.equal(analyzedBody.status, 'PARTIALLY_VALIDATED');
+  assert.equal(typeof analyzedBody.score, 'number');
+  assert.equal(analyzedBody.qualityGate.canScore, true);
+  assert.equal(analyzedBody.qualityGate.canPublish, true);
+  assert.equal(analyzedBody.qualityGate.status, 'PARTIALLY_VALIDATED');
 
   const list = await getJson(server.baseUrl, '/v1/reports?limit=50', {
     headers: authHeaders(session.token)
   });
   assert.equal(list.response.status, 200);
-  assert.equal(list.body.total, 0);
+  assert.equal(list.body.total, 1);
 });
 
 test('image report without a configured vision provider is safely gated instead of failing upload', async () => {

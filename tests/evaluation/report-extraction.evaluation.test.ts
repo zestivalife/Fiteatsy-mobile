@@ -54,12 +54,12 @@ test('medical report extraction evaluation harness measures labelled report accu
       id: evaluationCase.id,
       lab: evaluationCase.lab,
       expected: evaluationCase.expectedDecision,
-      actual: analysis.qualityGate.canPublish ? 'PUBLISHED' : analysis.qualityGate.status,
+      actual: analysis.qualityGate.status === 'PUBLISHABLE' ? 'PUBLISHED' : analysis.qualityGate.status,
       metrics
     });
 
     assert.equal(
-      analysis.qualityGate.canPublish ? 'PUBLISHED' : analysis.qualityGate.status,
+      analysis.qualityGate.status === 'PUBLISHABLE' ? 'PUBLISHED' : analysis.qualityGate.status,
       evaluationCase.expectedDecision,
       `${evaluationCase.id} final decision`
     );

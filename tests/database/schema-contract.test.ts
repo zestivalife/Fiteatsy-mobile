@@ -85,6 +85,7 @@ test('database schema enforces medical report intelligence governance gates', ()
   assert.equal(hasPattern(/'SCORE_GENERATED'/i), true);
   assert.equal(hasPattern(/'INSUFFICIENT_DATA'/i), true);
   assert.equal(hasPattern(/'PUBLISHED'/i), true);
+  assert.equal(hasPattern(/'PARTIALLY_VALIDATED'/i), true);
   assert.equal(hasPattern(/health_reports_client_document_hash_active_unique/i), true);
   assert.equal(hasPattern(/on health_reports \(client_id, document_hash\)/i), true);
 });

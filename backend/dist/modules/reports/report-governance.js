@@ -426,8 +426,13 @@ export const buildExtractionGovernance = (text, parameters, document) => {
         requiredTier1Confidence < 0.9 ||
         requiredTier1Coverage < TIER_1_REQUIRED_COVERAGE ||
         criticalValidationFailures.length > 0;
-    const canPublish = document.supported && reasons.length === 0;
-    const status = canPublish ? 'PUBLISHABLE' : parameters.length < 3 || !document.supported ? 'INSUFFICIENT_DATA' : 'REVIEW_REQUIRED';
+    const hasValidatedBiomarkers = validatedCount > 0;
+    const canPublish = document.supported && (reasons.length === 0 || hasValidatedBiomarkers);
+    const status = reasons.length === 0 && document.supported
+        ? 'PUBLISHABLE'
+        : document.supported && hasValidatedBiomarkers
+            ? 'PARTIALLY_VALIDATED'
+            : 'INSUFFICIENT_DATA';
     return {
         extractionAttempts: [
             {

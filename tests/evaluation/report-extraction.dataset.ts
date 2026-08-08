@@ -12,7 +12,7 @@ export type ReportExtractionEvaluationCase = {
   source: 'synthetic_pdf_text_fixture';
   lines: string[];
   groundTruth: GroundTruthBiomarker[];
-  expectedDecision: 'PUBLISHED' | 'REVIEW_REQUIRED' | 'INSUFFICIENT_DATA';
+  expectedDecision: 'PUBLISHED' | 'PARTIALLY_VALIDATED' | 'REVIEW_REQUIRED' | 'INSUFFICIENT_DATA';
 };
 
 export const reportExtractionEvaluationCases: ReportExtractionEvaluationCase[] = [
@@ -132,6 +132,6 @@ export const reportExtractionEvaluationCases: ReportExtractionEvaluationCase[] =
       { name: 'Hemoglobin', value: 13.4, unit: 'g/dL', referenceRange: '12-16' },
       { name: 'TSH', value: 2.1, unit: 'mIU/L', referenceRange: '0.4-4.5' }
     ],
-    expectedDecision: 'REVIEW_REQUIRED'
+    expectedDecision: 'PARTIALLY_VALIDATED'
   }
 ];

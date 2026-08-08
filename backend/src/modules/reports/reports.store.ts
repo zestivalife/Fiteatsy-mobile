@@ -16,6 +16,7 @@ export type ReportStatus =
   | 'PRIORITIZED'
   | 'SCORED'
   | 'PUBLISHED'
+  | 'PARTIALLY_VALIDATED'
   | 'FAILED'
   | 'REVIEW_REQUIRED'
   | 'INSUFFICIENT_DATA'
@@ -253,7 +254,9 @@ export const updateReportStatus = async (reportId: string, status: ReportStatus,
 
 export const attachReportAnalysis = async (reportId: string, analysis: ReportAnalysisResult) => {
   const nextStatus: ReportStatus = analysis.qualityGate.canPublish
-    ? 'PUBLISHED'
+    ? analysis.qualityGate.status === 'PARTIALLY_VALIDATED'
+      ? 'PARTIALLY_VALIDATED'
+      : 'PUBLISHED'
     : analysis.qualityGate.status === 'INSUFFICIENT_DATA'
       ? 'INSUFFICIENT_DATA'
       : 'REVIEW_REQUIRED';
@@ -303,7 +306,7 @@ export const listReports = async (owner: { userId: string; clientId: string }) =
       from health_reports
       where user_id = $1
         and client_id = $2
-        and processing_status = 'PUBLISHED'
+        and processing_status in ('PUBLISHED', 'PARTIALLY_VALIDATED')
         and deleted_at is null
       order by created_at desc
     `,
@@ -319,7 +322,7 @@ export const countReports = async (owner: { userId: string; clientId: string }) 
       from health_reports
       where user_id = $1
         and client_id = $2
-        and processing_status = 'PUBLISHED'
+        and processing_status in ('PUBLISHED', 'PARTIALLY_VALIDATED')
         and deleted_at is null
     `,
     [owner.userId, owner.clientId]

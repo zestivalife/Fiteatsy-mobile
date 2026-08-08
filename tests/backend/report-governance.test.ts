@@ -61,7 +61,7 @@ const parameter = (name: string, value?: number): ParsedParameter => {
   };
 };
 
-test('report governance blocks scoring for incomplete extraction', () => {
+test('report governance partially validates when at least one biomarker is valid', () => {
   const parameters = [parameter('Glucose', 98)];
   const document = classifyDocument({
     text: 'Tiny Lab Glucose report',
@@ -71,13 +71,27 @@ test('report governance blocks scoring for incomplete extraction', () => {
   });
   const governance = buildExtractionGovernance('Tiny Lab Glucose report', parameters, document);
 
-  assert.equal(governance.qualityGate.canScore, false);
-  assert.equal(governance.qualityGate.canPublish, false);
-  assert.equal(governance.qualityGate.status, 'INSUFFICIENT_DATA');
+  assert.equal(governance.qualityGate.canScore, true);
+  assert.equal(governance.qualityGate.canPublish, true);
+  assert.equal(governance.qualityGate.status, 'PARTIALLY_VALIDATED');
   assert.match(governance.qualityGate.reasons.join(' '), /minimum quality gate/);
 });
 
-test('report governance rejects clinically implausible extracted values', () => {
+test('report governance blocks only when zero biomarkers validate', () => {
+  const document = classifyDocument({
+    text: 'Unclear upload',
+    mimeType: 'image/jpeg',
+    parameterCount: 0,
+    labName: 'Uploaded Lab Report'
+  });
+  const governance = buildExtractionGovernance('Unclear upload', [], document);
+
+  assert.equal(governance.qualityGate.canScore, false);
+  assert.equal(governance.qualityGate.canPublish, false);
+  assert.equal(governance.qualityGate.status, 'INSUFFICIENT_DATA');
+});
+
+test('report governance partially validates reports with some clinically implausible extracted values', () => {
   const parameters = [
     parameter('HbA1c', 77),
     parameter('Glucose', 98),
@@ -99,8 +113,9 @@ test('report governance rejects clinically implausible extracted values', () => 
   });
   const governance = buildExtractionGovernance('HealthLab Diagnostics HbA1c Glucose lipid kidney thyroid report', parameters, document);
 
-  assert.equal(governance.qualityGate.canScore, false);
-  assert.equal(governance.qualityGate.status, 'REVIEW_REQUIRED');
+  assert.equal(governance.qualityGate.canScore, true);
+  assert.equal(governance.qualityGate.canPublish, true);
+  assert.equal(governance.qualityGate.status, 'PARTIALLY_VALIDATED');
   assert.match(governance.qualityGate.failedBiomarkers.join(' '), /HbA1c value 77/);
 });
 

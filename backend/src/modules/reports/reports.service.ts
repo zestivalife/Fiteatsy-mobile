@@ -42,7 +42,7 @@ export type ReportAnalysisResult = {
     notes: string[];
   }>;
   qualityGate: {
-    status: 'PUBLISHABLE' | 'REVIEW_REQUIRED' | 'INSUFFICIENT_DATA';
+    status: 'PUBLISHABLE' | 'PARTIALLY_VALIDATED' | 'REVIEW_REQUIRED' | 'INSUFFICIENT_DATA';
     canScore: boolean;
     canPublish: boolean;
     confidence: number;
@@ -727,6 +727,12 @@ export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Pro
     document.pageCount = pdfPageCount ?? document.pageCount;
   }
   const governance = buildExtractionGovernance(text, parameters, document);
+  const rejectedBiomarkerNames = new Set(
+    (governance.qualityGate.rejectedBiomarkers ?? [])
+      .filter((item) => item.validation_status !== 'VALID')
+      .map((item) => canonicalBiomarkerName(item.biomarker_name))
+  );
+  const validatedParameters = parameters.filter((parameter) => !rejectedBiomarkerNames.has(canonicalBiomarkerName(parameter.name)));
   const governanceAttempt = governance.extractionAttempts[0];
   const governedAttempts =
     extractionAttempts.length > 0
@@ -737,12 +743,13 @@ export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Pro
           notes: Array.from(new Set([...attempt.notes, ...(index === extractionAttempts.length - 1 ? governanceAttempt?.notes ?? [] : [])]))
         }))
       : governance.extractionAttempts;
-  const categoryScores = buildCategoryScores(parameters);
+  const categoryScores = buildCategoryScores(validatedParameters);
   const score = governance.qualityGate.canScore
     ? Math.round(
         (categoryScores.Blood + categoryScores.Metabolic + categoryScores.Organs + categoryScores.Thyroid + categoryScores.Vitamins) / 5
       )
     : null;
+  const partialReviewCount = governance.qualityGate.rejectedBiomarkers?.length ?? 0;
 
   return {
     reportDate,
@@ -750,11 +757,22 @@ export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Pro
     parameters,
     score,
     categoryScores,
-    summary: governance.qualityGate.canPublish
-      ? buildSummary(parameters)
+    summary: governance.qualityGate.status === 'PARTIALLY_VALIDATED'
+      ? `${governance.qualityGate.validatedBiomarkers} biomarkers were validated and ${partialReviewCount} need review. Scores use validated biomarkers only.`
+      : governance.qualityGate.canPublish
+        ? buildSummary(validatedParameters)
       : `Analysis incomplete. ${governance.qualityGate.detectedBiomarkers} biomarkers detected and ${governance.qualityGate.coreBiomarkers}/32 core markers identified. Please retry with a clearer full report or submit for review.`,
-    actionPlan: governance.qualityGate.canPublish
-      ? buildActionPlan(parameters)
+    actionPlan: governance.qualityGate.status === 'PARTIALLY_VALIDATED'
+      ? [
+          {
+            priority: 1,
+            title: 'Review uncertain biomarkers',
+            detail: `${partialReviewCount} extracted biomarkers need manual review before they influence clinical guidance.`
+          },
+          ...buildActionPlan(validatedParameters).slice(0, 2).map((item, index) => ({ ...item, priority: index + 2 }))
+        ]
+      : governance.qualityGate.canPublish
+        ? buildActionPlan(validatedParameters)
       : [
           {
             priority: 1,

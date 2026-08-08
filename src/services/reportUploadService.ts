@@ -39,7 +39,7 @@ export type ReportAnalysisResponse = {
     confidence: number;
   };
   qualityGate?: {
-    status: 'PUBLISHABLE' | 'REVIEW_REQUIRED' | 'INSUFFICIENT_DATA';
+    status: 'PUBLISHABLE' | 'PARTIALLY_VALIDATED' | 'REVIEW_REQUIRED' | 'INSUFFICIENT_DATA';
     canScore: boolean;
     canPublish: boolean;
     confidence: number;
@@ -231,7 +231,13 @@ const statusToProgress = (status: string): { stage: UploadProgressStage; percent
       return { stage: 'validation', percent: 98, message: 'Generating intelligence...', step: 'SCORE_GENERATED' };
     case 'COMPLETED':
     case 'PUBLISHED':
-      return { stage: 'completed', percent: 100, message: 'Report analysis completed.', step: 'PUBLISHED' };
+    case 'PARTIALLY_VALIDATED':
+      return {
+        stage: 'completed',
+        percent: 100,
+        message: status === 'PARTIALLY_VALIDATED' ? 'Report analysed. Some biomarkers need review.' : 'Report analysis completed.',
+        step: status === 'PARTIALLY_VALIDATED' ? 'PARTIALLY_VALIDATED' : 'PUBLISHED'
+      };
     case 'REVIEW_REQUIRED':
       return { stage: 'failed', percent: 100, message: 'Manual review is required before results can be shown.', step: 'REVIEW_REQUIRED' };
     case 'INSUFFICIENT_DATA':
@@ -373,7 +379,7 @@ export const uploadAndAnalyzeReport = async (params: {
         if (statusPayload.status === 'FAILED' || statusPayload.status === 'REVIEW_REQUIRED' || statusPayload.status === 'INSUFFICIENT_DATA') {
           throw new Error(statusPayload.error ?? progress.message);
         }
-        if (statusPayload.status === 'COMPLETED' || statusPayload.status === 'PUBLISHED') {
+        if (statusPayload.status === 'COMPLETED' || statusPayload.status === 'PUBLISHED' || statusPayload.status === 'PARTIALLY_VALIDATED') {
           const report = await requestJson<ReportDto>(baseUrl, `/v1/reports/${encodeURIComponent(startPayload.reportId)}`, {
             signal: params.signal
           });
