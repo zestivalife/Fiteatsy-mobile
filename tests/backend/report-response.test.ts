@@ -1,0 +1,28 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { analyzeReportBuffer } from '../../backend/src/modules/reports/reports.service.js';
+import { sanitizeReportAnalysisForPublic } from '../../backend/src/modules/reports/report-response.js';
+import { buildLabReportPdf } from '../helpers/reportFixtures.js';
+import { reportExtractionEvaluationCases } from '../evaluation/report-extraction.dataset.js';
+
+test('public report responses hide rejected biomarker values while preserving partial validation state', async () => {
+  const evaluationCase = reportExtractionEvaluationCases.find((item) => item.id === 'unknown-decimal-shift-risk');
+  assert.ok(evaluationCase, 'unknown decimal shift fixture must exist');
+
+  const analysis = await analyzeReportBuffer(buildLabReportPdf(evaluationCase.lines), 'application/pdf');
+  assert.equal(analysis.qualityGate.status, 'PARTIALLY_VALIDATED');
+  assert.equal(analysis.qualityGate.canPublish, true);
+  assert.equal(analysis.qualityGate.canScore, true);
+  assert.ok(analysis.parameters.some((parameter) => parameter.canonicalName === 'HbA1c' && parameter.value === 77));
+  assert.match(analysis.qualityGate.failedBiomarkers.join(' '), /77/);
+
+  const publicAnalysis = sanitizeReportAnalysisForPublic(analysis);
+  assert.equal(publicAnalysis.qualityGate.status, 'PARTIALLY_VALIDATED');
+  assert.equal(publicAnalysis.qualityGate.canPublish, true);
+  assert.equal(publicAnalysis.qualityGate.canScore, true);
+  assert.equal(publicAnalysis.parameters.some((parameter) => parameter.canonicalName === 'HbA1c'), false);
+  assert.ok(publicAnalysis.parameters.some((parameter) => parameter.canonicalName === 'Fasting Glucose'));
+  assert.equal(publicAnalysis.qualityGate.evidenceTraceability.some((item) => item.biomarker_name === 'HbA1c'), false);
+  assert.match(publicAnalysis.qualityGate.rejectedBiomarkers?.[0]?.reason ?? '', /needs review/i);
+  assert.equal(JSON.stringify(publicAnalysis).includes('HbA1c value 77'), false);
+});

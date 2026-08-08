@@ -7,6 +7,7 @@ import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/au
 import { createProcessingJob, updateProcessingJobStatus } from '../processing/processing-jobs.repository.js';
 import { persistReportIntelligence } from './report-intelligence.pipeline.js';
 import { documentHash } from './report-governance.js';
+import { sanitizeReportAnalysisForPublic } from './report-response.js';
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 12 * 1024 * 1024 }
@@ -21,6 +22,7 @@ const reportOwner = (owner) => ({ userId: owner.accountId, clientId: owner.clien
 const toReportDto = (record) => {
     if (!record)
         return null;
+    const analysis = record.analysis ? sanitizeReportAnalysisForPublic(record.analysis) : undefined;
     return {
         id: record.id,
         userId: record.userId,
@@ -35,10 +37,10 @@ const toReportDto = (record) => {
         updatedAtISO: record.updatedAtISO,
         error: record.error,
         analysisVersion: record.analysisVersion,
-        document: record.analysis?.document,
-        qualityGate: record.analysis?.qualityGate,
-        healthAssessment: record.analysis?.healthAssessment,
-        analysis: record.analysis,
+        document: analysis?.document,
+        qualityGate: analysis?.qualityGate,
+        healthAssessment: analysis?.healthAssessment,
+        analysis,
         feedback: record.feedback
     };
 };
@@ -112,6 +114,7 @@ const analyzeAndPersistReport = async (input) => {
         await syncReportPipelineToPlatform(input.owner, input.reportId, 'biomarkers_updated', `Biomarkers extracted from ${input.fileName}`);
         await syncReportPipelineToPlatform(input.owner, input.reportId, 'analysis_completed', `AI validation completed for ${input.fileName}`);
     }
+    const publicAnalysis = sanitizeReportAnalysisForPublic(analysis);
     return {
         reportId: saved?.id,
         status: saved?.status,
@@ -123,7 +126,7 @@ const analyzeAndPersistReport = async (input) => {
             confidence: score.confidence,
             calculatedAtISO: score.calculatedAtISO
         })),
-        ...analysis
+        ...publicAnalysis
     };
 };
 reportsRouter.get('/supported-formats', (_req, res) => {
@@ -190,15 +193,16 @@ reportsRouter.get('/:reportId/status', async (req, res) => {
         status: report.status,
         hasError: Boolean(report.error)
     });
+    const analysis = report.analysis ? sanitizeReportAnalysisForPublic(report.analysis) : undefined;
     return res.status(200).json({
         reportId: report.id,
         status: report.status,
         updatedAtISO: report.updatedAtISO,
         error: report.error,
-        document: report.analysis?.document,
-        qualityGate: report.analysis?.qualityGate,
-        healthAssessment: report.analysis?.healthAssessment,
-        processingTimeline: report.analysis?.extractionAttempts
+        document: analysis?.document,
+        qualityGate: analysis?.qualityGate,
+        healthAssessment: analysis?.healthAssessment,
+        processingTimeline: analysis?.extractionAttempts
     });
 });
 reportsRouter.patch('/:reportId/metadata', async (req, res) => {
@@ -267,9 +271,11 @@ reportsRouter.get('/:reportId/comparison', async (req, res) => {
     if (current.analysis.score == null || previous.analysis.score == null) {
         return res.status(409).json({ error: 'ANALYSIS_NOT_PUBLISHED', message: 'Both reports must pass the quality gate before comparison.' });
     }
-    const scoreDelta = current.analysis.score - previous.analysis.score;
-    const currentAbnormal = current.analysis.parameters.filter((item) => item.status !== 'normal').length;
-    const previousAbnormal = previous.analysis.parameters.filter((item) => item.status !== 'normal').length;
+    const currentAnalysis = sanitizeReportAnalysisForPublic(current.analysis);
+    const previousAnalysis = sanitizeReportAnalysisForPublic(previous.analysis);
+    const scoreDelta = currentAnalysis.score - previousAnalysis.score;
+    const currentAbnormal = currentAnalysis.parameters.filter((item) => item.status !== 'normal').length;
+    const previousAbnormal = previousAnalysis.parameters.filter((item) => item.status !== 'normal').length;
     const abnormalDelta = currentAbnormal - previousAbnormal;
     return res.status(200).json({
         currentReportId: current.id,
@@ -282,8 +288,8 @@ reportsRouter.get('/:reportId/comparison', async (req, res) => {
                 ? `Recovery score dropped by ${Math.abs(scoreDelta)} points; review adherence and follow-up recommendations.`
                 : 'Recovery score is unchanged; continue routine and monitor follow-up markers.',
         details: {
-            currentScore: current.analysis.score,
-            previousScore: previous.analysis.score,
+            currentScore: currentAnalysis.score,
+            previousScore: previousAnalysis.score,
             currentAbnormal,
             previousAbnormal
         }
@@ -412,7 +418,7 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
                 duplicate: true,
                 biomarkerObservations: [],
                 healthScores: [],
-                ...duplicate.analysis
+                ...sanitizeReportAnalysisForPublic(duplicate.analysis)
             });
         }
         if (duplicate && !duplicate.analysis) {
