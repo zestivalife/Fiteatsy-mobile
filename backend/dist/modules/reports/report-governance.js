@@ -71,7 +71,7 @@ const coreAliases = [
     },
     {
         canonicalName: 'Fasting Glucose',
-        aliases: ['Glucose', 'Glucose Fasting', 'Glucose Fasting F', 'GLUCOSE FASTING (F), PLASMA', 'FBS', 'Blood Sugar Fasting'],
+        aliases: ['Glucose', 'Glucose Fasting', 'Glucose - Fasting', 'Glucose Fasting F', 'GLUCOSE FASTING (F), PLASMA', 'FBS', 'Blood Sugar Fasting'],
         dimension: 'Metabolic'
     },
     { canonicalName: 'Insulin', aliases: ['Fasting Insulin'], dimension: 'Metabolic' },
@@ -100,7 +100,7 @@ const coreAliases = [
     { canonicalName: 'Lipoprotein(a)', aliases: ['Lp(a)', 'Lipoprotein A'], dimension: 'Cardiovascular' },
     { canonicalName: 'hs-CRP', aliases: ['High Sensitivity CRP', 'CRP', 'C-Reactive Protein', 'CRP Quantitative'], dimension: 'Cardiovascular' },
     { canonicalName: 'Vitamin B12', aliases: ['B12', 'Cobalamin', 'Serum B12', 'Vitamin - B12'], dimension: 'Nutrition' },
-    { canonicalName: 'Vitamin D', aliases: ['25-OH Vitamin D', 'Vitamin D3', 'Vitamin D 25 Hydroxy', 'Vitamin D 25 - Hydroxy'], dimension: 'Nutrition' },
+    { canonicalName: 'Vitamin D', aliases: ['25-OH Vitamin D', 'Vitamin D3', 'Vitamin D 25 Hydroxy', 'Vitamin D 25 - Hydroxy', 'Vitamin D (25-OH)'], dimension: 'Nutrition' },
     { canonicalName: 'Ferritin', aliases: ['Serum Ferritin'], dimension: 'Nutrition' },
     { canonicalName: 'Iron', aliases: ['Serum Iron'], dimension: 'Nutrition' },
     { canonicalName: 'Hemoglobin', aliases: ['Hb', 'Haemoglobin'], dimension: 'Nutrition' },
@@ -266,7 +266,7 @@ const plausibleRanges = [
     { pattern: /chloride/i, min: 70, max: 140 },
     { pattern: /calcium/i, min: 4, max: 18 },
     { pattern: /phosphorus/i, min: 0.5, max: 12 },
-    { pattern: /^alt$|^ast$|^ggt$/i, min: 1, max: 2000 },
+    { pattern: /^alt$|^ast$|^ggt$/i, min: 1, max: 2000, unitPattern: /u\/l|iu\/l/i },
     { pattern: /bilirubin/i, min: 0, max: 40 },
     { pattern: /albumin/i, min: 0.5, max: 8 },
     { pattern: /vitamin b12/i, min: 20, max: 3000 },

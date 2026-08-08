@@ -10,7 +10,7 @@ export const sanitizeReportAnalysisForPublic = (analysis: ReportAnalysisResult):
   const rejectedBiomarkers = analysis.qualityGate.rejectedBiomarkers ?? [];
   const rejectedKeys = new Set(
     rejectedBiomarkers
-      .filter((item) => item.validation_status !== 'VALID')
+      .filter((item) => item.validation_status === 'INVALID')
       .map((item) => keyForBiomarker(item.biomarker_name))
   );
 
@@ -25,9 +25,9 @@ export const sanitizeReportAnalysisForPublic = (analysis: ReportAnalysisResult):
       ...analysis.qualityGate,
       failedBiomarkers: rejectedBiomarkers
         .filter((item) => item.validation_status !== 'VALID')
-        .map((item) => publicReviewReason(item.biomarker_name)),
+        .map((item) => (item.validation_status === 'INVALID' ? publicReviewReason(item.biomarker_name) : item.reason)),
       rejectedBiomarkers: rejectedBiomarkers.map((item) =>
-        item.validation_status === 'VALID'
+        item.validation_status !== 'INVALID'
           ? item
           : {
               ...item,

@@ -4,7 +4,7 @@ const publicReviewReason = (name) => `${name} needs review before it can be show
 export const sanitizeReportAnalysisForPublic = (analysis) => {
     const rejectedBiomarkers = analysis.qualityGate.rejectedBiomarkers ?? [];
     const rejectedKeys = new Set(rejectedBiomarkers
-        .filter((item) => item.validation_status !== 'VALID')
+        .filter((item) => item.validation_status === 'INVALID')
         .map((item) => keyForBiomarker(item.biomarker_name)));
     if (rejectedKeys.size === 0) {
         return analysis;
@@ -16,8 +16,8 @@ export const sanitizeReportAnalysisForPublic = (analysis) => {
             ...analysis.qualityGate,
             failedBiomarkers: rejectedBiomarkers
                 .filter((item) => item.validation_status !== 'VALID')
-                .map((item) => publicReviewReason(item.biomarker_name)),
-            rejectedBiomarkers: rejectedBiomarkers.map((item) => item.validation_status === 'VALID'
+                .map((item) => (item.validation_status === 'INVALID' ? publicReviewReason(item.biomarker_name) : item.reason)),
+            rejectedBiomarkers: rejectedBiomarkers.map((item) => item.validation_status !== 'INVALID'
                 ? item
                 : {
                     ...item,

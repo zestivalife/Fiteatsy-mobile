@@ -177,6 +177,65 @@ const parseRangeUnitResult = (line) => {
     }
     return null;
 };
+const parseResultToken = (value) => {
+    const match = value.match(/^(?:<|>|<=|>=)?\s*(-?\d+(?:\.\d+)?)$/);
+    if (!match)
+        return null;
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+const looksLikeKnownBiomarkerName = (value) => {
+    const canonical = canonicalBiomarkerName(value);
+    return canonical !== value.trim().replace(/\s+/g, ' ') || groupedTableNames.some((name) => normalizeWhitespace(name).toLowerCase() === normalizeWhitespace(value).toLowerCase());
+};
+const containsUnitOrRangeFragment = (value) => /\d|mg\/dL|g\/dL|ng\/mL|pg\/mL|mIU\/L|µIU\/mL|uIU\/mL|IU\/L|U\/L|mmol\/L/i.test(value);
+const parseDelimitedReportRows = (text) => {
+    const rawLines = text.split('\n');
+    const out = [];
+    for (let index = 0; index < rawLines.length; index += 1) {
+        const cells = rawLines[index].split(/\t+/).map((cell) => normalizeWhitespace(cell)).filter(Boolean);
+        if (cells.length < 3 || !looksLikeKnownBiomarkerName(cells[0]))
+            continue;
+        const [name, unit, referenceRangeStart] = cells;
+        let referenceRange = referenceRangeStart;
+        let resultValue = parseResultToken(cells[cells.length - 1]);
+        let confidence = resultValue === null ? 0.88 : 0.95;
+        if (resultValue === null) {
+            const continuationLines = [];
+            for (let offset = 1; offset <= 6 && index + offset < rawLines.length; offset += 1) {
+                const nextLine = normalizeWhitespace(rawLines[index + offset]);
+                if (!nextLine)
+                    continue;
+                if (/^(?:comment|po no|customer name|age\/gender|lab visit id|barcode id|sample type|collected via|referred by|collection date|report date|report status|test name|this test has been performed)/i.test(nextLine))
+                    break;
+                continuationLines.push(nextLine);
+                const methodResult = nextLine.match(/\b(?:cmia|clia|hexokinase|kinetic|colorimetric|enzymatic|turbidimetry|immunoturbidimetric|arsenazo|biuret|diazo|calculated|impedance)\b.*?(?:<|>|<=|>=)?\s*(-?\d+(?:\.\d+)?)$/i);
+                if (methodResult) {
+                    const trailingValue = methodResult;
+                    resultValue = Number(trailingValue[1]);
+                    break;
+                }
+            }
+            referenceRange = normalizeWhitespace([referenceRangeStart, ...continuationLines.slice(0, -1)].join(' '));
+        }
+        if (resultValue === null)
+            continue;
+        out.push({
+            name,
+            canonicalName: canonicalBiomarkerName(name),
+            value: resultValue,
+            unit: normalizeUnit(unit),
+            referenceRange,
+            category: categorize(name),
+            status: inferStatus(resultValue, referenceRange),
+            pageNumber: Math.max(1, Math.ceil(index / 65)),
+            sectionName: 'Delimited report row',
+            extractionMethod: 'pdf_delimited_report_row_scan',
+            extractionConfidence: confidence
+        });
+    }
+    return out;
+};
 const parseGroupedTableParameters = (lines) => {
     const out = [];
     const inlineNames = [...groupedTableNames].sort((a, b) => b.length - a.length);
@@ -234,7 +293,7 @@ const parseGroupedTableParameters = (lines) => {
 };
 const parseParameters = (text) => {
     const lines = text.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
-    const out = parseGroupedTableParameters(lines);
+    const out = [...parseDelimitedReportRows(text), ...parseGroupedTableParameters(lines)];
     const linePattern = /^([A-Za-z][A-Za-z0-9 ()/+%-]{2,50})\s+(-?\d+(?:\.\d+)?)\s*([A-Za-z/%µ]+)?\s+(<?\s*-?\d+(?:\.\d+)?\s*(?:-|–)\s*-?\d+(?:\.\d+)?|<\s*-?\d+(?:\.\d+)?|>\s*-?\d+(?:\.\d+)?)/;
     for (const line of lines) {
         if (!looksLikeTableRow(line))
@@ -243,6 +302,8 @@ const parseParameters = (text) => {
         if (!match)
             continue;
         const name = normalizeWhitespace(match[1]);
+        if (containsUnitOrRangeFragment(name))
+            continue;
         const value = Number(match[2]);
         if (!Number.isFinite(value))
             continue;

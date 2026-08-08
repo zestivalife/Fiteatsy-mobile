@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { analyzeReportBuffer } from '../../backend/src/modules/reports/reports.service.js';
 import { sanitizeReportAnalysisForPublic } from '../../backend/src/modules/reports/report-response.js';
 import { buildLabReportPdf } from '../helpers/reportFixtures.js';
@@ -25,4 +26,21 @@ test('public report responses hide rejected biomarker values while preserving pa
   assert.equal(publicAnalysis.qualityGate.evidenceTraceability.some((item) => item.biomarker_name === 'HbA1c'), false);
   assert.match(publicAnalysis.qualityGate.rejectedBiomarkers?.[0]?.reason ?? '', /needs review/i);
   assert.equal(JSON.stringify(publicAnalysis).includes('HbA1c value 77'), false);
+});
+
+test('public report responses keep needs-review biomarkers visible but hide invalid real-PDF fragments', async () => {
+  const buffer = readFileSync('fixtures/real-reports/pdf_case_b.pdf');
+  const analysis = await analyzeReportBuffer(buffer, 'application/pdf');
+  const publicAnalysis = sanitizeReportAnalysisForPublic(analysis);
+
+  assert.equal(analysis.qualityGate.status, 'PARTIALLY_VALIDATED');
+  assert.ok(publicAnalysis.parameters.some((parameter) => parameter.canonicalName === 'Fasting Glucose' && parameter.value === 88));
+  assert.ok(publicAnalysis.parameters.some((parameter) => parameter.canonicalName === 'Vitamin D' && parameter.value === 29.2));
+  assert.ok(publicAnalysis.parameters.some((parameter) => parameter.canonicalName === 'Vitamin B12' && parameter.value === 148));
+  assert.ok(publicAnalysis.parameters.some((parameter) => parameter.canonicalName === 'Platelets'));
+  assert.equal(publicAnalysis.parameters.some((parameter) => parameter.canonicalName === 'HbA1c'), false);
+  assert.equal(publicAnalysis.parameters.some((parameter) => parameter.canonicalName === 'ALT'), false);
+  assert.equal(publicAnalysis.qualityGate.evidenceTraceability.some((item) => item.validation_status === 'NEEDS_REVIEW'), true);
+  assert.equal(JSON.stringify(publicAnalysis).includes('HbA1c value 1 c'), false);
+  assert.equal(JSON.stringify(publicAnalysis).includes('ALT value 1 in'), false);
 });
