@@ -78,6 +78,19 @@ export const createHealthScores = async (owner: ClientOwnershipContext, inputs: 
   return scores;
 };
 
+export const clearHealthScoresForOwner = async (owner: ClientOwnershipContext) => {
+  const result = await pool.query(
+    `
+      delete from health_scores
+      where user_id = $1
+        and client_id = $2
+      returning id
+    `,
+    [owner.accountId, owner.clientId]
+  );
+  return result.rows.map((row) => String(row.id));
+};
+
 export const listLatestHealthScores = async (owner: ClientOwnershipContext) => {
   const result = await pool.query(
     `

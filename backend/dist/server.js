@@ -14,6 +14,7 @@ import { reportsRouter } from './modules/reports/reports.routes.js';
 import { platformRouter } from './modules/platform/platform.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { biomarkersRouter } from './modules/biomarkers/biomarkers.routes.js';
+import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
 export const createApp = (options = {}) => {
     const app = express();
     const readinessCheck = options.readinessCheck ?? checkDatabaseReadiness;
@@ -80,6 +81,7 @@ export const createApp = (options = {}) => {
 export const app = createApp();
 export const initializeBackend = async () => {
     await migrateDatabase();
+    scheduleDeletedReportPurge();
 };
 export const startServer = async () => {
     await initializeBackend();

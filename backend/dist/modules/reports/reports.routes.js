@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { analyzeReportBuffer } from './reports.service.js';
-import { addFeedback, attachReportAnalysis, completeUploadSession, createReportRecord, createUploadSession, deleteReport, findActiveReportByDocumentHash, getReport, getUploadSession, listReports, updateReportMetadata, updateReportStatus } from './reports.store.js';
+import { addFeedback, attachReportAnalysis, completeUploadSession, createReportRecord, createUploadSession, deleteAllReports, deleteReport, findActiveReportByDocumentHash, getReport, getUploadSession, listReports, updateReportMetadata, updateReportStatus } from './reports.store.js';
 import { syncReportPipelineToPlatform } from '../platform/platform.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { createProcessingJob, updateProcessingJobStatus } from '../processing/processing-jobs.repository.js';
 import { persistReportIntelligence } from './report-intelligence.pipeline.js';
 import { documentHash } from './report-governance.js';
 import { sanitizeReportAnalysisForPublic } from './report-response.js';
+import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
+import { clearHealthScoresForOwner } from '../intelligence/health-scores.repository.js';
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 12 * 1024 * 1024 }
@@ -45,6 +47,10 @@ const toReportDto = (record) => {
     };
 };
 const ownsReport = (record, owner) => Boolean(record && record.userId === owner.accountId && record.clientId === owner.clientId);
+const recomputeOwnerHealthScores = async (owner) => {
+    await clearHealthScoresForOwner(owner);
+    await calculateHealthScores(owner);
+};
 const logReportRuntime = (event, payload) => {
     console.log(`[ReportsRuntime] ${event}`, payload);
 };
@@ -220,6 +226,23 @@ reportsRouter.patch('/:reportId/metadata', async (req, res) => {
     });
     return res.status(200).json(toReportDto(patched));
 });
+reportsRouter.delete('/all', async (req, res) => {
+    const owner = currentOwner(getAuthenticatedAccount(req));
+    if (Array.isArray(req.body?.reportIds) || Array.isArray(req.body?.ids)) {
+        return res.status(400).json({
+            error: 'CLIENT_SCOPED_BULK_DELETE_REJECTED',
+            message: 'Delete-all is scoped only by the authenticated account and current client.'
+        });
+    }
+    const deletedReportIds = await deleteAllReports(reportOwner(owner));
+    if (deletedReportIds.length > 0) {
+        await recomputeOwnerHealthScores(owner);
+    }
+    return res.status(200).json({
+        deletedCount: deletedReportIds.length,
+        recoveryWindowDays: 30
+    });
+});
 reportsRouter.delete('/:reportId', async (req, res) => {
     const owner = currentOwner(getAuthenticatedAccount(req));
     const report = await getReport(req.params.reportId);
@@ -227,7 +250,8 @@ reportsRouter.delete('/:reportId', async (req, res) => {
         return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
     }
     await deleteReport(report.id, reportOwner(owner));
-    return res.status(204).send();
+    await recomputeOwnerHealthScores(owner);
+    return res.status(200).json({ deleted: true, reportId: report.id, recoveryWindowDays: 30 });
 });
 reportsRouter.post('/:reportId/feedback', async (req, res) => {
     const owner = currentOwner(getAuthenticatedAccount(req));

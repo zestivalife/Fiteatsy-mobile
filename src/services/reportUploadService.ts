@@ -281,6 +281,42 @@ export const listBiomarkerHistory = async (): Promise<BiomarkerHistoryItem[]> =>
   throw new Error(lastError);
 };
 
+export const deleteAnalyzedReport = async (reportId: string): Promise<{ deleted: boolean; reportId: string; recoveryWindowDays: number }> => {
+  let lastError = 'network_error';
+  for (const baseUrl of getBaseUrls()) {
+    try {
+      return await requestJson<{ deleted: boolean; reportId: string; recoveryWindowDays: number }>(
+        baseUrl,
+        `/v1/reports/${encodeURIComponent(reportId)}`,
+        { method: 'DELETE' }
+      );
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'network_error';
+      logReportDebug('delete:failure', { baseUrl, reportId, error: lastError });
+      if (isTerminalHttpError(error)) throw error;
+    }
+  }
+  throw new Error(lastError);
+};
+
+export const deleteAllAnalyzedReports = async (): Promise<{ deletedCount: number; recoveryWindowDays: number }> => {
+  let lastError = 'network_error';
+  for (const baseUrl of getBaseUrls()) {
+    try {
+      return await requestJson<{ deletedCount: number; recoveryWindowDays: number }>(baseUrl, '/v1/reports/all', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'network_error';
+      logReportDebug('delete-all:failure', { baseUrl, error: lastError });
+      if (isTerminalHttpError(error)) throw error;
+    }
+  }
+  throw new Error(lastError);
+};
+
 export const uploadAndAnalyzeReport = async (params: {
   fileUri: string;
   fileName: string;

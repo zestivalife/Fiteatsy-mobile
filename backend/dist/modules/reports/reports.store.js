@@ -33,6 +33,8 @@ const rowToReport = (row) => ({
         : undefined,
     error: row.error == null ? undefined : String(row.error),
     documentHash: row.document_hash == null ? undefined : String(row.document_hash),
+    deletedAtISO: row.deleted_at == null ? undefined : new Date(String(row.deleted_at)).toISOString(),
+    deletedBy: row.deleted_by == null ? undefined : String(row.deleted_by),
     analysis: parseJson(row.analysis, undefined),
     analysisVersion: Number(row.analysis_version),
     feedback: parseJson(row.feedback, [])
@@ -206,14 +208,53 @@ export const countReports = async (owner) => {
 export const deleteReport = async (reportId, owner) => {
     const result = await pool.query(`
       update health_reports
-      set deleted_at = now(), updated_at = now()
+      set processing_status = 'DELETED', deleted_at = now(), deleted_by = $4, updated_at = now()
       where id = $1
         and user_id = $2
         and client_id = $3
         and deleted_at is null
       returning id
-    `, [reportId, owner.userId, owner.clientId]);
+    `, [reportId, owner.userId, owner.clientId, owner.userId]);
     return Boolean(result.rows[0]);
+};
+export const deleteAllReports = async (owner) => {
+    const result = await pool.query(`
+      update health_reports
+      set processing_status = 'DELETED', deleted_at = now(), deleted_by = $3, updated_at = now()
+      where user_id = $1
+        and client_id = $2
+        and deleted_at is null
+      returning id
+    `, [owner.userId, owner.clientId, owner.userId]);
+    return result.rows.map((row) => String(row.id));
+};
+export const purgeDeletedReportsPastRecoveryWindow = async (retentionDays = 30) => {
+    const result = await pool.query(`
+      with expired as (
+        select id
+        from health_reports
+        where processing_status = 'DELETED'
+          and deleted_at is not null
+          and deleted_at < now() - ($1::int * interval '1 day')
+      ),
+      deleted_observations as (
+        delete from biomarker_observations
+        where source_report_id in (select id from expired)
+        returning id
+      ),
+      deleted_reports as (
+        delete from health_reports
+        where id in (select id from expired)
+        returning id
+      )
+      select
+        (select count(*)::int from deleted_reports) as reports,
+        (select count(*)::int from deleted_observations) as observations
+    `, [retentionDays]);
+    return {
+        reports: Number(result.rows[0]?.reports ?? 0),
+        observations: Number(result.rows[0]?.observations ?? 0)
+    };
 };
 export const updateReportMetadata = async (reportId, owner, patch) => {
     const current = await getReport(reportId);

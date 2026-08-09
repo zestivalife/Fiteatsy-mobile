@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Platform,
   Easing,
@@ -39,6 +40,8 @@ import {
 import { useAppContext } from '../../state/AppContext';
 import {
   BiomarkerHistoryItem,
+  deleteAllAnalyzedReports,
+  deleteAnalyzedReport,
   listAnalyzedReports,
   listBiomarkerHistory,
   ReportAnalysisResponse,
@@ -357,6 +360,9 @@ export const ReportsScreen = () => {
   const [actionPlan, setActionPlan] = useState<NuetraActionItem[]>([]);
   const [crossInsights, setCrossInsights] = useState<NuetraCrossInsight[]>([]);
   const [heroExpanded, setHeroExpanded] = useState(true);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [deleteAllConfirmation, setDeleteAllConfirmation] = useState('');
   const heroAnim = useRef(new Animated.Value(1)).current;
   const activeUploadController = useRef<AbortController | null>(null);
 
@@ -430,6 +436,11 @@ export const ReportsScreen = () => {
         label: string;
       }>;
   }, [biomarkerHistory]);
+  const reportDateRange = useMemo(() => {
+    if (reports.length === 0) return 'No reports';
+    const dates = reports.map((report) => report.date).filter(Boolean);
+    return dates.length > 1 ? `${dates[dates.length - 1]} to ${dates[0]}` : dates[0] ?? 'Selected reports';
+  }, [reports]);
 
   const clearReportDerivedState = () => {
     setReports([]);
@@ -454,6 +465,71 @@ export const ReportsScreen = () => {
     }, []);
     setReports(hydratedReports);
     setBiomarkerHistory(history);
+  };
+
+  const reloadReportsAfterDelete = async () => {
+    clearReportDerivedState();
+    setReportsLoading(true);
+    try {
+      await refreshReportData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to refresh reports.';
+      setReportsLoadError(message);
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  const confirmDeleteReport = (report: ReportItem) => {
+    Alert.alert(
+      'Delete this report?',
+      'This can be undone within 30 days by support. The report will disappear from health score, trends, AI summary, and action plan immediately.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void handleDeleteReport(report);
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteReport = async (report: ReportItem) => {
+    if (deleteBusy) return;
+    setDeleteBusy(true);
+    try {
+      await deleteAnalyzedReport(report.id);
+      await reloadReportsAfterDelete();
+      Alert.alert('Report deleted', 'This report is hidden from your health insights and can be restored by support within 30 days.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete report.';
+      Alert.alert('Delete failed', message);
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const handleDeleteAllReports = async () => {
+    if (deleteBusy || deleteAllConfirmation.trim().toUpperCase() !== 'DELETE') return;
+    setDeleteBusy(true);
+    try {
+      const result = await deleteAllAnalyzedReports();
+      setShowDeleteAllConfirm(false);
+      setDeleteAllConfirmation('');
+      await reloadReportsAfterDelete();
+      Alert.alert(
+        'Reports deleted',
+        `${result.deletedCount} report${result.deletedCount === 1 ? '' : 's'} hidden from your health insights. Support can restore within ${result.recoveryWindowDays} days.`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete reports.';
+      Alert.alert('Delete all failed', message);
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -1077,9 +1153,22 @@ export const ReportsScreen = () => {
 
       <View style={styles.sectionHead}>
         <Text style={[styles.sectionTitle, !isLight && styles.sectionTitleDark]}>Report History</Text>
-        <Pressable style={[styles.countChip, !isLight && styles.countChipDark]} onPress={() => setShowHistory((prev) => !prev)}>
-          <Text style={styles.countChipText}>{showHistory ? 'Hide history' : `View history (${reportCountLabel})`}</Text>
-        </Pressable>
+        <View style={styles.historyActions}>
+          {reports.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Delete all reports"
+              style={[styles.deleteAllChip, deleteBusy && styles.disabledChip]}
+              disabled={deleteBusy}
+              onPress={() => setShowDeleteAllConfirm(true)}
+            >
+              <Text style={styles.deleteAllChipText}>Delete all</Text>
+            </Pressable>
+          ) : null}
+          <Pressable style={[styles.countChip, !isLight && styles.countChipDark]} onPress={() => setShowHistory((prev) => !prev)}>
+            <Text style={styles.countChipText}>{showHistory ? 'Hide history' : `View history (${reportCountLabel})`}</Text>
+          </Pressable>
+        </View>
       </View>
 
       {showHistory ? (
@@ -1104,7 +1193,7 @@ export const ReportsScreen = () => {
               key={report.id}
               report={report}
               onOpen={() => setReports((prev) => [report, ...prev.filter((item) => item.id !== report.id)])}
-              onDelete={() => setReports((prev) => prev.filter((r) => r.id !== report.id))}
+              onDelete={() => confirmDeleteReport(report)}
               isLight={isLight}
               highlightColor={sectionHighlight}
             />
@@ -1166,6 +1255,49 @@ export const ReportsScreen = () => {
           <Ionicons name="cloud-upload-outline" size={24} color={colors.white} />
         </Pressable>
       ) : null}
+
+      <Modal visible={showDeleteAllConfirm} animationType="fade" transparent onRequestClose={() => setShowDeleteAllConfirm(false)}>
+        <View style={styles.confirmBackdrop}>
+          <View style={[styles.confirmCard, !isLight && styles.confirmCardDark]}>
+            <Text style={[styles.confirmTitle, !isLight && styles.confirmTitleDark]}>Delete all reports?</Text>
+            <Text style={[styles.confirmCopy, !isLight && styles.confirmCopyDark]}>
+              This will hide {reports.length} report{reports.length === 1 ? '' : 's'} from health score, trends, AI summary, category
+              breakdown, and action plan immediately. Date range: {reportDateRange}. Support can restore within 30 days.
+            </Text>
+            <Text style={[styles.confirmLabel, !isLight && styles.confirmCopyDark]}>Type DELETE to confirm</Text>
+            <TextInput
+              value={deleteAllConfirmation}
+              onChangeText={setDeleteAllConfirmation}
+              autoCapitalize="characters"
+              placeholder="DELETE"
+              placeholderTextColor={palette.textLight}
+              style={[styles.confirmInput, !isLight && styles.confirmInputDark]}
+            />
+            <View style={styles.confirmActions}>
+              <Pressable
+                style={[styles.confirmSecondaryBtn, !isLight && styles.confirmSecondaryBtnDark]}
+                disabled={deleteBusy}
+                onPress={() => {
+                  setShowDeleteAllConfirm(false);
+                  setDeleteAllConfirmation('');
+                }}
+              >
+                <Text style={[styles.confirmSecondaryText, !isLight && styles.confirmSecondaryTextDark]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.confirmDangerBtn,
+                  (deleteBusy || deleteAllConfirmation.trim().toUpperCase() !== 'DELETE') && styles.primaryBtnDisabled
+                ]}
+                disabled={deleteBusy || deleteAllConfirmation.trim().toUpperCase() !== 'DELETE'}
+                onPress={handleDeleteAllReports}
+              >
+                <Text style={styles.confirmDangerText}>{deleteBusy ? 'Deleting...' : 'Delete all'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showUploadSheet}
@@ -1866,6 +1998,7 @@ const styles = StyleSheet.create({
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
     marginBottom: 8
   },
@@ -1884,6 +2017,26 @@ const styles = StyleSheet.create({
     color: palette.teal,
     fontSize: 12,
     fontFamily: 'Poppins_700Bold'
+  },
+  historyActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  deleteAllChip: {
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: palette.coral,
+    paddingHorizontal: 8,
+    paddingVertical: 2
+  },
+  deleteAllChipText: {
+    color: palette.coral,
+    fontSize: 12,
+    fontFamily: 'Poppins_700Bold'
+  },
+  disabledChip: {
+    opacity: 0.45
   },
   reportList: {
     gap: 10
@@ -2006,6 +2159,102 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(8,10,16,0.74)',
     justifyContent: 'flex-end'
+  },
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(8,10,16,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20
+  },
+  confirmCard: {
+    width: '100%',
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 18
+  },
+  confirmCardDark: {
+    backgroundColor: colors.cardRaised,
+    borderColor: colors.stroke
+  },
+  confirmTitle: {
+    fontSize: 20,
+    color: palette.textDark,
+    fontFamily: 'Poppins_700Bold',
+    marginBottom: 8
+  },
+  confirmTitleDark: {
+    color: colors.white
+  },
+  confirmCopy: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: palette.textMid,
+    marginBottom: 14
+  },
+  confirmCopyDark: {
+    color: colors.white
+  },
+  confirmLabel: {
+    fontSize: 12,
+    color: palette.textDark,
+    fontFamily: 'Poppins_600SemiBold',
+    marginBottom: 6
+  },
+  confirmInput: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    color: palette.textDark,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold',
+    marginBottom: 16
+  },
+  confirmInputDark: {
+    backgroundColor: colors.cardMuted,
+    borderColor: colors.stroke,
+    color: colors.white
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  confirmSecondaryBtn: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  confirmSecondaryBtnDark: {
+    borderColor: colors.stroke
+  },
+  confirmSecondaryText: {
+    color: palette.textDark,
+    fontSize: 14,
+    fontFamily: 'Poppins_600SemiBold'
+  },
+  confirmSecondaryTextDark: {
+    color: colors.white
+  },
+  confirmDangerBtn: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 12,
+    backgroundColor: palette.coral,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  confirmDangerText: {
+    color: colors.white,
+    fontSize: 14,
+    fontFamily: 'Poppins_700Bold'
   },
   sheetDismissZone: {
     flex: 1

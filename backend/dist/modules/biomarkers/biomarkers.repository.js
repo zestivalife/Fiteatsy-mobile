@@ -89,9 +89,11 @@ export const listBiomarkerHistory = async (owner, filters) => {
       select bo.*, b.canonical_name
       from biomarker_observations bo
       join biomarkers b on b.id = bo.biomarker_id
+      left join health_reports hr on hr.id = bo.source_report_id
       where bo.user_id = $1
         and bo.client_id = $2
         and ($3::text is null or bo.biomarker_id = $3)
+        and (bo.source_report_id is null or (hr.deleted_at is null and hr.processing_status <> 'DELETED'))
       order by bo.test_date desc, bo.created_at desc
       limit $4 offset $5
     `, [owner.accountId, owner.clientId, filters.biomarkerId ?? null, filters.limit, filters.offset]);
@@ -100,10 +102,12 @@ export const listBiomarkerHistory = async (owner, filters) => {
 export const countBiomarkerHistory = async (owner, biomarkerId) => {
     const result = await pool.query(`
       select count(*)::int as total
-      from biomarker_observations
-      where user_id = $1
-        and client_id = $2
-        and ($3::text is null or biomarker_id = $3)
+      from biomarker_observations bo
+      left join health_reports hr on hr.id = bo.source_report_id
+      where bo.user_id = $1
+        and bo.client_id = $2
+        and ($3::text is null or bo.biomarker_id = $3)
+        and (bo.source_report_id is null or (hr.deleted_at is null and hr.processing_status <> 'DELETED'))
     `, [owner.accountId, owner.clientId, biomarkerId ?? null]);
     return Number(result.rows[0]?.total ?? 0);
 };

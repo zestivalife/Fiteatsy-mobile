@@ -288,8 +288,9 @@ create table if not exists health_reports (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,
+  deleted_by text references users(id) on delete set null,
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
-  check (processing_status in ('UPLOADED', 'PROCESSING', 'DOCUMENT_ANALYSIS_COMPLETED', 'EXTRACTION_COMPLETED', 'VALIDATION_COMPLETED', 'PRIORITIZATION_COMPLETED', 'SCORE_GENERATED', 'PUBLISHED', 'PARTIALLY_VALIDATED', 'FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA', 'EXTRACTED', 'VALIDATION_PENDING', 'VALIDATED', 'PRIORITIZED', 'SCORED', 'COMPLETED'))
+  check (processing_status in ('UPLOADED', 'PROCESSING', 'DOCUMENT_ANALYSIS_COMPLETED', 'EXTRACTION_COMPLETED', 'VALIDATION_COMPLETED', 'PRIORITIZATION_COMPLETED', 'SCORE_GENERATED', 'PUBLISHED', 'PARTIALLY_VALIDATED', 'FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA', 'DELETED', 'EXTRACTED', 'VALIDATION_PENDING', 'VALIDATED', 'PRIORITIZED', 'SCORED', 'COMPLETED'))
 );
 
 create unique index if not exists health_reports_client_document_hash_active_unique
@@ -297,6 +298,10 @@ create unique index if not exists health_reports_client_document_hash_active_uni
   where document_hash is not null
     and deleted_at is null
     and processing_status <> 'FAILED';
+
+create index if not exists health_reports_deleted_recovery_idx
+  on health_reports (deleted_at)
+  where processing_status = 'DELETED' and deleted_at is not null;
 
 create table if not exists health_report_upload_sessions (
   id text primary key,
