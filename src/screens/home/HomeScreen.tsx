@@ -18,6 +18,7 @@ import { relationshipLabel, toRecoveryShareState, toSupportMoment } from '../../
 import { formatConsultantAvailability, getConsultantProfile } from '../../utils/healthProfile';
 import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
 import { getIdentityScopedStorageKey } from '../../utils/identityScopedStorage';
+import { listAnalyzedReports, type ReportDto } from '../../services/reportUploadService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -31,6 +32,20 @@ type HealthProfileReportSummary = {
   abnormal: number;
   score: number;
   uploadedAtISO?: string;
+};
+
+const toHealthProfileReportSummary = (report: ReportDto): HealthProfileReportSummary | null => {
+  const analysis = report.analysis;
+  if (!analysis) return null;
+  const parameters = Array.isArray(analysis.parameters) ? analysis.parameters : [];
+  return {
+    id: report.id,
+    labName: analysis.labName || report.labName || 'Blood Report',
+    date: analysis.reportDate || report.reportDate || 'Date unavailable',
+    abnormal: parameters.filter((parameter) => parameter.status !== 'normal').length,
+    score: Number(analysis.score ?? 0),
+    uploadedAtISO: report.createdAtISO
+  };
 };
 type RecoveryDimension = 'calm' | 'activity' | 'nutrition' | 'rhythm' | 'sleep';
 
@@ -295,6 +310,8 @@ export const HomeScreen = () => {
   const [healthProfileOpen, setHealthProfileOpen] = useState(false);
   const [reportHistoryCount, setReportHistoryCount] = useState(0);
   const [reportHistory, setReportHistory] = useState<HealthProfileReportSummary[]>([]);
+  const [reportHistoryLoading, setReportHistoryLoading] = useState(false);
+  const [reportHistoryError, setReportHistoryError] = useState<string | null>(null);
   const [sessionAntiManipulation, setSessionAntiManipulation] = useState({
     todaySessionCount: 0,
     recentCooldownPenalty: 1,
@@ -680,44 +697,47 @@ export const HomeScreen = () => {
     () => buildHealthProfileCompletion(onboarding, assessment, reportHistoryCount),
     [assessment, onboarding, reportHistoryCount]
   );
+  const healthProfileMissingCopy = reportHistoryLoading
+    ? 'Refreshing health reports...'
+    : reportHistoryError
+      ? 'Health reports could not refresh. Pull reports again when the network is available.'
+      : healthProfile.missingItems.slice(0, 3).join(' • ') || 'Profile is ready for consultant review';
 
   useFocusEffect(
     React.useCallback(() => {
       let active = true;
-      if (!reportHistoryStorageKey) {
-        setReportHistory([]);
-        setReportHistoryCount(0);
+      setReportHistory([]);
+      setReportHistoryCount(0);
+      setReportHistoryError(null);
+      if (!authSession || !reportHistoryStorageKey) {
+        setReportHistoryLoading(false);
         return () => {
           active = false;
         };
       }
-      AsyncStorage.getItem(reportHistoryStorageKey)
-        .then((raw) => {
+
+      setReportHistoryLoading(true);
+      listAnalyzedReports()
+        .then((reportDtos) => {
           if (!active) return;
-          const parsed = raw ? JSON.parse(raw) : [];
-          const reports = Array.isArray(parsed)
-            ? parsed.map((item) => ({
-                id: String(item?.id ?? ''),
-                labName: String(item?.labName ?? 'Blood Report'),
-                date: String(item?.date ?? 'Date unavailable'),
-                abnormal: Number(item?.abnormal ?? 0),
-                score: Number(item?.score ?? 0),
-                uploadedAtISO: typeof item?.uploadedAtISO === 'string' ? item.uploadedAtISO : undefined
-              }))
-            : [];
-          setReportHistory(reports.filter((item) => item.id));
+          const reports = reportDtos.map(toHealthProfileReportSummary).filter(Boolean) as HealthProfileReportSummary[];
+          setReportHistory(reports);
           setReportHistoryCount(reports.length);
+          void AsyncStorage.setItem(reportHistoryStorageKey, JSON.stringify(reports)).catch(() => undefined);
         })
-        .catch(() => {
-          if (active) {
-            setReportHistory([]);
-            setReportHistoryCount(0);
-          }
+        .catch((error) => {
+          if (!active) return;
+          setReportHistory([]);
+          setReportHistoryCount(0);
+          setReportHistoryError(error instanceof Error ? error.message : 'Unable to refresh health reports.');
+        })
+        .finally(() => {
+          if (active) setReportHistoryLoading(false);
         });
       return () => {
         active = false;
       };
-    }, [reportHistoryStorageKey])
+    }, [authSession, reportHistoryStorageKey])
   );
 
   const onConnectTrustedSupport = () => {
@@ -952,7 +972,7 @@ export const HomeScreen = () => {
           <View style={{ flex: 1 }}>
             <Text style={[styles.healthProfileSectionTitle, { color: ui.textPrimary }]}>Health Profile</Text>
             <Text style={[styles.healthProfileMissing, { color: ui.textSecondary }]}>
-              {healthProfile.missingItems.slice(0, 3).join(' • ') || 'Profile is ready for consultant review'}
+              {healthProfileMissingCopy}
             </Text>
           </View>
           <View style={[styles.healthProfileCta, { backgroundColor: '#59BE08' }]}>
