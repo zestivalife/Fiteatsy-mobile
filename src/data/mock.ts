@@ -1,5 +1,4 @@
 import { WearableDevice, WellnessSnapshot } from '../types';
-import { recalculateWellness } from '../utils/wellness';
 
 export const mockDevices: WearableDevice[] = [
   {
@@ -52,18 +51,18 @@ export const mockDevices: WearableDevice[] = [
   }
 ];
 
-export const initialWellness: WellnessSnapshot = recalculateWellness({
-  focusMinutes: 15,
-  breathingMinutes: 5,
-  movementMinutes: 10,
-  hydrationLiters: 2.4,
+export const initialWellness: WellnessSnapshot = {
+  focusMinutes: 0,
+  breathingMinutes: 0,
+  movementMinutes: 0,
+  hydrationLiters: 0,
   hydrationGoalLiters: 4,
-  heartRateAvg: 72,
-  sleepHours: 7.8,
-  moodScore: 60,
+  heartRateAvg: 0,
+  sleepHours: 0,
+  moodScore: 0,
   recoveryScore: 0,
   nourishmentScore: 0,
   wellnessScore: 0,
   hrvStatus: 'Normal',
-  stressScore: 80
-});
+  stressScore: 0
+};

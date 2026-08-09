@@ -180,7 +180,8 @@ intelligenceRouter.get('/summary', requireAuthenticatedAccount, async (req, res)
   });
 });
 
-intelligenceRouter.post('/priority', (req, res) => {
+intelligenceRouter.post('/priority', requireAuthenticatedAccount, (req, res) => {
+  getAuthenticatedAccount(req);
   const parsed = checkinSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -190,7 +191,8 @@ intelligenceRouter.post('/priority', (req, res) => {
   return res.json(response);
 });
 
-intelligenceRouter.post('/tracker-analysis', async (req, res) => {
+intelligenceRouter.post('/tracker-analysis', requireAuthenticatedAccount, async (req, res) => {
+  getAuthenticatedAccount(req);
   const parsed = trackerAnalysisSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -220,7 +222,8 @@ intelligenceRouter.post('/tracker-analysis', async (req, res) => {
   }
 });
 
-intelligenceRouter.post('/tracker-improvement', async (req, res) => {
+intelligenceRouter.post('/tracker-improvement', requireAuthenticatedAccount, async (req, res) => {
+  getAuthenticatedAccount(req);
   const parsed = trackerImprovementSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -235,7 +238,8 @@ intelligenceRouter.post('/tracker-improvement', async (req, res) => {
   }
 });
 
-intelligenceRouter.post('/reports/summary', async (req, res) => {
+intelligenceRouter.post('/reports/summary', requireAuthenticatedAccount, async (req, res) => {
+  getAuthenticatedAccount(req);
   const parsed = summarySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -250,7 +254,8 @@ intelligenceRouter.post('/reports/summary', async (req, res) => {
   }
 });
 
-intelligenceRouter.post('/reports/parameter-insight', async (req, res) => {
+intelligenceRouter.post('/reports/parameter-insight', requireAuthenticatedAccount, async (req, res) => {
+  getAuthenticatedAccount(req);
   const parsed = parameterInsightSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -272,7 +277,8 @@ intelligenceRouter.post('/reports/parameter-insight', async (req, res) => {
   }
 });
 
-intelligenceRouter.post('/reports/action-plan', async (req, res) => {
+intelligenceRouter.post('/reports/action-plan', requireAuthenticatedAccount, async (req, res) => {
+  getAuthenticatedAccount(req);
   const parsed = actionPlanSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -287,7 +293,8 @@ intelligenceRouter.post('/reports/action-plan', async (req, res) => {
   }
 });
 
-intelligenceRouter.post('/reports/cross-insights', async (req, res) => {
+intelligenceRouter.post('/reports/cross-insights', requireAuthenticatedAccount, async (req, res) => {
+  getAuthenticatedAccount(req);
   const parsed = crossInsightsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -302,7 +309,8 @@ intelligenceRouter.post('/reports/cross-insights', async (req, res) => {
   }
 });
 
-intelligenceRouter.post('/reports/chat', async (req, res) => {
+intelligenceRouter.post('/reports/chat', requireAuthenticatedAccount, async (req, res) => {
+  getAuthenticatedAccount(req);
   const parsed = chatSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });

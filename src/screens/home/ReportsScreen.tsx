@@ -319,7 +319,7 @@ const SwipeableReportCard = ({
 
 export const ReportsScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { wellness, onboarding, checkIns, themeMode } = useAppContext();
+  const { wellness, onboarding, checkIns, themeMode, authSession } = useAppContext();
   const isLight = themeMode === 'light';
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [biomarkerHistory, setBiomarkerHistory] = useState<BiomarkerHistoryItem[]>([]);
@@ -361,6 +361,9 @@ export const ReportsScreen = () => {
   const activeUploadController = useRef<AbortController | null>(null);
 
   const shimmer = useRef(new Animated.Value(0)).current;
+  const authenticatedReportOwnerKey = authSession
+    ? `${authSession.accountId}:${authSession.client.fiteatsyClientId}:${authSession.sessionId}`
+    : 'signed-out';
 
   const latestReport = reports[0] ?? null;
   const sortedReports = useMemo(() => {
@@ -423,6 +426,20 @@ export const ReportsScreen = () => {
       }>;
   }, [biomarkerHistory]);
 
+  const clearReportDerivedState = () => {
+    setReports([]);
+    setBiomarkerHistory([]);
+    setReportsLoadError(null);
+    setLatestComparisonSummary(null);
+    setAnalysisReview(null);
+    setShowAnalysisReview(false);
+    setNuetraSummary('');
+    setParameterInsights({});
+    setActionPlan([]);
+    setCrossInsights([]);
+    setShowHistory(false);
+  };
+
   const refreshReportData = async () => {
     setReportsLoadError(null);
     const [reportDtos, history] = await Promise.all([listAnalyzedReports(), listBiomarkerHistory()]);
@@ -436,6 +453,13 @@ export const ReportsScreen = () => {
 
   useEffect(() => {
     let active = true;
+    clearReportDerivedState();
+    if (!authSession) {
+      setReportsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
     setReportsLoading(true);
     refreshReportData()
       .catch((error) => {
@@ -448,7 +472,7 @@ export const ReportsScreen = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [authenticatedReportOwnerKey]);
 
   const hydratePickedFile = async (
     uri: string,

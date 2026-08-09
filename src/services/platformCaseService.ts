@@ -1,11 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiClientError, apiFetch } from './apiClient';
 import { CareCaseRef, OnboardingProfile } from '../types';
+import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/identityScopedStorage';
 
 const ACTIVE_CARE_CASE_STORAGE_KEY = 'fiteatsy.platform.activeCareCase.v1';
 
-const readStoredCareCase = async (): Promise<CareCaseRef | null> => {
-  const raw = await AsyncStorage.getItem(ACTIVE_CARE_CASE_STORAGE_KEY);
+const getStorageKey = (identity: StorageIdentity) =>
+  getIdentityScopedStorageKey(ACTIVE_CARE_CASE_STORAGE_KEY, identity);
+
+const readStoredCareCase = async (identity: StorageIdentity): Promise<CareCaseRef | null> => {
+  const key = getStorageKey(identity);
+  if (!key) return null;
+  const raw = await AsyncStorage.getItem(key);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as CareCaseRef;
@@ -16,8 +22,11 @@ const readStoredCareCase = async (): Promise<CareCaseRef | null> => {
 
 export const resolveActiveCareCase = async (params: {
   userId: string;
+  clientId?: string | null;
   onboarding: OnboardingProfile | null;
 }): Promise<CareCaseRef> => {
+  const identity = { userId: params.userId, clientId: params.clientId };
+  const storageKey = getStorageKey(identity);
   try {
     const remote = await apiFetch<{
       id: string;
@@ -48,7 +57,9 @@ export const resolveActiveCareCase = async (params: {
       updatedAtISO: remote.updatedAtISO,
       provisional: false
     };
-    await AsyncStorage.setItem(ACTIVE_CARE_CASE_STORAGE_KEY, JSON.stringify(remoteCase));
+    if (storageKey) {
+      await AsyncStorage.setItem(storageKey, JSON.stringify(remoteCase));
+    }
     return remoteCase;
   } catch (error) {
     if (!(error instanceof ApiClientError)) {
@@ -56,7 +67,7 @@ export const resolveActiveCareCase = async (params: {
     }
   }
 
-  const existing = await readStoredCareCase();
+  const existing = await readStoredCareCase(identity);
   if (existing) {
     return existing;
   }
@@ -82,6 +93,8 @@ export const resolveActiveCareCase = async (params: {
     provisional: true
   };
 
-  await AsyncStorage.setItem(ACTIVE_CARE_CASE_STORAGE_KEY, JSON.stringify(careCase));
+  if (storageKey) {
+    await AsyncStorage.setItem(storageKey, JSON.stringify(careCase));
+  }
   return careCase;
 };

@@ -9,6 +9,7 @@ import { Card } from '../../components/Card';
 import { RootStackParamList } from '../../navigation/types';
 import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
+import { getIdentityScopedStorageKey } from '../../utils/identityScopedStorage';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type SessionType =
@@ -135,7 +136,7 @@ const sessionCatalog: SessionConfig[] = [
 
 export const SessionsScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { setWellness, themeMode } = useAppContext();
+  const { authSession, setWellness, themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
   const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
@@ -170,6 +171,19 @@ export const SessionsScreen = () => {
   const [memoryAttempts, setMemoryAttempts] = useState(0);
   const memoryStartedRef = useRef<number | null>(null);
   const memoryPlaybackRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionSignalsStorageKey = useMemo(
+    () =>
+      getIdentityScopedStorageKey(
+        'fiteatsy.sessionSignals.v1',
+        authSession
+          ? {
+              userId: authSession.accountId,
+              clientId: authSession.client.fiteatsyClientId
+            }
+          : null
+      ),
+    [authSession]
+  );
 
   const grouped = useMemo(() => {
     return {
@@ -181,8 +195,8 @@ export const SessionsScreen = () => {
   }, []);
 
   const persistSessionPayload = async (payload: SessionStoragePayload) => {
-    const key = 'fiteatsy.sessionSignals.v1';
-    const raw = await AsyncStorage.getItem(key);
+    if (!sessionSignalsStorageKey) return;
+    const raw = await AsyncStorage.getItem(sessionSignalsStorageKey);
     let parsed: SessionStoragePayload[] = [];
     if (raw) {
       try {
@@ -193,7 +207,7 @@ export const SessionsScreen = () => {
       }
     }
     parsed.unshift(payload);
-    await AsyncStorage.setItem(key, JSON.stringify(parsed.slice(0, 60)));
+    await AsyncStorage.setItem(sessionSignalsStorageKey, JSON.stringify(parsed.slice(0, 60)));
   };
 
   const cleanupRhythm = () => {

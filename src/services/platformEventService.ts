@@ -6,6 +6,7 @@ type QueueHealthEventInput = {
   eventType: HealthEventType;
   eventSource: HealthEventSource;
   userId: string;
+  clientId?: string | null;
   onboarding: OnboardingProfile | null;
   eventPayload: Record<string, unknown>;
   priority?: 'low' | 'medium' | 'high';
@@ -15,8 +16,10 @@ type QueueHealthEventInput = {
 
 export const queueHealthEvent = async (input: QueueHealthEventInput): Promise<HealthEventDraft> => {
   const nowISO = new Date().toISOString();
+  const identity = { userId: input.userId, clientId: input.clientId };
   const careCase = await resolveActiveCareCase({
     userId: input.userId,
+    clientId: input.clientId,
     onboarding: input.onboarding
   });
 
@@ -48,6 +51,6 @@ export const queueHealthEvent = async (input: QueueHealthEventInput): Promise<He
     lastError: null
   };
 
-  await enqueueSyncItem(queueItem);
+  await enqueueSyncItem(queueItem, identity);
   return event;
 };

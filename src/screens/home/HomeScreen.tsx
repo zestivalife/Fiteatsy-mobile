@@ -17,6 +17,7 @@ import { FamilyRelationshipType, FamilyVisibilityLevel } from '../../types';
 import { relationshipLabel, toRecoveryShareState, toSupportMoment } from '../../services/familyConnectService';
 import { formatConsultantAvailability, getConsultantProfile } from '../../utils/healthProfile';
 import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
+import { getIdentityScopedStorageKey } from '../../utils/identityScopedStorage';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -327,9 +328,28 @@ export const HomeScreen = () => {
     setFamilySharingPaused,
     sendFamilyPing,
     familyEmergencyEvents,
-    themeMode
+    themeMode,
+    authSession
   } = useAppContext();
   const isLight = themeMode === 'light';
+  const authStorageIdentity = useMemo(
+    () =>
+      authSession
+        ? {
+            userId: authSession.accountId,
+            clientId: authSession.client.fiteatsyClientId
+          }
+        : null,
+    [authSession]
+  );
+  const reportHistoryStorageKey = useMemo(
+    () => getIdentityScopedStorageKey(REPORT_HISTORY_STORAGE_KEY, authStorageIdentity),
+    [authStorageIdentity]
+  );
+  const sessionSignalsStorageKey = useMemo(
+    () => getIdentityScopedStorageKey('fiteatsy.sessionSignals.v1', authStorageIdentity),
+    [authStorageIdentity]
+  );
   const ui = useMemo(() => ({
     textPrimary: isLight ? '#0F172A' : '#F4F4F4',
     textSecondary: isLight ? '#334155' : '#9A9A9A',
@@ -343,6 +363,13 @@ export const HomeScreen = () => {
 
   const connectedDevice = devices.find((d) => d.id === selectedDeviceId) ?? null;
   const latestHealthSync = wearableSyncData[0] ?? null;
+  const hasWellnessData = Boolean(
+    assessment ||
+    selectedDeviceId ||
+    wearableSyncData.length > 0 ||
+    checkIns.length > 0 ||
+    reportHistoryCount > 0
+  );
   const latestHealthMetrics = latestHealthSync?.dataQuality.connectedMetrics ?? {};
   const syncedHealthDomainCount = ['steps', 'sleep', 'heart_rate', 'hrv', 'workouts'].filter(
     (key) => latestHealthMetrics[key as keyof typeof latestHealthMetrics] === 'synced'
@@ -509,8 +536,16 @@ export const HomeScreen = () => {
 
   useEffect(() => {
     const hydrateSessionAntiManipulation = async () => {
+      if (!sessionSignalsStorageKey) {
+        setSessionAntiManipulation({
+          todaySessionCount: 0,
+          sessionInfluenceMultiplier: 1,
+          recentCooldownPenalty: 1
+        });
+        return;
+      }
       try {
-        const raw = await AsyncStorage.getItem('fiteatsy.sessionSignals.v1');
+        const raw = await AsyncStorage.getItem(sessionSignalsStorageKey);
         const parsedRaw = raw ? (JSON.parse(raw) as unknown) : [];
         const parsed = Array.isArray(parsedRaw) ? (parsedRaw as Array<{ timestamp?: string }>) : [];
         const now = Date.now();
@@ -544,7 +579,7 @@ export const HomeScreen = () => {
     };
 
     hydrateSessionAntiManipulation();
-  }, [wellness.breathingMinutes, wellness.focusMinutes, wellness.moodScore]);
+  }, [sessionSignalsStorageKey, wellness.breathingMinutes, wellness.focusMinutes, wellness.moodScore]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -649,7 +684,14 @@ export const HomeScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       let active = true;
-      AsyncStorage.getItem(REPORT_HISTORY_STORAGE_KEY)
+      if (!reportHistoryStorageKey) {
+        setReportHistory([]);
+        setReportHistoryCount(0);
+        return () => {
+          active = false;
+        };
+      }
+      AsyncStorage.getItem(reportHistoryStorageKey)
         .then((raw) => {
           if (!active) return;
           const parsed = raw ? JSON.parse(raw) : [];
@@ -675,7 +717,7 @@ export const HomeScreen = () => {
       return () => {
         active = false;
       };
-    }, [])
+    }, [reportHistoryStorageKey])
   );
 
   const onConnectTrustedSupport = () => {
@@ -832,6 +874,14 @@ export const HomeScreen = () => {
           <View style={styles.lowerTag}><Text style={styles.lowerTagText} numberOfLines={1}>{recoveryIntel.isCalibrating ? 'Calibration' : heroState}</Text></View>
         </View>
       </View>
+      {!hasWellnessData ? (
+        <View style={[styles.noWellnessCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}>
+          <Text style={[styles.noWellnessTitle, { color: ui.textPrimary }]}>No wellness data available yet</Text>
+          <Text style={[styles.noWellnessBody, { color: ui.textSecondary }]}>
+            Upload a report, complete your assessment, or connect Health Connect to start building your personal intelligence.
+          </Text>
+        </View>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${healthSyncHomeState.title}. ${healthSyncHomeState.body}`}
@@ -1709,6 +1759,22 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
     width: 20,
     textAlign: 'center'
+  },
+  noWellnessCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+    gap: 8,
+    marginBottom: 12
+  },
+  noWellnessTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins_700Bold'
+  },
+  noWellnessBody: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: 'Poppins_400Regular'
   },
   healthSyncCard: {
     borderWidth: 1,
