@@ -5,6 +5,7 @@ import { generateActionPlan, generateCrossReferenceInsights, generateNuetraChat,
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { listHealthScoreHistory, listLatestHealthScores } from './health-scores.repository.js';
 import { calculateHealthScores } from './health-calculation-engine.js';
+import { getReport } from '../reports/reports.store.js';
 export const intelligenceRouter = Router();
 const currentOwner = (account) => ({
     accountId: account.accountId,
@@ -38,20 +39,17 @@ const reportParameterSchema = z.object({
 });
 const summarySchema = z.object({
     userName: z.string().optional(),
-    parameters: z.array(reportParameterSchema).min(1)
+    reportId: z.string().min(1)
 });
 const parameterInsightSchema = z.object({
-    paramName: z.string().min(1),
-    value: z.number(),
-    unit: z.string().min(1),
-    status: z.string().min(1),
-    referenceRange: z.string().min(1)
+    reportId: z.string().min(1),
+    paramName: z.string().min(1)
 });
 const actionPlanSchema = z.object({
-    abnormalParameters: z.array(reportParameterSchema)
+    reportId: z.string().min(1)
 });
 const crossInsightsSchema = z.object({
-    abnormalParams: z.array(reportParameterSchema),
+    reportId: z.string().min(1),
     checkInHistory: z.array(z.object({
         mood: z.number().min(1).max(5),
         energy: z.number().min(1).max(5),
@@ -64,7 +62,7 @@ const chatSchema = z.object({
         role: z.enum(['user', 'assistant']),
         content: z.string().min(1)
     })),
-    reportParameters: z.array(reportParameterSchema).min(1)
+    reportId: z.string().min(1)
 });
 const trackerImprovementSchema = z.object({
     tab: z.enum(['health', 'wellness']),
@@ -90,6 +88,24 @@ const trackerImprovementSchema = z.object({
     })
         .optional()
 });
+const toReportParameter = (parameter) => reportParameterSchema.parse({
+    name: parameter.name,
+    value: parameter.value,
+    unit: parameter.unit,
+    status: parameter.status,
+    referenceRange: parameter.referenceRange,
+    category: parameter.category
+});
+const loadOwnedReportParameters = async (reportId, owner) => {
+    const report = await getReport(reportId);
+    if (!report || report.userId !== owner.accountId || report.clientId !== owner.clientId) {
+        return { status: 404, error: { error: 'REPORT_NOT_FOUND', message: 'Report not found.' } };
+    }
+    if (!report.analysis?.parameters?.length) {
+        return { status: 409, error: { error: 'ANALYSIS_NOT_READY', message: 'Report analysis is not ready.' } };
+    }
+    return { status: 200, parameters: report.analysis.parameters.map(toReportParameter) };
+};
 intelligenceRouter.get('/scores', requireAuthenticatedAccount, async (req, res) => {
     const account = getAuthenticatedAccount(req);
     const owner = currentOwner(account);
@@ -192,13 +208,16 @@ intelligenceRouter.post('/tracker-improvement', requireAuthenticatedAccount, asy
     }
 });
 intelligenceRouter.post('/reports/summary', requireAuthenticatedAccount, async (req, res) => {
-    getAuthenticatedAccount(req);
+    const owner = currentOwner(getAuthenticatedAccount(req));
     const parsed = summarySchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });
     }
     try {
-        const summary = await generateNuetraSummary(parsed.data.parameters, parsed.data.userName);
+        const owned = await loadOwnedReportParameters(parsed.data.reportId, owner);
+        if (owned.status !== 200)
+            return res.status(owned.status).json(owned.error);
+        const summary = await generateNuetraSummary(owned.parameters, parsed.data.userName);
         return res.json({ summary });
     }
     catch (error) {
@@ -207,13 +226,20 @@ intelligenceRouter.post('/reports/summary', requireAuthenticatedAccount, async (
     }
 });
 intelligenceRouter.post('/reports/parameter-insight', requireAuthenticatedAccount, async (req, res) => {
-    getAuthenticatedAccount(req);
+    const owner = currentOwner(getAuthenticatedAccount(req));
     const parsed = parameterInsightSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });
     }
     try {
-        const insight = await generateParameterInsight(parsed.data.paramName, parsed.data.value, parsed.data.unit, parsed.data.status, parsed.data.referenceRange);
+        const owned = await loadOwnedReportParameters(parsed.data.reportId, owner);
+        if (owned.status !== 200)
+            return res.status(owned.status).json(owned.error);
+        const parameter = owned.parameters.find((item) => item.name === parsed.data.paramName);
+        if (!parameter) {
+            return res.status(404).json({ error: 'PARAMETER_NOT_FOUND', message: 'Parameter not found in this report.' });
+        }
+        const insight = await generateParameterInsight(parameter.name, parameter.value, parameter.unit, parameter.status, parameter.referenceRange);
         return res.json({ insight });
     }
     catch (error) {
@@ -222,13 +248,16 @@ intelligenceRouter.post('/reports/parameter-insight', requireAuthenticatedAccoun
     }
 });
 intelligenceRouter.post('/reports/action-plan', requireAuthenticatedAccount, async (req, res) => {
-    getAuthenticatedAccount(req);
+    const owner = currentOwner(getAuthenticatedAccount(req));
     const parsed = actionPlanSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });
     }
     try {
-        const actions = await generateActionPlan(parsed.data.abnormalParameters);
+        const owned = await loadOwnedReportParameters(parsed.data.reportId, owner);
+        if (owned.status !== 200)
+            return res.status(owned.status).json(owned.error);
+        const actions = await generateActionPlan(owned.parameters.filter((parameter) => parameter.status !== 'normal'));
         return res.json({ actions });
     }
     catch (error) {
@@ -237,13 +266,16 @@ intelligenceRouter.post('/reports/action-plan', requireAuthenticatedAccount, asy
     }
 });
 intelligenceRouter.post('/reports/cross-insights', requireAuthenticatedAccount, async (req, res) => {
-    getAuthenticatedAccount(req);
+    const owner = currentOwner(getAuthenticatedAccount(req));
     const parsed = crossInsightsSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });
     }
     try {
-        const insights = await generateCrossReferenceInsights(parsed.data.abnormalParams, parsed.data.checkInHistory);
+        const owned = await loadOwnedReportParameters(parsed.data.reportId, owner);
+        if (owned.status !== 200)
+            return res.status(owned.status).json(owned.error);
+        const insights = await generateCrossReferenceInsights(owned.parameters.filter((parameter) => parameter.status !== 'normal'), parsed.data.checkInHistory);
         return res.json({ insights });
     }
     catch (error) {
@@ -252,13 +284,16 @@ intelligenceRouter.post('/reports/cross-insights', requireAuthenticatedAccount, 
     }
 });
 intelligenceRouter.post('/reports/chat', requireAuthenticatedAccount, async (req, res) => {
-    getAuthenticatedAccount(req);
+    const owner = currentOwner(getAuthenticatedAccount(req));
     const parsed = chatSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });
     }
     try {
-        const response = await generateNuetraChat(parsed.data.userMessage, parsed.data.conversationHistory, parsed.data.reportParameters);
+        const owned = await loadOwnedReportParameters(parsed.data.reportId, owner);
+        if (owned.status !== 200)
+            return res.status(owned.status).json(owned.error);
+        const response = await generateNuetraChat(parsed.data.userMessage, parsed.data.conversationHistory, owned.parameters);
         return res.json({ response });
     }
     catch (error) {
