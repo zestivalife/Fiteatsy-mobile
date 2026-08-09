@@ -32,41 +32,38 @@ const postJson = async <T>(path: string, body: unknown): Promise<T> => {
   return postConfiguredJson<T>(path, body);
 };
 
-export const generateNuetraSummary = async (parameters: ReportParameter[], userName?: string) => {
+export const generateNuetraSummary = async (reportId: string, userName?: string) => {
   const data = await postJson<{ summary: string }>('/v1/intelligence/reports/summary', {
-    parameters,
+    reportId,
     userName
   });
 
   return data.summary;
 };
 
-export const generateParameterInsight = async (parameter: ReportParameter) => {
+export const generateParameterInsight = async (reportId: string, parameter: ReportParameter) => {
   const data = await postJson<{ insight: string }>('/v1/intelligence/reports/parameter-insight', {
+    reportId,
     paramName: parameter.name,
-    value: parameter.value,
-    unit: parameter.unit,
-    status: parameter.status,
-    referenceRange: parameter.referenceRange
   });
 
   return data.insight;
 };
 
-export const generateActionPlan = async (abnormalParameters: ReportParameter[]) => {
+export const generateActionPlan = async (reportId: string) => {
   const data = await postJson<{ actions: NuetraActionItem[] }>('/v1/intelligence/reports/action-plan', {
-    abnormalParameters
+    reportId
   });
 
   return data.actions;
 };
 
 export const generateCrossReferenceInsights = async (
-  abnormalParams: ReportParameter[],
+  reportId: string,
   checkInHistory: DailyCheckIn[]
 ) => {
   const data = await postJson<{ insights: NuetraCrossInsight[] }>('/v1/intelligence/reports/cross-insights', {
-    abnormalParams,
+    reportId,
     checkInHistory: checkInHistory.map((item) => ({
       mood: item.mood,
       energy: item.energy,
@@ -80,12 +77,12 @@ export const generateCrossReferenceInsights = async (
 export const generateNuetraChat = async (
   userMessage: string,
   conversationHistory: NuetraChatMessage[],
-  reportParameters: ReportParameter[]
+  reportId: string
 ) => {
   const data = await postJson<{ response: string }>('/v1/intelligence/reports/chat', {
     userMessage,
     conversationHistory,
-    reportParameters
+    reportId
   });
 
   return data.response;

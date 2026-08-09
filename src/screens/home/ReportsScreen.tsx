@@ -366,6 +366,7 @@ export const ReportsScreen = () => {
     : 'signed-out';
 
   const latestReport = reports[0] ?? null;
+  const isReportBackedScore = latestReport?.score != null;
   const sortedReports = useMemo(() => {
     const next = [...reports];
     if (sortMode === 'oldest') {
@@ -380,8 +381,12 @@ export const ReportsScreen = () => {
     return next;
   }, [reports, sortMode]);
   const overallScore = latestReport?.score ?? wellness.wellnessScore;
-  const sectionHighlight = overallScore >= 80 ? colors.success : overallScore >= 60 ? colors.warning : colors.danger;
   const totalParams = latestReport?.parameters ?? 0;
+  const healthScoreLabel = isReportBackedScore ? 'Report-backed Health Score' : 'Estimated Wellness Score';
+  const healthScoreDescription = isReportBackedScore
+    ? `out of 100 · ${totalParams} lab parameters analysed`
+    : 'estimated from wellness activity · upload a publishable lab report for a report-backed score';
+  const sectionHighlight = overallScore >= 80 ? colors.success : overallScore >= 60 ? colors.warning : colors.danger;
 
   const categoryScores = latestReport?.categoryScores ?? {
     Blood: 0,
@@ -684,18 +689,18 @@ export const ReportsScreen = () => {
       setSummaryLoading(true);
 
       try {
-        const summaryPromise = generateNuetraSummary(latestReport.parametersData, onboarding?.name);
+        const summaryPromise = generateNuetraSummary(latestReport.id, onboarding?.name);
 
         const insightPairsPromise = Promise.all(
           abnormalParameters.map(async (parameter) => {
-            const insight = await generateParameterInsight(parameter);
+            const insight = await generateParameterInsight(latestReport.id, parameter);
             return [parameter.name, insight] as const;
           })
         );
 
-        const actionPlanPromise = generateActionPlan(abnormalParameters);
+        const actionPlanPromise = generateActionPlan(latestReport.id);
         const crossInsightsPromise =
-          checkIns.length > 0 ? generateCrossReferenceInsights(abnormalParameters, checkIns) : Promise.resolve([]);
+          checkIns.length > 0 ? generateCrossReferenceInsights(latestReport.id, checkIns) : Promise.resolve([]);
 
         const [summary, insightPairs, actions, cross] = await Promise.all([
           summaryPromise,
@@ -918,7 +923,7 @@ export const ReportsScreen = () => {
             style={styles.heroCardGradient}
           />
           <View style={styles.heroTopRow}>
-            <Text style={[styles.heroLabel, !isLight && styles.heroLabelDark]}>Overall Health Score</Text>
+            <Text style={[styles.heroLabel, !isLight && styles.heroLabelDark]}>{healthScoreLabel}</Text>
             <Text style={[styles.heroUpdated, !isLight && styles.heroUpdatedDark]}>Updated {latestReport.date}</Text>
           </View>
 
@@ -933,7 +938,7 @@ export const ReportsScreen = () => {
           >
             {overallScore}
           </Animated.Text>
-          <Text style={[styles.heroSub, !isLight && styles.heroSubDark]}>out of 100 · {totalParams} parameters analysed</Text>
+          <Text style={[styles.heroSub, !isLight && styles.heroSubDark]}>{healthScoreDescription}</Text>
 
           <Pressable style={[styles.heroToggleChip, !isLight && styles.heroToggleChipDark]} onPress={() => setHeroExpanded((current) => !current)}>
             <Text style={[styles.heroToggleText, !isLight && styles.heroToggleTextDark]}>{heroExpanded ? 'Hide details' : 'Show details'}</Text>
@@ -1014,6 +1019,7 @@ export const ReportsScreen = () => {
             latestReport
               ? navigation.navigate('ReportsChat', {
                   reportName: latestReport.labName,
+                  reportId: latestReport.id,
                   reportParameters: latestReport.parametersData
                 })
               : null

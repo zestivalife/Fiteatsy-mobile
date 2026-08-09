@@ -22,7 +22,7 @@ export type RootStackParamList = {
   Profile: undefined;
   ConnectedMetrics: undefined;
   HealthSyncDebug: undefined;
-  ReportsChat: { reportName: string; reportParameters: ReportParameter[] };
+  ReportsChat: { reportName: string; reportId: string; reportParameters: ReportParameter[] };
   MedicationForm: { medicationId?: string } | undefined;
   MedicationCalendar: undefined;
   MedicationNotifications: undefined;

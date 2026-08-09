@@ -114,7 +114,7 @@ export const ReportsChatScreen = () => {
     setLoading(true);
 
     try {
-      const response = await generateNuetraChat(content, nextMessages, route.params.reportParameters);
+      const response = await generateNuetraChat(content, nextMessages, route.params.reportId);
       setMessages((prev) => [...prev, { role: 'assistant', content: response }]);
     } catch {
       const fallback = generateOfflineNuetraReply(content, route.params.reportParameters);
