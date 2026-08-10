@@ -5,6 +5,7 @@ import {
   createAuthSession,
   findUserByIdForPin,
   findUserByMobileNumberForPin,
+  normalizeUserMobileNumber,
   recordPinFailure,
   resetPinFailureState,
   resolveVerifiedAccountIdentity,
@@ -355,6 +356,9 @@ export const loginWithPin = async (
   const user = await findUserByMobileNumberForPin(mobileNumber);
   if (!user) {
     throw asDomainError({ code: 'PIN_USER_NOT_FOUND', message: 'No existing account found for this mobile number.' });
+  }
+  if (user.mobileNumber !== mobileNumber) {
+    await normalizeUserMobileNumber(user.id, mobileNumber);
   }
 
   if (user.pinLockedUntilISO && new Date(user.pinLockedUntilISO).getTime() > now()) {

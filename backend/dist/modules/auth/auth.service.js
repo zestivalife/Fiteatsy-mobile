@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { createAuthEvent, createAuthSession, findUserByIdForPin, findUserByMobileNumberForPin, recordPinFailure, resetPinFailureState, resolveVerifiedAccountIdentity, setUserPinHash } from './auth.repository.js';
+import { createAuthEvent, createAuthSession, findUserByIdForPin, findUserByMobileNumberForPin, normalizeUserMobileNumber, recordPinFailure, resetPinFailureState, resolveVerifiedAccountIdentity, setUserPinHash } from './auth.repository.js';
 import { createOrResolveClientForAccount } from '../client/client.repository.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { OtpDeliveryError } from '../notifications/notification.types.js';
@@ -270,6 +270,9 @@ export const loginWithPin = async (input, metadata = {}) => {
     const user = await findUserByMobileNumberForPin(mobileNumber);
     if (!user) {
         throw asDomainError({ code: 'PIN_USER_NOT_FOUND', message: 'No existing account found for this mobile number.' });
+    }
+    if (user.mobileNumber !== mobileNumber) {
+        await normalizeUserMobileNumber(user.id, mobileNumber);
     }
     if (user.pinLockedUntilISO && new Date(user.pinLockedUntilISO).getTime() > now()) {
         throw asDomainError(buildPinLockError(user.pinLockedUntilISO));

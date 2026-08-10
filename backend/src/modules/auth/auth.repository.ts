@@ -55,6 +55,10 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const normalizeMobileNumber = (mobileNumber: string) => mobileNumber.trim();
+const getIndianNationalMobileNumber = (mobileNumber: string) => {
+  const digits = mobileNumber.replace(/\D/g, '');
+  return digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits;
+};
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 const now = () => new Date();
 
@@ -252,18 +256,55 @@ export const createAuthSession = async (
 };
 
 export const findUserByMobileNumberForPin = async (mobileNumber: string): Promise<PinAuthUser | null> => {
+  const normalizedMobile = normalizeMobileNumber(mobileNumber);
+  const nationalMobile = getIndianNationalMobileNumber(normalizedMobile);
   const result = await pool.query(
     `
       select *
       from users
-      where mobile_number_normalized = $1
+      where (
+          mobile_number_normalized = $1
+          or mobile_number_normalized = $2
+          or right(regexp_replace(coalesce(mobile_number_normalized, ''), '[^0-9]', '', 'g'), 10) = $2
+        )
         and deleted_at is null
+      order by
+        case
+          when mobile_number_normalized = $1 then 0
+          when mobile_number_normalized = $2 then 1
+          else 2
+        end,
+        created_at asc
       limit 1
     `,
-    [normalizeMobileNumber(mobileNumber)]
+    [normalizedMobile, nationalMobile]
   );
   if (result.rowCount === 0) return null;
   return mapPinUser(result.rows[0]);
+};
+
+export const normalizeUserMobileNumber = async (userId: string, mobileNumber: string) => {
+  await pool.query(
+    `
+      update users
+      set
+        mobile_number_normalized = $2,
+        mobile_verified_at = coalesce(mobile_verified_at, $3),
+        updated_at = $3,
+        version = version + 1
+      where id = $1
+        and deleted_at is null
+        and (mobile_number_normalized is null or mobile_number_normalized <> $2)
+        and not exists (
+          select 1
+          from users existing
+          where existing.id <> users.id
+            and existing.deleted_at is null
+            and existing.mobile_number_normalized = $2
+        )
+    `,
+    [userId, normalizeMobileNumber(mobileNumber), now().toISOString()]
+  );
 };
 
 export const findUserByIdForPin = async (userId: string): Promise<PinAuthUser | null> => {
