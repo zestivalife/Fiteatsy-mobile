@@ -115,9 +115,24 @@ export type ReportDto = {
   updatedAtISO: string;
   error?: string;
   analysis?: ReportAnalysisResponse;
+  analysisAttempts?: Array<{
+    id: string;
+    analysisMode: 'standard' | 'advanced_reanalysis';
+    status: string;
+    createdAtISO: string;
+    summary: {
+      parameterCount: number;
+      confidence: number;
+      canPublish: boolean;
+      qualityGateStatus: string;
+      strategies: string[];
+      reasons: string[];
+    };
+  }>;
 };
 
 type UploadProgressStage = 'uploading' | 'uploaded' | 'processing' | 'extraction' | 'validation' | 'completed' | 'failed';
+type UploadProgressEvent = { stage: UploadProgressStage; percent: number; message: string; status?: string; reportId?: string };
 
 const REQUEST_TIMEOUT_MS = 30000;
 const STATUS_REQUEST_TIMEOUT_MS = 20000;
@@ -325,7 +340,7 @@ export const uploadAndAnalyzeReport = async (params: {
   reportDate?: string;
   labName?: string;
   signal?: AbortSignal;
-  onProgress?: (event: { stage: UploadProgressStage; percent: number; message: string; status?: string }) => void;
+  onProgress?: (event: UploadProgressEvent) => void;
 }): Promise<ReportAnalysisResponse> => {
   const form = new FormData();
   form.append('reportFile', {
@@ -388,7 +403,8 @@ export const uploadAndAnalyzeReport = async (params: {
         stage: 'uploaded',
         percent: 35,
         message: startPayload.message ?? 'Report uploaded successfully. Processing health information...',
-        status: startPayload.status ?? 'UPLOADED'
+        status: startPayload.status ?? 'UPLOADED',
+        reportId: startPayload.reportId
       });
 
       const startedAt = Date.now();
@@ -410,7 +426,8 @@ export const uploadAndAnalyzeReport = async (params: {
           stage: progress.stage,
           percent: progress.percent,
           message: statusPayload.error ? `${progress.message} ${statusPayload.error}` : progress.message,
-          status: progress.step
+          status: progress.step,
+          reportId: statusPayload.reportId
         });
         if (statusPayload.status === 'FAILED' || statusPayload.status === 'REVIEW_REQUIRED' || statusPayload.status === 'INSUFFICIENT_DATA') {
           throw new Error(statusPayload.error ?? progress.message);
@@ -464,4 +481,28 @@ export const uploadAndAnalyzeReport = async (params: {
     throw new Error('Authentication is required before uploading reports. Please sign in again and retry.');
   }
   throw new Error(`Analysis failed: ${lastError}`);
+};
+
+export const reanalyzeReport = async (reportId: string, signal?: AbortSignal): Promise<ReportAnalysisResponse> => {
+  let lastError = 'network_error';
+  for (const baseUrl of getBaseUrls()) {
+    try {
+      const payload = await requestJson<ReportAnalysisResponse>(
+        baseUrl,
+        `/v1/reports/${encodeURIComponent(reportId)}/reanalyze`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+          signal
+        }
+      );
+      return { ...payload, reportId: payload.reportId ?? reportId };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'network_error';
+      logReportDebug('reanalyze:failure', { baseUrl, reportId, error: lastError });
+      if (isTerminalHttpError(error)) throw error;
+    }
+  }
+  throw new Error(lastError.includes('REPORT_FILE_NOT_AVAILABLE') ? 'Original upload is unavailable. Please upload the report again.' : lastError);
 };

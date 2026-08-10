@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { analyzeReportBuffer } from './reports.service.js';
+import { analyzeReportBuffer, analyzeReportBufferAdvanced, ReportAnalysisResult } from './reports.service.js';
 import {
   addFeedback,
   attachReportAnalysis,
@@ -11,8 +11,10 @@ import {
   deleteReport,
   findActiveReportByDocumentHash,
   getReport,
+  getReportFile,
   getUploadSession,
   listReports,
+  saveReportFile,
   updateReportMetadata,
   updateReportStatus
 } from './reports.store.js';
@@ -63,6 +65,13 @@ const toReportDto = (record: Awaited<ReturnType<typeof getReport>>) => {
     qualityGate: analysis?.qualityGate,
     healthAssessment: analysis?.healthAssessment,
     analysis,
+    analysisAttempts: record.analysisAttempts.map((attempt) => ({
+      id: attempt.id,
+      analysisMode: attempt.analysisMode,
+      status: attempt.status,
+      createdAtISO: attempt.createdAtISO,
+      summary: attempt.summary
+    })),
     feedback: record.feedback
   };
 };
@@ -88,6 +97,8 @@ const analyzeAndPersistReport = async (input: {
   mimeType: string;
   manualDate?: string;
   manualLab?: string;
+  analysisMode?: 'standard' | 'advanced_reanalysis';
+  analyzer?: (buffer: Buffer, mimeType: string) => Promise<ReportAnalysisResult>;
 }) => {
   logReportRuntime('processing:start', {
     reportId: input.reportId,
@@ -98,7 +109,7 @@ const analyzeAndPersistReport = async (input: {
   await updateReportStatus(input.reportId, 'PROCESSING');
   await updateProcessingJobStatus(input.processingJobId, 'processing');
   logReportRuntime('processing:status', { reportId: input.reportId, status: 'PROCESSING' });
-  const analysis = await analyzeReportBuffer(input.fileBuffer, input.mimeType);
+  const analysis = await (input.analyzer ?? analyzeReportBuffer)(input.fileBuffer, input.mimeType);
   await updateReportStatus(input.reportId, 'DOCUMENT_ANALYSIS_COMPLETED');
   logReportRuntime('processing:status', {
     reportId: input.reportId,
@@ -134,7 +145,7 @@ const analyzeAndPersistReport = async (input: {
     await updateReportStatus(input.reportId, 'SCORE_GENERATED');
     logReportRuntime('processing:status', { reportId: input.reportId, status: 'SCORE_GENERATED' });
   }
-  const saved = await attachReportAnalysis(input.reportId, analysis);
+  const saved = await attachReportAnalysis(input.reportId, analysis, input.analysisMode ?? 'standard');
   await updateProcessingJobStatus(input.processingJobId, analysis.qualityGate.canPublish ? 'completed' : 'review_required', saved?.error);
   logReportRuntime('processing:debug-trace', {
     reportId: input.reportId,
@@ -313,11 +324,55 @@ reportsRouter.post('/:reportId/feedback', async (req, res) => {
   return res.status(201).json(feedback);
 });
 
-reportsRouter.post('/:reportId/reanalyze', (_req, res) => {
-  return res.status(501).json({
-    error: 'REANALYZE_NOT_AVAILABLE',
-    message: 'Reanalyze requires persisted original file storage. This will be enabled when object storage is configured.'
+reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const report = await getReport(req.params.reportId);
+  if (!ownsReport(report, owner)) {
+    return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
+  }
+  if (report!.analysis?.qualityGate.canPublish) {
+    return res.status(409).json({
+      error: 'REANALYZE_NOT_REQUIRED',
+      message: 'This report already passed the quality gate. Advanced re-analysis is only available for low-confidence reports.'
+    });
+  }
+
+  const file = await getReportFile(report!.id, reportOwner(owner));
+  if (!file) {
+    return res.status(409).json({
+      error: 'REPORT_FILE_NOT_AVAILABLE',
+      message: 'The original upload is not available for re-analysis. Please upload the report again.'
+    });
+  }
+
+  const processingJob = await createProcessingJob({
+    clientId: owner.clientId,
+    reportId: report!.id,
+    jobType: 'report_reanalysis',
+    status: 'processing'
   });
+
+  try {
+    const payload = await analyzeAndPersistReport({
+      owner,
+      reportId: report!.id,
+      processingJobId: processingJob.id,
+      fileName: file.fileName,
+      fileBuffer: file.content,
+      mimeType: file.mimeType,
+      manualDate: report!.reportDate,
+      manualLab: report!.labName,
+      analysisMode: 'advanced_reanalysis',
+      analyzer: analyzeReportBufferAdvanced
+    });
+    return res.status(200).json({ ...payload, reanalysis: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to re-analyze this report file.';
+    logReportRuntime('reanalysis:failed', { reportId: report!.id, processingJobId: processingJob.id, message });
+    await updateReportStatus(report!.id, 'REVIEW_REQUIRED', message);
+    await updateProcessingJobStatus(processingJob.id, 'failed', message);
+    return res.status(422).json({ error: 'REANALYSIS_FAILED', message });
+  }
 });
 
 reportsRouter.get('/:reportId/comparison', async (req, res) => {
@@ -422,6 +477,11 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
       documentHash: hash
     });
     currentReportId = record.id;
+    await saveReportFile(record.id, reportOwner(owner), {
+      mimeType: req.file.mimetype,
+      fileName: record.fileName,
+      content: fileBuffer
+    });
     const processingJob = await createProcessingJob({
       clientId: owner.clientId,
       reportId: record.id,
@@ -531,6 +591,11 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
       documentHash: hash
     });
     currentReportId = record.id;
+    await saveReportFile(record.id, reportOwner(owner), {
+      mimeType: req.file.mimetype,
+      fileName: record.fileName,
+      content: Buffer.from(req.file.buffer)
+    });
     const processingJob = await createProcessingJob({
       clientId: owner.clientId,
       reportId: record.id,

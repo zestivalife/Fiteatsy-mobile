@@ -425,22 +425,27 @@ const parseParametersFromAiJson = (raw) => {
             .filter((item) => item && item.name && Number.isFinite(item.value))
             .map((item) => {
             const category = categorize(item.category || item.name);
-            const referenceRange = item.referenceRange?.trim() || 'Not specified';
+            const referenceRange = (item.referenceRange ?? item.reference_range)?.trim() || 'Not specified';
+            const pageNumber = Number(item.source_page ?? item.sourcePage ?? 1);
+            const confidence = Number(item.confidence ?? item.extractionConfidence ?? 0.82);
             const status = item.status === 'low' || item.status === 'high' || item.status === 'normal'
                 ? item.status
                 : inferStatus(Number(item.value), referenceRange);
             return {
                 name: normalizeWhitespace(item.name),
+                rawName: normalizeWhitespace(item.raw_name ?? item.rawName ?? item.name),
                 canonicalName: canonicalBiomarkerName(item.name),
+                canonicalBiomarkerId: item.canonical_biomarker_id ?? item.canonicalBiomarkerId ?? canonicalBiomarkerName(item.name),
+                operator: item.operator?.trim() || undefined,
                 value: Number(item.value),
                 unit: normalizeUnit(item.unit ?? ''),
                 referenceRange,
                 category,
                 status,
-                pageNumber: 1,
+                pageNumber: Number.isFinite(pageNumber) && pageNumber > 0 ? pageNumber : 1,
                 sectionName: 'Vision extraction',
-                extractionMethod: 'vision_structured_json',
-                extractionConfidence: 0.82
+                extractionMethod: (item.extraction_method ?? item.extractionMethod)?.trim() || 'vision_structured_json',
+                extractionConfidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.82
             };
         });
     }
@@ -564,6 +569,102 @@ const parseImageViaAi = async (buffer, mimeType) => {
     }
     return { reportDate, labName, parameters: parsed, notes: [] };
 };
+const renderPdfPagesForAdvancedAnalysis = async (buffer) => {
+    const parser = new PDFParse({ data: buffer });
+    try {
+        const result = await parser.getScreenshot({
+            first: 3,
+            imageDataUrl: true,
+            imageBuffer: false,
+            desiredWidth: 1400
+        });
+        return result.pages.map((page) => page.dataUrl).filter(Boolean).slice(0, 3);
+    }
+    catch {
+        return [];
+    }
+    finally {
+        await parser.destroy();
+    }
+};
+const parseViaAdvancedDocumentIntelligence = async (input) => {
+    if (!aiClient) {
+        return {
+            reportDate: null,
+            labName: null,
+            parameters: [],
+            notes: ['Advanced document intelligence provider is not configured.']
+        };
+    }
+    const isImage = input.mimeType.toLowerCase().includes('image');
+    const safeMimeType = input.mimeType.toLowerCase().includes('png')
+        ? 'image/png'
+        : input.mimeType.toLowerCase().includes('webp')
+            ? 'image/webp'
+            : 'image/jpeg';
+    const visualInputs = input.pageImages.length > 0
+        ? input.pageImages
+        : isImage
+            ? [`data:${safeMimeType};base64,${input.buffer.toString('base64')}`]
+            : [];
+    const userContent = [
+        {
+            type: 'text',
+            text: `Recover lab biomarkers from this medical report using visual layout and table reasoning.
+Map Test Name -> Result -> Unit -> Reference Range.
+Use biomarker aliases, expected units, and plausible ranges only to validate relationships; never force or invent values.
+If a value looks like a decimal-shift issue such as HbA1c 77 instead of 7.7, keep the printed value and set lower confidence.
+Return strict JSON with keys reportDate, labName, parameters. Each parameter must contain raw_name, canonical_biomarker_id, operator, value, unit, reference_range, source_page, extraction_method, confidence.
+PDF text/layout fallback:
+${input.text.slice(0, 12000)}`
+        },
+        ...visualInputs.map((url) => ({ type: 'image_url', image_url: { url } }))
+    ];
+    const completion = await withTimeout(aiClient.chat.completions.create({
+        model: AI_MODEL,
+        max_tokens: 1400,
+        response_format: { type: 'json_object' },
+        messages: [
+            {
+                role: 'system',
+                content: 'You are a medical document intelligence engine. Understand tables, columns, rows, headers, cells, reading order, and lab biomarker compatibility. Return only extracted visible values; do not diagnose and do not correct values silently.'
+            },
+            {
+                role: 'user',
+                content: userContent
+            }
+        ]
+    }), AI_VISION_TIMEOUT_MS, 'Advanced document intelligence');
+    const content = completion.choices[0]?.message?.content?.trim() ?? '';
+    const parsed = parseParametersFromAiJson(content).map((parameter) => ({
+        ...parameter,
+        rawName: parameter.rawName ?? parameter.name,
+        canonicalBiomarkerId: parameter.canonicalBiomarkerId ?? canonicalBiomarkerName(parameter.name),
+        sectionName: 'Advanced document intelligence recovery',
+        extractionMethod: 'document_intelligence_layout_recovery',
+        extractionConfidence: parameter.extractionConfidence ?? 0.84
+    }));
+    let reportDate = null;
+    let labName = null;
+    try {
+        const json = JSON.parse(extractJsonPayload(content));
+        reportDate = typeof json.reportDate === 'string' ? json.reportDate : null;
+        labName = typeof json.labName === 'string' ? json.labName : null;
+    }
+    catch {
+        // no-op
+    }
+    return {
+        reportDate,
+        labName,
+        parameters: parsed,
+        notes: [
+            visualInputs.length > 0
+                ? 'Advanced analysis used rendered visual page representations for layout recovery.'
+                : 'Advanced analysis used enhanced PDF text/table layout because visual page rendering was unavailable.'
+        ]
+    };
+};
 const mergeParameters = (primary, secondary) => {
     const merged = new Map();
     for (const parameter of [...primary, ...secondary]) {
@@ -574,6 +675,80 @@ const mergeParameters = (primary, secondary) => {
         }
     }
     return Array.from(merged.values());
+};
+const buildReportAnalysisResult = (input) => {
+    const document = classifyDocument({
+        text: input.text,
+        mimeType: input.mimeType,
+        parameterCount: input.parameters.length,
+        labName: input.labName
+    });
+    if (input.pageCount != null) {
+        document.pageCount = input.pageCount;
+    }
+    const governance = buildExtractionGovernance(input.text, input.parameters, document);
+    const rejectedBiomarkerNames = new Set((governance.qualityGate.rejectedBiomarkers ?? [])
+        .filter((item) => item.validation_status !== 'VALID')
+        .map((item) => canonicalBiomarkerName(item.biomarker_name)));
+    const validatedParameters = input.parameters.filter((parameter) => !rejectedBiomarkerNames.has(canonicalBiomarkerName(parameter.name)));
+    const governanceAttempt = governance.extractionAttempts[0];
+    const governedAttempts = input.extractionAttempts.length > 0
+        ? input.extractionAttempts.map((attempt, index) => ({
+            ...attempt,
+            rescanRecommended: attempt.rescanRecommended || (index === input.extractionAttempts.length - 1 ? governanceAttempt?.rescanRecommended ?? false : false),
+            notes: Array.from(new Set([...attempt.notes, ...(index === input.extractionAttempts.length - 1 ? governanceAttempt?.notes ?? [] : [])]))
+        }))
+        : governance.extractionAttempts;
+    const categoryScores = buildCategoryScores(validatedParameters);
+    const score = governance.qualityGate.canScore
+        ? Math.round((categoryScores.Blood + categoryScores.Metabolic + categoryScores.Organs + categoryScores.Thyroid + categoryScores.Vitamins) / 5)
+        : null;
+    const partialReviewCount = governance.qualityGate.rejectedBiomarkers?.length ?? 0;
+    return {
+        reportDate: input.reportDate,
+        labName: input.labName,
+        parameters: input.parameters,
+        score,
+        categoryScores,
+        summary: governance.qualityGate.status === 'PARTIALLY_VALIDATED'
+            ? `${governance.qualityGate.validatedBiomarkers} biomarkers were validated and ${partialReviewCount} need review. Scores use validated biomarkers only.`
+            : governance.qualityGate.canPublish
+                ? buildSummary(validatedParameters)
+                : `Analysis incomplete. ${governance.qualityGate.detectedBiomarkers} biomarkers detected and ${governance.qualityGate.coreBiomarkers}/32 core markers identified. Please retry with a clearer full report or submit for review.`,
+        actionPlan: governance.qualityGate.status === 'PARTIALLY_VALIDATED'
+            ? [
+                {
+                    priority: 1,
+                    title: 'Review uncertain biomarkers',
+                    detail: `${partialReviewCount} extracted biomarkers need manual review before they influence clinical guidance.`
+                },
+                ...buildActionPlan(validatedParameters).slice(0, 2).map((item, index) => ({ ...item, priority: index + 2 }))
+            ]
+            : governance.qualityGate.canPublish
+                ? buildActionPlan(validatedParameters)
+                : [
+                    {
+                        priority: 1,
+                        title: 'Retry upload or request review',
+                        detail: governance.qualityGate.reasons[0] ?? 'The report did not meet the clinical confidence gate for health intelligence.'
+                    }
+                ],
+        document,
+        ...governance,
+        extractionAttempts: governedAttempts,
+        debugTrace: {
+            pagesProcessed: document.pageCount,
+            totalPages: document.pageCount,
+            detectedContext: governance.qualityGate.reportContexts ?? [],
+            extractedBiomarkers: governance.qualityGate.detectedBiomarkers,
+            requiredBiomarkers: governance.qualityGate.requiredTier1Biomarkers?.length ?? 0,
+            validatedBiomarkers: governance.qualityGate.validatedRequiredTier1Biomarkers ?? 0,
+            rejectedBiomarkers: governance.qualityGate.rejectedBiomarkers?.length ?? 0,
+            confidence: governance.qualityGate.confidence,
+            finalState: governance.qualityGate.canPublish ? 'PUBLISHED' : governance.qualityGate.status,
+            failedReasons: governance.qualityGate.reasons
+        }
+    };
 };
 export const analyzeReportBuffer = async (buffer, mimeType) => {
     const isPdf = mimeType.toLowerCase().includes('pdf');
@@ -627,76 +802,57 @@ export const analyzeReportBuffer = async (buffer, mimeType) => {
         findDate(text) ??
         new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     const labName = aiLab ?? findLabName(text) ?? 'Uploaded Lab Report';
-    const document = classifyDocument({
+    return buildReportAnalysisResult({
         text,
         mimeType,
-        parameterCount: parameters.length,
-        labName
-    });
-    if (isPdf) {
-        document.pageCount = pdfPageCount ?? document.pageCount;
-    }
-    const governance = buildExtractionGovernance(text, parameters, document);
-    const rejectedBiomarkerNames = new Set((governance.qualityGate.rejectedBiomarkers ?? [])
-        .filter((item) => item.validation_status !== 'VALID')
-        .map((item) => canonicalBiomarkerName(item.biomarker_name)));
-    const validatedParameters = parameters.filter((parameter) => !rejectedBiomarkerNames.has(canonicalBiomarkerName(parameter.name)));
-    const governanceAttempt = governance.extractionAttempts[0];
-    const governedAttempts = extractionAttempts.length > 0
-        ? extractionAttempts.map((attempt, index) => ({
-            ...attempt,
-            rescanRecommended: attempt.rescanRecommended || (index === extractionAttempts.length - 1 ? governanceAttempt?.rescanRecommended ?? false : false),
-            notes: Array.from(new Set([...attempt.notes, ...(index === extractionAttempts.length - 1 ? governanceAttempt?.notes ?? [] : [])]))
-        }))
-        : governance.extractionAttempts;
-    const categoryScores = buildCategoryScores(validatedParameters);
-    const score = governance.qualityGate.canScore
-        ? Math.round((categoryScores.Blood + categoryScores.Metabolic + categoryScores.Organs + categoryScores.Thyroid + categoryScores.Vitamins) / 5)
-        : null;
-    const partialReviewCount = governance.qualityGate.rejectedBiomarkers?.length ?? 0;
-    return {
+        parameters,
+        extractionAttempts,
         reportDate,
         labName,
-        parameters,
-        score,
-        categoryScores,
-        summary: governance.qualityGate.status === 'PARTIALLY_VALIDATED'
-            ? `${governance.qualityGate.validatedBiomarkers} biomarkers were validated and ${partialReviewCount} need review. Scores use validated biomarkers only.`
-            : governance.qualityGate.canPublish
-                ? buildSummary(validatedParameters)
-                : `Analysis incomplete. ${governance.qualityGate.detectedBiomarkers} biomarkers detected and ${governance.qualityGate.coreBiomarkers}/32 core markers identified. Please retry with a clearer full report or submit for review.`,
-        actionPlan: governance.qualityGate.status === 'PARTIALLY_VALIDATED'
-            ? [
-                {
-                    priority: 1,
-                    title: 'Review uncertain biomarkers',
-                    detail: `${partialReviewCount} extracted biomarkers need manual review before they influence clinical guidance.`
-                },
-                ...buildActionPlan(validatedParameters).slice(0, 2).map((item, index) => ({ ...item, priority: index + 2 }))
-            ]
-            : governance.qualityGate.canPublish
-                ? buildActionPlan(validatedParameters)
-                : [
-                    {
-                        priority: 1,
-                        title: 'Retry upload or request review',
-                        detail: governance.qualityGate.reasons[0] ?? 'The report did not meet the clinical confidence gate for health intelligence.'
-                    }
-                ],
-        document,
-        ...governance,
-        extractionAttempts: governedAttempts,
-        debugTrace: {
-            pagesProcessed: document.pageCount,
-            totalPages: document.pageCount,
-            detectedContext: governance.qualityGate.reportContexts ?? [],
-            extractedBiomarkers: governance.qualityGate.detectedBiomarkers,
-            requiredBiomarkers: governance.qualityGate.requiredTier1Biomarkers?.length ?? 0,
-            validatedBiomarkers: governance.qualityGate.validatedRequiredTier1Biomarkers ?? 0,
-            rejectedBiomarkers: governance.qualityGate.rejectedBiomarkers?.length ?? 0,
-            confidence: governance.qualityGate.confidence,
-            finalState: governance.qualityGate.canPublish ? 'PUBLISHED' : governance.qualityGate.status,
-            failedReasons: governance.qualityGate.reasons
-        }
-    };
+        pageCount: isPdf ? pdfPageCount : undefined
+    });
+};
+export const analyzeReportBufferAdvanced = async (buffer, mimeType) => {
+    const isPdf = mimeType.toLowerCase().includes('pdf');
+    let text = '';
+    let pageCount = null;
+    let pageImages = [];
+    if (isPdf) {
+        const pdfText = await extractTextFromPdf(buffer);
+        text = pdfText.text;
+        pageCount = pdfText.pageCount;
+        pageImages = await renderPdfPagesForAdvancedAnalysis(buffer);
+    }
+    const advanced = await parseViaAdvancedDocumentIntelligence({
+        buffer,
+        mimeType,
+        text,
+        pageImages,
+        attemptNumber: 1
+    });
+    const reportDate = advanced.reportDate ??
+        findDate(text) ??
+        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const labName = advanced.labName ?? findLabName(text) ?? 'Uploaded Lab Report';
+    const extractionConfidence = advanced.parameters.length === 0
+        ? 0
+        : Number(Math.min(0.9, 0.6 + Math.min(advanced.parameters.length, 30) / 100).toFixed(2));
+    return buildReportAnalysisResult({
+        text,
+        mimeType,
+        parameters: advanced.parameters,
+        reportDate,
+        labName,
+        pageCount: pageCount ?? (isPdf ? undefined : 1),
+        extractionAttempts: [
+            {
+                attempt: 1,
+                strategy: 'document_intelligence_layout_recovery',
+                parameterCount: advanced.parameters.length,
+                confidence: extractionConfidence,
+                rescanRecommended: advanced.parameters.length < 3,
+                notes: advanced.notes
+            }
+        ]
+    });
 };

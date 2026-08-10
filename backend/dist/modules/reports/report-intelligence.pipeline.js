@@ -1,4 +1,4 @@
-import { createBiomarkerObservation, upsertBiomarker } from '../biomarkers/biomarkers.repository.js';
+import { createBiomarkerObservation, deleteBiomarkerObservationsForReport, upsertBiomarker } from '../biomarkers/biomarkers.repository.js';
 import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
 import { biomarkerDimension, biomarkerTier, canonicalBiomarkerName } from './report-governance.js';
 const aliasGroups = [
@@ -88,6 +88,7 @@ const testDateFromAnalysis = (analysis) => {
     return new Date().toISOString().slice(0, 10);
 };
 export const persistReportIntelligence = async (owner, reportId, analysis) => {
+    await deleteBiomarkerObservationsForReport(owner, reportId);
     const testDate = testDateFromAnalysis(analysis);
     const observations = [];
     for (const parameter of analysis.parameters) {

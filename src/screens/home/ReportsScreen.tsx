@@ -44,6 +44,7 @@ import {
   deleteAnalyzedReport,
   listAnalyzedReports,
   listBiomarkerHistory,
+  reanalyzeReport,
   ReportAnalysisResponse,
   ReportDto,
   uploadAndAnalyzeReport
@@ -336,6 +337,7 @@ export const ReportsScreen = () => {
   const [processingPercent, setProcessingPercent] = useState(0);
   const [processingMessage, setProcessingMessage] = useState('Uploading Report');
   const [processingStatus, setProcessingStatus] = useState('UPLOADED');
+  const [processingIntent, setProcessingIntent] = useState<'upload' | 'reanalysis' | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
   const [reportDate, setReportDate] = useState('15 Mar 2026');
@@ -346,6 +348,8 @@ export const ReportsScreen = () => {
   const [selectedUpload, setSelectedUpload] = useState<PickedUpload | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [reanalysisReportId, setReanalysisReportId] = useState<string | null>(null);
+  const [reanalysisBusy, setReanalysisBusy] = useState(false);
   const [showUploadPreparing, setShowUploadPreparing] = useState(false);
   const [preparingProgress, setPreparingProgress] = useState(0);
   const [analysisLaunching, setAnalysisLaunching] = useState(false);
@@ -715,12 +719,14 @@ export const ReportsScreen = () => {
       return;
     }
     setUploadError(null);
+    setReanalysisReportId(null);
     setUploadType(selectedUpload.source);
     setAnalysisLaunching(true);
     setProcessingPhase('uploading');
     setProcessingPercent(8);
     setProcessingMessage('Uploading Report');
     setProcessingStatus('UPLOADED');
+    setProcessingIntent('upload');
     setShowUploadSheet(false);
     setShowProcessing(true);
   };
@@ -829,7 +835,7 @@ export const ReportsScreen = () => {
   }, [abnormalParameters, checkIns, latestReport, onboarding?.name]);
 
   useEffect(() => {
-    if (!showProcessing) {
+    if (!showProcessing || processingIntent !== 'upload') {
       return;
     }
 
@@ -865,6 +871,9 @@ export const ReportsScreen = () => {
           signal: controller.signal,
           onProgress: (event) => {
             if (cancelled) return;
+            if (event.reportId) {
+              setReanalysisReportId(event.reportId);
+            }
             setProcessingPhase(event.stage);
             setProcessingPercent(event.percent);
             setProcessingMessage(event.message);
@@ -915,12 +924,14 @@ export const ReportsScreen = () => {
           healthScores: analysis.healthScores ?? []
         });
         setShowAnalysisReview(true);
+        setReanalysisReportId(null);
         refreshReportData().catch(() => undefined);
         setShowProcessing(false);
         setAnalysisLaunching(false);
         setUploadType(null);
         setSelectedUpload(null);
         setShowUploadSheet(false);
+        setProcessingIntent(null);
       } catch (error) {
         if (cancelled) return;
         setProcessingPhase('failed');
@@ -929,7 +940,9 @@ export const ReportsScreen = () => {
         setShowProcessing(false);
         setAnalysisLaunching(false);
         setShowUploadSheet(true);
-        setUploadError(error instanceof Error ? error.message : 'Analysis failed. Please retry with a clear report.');
+        setProcessingIntent(null);
+        const detail = error instanceof Error ? error.message : 'Analysis failed. Please retry with a clear report.';
+        setUploadError(`Some information could not be confidently analysed. ${detail}`);
       } finally {
         activeUploadController.current = null;
         clearTimeout(failSafeTimeout);
@@ -945,7 +958,66 @@ export const ReportsScreen = () => {
       }
       clearTimeout(failSafeTimeout);
     };
-  }, [showProcessing]);
+  }, [showProcessing, processingIntent]);
+
+  const startReanalysis = async () => {
+    if (!reanalysisReportId || reanalysisBusy) return;
+    const controller = new AbortController();
+    try {
+      setReanalysisBusy(true);
+      setUploadError(null);
+      setProcessingPhase('processing');
+      setProcessingPercent(45);
+      setProcessingMessage('Re-analysing report with document intelligence...');
+      setProcessingStatus('REANALYSIS');
+      setProcessingIntent('reanalysis');
+      setProcessingStep(2);
+      setShowUploadSheet(false);
+      setShowProcessing(true);
+      const analysis = await reanalyzeReport(reanalysisReportId, controller.signal);
+      setProcessingPhase('completed');
+      setProcessingPercent(100);
+      setProcessingMessage(
+        analysis.status === 'PARTIALLY_VALIDATED' ? 'Report re-analysed. Some biomarkers need review.' : 'Report analysis completed.'
+      );
+      setProcessingStatus(analysis.status === 'PARTIALLY_VALIDATED' ? 'PARTIALLY_VALIDATED' : 'PUBLISHED');
+      setProcessingStep(6);
+
+      const previous = reports.find((report) => report.id !== analysis.reportId) ?? reports[0] ?? null;
+      const newReport = toReportItem(analysis, { id: analysis.reportId, source: selectedUpload?.source }, previous);
+      const comparisonSummary = previous
+        ? `Compared with ${previous.date} (${previous.labName}), ${analysis.summary}`
+        : 'This is your first health report. Future reports will be compared against this baseline.';
+      setAnalysisReview({
+        report: newReport,
+        summary: analysis.summary,
+        comparisonSummary,
+        actionPlan: analysis.actionPlan.map((item) => ({ ...item, requiresDoctor: false })),
+        goodParameters: analysis.parameters.filter((parameter) => parameter.status === 'normal'),
+        attentionParameters: analysis.parameters.filter((parameter) => parameter.status !== 'normal'),
+        biomarkerObservations: analysis.biomarkerObservations ?? [],
+        healthScores: analysis.healthScores ?? []
+      });
+      setShowAnalysisReview(true);
+      await refreshReportData();
+      setReanalysisReportId(null);
+      setShowProcessing(false);
+      setSelectedUpload(null);
+      setShowUploadSheet(false);
+      setProcessingIntent(null);
+    } catch (error) {
+      setProcessingPhase('failed');
+      setProcessingMessage('Re-analysis failed');
+      setProcessingStatus('REVIEW_REQUIRED');
+      setShowProcessing(false);
+      setShowUploadSheet(true);
+      setProcessingIntent(null);
+      const detail = error instanceof Error ? error.message : 'Re-analysis failed. Please retry with a clearer file.';
+      setUploadError(`Some information could not be confidently analysed. ${detail}`);
+    } finally {
+      setReanalysisBusy(false);
+    }
+  };
 
   const onDatePicked = (_event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android') {
@@ -1362,9 +1434,15 @@ export const ReportsScreen = () => {
                       <Text style={styles.retryBtnText}>Retry File Pick</Text>
                     </Pressable>
                   ) : null}
-                  <Pressable style={styles.retryBtn} onPress={startAnalysis}>
-                    <Text style={styles.retryBtnText}>Retry Analysis</Text>
-                  </Pressable>
+                  {reanalysisReportId ? (
+                    <Pressable style={styles.retryBtn} onPress={startReanalysis} disabled={reanalysisBusy}>
+                      <Text style={styles.retryBtnText}>{reanalysisBusy ? 'Re-analysing...' : 'Re-analyse Report'}</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable style={styles.retryBtn} onPress={startAnalysis}>
+                      <Text style={styles.retryBtnText}>Retry Analysis</Text>
+                    </Pressable>
+                  )}
                 </View>
               ) : null}
 

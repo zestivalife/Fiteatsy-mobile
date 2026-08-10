@@ -284,6 +284,7 @@ create table if not exists health_reports (
   document_hash text,
   analysis_version integer not null default 1,
   analysis jsonb,
+  analysis_attempts jsonb not null default '[]'::jsonb,
   feedback jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -302,6 +303,20 @@ create unique index if not exists health_reports_client_document_hash_active_uni
 create index if not exists health_reports_deleted_recovery_idx
   on health_reports (deleted_at)
   where processing_status = 'DELETED' and deleted_at is not null;
+
+create table if not exists health_report_files (
+  report_id text primary key references health_reports(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  client_id text not null,
+  mime_type text not null,
+  original_filename text not null,
+  content bytea not null,
+  created_at timestamptz not null default now(),
+  foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
+);
+
+create index if not exists health_report_files_client_report_idx
+  on health_report_files (client_id, report_id);
 
 create table if not exists health_report_upload_sessions (
   id text primary key,

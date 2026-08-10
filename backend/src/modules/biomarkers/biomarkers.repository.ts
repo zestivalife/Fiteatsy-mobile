@@ -141,6 +141,20 @@ export const createBiomarkerObservation = async (
   return rowToObservation(result.rows[0]);
 };
 
+export const deleteBiomarkerObservationsForReport = async (owner: ClientOwnershipContext, reportId: string) => {
+  const result = await pool.query(
+    `
+      delete from biomarker_observations
+      where user_id = $1
+        and client_id = $2
+        and source_report_id = $3
+      returning id
+    `,
+    [owner.accountId, owner.clientId, reportId]
+  );
+  return result.rows.map((row) => String(row.id));
+};
+
 export const listBiomarkerHistory = async (
   owner: ClientOwnershipContext,
   filters: { biomarkerId?: string; limit: number; offset: number }

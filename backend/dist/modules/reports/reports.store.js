@@ -36,6 +36,7 @@ const rowToReport = (row) => ({
     deletedAtISO: row.deleted_at == null ? undefined : new Date(String(row.deleted_at)).toISOString(),
     deletedBy: row.deleted_by == null ? undefined : String(row.deleted_by),
     analysis: parseJson(row.analysis, undefined),
+    analysisAttempts: parseJson(row.analysis_attempts, []),
     analysisVersion: Number(row.analysis_version),
     feedback: parseJson(row.feedback, [])
 });
@@ -119,6 +120,38 @@ export const createReportRecord = async (input) => {
     ]);
     return rowToReport(result.rows[0]);
 };
+export const saveReportFile = async (reportId, owner, input) => {
+    await pool.query(`
+      insert into health_report_files (report_id, user_id, client_id, mime_type, original_filename, content)
+      values ($1, $2, $3, $4, $5, $6)
+      on conflict (report_id)
+      do update set
+        mime_type = excluded.mime_type,
+        original_filename = excluded.original_filename,
+        content = excluded.content,
+        created_at = now()
+    `, [reportId, owner.userId, owner.clientId, input.mimeType, input.fileName, input.content]);
+};
+export const getReportFile = async (reportId, owner) => {
+    const result = await pool.query(`
+      select *
+      from health_report_files
+      where report_id = $1
+        and user_id = $2
+        and client_id = $3
+    `, [reportId, owner.userId, owner.clientId]);
+    const row = result.rows[0];
+    if (!row)
+        return null;
+    return {
+        reportId: String(row.report_id),
+        userId: String(row.user_id),
+        clientId: String(row.client_id),
+        mimeType: String(row.mime_type),
+        fileName: String(row.original_filename),
+        content: Buffer.from(row.content)
+    };
+};
 export const findActiveReportByDocumentHash = async (owner, hash) => {
     const result = await pool.query(`
       select *
@@ -143,7 +176,7 @@ export const updateReportStatus = async (reportId, status, error) => {
     `, [reportId, status, error ?? null]);
     return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };
-export const attachReportAnalysis = async (reportId, analysis) => {
+export const attachReportAnalysis = async (reportId, analysis, analysisMode = 'standard') => {
     const nextStatus = analysis.qualityGate.canPublish
         ? analysis.qualityGate.status === 'PARTIALLY_VALIDATED'
             ? 'PARTIALLY_VALIDATED'
@@ -159,6 +192,23 @@ export const attachReportAnalysis = async (reportId, analysis) => {
         lab_name = $4,
         processing_status = $5,
         error = $6,
+        analysis_attempts = coalesce(health_reports.analysis_attempts, '[]'::jsonb) || jsonb_build_array(
+          jsonb_build_object(
+            'id', $7,
+            'analysisMode', $8,
+            'status', $5,
+            'createdAtISO', to_jsonb(to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+            'summary', jsonb_build_object(
+              'parameterCount', $9::int,
+              'confidence', $10::numeric,
+              'canPublish', $11::boolean,
+              'qualityGateStatus', $12::text,
+              'strategies', $13::jsonb,
+              'reasons', $14::jsonb
+            ),
+            'analysis', $2::jsonb
+          )
+        ),
         updated_at = now()
       where id = $1
         and deleted_at is null
@@ -169,7 +219,15 @@ export const attachReportAnalysis = async (reportId, analysis) => {
         analysis.reportDate,
         analysis.labName,
         nextStatus,
-        analysis.qualityGate.canPublish ? null : analysis.qualityGate.reasons.join(' ')
+        analysis.qualityGate.canPublish ? null : analysis.qualityGate.reasons.join(' '),
+        `attempt_${crypto.randomUUID()}`,
+        analysisMode,
+        analysis.parameters.length,
+        analysis.qualityGate.confidence,
+        analysis.qualityGate.canPublish,
+        analysis.qualityGate.status,
+        JSON.stringify(analysis.extractionAttempts.map((attempt) => attempt.strategy)),
+        JSON.stringify(analysis.qualityGate.reasons)
     ]);
     return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };

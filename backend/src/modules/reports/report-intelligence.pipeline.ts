@@ -1,4 +1,4 @@
-import { createBiomarkerObservation, upsertBiomarker } from '../biomarkers/biomarkers.repository.js';
+import { createBiomarkerObservation, deleteBiomarkerObservationsForReport, upsertBiomarker } from '../biomarkers/biomarkers.repository.js';
 import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { ReportAnalysisResult, ParsedParameter } from './reports.service.js';
@@ -87,6 +87,7 @@ export const persistReportIntelligence = async (
   reportId: string,
   analysis: ReportAnalysisResult
 ) => {
+  await deleteBiomarkerObservationsForReport(owner, reportId);
   const testDate = testDateFromAnalysis(analysis);
   const observations = [];
   for (const parameter of analysis.parameters) {

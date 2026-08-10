@@ -84,6 +84,16 @@ export const createBiomarkerObservation = async (owner, input) => {
     ]);
     return rowToObservation(result.rows[0]);
 };
+export const deleteBiomarkerObservationsForReport = async (owner, reportId) => {
+    const result = await pool.query(`
+      delete from biomarker_observations
+      where user_id = $1
+        and client_id = $2
+        and source_report_id = $3
+      returning id
+    `, [owner.accountId, owner.clientId, reportId]);
+    return result.rows.map((row) => String(row.id));
+};
 export const listBiomarkerHistory = async (owner, filters) => {
     const result = await pool.query(`
       select bo.*, b.canonical_name

@@ -132,10 +132,10 @@ test('report list, detail, metadata patch, status, feedback, delete, and 404 pat
   const removed = await deleteRequest(server.baseUrl, `/v1/reports/${analyzedBody.reportId}?userId=report-owner`, {
     headers: authHeaders(session.token)
   });
-  assert.equal(removed.response.status, 204);
+  assert.equal(removed.response.status, 200);
 });
 
-test('report comparison and reanalyze endpoints return expected 200, 400, 404, and 501 states', async () => {
+test('report comparison and reanalyze endpoints return expected 200, 400, 404, and 409 states', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const first = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
     method: 'POST',
@@ -177,7 +177,7 @@ test('report comparison and reanalyze endpoints return expected 200, 400, 404, a
     {},
     { headers: authHeaders(session.token) }
   );
-  assert.equal(reanalyze.response.status, 501);
+  assert.equal(reanalyze.response.status, 409);
 });
 
 test('duplicate report upload reuses the existing published report', async () => {
