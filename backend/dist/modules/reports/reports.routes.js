@@ -47,6 +47,7 @@ const toReportDto = (record) => {
             id: attempt.id,
             analysisMode: attempt.analysisMode,
             status: attempt.status,
+            selected: attempt.selected,
             createdAtISO: attempt.createdAtISO,
             summary: attempt.summary
         })),
@@ -54,6 +55,17 @@ const toReportDto = (record) => {
     };
 };
 const ownsReport = (record, owner) => Boolean(record && record.userId === owner.accountId && record.clientId === owner.clientId);
+const requiresAdvancedReanalysis = (report) => {
+    if (!report.analysis)
+        return true;
+    return (report.analysis.qualityGate.status !== 'PUBLISHABLE' ||
+        report.analysis.qualityGate.reasons.length > 0 ||
+        report.analysis.qualityGate.failedBiomarkers.length > 0 ||
+        (report.analysis.qualityGate.rejectedBiomarkers?.length ?? 0) > 0 ||
+        report.analysis.qualityGate.missingCriticalBiomarkers.length > 0 ||
+        report.analysis.qualityGate.conflicts.length > 0 ||
+        report.analysis.extractionAttempts.some((attempt) => attempt.rescanRecommended));
+};
 const recomputeOwnerHealthScores = async (owner) => {
     await clearHealthScoresForOwner(owner);
     await calculateHealthScores(owner);
@@ -282,10 +294,10 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
     if (!ownsReport(report, owner)) {
         return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
     }
-    if (report.analysis?.qualityGate.canPublish) {
+    if (!requiresAdvancedReanalysis(report)) {
         return res.status(409).json({
             error: 'REANALYZE_NOT_REQUIRED',
-            message: 'This report already passed the quality gate. Advanced re-analysis is only available for low-confidence reports.'
+            message: 'This report already passed the quality gate without review signals. Advanced re-analysis is only available for low-confidence reports.'
         });
     }
     const file = await getReportFile(report.id, reportOwner(owner));

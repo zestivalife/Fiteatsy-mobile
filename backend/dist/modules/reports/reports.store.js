@@ -55,6 +55,55 @@ const rowToUploadSession = (row) => ({
         : undefined,
     storageObjectRef: String(row.storage_object_ref)
 });
+const statusForAnalysis = (analysis) => analysis.qualityGate.canPublish
+    ? analysis.qualityGate.status === 'PARTIALLY_VALIDATED'
+        ? 'PARTIALLY_VALIDATED'
+        : 'PUBLISHED'
+    : analysis.qualityGate.status === 'INSUFFICIENT_DATA'
+        ? 'INSUFFICIENT_DATA'
+        : 'REVIEW_REQUIRED';
+const analysisStatusRank = (analysis) => {
+    if (analysis.qualityGate.status === 'PUBLISHABLE')
+        return 4;
+    if (analysis.qualityGate.status === 'PARTIALLY_VALIDATED')
+        return 3;
+    if (analysis.qualityGate.status === 'REVIEW_REQUIRED')
+        return 2;
+    return 1;
+};
+const compareAnalysisQuality = (candidate, current) => {
+    if (!current)
+        return 1;
+    const candidateRejected = candidate.qualityGate.rejectedBiomarkers?.length ?? 0;
+    const currentRejected = current.qualityGate.rejectedBiomarkers?.length ?? 0;
+    const candidateConflicts = candidate.qualityGate.conflicts?.length ?? 0;
+    const currentConflicts = current.qualityGate.conflicts?.length ?? 0;
+    const candidateScore = [
+        analysisStatusRank(candidate),
+        candidate.qualityGate.validatedRequiredTier1Biomarkers ?? 0,
+        candidate.qualityGate.validatedBiomarkers,
+        -candidateRejected,
+        -candidateConflicts,
+        candidate.qualityGate.confidence,
+        candidate.qualityGate.extractionConfidence
+    ];
+    const currentScore = [
+        analysisStatusRank(current),
+        current.qualityGate.validatedRequiredTier1Biomarkers ?? 0,
+        current.qualityGate.validatedBiomarkers,
+        -currentRejected,
+        -currentConflicts,
+        current.qualityGate.confidence,
+        current.qualityGate.extractionConfidence
+    ];
+    for (let index = 0; index < candidateScore.length; index += 1) {
+        if (candidateScore[index] > currentScore[index])
+            return 1;
+        if (candidateScore[index] < currentScore[index])
+            return -1;
+    }
+    return 0;
+};
 export const createUploadSession = async (input) => {
     const id = `upl_${crypto.randomUUID()}`;
     const storageObjectRef = `pending-report://${input.clientId}/${id}/${encodeURIComponent(input.fileName)}`;
@@ -177,13 +226,16 @@ export const updateReportStatus = async (reportId, status, error) => {
     return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };
 export const attachReportAnalysis = async (reportId, analysis, analysisMode = 'standard') => {
-    const nextStatus = analysis.qualityGate.canPublish
-        ? analysis.qualityGate.status === 'PARTIALLY_VALIDATED'
-            ? 'PARTIALLY_VALIDATED'
-            : 'PUBLISHED'
-        : analysis.qualityGate.status === 'INSUFFICIENT_DATA'
-            ? 'INSUFFICIENT_DATA'
-            : 'REVIEW_REQUIRED';
+    const current = await pool.query(`
+      select analysis
+      from health_reports
+      where id = $1
+        and deleted_at is null
+    `, [reportId]);
+    const currentAnalysis = parseJson(current.rows[0]?.analysis, undefined);
+    const selectedAnalysis = compareAnalysisQuality(analysis, currentAnalysis) >= 0 ? analysis : currentAnalysis ?? analysis;
+    const selectedStatus = statusForAnalysis(selectedAnalysis);
+    const attemptStatus = statusForAnalysis(analysis);
     const result = await pool.query(`
       update health_reports
       set
@@ -196,17 +248,20 @@ export const attachReportAnalysis = async (reportId, analysis, analysisMode = 's
           jsonb_build_object(
             'id', $7,
             'analysisMode', $8,
-            'status', $5,
+            'status', $9,
+            'selected', $10::boolean,
             'createdAtISO', to_jsonb(to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
             'summary', jsonb_build_object(
-              'parameterCount', $9::int,
-              'confidence', $10::numeric,
-              'canPublish', $11::boolean,
-              'qualityGateStatus', $12::text,
-              'strategies', $13::jsonb,
-              'reasons', $14::jsonb
+              'parameterCount', $11::int,
+              'confidence', $12::numeric,
+              'canPublish', $13::boolean,
+              'qualityGateStatus', $14::text,
+              'validatedBiomarkers', $15::int,
+              'extractionConfidence', $16::numeric,
+              'strategies', $17::jsonb,
+              'reasons', $18::jsonb
             ),
-            'analysis', $2::jsonb
+            'analysis', $19::jsonb
           )
         ),
         updated_at = now()
@@ -215,19 +270,24 @@ export const attachReportAnalysis = async (reportId, analysis, analysisMode = 's
       returning *
     `, [
         reportId,
-        JSON.stringify(analysis),
-        analysis.reportDate,
-        analysis.labName,
-        nextStatus,
-        analysis.qualityGate.canPublish ? null : analysis.qualityGate.reasons.join(' '),
+        JSON.stringify(selectedAnalysis),
+        selectedAnalysis.reportDate,
+        selectedAnalysis.labName,
+        selectedStatus,
+        selectedAnalysis.qualityGate.canPublish ? null : selectedAnalysis.qualityGate.reasons.join(' '),
         `attempt_${crypto.randomUUID()}`,
         analysisMode,
+        attemptStatus,
+        selectedAnalysis === analysis,
         analysis.parameters.length,
         analysis.qualityGate.confidence,
         analysis.qualityGate.canPublish,
         analysis.qualityGate.status,
+        analysis.qualityGate.validatedBiomarkers,
+        analysis.qualityGate.extractionConfidence,
         JSON.stringify(analysis.extractionAttempts.map((attempt) => attempt.strategy)),
-        JSON.stringify(analysis.qualityGate.reasons)
+        JSON.stringify(analysis.qualityGate.reasons),
+        JSON.stringify(analysis)
     ]);
     return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };

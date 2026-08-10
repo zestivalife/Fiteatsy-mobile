@@ -119,12 +119,15 @@ export type ReportDto = {
     id: string;
     analysisMode: 'standard' | 'advanced_reanalysis';
     status: string;
+    selected?: boolean;
     createdAtISO: string;
     summary: {
       parameterCount: number;
       confidence: number;
       canPublish: boolean;
       qualityGateStatus: string;
+      validatedBiomarkers?: number;
+      extractionConfidence?: number;
       strategies: string[];
       reasons: string[];
     };

@@ -16,6 +16,7 @@ describe('report re-analysis intelligence layer', () => {
     expect(routes).toContain("analysisMode: 'advanced_reanalysis'");
     expect(routes).toContain('analyzeReportBufferAdvanced');
     expect(routes).not.toContain('REANALYZE_NOT_AVAILABLE');
+    expect(routes).toContain('requiresAdvancedReanalysis');
     expect(service).toContain('document_intelligence_layout_recovery');
     expect(mobileService).toContain('export const reanalyzeReport');
     expect(reportsScreen).toContain('Some information could not be confidently analysed.');
@@ -31,5 +32,7 @@ describe('report re-analysis intelligence layer', () => {
     expect(store).toContain('saveReportFile');
     expect(store).toContain('getReportFile');
     expect(store).toContain("analysis_attempts = coalesce(health_reports.analysis_attempts, '[]'::jsonb) || jsonb_build_array");
+    expect(store).toContain('compareAnalysisQuality');
+    expect(store).toContain("'selected', $10::boolean");
   });
 });
