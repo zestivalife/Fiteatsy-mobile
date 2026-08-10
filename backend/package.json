@@ -12,6 +12,7 @@
     "test:qa": "/bin/zsh -lc 'node --import tsx --test --test-concurrency=1 ../tests/api/*.test.ts ../tests/backend/*.test.ts ../tests/database/*.test.ts'"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.21.2",

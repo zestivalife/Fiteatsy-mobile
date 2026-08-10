@@ -33,6 +33,15 @@ export type PersistedAuthSession = {
   lastUsedAtISO: string | null;
 };
 
+export type PinAuthUser = PersistedAuthUser & {
+  pinHash: string | null;
+  pinCreatedAtISO: string | null;
+  pinLastChangedAtISO: string | null;
+  forcePinChange: boolean;
+  pinFailedAttempts: number;
+  pinLockedUntilISO: string | null;
+};
+
 export type AuthenticatedAccount = {
   accountId: string;
   sessionId: string;
@@ -76,6 +85,16 @@ const mapSession = (row: Record<string, unknown>): PersistedAuthSession => ({
   expiresAtISO: new Date(String(row.expires_at)).toISOString(),
   revokedAtISO: toIso(row.revoked_at),
   lastUsedAtISO: toIso(row.last_used_at)
+});
+
+const mapPinUser = (row: Record<string, unknown>): PinAuthUser => ({
+  ...mapUser(row),
+  pinHash: row.pin_hash == null ? null : String(row.pin_hash),
+  pinCreatedAtISO: toIso(row.pin_created_at),
+  pinLastChangedAtISO: toIso(row.pin_last_changed_at),
+  forcePinChange: Boolean(row.force_pin_change),
+  pinFailedAttempts: Number(row.pin_failed_attempts ?? 0),
+  pinLockedUntilISO: toIso(row.pin_locked_until)
 });
 
 const isUniqueViolation = (error: unknown) =>
@@ -230,6 +249,135 @@ export const createAuthSession = async (
     token,
     session: mapSession(inserted.rows[0])
   };
+};
+
+export const findUserByMobileNumberForPin = async (mobileNumber: string): Promise<PinAuthUser | null> => {
+  const result = await pool.query(
+    `
+      select *
+      from users
+      where mobile_number_normalized = $1
+        and deleted_at is null
+      limit 1
+    `,
+    [normalizeMobileNumber(mobileNumber)]
+  );
+  if (result.rowCount === 0) return null;
+  return mapPinUser(result.rows[0]);
+};
+
+export const findUserByIdForPin = async (userId: string): Promise<PinAuthUser | null> => {
+  const result = await pool.query(
+    `
+      select *
+      from users
+      where id = $1
+        and deleted_at is null
+      limit 1
+    `,
+    [userId]
+  );
+  if (result.rowCount === 0) return null;
+  return mapPinUser(result.rows[0]);
+};
+
+export const setUserPinHash = async (
+  userId: string,
+  pinHash: string,
+  options: { forcePinChange: boolean }
+): Promise<PinAuthUser> => {
+  const timestamp = now().toISOString();
+  const result = await pool.query(
+    `
+      update users
+      set
+        pin_hash = $2,
+        pin_created_at = coalesce(pin_created_at, $3),
+        pin_last_changed_at = $3,
+        force_pin_change = $4,
+        pin_failed_attempts = 0,
+        pin_locked_until = null,
+        updated_at = $3,
+        version = version + 1
+      where id = $1
+        and deleted_at is null
+      returning *
+    `,
+    [userId, pinHash, timestamp, options.forcePinChange]
+  );
+  if (result.rowCount === 0) throw new Error('PIN user not found.');
+  return mapPinUser(result.rows[0]);
+};
+
+export const resetPinFailureState = async (userId: string) => {
+  await pool.query(
+    `
+      update users
+      set
+        pin_failed_attempts = 0,
+        pin_locked_until = null,
+        last_login_at = $2,
+        updated_at = $2
+      where id = $1
+        and deleted_at is null
+    `,
+    [userId, now().toISOString()]
+  );
+};
+
+export const recordPinFailure = async (
+  userId: string,
+  options: { maxAttempts: number; lockUntilISO: string }
+): Promise<PinAuthUser> => {
+  const result = await pool.query(
+    `
+      update users
+      set
+        pin_failed_attempts = pin_failed_attempts + 1,
+        pin_locked_until = case
+          when pin_failed_attempts + 1 >= $2 then $3::timestamptz
+          else pin_locked_until
+        end,
+        updated_at = $4
+      where id = $1
+        and deleted_at is null
+      returning *
+    `,
+    [userId, options.maxAttempts, options.lockUntilISO, now().toISOString()]
+  );
+  if (result.rowCount === 0) throw new Error('PIN user not found.');
+  return mapPinUser(result.rows[0]);
+};
+
+export const createAuthEvent = async (input: {
+  userId?: string | null;
+  event: 'PIN_LOGIN_FAILED' | 'PIN_LOGIN_SUCCESS' | 'PIN_CHANGED';
+  metadata?: Record<string, unknown>;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+}) => {
+  await pool.query(
+    `
+      insert into auth_events (
+        id,
+        user_id,
+        event,
+        metadata,
+        ip_address,
+        user_agent,
+        created_at
+      ) values ($1, $2, $3, $4::jsonb, $5, $6, $7)
+    `,
+    [
+      crypto.randomUUID(),
+      input.userId ?? null,
+      input.event,
+      JSON.stringify(input.metadata ?? {}),
+      input.ipAddress ?? null,
+      input.userAgent ?? null,
+      now().toISOString()
+    ]
+  );
 };
 
 export const getAuthenticatedAccountByToken = async (token: string): Promise<AuthenticatedAccount | null> => {

@@ -171,6 +171,13 @@ export const ProfileScreen = ({ navigation }: Props) => {
 
       <Card>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Preferences</Text>
+        <Pressable accessibilityRole="button" style={styles.securityRow} onPress={() => navigation.navigate('ChangePin')}>
+          <View>
+            <Text style={[styles.securityTitle, { color: palette.textPrimary }]}>Security</Text>
+            <Text style={[styles.securitySubtitle, { color: palette.textSecondary }]}>Change PIN</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={palette.textSecondary} />
+        </Pressable>
         <View style={styles.row}>
           <Text style={[styles.label, { color: palette.textSecondary }]}>Theme</Text>
           <View style={styles.themeSwitchWrap}>
@@ -335,6 +342,19 @@ const styles = StyleSheet.create({
     paddingVertical: 7
   },
   channelChipText: {
+    ...typography.caption
+  },
+  securityRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14
+  },
+  securityTitle: {
+    ...typography.bodyStrong,
+    fontSize: 14
+  },
+  securitySubtitle: {
     ...typography.caption
   },
   themeChip: {

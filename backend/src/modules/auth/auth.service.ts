@@ -1,5 +1,16 @@
 import crypto from 'node:crypto';
-import { createAuthSession, resolveVerifiedAccountIdentity } from './auth.repository.js';
+import bcrypt from 'bcryptjs';
+import {
+  createAuthEvent,
+  createAuthSession,
+  findUserByIdForPin,
+  findUserByMobileNumberForPin,
+  recordPinFailure,
+  resetPinFailureState,
+  resolveVerifiedAccountIdentity,
+  setUserPinHash
+} from './auth.repository.js';
+import { createOrResolveClientForAccount } from '../client/client.repository.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { OtpDeliveryError } from '../notifications/notification.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
@@ -29,7 +40,11 @@ export type OtpDomainError = {
     | 'OTP_RATE_LIMITED'
     | 'OTP_RESEND_NOT_READY'
     | 'OTP_TOO_MANY_ATTEMPTS'
-    | 'AUTH_CONTACT_CONFLICT';
+    | 'AUTH_CONTACT_CONFLICT'
+    | 'PIN_USER_NOT_FOUND'
+    | 'PIN_INVALID'
+    | 'PIN_LOCKED'
+    | 'PIN_REUSE_NOT_ALLOWED';
   message: string;
   retryAfterSec?: number;
 };
@@ -40,6 +55,10 @@ const OTP_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const OTP_REQUEST_LIMIT_PER_HOUR = 5;
 const MAX_ATTEMPTS = 5;
 const ACTIVE_CHALLENGE_LIMIT = 5_000;
+const DEFAULT_PIN = '123456';
+const PIN_LENGTH = 6;
+const PIN_LOCK_MS = 15 * 60 * 1000;
+const PIN_BCRYPT_ROUNDS = 12;
 
 const challengeStore = new Map<string, OtpChallenge>();
 const otpRequestTimestampsByMobile = new Map<string, number[]>();
@@ -137,6 +156,43 @@ const deliveryFailureToDomainError = (error: unknown): OtpDomainError => {
     };
   }
   throw error;
+};
+
+const assertPinShape = (pin: string) => {
+  if (!new RegExp(`^[0-9]{${PIN_LENGTH}}$`).test(pin)) {
+    throw asDomainError({ code: 'PIN_INVALID', message: 'PIN must be exactly 6 digits.' });
+  }
+};
+
+const buildPinLockError = (lockedUntilISO: string): OtpDomainError => {
+  const retryAfterSec = Math.max(1, Math.ceil((new Date(lockedUntilISO).getTime() - now()) / 1000));
+  return {
+    code: 'PIN_LOCKED',
+    message: 'Too many attempts. Try again later.',
+    retryAfterSec
+  };
+};
+
+const recordFailedPinLogin = async (
+  userId: string,
+  metadata: { reason: string; userAgent?: string | null; ipAddress?: string | null }
+) => {
+  const lockUntilISO = new Date(now() + PIN_LOCK_MS).toISOString();
+  const user = await recordPinFailure(userId, {
+    maxAttempts: MAX_ATTEMPTS,
+    lockUntilISO
+  });
+  await createAuthEvent({
+    userId,
+    event: 'PIN_LOGIN_FAILED',
+    metadata: { reason: metadata.reason, failedAttempts: user.pinFailedAttempts },
+    userAgent: metadata.userAgent,
+    ipAddress: metadata.ipAddress
+  });
+  if (user.pinLockedUntilISO && new Date(user.pinLockedUntilISO).getTime() > now()) {
+    throw asDomainError(buildPinLockError(user.pinLockedUntilISO));
+  }
+  throw asDomainError({ code: 'PIN_INVALID', message: 'Incorrect PIN. Please try again.' });
 };
 
 export const createOtpChallenge = async (input: SignupInput) => {
@@ -286,6 +342,112 @@ export const verifyOtpChallenge = async (
     }
     throw error;
   }
+};
+
+export const loginWithPin = async (
+  input: { mobile: string; pin: string },
+  metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
+) => {
+  const mobileNumber = normalizeCanonicalPhoneNumber(input.mobile);
+  const pin = input.pin.trim();
+  assertPinShape(pin);
+
+  const user = await findUserByMobileNumberForPin(mobileNumber);
+  if (!user) {
+    throw asDomainError({ code: 'PIN_USER_NOT_FOUND', message: 'No existing account found for this mobile number.' });
+  }
+
+  if (user.pinLockedUntilISO && new Date(user.pinLockedUntilISO).getTime() > now()) {
+    throw asDomainError(buildPinLockError(user.pinLockedUntilISO));
+  }
+
+  let pinUser = user;
+  let requiresPinChange = user.forcePinChange;
+  if (!user.pinHash) {
+    if (pin !== DEFAULT_PIN) {
+      await recordFailedPinLogin(user.id, { reason: 'default_pin_mismatch', ...metadata });
+    }
+    pinUser = await setUserPinHash(user.id, await bcrypt.hash(DEFAULT_PIN, PIN_BCRYPT_ROUNDS), {
+      forcePinChange: true
+    });
+    requiresPinChange = true;
+  } else {
+    const matches = await bcrypt.compare(pin, user.pinHash);
+    if (!matches) {
+      await recordFailedPinLogin(user.id, { reason: 'pin_mismatch', ...metadata });
+    }
+  }
+
+  await resetPinFailureState(pinUser.id);
+  await createAuthEvent({
+    userId: pinUser.id,
+    event: 'PIN_LOGIN_SUCCESS',
+    metadata: { requiresPinChange },
+    userAgent: metadata.userAgent,
+    ipAddress: metadata.ipAddress
+  });
+  const { token } = await createAuthSession(pinUser.id, metadata);
+  const client = await createOrResolveClientForAccount(pinUser.id);
+
+  return {
+    sessionToken: token,
+    requiresPinChange,
+    user: {
+      id: pinUser.id,
+      name: pinUser.name,
+      email: pinUser.email ?? '',
+      mobileNumber: pinUser.mobileNumber ?? mobileNumber
+    },
+    client: {
+      fiteatsyClientId: client.fiteatsyClientId,
+      status: client.status
+    }
+  };
+};
+
+export const changePin = async (
+  userId: string,
+  input: { currentPin: string; newPin: string },
+  metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
+) => {
+  const currentPin = input.currentPin.trim();
+  const newPin = input.newPin.trim();
+  assertPinShape(currentPin);
+  assertPinShape(newPin);
+
+  const user = await findUserByIdForPin(userId);
+  if (!user) {
+    throw asDomainError({ code: 'PIN_USER_NOT_FOUND', message: 'Authenticated account was not found.' });
+  }
+  if (user.pinLockedUntilISO && new Date(user.pinLockedUntilISO).getTime() > now()) {
+    throw asDomainError(buildPinLockError(user.pinLockedUntilISO));
+  }
+
+  const currentHash = user.pinHash ?? (await bcrypt.hash(DEFAULT_PIN, PIN_BCRYPT_ROUNDS));
+  const currentMatches = user.pinHash ? await bcrypt.compare(currentPin, currentHash) : currentPin === DEFAULT_PIN;
+  if (!currentMatches) {
+    await recordFailedPinLogin(user.id, { reason: 'change_pin_current_mismatch', ...metadata });
+  }
+
+  if (user.pinHash && (await bcrypt.compare(newPin, user.pinHash))) {
+    throw asDomainError({ code: 'PIN_REUSE_NOT_ALLOWED', message: 'Choose a new PIN you have not used before.' });
+  }
+  if (!user.pinHash && newPin === DEFAULT_PIN) {
+    throw asDomainError({ code: 'PIN_REUSE_NOT_ALLOWED', message: 'Choose a new PIN you have not used before.' });
+  }
+
+  await setUserPinHash(user.id, await bcrypt.hash(newPin, PIN_BCRYPT_ROUNDS), {
+    forcePinChange: false
+  });
+  await createAuthEvent({
+    userId: user.id,
+    event: 'PIN_CHANGED',
+    metadata: {},
+    userAgent: metadata.userAgent,
+    ipAddress: metadata.ipAddress
+  });
+
+  return { ok: true };
 };
 
 export const resetOtpChallengesForTests = () => {

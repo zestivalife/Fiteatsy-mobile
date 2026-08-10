@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { createOtpChallenge, resendOtpChallenge, verifyOtpChallenge } from './auth.service.js';
+import { createOtpChallenge, changePin, loginWithPin, resendOtpChallenge, verifyOtpChallenge } from './auth.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from './auth.middleware.js';
 import { revokeAuthSession } from './auth.repository.js';
 const signupRequestSchema = z.object({
@@ -15,6 +15,18 @@ const otpVerifySchema = z.object({
     challengeId: z.string().trim().min(10).max(120),
     otp: z.string().trim().regex(/^[0-9]{6}$/)
 });
+const pinLoginSchema = z.object({
+    mobile: z.string().trim().regex(/^\+?[0-9]{10,15}$/),
+    pin: z.string().trim().regex(/^[0-9]{6}$/)
+});
+const changePinSchema = z.object({
+    currentPin: z.string().trim().regex(/^[0-9]{6}$/),
+    newPin: z.string().trim().regex(/^[0-9]{6}$/),
+    confirmNewPin: z.string().trim().regex(/^[0-9]{6}$/)
+}).refine((value) => value.newPin === value.confirmNewPin, {
+    message: 'PIN confirmation does not match.',
+    path: ['confirmNewPin']
+});
 const toHttpStatus = (code) => {
     if (code === 'OTP_NOT_FOUND')
         return 404;
@@ -26,11 +38,41 @@ const toHttpStatus = (code) => {
         return 502;
     if (code === 'AUTH_CONTACT_CONFLICT')
         return 409;
+    if (code === 'PIN_USER_NOT_FOUND' || code === 'PIN_INVALID')
+        return 401;
+    if (code === 'PIN_LOCKED')
+        return 423;
+    if (code === 'PIN_REUSE_NOT_ALLOWED')
+        return 409;
     if (code === 'OTP_RESEND_NOT_READY' || code === 'OTP_TOO_MANY_ATTEMPTS' || code === 'OTP_RATE_LIMITED')
         return 429;
     return 400;
 };
 export const authRouter = Router();
+authRouter.post('/login/pin', async (req, res) => {
+    const parsed = pinLoginSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({
+            error: 'INVALID_INPUT',
+            details: parsed.error.flatten()
+        });
+    }
+    try {
+        const result = await loginWithPin(parsed.data, {
+            userAgent: req.header('user-agent') ?? null,
+            ipAddress: req.ip || null
+        });
+        return res.status(200).json(result);
+    }
+    catch (error) {
+        const domainError = error;
+        return res.status(toHttpStatus(domainError.code)).json({
+            error: domainError.code,
+            message: domainError.message,
+            retryAfterSec: domainError.retryAfterSec ?? undefined
+        });
+    }
+});
 authRouter.post('/signup/request-otp', async (req, res) => {
     const parsed = signupRequestSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -114,6 +156,34 @@ authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
             mobileNumber: account.user.mobileNumber
         }
     });
+});
+authRouter.put('/change-pin', requireAuthenticatedAccount, async (req, res) => {
+    const parsed = changePinSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({
+            error: 'INVALID_INPUT',
+            details: parsed.error.flatten()
+        });
+    }
+    try {
+        const account = getAuthenticatedAccount(req);
+        const result = await changePin(account.user.id, {
+            currentPin: parsed.data.currentPin,
+            newPin: parsed.data.newPin
+        }, {
+            userAgent: req.header('user-agent') ?? null,
+            ipAddress: req.ip || null
+        });
+        return res.status(200).json(result);
+    }
+    catch (error) {
+        const domainError = error;
+        return res.status(toHttpStatus(domainError.code)).json({
+            error: domainError.code,
+            message: domainError.message,
+            retryAfterSec: domainError.retryAfterSec ?? undefined
+        });
+    }
 });
 authRouter.post('/logout', requireAuthenticatedAccount, async (req, res) => {
     const account = getAuthenticatedAccount(req);

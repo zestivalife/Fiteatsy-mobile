@@ -16,16 +16,25 @@ type ApiErrorCode =
   | 'OTP_RESEND_NOT_READY'
   | 'OTP_TOO_MANY_ATTEMPTS'
   | 'AUTH_CONTACT_CONFLICT'
+  | 'PIN_USER_NOT_FOUND'
+  | 'PIN_INVALID'
+  | 'PIN_LOCKED'
+  | 'PIN_REUSE_NOT_ALLOWED'
   | 'NETWORK_OFFLINE'
   | 'SERVER_ERROR';
 
 export type AuthSessionResponse = {
   sessionToken: string;
+  requiresPinChange?: boolean;
   user: {
     id: string;
     name: string;
     email: string;
     mobileNumber: string;
+  };
+  client?: {
+    fiteatsyClientId: string;
+    status: string;
   };
 };
 
@@ -187,6 +196,21 @@ export type SignupOtpResponse = {
 export const requestSignupOtp = (params: SignupRequestParams) =>
   requestJson<SignupOtpResponse>('/v1/auth/signup/request-otp', {
     method: 'POST',
+    body: JSON.stringify(params)
+  });
+
+export const loginWithPin = (params: { mobile: string; pin: string }) =>
+  requestJson<AuthSessionResponse>('/v1/auth/login/pin', {
+    method: 'POST',
+    body: JSON.stringify(params)
+  });
+
+export const changePin = (sessionToken: string, params: { currentPin: string; newPin: string; confirmNewPin: string }) =>
+  requestJson<{ ok: true }>('/v1/auth/change-pin', {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${sessionToken}`
+    },
     body: JSON.stringify(params)
   });
 

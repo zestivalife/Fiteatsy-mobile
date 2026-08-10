@@ -12,10 +12,33 @@ create table if not exists users (
   status text not null default 'active',
   version integer not null default 1,
   last_login_at timestamptz,
+  pin_hash text,
+  pin_created_at timestamptz,
+  pin_last_changed_at timestamptz,
+  force_pin_change boolean not null default false,
+  pin_failed_attempts integer not null default 0,
+  pin_locked_until timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz
 );
+
+create index if not exists users_pin_locked_until_idx
+  on users (pin_locked_until)
+  where pin_locked_until is not null;
+
+create table if not exists auth_events (
+  id text primary key,
+  user_id text references users(id) on delete set null,
+  event text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  ip_address text,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists auth_events_user_created_idx
+  on auth_events (user_id, created_at desc);
 
 create table if not exists auth_sessions (
   id text primary key,

@@ -100,6 +100,119 @@ test('POST /v1/auth/signup/verify-otp issues a persisted session and GET /v1/aut
   assert.equal('id' in me.body.client, false);
 });
 
+test('PIN login bootstraps existing OTP users with default PIN and requires PIN change', async () => {
+  const created = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
+    name: 'Pin Bootstrap User',
+    email: 'pin-bootstrap@example.com',
+    mobileNumber: '+919876543214',
+  });
+  const otpSession = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+    challengeId: created.body.challengeId,
+    otp: TEST_OTP,
+  });
+  assert.equal(otpSession.response.status, 200);
+
+  const pinSession = await postJson(server.baseUrl, '/v1/auth/login/pin', {
+    mobile: '919876543214',
+    pin: '123456',
+  });
+  assert.equal(pinSession.response.status, 200);
+  assert.equal(pinSession.body.requiresPinChange, true);
+  assert.match(pinSession.body.sessionToken, /^[-a-z0-9]+$/i);
+  assert.equal(pinSession.body.user.id, otpSession.body.user.id);
+  assert.match(pinSession.body.client.fiteatsyClientId, /^fc_[a-f0-9]{32}$/i);
+});
+
+test('PIN change rejects old PIN reuse and then allows login only with the new PIN', async () => {
+  const created = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
+    name: 'Pin Change User',
+    email: 'pin-change@example.com',
+    mobileNumber: '+919876543215',
+  });
+  await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+    challengeId: created.body.challengeId,
+    otp: TEST_OTP,
+  });
+
+  const pinSession = await postJson(server.baseUrl, '/v1/auth/login/pin', {
+    mobile: '919876543215',
+    pin: '123456',
+  });
+  assert.equal(pinSession.response.status, 200);
+
+  const reuse = await getJson(server.baseUrl, '/v1/auth/change-pin', {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      ...authHeaders(pinSession.body.sessionToken)
+    },
+    body: JSON.stringify({
+      currentPin: '123456',
+      newPin: '123456',
+      confirmNewPin: '123456'
+    })
+  });
+  assert.equal(reuse.response.status, 409);
+  assert.equal(reuse.body.error, 'PIN_REUSE_NOT_ALLOWED');
+
+  const changed = await getJson(server.baseUrl, '/v1/auth/change-pin', {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      ...authHeaders(pinSession.body.sessionToken)
+    },
+    body: JSON.stringify({
+      currentPin: '123456',
+      newPin: '654321',
+      confirmNewPin: '654321'
+    })
+  });
+  assert.equal(changed.response.status, 200);
+  assert.equal(changed.body.ok, true);
+
+  const oldPin = await postJson(server.baseUrl, '/v1/auth/login/pin', {
+    mobile: '919876543215',
+    pin: '123456',
+  });
+  assert.equal(oldPin.response.status, 401);
+
+  const newPin = await postJson(server.baseUrl, '/v1/auth/login/pin', {
+    mobile: '919876543215',
+    pin: '654321',
+  });
+  assert.equal(newPin.response.status, 200);
+  assert.equal(newPin.body.requiresPinChange, false);
+});
+
+test('PIN login locks after five failed attempts', async () => {
+  const created = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
+    name: 'Pin Lock User',
+    email: 'pin-lock@example.com',
+    mobileNumber: '+919876543216',
+  });
+  await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+    challengeId: created.body.challengeId,
+    otp: TEST_OTP,
+  });
+
+  for (let index = 0; index < 4; index += 1) {
+    const failed = await postJson(server.baseUrl, '/v1/auth/login/pin', {
+      mobile: '919876543216',
+      pin: '000000',
+    });
+    assert.equal(failed.response.status, 401);
+    assert.equal(failed.body.error, 'PIN_INVALID');
+  }
+
+  const locked = await postJson(server.baseUrl, '/v1/auth/login/pin', {
+    mobile: '919876543216',
+    pin: '000000',
+  });
+  assert.equal(locked.response.status, 423);
+  assert.equal(locked.body.error, 'PIN_LOCKED');
+  assert.equal(typeof locked.body.retryAfterSec, 'number');
+});
+
 test('GET /v1/auth/me rejects missing and invalid bearer tokens', async () => {
   const missing = await getJson(server.baseUrl, '/v1/auth/me');
   assert.equal(missing.response.status, 401);

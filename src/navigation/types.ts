@@ -9,6 +9,7 @@ export type RootStackParamList = {
   OnboardingAssessment: undefined;
   SignIn: undefined;
   SignUp: undefined;
+  ChangePin: { force?: boolean } | undefined;
   SyncWearable: { autoSync?: boolean } | undefined;
   SyncSuccess: { deviceName: string };
   Main: undefined;
