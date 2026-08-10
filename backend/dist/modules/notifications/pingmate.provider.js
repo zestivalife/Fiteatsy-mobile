@@ -3,7 +3,7 @@ import { env } from '../../config/env.js';
 import { OtpDeliveryError } from './notification.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 const PINGMATE_PROVIDER_NAME = 'pingmate';
-const buildCopyCodePayload = (otp) => `otp${otp}`;
+const PINGMATE_COPY_CODE_BUTTON_PAYLOAD = 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp';
 const providerRequestIdHeaders = [
     'x-request-id',
     'x-correlation-id',
@@ -26,6 +26,23 @@ const sanitizeProviderBody = (body, input) => {
         .replaceAll(normalizedPhone, '[REDACTED_PHONE]');
 };
 const sanitizePayload = (payload, input) => JSON.parse(sanitizeProviderBody(JSON.stringify(payload), input));
+const parseProviderResponseSummary = (body) => {
+    try {
+        const parsed = JSON.parse(body);
+        return {
+            status: parsed.status ?? (parsed.success === true ? 'success' : parsed.success === false ? 'failed' : undefined),
+            error_code: parsed.error?.code ?? parsed.code,
+            message: parsed.error?.message ?? parsed.message
+        };
+    }
+    catch {
+        return {
+            status: undefined,
+            error_code: undefined,
+            message: body || undefined
+        };
+    }
+};
 const logPingMateRequest = (details) => {
     console.info('PingMate OTP request', details);
 };
@@ -58,10 +75,17 @@ export class PingMateProvider {
                     {
                         button_type: 'url',
                         button_index: 0,
-                        button_payload: buildCopyCodePayload(input.otp)
+                        button_payload: PINGMATE_COPY_CODE_BUTTON_PAYLOAD
                     }
                 ]
             }
+        };
+        const sanitizedOutgoingPayload = {
+            to: '[REDACTED_PHONE]',
+            template_name: requestPayload.message.template_name,
+            template_language: requestPayload.message.template_language,
+            body_variables_count: requestPayload.message.body_variables.length,
+            buttons_present: requestPayload.message.buttons.length > 0
         };
         const requestSummary = {
             correlationId,
@@ -77,7 +101,8 @@ export class PingMateProvider {
             buttonCount: 1,
             buttonType: 'url',
             buttonIndex: 0,
-            buttonPayloadShape: 'otp[REDACTED_OTP]',
+            buttonPayloadShape: 'whatsapp_copy_code_url',
+            sanitizedOutgoingPayload,
             outboundRequestBody: JSON.stringify(sanitizePayload(requestPayload, input))
         };
         logPingMateRequest(requestSummary);
@@ -120,11 +145,15 @@ export class PingMateProvider {
         const providerRequestId = getProviderRequestId(response);
         const responseBody = await response.text();
         const sanitizedResponseBody = sanitizeProviderBody(responseBody, input);
+        const providerResponse = parseProviderResponseSummary(sanitizedResponseBody);
         const responseSummary = {
             correlationId,
             requestUrl,
             httpMethod: 'POST',
             httpStatus: response.status,
+            status: providerResponse.status,
+            error_code: providerResponse.error_code,
+            message: providerResponse.message,
             providerRequestId,
             providerResponseBody: sanitizedResponseBody,
             latencyMs
