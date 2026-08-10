@@ -3,7 +3,8 @@ import { env } from '../../config/env.js';
 import { OtpDeliveryError } from './notification.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 const PINGMATE_PROVIDER_NAME = 'pingmate';
-const PINGMATE_COPY_CODE_BUTTON_PAYLOAD = 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp';
+const PINGMATE_COPY_CODE_BUTTON_PAYLOAD_PREFIX = 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp';
+const buildCopyCodePayload = (otp) => `${PINGMATE_COPY_CODE_BUTTON_PAYLOAD_PREFIX}${otp}`;
 const providerRequestIdHeaders = [
     'x-request-id',
     'x-correlation-id',
@@ -75,7 +76,7 @@ export class PingMateProvider {
                     {
                         button_type: 'url',
                         button_index: 0,
-                        button_payload: PINGMATE_COPY_CODE_BUTTON_PAYLOAD
+                        button_payload: buildCopyCodePayload(input.otp)
                     }
                 ]
             }
@@ -101,7 +102,7 @@ export class PingMateProvider {
             buttonCount: 1,
             buttonType: 'url',
             buttonIndex: 0,
-            buttonPayloadShape: 'whatsapp_copy_code_url',
+            buttonPayloadShape: 'whatsapp_copy_code_url_with_otp',
             sanitizedOutgoingPayload,
             outboundRequestBody: JSON.stringify(sanitizePayload(requestPayload, input))
         };

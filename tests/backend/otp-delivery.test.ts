@@ -109,12 +109,12 @@ test('PingMate provider sends the required WhatsApp template payload without har
       assert.equal(body.message.template_language, 'en');
       assert.equal(
         body.message.buttons[0].button_payload,
-        'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp'
+        'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp123456'
       );
       assert.deepEqual(body.message.buttons[0], {
         button_type: 'url',
         button_index: 0,
-        button_payload: 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp'
+        button_payload: 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp123456'
       });
 
       const serializedLogs = JSON.stringify(capturedLogs);
