@@ -17,7 +17,10 @@ describe('report re-analysis intelligence layer', () => {
     expect(routes).toContain('analyzeReportBufferAdvanced');
     expect(routes).not.toContain('REANALYZE_NOT_AVAILABLE');
     expect(routes).toContain('requiresAdvancedReanalysis');
+    expect(routes).toContain('REANALYSIS_STAGE');
+    expect(routes.indexOf('const saved = await attachReportAnalysis')).toBeLessThan(routes.indexOf('persistReportIntelligence(input.owner, input.reportId, selectedAnalysis)'));
     expect(service).toContain('document_intelligence_layout_recovery');
+    expect(service).toContain('describeAiProviderError');
     expect(mobileService).toContain('export const reanalyzeReport');
     expect(reportsScreen).toContain('Some information could not be confidently analysed.');
     expect(reportsScreen).toContain('Re-analyse Report');
@@ -25,10 +28,12 @@ describe('report re-analysis intelligence layer', () => {
 
   it('persists original upload files and appends attempt summaries for traceability', () => {
     const migration = read('backend/src/db/migrations/0012_report_reanalysis_intelligence.sql');
+    const metadataMigration = read('backend/src/db/migrations/0013_report_file_storage_metadata.sql');
     const store = read('backend/src/modules/reports/reports.store.ts');
 
     expect(migration).toContain('analysis_attempts jsonb');
     expect(migration).toContain('create table if not exists health_report_files');
+    expect(metadataMigration).toContain('add column if not exists file_size bigint');
     expect(store).toContain('saveReportFile');
     expect(store).toContain('getReportFile');
     expect(store).toContain("analysis_attempts = coalesce(health_reports.analysis_attempts, '[]'::jsonb) || jsonb_build_array");

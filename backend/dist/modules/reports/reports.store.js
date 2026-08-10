@@ -171,15 +171,16 @@ export const createReportRecord = async (input) => {
 };
 export const saveReportFile = async (reportId, owner, input) => {
     await pool.query(`
-      insert into health_report_files (report_id, user_id, client_id, mime_type, original_filename, content)
-      values ($1, $2, $3, $4, $5, $6)
+      insert into health_report_files (report_id, user_id, client_id, mime_type, original_filename, file_size, content)
+      values ($1, $2, $3, $4, $5, $6, $7)
       on conflict (report_id)
       do update set
         mime_type = excluded.mime_type,
         original_filename = excluded.original_filename,
+        file_size = excluded.file_size,
         content = excluded.content,
         created_at = now()
-    `, [reportId, owner.userId, owner.clientId, input.mimeType, input.fileName, input.content]);
+    `, [reportId, owner.userId, owner.clientId, input.mimeType, input.fileName, input.fileSize, input.content]);
 };
 export const getReportFile = async (reportId, owner) => {
     const result = await pool.query(`
@@ -198,6 +199,7 @@ export const getReportFile = async (reportId, owner) => {
         clientId: String(row.client_id),
         mimeType: String(row.mime_type),
         fileName: String(row.original_filename),
+        fileSize: Number(row.file_size),
         content: Buffer.from(row.content)
     };
 };

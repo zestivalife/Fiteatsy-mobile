@@ -684,6 +684,27 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, label: str
   }
 };
 
+const describeAiProviderError = (error: unknown, label: string) => {
+  if (!error || typeof error !== 'object') {
+    return `${label} failed.`;
+  }
+  const details = error as {
+    status?: number;
+    code?: string;
+    type?: string;
+    requestID?: string;
+    message?: string;
+  };
+  const parts = [
+    `${label} failed`,
+    details.status ? `status=${details.status}` : null,
+    details.code ? `code=${details.code}` : null,
+    details.type ? `type=${details.type}` : null,
+    details.requestID ? `requestID=${details.requestID}` : null
+  ].filter(Boolean);
+  return `${parts.join(' ')}${details.message ? `: ${details.message.replace(/sk-[A-Za-z0-9]+/g, 'sk-REDACTED')}` : ''}`;
+};
+
 const parseImageViaAi = async (
   buffer: Buffer,
   mimeType: string
@@ -708,29 +729,34 @@ const parseImageViaAi = async (
       ? 'image/webp'
       : 'image/jpeg';
   const dataUrl = `data:${safeMimeType};base64,${buffer.toString('base64')}`;
-  const completion = await withTimeout(
-    aiClient.chat.completions.create({
-      model: AI_MODEL,
-      max_tokens: 800,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You extract lab report data. Return strict JSON with keys reportDate, labName, parameters. parameters is array of {name,value,unit,referenceRange,status,category}. status must be normal/low/high when possible. Never infer or invent missing values.'
-        },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'Extract all readable lab parameters from this report image. Do not add fake values.' },
-            { type: 'image_url', image_url: { url: dataUrl } }
-          ]
-        }
-      ]
-    }),
-    AI_VISION_TIMEOUT_MS,
-    'Vision extraction'
-  );
+  let completion;
+  try {
+    completion = await withTimeout(
+      aiClient.chat.completions.create({
+        model: AI_MODEL,
+        max_tokens: 800,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You extract lab report data. Return strict JSON with keys reportDate, labName, parameters. parameters is array of {name,value,unit,referenceRange,status,category}. status must be normal/low/high when possible. Never infer or invent missing values.'
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Extract all readable lab parameters from this report image. Do not add fake values.' },
+              { type: 'image_url', image_url: { url: dataUrl } }
+            ]
+          }
+        ]
+      }),
+      AI_VISION_TIMEOUT_MS,
+      'Vision extraction'
+    );
+  } catch (error) {
+    throw new Error(describeAiProviderError(error, 'Vision extraction'));
+  }
 
   const content = completion.choices[0]?.message?.content?.trim() ?? '';
   const parsed = parseParametersFromAiJson(content);
@@ -816,26 +842,31 @@ ${input.text.slice(0, 12000)}`
     ...visualInputs.map((url) => ({ type: 'image_url' as const, image_url: { url } }))
   ];
 
-  const completion = await withTimeout(
-    aiClient.chat.completions.create({
-      model: AI_MODEL,
-      max_tokens: 1400,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a medical document intelligence engine. Understand tables, columns, rows, headers, cells, reading order, and lab biomarker compatibility. Return only extracted visible values; do not diagnose and do not correct values silently.'
-        },
-        {
-          role: 'user',
-          content: userContent
-        }
-      ]
-    }),
-    AI_VISION_TIMEOUT_MS,
-    'Advanced document intelligence'
-  );
+  let completion;
+  try {
+    completion = await withTimeout(
+      aiClient.chat.completions.create({
+        model: AI_MODEL,
+        max_tokens: 1400,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a medical document intelligence engine. Understand tables, columns, rows, headers, cells, reading order, and lab biomarker compatibility. Return only extracted visible values; do not diagnose and do not correct values silently.'
+          },
+          {
+            role: 'user',
+            content: userContent
+          }
+        ]
+      }),
+      AI_VISION_TIMEOUT_MS,
+      'Advanced document intelligence'
+    );
+  } catch (error) {
+    throw new Error(describeAiProviderError(error, 'Advanced document intelligence'));
+  }
 
   const content = completion.choices[0]?.message?.content?.trim() ?? '';
   const parsed = parseParametersFromAiJson(content).map((parameter) => ({

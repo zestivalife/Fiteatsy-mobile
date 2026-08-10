@@ -310,6 +310,7 @@ create table if not exists health_report_files (
   client_id text not null,
   mime_type text not null,
   original_filename text not null,
+  file_size bigint not null,
   content bytea not null,
   created_at timestamptz not null default now(),
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict

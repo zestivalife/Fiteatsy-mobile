@@ -73,6 +73,9 @@ const recomputeOwnerHealthScores = async (owner) => {
 const logReportRuntime = (event, payload) => {
     console.log(`[ReportsRuntime] ${event}`, payload);
 };
+const logReanalysisStage = (payload) => {
+    logReportRuntime('REANALYSIS_STAGE', payload);
+};
 const analyzeAndPersistReport = async (input) => {
     logReportRuntime('processing:start', {
         reportId: input.reportId,
@@ -110,18 +113,16 @@ const analyzeAndPersistReport = async (input) => {
         status: 'VALIDATION_COMPLETED',
         validationConfidence: analysis.qualityGate.validationConfidence
     });
-    const intelligence = await persistReportIntelligence(input.owner, input.reportId, analysis);
-    await updateReportStatus(input.reportId, 'PRIORITIZATION_COMPLETED');
+    const saved = await attachReportAnalysis(input.reportId, analysis, input.analysisMode ?? 'standard');
+    const selectedAnalysis = saved?.analysis ?? analysis;
+    const intelligence = await persistReportIntelligence(input.owner, input.reportId, selectedAnalysis);
     logReportRuntime('processing:status', {
         reportId: input.reportId,
-        status: 'PRIORITIZATION_COMPLETED',
-        coreBiomarkers: analysis.qualityGate.coreBiomarkers
+        status: 'SELECTED_ANALYSIS_PERSISTED',
+        candidateQualityGate: analysis.qualityGate.status,
+        selectedQualityGate: selectedAnalysis.qualityGate.status,
+        selectedBiomarkers: selectedAnalysis.parameters.length
     });
-    if (analysis.qualityGate.canScore) {
-        await updateReportStatus(input.reportId, 'SCORE_GENERATED');
-        logReportRuntime('processing:status', { reportId: input.reportId, status: 'SCORE_GENERATED' });
-    }
-    const saved = await attachReportAnalysis(input.reportId, analysis, input.analysisMode ?? 'standard');
     await updateProcessingJobStatus(input.processingJobId, analysis.qualityGate.canPublish ? 'completed' : 'review_required', saved?.error);
     logReportRuntime('processing:debug-trace', {
         reportId: input.reportId,
@@ -133,13 +134,13 @@ const analyzeAndPersistReport = async (input) => {
         status: saved?.status,
         observationCount: intelligence.observations.length,
         scoreCount: intelligence.scores.length,
-        qualityGate: analysis.qualityGate.status
+        qualityGate: selectedAnalysis.qualityGate.status
     });
-    if (analysis.qualityGate.canPublish) {
+    if (selectedAnalysis.qualityGate.canPublish) {
         await syncReportPipelineToPlatform(input.owner, input.reportId, 'biomarkers_updated', `Biomarkers extracted from ${input.fileName}`);
         await syncReportPipelineToPlatform(input.owner, input.reportId, 'analysis_completed', `AI validation completed for ${input.fileName}`);
     }
-    const publicAnalysis = sanitizeReportAnalysisForPublic(analysis);
+    const publicAnalysis = sanitizeReportAnalysisForPublic(selectedAnalysis);
     return {
         reportId: saved?.id,
         status: saved?.status,
@@ -290,11 +291,47 @@ reportsRouter.post('/:reportId/feedback', async (req, res) => {
 });
 reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
     const owner = currentOwner(getAuthenticatedAccount(req));
+    logReportRuntime('REANALYSIS_STARTED', {
+        reportId: req.params.reportId,
+        userId: owner.accountId,
+        clientId: owner.clientId
+    });
+    logReanalysisStage({
+        reportId: req.params.reportId,
+        userId: owner.accountId,
+        clientId: owner.clientId,
+        stage: 'auth_context',
+        status: 'completed'
+    });
     const report = await getReport(req.params.reportId);
     if (!ownsReport(report, owner)) {
+        logReanalysisStage({
+            reportId: req.params.reportId,
+            userId: owner.accountId,
+            clientId: owner.clientId,
+            stage: 'ownership_validation',
+            status: 'failed',
+            error: 'REPORT_NOT_FOUND'
+        });
         return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
     }
+    logReanalysisStage({
+        reportId: report.id,
+        userId: owner.accountId,
+        clientId: owner.clientId,
+        stage: 'ownership_validation',
+        status: 'completed',
+        details: { reportStatus: report.status, attempts: report.analysisAttempts.length }
+    });
     if (!requiresAdvancedReanalysis(report)) {
+        logReanalysisStage({
+            reportId: report.id,
+            userId: owner.accountId,
+            clientId: owner.clientId,
+            stage: 'quality_gate',
+            status: 'failed',
+            error: 'REANALYZE_NOT_REQUIRED'
+        });
         return res.status(409).json({
             error: 'REANALYZE_NOT_REQUIRED',
             message: 'This report already passed the quality gate without review signals. Advanced re-analysis is only available for low-confidence reports.'
@@ -302,11 +339,27 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
     }
     const file = await getReportFile(report.id, reportOwner(owner));
     if (!file) {
+        logReanalysisStage({
+            reportId: report.id,
+            userId: owner.accountId,
+            clientId: owner.clientId,
+            stage: 'original_file_retrieval',
+            status: 'failed',
+            error: 'REPORT_FILE_NOT_AVAILABLE'
+        });
         return res.status(409).json({
             error: 'REPORT_FILE_NOT_AVAILABLE',
             message: 'The original upload is not available for re-analysis. Please upload the report again.'
         });
     }
+    logReanalysisStage({
+        reportId: report.id,
+        userId: owner.accountId,
+        clientId: owner.clientId,
+        stage: 'original_file_retrieval',
+        status: 'completed',
+        details: { mimeType: file.mimeType, fileSize: file.fileSize }
+    });
     const processingJob = await createProcessingJob({
         clientId: owner.clientId,
         reportId: report.id,
@@ -314,6 +367,13 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
         status: 'processing'
     });
     try {
+        logReanalysisStage({
+            reportId: report.id,
+            userId: owner.accountId,
+            clientId: owner.clientId,
+            stage: 'provider_request',
+            status: 'started'
+        });
         const payload = await analyzeAndPersistReport({
             owner,
             reportId: report.id,
@@ -326,10 +386,30 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
             analysisMode: 'advanced_reanalysis',
             analyzer: analyzeReportBufferAdvanced
         });
+        logReanalysisStage({
+            reportId: report.id,
+            userId: owner.accountId,
+            clientId: owner.clientId,
+            stage: 'attempt_storage_and_selection',
+            status: 'completed',
+            details: {
+                finalStatus: payload.status,
+                detectedBiomarkers: payload.qualityGate?.detectedBiomarkers,
+                validatedBiomarkers: payload.qualityGate?.validatedBiomarkers
+            }
+        });
         return res.status(200).json({ ...payload, reanalysis: true });
     }
     catch (error) {
         const message = error instanceof Error ? error.message : 'Unable to re-analyze this report file.';
+        logReanalysisStage({
+            reportId: report.id,
+            userId: owner.accountId,
+            clientId: owner.clientId,
+            stage: 'provider_request_or_analysis',
+            status: 'failed',
+            error: message
+        });
         logReportRuntime('reanalysis:failed', { reportId: report.id, processingJobId: processingJob.id, message });
         await updateReportStatus(report.id, 'REVIEW_REQUIRED', message);
         await updateProcessingJobStatus(processingJob.id, 'failed', message);
@@ -433,6 +513,7 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
         await saveReportFile(record.id, reportOwner(owner), {
             mimeType: req.file.mimetype,
             fileName: record.fileName,
+            fileSize: req.file.size,
             content: fileBuffer
         });
         const processingJob = await createProcessingJob({
@@ -541,6 +622,7 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
         await saveReportFile(record.id, reportOwner(owner), {
             mimeType: req.file.mimetype,
             fileName: record.fileName,
+            fileSize: req.file.size,
             content: Buffer.from(req.file.buffer)
         });
         const processingJob = await createProcessingJob({
