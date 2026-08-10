@@ -91,6 +91,26 @@ const createOrReplaceChallenge = (user: SignupInput) => {
 
 const normalizeRateLimitKey = (mobileNumber: string) => mobileNumber.replace(/\D/g, '');
 
+const findActiveChallengeForMobile = (mobileNumber: string) => {
+  const key = normalizeRateLimitKey(mobileNumber);
+  const current = now();
+  return Array.from(challengeStore.values()).find(
+    (challenge) =>
+      !challenge.verified &&
+      current <= challenge.expiresAtMs &&
+      normalizeRateLimitKey(challenge.user.mobileNumber) === key
+  );
+};
+
+const invalidateActiveChallengesForMobile = (mobileNumber: string) => {
+  const key = normalizeRateLimitKey(mobileNumber);
+  for (const [challengeId, challenge] of challengeStore.entries()) {
+    if (!challenge.verified && normalizeRateLimitKey(challenge.user.mobileNumber) === key) {
+      challengeStore.delete(challengeId);
+    }
+  }
+};
+
 const assertOtpRequestQuota = (mobileNumber: string) => {
   const current = now();
   const key = normalizeRateLimitKey(mobileNumber);
@@ -126,6 +146,16 @@ export const createOtpChallenge = async (input: SignupInput) => {
     email: input.email.trim().toLowerCase(),
     mobileNumber: normalizeCanonicalPhoneNumber(input.mobileNumber)
   };
+  const activeChallenge = findActiveChallengeForMobile(user.mobileNumber);
+  const current = now();
+  if (activeChallenge && current < activeChallenge.resendAvailableAtMs) {
+    throw asDomainError({
+      code: 'OTP_RESEND_NOT_READY',
+      message: 'Please wait before requesting another OTP.',
+      retryAfterSec: Math.ceil((activeChallenge.resendAvailableAtMs - current) / 1000)
+    });
+  }
+  invalidateActiveChallengesForMobile(user.mobileNumber);
   assertOtpRequestQuota(user.mobileNumber);
   const { challenge, otp } = createOrReplaceChallenge(user);
   try {

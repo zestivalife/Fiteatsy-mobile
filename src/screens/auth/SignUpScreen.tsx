@@ -44,6 +44,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
   const [otp, setOtp] = useState('');
   const [expiresAtMs, setExpiresAtMs] = useState(0);
   const [resendAtMs, setResendAtMs] = useState(0);
+  const [requestCooldownAtMs, setRequestCooldownAtMs] = useState(0);
   const [attemptsRemaining, setAttemptsRemaining] = useState(5);
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -66,9 +67,11 @@ export const SignUpScreen = ({ navigation }: Props) => {
 
   const otpExpired = phase === 'verify' && expiresAtMs > 0 && nowMs >= expiresAtMs;
   const resendRemainingSec = Math.max(0, Math.ceil((resendAtMs - nowMs) / 1000));
+  const requestCooldownRemainingSec = Math.max(0, Math.ceil((requestCooldownAtMs - nowMs) / 1000));
   const canResend = phase === 'verify' && resendRemainingSec === 0 && !loading;
   const canVerify = otp.length === OTP_LENGTH && !otpExpired && !verifying;
-  const canRequestOtp = name.trim().length >= 2 && email.trim().length > 0 && normalizedPhone !== null && !loading;
+  const canRequestOtp =
+    name.trim().length >= 2 && email.trim().length > 0 && normalizedPhone !== null && !loading && requestCooldownRemainingSec === 0;
 
   useEffect(() => {
     AsyncStorage.getItem(LAST_COUNTRY_KEY).then((storedCountry) => {
@@ -77,10 +80,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
   }, []);
 
   useEffect(() => {
-    if (phase !== 'verify') return;
+    if (phase !== 'verify' && requestCooldownRemainingSec === 0) return;
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [phase]);
+  }, [phase, requestCooldownRemainingSec]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
@@ -123,6 +126,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
       });
       applyOtpMetadata(response);
       setOtp('');
+      setRequestCooldownAtMs(0);
       setPhase('verify');
       setTimeout(() => hiddenOtpRef.current?.focus(), 120);
     } catch (e) {
@@ -134,6 +138,9 @@ export const SignUpScreen = ({ navigation }: Props) => {
         stack: err.stack
       });
       setError(err.message);
+      if (typeof err.retryAfterSec === 'number') {
+        setRequestCooldownAtMs(Date.now() + err.retryAfterSec * 1000);
+      }
     } finally {
       setLoading(false);
     }
@@ -258,7 +265,22 @@ export const SignUpScreen = ({ navigation }: Props) => {
               onChangeText={(value) => setNationalNumber(getPhoneDigits(value))}
               maxLength={14}
             />
-            <PrimaryButton title={loading ? 'Sending OTP...' : 'Send OTP'} onPress={requestOtp} disabled={!canRequestOtp} />
+            <PrimaryButton
+              title={
+                loading
+                  ? 'Sending OTP...'
+                  : requestCooldownRemainingSec > 0
+                    ? `Send OTP in ${requestCooldownRemainingSec}s`
+                    : 'Send OTP'
+              }
+              onPress={requestOtp}
+              disabled={!canRequestOtp}
+            />
+            {requestCooldownRemainingSec > 0 ? (
+              <Text style={[styles.timerText, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>
+                Please wait before requesting another WhatsApp OTP.
+              </Text>
+            ) : null}
           </>
         ) : (
           <>

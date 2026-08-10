@@ -284,6 +284,7 @@ test('OTP request rate limit allows five requests per hour per mobile number', a
             email: `rate-limit-${index}@example.com`
           });
           assert.equal(requested.response.status, 201);
+          expireOtpChallengeForTests(requested.body.challengeId);
         }
 
         const limited = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
@@ -292,6 +293,47 @@ test('OTP request rate limit allows five requests per hour per mobile number', a
         });
         assert.equal(limited.response.status, 429);
         assert.equal(limited.body.error, 'OTP_RATE_LIMITED');
+      } finally {
+        await server.close();
+      }
+    }
+  );
+});
+
+test('OTP request cooldown blocks duplicate WhatsApp sends for an active challenge', async () => {
+  await withEnv(
+    {
+      NODE_ENV: 'production',
+      OTP_DEBUG_RESPONSE_ENABLED: undefined
+    },
+    async () => {
+      let deliveryAttempts = 0;
+      setWhatsappProviderForTests({
+        async sendOtp() {
+          deliveryAttempts += 1;
+          return {
+            status: 'sent',
+            provider: 'test-whatsapp',
+            providerResponseCode: 201,
+            latencyMs: 1
+          };
+        }
+      });
+
+      const server = await startAppServer(createApp());
+      try {
+        const first = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', signupPayload);
+        assert.equal(first.response.status, 201);
+        assert.match(first.body.challengeId, /^[-a-z0-9]+$/i);
+
+        const duplicate = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
+          ...signupPayload,
+          email: 'duplicate-attempt@example.com'
+        });
+        assert.equal(duplicate.response.status, 429);
+        assert.equal(duplicate.body.error, 'OTP_RESEND_NOT_READY');
+        assert.equal(typeof duplicate.body.retryAfterSec, 'number');
+        assert.equal(deliveryAttempts, 1);
       } finally {
         await server.close();
       }
