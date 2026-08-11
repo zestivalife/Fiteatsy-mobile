@@ -139,6 +139,25 @@ test('consultant discovery repairs inactive client mappings and preserves client
   assert.equal(repaired.rows[0].deleted_at, null);
 });
 
+test('consultant discovery accepts production status and role casing', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Uppercase Status Client',
+    email: `uppercase-status-client-${Date.now()}@example.com`
+  });
+  await pool.query('update users set status = $2, role = $3 where id = $1', [client.current.body.accountId, 'ACTIVE', 'USER']);
+  await pool.query('update fiteatsy_clients set status = $2 where account_user_id = $1', [client.current.body.accountId, 'ACTIVE']);
+
+  const consultant = await createConsultantSession();
+  const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.clients.length, 1);
+  assert.equal(response.body.clients[0].name, 'Uppercase Status Client');
+  assert.equal(response.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+});
+
 test('consultant client profile returns real onboarding fields only', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Onboarded Client',

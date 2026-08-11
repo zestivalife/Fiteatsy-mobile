@@ -145,8 +145,8 @@ const profileCompleted = (row: Record<string, unknown>) =>
 
 const eligibleUserPredicate = `
   u.deleted_at is null
-  and u.status = 'active'
-  and coalesce(u.role, 'user') not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
+  and lower(coalesce(u.status, '')) = 'active'
+  and lower(coalesce(u.role, 'user')) not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
 `;
 
 const listClientSelect = `
@@ -192,7 +192,7 @@ const listClientSelect = `
     where c.account_user_id = u.id
     order by
       case
-        when c.deleted_at is null and c.status = 'active' then 0
+        when c.deleted_at is null and lower(coalesce(c.status, '')) = 'active' then 0
         when c.deleted_at is null then 1
         else 2
       end,
@@ -203,7 +203,7 @@ const listClientSelect = `
     on hp.client_id = c.id
     and hp.user_id = u.id
     and hp.deleted_at is null
-    and hp.status = 'active'
+    and lower(coalesce(hp.status, '')) = 'active'
   left join lateral (
     select max(coalesce(s.last_used_at, s.created_at)) as last_session_at
     from auth_sessions s
@@ -223,7 +223,7 @@ const listClientSelect = `
   where ${eligibleUserPredicate}
     and c.id is not null
     and c.deleted_at is null
-    and c.status = 'active'
+    and lower(coalesce(c.status, '')) = 'active'
 `;
 
 const mapListRecord = (row: Record<string, unknown>): ConsultantClientListRecord => ({
@@ -274,7 +274,7 @@ export const getConsultantClientSyncDiagnostics = async (): Promise<ConsultantCl
         count(distinct u.id)::int as total_users_found,
         count(distinct case when c_active.id is not null then u.id end)::int as clients_mapped,
         count(distinct case when c_active.id is null then u.id end)::int as missing_client_mappings,
-        count(distinct case when c_any.id is not null and (c_any.deleted_at is not null or c_any.status <> 'active') then u.id end)::int as inactive_client_mappings,
+        count(distinct case when c_any.id is not null and (c_any.deleted_at is not null or lower(coalesce(c_any.status, '')) <> 'active') then u.id end)::int as inactive_client_mappings,
         count(distinct hp.id)::int as active_health_profiles
       from users u
       left join lateral (
@@ -282,7 +282,7 @@ export const getConsultantClientSyncDiagnostics = async (): Promise<ConsultantCl
         from fiteatsy_clients c
         where c.account_user_id = u.id
           and c.deleted_at is null
-          and c.status = 'active'
+          and lower(coalesce(c.status, '')) = 'active'
         order by c.updated_at desc
         limit 1
       ) c_active on true
@@ -292,7 +292,7 @@ export const getConsultantClientSyncDiagnostics = async (): Promise<ConsultantCl
         where c.account_user_id = u.id
         order by
           case
-            when c.deleted_at is null and c.status = 'active' then 0
+            when c.deleted_at is null and lower(coalesce(c.status, '')) = 'active' then 0
             when c.deleted_at is null then 1
             else 2
           end,
@@ -303,7 +303,7 @@ export const getConsultantClientSyncDiagnostics = async (): Promise<ConsultantCl
         on hp.user_id = u.id
         and hp.client_id = c_active.id
         and hp.deleted_at is null
-        and hp.status = 'active'
+        and lower(coalesce(hp.status, '')) = 'active'
       where ${eligibleUserPredicate}
     `,
     [...AUTHENTICATED_USER_EXCLUSION_ROLES]
@@ -329,7 +329,7 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
         where c.account_user_id = u.id
         order by
           case
-            when c.deleted_at is null and c.status = 'active' then 0
+            when c.deleted_at is null and lower(coalesce(c.status, '')) = 'active' then 0
             when c.deleted_at is null then 1
             else 2
           end,
@@ -340,7 +340,7 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
         and (
           c.id is null
           or c.deleted_at is not null
-          or c.status <> 'active'
+          or lower(coalesce(c.status, '')) <> 'active'
         )
       order by u.created_at asc
     `,

@@ -52,7 +52,7 @@ export const getClientByAccountUserId = async (
       from fiteatsy_clients
       where account_user_id = $1
         and deleted_at is null
-      order by case when status = 'active' then 0 else 1 end, updated_at desc
+      order by case when lower(coalesce(status, '')) = 'active' then 0 else 1 end, updated_at desc
       limit 1
     `,
     [accountUserId]
@@ -72,7 +72,7 @@ const getClientByAccountUserIdAnyStatus = async (
       where account_user_id = $1
       order by
         case
-          when deleted_at is null and status = 'active' then 0
+          when deleted_at is null and lower(coalesce(status, '')) = 'active' then 0
           when deleted_at is null then 1
           else 2
         end,
@@ -128,7 +128,7 @@ export const createOrResolveClientForAccount = async (
 ): Promise<PersistedClient> => {
   const existing = await getClientByAccountUserIdAnyStatus(accountUserId, db);
   if (existing) {
-    if (existing.deletedAtISO == null && existing.status === 'active') return existing;
+    if (existing.deletedAtISO == null && existing.status.toLowerCase() === 'active') return existing;
     const reactivated = await reactivateClientRecord(existing.id, db);
     if (reactivated) return reactivated;
   }
@@ -154,7 +154,7 @@ export const createOrResolveClientForAccount = async (
       if (inserted.rowCount === 1) return mapClient(inserted.rows[0]);
       const resolved = await getClientByAccountUserIdAnyStatus(accountUserId, db);
       if (resolved) {
-        if (resolved.deletedAtISO == null && resolved.status === 'active') return resolved;
+        if (resolved.deletedAtISO == null && resolved.status.toLowerCase() === 'active') return resolved;
         const reactivated = await reactivateClientRecord(resolved.id, db);
         if (reactivated) return reactivated;
       }
@@ -166,7 +166,7 @@ export const createOrResolveClientForAccount = async (
 
   const resolved = await getClientByAccountUserIdAnyStatus(accountUserId, db);
   if (resolved) {
-    if (resolved.deletedAtISO == null && resolved.status === 'active') return resolved;
+    if (resolved.deletedAtISO == null && resolved.status.toLowerCase() === 'active') return resolved;
     const reactivated = await reactivateClientRecord(resolved.id, db);
     if (reactivated) return reactivated;
   }
