@@ -171,6 +171,7 @@ const compareAnalysisQuality = (candidate: ReportAnalysisResult, current?: Repor
     analysisStatusRank(candidate),
     candidate.qualityGate.validatedRequiredTier1Biomarkers ?? 0,
     candidate.qualityGate.validatedBiomarkers,
+    candidate.parameters.length,
     -candidateRejected,
     -candidateConflicts,
     candidate.qualityGate.confidence,
@@ -180,6 +181,7 @@ const compareAnalysisQuality = (candidate: ReportAnalysisResult, current?: Repor
     analysisStatusRank(current),
     current.qualityGate.validatedRequiredTier1Biomarkers ?? 0,
     current.qualityGate.validatedBiomarkers,
+    current.parameters.length,
     -currentRejected,
     -currentConflicts,
     current.qualityGate.confidence,
@@ -396,7 +398,24 @@ export const attachReportAnalysis = async (
         lab_name = $4,
         processing_status = $5,
         error = $6,
-        analysis_attempts = coalesce(health_reports.analysis_attempts, '[]'::jsonb) || jsonb_build_array(
+        analysis_attempts = (
+          case
+            when $10::boolean then (
+              select coalesce(
+                jsonb_agg(
+                  case
+                    when jsonb_typeof(attempt.value) = 'object'
+                      then jsonb_set(attempt.value, '{selected}', 'false'::jsonb, true)
+                    else attempt.value
+                  end
+                ),
+                '[]'::jsonb
+              )
+              from jsonb_array_elements(coalesce(health_reports.analysis_attempts, '[]'::jsonb)) as attempt(value)
+            )
+            else coalesce(health_reports.analysis_attempts, '[]'::jsonb)
+          end
+        ) || jsonb_build_array(
           jsonb_build_object(
             'id', $7::text,
             'analysisMode', $8::text,
