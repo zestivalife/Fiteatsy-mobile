@@ -1,5 +1,6 @@
 import { pool } from '../../db/pool.js';
 import { createOrResolveClientForAccount } from '../client/client.repository.js';
+import type { HealthCalculationInput, HealthMetrics } from '../health/health-calculations.service.js';
 
 export type ConsultantClientListRecord = {
   clientId: string;
@@ -53,6 +54,29 @@ export type ConsultantClientProfileRecord = {
     lastHealthUpdate: string | null;
     profileCompleted: boolean;
   };
+  healthMetrics?: HealthMetrics;
+  biomarkers?: ConsultantBiomarkerSummary[];
+};
+
+export type ConsultantBiomarkerSummary = {
+  biomarkerId: string;
+  name: string;
+  value: number;
+  unit: string;
+  status: 'VALIDATED';
+  referenceRange: string | null;
+  confidence: number;
+  testDate: string;
+  trend: 'UP' | 'DOWN' | 'STABLE' | null;
+  previousValue: number | null;
+  previousTestDate: string | null;
+};
+
+export type ConsultantClientProfileContext = {
+  accountId: string;
+  internalClientId: string;
+  profile: ConsultantClientProfileRecord;
+  calculationInput: HealthCalculationInput;
 };
 
 const AUTHENTICATED_USER_EXCLUSION_ROLES = ['consultant', 'practitioner', 'admin', 'super_admin'];
@@ -121,6 +145,9 @@ const listClientSelect = `
     hp.gender,
     hp.height_cm,
     hp.current_weight_kg,
+    hp.waist_cm,
+    hp.hip_cm,
+    hp.neck_cm,
     hp.wellness_goals,
     hp.activity_level,
     hp.diet_type,
@@ -221,6 +248,13 @@ export const listRegisteredConsultantClients = async (): Promise<ConsultantClien
 export const getRegisteredConsultantClientProfile = async (
   publicClientId: string
 ): Promise<ConsultantClientProfileRecord | null> => {
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId);
+  return context?.profile ?? null;
+};
+
+export const getRegisteredConsultantClientProfileContext = async (
+  publicClientId: string
+): Promise<ConsultantClientProfileContext | null> => {
   const result = await pool.query(
     `${listClientSelect}
       and c.fiteatsy_client_id = $6
@@ -233,7 +267,7 @@ export const getRegisteredConsultantClientProfile = async (
   const row = result.rows[0];
   if (!row) return null;
 
-  return {
+  const profile: ConsultantClientProfileRecord = {
     client: {
       id: String(row.fiteatsy_client_id),
       name: String(row.name),
@@ -262,4 +296,82 @@ export const getRegisteredConsultantClientProfile = async (
       profileCompleted: profileCompleted(row)
     }
   };
+
+  return {
+    accountId: String(row.account_user_id),
+    internalClientId: String(row.internal_client_id),
+    profile,
+    calculationInput: {
+      age: toNumberOrNull(row.age),
+      gender: row.gender == null ? null : String(row.gender),
+      heightCm: toNumberOrNull(row.height_cm),
+      weightKg: toNumberOrNull(row.current_weight_kg),
+      waistCm: toNumberOrNull(row.waist_cm),
+      hipCm: toNumberOrNull(row.hip_cm),
+      neckCm: toNumberOrNull(row.neck_cm),
+      activityLevel: row.activity_level == null ? null : String(row.activity_level)
+    }
+  };
+};
+
+export const listValidatedBiomarkerSummaryForClient = async (
+  internalClientId: string,
+  accountId: string
+): Promise<ConsultantBiomarkerSummary[]> => {
+  const result = await pool.query(
+    `
+      with ranked as (
+        select
+          bo.*,
+          b.canonical_name,
+          row_number() over (
+            partition by bo.biomarker_id
+            order by bo.test_date desc, bo.created_at desc
+          ) as observation_rank
+        from biomarker_observations bo
+        join biomarkers b on b.id = bo.biomarker_id
+        left join health_reports hr on hr.id = bo.source_report_id
+        where bo.client_id = $1
+          and bo.user_id = $2
+          and bo.validation_status = 'validated'
+          and (bo.source_report_id is null or (hr.deleted_at is null and hr.processing_status <> 'DELETED'))
+      )
+      select
+        latest.biomarker_id,
+        latest.canonical_name,
+        latest.value,
+        latest.unit,
+        latest.reference_range,
+        latest.confidence,
+        latest.test_date,
+        previous.value as previous_value,
+        previous.test_date as previous_test_date
+      from ranked latest
+      left join ranked previous
+        on previous.biomarker_id = latest.biomarker_id
+        and previous.observation_rank = 2
+      where latest.observation_rank = 1
+      order by latest.test_date desc, latest.canonical_name asc
+    `,
+    [internalClientId, accountId]
+  );
+
+  return result.rows.map((row) => {
+    const value = Number(row.value);
+    const previousValue = row.previous_value == null ? null : Number(row.previous_value);
+    const trend = previousValue == null ? null : value > previousValue ? 'UP' : value < previousValue ? 'DOWN' : 'STABLE';
+    return {
+      biomarkerId: String(row.biomarker_id),
+      name: String(row.canonical_name),
+      value,
+      unit: String(row.unit),
+      status: 'VALIDATED',
+      referenceRange: row.reference_range == null ? null : String(row.reference_range),
+      confidence: Number(row.confidence),
+      testDate: new Date(String(row.test_date)).toISOString().slice(0, 10),
+      trend,
+      previousValue,
+      previousTestDate: row.previous_test_date == null ? null : new Date(String(row.previous_test_date)).toISOString().slice(0, 10)
+    };
+  });
 };

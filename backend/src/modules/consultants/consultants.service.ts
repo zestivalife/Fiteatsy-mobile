@@ -1,7 +1,10 @@
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
+import { persistHealthCalculations } from '../health/health-calculations.repository.js';
+import { calculateHealthMetrics } from '../health/health-calculations.service.js';
 import {
   ensureRegisteredClientsForEligibleUsers,
-  getRegisteredConsultantClientProfile,
+  getRegisteredConsultantClientProfileContext,
+  listValidatedBiomarkerSummaryForClient,
   listRegisteredConsultantClients
 } from './consultants.repository.js';
 
@@ -17,5 +20,19 @@ export const listConsultantClients = async () => {
 
 export const getConsultantClientProfile = async (publicClientId: string) => {
   await ensureRegisteredClientsForEligibleUsers();
-  return getRegisteredConsultantClientProfile(publicClientId);
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId);
+  if (!context) return null;
+
+  const healthMetrics = calculateHealthMetrics(context.calculationInput);
+  await persistHealthCalculations(
+    { accountId: context.accountId, clientId: context.internalClientId },
+    healthMetrics
+  );
+  const biomarkers = await listValidatedBiomarkerSummaryForClient(context.internalClientId, context.accountId);
+
+  return {
+    ...context.profile,
+    healthMetrics,
+    biomarkers
+  };
 };

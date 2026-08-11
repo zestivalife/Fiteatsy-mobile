@@ -124,6 +124,9 @@ test('consultant client profile returns real onboarding fields only', async () =
       gender: 'Female',
       heightCm: 162,
       currentWeightKg: 61,
+      waistCm: 78,
+      hipCm: 94,
+      neckCm: 32,
       wellnessGoals: ['Improve energy'],
       activityLevel: 'Moderate',
       dietType: 'Vegetarian',
@@ -173,6 +176,13 @@ test('consultant client profile returns real onboarding fields only', async () =
   assert.equal(profile.body.healthProfile.biomarkerStatus, null);
   assert.equal(profile.body.healthProfile.reportsCount, 0);
   assert.equal(profile.body.healthProfile.profileCompleted, true);
-  assert.equal('biomarkers' in profile.body, false);
+  assert.equal(profile.body.healthMetrics.bmi.status, 'AVAILABLE');
+  assert.equal(profile.body.healthMetrics.bmi.value, 23.2);
+  assert.equal(profile.body.healthMetrics.bmi.category, 'Normal');
+  assert.equal(profile.body.healthMetrics.bmr.status, 'AVAILABLE');
+  assert.equal(profile.body.healthMetrics.tdee.status, 'AVAILABLE');
+  assert.equal(profile.body.healthMetrics.bodyFat.status, 'AVAILABLE');
+  assert.equal(profile.body.healthMetrics.oneRepMax.status, 'NOT_AVAILABLE');
+  assert.deepEqual(profile.body.biomarkers, []);
   assert.equal('recommendations' in profile.body, false);
 });

@@ -26,6 +26,7 @@ test('database schema defines required platform tables for CRUD coverage', () =>
     'biomarker_observations',
     'processing_jobs',
     'health_scores',
+    'health_calculations',
     'diet_plans',
     'diet_plan_versions',
     'clinical_memory',
@@ -65,6 +66,16 @@ test('database schema defines traceable health intelligence scores', () => {
   assert.equal(hasPattern(/input_summary jsonb not null default/i), true);
   assert.equal(hasPattern(/calculation_version text not null/i), true);
   assert.equal(hasPattern(/check \(score_type in \('nutrition', 'clinical', 'activity', 'sleep', 'calm', 'recovery', 'overall'\)\)/i), true);
+});
+
+test('database schema defines traceable deterministic health calculations', () => {
+  assert.equal(hasPattern(/create table if not exists health_calculations/i), true);
+  assert.equal(hasPattern(/calculation_type text not null/i), true);
+  assert.equal(hasPattern(/input_snapshot jsonb not null default/i), true);
+  assert.equal(hasPattern(/calculated_values jsonb not null default/i), true);
+  assert.equal(hasPattern(/formula_version text not null/i), true);
+  assert.equal(hasPattern(/check \(calculation_type in \('bmi', 'bmr', 'tdee', 'target_heart_rate', 'body_fat', 'one_rep_max'\)\)/i), true);
+  assert.equal(hasPattern(/health_calculations_client_type_calculated_idx/i), true);
 });
 
 test('database schema preserves report-to-biomarker extraction lineage', () => {
