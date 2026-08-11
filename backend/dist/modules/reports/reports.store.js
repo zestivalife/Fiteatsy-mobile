@@ -82,6 +82,7 @@ const compareAnalysisQuality = (candidate, current) => {
         analysisStatusRank(candidate),
         candidate.qualityGate.validatedRequiredTier1Biomarkers ?? 0,
         candidate.qualityGate.validatedBiomarkers,
+        candidate.parameters.length,
         -candidateRejected,
         -candidateConflicts,
         candidate.qualityGate.confidence,
@@ -91,6 +92,7 @@ const compareAnalysisQuality = (candidate, current) => {
         analysisStatusRank(current),
         current.qualityGate.validatedRequiredTier1Biomarkers ?? 0,
         current.qualityGate.validatedBiomarkers,
+        current.parameters.length,
         -currentRejected,
         -currentConflicts,
         current.qualityGate.confidence,
@@ -203,6 +205,35 @@ export const getReportFile = async (reportId, owner) => {
         content: Buffer.from(row.content)
     };
 };
+export const createDocumentIntelligenceAudit = async (input) => {
+    const result = await pool.query(`
+      insert into document_intelligence_audit (
+        report_id, trigger_source, provider, model, user_id, client_id, cost_estimate
+      )
+      values ($1, $2, $3, $4, $5, $6, $7)
+      returning *
+    `, [
+        input.reportId,
+        input.triggerSource,
+        input.provider,
+        input.model,
+        input.userId,
+        input.clientId,
+        input.costEstimate ?? null
+    ]);
+    const row = result.rows[0];
+    return {
+        id: String(row.id),
+        reportId: String(row.report_id),
+        triggerSource: String(row.trigger_source),
+        provider: String(row.provider),
+        model: String(row.model),
+        userId: String(row.user_id),
+        clientId: String(row.client_id),
+        costEstimate: row.cost_estimate == null ? undefined : Number(row.cost_estimate),
+        createdAtISO: new Date(String(row.created_at)).toISOString()
+    };
+};
 export const findActiveReportByDocumentHash = async (owner, hash) => {
     const result = await pool.query(`
       select *
@@ -246,11 +277,28 @@ export const attachReportAnalysis = async (reportId, analysis, analysisMode = 's
         lab_name = $4,
         processing_status = $5,
         error = $6,
-        analysis_attempts = coalesce(health_reports.analysis_attempts, '[]'::jsonb) || jsonb_build_array(
+        analysis_attempts = (
+          case
+            when $10::boolean then (
+              select coalesce(
+                jsonb_agg(
+                  case
+                    when jsonb_typeof(attempt.value) = 'object'
+                      then jsonb_set(attempt.value, '{selected}', 'false'::jsonb, true)
+                    else attempt.value
+                  end
+                ),
+                '[]'::jsonb
+              )
+              from jsonb_array_elements(coalesce(health_reports.analysis_attempts, '[]'::jsonb)) as attempt(value)
+            )
+            else coalesce(health_reports.analysis_attempts, '[]'::jsonb)
+          end
+        ) || jsonb_build_array(
           jsonb_build_object(
-            'id', $7,
-            'analysisMode', $8,
-            'status', $9,
+            'id', $7::text,
+            'analysisMode', $8::text,
+            'status', $9::text,
             'selected', $10::boolean,
             'createdAtISO', to_jsonb(to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
             'summary', jsonb_build_object(

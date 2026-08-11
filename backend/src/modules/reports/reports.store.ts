@@ -86,6 +86,8 @@ export type UploadSession = {
   storageObjectRef: string;
 };
 
+export type DocumentIntelligenceTriggerSource = 'USER_REANALYZE' | 'UPLOAD' | 'AUTO_RETRY' | 'BACKGROUND_SYNC' | 'CRON';
+
 const nowIso = () => new Date().toISOString();
 
 const parseJson = <T>(value: unknown, fallback: T): T => {
@@ -336,6 +338,47 @@ export const getReportFile = async (reportId: string, owner: { userId: string; c
     fileName: String(row.original_filename),
     fileSize: Number(row.file_size),
     content: Buffer.from(row.content as Buffer)
+  };
+};
+
+export const createDocumentIntelligenceAudit = async (input: {
+  reportId: string;
+  triggerSource: DocumentIntelligenceTriggerSource;
+  provider: string;
+  model: string;
+  userId: string;
+  clientId: string;
+  costEstimate?: number;
+}) => {
+  const result = await pool.query(
+    `
+      insert into document_intelligence_audit (
+        report_id, trigger_source, provider, model, user_id, client_id, cost_estimate
+      )
+      values ($1, $2, $3, $4, $5, $6, $7)
+      returning *
+    `,
+    [
+      input.reportId,
+      input.triggerSource,
+      input.provider,
+      input.model,
+      input.userId,
+      input.clientId,
+      input.costEstimate ?? null
+    ]
+  );
+  const row = result.rows[0];
+  return {
+    id: String(row.id),
+    reportId: String(row.report_id),
+    triggerSource: String(row.trigger_source),
+    provider: String(row.provider),
+    model: String(row.model),
+    userId: String(row.user_id),
+    clientId: String(row.client_id),
+    costEstimate: row.cost_estimate == null ? undefined : Number(row.cost_estimate),
+    createdAtISO: new Date(String(row.created_at)).toISOString()
   };
 };
 

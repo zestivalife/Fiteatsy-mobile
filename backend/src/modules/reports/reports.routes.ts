@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { analyzeReportBuffer, analyzeReportBufferAdvanced, ReportAnalysisResult } from './reports.service.js';
+import { AdvancedAnalysisNotAllowedError, analyzeReportBuffer, analyzeReportBufferAdvanced, ReportAnalysisResult } from './reports.service.js';
 import {
   addFeedback,
   attachReportAnalysis,
   completeUploadSession,
+  createDocumentIntelligenceAudit,
   createReportRecord,
   createUploadSession,
   deleteAllReports,
@@ -446,7 +447,27 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
       manualDate: report!.reportDate,
       manualLab: report!.labName,
       analysisMode: 'advanced_reanalysis',
-      analyzer: analyzeReportBufferAdvanced
+      analyzer: (buffer, mimeType) =>
+        analyzeReportBufferAdvanced(buffer, mimeType, {
+          analysisTrigger: 'USER_REANALYZE',
+          reportId: report!.id,
+          userId: owner.accountId,
+          clientId: owner.clientId,
+          auditProviderCall: async (audit) => {
+            if (!audit.reportId || !audit.userId || !audit.clientId) {
+              throw new Error('Document intelligence audit context is incomplete.');
+            }
+            await createDocumentIntelligenceAudit({
+              reportId: audit.reportId,
+              triggerSource: audit.triggerSource,
+              provider: audit.provider,
+              model: audit.model,
+              userId: audit.userId,
+              clientId: audit.clientId,
+              costEstimate: audit.costEstimate
+            });
+          }
+        })
     });
     logReanalysisStage({
       reportId: report!.id,
@@ -462,6 +483,12 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
     });
     return res.status(200).json({ ...payload, reanalysis: true });
   } catch (error) {
+    if (error instanceof AdvancedAnalysisNotAllowedError) {
+      return res.status(403).json({
+        error: error.code,
+        message: 'Advanced document intelligence can only run after the user taps Re-analyse Report.'
+      });
+    }
     const message = error instanceof Error ? error.message : 'Unable to re-analyze this report file.';
     logReanalysisStage({
       reportId: report!.id,

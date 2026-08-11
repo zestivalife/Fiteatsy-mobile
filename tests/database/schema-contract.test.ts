@@ -88,6 +88,10 @@ test('database schema enforces medical report intelligence governance gates', ()
   assert.equal(hasPattern(/'PARTIALLY_VALIDATED'/i), true);
   assert.equal(hasPattern(/health_reports_client_document_hash_active_unique/i), true);
   assert.equal(hasPattern(/on health_reports \(client_id, document_hash\)/i), true);
+  assert.equal(hasPattern(/create table if not exists document_intelligence_audit/i), true);
+  assert.equal(hasPattern(/trigger_source text not null/i), true);
+  assert.equal(hasPattern(/check \(trigger_source = 'USER_REANALYZE'\)/i), true);
+  assert.equal(hasPattern(/document_intelligence_audit_client_owner_fk/i), true);
 });
 
 test.skip('database CRUD runtime validation is pending a live PostgreSQL test database');

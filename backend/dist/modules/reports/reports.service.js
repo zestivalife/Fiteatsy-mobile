@@ -2,9 +2,20 @@ import OpenAI from 'openai';
 import { PDFParse } from 'pdf-parse';
 import { env } from '../../config/env.js';
 import { buildExtractionGovernance, canonicalBiomarkerName, classifyDocument, CORE_BIOMARKERS } from './report-governance.js';
-const STANDARD_IMAGE_AI_MODEL = process.env.OPENAI_MODEL?.trim() || env.openAiVisionModel;
 const AI_VISION_TIMEOUT_MS = 25000;
 const SUPPORTED_DOCUMENT_INTELLIGENCE_PROVIDERS = new Set(['openai']);
+export class AdvancedAnalysisNotAllowedError extends Error {
+    code = 'ADVANCED_ANALYSIS_NOT_ALLOWED';
+    constructor(trigger) {
+        super(`Advanced document intelligence is only allowed for USER_REANALYZE. Received ${trigger ?? 'missing trigger'}.`);
+        this.name = 'AdvancedAnalysisNotAllowedError';
+    }
+}
+export const assertAdvancedAnalysisAllowed = (trigger) => {
+    if (trigger !== 'USER_REANALYZE') {
+        throw new AdvancedAnalysisNotAllowedError(trigger);
+    }
+};
 const getDocumentIntelligenceConfig = () => {
     const provider = env.documentIntelligenceProvider;
     return {
@@ -686,60 +697,6 @@ const describeAiProviderError = (error, label) => {
     ].filter(Boolean);
     return `${parts.join(' ')}${details.message ? `: ${details.message.replace(/sk-[A-Za-z0-9]+/g, 'sk-REDACTED')}` : ''}`;
 };
-const parseImageViaAi = async (buffer, mimeType) => {
-    const aiClient = createOpenAiClient();
-    if (!aiClient) {
-        return {
-            reportDate: null,
-            labName: null,
-            parameters: [],
-            notes: ['Backend image extraction provider is not configured; report requires retry with PDF or manual review.']
-        };
-    }
-    const safeMimeType = mimeType.toLowerCase().includes('png')
-        ? 'image/png'
-        : mimeType.toLowerCase().includes('webp')
-            ? 'image/webp'
-            : 'image/jpeg';
-    const dataUrl = `data:${safeMimeType};base64,${buffer.toString('base64')}`;
-    let completion;
-    try {
-        completion = await withTimeout(aiClient.chat.completions.create({
-            model: STANDARD_IMAGE_AI_MODEL,
-            max_tokens: 800,
-            response_format: { type: 'json_object' },
-            messages: [
-                {
-                    role: 'system',
-                    content: 'You extract lab report data. Return strict JSON with keys reportDate, labName, parameters. parameters is array of {name,value,unit,referenceRange,status,category}. status must be normal/low/high when possible. Never infer or invent missing values.'
-                },
-                {
-                    role: 'user',
-                    content: [
-                        { type: 'text', text: 'Extract all readable lab parameters from this report image. Do not add fake values.' },
-                        { type: 'image_url', image_url: { url: dataUrl } }
-                    ]
-                }
-            ]
-        }), AI_VISION_TIMEOUT_MS, 'Vision extraction');
-    }
-    catch (error) {
-        throw new Error(describeAiProviderError(error, 'Vision extraction'));
-    }
-    const content = completion.choices[0]?.message?.content?.trim() ?? '';
-    const parsed = parseParametersFromAiJson(content);
-    let reportDate = null;
-    let labName = null;
-    try {
-        const json = JSON.parse(extractJsonPayload(content));
-        reportDate = typeof json.reportDate === 'string' ? json.reportDate : null;
-        labName = typeof json.labName === 'string' ? json.labName : null;
-    }
-    catch {
-        // no-op
-    }
-    return { reportDate, labName, parameters: parsed, notes: [] };
-};
 const renderPdfPagesForAdvancedAnalysis = async (buffer, pageCount) => {
     const parser = new PDFParse({ data: buffer });
     try {
@@ -760,6 +717,7 @@ const renderPdfPagesForAdvancedAnalysis = async (buffer, pageCount) => {
     }
 };
 const parseViaAdvancedDocumentIntelligence = async (input) => {
+    assertAdvancedAnalysisAllowed(input.context.analysisTrigger);
     const providerConfig = getDocumentIntelligenceConfig();
     if (!providerConfig.configured) {
         const reason = providerConfig.provider
@@ -807,6 +765,14 @@ ${input.text.slice(0, 12000)}`
     ];
     let completion;
     try {
+        await input.context.auditProviderCall?.({
+            reportId: input.context.reportId,
+            triggerSource: input.context.analysisTrigger,
+            provider: providerConfig.provider,
+            model: providerConfig.model,
+            userId: input.context.userId,
+            clientId: input.context.clientId
+        });
         completion = await withTimeout(aiClient.chat.completions.create({
             model: providerConfig.model,
             max_tokens: 1400,
@@ -1008,17 +974,14 @@ export const analyzeReportBuffer = async (buffer, mimeType) => {
         parameters = mergeParameters(primaryParameters, secondaryParameters);
     }
     else {
-        const imageResult = await parseImageViaAi(buffer, mimeType);
-        aiDate = imageResult.reportDate;
-        aiLab = imageResult.labName;
-        parameters = imageResult.parameters;
+        text = 'Image report uploaded. Standard upload does not run AI vision extraction; use user-initiated re-analysis for visual layout recovery.';
         extractionAttempts.push({
             attempt: 1,
-            strategy: 'vision_structured_json',
+            strategy: 'standard_image_upload_no_ai',
             parameterCount: parameters.length,
-            confidence: Number((parameters.length === 0 ? 0 : Math.min(0.82, 0.52 + Math.min(parameters.length, 25) / 100)).toFixed(2)),
-            rescanRecommended: parameters.length < 8,
-            notes: imageResult.notes
+            confidence: 0,
+            rescanRecommended: true,
+            notes: ['Standard upload intentionally avoids OpenAI Vision. Ask the user to tap Re-analyse Report for advanced visual extraction.']
         });
     }
     const reportDate = aiDate ??
@@ -1035,7 +998,8 @@ export const analyzeReportBuffer = async (buffer, mimeType) => {
         pageCount: isPdf ? pdfPageCount : undefined
     });
 };
-export const analyzeReportBufferAdvanced = async (buffer, mimeType) => {
+export const analyzeReportBufferAdvanced = async (buffer, mimeType, context) => {
+    assertAdvancedAnalysisAllowed(context.analysisTrigger);
     const isPdf = mimeType.toLowerCase().includes('pdf');
     let text = '';
     let pageCount = null;
@@ -1051,7 +1015,8 @@ export const analyzeReportBufferAdvanced = async (buffer, mimeType) => {
         mimeType,
         text,
         pageImages,
-        attemptNumber: 1
+        attemptNumber: 1,
+        context
     });
     const reportDate = advanced.reportDate ??
         findDate(text) ??
