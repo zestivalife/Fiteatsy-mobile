@@ -14,6 +14,7 @@ import { reportsRouter } from './modules/reports/reports.routes.js';
 import { platformRouter } from './modules/platform/platform.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { biomarkersRouter } from './modules/biomarkers/biomarkers.routes.js';
+import { consultantsRouter } from './modules/consultants/consultants.routes.js';
 import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
 export const createApp = (options = {}) => {
     const app = express();
@@ -71,6 +72,7 @@ export const createApp = (options = {}) => {
     app.use('/v1/reports', reportsRouter);
     app.use('/v1/health', healthRouter);
     app.use('/v1/biomarkers', biomarkersRouter);
+    app.use('/v1/consultants', consultantsRouter);
     app.use('/v1/platform', platformRouter);
     app.use((error, _req, res, _next) => {
         const message = error instanceof Error ? error.message : 'Internal server error';

@@ -14,6 +14,7 @@ export type PersistedAuthUser = {
   name: string;
   email: string | null;
   mobileNumber: string | null;
+  role: string | null;
   status: string;
   version: number;
   createdAtISO: string;
@@ -72,6 +73,7 @@ const mapUser = (row: Record<string, unknown>): PersistedAuthUser => ({
   name: String(row.name),
   email: row.email_normalized == null ? null : String(row.email_normalized),
   mobileNumber: row.mobile_number_normalized == null ? null : String(row.mobile_number_normalized),
+  role: row.role == null ? null : String(row.role),
   status: String(row.status),
   version: Number(row.version),
   createdAtISO: new Date(String(row.created_at)).toISOString(),
@@ -430,6 +432,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
         u.name,
         u.email_normalized,
         u.mobile_number_normalized,
+        u.role,
         u.status as user_status,
         u.version as user_version,
         u.created_at as user_created_at,
@@ -469,6 +472,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
       name: String(row.name),
       email: row.email_normalized == null ? null : String(row.email_normalized),
       mobileNumber: row.mobile_number_normalized == null ? null : String(row.mobile_number_normalized),
+      role: row.role == null ? null : String(row.role),
       status: String(row.user_status),
       version: Number(row.user_version),
       createdAtISO: new Date(String(row.user_created_at)).toISOString(),
