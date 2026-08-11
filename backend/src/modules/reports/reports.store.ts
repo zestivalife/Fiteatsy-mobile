@@ -398,9 +398,9 @@ export const attachReportAnalysis = async (
         error = $6,
         analysis_attempts = coalesce(health_reports.analysis_attempts, '[]'::jsonb) || jsonb_build_array(
           jsonb_build_object(
-            'id', $7,
-            'analysisMode', $8,
-            'status', $9,
+            'id', $7::text,
+            'analysisMode', $8::text,
+            'status', $9::text,
             'selected', $10::boolean,
             'createdAtISO', to_jsonb(to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
             'summary', jsonb_build_object(
