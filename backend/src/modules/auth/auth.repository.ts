@@ -48,6 +48,7 @@ export type AuthenticatedAccount = {
   sessionId: string;
   sessionExpiresAtISO: string;
   token: string;
+  authProvider: 'fiteatsy' | 'consultant_dashboard';
   user: PersistedAuthUser;
   client: PersistedClient;
 };
@@ -83,6 +84,7 @@ const decodeJwtPayloadUnsafe = (token: string): Record<string, unknown> | null =
 const getConsultantDashboardJwtSecret = () =>
   process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEY ??
   process.env.CONSULTANT_DASHBOARD_JWT_SECRET ??
+  process.env.JWT_SECRET_KEY ??
   null;
 
 const verifyConsultantDashboardJwt = (token: string) => {
@@ -178,6 +180,7 @@ const rowToAuthenticatedAccount = async (
     sessionId: input.sessionId,
     sessionExpiresAtISO: input.sessionExpiresAtISO,
     token: input.token,
+    authProvider: 'fiteatsy',
     client: currentClient,
     user: {
       id: String(row.user_id_value),
@@ -623,28 +626,51 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
   );
 
   const userRow = bridgedUser.rows[0];
-  if (!userRow) {
+  if (userRow) {
     console.info('CONSULTANT_SESSION_DEBUG', {
       tokenUserId: bridgeUserId,
       sessionFound: false,
-      sessionStatus: 'user_not_allowed',
+      sessionStatus: 'consultant_jwt_bridge',
       expiryResult: bridge.expiryResult
     });
-    return null;
+
+    return rowToAuthenticatedAccount(userRow, {
+      token,
+      sessionId: `consultant-dashboard:${bridgeUserId}`,
+      sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString()
+    });
   }
 
   console.info('CONSULTANT_SESSION_DEBUG', {
     tokenUserId: bridgeUserId,
     sessionFound: false,
-    sessionStatus: 'consultant_jwt_bridge',
+    sessionStatus: 'consultant_jwt_bridge_external',
     expiryResult: bridge.expiryResult
   });
 
-  return rowToAuthenticatedAccount(userRow, {
-    token,
+  return {
+    accountId: bridgeUserId,
     sessionId: `consultant-dashboard:${bridgeUserId}`,
-    sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString()
-  });
+    sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString(),
+    token,
+    authProvider: 'consultant_dashboard',
+    user: {
+      id: bridgeUserId,
+      name: bridgeEmail ?? 'Consultant Dashboard User',
+      email: bridgeEmail,
+      mobileNumber: null,
+      role: bridgeRole,
+      status: 'active',
+      version: 1,
+      createdAtISO: new Date(0).toISOString(),
+      updatedAtISO: new Date(0).toISOString(),
+      deletedAtISO: null,
+      lastLoginAtISO: null,
+      emailVerifiedAtISO: null,
+      mobileVerifiedAtISO: null
+    },
+    client: undefined as unknown as PersistedClient
+  };
 };
 
 export const revokeAuthSession = async (sessionId: string) => {
