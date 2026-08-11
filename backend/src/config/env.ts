@@ -102,4 +102,7 @@ export const env = {
   get pingmateLanguage() {
     return process.env.PINGMATE_LANGUAGE?.trim() || 'en';
   },
+  get initialAdminPhone() {
+    return process.env.INITIAL_ADMIN_PHONE?.trim() || '';
+  },
 };

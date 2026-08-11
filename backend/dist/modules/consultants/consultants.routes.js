@@ -6,7 +6,7 @@ const requireConsultantAccount = (req, res, next) => {
     const account = getAuthenticatedAccount(req);
     if (!canAccessConsultantClientApi(account)) {
         return res.status(403).json({
-            error: 'CONSULTANT_ACCESS_REQUIRED',
+            error: 'ROLE_NOT_ALLOWED',
             message: 'A consultant account is required to access client management APIs.'
         });
     }

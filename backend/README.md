@@ -30,6 +30,9 @@ Production-oriented Node.js + PostgreSQL scaffold for:
 - `GET /v1/platform/care-cases/:careCaseId/tickets`
 - `GET /v1/platform/notifications`
 - `POST /v1/reports/analyze`
+- `POST /v1/admin/users/:userId/role`
+- `GET /v1/consultants/clients`
+- `GET /v1/consultants/clients/:clientId`
 
 Protected routes under `/v1/platform/*`, `/v1/reports/*`, and authenticated wearable endpoints now require:
 
@@ -62,6 +65,7 @@ Server-side ownership comes from the authenticated account context and no longer
 - `OTP_DEBUG_RESPONSE_ENABLED`
 - `GIT_COMMIT`
 - `RAILWAY_GIT_COMMIT_SHA`
+- `INITIAL_ADMIN_PHONE` (one-time first-admin bootstrap by active user mobile number)
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
 - `DOCUMENT_INTELLIGENCE_PROVIDER` (`openai` enables advanced report re-analysis)
@@ -75,6 +79,15 @@ Server-side ownership comes from the authenticated account context and no longer
 - `GET /v1/version` returns `service`, `version`, `environment`, and `git_commit`.
 - `GET /ready` checks PostgreSQL readiness and returns `200` when ready or `503` when not ready.
 - Current CORS remains the default permissive mobile-staging setup and should be hardened before production.
+
+### Admin / Consultant Role Management
+
+- Roles are stored on `users.role`.
+- Supported managed roles are `user`, `consultant`, and `admin`.
+- Only authenticated `admin` users can call `POST /v1/admin/users/:userId/role`.
+- Every role change writes a `role_audit_events` record.
+- `INITIAL_ADMIN_PHONE` is a one-time bootstrap helper: if configured, no active admin exists, and the matching active user exists, startup promotes that user to `admin` and records `reason = initial_admin_bootstrap`. Once that audit event exists, the bootstrap path will not run again.
+- Consultant dashboard APIs require `consultant`, `practitioner`, `admin`, or `super_admin` role and return `403 ROLE_NOT_ALLOWED` for ordinary users.
 
 ## Phase 1 Foundation
 

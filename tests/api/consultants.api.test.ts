@@ -58,7 +58,7 @@ test('GET /v1/consultants/clients denies normal user sessions', async () => {
   });
 
   assert.equal(response.response.status, 403);
-  assert.equal(response.body.error, 'CONSULTANT_ACCESS_REQUIRED');
+  assert.equal(response.body.error, 'ROLE_NOT_ALLOWED');
 });
 
 test('registered Fiteatsy users appear in consultant client discovery without dummy data', async () => {
