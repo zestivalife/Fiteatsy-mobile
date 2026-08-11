@@ -62,9 +62,11 @@ test('GET /v1/consultants/clients denies normal user sessions', async () => {
 });
 
 test('registered Fiteatsy users appear in consultant client discovery without dummy data', async () => {
+  const email = `real-client-${Date.now()}@example.com`;
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Real Client',
-    email: `real-client-${Date.now()}@example.com`
+    email,
+    mobileNumber: '+919900001234'
   });
   const consultant = await createConsultantSession();
 
@@ -76,15 +78,43 @@ test('registered Fiteatsy users appear in consultant client discovery without du
   assert.equal(response.body.clients.length, 1);
   assert.equal(response.body.clients[0].name, 'Real Client');
   assert.equal(response.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+  assert.equal(response.body.clients[0].email, email);
+  assert.equal(response.body.clients[0].mobile, '919900001234');
+  assert.equal(response.body.clients[0].mobileNumberMasked, '******1234');
+  assert.equal(response.body.clients[0].status, 'active');
+  assert.equal(response.body.clients[0].accountStatus, 'active');
   assert.equal(response.body.clients[0].profileCompleted, false);
+  assert.equal(response.body.clients[0].reportsCount, 0);
+  assert.equal(response.body.clients[0].biomarkerStatus, null);
+  assert.equal(response.body.clients[0].lastHealthUpdate, null);
   assert.equal(typeof response.body.clients[0].registeredAt, 'string');
   assert.equal(typeof response.body.clients[0].lastActiveAt, 'string');
+});
+
+test('consultant discovery backfills missing client records for registered users', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Legacy Client',
+    email: `legacy-client-${Date.now()}@example.com`
+  });
+  await pool.query('delete from fiteatsy_clients where account_user_id = $1', [client.current.body.accountId]);
+
+  const consultant = await createConsultantSession();
+  const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.clients.length, 1);
+  assert.equal(response.body.clients[0].name, 'Legacy Client');
+  const clientRow = await pool.query('select count(*)::int as total from fiteatsy_clients where account_user_id = $1', [client.current.body.accountId]);
+  assert.equal(clientRow.rows[0].total, 1);
 });
 
 test('consultant client profile returns real onboarding fields only', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Onboarded Client',
-    email: `onboarded-client-${Date.now()}@example.com`
+    email: `onboarded-client-${Date.now()}@example.com`,
+    mobileNumber: '+919811112222'
   });
   await patchJson(
     server.baseUrl,
@@ -110,6 +140,13 @@ test('consultant client profile returns real onboarding fields only', async () =
   assert.equal(list.body.clients[0].profileCompleted, true);
   assert.equal(list.body.clients[0].age, ageFromDob('1991-06-14T00:00:00.000Z'));
   assert.equal(list.body.clients[0].gender, 'Female');
+  assert.equal(list.body.clients[0].height, 162);
+  assert.equal(list.body.clients[0].weight, 61);
+  assert.equal(list.body.clients[0].goal, 'Improve energy');
+  assert.equal(list.body.clients[0].activityLevel, 'Moderate');
+  assert.equal(list.body.clients[0].dietPreference, 'Vegetarian');
+  assert.deepEqual(list.body.clients[0].medicalConditions, ['Vitamin D deficiency']);
+  assert.equal(list.body.clients[0].reportsCount, 0);
 
   const profile = await getJson(
     server.baseUrl,
@@ -121,13 +158,21 @@ test('consultant client profile returns real onboarding fields only', async () =
   assert.equal(profile.body.client.id, client.current.body.client.fiteatsyClientId);
   assert.equal(profile.body.client.name, 'Onboarded Client');
   assert.equal(profile.body.client.dob, '1991-06-14T00:00:00.000Z');
+  assert.equal(profile.body.client.age, ageFromDob('1991-06-14T00:00:00.000Z'));
   assert.equal(profile.body.client.gender, 'Female');
+  assert.equal(profile.body.client.mobile, '919811112222');
+  assert.equal(profile.body.client.status, 'active');
+  assert.equal(profile.body.client.accountStatus, 'active');
+  assert.equal(profile.body.client.mobileNumberMasked, '******2222');
   assert.equal(profile.body.onboarding.height, 162);
   assert.equal(profile.body.onboarding.weight, 61);
   assert.equal(profile.body.onboarding.goal, 'Improve energy');
   assert.equal(profile.body.onboarding.activityLevel, 'Moderate');
   assert.equal(profile.body.onboarding.dietPreference, 'Vegetarian');
   assert.deepEqual(profile.body.onboarding.medicalConditions, ['Vitamin D deficiency']);
+  assert.equal(profile.body.healthProfile.biomarkerStatus, null);
+  assert.equal(profile.body.healthProfile.reportsCount, 0);
+  assert.equal(profile.body.healthProfile.profileCompleted, true);
   assert.equal('biomarkers' in profile.body, false);
   assert.equal('recommendations' in profile.body, false);
 });
