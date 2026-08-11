@@ -64,6 +64,8 @@ Server-side ownership comes from the authenticated account context and no longer
 - `RAILWAY_GIT_COMMIT_SHA`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
+- `DOCUMENT_INTELLIGENCE_PROVIDER` (`openai` enables advanced report re-analysis)
+- `OPENAI_VISION_MODEL`
 
 ### Environment Notes
 

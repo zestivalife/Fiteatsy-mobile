@@ -84,6 +84,12 @@ export const env = {
   get openAiApiKey() {
     return process.env.OPENAI_API_KEY?.trim() ?? '';
   },
+  get documentIntelligenceProvider() {
+    return process.env.DOCUMENT_INTELLIGENCE_PROVIDER?.trim().toLowerCase() ?? '';
+  },
+  get openAiVisionModel() {
+    return process.env.OPENAI_VISION_MODEL?.trim() || process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
+  },
   get pingmateApiKey() {
     return process.env.PINGMATE_API_KEY?.trim() ?? '';
   },

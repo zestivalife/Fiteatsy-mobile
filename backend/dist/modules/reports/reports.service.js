@@ -2,9 +2,18 @@ import OpenAI from 'openai';
 import { PDFParse } from 'pdf-parse';
 import { env } from '../../config/env.js';
 import { buildExtractionGovernance, canonicalBiomarkerName, classifyDocument, CORE_BIOMARKERS } from './report-governance.js';
-const AI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
+const STANDARD_IMAGE_AI_MODEL = process.env.OPENAI_MODEL?.trim() || env.openAiVisionModel;
 const AI_VISION_TIMEOUT_MS = 25000;
-const aiClient = env.openAiApiKey ? new OpenAI({ apiKey: env.openAiApiKey }) : null;
+const SUPPORTED_DOCUMENT_INTELLIGENCE_PROVIDERS = new Set(['openai']);
+const getDocumentIntelligenceConfig = () => {
+    const provider = env.documentIntelligenceProvider;
+    return {
+        provider,
+        model: env.openAiVisionModel,
+        configured: SUPPORTED_DOCUMENT_INTELLIGENCE_PROVIDERS.has(provider) && Boolean(env.openAiApiKey)
+    };
+};
+const createOpenAiClient = () => (env.openAiApiKey ? new OpenAI({ apiKey: env.openAiApiKey }) : null);
 const normalizeWhitespace = (value) => value.replace(/\s+/g, ' ').trim();
 const normalizeUnit = (value) => normalizeWhitespace(value)
     .replace(/[´`'’]\s*L\b/g, 'µL')
@@ -417,34 +426,66 @@ const extractJsonPayload = (raw) => {
         return trimmed.slice(firstArray, lastArray + 1);
     return trimmed;
 };
+const parseAiNumericValue = (raw) => {
+    if (typeof raw === 'number' && Number.isFinite(raw))
+        return raw;
+    if (typeof raw !== 'string')
+        return null;
+    const match = raw.trim().match(/^(?:<|>|<=|>=)?\s*(-?\d+(?:\.\d+)?)/);
+    if (!match)
+        return null;
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+const aiConfidenceToNumber = (raw) => {
+    if (typeof raw === 'number' && Number.isFinite(raw))
+        return raw;
+    if (typeof raw !== 'string')
+        return 0.82;
+    const normalized = raw.trim().toLowerCase();
+    if (normalized === 'high')
+        return 0.9;
+    if (normalized === 'medium')
+        return 0.72;
+    if (normalized === 'low')
+        return 0.48;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0.82;
+};
 const parseParametersFromAiJson = (raw) => {
     try {
         const json = JSON.parse(extractJsonPayload(raw));
         const parameters = Array.isArray(json) ? json : Array.isArray(json.parameters) ? json.parameters : [];
         return parameters
-            .filter((item) => item && item.name && Number.isFinite(item.value))
+            .map((item) => ({
+            item,
+            name: normalizeWhitespace(item.normalized_name ?? item.normalizedName ?? item.name ?? item.raw_name ?? item.rawName ?? ''),
+            value: parseAiNumericValue(item.value)
+        }))
+            .filter(({ name, value }) => name && value !== null)
             .map((item) => {
-            const category = categorize(item.category || item.name);
-            const referenceRange = (item.referenceRange ?? item.reference_range)?.trim() || 'Not specified';
-            const pageNumber = Number(item.source_page ?? item.sourcePage ?? 1);
-            const confidence = Number(item.confidence ?? item.extractionConfidence ?? 0.82);
-            const status = item.status === 'low' || item.status === 'high' || item.status === 'normal'
-                ? item.status
-                : inferStatus(Number(item.value), referenceRange);
+            const rawItem = item.item;
+            const category = categorize(rawItem.category || item.name);
+            const referenceRange = (rawItem.referenceRange ?? rawItem.reference_range)?.trim() || 'Not specified';
+            const pageNumber = Number(rawItem.source_page ?? rawItem.sourcePage ?? 1);
+            const confidence = aiConfidenceToNumber(rawItem.confidence ?? rawItem.extractionConfidence);
+            const status = rawItem.status === 'low' || rawItem.status === 'high' || rawItem.status === 'normal'
+                ? rawItem.status
+                : inferStatus(item.value, referenceRange);
             return {
-                name: normalizeWhitespace(item.name),
-                rawName: normalizeWhitespace(item.raw_name ?? item.rawName ?? item.name),
+                name: item.name,
+                rawName: normalizeWhitespace(rawItem.raw_name ?? rawItem.rawName ?? item.name),
                 canonicalName: canonicalBiomarkerName(item.name),
-                canonicalBiomarkerId: item.canonical_biomarker_id ?? item.canonicalBiomarkerId ?? canonicalBiomarkerName(item.name),
-                operator: item.operator?.trim() || undefined,
-                value: Number(item.value),
-                unit: normalizeUnit(item.unit ?? ''),
+                canonicalBiomarkerId: rawItem.canonical_biomarker_id ?? rawItem.canonicalBiomarkerId ?? canonicalBiomarkerName(item.name),
+                operator: rawItem.operator?.trim() || undefined,
+                value: item.value,
+                unit: normalizeUnit(rawItem.unit ?? ''),
                 referenceRange,
                 category,
                 status,
                 pageNumber: Number.isFinite(pageNumber) && pageNumber > 0 ? pageNumber : 1,
                 sectionName: 'Vision extraction',
-                extractionMethod: (item.extraction_method ?? item.extractionMethod)?.trim() || 'vision_structured_json',
+                extractionMethod: (rawItem.extraction_method ?? rawItem.extractionMethod)?.trim() || 'vision_structured_json',
                 extractionConfidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.82
             };
         });
@@ -537,6 +578,7 @@ const describeAiProviderError = (error, label) => {
     return `${parts.join(' ')}${details.message ? `: ${details.message.replace(/sk-[A-Za-z0-9]+/g, 'sk-REDACTED')}` : ''}`;
 };
 const parseImageViaAi = async (buffer, mimeType) => {
+    const aiClient = createOpenAiClient();
     if (!aiClient) {
         return {
             reportDate: null,
@@ -554,7 +596,7 @@ const parseImageViaAi = async (buffer, mimeType) => {
     let completion;
     try {
         completion = await withTimeout(aiClient.chat.completions.create({
-            model: AI_MODEL,
+            model: STANDARD_IMAGE_AI_MODEL,
             max_tokens: 800,
             response_format: { type: 'json_object' },
             messages: [
@@ -589,16 +631,17 @@ const parseImageViaAi = async (buffer, mimeType) => {
     }
     return { reportDate, labName, parameters: parsed, notes: [] };
 };
-const renderPdfPagesForAdvancedAnalysis = async (buffer) => {
+const renderPdfPagesForAdvancedAnalysis = async (buffer, pageCount) => {
     const parser = new PDFParse({ data: buffer });
     try {
+        const pagesToRender = Array.from({ length: Math.max(0, pageCount ?? 0) }, (_, index) => index + 1);
         const result = await parser.getScreenshot({
-            first: 3,
+            ...(pagesToRender.length > 0 ? { partial: pagesToRender } : {}),
             imageDataUrl: true,
             imageBuffer: false,
             desiredWidth: 1400
         });
-        return result.pages.map((page) => page.dataUrl).filter(Boolean).slice(0, 3);
+        return result.pages.map((page) => page.dataUrl).filter(Boolean);
     }
     catch {
         return [];
@@ -608,12 +651,25 @@ const renderPdfPagesForAdvancedAnalysis = async (buffer) => {
     }
 };
 const parseViaAdvancedDocumentIntelligence = async (input) => {
+    const providerConfig = getDocumentIntelligenceConfig();
+    if (!providerConfig.configured) {
+        const reason = providerConfig.provider
+            ? `Advanced document intelligence provider "${providerConfig.provider}" is not configured with required credentials.`
+            : 'Advanced document intelligence provider is not configured.';
+        return {
+            reportDate: null,
+            labName: null,
+            parameters: [],
+            notes: [reason]
+        };
+    }
+    const aiClient = createOpenAiClient();
     if (!aiClient) {
         return {
             reportDate: null,
             labName: null,
             parameters: [],
-            notes: ['Advanced document intelligence provider is not configured.']
+            notes: ['Advanced document intelligence provider credentials are missing.']
         };
     }
     const isImage = input.mimeType.toLowerCase().includes('image');
@@ -634,7 +690,7 @@ const parseViaAdvancedDocumentIntelligence = async (input) => {
 Map Test Name -> Result -> Unit -> Reference Range.
 Use biomarker aliases, expected units, and plausible ranges only to validate relationships; never force or invent values.
 If a value looks like a decimal-shift issue such as HbA1c 77 instead of 7.7, keep the printed value and set lower confidence.
-Return strict JSON with keys reportDate, labName, parameters. Each parameter must contain raw_name, canonical_biomarker_id, operator, value, unit, reference_range, source_page, extraction_method, confidence.
+Return strict JSON only. parameters must be an array of objects with raw_name, normalized_name, value, unit, reference_range, flag, confidence. confidence must be high, medium, or low.
 PDF text/layout fallback:
 ${input.text.slice(0, 12000)}`
         },
@@ -643,13 +699,45 @@ ${input.text.slice(0, 12000)}`
     let completion;
     try {
         completion = await withTimeout(aiClient.chat.completions.create({
-            model: AI_MODEL,
+            model: providerConfig.model,
             max_tokens: 1400,
-            response_format: { type: 'json_object' },
+            response_format: {
+                type: 'json_schema',
+                json_schema: {
+                    name: 'fiteatsy_document_intelligence_biomarkers',
+                    strict: true,
+                    schema: {
+                        type: 'object',
+                        additionalProperties: false,
+                        properties: {
+                            reportDate: { type: ['string', 'null'] },
+                            labName: { type: ['string', 'null'] },
+                            parameters: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    additionalProperties: false,
+                                    properties: {
+                                        raw_name: { type: 'string' },
+                                        normalized_name: { type: 'string' },
+                                        value: { type: 'string' },
+                                        unit: { type: 'string' },
+                                        reference_range: { type: 'string' },
+                                        flag: { type: 'string' },
+                                        confidence: { type: 'string', enum: ['high', 'medium', 'low'] }
+                                    },
+                                    required: ['raw_name', 'normalized_name', 'value', 'unit', 'reference_range', 'flag', 'confidence']
+                                }
+                            }
+                        },
+                        required: ['reportDate', 'labName', 'parameters']
+                    }
+                }
+            },
             messages: [
                 {
                     role: 'system',
-                    content: 'You are a medical document intelligence engine. Understand tables, columns, rows, headers, cells, reading order, and lab biomarker compatibility. Return only extracted visible values; do not diagnose and do not correct values silently.'
+                    content: 'You are a medical document intelligence engine. Understand tables, columns, rows, headers, cells, reading order, and lab biomarker compatibility. Return only extracted visible values; do not diagnose, do not infer hidden values, and do not correct values silently.'
                 },
                 {
                     role: 'user',
@@ -847,7 +935,7 @@ export const analyzeReportBufferAdvanced = async (buffer, mimeType) => {
         const pdfText = await extractTextFromPdf(buffer);
         text = pdfText.text;
         pageCount = pdfText.pageCount;
-        pageImages = await renderPdfPagesForAdvancedAnalysis(buffer);
+        pageImages = await renderPdfPagesForAdvancedAnalysis(buffer, pageCount);
     }
     const advanced = await parseViaAdvancedDocumentIntelligence({
         buffer,
