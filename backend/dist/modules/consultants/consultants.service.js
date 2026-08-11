@@ -1,11 +1,21 @@
 import { persistHealthCalculations } from '../health/health-calculations.repository.js';
 import { calculateHealthMetrics } from '../health/health-calculations.service.js';
-import { ensureRegisteredClientsForEligibleUsers, getRegisteredConsultantClientProfileContext, listValidatedBiomarkerSummaryForClient, listRegisteredConsultantClients } from './consultants.repository.js';
+import { ensureRegisteredClientsForEligibleUsers, getConsultantClientSyncDiagnostics, getRegisteredConsultantClientProfileContext, listValidatedBiomarkerSummaryForClient, listRegisteredConsultantClients } from './consultants.repository.js';
 const CONSULTANT_ROLES = new Set(['consultant', 'practitioner', 'admin', 'super_admin']);
 export const canAccessConsultantClientApi = (account) => CONSULTANT_ROLES.has(account.user.role ?? '');
-export const listConsultantClients = async () => {
-    await ensureRegisteredClientsForEligibleUsers();
-    return listRegisteredConsultantClients();
+export const listConsultantClients = async (account) => {
+    const clientsBackfilled = await ensureRegisteredClientsForEligibleUsers();
+    const clients = await listRegisteredConsultantClients();
+    const diagnostics = await getConsultantClientSyncDiagnostics();
+    console.info('CONSULTANT_CLIENT_SYNC', {
+        totalUsersFound: diagnostics.totalUsersFound,
+        clientsMapped: diagnostics.clientsMapped,
+        activeHealthProfiles: diagnostics.activeHealthProfiles,
+        clientsBackfilled,
+        usersReturned: clients.length,
+        requestRole: account.user.role ?? null
+    });
+    return clients;
 };
 export const getConsultantClientProfile = async (publicClientId) => {
     await ensureRegisteredClientsForEligibleUsers();

@@ -149,6 +149,14 @@ test('consultant client profile returns real onboarding fields only', async () =
   assert.equal(list.body.clients[0].activityLevel, 'Moderate');
   assert.equal(list.body.clients[0].dietPreference, 'Vegetarian');
   assert.deepEqual(list.body.clients[0].medicalConditions, ['Vitamin D deficiency']);
+  assert.equal(list.body.clients[0].onboarding.height, 162);
+  assert.equal(list.body.clients[0].onboarding.weight, 61);
+  assert.equal(list.body.clients[0].onboarding.goal, 'Improve energy');
+  assert.equal(list.body.clients[0].onboarding.activityLevel, 'Moderate');
+  assert.equal(list.body.clients[0].onboarding.dietPreference, 'Vegetarian');
+  assert.deepEqual(list.body.clients[0].onboarding.medicalConditions, ['Vitamin D deficiency']);
+  assert.equal(list.body.clients[0].healthProfile.reportsCount, 0);
+  assert.equal(list.body.clients[0].healthProfile.profileCompleted, true);
   assert.equal(list.body.clients[0].reportsCount, 0);
 
   const profile = await getJson(

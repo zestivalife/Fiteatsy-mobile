@@ -23,8 +23,9 @@ const requireConsultantAccount = (req: Request, res: Response, next: NextFunctio
 consultantsRouter.use(requireAuthenticatedAccount);
 consultantsRouter.use(requireConsultantAccount);
 
-consultantsRouter.get('/clients', async (_req, res) => {
-  const clients = await listConsultantClients();
+consultantsRouter.get('/clients', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const clients = await listConsultantClients(account);
   return res.status(200).json({ clients });
 });
 

@@ -3,6 +3,7 @@ import { persistHealthCalculations } from '../health/health-calculations.reposit
 import { calculateHealthMetrics } from '../health/health-calculations.service.js';
 import {
   ensureRegisteredClientsForEligibleUsers,
+  getConsultantClientSyncDiagnostics,
   getRegisteredConsultantClientProfileContext,
   listValidatedBiomarkerSummaryForClient,
   listRegisteredConsultantClients
@@ -13,9 +14,21 @@ const CONSULTANT_ROLES = new Set(['consultant', 'practitioner', 'admin', 'super_
 export const canAccessConsultantClientApi = (account: AuthenticatedAccount) =>
   CONSULTANT_ROLES.has(account.user.role ?? '');
 
-export const listConsultantClients = async () => {
-  await ensureRegisteredClientsForEligibleUsers();
-  return listRegisteredConsultantClients();
+export const listConsultantClients = async (account: AuthenticatedAccount) => {
+  const clientsBackfilled = await ensureRegisteredClientsForEligibleUsers();
+  const clients = await listRegisteredConsultantClients();
+  const diagnostics = await getConsultantClientSyncDiagnostics();
+
+  console.info('CONSULTANT_CLIENT_SYNC', {
+    totalUsersFound: diagnostics.totalUsersFound,
+    clientsMapped: diagnostics.clientsMapped,
+    activeHealthProfiles: diagnostics.activeHealthProfiles,
+    clientsBackfilled,
+    usersReturned: clients.length,
+    requestRole: account.user.role ?? null
+  });
+
+  return clients;
 };
 
 export const getConsultantClientProfile = async (publicClientId: string) => {

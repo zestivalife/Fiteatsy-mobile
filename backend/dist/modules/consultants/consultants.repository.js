@@ -126,8 +126,49 @@ const mapListRecord = (row) => ({
     reportsCount: Number(row.reports_count ?? 0),
     lastHealthUpdate: toIso(row.last_health_update),
     profileCompleted: profileCompleted(row),
-    lastActiveAt: toIso(row.last_active_at)
+    lastActiveAt: toIso(row.last_active_at),
+    onboarding: {
+        age: toNumberOrNull(row.age),
+        gender: row.gender == null ? null : String(row.gender),
+        height: toNumberOrNull(row.height_cm),
+        weight: toNumberOrNull(row.current_weight_kg),
+        goal: firstString(row.wellness_goals),
+        activityLevel: row.activity_level == null ? null : String(row.activity_level),
+        dietPreference: row.diet_type == null ? null : String(row.diet_type),
+        medicalConditions: row.health_profile_id ? toStringArray(row.primary_conditions) : null
+    },
+    healthProfile: {
+        biomarkerStatus: null,
+        reportsCount: Number(row.reports_count ?? 0),
+        lastHealthUpdate: toIso(row.last_health_update),
+        profileCompleted: profileCompleted(row)
+    }
 });
+export const getConsultantClientSyncDiagnostics = async () => {
+    const result = await pool.query(`
+      select
+        count(distinct u.id)::int as total_users_found,
+        count(distinct c.id)::int as clients_mapped,
+        count(distinct hp.id)::int as active_health_profiles
+      from users u
+      left join fiteatsy_clients c
+        on c.account_user_id = u.id
+        and c.deleted_at is null
+        and c.status = 'active'
+      left join health_profiles hp
+        on hp.user_id = u.id
+        and hp.client_id = c.id
+        and hp.deleted_at is null
+        and hp.status = 'active'
+      where ${eligibleUserPredicate}
+    `, [...AUTHENTICATED_USER_EXCLUSION_ROLES]);
+    const row = result.rows[0] ?? {};
+    return {
+        totalUsersFound: Number(row.total_users_found ?? 0),
+        clientsMapped: Number(row.clients_mapped ?? 0),
+        activeHealthProfiles: Number(row.active_health_profiles ?? 0)
+    };
+};
 export const ensureRegisteredClientsForEligibleUsers = async () => {
     const result = await pool.query(`
       select u.id
