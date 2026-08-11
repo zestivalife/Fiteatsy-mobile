@@ -37,6 +37,52 @@ test('client repository creates a stable one-to-one client identity for a verifi
   assert.equal(await countClients(), 1);
 });
 
+test('createOrResolveClientForAccount reactivates stale client mappings and preserves public ids', async () => {
+  const timestamp = new Date().toISOString();
+  await pool.query(
+    `
+      insert into users (
+        id,
+        name,
+        email_normalized,
+        mobile_number_normalized,
+        email_verified_at,
+        mobile_verified_at,
+        status,
+        version,
+        last_login_at,
+        created_at,
+        updated_at
+      ) values ($1, $2, $3, $4, $5, $5, 'active', 1, $5, $5, $5)
+    `,
+    ['stale-client-user', 'Stale Client User', 'stale-client@example.com', '+919876543211', timestamp]
+  );
+
+  await pool.query(
+    `
+      insert into fiteatsy_clients (
+        id,
+        fiteatsy_client_id,
+        account_user_id,
+        status,
+        version,
+        created_at,
+        updated_at,
+        deleted_at
+      ) values ($1, $2, $3, 'inactive', 3, $4, $4, $4)
+    `,
+    ['11111111-1111-1111-1111-111111111111', 'fc_existingpreserved1234567890abcdef', 'stale-client-user', timestamp]
+  );
+
+  const resolved = await createOrResolveClientForAccount('stale-client-user');
+
+  assert.equal(resolved.id, '11111111-1111-1111-1111-111111111111');
+  assert.equal(resolved.fiteatsyClientId, 'fc_existingpreserved1234567890abcdef');
+  assert.equal(resolved.status, 'active');
+  assert.equal(resolved.deletedAtISO, null);
+  assert.equal(await countClients(), 1);
+});
+
 test('migration backfills one client for an existing account and records the migration', async () => {
   const timestamp = new Date().toISOString();
   await pool.query(

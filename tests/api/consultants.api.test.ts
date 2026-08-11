@@ -110,6 +110,35 @@ test('consultant discovery backfills missing client records for registered users
   assert.equal(clientRow.rows[0].total, 1);
 });
 
+test('consultant discovery repairs inactive client mappings and preserves client ids', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Inactive Mapping Client',
+    email: `inactive-client-${Date.now()}@example.com`
+  });
+  await pool.query(
+    'update fiteatsy_clients set status = $2, deleted_at = now(), version = version + 1 where account_user_id = $1',
+    [client.current.body.accountId, 'inactive']
+  );
+
+  const consultant = await createConsultantSession();
+  const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.clients.length, 1);
+  assert.equal(response.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+  assert.equal(response.body.clients[0].name, 'Inactive Mapping Client');
+  assert.equal(response.body.clients[0].status, 'active');
+
+  const repaired = await pool.query(
+    'select status, deleted_at from fiteatsy_clients where account_user_id = $1',
+    [client.current.body.accountId]
+  );
+  assert.equal(repaired.rows[0].status, 'active');
+  assert.equal(repaired.rows[0].deleted_at, null);
+});
+
 test('consultant client profile returns real onboarding fields only', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Onboarded Client',

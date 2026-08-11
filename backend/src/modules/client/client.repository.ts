@@ -52,9 +52,53 @@ export const getClientByAccountUserId = async (
       from fiteatsy_clients
       where account_user_id = $1
         and deleted_at is null
+      order by case when status = 'active' then 0 else 1 end, updated_at desc
       limit 1
     `,
     [accountUserId]
+  );
+  if (result.rowCount === 0) return null;
+  return mapClient(result.rows[0]);
+};
+
+const getClientByAccountUserIdAnyStatus = async (
+  accountUserId: string,
+  db: Queryable = pool
+) => {
+  const result = await db.query(
+    `
+      select *
+      from fiteatsy_clients
+      where account_user_id = $1
+      order by
+        case
+          when deleted_at is null and status = 'active' then 0
+          when deleted_at is null then 1
+          else 2
+        end,
+        updated_at desc
+      limit 1
+    `,
+    [accountUserId]
+  );
+  if (result.rowCount === 0) return null;
+  return mapClient(result.rows[0]);
+};
+
+const reactivateClientRecord = async (clientId: string, db: Queryable = pool) => {
+  const timestamp = new Date().toISOString();
+  const result = await db.query(
+    `
+      update fiteatsy_clients
+      set
+        status = 'active',
+        deleted_at = null,
+        updated_at = $2,
+        version = version + 1
+      where id = $1
+      returning *
+    `,
+    [clientId, timestamp]
   );
   if (result.rowCount === 0) return null;
   return mapClient(result.rows[0]);
@@ -82,8 +126,12 @@ export const createOrResolveClientForAccount = async (
   accountUserId: string,
   db: Queryable = pool
 ): Promise<PersistedClient> => {
-  const existing = await getClientByAccountUserId(accountUserId, db);
-  if (existing) return existing;
+  const existing = await getClientByAccountUserIdAnyStatus(accountUserId, db);
+  if (existing) {
+    if (existing.deletedAtISO == null && existing.status === 'active') return existing;
+    const reactivated = await reactivateClientRecord(existing.id, db);
+    if (reactivated) return reactivated;
+  }
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -104,16 +152,24 @@ export const createOrResolveClientForAccount = async (
         [crypto.randomUUID(), buildClientPublicId(), accountUserId, new Date().toISOString()]
       );
       if (inserted.rowCount === 1) return mapClient(inserted.rows[0]);
-      const resolved = await getClientByAccountUserId(accountUserId, db);
-      if (resolved) return resolved;
+      const resolved = await getClientByAccountUserIdAnyStatus(accountUserId, db);
+      if (resolved) {
+        if (resolved.deletedAtISO == null && resolved.status === 'active') return resolved;
+        const reactivated = await reactivateClientRecord(resolved.id, db);
+        if (reactivated) return reactivated;
+      }
     } catch (error) {
       if (isUniqueViolation(error)) continue;
       throw error;
     }
   }
 
-  const resolved = await getClientByAccountUserId(accountUserId, db);
-  if (resolved) return resolved;
+  const resolved = await getClientByAccountUserIdAnyStatus(accountUserId, db);
+  if (resolved) {
+    if (resolved.deletedAtISO == null && resolved.status === 'active') return resolved;
+    const reactivated = await reactivateClientRecord(resolved.id, db);
+    if (reactivated) return reactivated;
+  }
   throw new Error('Failed to create or resolve Fiteatsy client for account.');
 };
 

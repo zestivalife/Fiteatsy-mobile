@@ -9,6 +9,7 @@ export type ConsultantClientListRecord = {
   mobile: string | null;
   mobileNumberMasked: string | null;
   registeredAt: string;
+  registrationDate: string;
   status: string;
   accountStatus: string;
   age: number | null;
@@ -98,6 +99,8 @@ export type ConsultantClientProfileContext = {
 export type ConsultantClientSyncDiagnostics = {
   totalUsersFound: number;
   clientsMapped: number;
+  missingClientMappings: number;
+  inactiveClientMappings: number;
   activeHealthProfiles: number;
 };
 
@@ -182,8 +185,20 @@ const listClientSelect = `
         coalesce(report_stats.last_report_at, hp.updated_at)
       )
     end as last_health_update
-  from fiteatsy_clients c
-  join users u on u.id = c.account_user_id
+  from users u
+  left join lateral (
+    select *
+    from fiteatsy_clients c
+    where c.account_user_id = u.id
+    order by
+      case
+        when c.deleted_at is null and c.status = 'active' then 0
+        when c.deleted_at is null then 1
+        else 2
+      end,
+      c.updated_at desc
+    limit 1
+  ) c on true
   left join health_profiles hp
     on hp.client_id = c.id
     and hp.user_id = u.id
@@ -205,9 +220,10 @@ const listClientSelect = `
       and hr.deleted_at is null
       and hr.processing_status = any($5)
   ) report_stats on true
-  where c.deleted_at is null
+  where ${eligibleUserPredicate}
+    and c.id is not null
+    and c.deleted_at is null
     and c.status = 'active'
-    and ${eligibleUserPredicate}
 `;
 
 const mapListRecord = (row: Record<string, unknown>): ConsultantClientListRecord => ({
@@ -217,6 +233,7 @@ const mapListRecord = (row: Record<string, unknown>): ConsultantClientListRecord
   mobile: row.mobile_number_normalized == null ? null : String(row.mobile_number_normalized),
   mobileNumberMasked: maskMobileNumber(row.mobile_number_normalized),
   registeredAt: new Date(String(row.registered_at)).toISOString(),
+  registrationDate: new Date(String(row.registered_at)).toISOString(),
   status: String(row.client_status),
   accountStatus: String(row.account_status),
   age: toNumberOrNull(row.age),
@@ -255,16 +272,36 @@ export const getConsultantClientSyncDiagnostics = async (): Promise<ConsultantCl
     `
       select
         count(distinct u.id)::int as total_users_found,
-        count(distinct c.id)::int as clients_mapped,
+        count(distinct case when c_active.id is not null then u.id end)::int as clients_mapped,
+        count(distinct case when c_active.id is null then u.id end)::int as missing_client_mappings,
+        count(distinct case when c_any.id is not null and (c_any.deleted_at is not null or c_any.status <> 'active') then u.id end)::int as inactive_client_mappings,
         count(distinct hp.id)::int as active_health_profiles
       from users u
-      left join fiteatsy_clients c
-        on c.account_user_id = u.id
-        and c.deleted_at is null
-        and c.status = 'active'
+      left join lateral (
+        select *
+        from fiteatsy_clients c
+        where c.account_user_id = u.id
+          and c.deleted_at is null
+          and c.status = 'active'
+        order by c.updated_at desc
+        limit 1
+      ) c_active on true
+      left join lateral (
+        select *
+        from fiteatsy_clients c
+        where c.account_user_id = u.id
+        order by
+          case
+            when c.deleted_at is null and c.status = 'active' then 0
+            when c.deleted_at is null then 1
+            else 2
+          end,
+          c.updated_at desc
+        limit 1
+      ) c_any on true
       left join health_profiles hp
         on hp.user_id = u.id
-        and hp.client_id = c.id
+        and hp.client_id = c_active.id
         and hp.deleted_at is null
         and hp.status = 'active'
       where ${eligibleUserPredicate}
@@ -275,6 +312,8 @@ export const getConsultantClientSyncDiagnostics = async (): Promise<ConsultantCl
   return {
     totalUsersFound: Number(row.total_users_found ?? 0),
     clientsMapped: Number(row.clients_mapped ?? 0),
+    missingClientMappings: Number(row.missing_client_mappings ?? 0),
+    inactiveClientMappings: Number(row.inactive_client_mappings ?? 0),
     activeHealthProfiles: Number(row.active_health_profiles ?? 0)
   };
 };
@@ -284,11 +323,25 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
     `
       select u.id
       from users u
-      left join fiteatsy_clients c
-        on c.account_user_id = u.id
-        and c.deleted_at is null
+      left join lateral (
+        select *
+        from fiteatsy_clients c
+        where c.account_user_id = u.id
+        order by
+          case
+            when c.deleted_at is null and c.status = 'active' then 0
+            when c.deleted_at is null then 1
+            else 2
+          end,
+          c.updated_at desc
+        limit 1
+      ) c on true
       where ${eligibleUserPredicate}
-        and c.id is null
+        and (
+          c.id is null
+          or c.deleted_at is not null
+          or c.status <> 'active'
+        )
       order by u.created_at asc
     `,
     [...AUTHENTICATED_USER_EXCLUSION_ROLES]

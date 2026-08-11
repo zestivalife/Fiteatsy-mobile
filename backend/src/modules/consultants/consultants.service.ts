@@ -20,12 +20,15 @@ export const listConsultantClients = async (account: AuthenticatedAccount) => {
   const diagnostics = await getConsultantClientSyncDiagnostics();
 
   console.info('CONSULTANT_CLIENT_SYNC', {
+    requestAccountId: account.accountId,
+    requestRole: account.user.role ?? null,
     totalUsersFound: diagnostics.totalUsersFound,
     clientsMapped: diagnostics.clientsMapped,
+    missingClientMappings: diagnostics.missingClientMappings,
+    inactiveClientMappings: diagnostics.inactiveClientMappings,
     activeHealthProfiles: diagnostics.activeHealthProfiles,
     clientsBackfilled,
-    usersReturned: clients.length,
-    requestRole: account.user.role ?? null
+    usersReturned: clients.length
   });
 
   return clients;
