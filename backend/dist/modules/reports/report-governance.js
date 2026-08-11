@@ -103,27 +103,31 @@ const coreAliases = [
     { canonicalName: 'Vitamin D', aliases: ['25-OH Vitamin D', 'Vitamin D3', 'Vitamin D 25 Hydroxy', 'Vitamin D 25 - Hydroxy', 'Vitamin D (25-OH)'], dimension: 'Nutrition' },
     { canonicalName: 'Ferritin', aliases: ['Serum Ferritin'], dimension: 'Nutrition' },
     { canonicalName: 'Iron', aliases: ['Serum Iron'], dimension: 'Nutrition' },
-    { canonicalName: 'Hemoglobin', aliases: ['Hb', 'Haemoglobin'], dimension: 'Nutrition' },
+    { canonicalName: 'Hemoglobin', aliases: ['Hb', 'Haemoglobin', 'Haemoglobin Hb'], dimension: 'Nutrition' },
     {
         canonicalName: 'TSH',
-        aliases: ['Thyroid Stimulating Hormone', 'Thyroid Stimulating Hormone Ultrasensitive', 'TSH Thyroid Stimulating Hormone'],
+        aliases: ['Thyroid Stimulating Hormone', 'Thyroid Stimulating Hormone Ultrasensitive', 'TSH Thyroid Stimulating Hormone', 'TSH 3rd Generation'],
         dimension: 'Thyroid/Blood Context'
     },
     { canonicalName: 'Free T4', aliases: ['FT4'], dimension: 'Thyroid/Blood Context' },
     {
         canonicalName: 'WBC',
-        aliases: ['White Blood Cells', 'White Blood Cell Count', 'TLC', 'Total Leukocyte Count', 'Total Leukocyte Count TLC', 'Total Leucocyte Count', 'Total Leucocyte Count TLC'],
+        aliases: ['White Blood Cells', 'White Blood Cell Count', 'TLC', 'Total WBC Count', 'Total WBC Count TLC', 'Total Leukocyte Count', 'Total Leukocyte Count TLC', 'Total Leucocyte Count', 'Total Leucocyte Count TLC'],
         dimension: 'Thyroid/Blood Context'
     },
     { canonicalName: 'Platelets', aliases: ['Platelet Count'], dimension: 'Thyroid/Blood Context' }
 ];
 const supportingAliases = [
     { canonicalName: 'RBC', aliases: ['Red Blood Cells', 'Red Blood Cell Count', 'RBC Count'], dimension: 'Blood' },
-    { canonicalName: 'Hematocrit', aliases: ['HCT', 'Packed Cell Volume', 'PCV'], dimension: 'Blood' },
-    { canonicalName: 'MCV', aliases: ['Mean Corpuscular Volume'], dimension: 'Blood' },
-    { canonicalName: 'MCH', aliases: ['Mean Corpuscular Hemoglobin'], dimension: 'Blood' },
-    { canonicalName: 'MCHC', aliases: ['Mean Corpuscular Hemoglobin Concentration'], dimension: 'Blood' },
-    { canonicalName: 'RDW', aliases: ['Red Cell Distribution Width'], dimension: 'Blood' },
+    { canonicalName: 'Hematocrit', aliases: ['HCT', 'Packed Cell Volume', 'PCV', 'PCV Hematocrit'], dimension: 'Blood' },
+    { canonicalName: 'MCV', aliases: ['Mean Corpuscular Volume', 'Mean Cell Volume', 'Mean Cell Volume MCV'], dimension: 'Blood' },
+    { canonicalName: 'MCH', aliases: ['Mean Corpuscular Hemoglobin', 'Mean Cell Hemoglobin', 'Mean Cell Hemoglobin MCH', 'Mean Cell Haemoglobin', 'Mean Cell Haemoglobin MCH'], dimension: 'Blood' },
+    {
+        canonicalName: 'MCHC',
+        aliases: ['Mean Corpuscular Hemoglobin Concentration', 'Mean Cell Hemoglobin Concentration', 'Mean Cell Hemoglobin Concentration MCHC', 'Mean Cell Hb Conc', 'Mean Cell Hb Conc MCHC', 'Mean Cell Haemoglobin Concentration', 'Mean Cell Haemoglobin Concentration MCHC'],
+        dimension: 'Blood'
+    },
+    { canonicalName: 'RDW', aliases: ['Red Cell Distribution Width', 'RDW CV', 'RDW Red Cell Distribution Width'], dimension: 'Blood' },
     { canonicalName: 'Neutrophils', aliases: ['Neutrophil'], dimension: 'Blood' },
     { canonicalName: 'Lymphocytes', aliases: ['Lymphocyte'], dimension: 'Blood' },
     { canonicalName: 'Monocytes', aliases: ['Monocyte'], dimension: 'Blood' },

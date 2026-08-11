@@ -78,7 +78,11 @@ const groupedTableNames = [
     ...CORE_BIOMARKERS,
     'Glucose',
     'Glucose Fasting',
+    'Fasting Plasma Glucose',
+    'Glucose Random',
     'Glycosylated Hemoglobin (HbA1c)',
+    'Haemoglobin (Hb)',
+    'Haemoglobin',
     'Estimated average glucose (eAG)',
     'SGPT',
     'SGOT',
@@ -98,19 +102,39 @@ const groupedTableNames = [
     'Thyroid Stimulating Hormone (Ultrasensitive)',
     'Gamma Glutamyl Transferase (GGT)',
     'TLC',
+    'Total WBC Count',
+    'Total WBC Count / TLC',
     'Total Leukocyte Count (TLC)',
     'Total Leucocyte Count (TLC)',
     'RBC Count',
+    'PCV / Hematocrit',
     'PCV',
+    'Mean Cell Volume(MCV)',
+    'Mean Cell Volume',
     'MCV',
+    'Mean Cell Haemoglobin Concentration(MCHC)',
+    'Mean Cell Haemoglobin Concentration',
+    'Mean Cell Hemoglobin Concentration',
+    'Mean Cell Hb Conc(MCHC)',
+    'Mean Cell Hb Conc',
+    'Mean Cell Hemoglobin( MCH)',
+    'Mean Cell Hemoglobin(MCH)',
+    'Mean Cell Haemoglobin(MCH)',
+    'Mean Cell Haemoglobin',
+    'Mean Cell Hemoglobin',
     'MCH',
     'MCHC',
+    'RDW (Red Cell Distribution Width)',
     'RDW (CV)',
     'Neutrophils',
     'Lymphocytes',
     'Monocytes',
     'Eosinophils',
     'Basophils',
+    'Absolute Neutrophil Count',
+    'Absolute Lymphocyte Count',
+    'Absolute Monocyte Count',
+    'Absolute Eosinophil Count',
     'Platelet Count',
     'Alkaline Phosphatase',
     'Total Protein',
@@ -127,9 +151,15 @@ const groupedTableNames = [
     'TIBC,(Total Iron Binding Capacity)',
     'Triiodothyronine (T3)',
     'Total Thyroxine (T4)',
+    'Prolactin',
+    'Prolactin-Serum',
+    'Thyroid Stimulating Hormone(TSH)',
+    'Thyroid Stimulating Hormone',
+    'TSH 3rd Generation',
     'GLUCOSE FASTING (F), PLASMA',
     'TSH (THYROID STIMULATING HORMONE), SERUM'
 ];
+const numericPattern = String.raw `-?\d+(?:\.\d+)?`;
 const knownNameMatchesLine = (name, line) => {
     const normalizedName = normalizeWhitespace(name).toLowerCase();
     const normalizedLine = normalizeWhitespace(line).toLowerCase();
@@ -143,7 +173,7 @@ const isKnownBiomarkerLabel = (line) => {
         return false;
     return groupedTableNames.some((name) => normalizeWhitespace(name).toLowerCase() === line.toLowerCase());
 };
-const isMethodOrSectionLine = (line) => /^(?:calculated|hplc|cmia|urease|uricase|ferene|immunoturbidimetry|immunoturbidimetric|hexokinase|enzymatic|colorimetric|biuret|arsenazo|ise-|electrical impedance|laser based|cyanide free|kinetic|glycerol|accelerator|para-nitrophenyl|diazo|diazonium)/i.test(line);
+const isMethodOrSectionLine = (line) => /^(?:method\s*:|calculated|hplc|cmia|clia|eclia|urease|uricase|ferene|immunoturbidimetry|immunoturbidimetric|hexokinase|enzymatic|colorimetric|biuret|arsenazo|ise-|electrical impedance|laser based|cyanide free|kinetic|glycerol|accelerator|para-nitrophenyl|diazo|diazonium)/i.test(line);
 const normalizeRepeatedLeadingValues = (line) => {
     const first = line.match(/^(-?\d+(?:\.\d+)?)(?:\s+|$)/);
     if (!first)
@@ -156,7 +186,7 @@ const normalizeRepeatedLeadingValues = (line) => {
     return `${first[1]} ${remaining}`.trim();
 };
 const parseValueUnitRange = (line) => {
-    const normalizedLine = normalizeRepeatedLeadingValues(line);
+    const normalizedLine = stripResultFlag(normalizeRepeatedLeadingValues(line));
     const match = normalizedLine.match(/^(-?\d+(?:\.\d+)?)\s+(.+?)\s+((?:<?|>?|>=?|<=?)\s*-?\d+(?:\.\d+)?(?:\s*(?:-|–)\s*-?\d+(?:\.\d+)?)?|up to\s+\d+(?:\.\d+)?|Deficient\s+<\s*\d+(?:\.\d+)?|Normal Or High:\s*>=\s*\d+(?:\.\d+)?)/i);
     if (!match)
         return null;
@@ -168,7 +198,8 @@ const parseValueUnitRange = (line) => {
 };
 const boundedRangePattern = String.raw `(?:(?:<|>|>=|<=)\s*-?\d+(?:\.\d+)?|-?\d+(?:\.\d+)?\s*(?:-|–)\s*-?\d+(?:\.\d+)?)`;
 const parseRangeUnitResult = (line) => {
-    const rangeFirst = line.match(new RegExp(`^(${boundedRangePattern})\\s+(.+?)\\s+(-?\\d+(?:\\.\\d+)?)$`, 'i'));
+    const sanitizedLine = stripResultFlag(line);
+    const rangeFirst = sanitizedLine.match(new RegExp(`^(${boundedRangePattern})\\s+(.+?)\\s+(-?\\d+(?:\\.\\d+)?)$`, 'i'));
     if (rangeFirst) {
         return {
             value: Number(rangeFirst[3]),
@@ -176,7 +207,7 @@ const parseRangeUnitResult = (line) => {
             referenceRange: normalizeWhitespace(rangeFirst[1])
         };
     }
-    const unitFirst = line.match(new RegExp(`^([A-Za-zµμ/%][A-Za-z0-9/%µμ^./-]*)\\s+(${boundedRangePattern})\\s+(-?\\d+(?:\\.\\d+)?)$`, 'i'));
+    const unitFirst = sanitizedLine.match(new RegExp(`^([A-Za-zµμ/%][A-Za-z0-9/%µμ^./-]*)\\s+(${boundedRangePattern})\\s+(-?\\d+(?:\\.\\d+)?)$`, 'i'));
     if (unitFirst) {
         return {
             value: Number(unitFirst[3]),
@@ -198,8 +229,94 @@ const looksLikeKnownBiomarkerName = (value) => {
     return canonical !== value.trim().replace(/\s+/g, ' ') || groupedTableNames.some((name) => normalizeWhitespace(name).toLowerCase() === normalizeWhitespace(value).toLowerCase());
 };
 const containsUnitOrRangeFragment = (value) => /\d|mg\/dL|g\/dL|ng\/mL|pg\/mL|mIU\/L|µIU\/mL|uIU\/mL|IU\/L|U\/L|mmol\/L/i.test(value);
+const stripResultFlag = (line) => normalizeWhitespace(line).replace(new RegExp(`^(${numericPattern})\\s+[HL]\\s+(?=[A-Za-zµμ/%])`, 'i'), '$1 ');
+const collapseStandaloneRepeatedLetters = (line) => line.replace(/\b([A-Za-z])\1{2,}\b/g, '$1');
+const compactPdfExtractedLine = (line) => {
+    const cells = line.split(/\t+/).map((cell) => normalizeWhitespace(collapseStandaloneRepeatedLetters(cell))).filter(Boolean);
+    if (cells.length === 0)
+        return '';
+    const first = cells[0];
+    const repeatedFirstCells = cells.filter((cell) => cell === first).length;
+    const firstNumber = parseResultToken(first);
+    if (firstNumber !== null && repeatedFirstCells >= 2) {
+        const richerRepeatedCell = cells.find((cell) => cell.startsWith(first) && cell !== first);
+        const trailingCells = cells.filter((cell) => cell !== first && cell !== richerRepeatedCell);
+        return normalizeWhitespace([richerRepeatedCell ?? first, ...trailingCells].join(' '));
+    }
+    if (repeatedFirstCells >= 2) {
+        return normalizeWhitespace(first.replace(/\bSample:.*$/i, ''));
+    }
+    if (cells.length === 2 && looksLikeKnownBiomarkerName(cells[0])) {
+        return normalizeWhitespace(`${cells[0]} ${cells[1]}`);
+    }
+    return normalizeWhitespace(cells.join(' '));
+};
+const normalizePdfTextForParsing = (text) => text
+    .split('\n')
+    .map(compactPdfExtractedLine)
+    .filter(Boolean)
+    .join('\n');
+const extractKnownBiomarkerLabel = (line) => {
+    const cleaned = normalizeWhitespace(line.replace(/\bSample:.*$/i, '').replace(/[-:]\s*$/, ''));
+    if (/^(?:biological reference|reference group|interpretation|clinical significance|method|sample)\b/i.test(cleaned) ||
+        /^[A-Za-z]+\),/.test(cleaned)) {
+        return null;
+    }
+    if (isKnownBiomarkerLabel(cleaned))
+        return cleaned;
+    const inlineNames = [...groupedTableNames].sort((a, b) => b.length - a.length);
+    return inlineNames.find((candidate) => {
+        const normalizedCandidate = normalizeWhitespace(candidate).toLowerCase();
+        const normalizedLine = cleaned.toLowerCase();
+        return (normalizedLine === normalizedCandidate ||
+            normalizedLine.startsWith(`${normalizedCandidate} `) ||
+            normalizedLine.startsWith(`${normalizedCandidate}(`) ||
+            normalizedLine.startsWith(`${normalizedCandidate}/`));
+    }) ?? null;
+};
+const parseLooseResultUnitRange = (line) => {
+    const normalizedLine = stripResultFlag(line).replace(/^\(\s*[A-Za-z0-9]+\s*\)\s+/, '');
+    const valueUnitRange = normalizedLine.match(new RegExp(`^(${numericPattern})\\s+(.+?)\\s+(${boundedRangePattern})$`, 'i'));
+    if (valueUnitRange) {
+        return {
+            value: Number(valueUnitRange[1]),
+            unit: normalizeUnit(valueUnitRange[2]),
+            referenceRange: normalizeWhitespace(valueUnitRange[3])
+        };
+    }
+    const unitRangeValue = normalizedLine.match(new RegExp(`^(.+?)\\s+(${boundedRangePattern})\\s+(${numericPattern})$`, 'i'));
+    if (unitRangeValue) {
+        return {
+            value: Number(unitRangeValue[3]),
+            unit: normalizeUnit(unitRangeValue[1]),
+            referenceRange: normalizeWhitespace(unitRangeValue[2])
+        };
+    }
+    const valueUnitOnly = normalizedLine.match(new RegExp(`^(${numericPattern})\\s+([A-Za-zµμ/%][A-Za-z0-9/%µμ^./-]*)$`, 'i'));
+    if (valueUnitOnly) {
+        return {
+            value: Number(valueUnitOnly[1]),
+            unit: normalizeUnit(valueUnitOnly[2]),
+            referenceRange: 'Not specified'
+        };
+    }
+    return null;
+};
+const buildParsedParameter = (name, parsed, index, sectionName, extractionMethod, extractionConfidence) => ({
+    name,
+    canonicalName: canonicalBiomarkerName(name),
+    value: parsed.value,
+    unit: parsed.unit,
+    referenceRange: parsed.referenceRange,
+    category: categorize(name),
+    status: inferStatus(parsed.value, parsed.referenceRange),
+    pageNumber: Math.max(1, Math.ceil(index / 45)),
+    sectionName,
+    extractionMethod,
+    extractionConfidence
+});
 const parseDelimitedReportRows = (text) => {
-    const rawLines = text.split('\n');
+    const rawLines = normalizePdfTextForParsing(text).split('\n');
     const out = [];
     for (let index = 0; index < rawLines.length; index += 1) {
         const cells = rawLines[index].split(/\t+/).map((cell) => normalizeWhitespace(cell)).filter(Boolean);
@@ -250,60 +367,49 @@ const parseGroupedTableParameters = (lines) => {
     const inlineNames = [...groupedTableNames].sort((a, b) => b.length - a.length);
     for (let index = 0; index < lines.length; index += 1) {
         const name = lines[index];
-        const inlineName = inlineNames.find((candidate) => name.toLowerCase().startsWith(`${candidate.toLowerCase()} `));
+        const inlineName = inlineNames.find((candidate) => {
+            const normalizedName = name.toLowerCase();
+            const normalizedCandidate = candidate.toLowerCase();
+            return normalizedName === normalizedCandidate || normalizedName.startsWith(`${normalizedCandidate} `);
+        });
         if (inlineName) {
-            const parsed = parseValueUnitRange(name.slice(inlineName.length).trim());
+            const inlineRemainder = name.slice(inlineName.length).trim();
+            const parsed = parseValueUnitRange(inlineRemainder) ?? parseLooseResultUnitRange(inlineRemainder);
             if (parsed && Number.isFinite(parsed.value)) {
-                out.push({
-                    name: inlineName,
-                    canonicalName: canonicalBiomarkerName(inlineName),
-                    value: parsed.value,
-                    unit: parsed.unit,
-                    referenceRange: parsed.referenceRange,
-                    category: categorize(inlineName),
-                    status: inferStatus(parsed.value, parsed.referenceRange),
-                    pageNumber: Math.max(1, Math.ceil(index / 45)),
-                    sectionName: 'Inline PDF table row',
-                    extractionMethod: 'pdf_inline_table_scan',
-                    extractionConfidence: 0.95
-                });
-            }
-        }
-        if (!isKnownBiomarkerLabel(name))
-            continue;
-        for (let offset = 1; offset <= 3 && index + offset < lines.length; offset += 1) {
-            const candidate = lines[index + offset];
-            if (ignoredLabTextPattern.test(candidate))
-                break;
-            if (isKnownBiomarkerLabel(candidate))
-                break;
-            if (offset === 1 && !isMethodOrSectionLine(candidate) && !parseRangeUnitResult(candidate) && !parseValueUnitRange(candidate))
+                out.push(buildParsedParameter(inlineName, parsed, index, 'Inline PDF table row', 'pdf_inline_table_scan', 0.95));
                 continue;
-            const parsed = parseRangeUnitResult(candidate) ?? parseValueUnitRange(candidate);
+            }
+            if (containsUnitOrRangeFragment(inlineRemainder))
+                continue;
+        }
+        const groupedName = extractKnownBiomarkerLabel(name);
+        if (!groupedName)
+            continue;
+        for (let offset = 1; offset <= 6 && index + offset < lines.length; offset += 1) {
+            const candidate = lines[index + offset];
+            if (ignoredLabTextPattern.test(candidate)) {
+                if (isMethodOrSectionLine(candidate))
+                    continue;
+                break;
+            }
+            if (extractKnownBiomarkerLabel(candidate))
+                break;
+            if (offset === 1 && !isMethodOrSectionLine(candidate) && !parseRangeUnitResult(candidate) && !parseValueUnitRange(candidate) && !parseLooseResultUnitRange(candidate))
+                continue;
+            const parsed = parseRangeUnitResult(candidate) ?? parseValueUnitRange(candidate) ?? parseLooseResultUnitRange(candidate);
             if (!parsed || !Number.isFinite(parsed.value))
                 continue;
-            out.push({
-                name,
-                canonicalName: canonicalBiomarkerName(name),
-                value: parsed.value,
-                unit: parsed.unit,
-                referenceRange: parsed.referenceRange,
-                category: categorize(name),
-                status: inferStatus(parsed.value, parsed.referenceRange),
-                pageNumber: Math.max(1, Math.ceil(index / 45)),
-                sectionName: 'Grouped PDF table row',
-                extractionMethod: 'pdf_grouped_table_scan',
-                extractionConfidence: 0.97
-            });
+            out.push(buildParsedParameter(groupedName, parsed, index, 'Grouped PDF table row', 'pdf_grouped_table_scan', 0.97));
             break;
         }
     }
     return out;
 };
 const parseParameters = (text) => {
-    const lines = text.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
-    const out = [...parseDelimitedReportRows(text), ...parseGroupedTableParameters(lines)];
-    const linePattern = /^([A-Za-z][A-Za-z0-9 ()/+%-]{2,50})\s+(-?\d+(?:\.\d+)?)\s*([A-Za-z/%µ]+)?\s+(<?\s*-?\d+(?:\.\d+)?\s*(?:-|–)\s*-?\d+(?:\.\d+)?|<\s*-?\d+(?:\.\d+)?|>\s*-?\d+(?:\.\d+)?)/;
+    const normalizedText = normalizePdfTextForParsing(text);
+    const lines = normalizedText.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
+    const out = [...parseDelimitedReportRows(normalizedText), ...parseGroupedTableParameters(lines)];
+    const linePattern = /^([A-Za-z][A-Za-z0-9 .(),/+%-]{2,70})\s+(-?\d+(?:\.\d+)?)\s*([A-Za-z0-9/%µμ^./-]+)?\s+(<?\s*-?\d+(?:\.\d+)?\s*(?:-|–)\s*-?\d+(?:\.\d+)?|<\s*-?\d+(?:\.\d+)?|>\s*-?\d+(?:\.\d+)?)/;
     for (const line of lines) {
         if (!looksLikeTableRow(line))
             continue;
@@ -332,16 +438,19 @@ const parseParameters = (text) => {
             extractionConfidence: 0.96
         });
     }
-    // de-dup by name and keep first parsed occurrence
+    // De-dup by canonical biomarker so richer generic aliases beat weaker fallback rows.
     const unique = new Map();
     for (const p of out) {
-        if (!unique.has(p.name.toLowerCase()))
-            unique.set(p.name.toLowerCase(), p);
+        const key = canonicalBiomarkerName(p.name).toLowerCase();
+        const existing = unique.get(key);
+        if (!existing || (p.extractionConfidence ?? 0) > (existing.extractionConfidence ?? 0)) {
+            unique.set(key, p);
+        }
     }
     return Array.from(unique.values());
 };
 const parseParametersFallback = (text) => {
-    const lines = text.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
+    const lines = normalizePdfTextForParsing(text).split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
     const out = [];
     const knownNames = [
         'Estimated average glucose (eAG)',
