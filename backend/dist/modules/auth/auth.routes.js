@@ -48,14 +48,16 @@ const toHttpStatus = (code) => {
         return 429;
     return 400;
 };
+const validationErrorResponse = (error) => ({
+    error: 'INVALID_INPUT',
+    message: 'Please check the highlighted fields and try again.',
+    details: error.flatten()
+});
 export const authRouter = Router();
 authRouter.post('/login/pin', async (req, res) => {
     const parsed = pinLoginSchema.safeParse(req.body);
     if (!parsed.success) {
-        return res.status(400).json({
-            error: 'INVALID_INPUT',
-            details: parsed.error.flatten()
-        });
+        return res.status(400).json(validationErrorResponse(parsed.error));
     }
     try {
         const result = await loginWithPin(parsed.data, {
@@ -76,10 +78,7 @@ authRouter.post('/login/pin', async (req, res) => {
 authRouter.post('/signup/request-otp', async (req, res) => {
     const parsed = signupRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-        return res.status(400).json({
-            error: 'INVALID_INPUT',
-            details: parsed.error.flatten()
-        });
+        return res.status(400).json(validationErrorResponse(parsed.error));
     }
     try {
         const result = await createOtpChallenge(parsed.data);
@@ -97,10 +96,7 @@ authRouter.post('/signup/request-otp', async (req, res) => {
 authRouter.post('/signup/resend-otp', async (req, res) => {
     const parsed = otpResendSchema.safeParse(req.body);
     if (!parsed.success) {
-        return res.status(400).json({
-            error: 'INVALID_INPUT',
-            details: parsed.error.flatten()
-        });
+        return res.status(400).json(validationErrorResponse(parsed.error));
     }
     try {
         const result = await resendOtpChallenge(parsed.data.challengeId);
@@ -118,10 +114,7 @@ authRouter.post('/signup/resend-otp', async (req, res) => {
 authRouter.post('/signup/verify-otp', async (req, res) => {
     const parsed = otpVerifySchema.safeParse(req.body);
     if (!parsed.success) {
-        return res.status(400).json({
-            error: 'INVALID_INPUT',
-            details: parsed.error.flatten()
-        });
+        return res.status(400).json(validationErrorResponse(parsed.error));
     }
     try {
         const result = await verifyOtpChallenge(parsed.data.challengeId, parsed.data.otp, {
@@ -160,10 +153,7 @@ authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
 authRouter.put('/change-pin', requireAuthenticatedAccount, async (req, res) => {
     const parsed = changePinSchema.safeParse(req.body);
     if (!parsed.success) {
-        return res.status(400).json({
-            error: 'INVALID_INPUT',
-            details: parsed.error.flatten()
-        });
+        return res.status(400).json(validationErrorResponse(parsed.error));
     }
     try {
         const account = getAuthenticatedAccount(req);

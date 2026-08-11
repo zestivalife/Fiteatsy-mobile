@@ -31,6 +31,7 @@ import { getPhoneDigits, normalizePhoneNumber } from '../../utils/phone';
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 const OTP_LENGTH = 6;
 const LAST_COUNTRY_KEY = 'fiteatsy.auth.lastCountry';
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const SignUpScreen = ({ navigation }: Props) => {
   const { completeAuthentication, setOnboarding, themeMode } = useAppContext();
@@ -64,6 +65,9 @@ export const SignUpScreen = ({ navigation }: Props) => {
       return null;
     }
   }, [nationalNumber, selectedCountry.dialCode]);
+  const trimmedName = name.trim();
+  const trimmedEmail = email.trim().toLowerCase();
+  const isValidEmail = EMAIL_PATTERN.test(trimmedEmail);
 
   const otpExpired = phase === 'verify' && expiresAtMs > 0 && nowMs >= expiresAtMs;
   const resendRemainingSec = Math.max(0, Math.ceil((resendAtMs - nowMs) / 1000));
@@ -71,7 +75,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
   const canResend = phase === 'verify' && resendRemainingSec === 0 && !loading;
   const canVerify = otp.length === OTP_LENGTH && !otpExpired && !verifying;
   const canRequestOtp =
-    name.trim().length >= 2 && email.trim().length > 0 && normalizedPhone !== null && !loading && requestCooldownRemainingSec === 0;
+    trimmedName.length >= 2 && isValidEmail && normalizedPhone !== null && !loading && requestCooldownRemainingSec === 0;
 
   useEffect(() => {
     AsyncStorage.getItem(LAST_COUNTRY_KEY).then((storedCountry) => {
@@ -104,6 +108,15 @@ export const SignUpScreen = ({ navigation }: Props) => {
 
   const requestOtp = async () => {
     setError(null);
+    if (trimmedName.length < 2) {
+      setError('Enter your full name.');
+      return;
+    }
+    if (!isValidEmail) {
+      setError('Enter a valid email address.');
+      return;
+    }
+
     let phone;
     try {
       phone = normalizePhoneNumber(selectedCountry.dialCode, nationalNumber);
@@ -120,8 +133,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
     try {
       await AsyncStorage.setItem(LAST_COUNTRY_KEY, selectedCountry.iso2);
       const response = await requestSignupOtp({
-        name: name.trim(),
-        email: email.trim(),
+        name: trimmedName,
+        email: trimmedEmail,
         mobileNumber: phone.normalizedNumber
       });
       applyOtpMetadata(response);

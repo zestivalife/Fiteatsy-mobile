@@ -244,6 +244,32 @@ test('OTP request returns OTP_DELIVERY_FAILED when provider delivery fails', asy
   );
 });
 
+test('OTP request invalid input returns safe validation details', async () => {
+  await withEnv(
+    {
+      NODE_ENV: 'test'
+    },
+    async () => {
+      const server = await startAppServer(createApp());
+      try {
+        const { response, body } = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
+          name: 'A',
+          email: 'not-an-email',
+          mobileNumber: '123'
+        });
+        assert.equal(response.status, 400);
+        assert.equal(body.error, 'INVALID_INPUT');
+        assert.equal(body.message, 'Please check the highlighted fields and try again.');
+        assert.equal(Array.isArray(body.details.fieldErrors.name), true);
+        assert.equal(Array.isArray(body.details.fieldErrors.email), true);
+        assert.equal(Array.isArray(body.details.fieldErrors.mobileNumber), true);
+      } finally {
+        await server.close();
+      }
+    }
+  );
+});
+
 test('OTP expiry rejects verification without creating a session', async () => {
   await withEnv(
     {

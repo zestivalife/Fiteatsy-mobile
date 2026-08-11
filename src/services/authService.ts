@@ -94,8 +94,33 @@ const sanitizeAuthPayload = (value: unknown): unknown => {
   return value;
 };
 
+const formatValidationDetails = (details: unknown) => {
+  if (!details || typeof details !== 'object') return null;
+  const fieldErrors = (details as { fieldErrors?: Record<string, unknown> }).fieldErrors;
+  if (!fieldErrors || typeof fieldErrors !== 'object') return null;
+
+  const labels: Record<string, string> = {
+    name: 'Name',
+    email: 'Email',
+    mobile: 'Mobile number',
+    mobileNumber: 'Mobile number',
+    pin: 'PIN',
+    otp: 'OTP',
+    challengeId: 'OTP request'
+  };
+
+  const messages = Object.entries(fieldErrors)
+    .flatMap(([field, errors]) => {
+      if (!Array.isArray(errors)) return [];
+      return errors.map((message) => `${labels[field] ?? field}: ${String(message)}`);
+    })
+    .filter(Boolean);
+
+  return messages.length > 0 ? messages.join('\n') : null;
+};
+
 const parseError = async (response: Response, url: string): Promise<never> => {
-  let payload: { error?: ApiErrorCode; message?: string; retryAfterSec?: number } = {};
+  let payload: { error?: ApiErrorCode; message?: string; retryAfterSec?: number; details?: unknown } = {};
   let responseText = '';
   try {
     responseText = await response.text();
@@ -115,9 +140,10 @@ const parseError = async (response: Response, url: string): Promise<never> => {
     });
     payload = {};
   }
+  const validationMessage = payload.error === 'INVALID_INPUT' ? formatValidationDetails(payload.details) : null;
   throw new AuthServiceError(
     payload.error ?? 'SERVER_ERROR',
-    payload.message ?? 'Unable to complete authentication request.',
+    validationMessage ?? payload.message ?? 'Unable to complete authentication request.',
     payload.retryAfterSec
   );
 };
