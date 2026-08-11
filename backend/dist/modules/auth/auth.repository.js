@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import { createOrResolveClientForAccount, resolveCurrentClientForAccount } from '../client/client.repository.js';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const CONSULTANT_DASHBOARD_BRIDGE_ROLES = new Set(['consultant', 'practitioner', 'admin', 'super_admin']);
 const normalizeEmail = (email) => email.trim().toLowerCase();
 const normalizeMobileNumber = (mobileNumber) => mobileNumber.trim();
 const getIndianNationalMobileNumber = (mobileNumber) => {
@@ -10,6 +11,62 @@ const getIndianNationalMobileNumber = (mobileNumber) => {
 };
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 const now = () => new Date();
+const base64UrlDecode = (value) => {
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
+    return Buffer.from(`${normalized}${padding}`, 'base64');
+};
+const decodeJwtPayloadUnsafe = (token) => {
+    const parts = token.split('.');
+    if (parts.length !== 3)
+        return null;
+    try {
+        return JSON.parse(base64UrlDecode(parts[1]).toString('utf8'));
+    }
+    catch {
+        return null;
+    }
+};
+const getConsultantDashboardJwtSecret = () => process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEY ??
+    process.env.CONSULTANT_DASHBOARD_JWT_SECRET ??
+    null;
+const verifyConsultantDashboardJwt = (token) => {
+    const secret = getConsultantDashboardJwtSecret();
+    const parts = token.split('.');
+    if (!secret || parts.length !== 3) {
+        return { payload: null, expiryResult: 'not_configured_or_not_jwt' };
+    }
+    const [headerPart, payloadPart, signaturePart] = parts;
+    let header;
+    let payload;
+    try {
+        header = JSON.parse(base64UrlDecode(headerPart).toString('utf8'));
+        payload = JSON.parse(base64UrlDecode(payloadPart).toString('utf8'));
+    }
+    catch {
+        return { payload: null, expiryResult: 'invalid_json' };
+    }
+    if (header.alg !== 'HS256') {
+        return { payload, expiryResult: 'unsupported_algorithm' };
+    }
+    const expected = crypto
+        .createHmac('sha256', secret)
+        .update(`${headerPart}.${payloadPart}`)
+        .digest('base64url');
+    const actual = Buffer.from(signaturePart);
+    const expectedBuffer = Buffer.from(expected);
+    if (actual.length !== expectedBuffer.length || !crypto.timingSafeEqual(actual, expectedBuffer)) {
+        return { payload, expiryResult: 'invalid_signature' };
+    }
+    const expiresAtSeconds = typeof payload.exp === 'number' ? payload.exp : null;
+    if (expiresAtSeconds == null) {
+        return { payload, expiryResult: 'missing_expiry' };
+    }
+    if (expiresAtSeconds * 1000 <= Date.now()) {
+        return { payload, expiryResult: 'expired' };
+    }
+    return { payload, expiryResult: 'valid' };
+};
 const toIso = (value) => {
     if (!value)
         return null;
@@ -47,6 +104,31 @@ const mapPinUser = (row) => ({
     pinFailedAttempts: Number(row.pin_failed_attempts ?? 0),
     pinLockedUntilISO: toIso(row.pin_locked_until)
 });
+const rowToAuthenticatedAccount = async (row, input) => {
+    const currentClient = await resolveCurrentClientForAccount(String(row.user_id_value));
+    return {
+        accountId: String(row.user_id_value),
+        sessionId: input.sessionId,
+        sessionExpiresAtISO: input.sessionExpiresAtISO,
+        token: input.token,
+        client: currentClient,
+        user: {
+            id: String(row.user_id_value),
+            name: String(row.name),
+            email: row.email_normalized == null ? null : String(row.email_normalized),
+            mobileNumber: row.mobile_number_normalized == null ? null : String(row.mobile_number_normalized),
+            role: row.role == null ? null : String(row.role),
+            status: String(row.user_status),
+            version: Number(row.user_version),
+            createdAtISO: new Date(String(row.user_created_at)).toISOString(),
+            updatedAtISO: new Date(String(row.user_updated_at)).toISOString(),
+            deletedAtISO: toIso(row.user_deleted_at),
+            lastLoginAtISO: toIso(row.user_last_login_at),
+            emailVerifiedAtISO: toIso(row.email_verified_at),
+            mobileVerifiedAtISO: toIso(row.mobile_verified_at)
+        }
+    };
+};
 const isUniqueViolation = (error) => typeof error === 'object' &&
     error !== null &&
     'code' in error &&
@@ -301,6 +383,8 @@ export const createAuthEvent = async (input) => {
     ]);
 };
 export const getAuthenticatedAccountByToken = async (token) => {
+    const unsafePayload = decodeJwtPayloadUnsafe(token);
+    const tokenUserId = typeof unsafePayload?.sub === 'string' ? unsafePayload.sub : null;
     const result = await pool.query(`
       select
         s.*,
@@ -325,36 +409,90 @@ export const getAuthenticatedAccountByToken = async (token) => {
         and u.deleted_at is null
       limit 1
     `, [hashToken(token)]);
-    if (result.rowCount === 0)
+    if (result.rows.length > 0) {
+        const row = result.rows[0];
+        await pool.query('update auth_sessions set last_used_at = $2 where id = $1', [
+            String(row.id),
+            now().toISOString()
+        ]);
+        console.info('CONSULTANT_SESSION_DEBUG', {
+            tokenUserId: tokenUserId ?? String(row.user_id_value),
+            sessionFound: true,
+            sessionStatus: 'active',
+            expiryResult: 'valid'
+        });
+        return rowToAuthenticatedAccount(row, {
+            token,
+            sessionId: String(row.id),
+            sessionExpiresAtISO: new Date(String(row.expires_at)).toISOString()
+        });
+    }
+    const bridge = verifyConsultantDashboardJwt(token);
+    const bridgePayload = bridge.payload ?? unsafePayload;
+    const bridgeUserId = typeof bridgePayload?.sub === 'string' ? bridgePayload.sub : tokenUserId;
+    const bridgeRole = typeof bridgePayload?.role === 'string' ? bridgePayload.role.toLowerCase() : null;
+    const bridgeEmail = typeof bridgePayload?.email === 'string' ? normalizeEmail(bridgePayload.email) : null;
+    const bridgeStatus = typeof bridgePayload?.status === 'string' ? bridgePayload.status.toUpperCase() : null;
+    const credentialStatus = typeof bridgePayload?.credential_status === 'string'
+        ? bridgePayload.credential_status.toUpperCase()
+        : null;
+    if (bridge.expiryResult !== 'valid' ||
+        !bridgeUserId ||
+        !bridgeRole ||
+        !CONSULTANT_DASHBOARD_BRIDGE_ROLES.has(bridgeRole) ||
+        bridgeStatus !== 'ACTIVE' ||
+        credentialStatus !== 'PERMANENT') {
+        console.info('CONSULTANT_SESSION_DEBUG', {
+            tokenUserId: bridgeUserId,
+            sessionFound: false,
+            sessionStatus: 'missing',
+            expiryResult: bridge.expiryResult
+        });
         return null;
-    const row = result.rows[0];
-    await pool.query('update auth_sessions set last_used_at = $2 where id = $1', [
-        String(row.id),
-        now().toISOString()
-    ]);
-    const currentClient = await resolveCurrentClientForAccount(String(row.user_id_value));
-    return {
-        accountId: String(row.user_id_value),
-        sessionId: String(row.id),
-        sessionExpiresAtISO: new Date(String(row.expires_at)).toISOString(),
+    }
+    const bridgedUser = await pool.query(`
+      select
+        u.id as user_id_value,
+        u.name,
+        u.email_normalized,
+        u.mobile_number_normalized,
+        u.role,
+        u.status as user_status,
+        u.version as user_version,
+        u.created_at as user_created_at,
+        u.updated_at as user_updated_at,
+        u.deleted_at as user_deleted_at,
+        u.last_login_at as user_last_login_at,
+        u.email_verified_at,
+        u.mobile_verified_at
+      from users u
+      where (u.id = $1 or ($2::text is not null and u.email_normalized = $2))
+        and u.deleted_at is null
+        and u.status = 'active'
+        and coalesce(u.role, 'user') = any($3)
+      limit 1
+    `, [bridgeUserId, bridgeEmail, Array.from(CONSULTANT_DASHBOARD_BRIDGE_ROLES)]);
+    const userRow = bridgedUser.rows[0];
+    if (!userRow) {
+        console.info('CONSULTANT_SESSION_DEBUG', {
+            tokenUserId: bridgeUserId,
+            sessionFound: false,
+            sessionStatus: 'user_not_allowed',
+            expiryResult: bridge.expiryResult
+        });
+        return null;
+    }
+    console.info('CONSULTANT_SESSION_DEBUG', {
+        tokenUserId: bridgeUserId,
+        sessionFound: false,
+        sessionStatus: 'consultant_jwt_bridge',
+        expiryResult: bridge.expiryResult
+    });
+    return rowToAuthenticatedAccount(userRow, {
         token,
-        client: currentClient,
-        user: {
-            id: String(row.user_id_value),
-            name: String(row.name),
-            email: row.email_normalized == null ? null : String(row.email_normalized),
-            mobileNumber: row.mobile_number_normalized == null ? null : String(row.mobile_number_normalized),
-            role: row.role == null ? null : String(row.role),
-            status: String(row.user_status),
-            version: Number(row.user_version),
-            createdAtISO: new Date(String(row.user_created_at)).toISOString(),
-            updatedAtISO: new Date(String(row.user_updated_at)).toISOString(),
-            deletedAtISO: toIso(row.user_deleted_at),
-            lastLoginAtISO: toIso(row.user_last_login_at),
-            emailVerifiedAtISO: toIso(row.email_verified_at),
-            mobileVerifiedAtISO: toIso(row.mobile_verified_at)
-        }
-    };
+        sessionId: `consultant-dashboard:${bridgeUserId}`,
+        sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString()
+    });
 };
 export const revokeAuthSession = async (sessionId) => {
     await pool.query('update auth_sessions set revoked_at = $2 where id = $1 and revoked_at is null', [
