@@ -92,7 +92,7 @@ export const countActiveAdmins = async () => {
     `);
     return Number(result.rows[0]?.count ?? 0);
 };
-export const findActiveUserIdByMobile = async (mobile) => {
+export const findActiveVerifiedUserIdByMobile = async (mobile) => {
     const canonical = normalizeMobile(mobile);
     const national = canonical.startsWith('91') && canonical.length === 12 ? canonical.slice(2) : canonical;
     const result = await pool.query(`
@@ -100,6 +100,7 @@ export const findActiveUserIdByMobile = async (mobile) => {
       from users
       where deleted_at is null
         and status = 'active'
+        and mobile_verified_at is not null
         and (
           regexp_replace(coalesce(mobile_number_normalized, ''), '[^0-9]', '', 'g') = $1
           or regexp_replace(coalesce(mobile_number_normalized, ''), '[^0-9]', '', 'g') = $2

@@ -100,6 +100,14 @@ export const app = createApp();
 export const initializeBackend = async () => {
   await migrateDatabase();
   const adminBootstrap = await bootstrapInitialAdminFromEnvironment();
+  console.log('Initial admin bootstrap status', {
+    enabled: adminBootstrap.enabled,
+    activeAdminExists: adminBootstrap.activeAdminExists,
+    bootstrapAuditExists: adminBootstrap.bootstrapAuditExists,
+    adminUserFound: adminBootstrap.adminUserFound,
+    completed: adminBootstrap.completed,
+    reason: 'reason' in adminBootstrap ? adminBootstrap.reason : undefined
+  });
   if (adminBootstrap.status === 'bootstrapped') {
     console.log('Initial admin bootstrap completed.');
   }

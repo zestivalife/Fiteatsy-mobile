@@ -31,6 +31,7 @@ Production-oriented Node.js + PostgreSQL scaffold for:
 - `GET /v1/platform/notifications`
 - `POST /v1/reports/analyze`
 - `POST /v1/admin/users/:userId/role`
+- `GET /v1/admin/status`
 - `GET /v1/consultants/clients`
 - `GET /v1/consultants/clients/:clientId`
 
@@ -86,7 +87,9 @@ Server-side ownership comes from the authenticated account context and no longer
 - Supported managed roles are `user`, `consultant`, and `admin`.
 - Only authenticated `admin` users can call `POST /v1/admin/users/:userId/role`.
 - Every role change writes a `role_audit_events` record.
-- `INITIAL_ADMIN_PHONE` is a one-time bootstrap helper: if configured, no active admin exists, and the matching active user exists, startup promotes that user to `admin` and records `reason = initial_admin_bootstrap`. Once that audit event exists, the bootstrap path will not run again.
+- `INITIAL_ADMIN_PHONE` is a one-time bootstrap helper: if configured, no active admin exists, and the matching active verified mobile user exists, startup promotes that user to `admin` and records `reason = initial_admin_bootstrap`. Once that audit event exists, the bootstrap path will not run again.
+- Startup logs safe bootstrap diagnostics only: enabled, active admin existence, prior bootstrap audit existence, whether the user was found, completion, and reason. It never logs the configured phone.
+- `GET /v1/admin/status` is admin-only and exposes role-management readiness without returning users, tokens, secrets, or environment values.
 - Consultant dashboard APIs require `consultant`, `practitioner`, `admin`, or `super_admin` role and return `403 ROLE_NOT_ALLOWED` for ordinary users.
 
 ## Phase 1 Foundation

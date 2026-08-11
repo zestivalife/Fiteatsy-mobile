@@ -4,7 +4,7 @@ import {
   assignUserRole,
   countActiveAdmins,
   countRoleAuditEventsByReason,
-  findActiveUserIdByMobile,
+  findActiveVerifiedUserIdByMobile,
   isManagedRole,
   type ManagedRole
 } from './admin.repository.js';
@@ -12,6 +12,26 @@ import {
 const INITIAL_ADMIN_BOOTSTRAP_REASON = 'initial_admin_bootstrap';
 
 export const canManageRoles = (account: AuthenticatedAccount) => account.user.role === 'admin';
+
+export const getAdminStatus = async (account: AuthenticatedAccount) => {
+  if (!canManageRoles(account)) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: 'ROLE_NOT_ALLOWED',
+      message: 'An admin account is required to view admin status.'
+    };
+  }
+
+  return {
+    ok: true as const,
+    role: 'admin',
+    permissions: ['role_management'],
+    bootstrapConfigured: Boolean(env.initialAdminPhone),
+    activeAdmins: await countActiveAdmins(),
+    bootstrapAuditRecorded: (await countRoleAuditEventsByReason(INITIAL_ADMIN_BOOTSTRAP_REASON)) > 0
+  };
+};
 
 export const assignRoleAsAdmin = async (
   actor: AuthenticatedAccount,
@@ -58,21 +78,58 @@ export const assignRoleAsAdmin = async (
 
 export const bootstrapInitialAdminFromEnvironment = async () => {
   const configuredPhone = env.initialAdminPhone;
-  if (!configuredPhone) return { status: 'skipped' as const, reason: 'not_configured' };
+  const enabled = Boolean(configuredPhone);
+  if (!enabled) {
+    return {
+      status: 'skipped' as const,
+      enabled,
+      activeAdminExists: false,
+      bootstrapAuditExists: false,
+      adminUserFound: false,
+      completed: false,
+      reason: 'not_configured'
+    };
+  }
+
+  const activeAdminCount = await countActiveAdmins();
+  const activeAdminExists = activeAdminCount > 0;
+  if (activeAdminExists) {
+    return {
+      status: 'skipped' as const,
+      enabled,
+      activeAdminExists,
+      bootstrapAuditExists: false,
+      adminUserFound: false,
+      completed: false,
+      reason: 'admin_exists'
+    };
+  }
 
   const priorBootstrapEvents = await countRoleAuditEventsByReason(INITIAL_ADMIN_BOOTSTRAP_REASON);
+  const bootstrapAuditExists = priorBootstrapEvents > 0;
   if (priorBootstrapEvents > 0) {
-    return { status: 'skipped' as const, reason: 'already_used' };
+    return {
+      status: 'skipped' as const,
+      enabled,
+      activeAdminExists,
+      bootstrapAuditExists,
+      adminUserFound: false,
+      completed: false,
+      reason: 'already_used'
+    };
   }
 
-  const activeAdmins = await countActiveAdmins();
-  if (activeAdmins > 0) {
-    return { status: 'skipped' as const, reason: 'admin_exists' };
-  }
-
-  const targetUserId = await findActiveUserIdByMobile(configuredPhone);
+  const targetUserId = await findActiveVerifiedUserIdByMobile(configuredPhone);
   if (!targetUserId) {
-    return { status: 'skipped' as const, reason: 'target_user_not_found' };
+    return {
+      status: 'skipped' as const,
+      enabled,
+      activeAdminExists,
+      bootstrapAuditExists,
+      adminUserFound: false,
+      completed: false,
+      reason: 'INITIAL_ADMIN_USER_NOT_FOUND'
+    };
   }
 
   await assignUserRole({
@@ -81,5 +138,13 @@ export const bootstrapInitialAdminFromEnvironment = async () => {
     role: 'admin' satisfies ManagedRole,
     reason: INITIAL_ADMIN_BOOTSTRAP_REASON
   });
-  return { status: 'bootstrapped' as const, userId: targetUserId };
+  return {
+    status: 'bootstrapped' as const,
+    enabled,
+    activeAdminExists,
+    bootstrapAuditExists,
+    adminUserFound: true,
+    completed: true,
+    userId: targetUserId
+  };
 };
