@@ -12,6 +12,7 @@ import { wearablesRouter } from './modules/wearables/wearables.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { reportsRouter } from './modules/reports/reports.routes.js';
 import { platformRouter } from './modules/platform/platform.routes.js';
+import { profileRouter } from './modules/profile/profile.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { biomarkersRouter } from './modules/biomarkers/biomarkers.routes.js';
 import { consultantsRouter } from './modules/consultants/consultants.routes.js';
@@ -39,7 +40,8 @@ const REGISTERED_ROUTE_GROUPS = [
   '/v1/biomarkers',
   '/v1/consultants',
   '/v1/admin',
-  '/v1/platform'
+  '/v1/platform',
+  '/v1/profile'
 ];
 
 const logStartupRoutes = () => {
@@ -127,6 +129,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/consultants', consultantsRouter);
   app.use('/v1/admin', adminRouter);
   app.use('/v1/platform', platformRouter);
+  app.use('/v1/profile', profileRouter);
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message });

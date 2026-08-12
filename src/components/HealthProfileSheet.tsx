@@ -14,6 +14,7 @@ import {
 import { buildHealthProfileCompletion, HealthProfileSectionSummary } from '../utils/healthProfileCompletion';
 import {
   calculateBodyFatPercentage,
+  deriveApproximateDobFromAge,
   formatConsultantAvailability,
   formatDobLabel
 } from '../utils/healthProfile';
@@ -370,7 +371,7 @@ export const HealthProfileSheet = ({
   onUpdateAssessment
 }: Props) => {
   const palette = getThemeColors(themeMode);
-  const [expandedSection, setExpandedSection] = useState<HealthProfileSectionKey>('basic');
+  const [activeStep, setActiveStep] = useState(0);
   const foodSuggestions = useMemo(
     () => ({
       liked: ['Paneer', 'Eggs', 'Chicken', 'Rice', 'Curd', 'Dal'],
@@ -404,7 +405,7 @@ export const HealthProfileSheet = ({
 
   const bodyFatValue = completion.bodyFatPct ?? calculatedBodyFat;
   const selectedSharedReportIds = onboarding?.consultantSharedReportIds ?? [];
-  const nextSection = completion.sections.find((section) => section.status !== 'complete') ?? completion.sections[0];
+  const visibleReports = reports.slice(0, 3);
 
   const touchSection = (section: HealthProfileSectionKey) => {
     const nextStamp = new Date().toISOString();
@@ -448,7 +449,123 @@ export const HealthProfileSheet = ({
     });
   };
 
-  const consultant = onboarding?.assignedConsultant;
+  const updateAge = (value: string) => {
+    const age = Number(value);
+    if (!age || age < 10 || age > 120) return;
+    updateOnboardingSection('basic', {
+      age,
+      calculatedAge: age,
+      dateOfBirthISO: deriveApproximateDobFromAge(age).toISOString()
+    });
+    updateAssessmentSection('basic', { age });
+  };
+
+  const toggleConditionCard = (condition: HealthCondition) => {
+    const current = onboarding?.primaryConditions ?? [];
+    updateOnboardingSection('medical', {
+      primaryConditions: toggleListValue(current, condition) as HealthCondition[]
+    });
+  };
+
+  const clearConditions = () => {
+    updateOnboardingSection('medical', {
+      primaryConditions: [],
+      diabetesStatus: 'No',
+      thyroidStatus: 'No',
+      pcosStatus: 'No',
+      hypertensionStatus: 'No',
+      cholesterolStatus: 'No',
+      heartConditionStatus: 'No'
+    });
+  };
+
+  const stepCount = 7;
+  const canGoBack = activeStep > 0;
+  const canGoNext = activeStep < stepCount - 1;
+  const goNext = () => (canGoNext ? setActiveStep((step) => step + 1) : onClose());
+  const goBack = () => (canGoBack ? setActiveStep((step) => step - 1) : onClose());
+
+  const goalCards: Array<{ label: string; value: HealthGoal; icon: keyof typeof Ionicons.glyphMap }> = [
+    { label: 'Weight Loss', value: 'Weight Loss', icon: 'walk-outline' },
+    { label: 'Muscle Gain', value: 'Muscle Building', icon: 'barbell-outline' },
+    { label: 'Diabetes Management', value: 'Diabetes Management', icon: 'medical-outline' },
+    { label: 'Heart Health', value: 'General Wellness', icon: 'heart-outline' },
+    { label: 'PCOS Recovery', value: 'PCOS Management', icon: 'flower-outline' },
+    { label: 'Energy Improvement', value: 'Better Energy', icon: 'flash-outline' },
+    { label: 'Stress Recovery', value: 'Recovery', icon: 'leaf-outline' }
+  ];
+
+  const unlockedItems = [
+    'Basic health insights',
+    completion.bmi ? 'BMI analysis' : null,
+    completion.readinessPercent >= 40 ? 'Energy requirement' : null,
+    reportCount > 0 ? 'Report-aware insights' : null
+  ].filter(Boolean);
+
+  const journeySteps = [
+    { key: 'about', label: 'About You' },
+    { key: 'goal', label: 'Your Goal' },
+    { key: 'lifestyle', label: 'Lifestyle' },
+    { key: 'medical', label: 'Medical History' },
+    { key: 'reports', label: 'Reports' },
+    { key: 'body', label: 'Measurements' },
+    { key: 'summary', label: 'Summary' }
+  ];
+
+  const StepIntro = ({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) => (
+    <View style={styles.journeyIntro}>
+      <Text style={[styles.journeyEyebrow, { color: '#59BE08' }]}>{eyebrow}</Text>
+      <Text style={[styles.journeyTitle, { color: palette.textPrimary }]}>{title}</Text>
+      <Text style={[styles.journeyCopy, { color: palette.textSecondary }]}>{copy}</Text>
+    </View>
+  );
+
+  const SelectCard = ({
+    label,
+    icon,
+    active,
+    onPress
+  }: {
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    active: boolean;
+    onPress: () => void;
+  }) => (
+    <Pressable
+      style={[
+        styles.journeySelectCard,
+        { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#202020' },
+        active && styles.journeySelectCardActive
+      ]}
+      onPress={onPress}
+    >
+      <View style={[styles.journeyIconBubble, active && styles.journeyIconBubbleActive]}>
+        <Ionicons name={icon} size={20} color={active ? '#FFFFFF' : '#59BE08'} />
+      </View>
+      <Text style={[styles.journeySelectText, { color: active ? '#FFFFFF' : palette.textPrimary }]}>{label}</Text>
+    </Pressable>
+  );
+
+  const MiniOption = ({
+    label,
+    active,
+    onPress
+  }: {
+    label: string;
+    active: boolean;
+    onPress: () => void;
+  }) => (
+    <Pressable
+      style={[
+        styles.journeyMiniOption,
+        { borderColor: palette.stroke, backgroundColor: palette.cardMuted },
+        active && styles.journeyMiniOptionActive
+      ]}
+      onPress={onPress}
+    >
+      <Text style={[styles.journeyMiniOptionText, { color: active ? '#FFFFFF' : palette.textPrimary }]}>{label}</Text>
+    </Pressable>
+  );
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -466,9 +583,9 @@ export const HealthProfileSheet = ({
           <View style={[styles.handle, { backgroundColor: palette.stroke }]} />
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.headerTitle, { color: palette.textPrimary }]}>Health Profile Completion</Text>
+              <Text style={[styles.headerTitle, { color: palette.textPrimary }]}>Your Health Story</Text>
               <Text style={[styles.headerCopy, { color: palette.textSecondary }]}>
-                Structured clinical profile sections for better consultant review and stronger nutrition readiness.
+                A guided journey that turns your profile into personalised nutrition, recovery, and consultant context.
               </Text>
             </View>
             <Pressable
@@ -489,7 +606,7 @@ export const HealthProfileSheet = ({
             ]}
           >
             <View style={styles.summaryCol}>
-              <Text style={[styles.summaryLabel, { color: palette.textSecondary }]}>Profile completion</Text>
+              <Text style={[styles.summaryLabel, { color: palette.textSecondary }]}>Profile strength</Text>
               <Text style={[styles.summaryValue, { color: palette.textPrimary }]}>{completion.completionPercent}%</Text>
             </View>
             <View style={styles.summaryCol}>
@@ -504,161 +621,319 @@ export const HealthProfileSheet = ({
             </View>
           </View>
 
-          <Text style={[styles.missingCopy, { color: palette.textSecondary }]}>
-            {completion.missingItems.slice(0, 3).join(' • ') || 'No critical gaps right now.'}
-          </Text>
-
-          {nextSection ? (
-            <View style={[styles.nextStepCard, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.nextStepEyebrow, { color: '#59BE08' }]}>Next best step</Text>
-                <Text style={[styles.nextStepTitle, { color: palette.textPrimary }]}>
-                  Complete {nextSection.title.toLowerCase()}
-                </Text>
-                <Text style={[styles.nextStepCopy, { color: palette.textSecondary }]}>
-                  {nextSection.missing.slice(0, 2).join(' • ') || 'Review this section to keep your health intelligence current.'}
-                </Text>
-              </View>
-              <Pressable style={styles.nextStepButton} onPress={() => setExpandedSection(nextSection.id)}>
-                <Text style={styles.nextStepButtonText}>Resume</Text>
-              </Pressable>
-            </View>
-          ) : null}
+          <View style={styles.journeyStepTrack}>
+            {journeySteps.map((step, index) => (
+              <Pressable
+                key={step.key}
+                style={[
+                  styles.journeyStepDot,
+                  { backgroundColor: index <= activeStep ? '#59BE08' : palette.stroke }
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${step.label}`}
+                onPress={() => setActiveStep(index)}
+              />
+            ))}
+          </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {completion.sections.map((section) => (
-              <SectionShell
-                key={section.id}
-                section={section}
-                expanded={expandedSection === section.id}
-                palette={palette}
-                themeMode={themeMode}
-                onToggle={() => setExpandedSection(expandedSection === section.id ? 'basic' : section.id)}
-              >
-                {section.id === 'basic' ? (
-                  <>
-                    <View style={styles.metricGrid}>
-                      <ReadOnlyMetric
-                        label="DOB"
-                        value={onboarding?.dateOfBirthISO ? formatDobLabel(onboarding.dateOfBirthISO) : 'Not set'}
-                        verification="verified"
-                        palette={palette}
-                      />
-                      <ReadOnlyMetric
-                        label="Calculated Age"
-                        value={onboarding?.calculatedAge ? `${onboarding.calculatedAge} yrs` : 'Not set'}
-                        verification="calculated"
-                        palette={palette}
-                      />
-                    </View>
-                    <View style={styles.metricGrid}>
-                      <ReadOnlyMetric
-                        label="Gender"
-                        value={onboarding?.gender ?? 'Not set'}
-                        verification="verified"
-                        hint="Pulled from Quick Setup. Edit from Personal Information only."
-                        palette={palette}
-                      />
-                      <Field
-                        label="Goal Weight (kg)"
-                        value={String(onboarding?.goalWeightKg ?? '')}
-                        keyboardType="numeric"
-                        palette={palette}
-                        onChangeText={(value) => updateOnboardingSection('basic', { goalWeightKg: Number(value) || undefined })}
-                      />
-                    </View>
+            <View
+              style={[
+                styles.journeyCard,
+                {
+                  borderColor: palette.stroke,
+                  backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#141414'
+                }
+              ]}
+            >
+              {activeStep === 0 ? (
+                <>
+                  <StepIntro
+                    eyebrow="Step 1"
+                    title="Tell us about yourself"
+                    copy="This helps us understand your body and create a personalised plan."
+                  />
+                  <View style={styles.metricGrid}>
                     <Field
-                      label="Occupation"
-                      value={onboarding?.occupation ?? ''}
-                      placeholder="e.g. Software engineer"
+                      label="Age"
+                      value={String(onboarding?.calculatedAge ?? onboarding?.age ?? assessment?.age ?? '')}
+                      keyboardType="numeric"
                       palette={palette}
-                      onChangeText={(value) => updateOnboardingSection('basic', { occupation: value })}
+                      onChangeText={updateAge}
                     />
-                    <SingleSelectField
-                      label="Primary Goal"
-                      value={onboarding?.primaryGoal ?? onboarding?.wellnessGoal ?? onboarding?.healthGoals?.[0]}
-                      options={foodSuggestions.goals}
+                    <Field
+                      label="Height (cm)"
+                      value={String(assessment?.heightCm ?? onboarding?.heightCm ?? '')}
+                      keyboardType="numeric"
                       palette={palette}
-                      onSelect={(value) =>
-                        updateOnboardingSection('basic', {
-                          primaryGoal: value as HealthGoal,
-                          wellnessGoal: value as HealthGoal,
-                          healthGoals: [value as HealthGoal]
-                        })
-                      }
+                      onChangeText={(value) => {
+                        const heightCm = Number(value) || 0;
+                        updateAssessmentSection('body', { heightCm });
+                        updateOnboardingSection('body', { heightCm });
+                      }}
                     />
-                    <SingleSelectField
-                      label="Work Mode"
-                      value={onboarding?.workMode}
-                      options={['Office', 'Hybrid', 'Remote']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('basic', { workMode: value })}
-                    />
-                    <SingleSelectField
-                      label="Working Hours"
-                      value={onboarding?.workingHoursLabel ?? onboarding?.workHours}
-                      options={['6am-2pm', '7am-3pm', '9am-6pm', '10am-7pm', '12pm-9pm', 'Flexible']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('basic', { workingHoursLabel: value })}
-                    />
-                    <SingleSelectField
-                      label="Shift Type"
-                      value={onboarding?.shiftType}
-                      options={['Day', 'Night', 'Rotational']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('basic', { shiftType: value })}
-                    />
-                    <SingleSelectField
-                      label="Travel Frequency"
-                      value={onboarding?.travelFrequency}
-                      options={['Rarely', 'Monthly', 'Weekly', 'Frequent']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('basic', { travelFrequency: value })}
-                    />
-                    <SingleSelectField
-                      label="Activity Level"
-                      value={onboarding?.activityLevel}
-                      options={['Sedentary', 'Lightly active', 'Moderately active', 'Very active', 'Athlete']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('basic', { activityLevel: value })}
-                    />
-                  </>
-                ) : null}
+                  </View>
+                  <Text style={[styles.fieldLabel, { color: palette.textSecondary }]}>Gender</Text>
+                  <View style={styles.journeyCardGrid}>
+                    {([
+                      { label: 'Female', value: 'Female' },
+                      { label: 'Male', value: 'Male' },
+                      { label: 'Other', value: 'Prefer not to say' }
+                    ] as Array<{ label: string; value: NonNullable<AssessmentProfile['gender']> }>).map((gender) => (
+                      <SelectCard
+                        key={gender.label}
+                        label={gender.label}
+                        icon={gender.value === 'Female' ? 'female-outline' : gender.value === 'Male' ? 'male-outline' : 'person-outline'}
+                        active={onboarding?.gender === gender.value}
+                        onPress={() => {
+                          updateOnboardingSection('basic', { gender: gender.value });
+                          updateAssessmentSection('basic', { gender: gender.value });
+                        }}
+                      />
+                    ))}
+                  </View>
+                  <Field
+                    label="Weight (kg)"
+                    value={String(assessment?.weightKg ?? onboarding?.currentWeightKg ?? '')}
+                    keyboardType="numeric"
+                    palette={palette}
+                    onChangeText={(value) => {
+                      const weight = Number(value) || 0;
+                      updateAssessmentSection('body', { weightKg: weight });
+                      updateOnboardingSection('body', { currentWeightKg: weight });
+                    }}
+                  />
+                </>
+              ) : null}
 
-                {section.id === 'body' ? (
-                  <>
-                    <View style={styles.metricGrid}>
-                      <Field
-                        label="Height (cm)"
-                        value={String(assessment?.heightCm ?? onboarding?.heightCm ?? '')}
-                        keyboardType="numeric"
-                        palette={palette}
-                        onChangeText={(value) => updateAssessmentSection('body', { heightCm: Number(value) || 0 })}
+              {activeStep === 1 ? (
+                <>
+                  <StepIntro
+                    eyebrow="Step 2"
+                    title="What is your primary goal?"
+                    copy="Pick the one outcome you most want Fiteatsy and your consultant to optimise for first."
+                  />
+                  <View style={styles.journeyCardGrid}>
+                    {goalCards.map((goal) => (
+                      <SelectCard
+                        key={goal.label}
+                        label={goal.label}
+                        icon={goal.icon}
+                        active={(onboarding?.primaryGoal ?? onboarding?.wellnessGoal ?? onboarding?.healthGoals?.[0]) === goal.value}
+                        onPress={() =>
+                          updateOnboardingSection('basic', {
+                            primaryGoal: goal.value,
+                            wellnessGoal: goal.value,
+                            healthGoals: [goal.value]
+                          })
+                        }
                       />
-                      <Field
-                        label="Current Weight (kg)"
-                        value={String(assessment?.weightKg ?? onboarding?.currentWeightKg ?? '')}
-                        keyboardType="numeric"
-                        palette={palette}
-                        onChangeText={(value) => updateAssessmentSection('body', { weightKg: Number(value) || 0 })}
+                    ))}
+                  </View>
+                </>
+              ) : null}
+
+              {activeStep === 2 ? (
+                <>
+                  <StepIntro
+                    eyebrow="Step 3"
+                    title="Your lifestyle rhythm"
+                    copy="A few everyday signals help us tune recovery, calories, and nutrition timing."
+                  />
+                  <Text style={[styles.journeyQuestion, { color: palette.textPrimary }]}>How is your sleep usually?</Text>
+                  <View style={styles.journeyMiniGrid}>
+                    {['Poor', 'Average', 'Good', 'Excellent'].map((value) => (
+                      <MiniOption
+                        key={value}
+                        label={value}
+                        active={onboarding?.sleepQualityLabel === value}
+                        onPress={() => updateOnboardingSection('lifestyle', { sleepQualityLabel: value })}
                       />
-                    </View>
-                    <View style={styles.metricGrid}>
-                      <Field
-                        label="Waist (cm)"
-                        value={String(onboarding?.waistCm ?? '')}
-                        keyboardType="numeric"
-                        palette={palette}
-                        onChangeText={(value) => updateBodyComposition({ waistCm: Number(value) || undefined })}
+                    ))}
+                  </View>
+                  <Text style={[styles.journeyQuestion, { color: palette.textPrimary }]}>Your daily movement?</Text>
+                  <View style={styles.journeyMiniGrid}>
+                    {[
+                      ['Mostly sitting', 'Sedentary'],
+                      ['Light activity', 'Lightly active'],
+                      ['Active', 'Moderately active'],
+                      ['Highly active', 'Very active']
+                    ].map(([label, value]) => (
+                      <MiniOption
+                        key={label}
+                        label={label}
+                        active={onboarding?.activityLevel === value}
+                        onPress={() => updateOnboardingSection('lifestyle', { activityLevel: value })}
                       />
-                      <Field
-                        label="Hip (cm)"
-                        value={String(onboarding?.hipCm ?? '')}
-                        keyboardType="numeric"
-                        palette={palette}
-                        onChangeText={(value) => updateBodyComposition({ hipCm: Number(value) || undefined })}
+                    ))}
+                  </View>
+                  <Text style={[styles.journeyQuestion, { color: palette.textPrimary }]}>Your eating preference?</Text>
+                  <View style={styles.journeyMiniGrid}>
+                    {[
+                      ['Indian Vegetarian', 'Vegetarian'],
+                      ['Non Vegetarian', 'Non vegetarian'],
+                      ['Vegan', 'Vegan'],
+                      ['Mixed', 'Other']
+                    ].map(([label, value]) => (
+                      <MiniOption
+                        key={label}
+                        label={label}
+                        active={onboarding?.dietType === value}
+                        onPress={() =>
+                          updateOnboardingSection('nutrition', {
+                            dietType: value,
+                            regionalCuisine: label === 'Indian Vegetarian' ? 'North Indian' : onboarding?.regionalCuisine
+                          })
+                        }
                       />
-                    </View>
+                    ))}
+                  </View>
+                  <View style={styles.metricGrid}>
+                    <SingleSelectField
+                      label="Stress"
+                      value={onboarding?.stressLevelLabel}
+                      options={['Low', 'Moderate', 'High', 'Very High']}
+                      palette={palette}
+                      onSelect={(value) => updateOnboardingSection('lifestyle', { stressLevelLabel: value })}
+                    />
+                    <SingleSelectField
+                      label="Exercise"
+                      value={onboarding?.exerciseFrequency}
+                      options={['Never', '1-2x/week', '3-4x/week', '5x+/week']}
+                      palette={palette}
+                      onSelect={(value) => updateOnboardingSection('lifestyle', { exerciseFrequency: value })}
+                    />
+                  </View>
+                </>
+              ) : null}
+
+              {activeStep === 3 ? (
+                <>
+                  <StepIntro
+                    eyebrow="Step 4"
+                    title="Do you have any health conditions?"
+                    copy="Select all that apply. This keeps recommendations safer and more relevant."
+                  />
+                  <View style={styles.journeyCardGrid}>
+                    {[
+                      ['Diabetes', 'Diabetes', 'medical-outline'],
+                      ['Thyroid', 'Thyroid', 'pulse-outline'],
+                      ['PCOS', 'PCOS', 'flower-outline'],
+                      ['Heart condition', 'High Cholesterol', 'heart-outline'],
+                      ['Blood pressure', 'Hypertension', 'fitness-outline'],
+                      ['Cholesterol', 'High Cholesterol', 'analytics-outline']
+                    ].map(([label, value, icon]) => (
+                      <SelectCard
+                        key={`${label}-${value}`}
+                        label={label}
+                        icon={icon as keyof typeof Ionicons.glyphMap}
+                        active={(onboarding?.primaryConditions ?? []).includes(value as HealthCondition)}
+                        onPress={() => toggleConditionCard(value as HealthCondition)}
+                      />
+                    ))}
+                    <SelectCard
+                      label="None"
+                      icon="checkmark-done-outline"
+                      active={(onboarding?.primaryConditions ?? []).length === 0}
+                      onPress={clearConditions}
+                    />
+                  </View>
+                  <ListSuggestionField
+                    label="Family medical history"
+                    value={onboarding?.familyHistoryConditions ?? []}
+                    placeholder="comma separated"
+                    suggestions={HEALTH_CONDITION_OPTIONS.slice(0, 8)}
+                    palette={palette}
+                    onChange={(value) => updateOnboardingSection('medical', { familyHistoryConditions: value as HealthCondition[] })}
+                  />
+                  <ListSuggestionField
+                    label="Previous surgeries"
+                    value={onboarding?.previousSurgeries ?? []}
+                    placeholder="comma separated"
+                    suggestions={['None', 'Appendix', 'Gallbladder', 'C-section', 'Orthopedic', 'Cardiac']}
+                    palette={palette}
+                    onChange={(value) => updateOnboardingSection('medical', { previousSurgeries: value })}
+                  />
+                </>
+              ) : null}
+
+              {activeStep === 4 ? (
+                <>
+                  <StepIntro
+                    eyebrow="Step 5"
+                    title="Do you have recent reports?"
+                    copy="Upload blood reports and Fiteatsy will extract health markers into your profile."
+                  />
+                  <View style={[styles.reportSummary, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]}>
+                    <Text style={[styles.reportSummaryTitle, { color: palette.textPrimary }]}>
+                      AI can extract HbA1c, vitamin levels, lipid profile, thyroid markers, and CBC values.
+                    </Text>
+                    <Text style={[styles.reportSummaryCopy, { color: palette.textSecondary }]}>
+                      {reportCount > 0
+                        ? `${reportCount} reports are already connected to this profile.`
+                        : 'No reports yet. Your profile still works, and reports can unlock deeper biomarker intelligence later.'}
+                    </Text>
+                  </View>
+                  <Pressable style={styles.primaryBtn} onPress={onOpenReports}>
+                    <Text style={styles.primaryBtnText}>{reportCount > 0 ? 'View Reports' : 'Upload Report'}</Text>
+                  </Pressable>
+                  {visibleReports.map((report) => {
+                    const active = selectedSharedReportIds.includes(report.id);
+                    return (
+                      <Pressable
+                        key={report.id}
+                        style={[
+                          styles.reportRow,
+                          { borderColor: palette.stroke, backgroundColor: palette.cardMuted },
+                          active && styles.reportRowActive
+                        ]}
+                        onPress={() =>
+                          updateOnboardingSection('reports', {
+                            consultantSharedReportIds: active
+                              ? selectedSharedReportIds.filter((id) => id !== report.id)
+                              : [...selectedSharedReportIds, report.id]
+                          })
+                        }
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.reportRowTitle, { color: palette.textPrimary }]}>{report.labName}</Text>
+                          <Text style={[styles.reportRowMeta, { color: palette.textSecondary }]}>
+                            {report.date} | Score {report.score} | {report.abnormal} flagged
+                          </Text>
+                        </View>
+                        <View style={[styles.toggleIndicator, active && styles.toggleIndicatorActive]}>
+                          {active ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </>
+              ) : null}
+
+              {activeStep === 5 ? (
+                <>
+                  <StepIntro
+                    eyebrow="Step 6"
+                    title="To improve accuracy of your plan"
+                    copy="Body measurements make calorie, protein, and metabolic recommendations more precise."
+                  />
+                  <View style={styles.metricGrid}>
+                    <Field
+                      label="Waist (cm)"
+                      value={String(onboarding?.waistCm ?? '')}
+                      keyboardType="numeric"
+                      palette={palette}
+                      onChangeText={(value) => updateBodyComposition({ waistCm: Number(value) || undefined })}
+                    />
+                    <Field
+                      label="Hip (cm)"
+                      value={String(onboarding?.hipCm ?? '')}
+                      keyboardType="numeric"
+                      palette={palette}
+                      onChangeText={(value) => updateBodyComposition({ hipCm: Number(value) || undefined })}
+                    />
+                  </View>
+                  <View style={styles.metricGrid}>
                     <Field
                       label="Neck (cm)"
                       value={String(onboarding?.neckCm ?? '')}
@@ -666,435 +941,64 @@ export const HealthProfileSheet = ({
                       palette={palette}
                       onChangeText={(value) => updateBodyComposition({ neckCm: Number(value) || undefined })}
                     />
-                    <View style={styles.metricGrid}>
-                      <ReadOnlyMetric
-                        label="BMI"
-                        value={completion.bmi ? `${completion.bmi}` : 'Calculates automatically'}
-                        palette={palette}
-                      />
-                      <ReadOnlyMetric
-                        label="Body Fat %"
-                        value={
-                          bodyFatValue
-                            ? `${bodyFatValue}%`
-                            : onboarding?.gender === 'Female'
-                              ? 'Needs height, waist, hip, neck'
-                              : 'Needs height, waist, neck'
-                        }
-                        hint="Derived from body composition entries."
-                        palette={palette}
-                      />
-                    </View>
-                    <ReadOnlyMetric
-                      label="Waist-Hip Ratio"
-                      value={completion.waistHipRatio ? `${completion.waistHipRatio}` : 'Needs waist and hip'}
-                      hint="Useful for metabolic risk screening."
-                      palette={palette}
-                    />
-                  </>
-                ) : null}
-
-                {section.id === 'lifestyle' ? (
-                  <>
-                    <View style={styles.metricGrid}>
-                      <SingleSelectField
-                        label="Sleep Hours"
-                        value={onboarding?.sleepHours}
-                        options={['5', '6', '7', '8', '9']}
-                        palette={palette}
-                        onSelect={(value) => updateOnboardingSection('lifestyle', { sleepHours: Number(value) })}
-                      />
-                      <SingleSelectField
-                        label="Sleep Goal"
-                        value={onboarding?.sleepGoalHours}
-                        options={['7', '8', '9']}
-                        palette={palette}
-                        onSelect={(value) => updateOnboardingSection('lifestyle', { sleepGoalHours: Number(value) })}
-                      />
-                    </View>
-                    <SingleSelectField
-                      label="Sleep Quality"
-                      value={onboarding?.sleepQualityLabel}
-                      options={['Excellent', 'Good', 'Fair', 'Poor']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('lifestyle', { sleepQualityLabel: value })}
-                    />
-                    <View style={styles.metricGrid}>
-                      <SingleSelectField
-                        label="Water Intake (L)"
-                        value={onboarding?.waterIntakeLiters}
-                        options={['1.5', '2', '2.5', '3', '3.5']}
-                        palette={palette}
-                        onSelect={(value) => updateOnboardingSection('lifestyle', { waterIntakeLiters: Number(value) })}
-                      />
-                      <SingleSelectField
-                        label="Meals Per Day"
-                        value={onboarding?.mealsPerDay}
-                        options={['2', '3', '4', '5']}
-                        palette={palette}
-                        onSelect={(value) => updateOnboardingSection('lifestyle', { mealsPerDay: Number(value) })}
-                      />
-                    </View>
-                    <SingleSelectField
-                      label="Smoking Status"
-                      value={onboarding?.smokingStatus}
-                      options={['Never', 'Occasional', 'Daily', 'Quit']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('lifestyle', { smokingStatus: value })}
-                    />
-                    <SingleSelectField
-                      label="Alcohol Frequency"
-                      value={onboarding?.alcoholFrequency}
-                      options={['Never', 'Monthly', 'Weekly', 'Socially']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('lifestyle', { alcoholFrequency: value })}
-                    />
-                    <SingleSelectField
-                      label="Exercise Frequency"
-                      value={onboarding?.exerciseFrequency}
-                      options={['Never', '1-2x/week', '3-4x/week', '5x+/week']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('lifestyle', { exerciseFrequency: value })}
-                    />
-                    <SingleSelectField
-                      label="Stress Level"
-                      value={onboarding?.stressLevelLabel}
-                      options={['Low', 'Moderate', 'High', 'Very High']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('lifestyle', { stressLevelLabel: value })}
-                    />
-                  </>
-                ) : null}
-
-                {section.id === 'nutrition' ? (
-                  <>
-                    <SingleSelectField
-                      label="Diet Type"
-                      value={onboarding?.dietType}
-                      options={['Vegetarian', 'Non vegetarian', 'Vegan', 'Eggetarian', 'Other']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('nutrition', { dietType: value })}
-                    />
-                    <SingleSelectField
-                      label="Regional Cuisine"
-                      value={onboarding?.regionalCuisine}
-                      options={foodSuggestions.cuisines}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('nutrition', { regionalCuisine: value })}
-                    />
-                    <MultiSelectField
-                      label="Preferred Cuisines"
-                      values={onboarding?.preferredCuisines ?? []}
-                      options={foodSuggestions.cuisines}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('nutrition', { preferredCuisines: value })}
-                    />
-                    <ListSuggestionField
-                      label="Foods You Like"
-                      value={onboarding?.foodsLiked ?? []}
-                      placeholder="comma separated"
-                      suggestions={foodSuggestions.liked}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('nutrition', { foodsLiked: value })}
-                    />
-                    <ListSuggestionField
-                      label="Foods You Dislike"
-                      value={onboarding?.foodsDisliked ?? []}
-                      placeholder="comma separated"
-                      suggestions={foodSuggestions.disliked}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('nutrition', { foodsDisliked: value })}
-                    />
-                    <ListSuggestionField
-                      label="Food Allergies"
-                      value={onboarding?.foodAllergies ?? []}
-                      placeholder="comma separated"
-                      suggestions={foodSuggestions.allergies}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('nutrition', { foodAllergies: value })}
-                    />
-                    <ListSuggestionField
-                      label="Food Intolerances"
-                      value={onboarding?.foodIntolerances ?? []}
-                      placeholder="comma separated"
-                      suggestions={foodSuggestions.intolerances}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('nutrition', { foodIntolerances: value })}
-                    />
-                    <SingleSelectField
-                      label="Outside Food Frequency"
-                      value={onboarding?.outsideFoodFrequency}
-                      options={['Rarely', '1-2 times/week', '3-4 times/week', 'Daily']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('nutrition', { outsideFoodFrequency: value })}
-                    />
-                    <SingleSelectField
-                      label="Cooking At Home"
-                      value={onboarding?.cookingAtHome}
-                      options={['Always', 'Sometimes', 'Rarely']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('nutrition', { cookingAtHome: value })}
-                    />
-                    <SingleSelectField
-                      label="Who Cooks"
-                      value={onboarding?.whoCooks}
-                      options={['Self', 'Family', 'Cook', 'Hostel/Cafeteria']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('nutrition', { whoCooks: value })}
-                    />
-                    <SingleSelectField
-                      label="Meal Timing Preference"
-                      value={onboarding?.mealTimingPreference}
-                      options={['Early', 'Regular', 'Late', 'Irregular']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('nutrition', { mealTimingPreference: value })}
-                    />
-                    <ListSuggestionField
-                      label="Current Supplements"
-                      value={onboarding?.currentSupplements ?? []}
-                      placeholder="comma separated"
-                      suggestions={foodSuggestions.supplements}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('nutrition', { currentSupplements: value })}
-                    />
-                    <ListSuggestionField
-                      label="Current Medicines"
-                      value={onboarding?.currentMedicines ?? []}
-                      placeholder="comma separated"
-                      suggestions={foodSuggestions.medicines}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('nutrition', { currentMedicines: value })}
-                    />
-                  </>
-                ) : null}
-
-                {section.id === 'medical' ? (
-                  <>
-                    <MultiSelectField
-                      label="Current Conditions"
-                      values={onboarding?.primaryConditions ?? []}
-                      options={HEALTH_CONDITION_OPTIONS}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('medical', { primaryConditions: value as HealthCondition[] })}
-                    />
-                    <MultiSelectField
-                      label="Previous Conditions"
-                      values={onboarding?.previousConditions ?? []}
-                      options={HEALTH_CONDITION_OPTIONS}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('medical', { previousConditions: value as HealthCondition[] })}
-                    />
-                    <MultiSelectField
-                      label="Family History"
-                      values={onboarding?.familyHistoryConditions ?? []}
-                      options={HEALTH_CONDITION_OPTIONS}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('medical', { familyHistoryConditions: value as HealthCondition[] })}
-                    />
-                    <SingleSelectField
-                      label="PCOS"
-                      value={onboarding?.pcosStatus}
-                      options={['No', 'Suspected', 'Diagnosed']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('medical', { pcosStatus: value })}
-                    />
-                    <SingleSelectField
-                      label="Thyroid"
-                      value={onboarding?.thyroidStatus}
-                      options={['No', 'Hypothyroid', 'Hyperthyroid', 'Under evaluation']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('medical', { thyroidStatus: value })}
-                    />
-                    <SingleSelectField
-                      label="Diabetes"
-                      value={onboarding?.diabetesStatus}
-                      options={['No', 'Prediabetes', 'Type 2', 'Under evaluation']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('medical', { diabetesStatus: value })}
-                    />
-                    <SingleSelectField
-                      label="Hypertension"
-                      value={onboarding?.hypertensionStatus}
-                      options={['No', 'Borderline', 'Diagnosed']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('medical', { hypertensionStatus: value })}
-                    />
-                    <SingleSelectField
-                      label="Cholesterol Issues"
-                      value={onboarding?.cholesterolStatus}
-                      options={['No', 'Borderline', 'Diagnosed', 'Under evaluation']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('medical', { cholesterolStatus: value })}
-                    />
-                    <SingleSelectField
-                      label="Heart Conditions"
-                      value={onboarding?.heartConditionStatus}
-                      options={['No', 'Family risk', 'Diagnosed', 'Under evaluation']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('medical', { heartConditionStatus: value })}
-                    />
-                    <ListSuggestionField
-                      label="Previous Surgeries"
-                      value={onboarding?.previousSurgeries ?? []}
-                      placeholder="comma separated"
-                      suggestions={['None', 'Appendix', 'Gallbladder', 'C-section', 'Orthopedic', 'Cardiac']}
-                      palette={palette}
-                      onChange={(value) => updateOnboardingSection('medical', { previousSurgeries: value })}
-                    />
-                    <SingleSelectField
-                      label="Pregnancy"
-                      value={onboarding?.pregnancyStatus}
-                      options={['Not applicable', 'No', 'Trying to conceive', 'Pregnant']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('medical', { pregnancyStatus: value })}
-                    />
-                    <SingleSelectField
-                      label="Breastfeeding"
-                      value={onboarding?.breastfeedingStatus}
-                      options={['Not applicable', 'No', 'Yes']}
-                      palette={palette}
-                      onSelect={(value) => updateOnboardingSection('medical', { breastfeedingStatus: value })}
-                    />
                     <Field
-                      label="Clinical Notes"
-                      value={onboarding?.medicalNotes ?? ''}
-                      placeholder="Anything the consultant should know"
+                      label="Body Fat %"
+                      value={String(onboarding?.bodyFatPct ?? bodyFatValue ?? '')}
+                      keyboardType="numeric"
                       palette={palette}
-                      onChangeText={(value) => updateOnboardingSection('medical', { medicalNotes: value })}
+                      onChangeText={(value) => updateOnboardingSection('body', { bodyFatPct: Number(value) || undefined })}
                     />
-                  </>
-                ) : null}
+                  </View>
+                  <View style={styles.metricGrid}>
+                    <ReadOnlyMetric label="BMI" value={completion.bmi ? `${completion.bmi}` : 'Calculates automatically'} palette={palette} />
+                    <ReadOnlyMetric label="Daily Energy" value={completion.readinessPercent >= 40 ? 'Calculates after save' : 'Needs profile basics'} palette={palette} />
+                  </View>
+                </>
+              ) : null}
 
-                {section.id === 'reports' ? (
-                  <>
-                    <View style={[styles.reportSummary, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]}>
-                      <Text style={[styles.reportSummaryTitle, { color: palette.textPrimary }]}>
-                        {reportCount > 0 ? `${reportCount} reports available` : 'No blood reports uploaded yet'}
-                      </Text>
-                      <Text style={[styles.reportSummaryCopy, { color: palette.textSecondary }]}>
-                        Recent uploads stay separate from profile data. Select which reports should be visible to consultants.
-                      </Text>
+              {activeStep === 6 ? (
+                <>
+                  <StepIntro
+                    eyebrow="Final"
+                    title="Your Health Profile"
+                    copy="This is your current profile strength. Keep going when you are ready; every section improves your plan."
+                  />
+                  <View style={[styles.journeyStrengthPanel, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]}>
+                    <Text style={[styles.journeyStrengthLabel, { color: palette.textSecondary }]}>Strength</Text>
+                    <Text style={[styles.journeyStrengthValue, { color: palette.textPrimary }]}>{completion.completionPercent}%</Text>
+                    <View style={[styles.journeyStrengthTrack, { backgroundColor: themeMode === 'light' ? '#DDE8D7' : '#2A3326' }]}>
+                      <View style={[styles.journeyStrengthFill, { width: `${completion.completionPercent}%` }]} />
                     </View>
-                    <View style={styles.dualButtonRow}>
-                      <Pressable style={styles.primaryBtn} onPress={onOpenReports}>
-                        <Text style={styles.primaryBtnText}>{reportCount > 0 ? 'View Reports' : 'Upload Report'}</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.secondaryBtn, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]}
-                        onPress={onOpenReports}
-                      >
-                        <Text style={[styles.secondaryBtnText, { color: palette.textPrimary }]}>Manage Access</Text>
-                      </Pressable>
+                  </View>
+                  <Text style={[styles.journeyQuestion, { color: palette.textPrimary }]}>You unlocked:</Text>
+                  {unlockedItems.map((item) => (
+                    <View key={String(item)} style={styles.journeyCheckRow}>
+                      <Ionicons name="checkmark-circle" size={18} color="#59BE08" />
+                      <Text style={[styles.journeyCheckText, { color: palette.textPrimary }]}>{item}</Text>
                     </View>
-                    {reports.length > 0 ? (
-                      <View style={styles.reportList}>
-                        {reports.map((report) => {
-                          const active = selectedSharedReportIds.includes(report.id);
-                          return (
-                            <Pressable
-                              key={report.id}
-                              style={[
-                                styles.reportRow,
-                                { borderColor: palette.stroke, backgroundColor: palette.cardMuted },
-                                active && styles.reportRowActive
-                              ]}
-                              onPress={() =>
-                                updateOnboardingSection('reports', {
-                                  consultantSharedReportIds: active
-                                    ? selectedSharedReportIds.filter((id) => id !== report.id)
-                                    : [...selectedSharedReportIds, report.id]
-                                })
-                              }
-                            >
-                              <View style={{ flex: 1 }}>
-                                <Text style={[styles.reportRowTitle, { color: palette.textPrimary }]}>{report.labName}</Text>
-                                <Text style={[styles.reportRowMeta, { color: palette.textSecondary }]}>
-                                  {report.date} • Score {report.score} • {report.abnormal} flagged
-                                </Text>
-                                <View style={styles.reportMetaPills}>
-                                  <VerificationPill state="lab_verified" palette={palette} />
-                                  <VerificationPill state={active ? 'consultant_verified' : 'self_reported'} palette={palette} />
-                                </View>
-                              </View>
-                              <View style={[styles.toggleIndicator, active && styles.toggleIndicatorActive]}>
-                                {active ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
-                              </View>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    ) : null}
-                  </>
-                ) : null}
-
-                {section.id === 'sharing' ? (
-                  <>
-                    <View style={[styles.consultantCard, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]}>
-                      <Text style={[styles.consultantName, { color: palette.textPrimary }]}>
-                        {consultant?.fullName ?? 'Consultant assignment in progress'}
-                      </Text>
-                      <Text style={[styles.consultantMeta, { color: palette.textSecondary }]}>
-                        {consultant?.specialization ?? onboarding?.careTrack ?? 'Foundational Recovery Care'} •{' '}
-                        {formatConsultantAvailability(consultant?.availability ?? 'awaiting_schedule')}
-                      </Text>
-                      <Text style={[styles.consultantMeta, { color: palette.textSecondary }]}>
-                        Last consultation: {consultant?.lastConsultationISO ? formatDobLabel(consultant.lastConsultationISO) : 'Not available'}
-                      </Text>
-                      <Text style={[styles.consultantMeta, { color: palette.textSecondary }]}>
-                        Next appointment: {consultant?.nextAppointmentISO ? formatDobLabel(consultant.nextAppointmentISO) : 'Not scheduled'}
-                      </Text>
+                  ))}
+                  <Text style={[styles.journeyQuestion, { color: palette.textPrimary }]}>Complete next:</Text>
+                  {(completion.missingItems.slice(0, 4).length ? completion.missingItems.slice(0, 4) : ['No critical gaps right now.']).map((item) => (
+                    <View key={item} style={styles.journeyCheckRow}>
+                      <Ionicons name="ellipse-outline" size={16} color={palette.textSecondary} />
+                      <Text style={[styles.journeyCheckText, { color: palette.textSecondary }]}>{item}</Text>
                     </View>
-                    <ToggleRow
-                      label="Share measurements"
-                      value={onboarding?.shareMeasurementsWithConsultant ?? true}
-                      palette={palette}
-                      onToggle={() =>
-                        updateOnboardingSection('sharing', {
-                          shareMeasurementsWithConsultant: !(onboarding?.shareMeasurementsWithConsultant ?? true)
-                        })
-                      }
-                    />
-                    <ToggleRow
-                      label="Share nutrition profile"
-                      value={onboarding?.shareNutritionWithConsultant ?? true}
-                      palette={palette}
-                      onToggle={() =>
-                        updateOnboardingSection('sharing', {
-                          shareNutritionWithConsultant: !(onboarding?.shareNutritionWithConsultant ?? true)
-                        })
-                      }
-                    />
-                    <ToggleRow
-                      label="Share medications"
-                      value={onboarding?.shareMedicationWithConsultant ?? true}
-                      palette={palette}
-                      onToggle={() =>
-                        updateOnboardingSection('sharing', {
-                          shareMedicationWithConsultant: !(onboarding?.shareMedicationWithConsultant ?? true)
-                        })
-                      }
-                    />
-                    <ToggleRow
-                      label="Share lifestyle data"
-                      value={onboarding?.shareLifestyleWithConsultant ?? true}
-                      palette={palette}
-                      onToggle={() =>
-                        updateOnboardingSection('sharing', {
-                          shareLifestyleWithConsultant: !(onboarding?.shareLifestyleWithConsultant ?? true)
-                        })
-                      }
-                    />
-                    <ReadOnlyMetric
-                      label="Reports shared"
-                      value={`${selectedSharedReportIds.length} selected`}
-                      verification="consultant_verified"
-                      palette={palette}
-                    />
-                  </>
-                ) : null}
-              </SectionShell>
-            ))}
+                  ))}
+                </>
+              ) : null}
+            </View>
           </ScrollView>
+          <View style={styles.journeyFooter}>
+            <Pressable
+              style={[styles.secondaryBtn, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]}
+              onPress={goBack}
+            >
+              <Text style={[styles.secondaryBtnText, { color: palette.textPrimary }]}>{canGoBack ? 'Back' : 'Close'}</Text>
+            </Pressable>
+            <Pressable style={styles.primaryBtn} onPress={goNext}>
+              <Text style={styles.primaryBtnText}>{canGoNext ? 'Continue' : 'Continue Journey'}</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </Modal>
@@ -1215,6 +1119,149 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 12,
     paddingBottom: 48
+  },
+  journeyStepTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 14
+  },
+  journeyStepDot: {
+    flex: 1,
+    height: 5,
+    borderRadius: 999
+  },
+  journeyCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 12
+  },
+  journeyIntro: {
+    marginBottom: 18
+  },
+  journeyEyebrow: {
+    ...typography.caption,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
+    marginBottom: 8
+  },
+  journeyTitle: {
+    ...typography.section,
+    fontSize: 24,
+    lineHeight: 30
+  },
+  journeyCopy: {
+    ...typography.body,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8
+  },
+  journeyCardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14
+  },
+  journeySelectCard: {
+    width: '48%',
+    minHeight: 116,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 14,
+    justifyContent: 'space-between'
+  },
+  journeySelectCardActive: {
+    backgroundColor: '#59BE08',
+    borderColor: '#59BE08'
+  },
+  journeyIconBubble: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(89, 190, 8, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  journeyIconBubbleActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)'
+  },
+  journeySelectText: {
+    ...typography.bodyStrong,
+    fontSize: 14,
+    lineHeight: 19,
+    marginTop: 14
+  },
+  journeyQuestion: {
+    ...typography.bodyStrong,
+    fontSize: 15,
+    marginTop: 8,
+    marginBottom: 10
+  },
+  journeyMiniGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14
+  },
+  journeyMiniOption: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  journeyMiniOptionActive: {
+    backgroundColor: '#59BE08',
+    borderColor: '#59BE08'
+  },
+  journeyMiniOptionText: {
+    ...typography.bodyStrong,
+    fontSize: 13
+  },
+  journeyStrengthPanel: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16
+  },
+  journeyStrengthLabel: {
+    ...typography.caption,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8
+  },
+  journeyStrengthValue: {
+    ...typography.section,
+    fontSize: 38,
+    marginTop: 4
+  },
+  journeyStrengthTrack: {
+    height: 9,
+    borderRadius: 999,
+    overflow: 'hidden',
+    marginTop: 12
+  },
+  journeyStrengthFill: {
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: '#59BE08'
+  },
+  journeyCheckRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 9
+  },
+  journeyCheckText: {
+    ...typography.body,
+    fontSize: 14,
+    flex: 1
+  },
+  journeyFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 8
   },
   sectionCard: {
     borderRadius: 24,

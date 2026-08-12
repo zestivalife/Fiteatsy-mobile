@@ -966,32 +966,37 @@ export const HomeScreen = () => {
         onPress={() => setHealthProfileOpen(true)}
       >
         <View style={styles.healthProfileTop}>
-          <View>
-            <Text style={[styles.healthProfileEyebrow, { color: ui.textSecondary }]}>Your Dietitian</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.healthProfileEyebrow, { color: '#59BE08' }]}>Your Health Journey</Text>
             <Text style={[styles.healthProfileName, { color: ui.textPrimary }]}>
-              {consultant.status === 'pending_assignment' ? 'Consultant assignment in progress' : consultant.fullName}
+              Complete your profile to unlock:
             </Text>
-            <Text style={[styles.healthProfileMeta, { color: ui.textSecondary }]}>
-              {consultant.status === 'pending_assignment'
-                ? 'No consultant assigned yet'
-                : `${consultant.specialization} • ${formatConsultantAvailability(consultant.availability)}`}
-            </Text>
+            <View style={styles.healthJourneyUnlockList}>
+              {['Personalised diet plan', 'Recovery score', 'Health insights', 'Consultant recommendations'].map((item) => (
+                <View key={item} style={styles.healthJourneyUnlockRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#59BE08" />
+                  <Text style={[styles.healthJourneyUnlockText, { color: ui.textSecondary }]}>{item}</Text>
+                </View>
+              ))}
+            </View>
           </View>
           <View style={[styles.healthProfileBadge, { backgroundColor: isLight ? '#EEF6E8' : '#19250D' }]}>
-            <Text style={styles.healthProfileBadgeText}>{healthProfile.completionPercent}% Complete</Text>
+            <Text style={styles.healthProfileBadgeText}>{healthProfile.completionPercent}%</Text>
+            <Text style={[styles.healthJourneyBadgeLabel, { color: ui.textSecondary }]}>strength</Text>
           </View>
+        </View>
+        <View style={[styles.healthJourneyProgressTrack, { backgroundColor: isLight ? '#DDE8D7' : '#2A3326' }]}>
+          <View style={[styles.healthJourneyProgressFill, { width: `${Math.min(100, Math.max(0, healthProfile.completionPercent))}%` }]} />
         </View>
         <View style={styles.healthProfileBottom}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.healthProfileSectionTitle, { color: ui.textPrimary }]}>Health Profile</Text>
+            <Text style={[styles.healthProfileSectionTitle, { color: ui.textPrimary }]}>Profile strength</Text>
             <Text style={[styles.healthProfileMissing, { color: ui.textSecondary }]}>
-              {healthProfileMissingCopy}
+              {healthProfileMissingCopy || 'Keep building your health story for sharper recommendations.'}
             </Text>
           </View>
           <View style={[styles.healthProfileCta, { backgroundColor: '#59BE08' }]}>
-            <Text style={styles.healthProfileCtaText}>
-              {healthProfile.completionPercent >= 100 ? 'View Profile' : 'Complete Health Profile'}
-            </Text>
+            <Text style={styles.healthProfileCtaText}>Update My Health Profile</Text>
           </View>
         </View>
       </Pressable>
@@ -2609,6 +2614,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
     maxWidth: 220
   },
+  healthJourneyUnlockList: {
+    marginTop: 10,
+    gap: 7
+  },
+  healthJourneyUnlockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7
+  },
+  healthJourneyUnlockText: {
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium'
+  },
   healthProfileBadge: {
     minWidth: 96,
     paddingHorizontal: 12,
@@ -2622,6 +2640,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Poppins_600SemiBold',
     textAlign: 'center'
+  },
+  healthJourneyBadgeLabel: {
+    fontSize: 10,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 2
+  },
+  healthJourneyProgressTrack: {
+    height: 8,
+    borderRadius: 999,
+    overflow: 'hidden'
+  },
+  healthJourneyProgressFill: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#59BE08'
   },
   healthProfileBottom: {
     flexDirection: 'row',
