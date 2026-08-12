@@ -160,6 +160,27 @@ test('consultant bridge tolerates accidentally quoted Railway secret values', ()
   assert.equal(result.matchedSecretSource, 'AUTH_SERVICE_JWT_SECRET_KEY:unquoted');
 });
 
+test('consultant bridge tolerates Railway secrets copied with internal whitespace', () => {
+  clearEnv();
+  process.env.AUTH_SERVICE_JWT_SECRET_KEY = 'auth-service-production-\nsecret';
+  const token = signJwt({
+    secret: 'auth-service-production-secret',
+    payload: {
+      sub: 'wrapped-secret-user',
+      role: 'consultant',
+      status: 'ACTIVE',
+      credential_status: 'PERMANENT',
+      type: 'access',
+      exp: Math.floor(Date.now() / 1000) + 600
+    }
+  });
+
+  const result = verifyConsultantDashboardJwt(token);
+
+  assert.equal(result.expiryResult, 'valid');
+  assert.equal(result.matchedSecretSource, 'AUTH_SERVICE_JWT_SECRET_KEY:compact_whitespace');
+});
+
 test('consultant bridge accepts dashboard access token claim aliases', () => {
   clearEnv();
   process.env.AUTH_SERVICE_JWT_SECRET_KEY = 'auth-service-production-secret';

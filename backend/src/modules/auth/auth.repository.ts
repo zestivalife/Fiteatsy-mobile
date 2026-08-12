@@ -116,6 +116,10 @@ const expandSecretVariants = (source: string, secret: string) => {
   if (escapedNewline !== trimmed) {
     variants.push({ source: `${source}:escaped_newline`, secret: escapedNewline });
   }
+  const compactWhitespace = trimmed.replace(/\s+/g, '');
+  if (compactWhitespace !== trimmed && compactWhitespace) {
+    variants.push({ source: `${source}:compact_whitespace`, secret: compactWhitespace });
+  }
   return variants;
 };
 
