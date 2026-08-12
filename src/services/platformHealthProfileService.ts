@@ -1,5 +1,7 @@
-import { AssessmentProfile, OnboardingProfile } from '../types';
-import { apiFetch } from './apiClient';
+import { AssessmentProfile, HealthProfileSyncDiagnostics, OnboardingProfile, SyncQueueItem } from '../types';
+import { ApiClientError, apiFetch } from './apiClient';
+import { enqueueSyncItem, getPendingSyncItems, getHealthProfileSyncDiagnostics, getSyncQueue, removeSyncQueueItem, updateHealthProfileSyncDiagnostics, updateSyncQueueItem } from './platformSyncService';
+import { type StorageIdentity } from '../utils/identityScopedStorage';
 
 export type PlatformHealthProfile = {
   dateOfBirthISO: string | null;
@@ -92,13 +94,18 @@ const goalList = (profile: OnboardingProfile) =>
     )
   );
 
-export const syncPlatformHealthProfile = async (
+const HEALTH_PROFILE_SYNC_MAX_ATTEMPTS = 5;
+const HEALTH_PROFILE_SYNC_RETRY_DELAY_MS = 60_000;
+
+const nextRetryAtISO = (attempts: number) => new Date(Date.now() + attempts * HEALTH_PROFILE_SYNC_RETRY_DELAY_MS).toISOString();
+
+export const buildPlatformHealthProfilePayload = (
   onboarding: OnboardingProfile | null,
   assessment: AssessmentProfile | null
 ) => {
   if (!onboarding) return null;
 
-  const payload = compactPayload({
+  return compactPayload({
     dateOfBirthISO: onboarding.dateOfBirthISO,
     gender: onboarding.gender,
     heightCm: positiveNumber(assessment?.heightCm ?? onboarding.heightCm),
@@ -155,12 +162,207 @@ export const syncPlatformHealthProfile = async (
     heartConditionStatus: onboarding.heartConditionStatus,
     previousSurgeries: nonEmptyArray(onboarding.previousSurgeries)
   });
+};
 
-  return apiFetch('/v1/platform/health-profile', {
+const patchPlatformHealthProfile = (payload: Record<string, unknown>) =>
+  apiFetch('/v1/platform/health-profile', {
     method: 'PATCH',
     body: JSON.stringify(payload)
   });
+
+const createHealthProfileSyncQueueItem = (payload: Record<string, unknown>): SyncQueueItem => {
+  const nowISO = new Date().toISOString();
+  return {
+    id: `sync-health-profile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    entityType: 'health_profile',
+    operation: 'patch',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: HEALTH_PROFILE_SYNC_MAX_ATTEMPTS,
+    nextAttemptAtISO: null,
+    createdAtISO: nowISO,
+    updatedAtISO: nowISO,
+    payload: {
+      patch: payload,
+      queuedAtISO: nowISO
+    },
+    lastError: null
+  };
 };
+
+export const queuePlatformHealthProfileSync = async (
+  payload: Record<string, unknown>,
+  identity?: StorageIdentity | null
+) => {
+  const existingQueue = await getSyncQueue(identity);
+  const existingItem = existingQueue.find((item) => item.entityType === 'health_profile' && item.operation === 'patch');
+  const queuedAtISO = new Date().toISOString();
+
+  if (existingItem) {
+    await updateSyncQueueItem(
+      existingItem.id,
+      (current) => ({
+        ...current,
+        status: 'pending',
+        nextAttemptAtISO: null,
+        updatedAtISO: queuedAtISO,
+        payload: {
+          patch: payload,
+          queuedAtISO
+        },
+        lastError: null
+      }),
+      identity
+    );
+    await updateHealthProfileSyncDiagnostics(
+      (current) => ({
+        ...current,
+        status: 'pending'
+      }),
+      identity
+    );
+    return { ...existingItem, payload: { patch: payload, queuedAtISO } };
+  }
+
+  const item = createHealthProfileSyncQueueItem(payload);
+  await enqueueSyncItem(item, identity);
+  await updateHealthProfileSyncDiagnostics(
+    (current) => ({
+      ...current,
+      status: 'pending'
+    }),
+    identity
+  );
+  return item;
+};
+
+export const syncPlatformHealthProfile = async (
+  onboarding: OnboardingProfile | null,
+  assessment: AssessmentProfile | null,
+  identity?: StorageIdentity | null
+) => {
+  const payload = buildPlatformHealthProfilePayload(onboarding, assessment);
+  if (!payload) return null;
+
+  const attemptedAt = new Date().toISOString();
+  await updateHealthProfileSyncDiagnostics(
+    (current) => ({
+      ...current,
+      status: current.status === 'failed' ? 'failed' : 'pending',
+      lastAttemptAt: attemptedAt
+    }),
+    identity
+  );
+
+  try {
+    const result = await patchPlatformHealthProfile(payload);
+    await updateHealthProfileSyncDiagnostics(
+      (current) => ({
+        status: 'synced',
+        lastAttemptAt: attemptedAt,
+        lastSuccessAt: attemptedAt,
+        retryCount: 0
+      }),
+      identity
+    );
+    return result;
+  } catch (error) {
+    await queuePlatformHealthProfileSync(payload, identity);
+    await updateHealthProfileSyncDiagnostics(
+      (current) => ({
+        ...current,
+        status: 'pending',
+        lastAttemptAt: attemptedAt,
+        retryCount: Math.max(current.retryCount, 1)
+      }),
+      identity
+    );
+    if (error instanceof ApiClientError) {
+      throw error;
+    }
+    throw error;
+  }
+};
+
+export const processPendingHealthProfileSync = async (identity?: StorageIdentity | null) => {
+  const queue = await getPendingSyncItems(identity);
+  const healthProfileItems = queue
+    .filter((item) => item.entityType === 'health_profile' && item.operation === 'patch')
+    .sort((left, right) => new Date(left.createdAtISO).getTime() - new Date(right.createdAtISO).getTime());
+
+  let processed = 0;
+  for (const item of healthProfileItems) {
+    const now = Date.now();
+    if (item.nextAttemptAtISO && new Date(item.nextAttemptAtISO).getTime() > now) continue;
+    const attemptedAt = new Date().toISOString();
+    await updateSyncQueueItem(
+      item.id,
+      (current) => ({
+        ...current,
+        status: 'processing',
+        updatedAtISO: attemptedAt,
+        lastError: null
+      }),
+      identity
+    );
+    await updateHealthProfileSyncDiagnostics(
+      (current) => ({
+        ...current,
+        status: 'pending',
+        lastAttemptAt: attemptedAt,
+        retryCount: Math.max(current.retryCount, item.attempts)
+      }),
+      identity
+    );
+
+    try {
+      const queuePayload = item.payload as { patch: Record<string, unknown> };
+      await patchPlatformHealthProfile(queuePayload.patch);
+      await removeSyncQueueItem(item.id, identity);
+      await updateHealthProfileSyncDiagnostics(
+        () => ({
+          status: 'synced',
+          lastAttemptAt: attemptedAt,
+          lastSuccessAt: attemptedAt,
+          retryCount: 0
+        }),
+        identity
+      );
+      processed += 1;
+    } catch (error) {
+      const nextAttempts = item.attempts + 1;
+      const nextStatus = nextAttempts >= item.maxAttempts ? 'failed' : 'pending';
+      const nextAttemptAtISO = nextStatus === 'pending' ? nextRetryAtISO(nextAttempts) : null;
+      await updateSyncQueueItem(
+        item.id,
+        (current) => ({
+          ...current,
+          status: nextStatus,
+          attempts: nextAttempts,
+          nextAttemptAtISO,
+          updatedAtISO: attemptedAt,
+          lastError: error instanceof Error ? error.message : 'health_profile_sync_failed'
+        }),
+        identity
+      );
+      await updateHealthProfileSyncDiagnostics(
+        (current) => ({
+          ...current,
+          status: nextStatus === 'failed' ? 'failed' : 'pending',
+          lastAttemptAt: attemptedAt,
+          retryCount: nextAttempts
+        }),
+        identity
+      );
+    }
+  }
+
+  return processed;
+};
+
+export const getPlatformHealthProfileSyncDiagnostics = async (
+  identity?: StorageIdentity | null
+): Promise<HealthProfileSyncDiagnostics> => getHealthProfileSyncDiagnostics(identity);
 
 export const getPlatformHealthProfile = () =>
   apiFetch<PlatformHealthProfileBundle>('/v1/platform/health-profile');

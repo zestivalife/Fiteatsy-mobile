@@ -579,17 +579,29 @@ export type HealthEventDraft = {
 
 export type SyncQueueStatus = 'pending' | 'processing' | 'failed' | 'completed';
 
+export type HealthProfileSyncPayload = {
+  patch: Record<string, unknown>;
+  queuedAtISO: string;
+};
+
+export type HealthProfileSyncDiagnostics = {
+  status: 'pending' | 'synced' | 'failed';
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  retryCount: number;
+};
+
 export type SyncQueueItem = {
   id: string;
-  entityType: 'health_event';
-  operation: 'enqueue';
+  entityType: 'health_event' | 'health_profile';
+  operation: 'enqueue' | 'patch';
   status: SyncQueueStatus;
   attempts: number;
   maxAttempts: number;
   nextAttemptAtISO: string | null;
   createdAtISO: string;
   updatedAtISO: string;
-  payload: HealthEventDraft;
+  payload: HealthEventDraft | HealthProfileSyncPayload;
   lastError: string | null;
 };
 

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as Notifications from 'expo-notifications';
 import { initialWellness } from '../data/mock';
@@ -29,7 +30,8 @@ import {
   ThemeMode,
   WearableDevice,
   WearableSyncPayload,
-  WellnessSnapshot
+  WellnessSnapshot,
+  HealthProfileSyncDiagnostics
 } from '../types';
 import { applyMoodImpact } from '../utils/wellness';
 import { generatePriorityPlan, buildDecisionLog } from '../services/intelligenceEngine';
@@ -73,7 +75,9 @@ import { registerAccessTokenProvider } from '../services/apiClient';
 import { queueHealthEvent } from '../services/platformEventService';
 import {
   getPlatformHealthProfile,
+  getPlatformHealthProfileSyncDiagnostics,
   mergePlatformProfileIntoOnboarding,
+  processPendingHealthProfileSync,
   syncPlatformHealthProfile
 } from '../services/platformHealthProfileService';
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
@@ -174,6 +178,8 @@ type AppContextValue = {
   sendFamilyPing: (connectionId: string, message: string) => Promise<void>;
   triggerFamilySOS: (connectionId: string, message?: string) => Promise<void>;
   getFamilySummary: (connectionId: string) => FamilyWellnessSummary | null;
+  healthProfileSyncDiagnostics: HealthProfileSyncDiagnostics;
+  retryPendingHealthProfileSync: () => Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -280,6 +286,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [familyInvites, setFamilyInvites] = useState<FamilyInvite[]>([]);
   const [familyConnections, setFamilyConnections] = useState<FamilyConnection[]>([]);
   const [familyEmergencyEvents, setFamilyEmergencyEvents] = useState<FamilyEmergencyEvent[]>([]);
+  const [healthProfileSyncDiagnostics, setHealthProfileSyncDiagnosticsState] = useState<HealthProfileSyncDiagnostics>({
+    status: 'synced',
+    lastAttemptAt: null,
+    lastSuccessAt: null,
+    retryCount: 0
+  });
   const userId = authSession?.accountId ?? '';
   const clientId = authSession?.client.fiteatsyClientId ?? '';
   const isAuthenticated = authSession !== null;
@@ -288,6 +300,23 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     (baseKey: string) => getSessionScopedKey(baseKey, authSession),
     [authSession]
   );
+
+  const currentStorageIdentity = useMemo(
+    () => (authSession ? { userId: authSession.accountId, clientId: authSession.client.fiteatsyClientId } : null),
+    [authSession]
+  );
+
+  const refreshHealthProfileSyncDiagnostics = useCallback(async (identity = currentStorageIdentity) => {
+    const diagnostics = await getPlatformHealthProfileSyncDiagnostics(identity);
+    setHealthProfileSyncDiagnosticsState(diagnostics);
+    return diagnostics;
+  }, [currentStorageIdentity]);
+
+  const retryPendingHealthProfileSync = useCallback(async () => {
+    if (!currentStorageIdentity) return;
+    await processPendingHealthProfileSync(currentStorageIdentity);
+    await refreshHealthProfileSyncDiagnostics(currentStorageIdentity);
+  }, [currentStorageIdentity, refreshHealthProfileSyncDiagnostics]);
 
   const setUserStorageItem = useCallback(
     (baseKey: string, value: string) => {
@@ -449,6 +478,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           if (parsed && typeof parsed === 'object') setAssessmentState(parsed);
         }
         try {
+          await processPendingHealthProfileSync(toSessionStorageIdentity(sessionForStorage));
           const remoteBundle = await getPlatformHealthProfile();
           setOnboardingState((previous) => {
             const baseProfile = previous ?? normalizeOnboardingProfile({
@@ -483,10 +513,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             }
             return next;
           });
+          const diagnostics = await getPlatformHealthProfileSyncDiagnostics(toSessionStorageIdentity(sessionForStorage));
+          setHealthProfileSyncDiagnosticsState(diagnostics);
         } catch (error) {
           console.warn('[AppContext] platform health profile hydration skipped', {
             errorMessage: error instanceof Error ? error.message : String(error)
           });
+          const diagnostics = await getPlatformHealthProfileSyncDiagnostics(toSessionStorageIdentity(sessionForStorage));
+          setHealthProfileSyncDiagnosticsState(diagnostics);
         }
         if (storedSelectedDeviceId) {
           setSelectedDeviceIdState(storedSelectedDeviceId);
@@ -570,7 +604,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 secondaryGoals: normalized.secondaryGoals
               }
             });
-            void syncPlatformHealthProfile(normalized, assessment).catch(() => undefined);
+            void syncPlatformHealthProfile(normalized, assessment, currentStorageIdentity).finally(() => {
+              void refreshHealthProfileSyncDiagnostics(currentStorageIdentity);
+            }).catch(() => undefined);
           }
           return normalized;
         } else {
@@ -579,7 +615,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return next;
       });
     },
-    [clientId, removeUserStorageItem, setUserStorageItem, userId]
+    [assessment, clientId, currentStorageIdentity, refreshHealthProfileSyncDiagnostics, removeUserStorageItem, setUserStorageItem, userId]
   );
 
   const setAssessment = useCallback<React.Dispatch<React.SetStateAction<AssessmentProfile | null>>>(
@@ -602,7 +638,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 physicalDistress: next.physicalDistress
               }
             });
-            void syncPlatformHealthProfile(onboarding, next).catch(() => undefined);
+            void syncPlatformHealthProfile(onboarding, next, currentStorageIdentity).finally(() => {
+              void refreshHealthProfileSyncDiagnostics(currentStorageIdentity);
+            }).catch(() => undefined);
           }
         } else {
           removeUserStorageItem(STORAGE_KEYS.assessment);
@@ -610,7 +648,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return next;
       });
     },
-    [clientId, onboarding, removeUserStorageItem, setUserStorageItem, userId]
+    [clientId, currentStorageIdentity, onboarding, refreshHealthProfileSyncDiagnostics, removeUserStorageItem, setUserStorageItem, userId]
   );
 
   const setIsAuthenticated = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(
@@ -1398,6 +1436,30 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setWellnessState(initialWellness);
   }, [authSession, clearPersistedAuth, setSelectedDeviceId, setWearableSetupCompleted]);
 
+
+  useEffect(() => {
+    if (!currentStorageIdentity) {
+      setHealthProfileSyncDiagnosticsState({
+        status: 'synced',
+        lastAttemptAt: null,
+        lastSuccessAt: null,
+        retryCount: 0
+      });
+      return;
+    }
+    void refreshHealthProfileSyncDiagnostics(currentStorageIdentity);
+  }, [currentStorageIdentity, refreshHealthProfileSyncDiagnostics]);
+
+  useEffect(() => {
+    if (!authSession) return undefined;
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        void retryPendingHealthProfileSync();
+      }
+    });
+    return () => unsubscribe();
+  }, [authSession, retryPendingHealthProfileSync]);
+
   const value = useMemo(
     () => ({
       bootstrapped,
@@ -1461,7 +1523,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       disconnectFamilyMember,
       sendFamilyPing,
       triggerFamilySOS,
-      getFamilySummary
+      getFamilySummary,
+      healthProfileSyncDiagnostics,
+      retryPendingHealthProfileSync
     }),
     [
       addWearableSyncData,
@@ -1486,6 +1550,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       familyConnections,
       familyEmergencyEvents,
       familyInvites,
+      healthProfileSyncDiagnostics,
       mood,
       nudges,
       onboarding,
@@ -1522,6 +1587,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       sendFamilyPing,
       triggerFamilySOS,
       getFamilySummary,
+      retryPendingHealthProfileSync,
       submitCheckIn,
       themeMode,
       wearableSyncData,

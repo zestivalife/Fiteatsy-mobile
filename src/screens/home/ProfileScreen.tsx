@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../../components/Screen';
@@ -34,13 +35,22 @@ export const ProfileScreen = ({ navigation }: Props) => {
     checkIns,
     wearableSyncData,
     nudges,
-    assessment
+    assessment,
+    healthProfileSyncDiagnostics,
+    retryPendingHealthProfileSync
   } = useAppContext();
   const connectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? null;
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
   const consultant = getConsultantProfile(onboarding);
   const healthProfile = buildHealthProfileCompletion(onboarding, assessment, 0);
+
+
+  useFocusEffect(
+    useCallback(() => {
+      void retryPendingHealthProfileSync();
+    }, [retryPendingHealthProfileSync])
+  );
 
   const updateGender = (gender: AssessmentGender) => {
     if (!onboarding) return;
@@ -157,6 +167,14 @@ export const ProfileScreen = ({ navigation }: Props) => {
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Total Syncs</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{wearableSyncData.length}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Check-ins Logged</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{checkIns.length}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Care Nudges</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{nudges.length}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Profile Sync Status</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfileSyncDiagnostics.status}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Last Attempt</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDate(healthProfileSyncDiagnostics.lastAttemptAt)}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Last Success</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDate(healthProfileSyncDiagnostics.lastSuccessAt)}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Retry Count</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfileSyncDiagnostics.retryCount}</Text></View>
+        <Pressable style={styles.metricsLink} onPress={() => { void retryPendingHealthProfileSync(); }}>
+          <Text style={[styles.metricsLinkText, { color: palette.blue }]}>Retry Health Profile Sync</Text>
+          <Ionicons name="refresh" size={14} color={palette.blue} />
+        </Pressable>
         <Pressable style={styles.metricsLink} onPress={() => navigation.navigate('ConnectedMetrics')}>
           <Text style={[styles.metricsLinkText, { color: palette.blue }]}>View Connected Metrics</Text>
           <Ionicons name="chevron-forward" size={14} color={palette.blue} />

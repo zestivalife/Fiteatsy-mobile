@@ -63,7 +63,9 @@ export const HealthSyncDebugScreen = ({ navigation }: Props) => {
     wellness,
     addWearableSyncData,
     setSelectedDeviceId,
-    setWellness
+    setWellness,
+    healthProfileSyncDiagnostics,
+    retryPendingHealthProfileSync
   } = useAppContext();
   const palette = getThemeColors(themeMode);
   const [diagnostics, setDiagnostics] = useState<HealthConnectRuntimeDiagnostics | null>(null);
@@ -223,6 +225,15 @@ export const HealthSyncDebugScreen = ({ navigation }: Props) => {
             </View>
           );
         })}
+      </Card>
+
+      <Card>
+        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Health Profile Sync</Text>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Status</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfileSyncDiagnostics.status}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Last attempt</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDateTime(healthProfileSyncDiagnostics.lastAttemptAt)}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Last success</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDateTime(healthProfileSyncDiagnostics.lastSuccessAt)}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Retry count</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfileSyncDiagnostics.retryCount}</Text></View>
+        <PrimaryButton title="Retry Profile Sync" onPress={() => { void retryPendingHealthProfileSync(); }} />
       </Card>
 
       <Card>
