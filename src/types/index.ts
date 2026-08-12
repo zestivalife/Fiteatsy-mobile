@@ -52,6 +52,13 @@ export type SymptomTag =
 export type HealthGoal =
   | 'Sugar Control'
   | 'Weight Loss'
+  | 'Weight Gain'
+  | 'Muscle Building'
+  | 'Diabetes Management'
+  | 'PCOS Management'
+  | 'General Wellness'
+  | 'Fitness Improvement'
+  | 'Recovery'
   | 'Hormone Balance'
   | 'BP Control'
   | 'Gut Relief'

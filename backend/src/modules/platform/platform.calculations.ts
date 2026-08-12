@@ -74,6 +74,12 @@ export const calculateNutritionProfileCompletion = (
       { label: 'Activity Level', value: profile.activityLevel },
       { label: 'Work Mode', value: profile.workMode },
       { label: 'Travel Frequency', value: profile.travelFrequency },
+      { label: 'Sleep Hours', value: profile.sleepHours },
+      { label: 'Sleep Goal', value: profile.sleepGoalHours },
+      { label: 'Smoking Status', value: profile.smokingStatus },
+      { label: 'Alcohol Frequency', value: profile.alcoholFrequency },
+      { label: 'Exercise Frequency', value: profile.exerciseFrequency },
+      { label: 'Stress Level', value: profile.stressLevelLabel },
     ]),
     scoreSection('meal_behaviour', [
       { label: 'Wake Time', value: profile.wakeTime },
@@ -90,6 +96,7 @@ export const calculateNutritionProfileCompletion = (
     scoreSection('food_preferences', [
       { label: 'Diet Type', value: profile.dietType },
       { label: 'Regional Cuisine', value: profile.regionalCuisine },
+      { label: 'Preferred Cuisines', value: profile.preferredCuisines },
       { label: 'Foods You Like', value: profile.foodsLiked },
       { label: 'Foods You Dislike', value: profile.foodsDisliked },
       { label: 'Food Allergies', value: profile.foodAllergies },
@@ -99,7 +106,14 @@ export const calculateNutritionProfileCompletion = (
     scoreSection('medical_history', [
       { label: 'Current Medicines', value: profile.currentMedicines },
       { label: 'Primary Conditions', value: profile.primaryConditions },
+      { label: 'Previous Conditions', value: profile.previousConditions },
+      { label: 'Family History', value: profile.familyHistoryConditions },
       { label: 'Wellness Goals', value: profile.wellnessGoals },
+      { label: 'Clinical Notes', value: profile.medicalNotes },
+      { label: 'PCOS', value: profile.pcosStatus },
+      { label: 'Thyroid', value: profile.thyroidStatus },
+      { label: 'Diabetes', value: profile.diabetesStatus },
+      { label: 'Hypertension', value: profile.hypertensionStatus },
     ]),
     scoreSection('blood_reports', [
       { label: 'Blood Reports', value: reportCount > 0 ? reportCount : null },

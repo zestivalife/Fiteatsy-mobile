@@ -64,6 +64,7 @@ const mapHealthProfile = (row: Record<string, unknown>): HealthProfileRecord => 
   travelFrequency: row.travel_frequency == null ? null : String(row.travel_frequency),
   dietType: row.diet_type == null ? null : String(row.diet_type),
   regionalCuisine: row.regional_cuisine == null ? null : String(row.regional_cuisine),
+  preferredCuisines: toStringArray(row.preferred_cuisines),
   foodsLiked: toStringArray(row.foods_liked),
   foodsDisliked: toStringArray(row.foods_disliked),
   foodAllergies: toStringArray(row.food_allergies),
@@ -77,11 +78,26 @@ const mapHealthProfile = (row: Record<string, unknown>): HealthProfileRecord => 
   sleepTime: row.sleep_time == null ? null : String(row.sleep_time),
   mealsPerDay: row.meals_per_day == null ? null : Number(row.meals_per_day),
   waterIntakeLiters: toNumberOrNull(row.water_intake_liters),
+  sleepHours: toNumberOrNull(row.sleep_hours),
+  sleepGoalHours: toNumberOrNull(row.sleep_goal_hours),
   outsideFoodFrequency: row.outside_food_frequency == null ? null : String(row.outside_food_frequency),
   cookingAtHome: row.cooking_at_home == null ? null : String(row.cooking_at_home),
   whoCooks: row.who_cooks == null ? null : String(row.who_cooks),
+  smokingStatus: row.smoking_status == null ? null : String(row.smoking_status),
+  alcoholFrequency: row.alcohol_frequency == null ? null : String(row.alcohol_frequency),
+  exerciseFrequency: row.exercise_frequency == null ? null : String(row.exercise_frequency),
+  stressLevelLabel: row.stress_level_label == null ? null : String(row.stress_level_label),
   primaryConditions: toStringArray(row.primary_conditions),
+  previousConditions: toStringArray(row.previous_conditions),
+  familyHistoryConditions: toStringArray(row.family_history_conditions),
   wellnessGoals: toStringArray(row.wellness_goals),
+  medicalNotes: row.medical_notes == null ? null : String(row.medical_notes),
+  pregnancyStatus: row.pregnancy_status == null ? null : String(row.pregnancy_status),
+  breastfeedingStatus: row.breastfeeding_status == null ? null : String(row.breastfeeding_status),
+  pcosStatus: row.pcos_status == null ? null : String(row.pcos_status),
+  thyroidStatus: row.thyroid_status == null ? null : String(row.thyroid_status),
+  diabetesStatus: row.diabetes_status == null ? null : String(row.diabetes_status),
+  hypertensionStatus: row.hypertension_status == null ? null : String(row.hypertension_status),
   assignedConsultantId: row.assigned_consultant_id == null ? null : String(row.assigned_consultant_id),
   assignedMentorId: row.assigned_mentor_id == null ? null : String(row.assigned_mentor_id),
   ...mapAuditFields(row)
@@ -188,6 +204,7 @@ const buildHealthProfileDefaults = (owner: ClientOwnershipContext): HealthProfil
   travelFrequency: null,
   dietType: null,
   regionalCuisine: null,
+  preferredCuisines: [],
   foodsLiked: [],
   foodsDisliked: [],
   foodAllergies: [],
@@ -201,11 +218,26 @@ const buildHealthProfileDefaults = (owner: ClientOwnershipContext): HealthProfil
   sleepTime: null,
   mealsPerDay: null,
   waterIntakeLiters: null,
+  sleepHours: null,
+  sleepGoalHours: null,
   outsideFoodFrequency: null,
   cookingAtHome: null,
   whoCooks: null,
+  smokingStatus: null,
+  alcoholFrequency: null,
+  exerciseFrequency: null,
+  stressLevelLabel: null,
   primaryConditions: [],
+  previousConditions: [],
+  familyHistoryConditions: [],
   wellnessGoals: [],
+  medicalNotes: null,
+  pregnancyStatus: null,
+  breastfeedingStatus: null,
+  pcosStatus: null,
+  thyroidStatus: null,
+  diabetesStatus: null,
+  hypertensionStatus: null,
   assignedConsultantId: null,
   assignedMentorId: null,
   createdAtISO: nowIso(),
@@ -315,7 +347,7 @@ export const createOrUpdateHealthProfile = async (
         next.createdAtISO
       ]
     );
-    return mapHealthProfile(inserted.rows[0]);
+    return saveHealthProfileProgressiveFields(inserted.rows[0].id, owner.clientId, next);
   }
 
   const updated = await pool.query(
@@ -410,6 +442,62 @@ export const createOrUpdateHealthProfile = async (
       next.status,
       nowIso(),
       owner.clientId
+    ]
+  );
+  if (updated.rowCount === 0) {
+    throw new Error('Health profile ownership mismatch.');
+  }
+  return saveHealthProfileProgressiveFields(updated.rows[0].id, owner.clientId, next);
+};
+
+const saveHealthProfileProgressiveFields = async (
+  profileId: string,
+  clientId: string,
+  next: HealthProfileRecord
+) => {
+  const updated = await pool.query(
+    `
+      update health_profiles
+      set
+        preferred_cuisines = $3::jsonb,
+        sleep_hours = $4,
+        sleep_goal_hours = $5,
+        smoking_status = $6,
+        alcohol_frequency = $7,
+        exercise_frequency = $8,
+        stress_level_label = $9,
+        previous_conditions = $10::jsonb,
+        family_history_conditions = $11::jsonb,
+        medical_notes = $12,
+        pregnancy_status = $13,
+        breastfeeding_status = $14,
+        pcos_status = $15,
+        thyroid_status = $16,
+        diabetes_status = $17,
+        hypertension_status = $18
+      where id = $1
+        and client_id = $2
+      returning *
+    `,
+    [
+      profileId,
+      clientId,
+      JSON.stringify(next.preferredCuisines),
+      next.sleepHours,
+      next.sleepGoalHours,
+      next.smokingStatus,
+      next.alcoholFrequency,
+      next.exerciseFrequency,
+      next.stressLevelLabel,
+      JSON.stringify(next.previousConditions),
+      JSON.stringify(next.familyHistoryConditions),
+      next.medicalNotes,
+      next.pregnancyStatus,
+      next.breastfeedingStatus,
+      next.pcosStatus,
+      next.thyroidStatus,
+      next.diabetesStatus,
+      next.hypertensionStatus,
     ]
   );
   if (updated.rowCount === 0) {

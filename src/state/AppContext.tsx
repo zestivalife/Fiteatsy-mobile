@@ -70,6 +70,7 @@ import {
 } from '../services/authService';
 import { registerAccessTokenProvider } from '../services/apiClient';
 import { queueHealthEvent } from '../services/platformEventService';
+import { syncPlatformHealthProfile } from '../services/platformHealthProfileService';
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
 import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/identityScopedStorage';
 
@@ -509,6 +510,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 secondaryGoals: normalized.secondaryGoals
               }
             });
+            void syncPlatformHealthProfile(normalized, assessment).catch(() => undefined);
           }
           return normalized;
         } else {
@@ -540,6 +542,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
                 physicalDistress: next.physicalDistress
               }
             });
+            void syncPlatformHealthProfile(onboarding, next).catch(() => undefined);
           }
         } else {
           removeUserStorageItem(STORAGE_KEYS.assessment);

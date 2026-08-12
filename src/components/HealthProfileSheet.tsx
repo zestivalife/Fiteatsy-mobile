@@ -5,6 +5,7 @@ import { colors, getThemeColors, typography } from '../design/tokens';
 import {
   AssessmentProfile,
   HealthCondition,
+  HealthGoal,
   HealthProfileSectionKey,
   HealthProfileVerificationState,
   OnboardingProfile,
@@ -379,7 +380,7 @@ export const HealthProfileSheet = ({
       supplements: ['Vitamin D3', 'Omega-3', 'B12', 'Protein Powder', 'Iron'],
       medicines: ['Metformin', 'Levothyroxine', 'Iron', 'Prenatal Vitamins'],
       cuisines: ['North Indian', 'South Indian', 'Gujarati', 'Maharashtrian', 'Punjabi', 'Bengali'],
-      goals: ['Weight Loss', 'Better Energy', 'Better Sleep', 'Sugar Control', 'Hormone Balance']
+      goals: ['Weight Loss', 'Weight Gain', 'Muscle Building', 'Diabetes Management', 'PCOS Management', 'General Wellness', 'Fitness Improvement', 'Recovery']
     }),
     []
   );
@@ -403,6 +404,7 @@ export const HealthProfileSheet = ({
 
   const bodyFatValue = completion.bodyFatPct ?? calculatedBodyFat;
   const selectedSharedReportIds = onboarding?.consultantSharedReportIds ?? [];
+  const nextSection = completion.sections.find((section) => section.status !== 'complete') ?? completion.sections[0];
 
   const touchSection = (section: HealthProfileSectionKey) => {
     const nextStamp = new Date().toISOString();
@@ -506,6 +508,23 @@ export const HealthProfileSheet = ({
             {completion.missingItems.slice(0, 3).join(' • ') || 'No critical gaps right now.'}
           </Text>
 
+          {nextSection ? (
+            <View style={[styles.nextStepCard, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.nextStepEyebrow, { color: '#59BE08' }]}>Next best step</Text>
+                <Text style={[styles.nextStepTitle, { color: palette.textPrimary }]}>
+                  Complete {nextSection.title.toLowerCase()}
+                </Text>
+                <Text style={[styles.nextStepCopy, { color: palette.textSecondary }]}>
+                  {nextSection.missing.slice(0, 2).join(' • ') || 'Review this section to keep your health intelligence current.'}
+                </Text>
+              </View>
+              <Pressable style={styles.nextStepButton} onPress={() => setExpandedSection(nextSection.id)}>
+                <Text style={styles.nextStepButtonText}>Resume</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {completion.sections.map((section) => (
               <SectionShell
@@ -556,6 +575,19 @@ export const HealthProfileSheet = ({
                       onChangeText={(value) => updateOnboardingSection('basic', { occupation: value })}
                     />
                     <SingleSelectField
+                      label="Primary Goal"
+                      value={onboarding?.primaryGoal ?? onboarding?.wellnessGoal ?? onboarding?.healthGoals?.[0]}
+                      options={foodSuggestions.goals}
+                      palette={palette}
+                      onSelect={(value) =>
+                        updateOnboardingSection('basic', {
+                          primaryGoal: value as HealthGoal,
+                          wellnessGoal: value as HealthGoal,
+                          healthGoals: [value as HealthGoal]
+                        })
+                      }
+                    />
+                    <SingleSelectField
                       label="Work Mode"
                       value={onboarding?.workMode}
                       options={['Office', 'Hybrid', 'Remote']}
@@ -586,7 +618,7 @@ export const HealthProfileSheet = ({
                     <SingleSelectField
                       label="Activity Level"
                       value={onboarding?.activityLevel}
-                      options={['Sedentary', 'Light', 'Moderate', 'Active']}
+                      options={['Sedentary', 'Lightly active', 'Moderately active', 'Very active', 'Athlete']}
                       palette={palette}
                       onSelect={(value) => updateOnboardingSection('basic', { activityLevel: value })}
                     />
@@ -732,7 +764,7 @@ export const HealthProfileSheet = ({
                     <SingleSelectField
                       label="Diet Type"
                       value={onboarding?.dietType}
-                      options={['Vegetarian', 'Eggetarian', 'Vegan', 'Jain', 'Pescatarian', 'Mixed']}
+                      options={['Vegetarian', 'Non vegetarian', 'Vegan', 'Eggetarian', 'Other']}
                       palette={palette}
                       onSelect={(value) => updateOnboardingSection('nutrition', { dietType: value })}
                     />
@@ -1113,6 +1145,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginTop: 12
+  },
+  nextStepCard: {
+    marginTop: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  nextStepEyebrow: {
+    ...typography.caption,
+    fontSize: 11,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8
+  },
+  nextStepTitle: {
+    ...typography.bodyStrong,
+    fontSize: 15
+  },
+  nextStepCopy: {
+    ...typography.body,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4
+  },
+  nextStepButton: {
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#59BE08',
+    marginLeft: 12
+  },
+  nextStepButtonText: {
+    ...typography.bodyStrong,
+    color: '#FFFFFF',
+    fontSize: 13
   },
   scrollContent: {
     paddingTop: 12,

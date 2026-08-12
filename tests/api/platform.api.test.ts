@@ -41,11 +41,33 @@ test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 
       gender: 'Female',
       heightCm: 164,
       currentWeightKg: 62,
+      goalWeightKg: 58,
+      activityLevel: 'Moderately active',
+      dietType: 'Vegetarian',
+      preferredCuisines: ['Maharashtrian'],
+      sleepHours: 6.5,
+      sleepGoalHours: 8,
+      smokingStatus: 'Never',
+      alcoholFrequency: 'Never',
+      exerciseFrequency: '3-4x/week',
+      stressLevelLabel: 'Moderate',
+      previousConditions: ['Vitamin Deficiency'],
+      familyHistoryConditions: ['Diabetes'],
+      medicalNotes: 'Prefers vegetarian meals.',
+      pcosStatus: 'No',
+      thyroidStatus: 'No',
+      diabetesStatus: 'No',
+      hypertensionStatus: 'No',
+      wellnessGoals: ['Weight Loss'],
     },
     { headers: authHeaders(session.token) }
   );
   assert.equal(patched.response.status, 200);
   assert.equal(patched.body.profile.userId, session.current.body.accountId);
+  assert.deepEqual(patched.body.profile.preferredCuisines, ['Maharashtrian']);
+  assert.equal(patched.body.profile.sleepHours, 6.5);
+  assert.deepEqual(patched.body.profile.familyHistoryConditions, ['Diabetes']);
+  assert.equal(patched.body.profile.medicalNotes, 'Prefers vegetarian meals.');
   assert.equal('clientId' in patched.body.profile, false);
   assert.equal('clientId' in patched.body.nutrition, false);
   assert.equal('clientId' in patched.body.careCase, false);
