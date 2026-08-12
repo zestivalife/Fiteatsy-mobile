@@ -84,6 +84,24 @@ test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 
   });
   assert.equal(profile.response.status, 200);
   assert.equal(profile.body.profile.userId, session.current.body.accountId);
+  assert.deepEqual(profile.body.profile.preferredCuisines, ['Maharashtrian']);
+  assert.equal(profile.body.profile.sleepHours, 6.5);
+  assert.equal(profile.body.profile.sleepGoalHours, 8);
+  assert.equal(profile.body.profile.sleepQualityLabel, 'Fair');
+  assert.equal(profile.body.profile.smokingStatus, 'Never');
+  assert.equal(profile.body.profile.alcoholFrequency, 'Never');
+  assert.equal(profile.body.profile.exerciseFrequency, '3-4x/week');
+  assert.equal(profile.body.profile.stressLevelLabel, 'Moderate');
+  assert.deepEqual(profile.body.profile.previousConditions, ['Vitamin Deficiency']);
+  assert.deepEqual(profile.body.profile.familyHistoryConditions, ['Diabetes']);
+  assert.equal(profile.body.profile.medicalNotes, 'Prefers vegetarian meals.');
+  assert.equal(profile.body.profile.pcosStatus, 'No');
+  assert.equal(profile.body.profile.thyroidStatus, 'No');
+  assert.equal(profile.body.profile.diabetesStatus, 'No');
+  assert.equal(profile.body.profile.hypertensionStatus, 'No');
+  assert.equal(profile.body.profile.cholesterolStatus, 'Borderline');
+  assert.equal(profile.body.profile.heartConditionStatus, 'No');
+  assert.deepEqual(profile.body.profile.previousSurgeries, ['None']);
   assert.equal('clientId' in profile.body.profile, false);
 
   const completion = await getJson(server.baseUrl, '/v1/platform/health-profile/completion?userId=platform-user', {

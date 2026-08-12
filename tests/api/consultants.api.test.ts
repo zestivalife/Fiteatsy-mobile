@@ -190,7 +190,32 @@ test('consultant client profile returns real onboarding fields only', async () =
       wellnessGoals: ['Improve energy'],
       activityLevel: 'Moderate',
       dietType: 'Vegetarian',
-      primaryConditions: ['Vitamin D deficiency']
+      primaryConditions: ['Vitamin D deficiency'],
+      sleepHours: 7,
+      sleepGoalHours: 8,
+      sleepQualityLabel: 'Good',
+      smokingStatus: 'Never',
+      alcoholFrequency: 'Monthly',
+      exerciseFrequency: '3-4x/week',
+      stressLevelLabel: 'Moderate',
+      preferredCuisines: ['Maharashtrian', 'South Indian'],
+      foodAllergies: ['Peanuts'],
+      foodsDisliked: ['Bitter gourd'],
+      mealsPerDay: 3,
+      waterIntakeLiters: 2.5,
+      previousConditions: ['Anemia'],
+      familyHistoryConditions: ['Diabetes'],
+      currentMedicines: ['Vitamin D3'],
+      medicalNotes: 'Prefers early dinners.',
+      pcosStatus: 'No',
+      thyroidStatus: 'No',
+      diabetesStatus: 'No',
+      hypertensionStatus: 'No',
+      cholesterolStatus: 'Borderline',
+      heartConditionStatus: 'No',
+      pregnancyStatus: 'Not applicable',
+      breastfeedingStatus: 'No',
+      previousSurgeries: ['None']
     },
     { headers: authHeaders(client.token) }
   );
@@ -321,6 +346,31 @@ test('GET /v1/consultants/clients/:clientId/workspace exposes calculated health 
   assert.equal(workspace.response.status, 200);
   assert.equal(workspace.body.onboarding.height, 162);
   assert.equal(workspace.body.onboarding.weight, 61);
+  assert.equal(workspace.body.onboarding.lifestyle.sleepHours, 7);
+  assert.equal(workspace.body.onboarding.lifestyle.sleepGoalHours, 8);
+  assert.equal(workspace.body.onboarding.lifestyle.sleepQuality, 'Good');
+  assert.equal(workspace.body.onboarding.lifestyle.stressLevel, 'Moderate');
+  assert.equal(workspace.body.onboarding.lifestyle.smoking, 'Never');
+  assert.equal(workspace.body.onboarding.lifestyle.alcohol, 'Monthly');
+  assert.equal(workspace.body.onboarding.lifestyle.exerciseFrequency, '3-4x/week');
+  assert.deepEqual(workspace.body.onboarding.nutrition.preferredCuisines, ['Maharashtrian', 'South Indian']);
+  assert.deepEqual(workspace.body.onboarding.nutrition.foodAllergies, ['Peanuts']);
+  assert.deepEqual(workspace.body.onboarding.nutrition.foodDislikes, ['Bitter gourd']);
+  assert.equal(workspace.body.onboarding.nutrition.mealFrequency, 3);
+  assert.equal(workspace.body.onboarding.nutrition.waterIntakeLiters, 2.5);
+  assert.equal(workspace.body.onboarding.healthHistory.pcos, 'No');
+  assert.equal(workspace.body.onboarding.healthHistory.thyroid, 'No');
+  assert.equal(workspace.body.onboarding.healthHistory.diabetes, 'No');
+  assert.equal(workspace.body.onboarding.healthHistory.hypertension, 'No');
+  assert.equal(workspace.body.onboarding.healthHistory.cholesterol, 'Borderline');
+  assert.equal(workspace.body.onboarding.healthHistory.heartConditions, 'No');
+  assert.equal(workspace.body.onboarding.healthHistory.pregnancy, 'Not applicable');
+  assert.equal(workspace.body.onboarding.healthHistory.breastfeeding, 'No');
+  assert.deepEqual(workspace.body.onboarding.healthHistory.previousConditions, ['Anemia']);
+  assert.deepEqual(workspace.body.onboarding.healthHistory.familyMedicalHistory, ['Diabetes']);
+  assert.deepEqual(workspace.body.onboarding.healthHistory.previousSurgeries, ['None']);
+  assert.deepEqual(workspace.body.onboarding.healthHistory.medications, ['Vitamin D3']);
+  assert.equal(workspace.body.onboarding.healthHistory.medicalNotes, 'Prefers early dinners.');
   assert.equal(workspace.body.bodyMetrics.bmi, 23.2);
   assert.equal(workspace.body.bodyMetrics.bmiCategory, 'Normal');
   assert.equal(workspace.body.bodyMetrics.bmr > 0, true);

@@ -451,8 +451,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         try {
           const remoteBundle = await getPlatformHealthProfile();
           setOnboardingState((previous) => {
-            if (!previous) return previous;
-            const normalized = normalizeOnboardingProfile(mergePlatformProfileIntoOnboarding(previous, remoteBundle.profile));
+            const baseProfile = previous ?? normalizeOnboardingProfile({
+              name: sessionForStorage?.user.name ?? 'Fiteatsy Client',
+              createdAtISO: new Date().toISOString()
+            });
+            const normalized = normalizeOnboardingProfile(mergePlatformProfileIntoOnboarding(baseProfile, remoteBundle.profile));
             const scopedKey = getSessionScopedKey(STORAGE_KEYS.onboarding, sessionForStorage);
             if (scopedKey) {
               AsyncStorage.setItem(scopedKey, JSON.stringify(normalized));

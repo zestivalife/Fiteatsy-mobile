@@ -35,9 +35,13 @@ type ConsultantOnboardingProjection = {
     pcos: string | null;
     cholesterol: string | null;
     heartConditions: string | null;
+    pregnancy: string | null;
+    breastfeeding: string | null;
+    previousConditions: string[];
     previousSurgeries: string[];
     familyMedicalHistory: string[];
     medications: string[];
+    medicalNotes: string | null;
   };
 };
 
@@ -237,9 +241,13 @@ const mapOnboardingProjection = (row: Record<string, unknown>): ConsultantOnboar
     pcos: row.pcos_status == null ? null : String(row.pcos_status),
     cholesterol: row.cholesterol_status == null ? null : String(row.cholesterol_status),
     heartConditions: row.heart_condition_status == null ? null : String(row.heart_condition_status),
+    pregnancy: row.pregnancy_status == null ? null : String(row.pregnancy_status),
+    breastfeeding: row.breastfeeding_status == null ? null : String(row.breastfeeding_status),
+    previousConditions: toStringArray(row.previous_conditions),
     previousSurgeries: toStringArray(row.previous_surgeries),
     familyMedicalHistory: toStringArray(row.family_history_conditions),
-    medications: toStringArray(row.current_medicines)
+    medications: toStringArray(row.current_medicines),
+    medicalNotes: row.medical_notes == null ? null : String(row.medical_notes)
   }
 });
 
@@ -281,6 +289,10 @@ const listClientSelect = `
     hp.food_allergies,
     hp.foods_disliked,
     hp.current_medicines,
+    hp.previous_conditions,
+    hp.medical_notes,
+    hp.pregnancy_status,
+    hp.breastfeeding_status,
     hp.sleep_hours,
     hp.sleep_goal_hours,
     hp.sleep_quality_label,

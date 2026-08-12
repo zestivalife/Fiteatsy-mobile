@@ -486,7 +486,8 @@ const saveHealthProfileProgressiveFields = async (
         sleep_quality_label = $19,
         cholesterol_status = $20,
         heart_condition_status = $21,
-        previous_surgeries = $22::jsonb
+        previous_surgeries = $22::jsonb,
+        updated_at = $23
       where id = $1
         and client_id = $2
       returning *
@@ -514,6 +515,7 @@ const saveHealthProfileProgressiveFields = async (
       next.cholesterolStatus,
       next.heartConditionStatus,
       JSON.stringify(next.previousSurgeries),
+      nowIso(),
     ]
   );
   if (updated.rowCount === 0) {
