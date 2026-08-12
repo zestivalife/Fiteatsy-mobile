@@ -214,6 +214,156 @@ export type NotificationRecord = AuditFields & {
   sentAtISO: string | null;
 };
 
+export type NutritionPlanLifecycle =
+  | 'draft'
+  | 'review_ready'
+  | 'approved'
+  | 'published'
+  | 'archived';
+
+export type NutritionMealSlot = {
+  slot: number;
+  meal: string;
+  portion: string;
+  prepNote: string;
+  approxKcal: number | null;
+  proteinGrams: number | null;
+};
+
+export type NutritionMealSection = {
+  window: string;
+  focus: string;
+  options: NutritionMealSlot[];
+};
+
+export type HydrationRhythmEntry = {
+  slot: number;
+  anchor: string;
+  quantity: string;
+  note: string;
+};
+
+export type SmartSubstitutionEntry = {
+  foodGroup: string;
+  usualChoice: string;
+  alternative: string;
+};
+
+export type SupplementClinicalNote = {
+  supplement: string;
+  dose: string;
+  timing: string;
+  duration: string;
+  note: string;
+};
+
+export type NutritionPlanContent = {
+  nutritionSnapshot: {
+    client: string;
+    age: number | null;
+    gender: string | null;
+    goals: string[];
+    healthConditions: string[];
+    dietPreference: string | null;
+    allergies: string[];
+    lifestyleSummary: string;
+    personalisedPlanFocus: string;
+    programmeName: string;
+    preparedBy: string;
+  };
+  dailyTargets: {
+    calories: number | null;
+    protein: number | null;
+    hydration: number | null;
+    movement: string;
+  };
+  mealPlan: {
+    earlyMorning: NutritionMealSection;
+    breakfast: NutritionMealSection;
+    midMorningSnack: NutritionMealSection;
+    lunch: NutritionMealSection;
+    eveningSnack: NutritionMealSection;
+    dinner: NutritionMealSection;
+    bedtimeNutrition: NutritionMealSection;
+  };
+  hydrationRhythm: HydrationRhythmEntry[];
+  weeklySuccessGuide: string[];
+  smartSubstitutions: SmartSubstitutionEntry[];
+  supplementsAndClinicalNotes: SupplementClinicalNote[];
+};
+
+export type NutritionPlanSourceSnapshot = {
+  bmi: number | null;
+  weightKg: number | null;
+  biomarkers: Array<{
+    name: string;
+    value: number;
+    unit: string;
+    status: string;
+    referenceRange: string | null;
+    testDate: string;
+  }>;
+  healthProfile: Record<string, unknown>;
+  calorieTarget: number | null;
+  proteinTargetGrams: number | null;
+  hydrationTargetLiters: number | null;
+  generatedAtISO: string;
+};
+
+export type NutritionIntelligence = {
+  riskLevel: 'low' | 'needs_attention' | 'high';
+  observations: Array<{
+    title: string;
+    detail: string;
+    sources: string[];
+  }>;
+  recommendations: Array<{
+    title: string;
+    detail: string;
+    sources: string[];
+    requiresConsultantReview: boolean;
+  }>;
+  nutritionFocus: string[];
+  foodRecommendations: string[];
+  consultantActions: string[];
+};
+
+export type DietPlanRecord = AuditFields & {
+  id: string;
+  careCaseId: string;
+  userId: string;
+  consultantId: string | null;
+  currentVersionId: string | null;
+  latestPublishedVersionId: string | null;
+  planStatus: NutritionPlanLifecycle;
+  readinessScore: number | null;
+  templateVersion: string;
+  approvedBy: string | null;
+  approvedAtISO: string | null;
+  publishedAtISO: string | null;
+  archivedAtISO: string | null;
+  sourceSnapshot: NutritionPlanSourceSnapshot;
+};
+
+export type DietPlanVersionRecord = AuditFields & {
+  id: string;
+  dietPlanId: string;
+  versionNumber: number;
+  generatedBy: string;
+  content: NutritionPlanContent;
+  sourceSnapshot: NutritionPlanSourceSnapshot;
+  contentSummary: {
+    calories: number | null;
+    protein: number | null;
+    hydration: number | null;
+    focusAreas: string[];
+  };
+  lifecycleStatus: NutritionPlanLifecycle;
+  reviewNotes: string | null;
+  exportedDocPath: string | null;
+  exportedPdfPath: string | null;
+};
+
 export type ReportPipelineProgress = {
   uploadPercent: number;
   ocrPercent: number;

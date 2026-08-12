@@ -19,6 +19,7 @@ import {
   FamilyRelationshipType,
   FamilyShareType,
   FamilyWellnessSummary,
+  PublishedNutritionPlan,
   MoodSelection,
   Medication,
   MedicationLog,
@@ -80,6 +81,7 @@ import {
   processPendingHealthProfileSync,
   syncPlatformHealthProfile
 } from '../services/platformHealthProfileService';
+import { getPublishedNutritionPlan } from '../services/nutritionPlanService';
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
 import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/identityScopedStorage';
 
@@ -180,6 +182,8 @@ type AppContextValue = {
   getFamilySummary: (connectionId: string) => FamilyWellnessSummary | null;
   healthProfileSyncDiagnostics: HealthProfileSyncDiagnostics;
   retryPendingHealthProfileSync: () => Promise<void>;
+  publishedNutritionPlan: PublishedNutritionPlan | null;
+  refreshPublishedNutritionPlan: () => Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -292,6 +296,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     lastSuccessAt: null,
     retryCount: 0
   });
+  const [publishedNutritionPlan, setPublishedNutritionPlan] = useState<PublishedNutritionPlan | null>(null);
   const userId = authSession?.accountId ?? '';
   const clientId = authSession?.client.fiteatsyClientId ?? '';
   const isAuthenticated = authSession !== null;
@@ -317,6 +322,26 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     await processPendingHealthProfileSync(currentStorageIdentity);
     await refreshHealthProfileSyncDiagnostics(currentStorageIdentity);
   }, [currentStorageIdentity, refreshHealthProfileSyncDiagnostics]);
+
+  const refreshPublishedNutritionPlan = useCallback(async () => {
+    if (!authSession) {
+      setPublishedNutritionPlan(null);
+      return;
+    }
+    try {
+      const plan = await getPublishedNutritionPlan();
+      setPublishedNutritionPlan(plan);
+    } catch (error) {
+      if (error instanceof Error && /still being prepared|not found/i.test(error.message)) {
+        setPublishedNutritionPlan(null);
+        return;
+      }
+      console.warn('[AppContext] published nutrition plan refresh skipped', {
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
+      setPublishedNutritionPlan(null);
+    }
+  }, [authSession]);
 
   const setUserStorageItem = useCallback(
     (baseKey: string, value: string) => {
@@ -515,12 +540,24 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           });
           const diagnostics = await getPlatformHealthProfileSyncDiagnostics(toSessionStorageIdentity(sessionForStorage));
           setHealthProfileSyncDiagnosticsState(diagnostics);
+          try {
+            const plan = await getPublishedNutritionPlan();
+            setPublishedNutritionPlan(plan);
+          } catch (error) {
+            if (!(error instanceof Error) || !/still being prepared|not found/i.test(error.message)) {
+              console.warn('[AppContext] published nutrition plan bootstrap skipped', {
+                errorMessage: error instanceof Error ? error.message : String(error)
+              });
+            }
+            setPublishedNutritionPlan(null);
+          }
         } catch (error) {
           console.warn('[AppContext] platform health profile hydration skipped', {
             errorMessage: error instanceof Error ? error.message : String(error)
           });
           const diagnostics = await getPlatformHealthProfileSyncDiagnostics(toSessionStorageIdentity(sessionForStorage));
           setHealthProfileSyncDiagnosticsState(diagnostics);
+          setPublishedNutritionPlan(null);
         }
         if (storedSelectedDeviceId) {
           setSelectedDeviceIdState(storedSelectedDeviceId);
@@ -1433,6 +1470,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setFamilyInvites([]);
     setFamilyConnections([]);
     setFamilyEmergencyEvents([]);
+    setPublishedNutritionPlan(null);
     setWellnessState(initialWellness);
   }, [authSession, clearPersistedAuth, setSelectedDeviceId, setWearableSetupCompleted]);
 
@@ -1525,7 +1563,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       triggerFamilySOS,
       getFamilySummary,
       healthProfileSyncDiagnostics,
-      retryPendingHealthProfileSync
+      retryPendingHealthProfileSync,
+      publishedNutritionPlan,
+      refreshPublishedNutritionPlan
     }),
     [
       addWearableSyncData,
@@ -1551,6 +1591,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       familyEmergencyEvents,
       familyInvites,
       healthProfileSyncDiagnostics,
+      publishedNutritionPlan,
       mood,
       nudges,
       onboarding,
@@ -1588,6 +1629,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       triggerFamilySOS,
       getFamilySummary,
       retryPendingHealthProfileSync,
+      refreshPublishedNutritionPlan,
       submitCheckIn,
       themeMode,
       wearableSyncData,
