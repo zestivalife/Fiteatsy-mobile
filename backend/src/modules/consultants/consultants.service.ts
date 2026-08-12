@@ -2,6 +2,7 @@ import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { persistHealthCalculations } from '../health/health-calculations.repository.js';
 import { type HealthMetrics, calculateHealthMetrics } from '../health/health-calculations.service.js';
 import { listLatestHealthScores } from '../intelligence/health-scores.repository.js';
+import { getConsultantLatestDietPlan, getConsultantNutritionIntelligence } from '../nutrition/nutrition.service.js';
 import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId } from '../platform/platform.store.js';
 import {
   ensureRegisteredClientsForEligibleUsers,
@@ -472,6 +473,10 @@ export const getConsultantClientWorkspace = async (
     careCase,
     lastSyncedAt
   });
+  const [nutritionIntelligencePayload, latestDietPlan] = await Promise.all([
+    getConsultantNutritionIntelligence(publicClientId),
+    getConsultantLatestDietPlan(publicClientId),
+  ]);
 
   return {
     contract: {
@@ -544,6 +549,21 @@ export const getConsultantClientWorkspace = async (
         hydrationTargetLiters: context.calculationInput.weightKg ? null : 'Weight is required.'
       }
     },
+    nutritionIntelligence: nutritionIntelligencePayload?.intelligence ?? null,
+    nutritionSnapshot: nutritionIntelligencePayload?.nutritionSnapshot ?? null,
+    dietPlan:
+      latestDietPlan == null
+        ? null
+        : {
+            plan: latestDietPlan.plan,
+            version: latestDietPlan.version,
+            templateVersion: latestDietPlan.plan.templateVersion,
+            currentLifecycle: latestDietPlan.version.lifecycleStatus,
+            currentVersionNumber: latestDietPlan.version.versionNumber,
+            sourceSnapshot: latestDietPlan.version.sourceSnapshot,
+            contentSummary: latestDietPlan.version.contentSummary,
+            content: latestDietPlan.version.content,
+          },
     planWorkflow,
     recommendations: buildRecommendations({
       completeness,

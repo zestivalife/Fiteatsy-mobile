@@ -511,6 +511,123 @@ export type PlatformEntityStatus = 'active' | 'inactive' | 'paused' | 'archived'
 
 export type CareCaseStatus = 'draft' | 'active' | 'monitoring' | 'paused' | 'closed';
 
+export type NutritionMealOption = {
+  slot: number;
+  meal: string;
+  portion: string;
+  prepNote: string;
+  approxKcal: number | null;
+  proteinGrams: number | null;
+};
+
+export type NutritionMealSection = {
+  window: string;
+  focus: string;
+  options: NutritionMealOption[];
+};
+
+export type NutritionHydrationRhythmEntry = {
+  slot: number;
+  anchor: string;
+  quantity: string;
+  note: string;
+};
+
+export type NutritionSubstitution = {
+  foodGroup: string;
+  usualChoice: string;
+  alternative: string;
+};
+
+export type NutritionClinicalNote = {
+  supplement: string;
+  dose: string;
+  timing: string;
+  duration: string;
+  note: string;
+};
+
+export type NutritionPlanContent = {
+  nutritionSnapshot: {
+    client: string;
+    age: number | null;
+    gender: string | null;
+    goals: string[];
+    healthConditions: string[];
+    dietPreference: string | null;
+    allergies: string[];
+    lifestyleSummary: string;
+    personalisedPlanFocus: string;
+    programmeName: string;
+    preparedBy: string;
+  };
+  dailyTargets: {
+    calories: number | null;
+    protein: number | null;
+    hydration: number | null;
+    movement: string;
+  };
+  mealPlan: {
+    earlyMorning: NutritionMealSection;
+    breakfast: NutritionMealSection;
+    midMorningSnack: NutritionMealSection;
+    lunch: NutritionMealSection;
+    eveningSnack: NutritionMealSection;
+    dinner: NutritionMealSection;
+    bedtimeNutrition: NutritionMealSection;
+  };
+  hydrationRhythm: NutritionHydrationRhythmEntry[];
+  weeklySuccessGuide: string[];
+  smartSubstitutions: NutritionSubstitution[];
+  supplementsAndClinicalNotes: NutritionClinicalNote[];
+};
+
+export type PublishedNutritionPlan = {
+  plan: {
+    id: string;
+    templateVersion: string;
+    planStatus: 'draft' | 'review_ready' | 'approved' | 'published' | 'archived';
+    publishedAtISO: string | null;
+    approvedAtISO: string | null;
+  };
+  version: {
+    id: string;
+    versionNumber: number;
+    lifecycleStatus: 'draft' | 'review_ready' | 'approved' | 'published' | 'archived';
+    contentSummary: {
+      calories: number | null;
+      protein: number | null;
+      hydration: number | null;
+      focusAreas: string[];
+    };
+    content: NutritionPlanContent;
+  };
+  today: {
+    todaysMeals: Array<{
+      key: string;
+      label: string;
+      window: string;
+      focus: string;
+      primaryMeal: string | null;
+      portion: string | null;
+      note: string | null;
+      kcal: number | null;
+      proteinGrams: number | null;
+      options: NutritionMealOption[];
+    }>;
+    consultantNotes: string[];
+    hydrationRhythm: NutritionHydrationRhythmEntry[];
+    substitutions: NutritionSubstitution[];
+    weeklySuccessGuide: string[];
+    dailyTargets: {
+      calories: number | null;
+      protein: number | null;
+      hydration: number | null;
+      movement: string;
+    };
+  };
+};
+
 export type RecoveryProgramRef = {
   id: string;
   title: string;

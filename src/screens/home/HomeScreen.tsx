@@ -347,7 +347,9 @@ export const HomeScreen = () => {
     sendFamilyPing,
     familyEmergencyEvents,
     themeMode,
-    authSession
+    authSession,
+    publishedNutritionPlan,
+    refreshPublishedNutritionPlan
   } = useAppContext();
   const isLight = themeMode === 'light';
   const authStorageIdentity = useMemo(
@@ -753,6 +755,12 @@ export const HomeScreen = () => {
     }, [authSession, reportHistoryStorageKey])
   );
 
+  useFocusEffect(
+    React.useCallback(() => {
+      void refreshPublishedNutritionPlan();
+    }, [refreshPublishedNutritionPlan])
+  );
+
   const onConnectTrustedSupport = () => {
     const trimmedName = supportName.trim();
     const trimmedContact = supportContactValue.trim();
@@ -963,16 +971,32 @@ export const HomeScreen = () => {
 
       <Pressable
         style={[styles.healthProfileCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
-        onPress={() => setHealthProfileOpen(true)}
+        onPress={() => (publishedNutritionPlan ? navigation.navigate('NutritionPlan') : setHealthProfileOpen(true))}
       >
         <View style={styles.healthProfileTop}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.healthProfileEyebrow, { color: '#59BE08' }]}>Your Health Journey</Text>
+            <Text style={[styles.healthProfileEyebrow, { color: '#59BE08' }]}>
+              {publishedNutritionPlan ? 'Your Nutrition Plan' : 'Your Health Journey'}
+            </Text>
             <Text style={[styles.healthProfileName, { color: ui.textPrimary }]}>
-              Complete your profile to unlock:
+              {publishedNutritionPlan ? 'Your consultant-approved plan is now live:' : 'Complete your profile to unlock:'}
             </Text>
             <View style={styles.healthJourneyUnlockList}>
-              {['Personalised diet plan', 'Recovery score', 'Health insights', 'Consultant recommendations'].map((item) => (
+              {(publishedNutritionPlan
+                ? [
+                    publishedNutritionPlan.today.todaysMeals[0]?.primaryMeal
+                      ? `Next meal: ${publishedNutritionPlan.today.todaysMeals[0].primaryMeal}`
+                      : 'Meals prepared for today',
+                    publishedNutritionPlan.today.dailyTargets.calories != null
+                      ? `Calories target: ${publishedNutritionPlan.today.dailyTargets.calories} kcal`
+                      : 'Calories target available in your plan',
+                    publishedNutritionPlan.today.dailyTargets.protein != null
+                      ? `Protein target: ${publishedNutritionPlan.today.dailyTargets.protein} g`
+                      : 'Protein guidance available in your plan',
+                    publishedNutritionPlan.today.consultantNotes[0] || 'Consultant notes are included in your plan',
+                  ]
+                : ['Personalised diet plan', 'Recovery score', 'Health insights', 'Consultant recommendations']
+              ).map((item) => (
                 <View key={item} style={styles.healthJourneyUnlockRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#59BE08" />
                   <Text style={[styles.healthJourneyUnlockText, { color: ui.textSecondary }]}>{item}</Text>
@@ -986,17 +1010,32 @@ export const HomeScreen = () => {
           </View>
         </View>
         <View style={[styles.healthJourneyProgressTrack, { backgroundColor: isLight ? '#DDE8D7' : '#2A3326' }]}>
-          <View style={[styles.healthJourneyProgressFill, { width: `${Math.min(100, Math.max(0, healthProfile.completionPercent))}%` }]} />
+          <View
+            style={[
+              styles.healthJourneyProgressFill,
+              {
+                width: `${
+                  publishedNutritionPlan
+                    ? 100
+                    : Math.min(100, Math.max(0, healthProfile.completionPercent))
+                }%`,
+              },
+            ]}
+          />
         </View>
         <View style={styles.healthProfileBottom}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.healthProfileSectionTitle, { color: ui.textPrimary }]}>Profile strength</Text>
             <Text style={[styles.healthProfileMissing, { color: ui.textSecondary }]}>
-              {healthProfileMissingCopy || 'Keep building your health story for sharper recommendations.'}
+              {publishedNutritionPlan
+                ? 'Open your full meal cards, hydration rhythm, substitutions, and consultant notes.'
+                : healthProfileMissingCopy || 'Keep building your health story for sharper recommendations.'}
             </Text>
           </View>
           <View style={[styles.healthProfileCta, { backgroundColor: '#59BE08' }]}>
-            <Text style={styles.healthProfileCtaText}>Update My Health Profile</Text>
+            <Text style={styles.healthProfileCtaText}>
+              {publishedNutritionPlan ? 'Open My Plan' : 'Update My Health Profile'}
+            </Text>
           </View>
         </View>
       </Pressable>
