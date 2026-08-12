@@ -24,7 +24,8 @@ export const requireAuthenticatedAccount = async (req: Request, res: Response, n
       return res.status(401).json({ error: 'INVALID_SESSION', message: 'Session token is invalid, expired, or revoked.' });
     }
 
-    if (account.authProvider === 'consultant_dashboard' && !req.originalUrl.startsWith('/v1/consultants')) {
+    const consultantWorkspaceRouteAllowed = /^\/v1\/clients\/[^/]+\/workspace(?:$|[?#/])/.test(req.originalUrl);
+    if (account.authProvider === 'consultant_dashboard' && !req.originalUrl.startsWith('/v1/consultants') && !consultantWorkspaceRouteAllowed) {
       return res.status(403).json({
         error: 'EXTERNAL_SESSION_SCOPE_NOT_ALLOWED',
         message: 'Consultant dashboard sessions are only valid for consultant APIs.'

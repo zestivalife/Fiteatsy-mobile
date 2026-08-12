@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pool } from '../../backend/src/db/pool.js';
+import { createBiomarkerObservation, upsertBiomarker } from '../../backend/src/modules/biomarkers/biomarkers.repository.js';
+import { ingestHealthObservations } from '../../backend/src/modules/health/health-observations.repository.js';
+import { createReportRecord } from '../../backend/src/modules/reports/reports.store.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson, patchJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
@@ -387,4 +390,224 @@ test('GET /v1/consultants/clients/:clientId/workspace exposes calculated health 
     [client.current.body.accountId, client.current.body.client.id]
   );
   assert.equal(calculationRows.rows[0].total >= 6, true);
+});
+
+test('GET /v1/clients/:clientId/workspace exposes canonical contract, assignment scope, and profile provenance', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Canonical Contract Client',
+    email: `canonical-contract-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    {
+      dateOfBirthISO: '1992-05-10T00:00:00.000Z',
+      gender: 'Male',
+      heightCm: 174,
+      currentWeightKg: 76,
+      wellnessGoals: ['Improve metabolic health'],
+      activityLevel: 'Lightly Active',
+      dietType: 'Mixed'
+    },
+    { headers: authHeaders(client.token) }
+  );
+
+  const response = await getJson(
+    server.baseUrl,
+    `/v1/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.contract.version, '2026-08-12.fiteatsy-client-workspace.v1');
+  assert.equal(response.body.contract.canonicalRoute, '/v1/clients/{id}/workspace');
+  assert.equal(response.body.access.requestAccountId, consultant.current.body.accountId);
+  assert.equal(response.body.access.requestRole, 'consultant');
+  assert.equal(response.body.access.consentValidation.status, 'granted');
+  assert.equal(response.body.access.assignmentValidation.status, 'unassigned');
+  assert.equal(response.body.healthProfile.gender, 'Male');
+  assert.equal(response.body.healthProfile.heightCm, 174);
+  assert.equal(response.body.healthProfile.currentWeightKg, 76);
+  assert.equal(response.body.healthProfile.assignedConsultantId, null);
+  assert.equal(response.body.sourceMetadata.sourceProduct, 'Fiteatsy');
+  assert.equal(response.body.sourceMetadata.sourceClientRef, client.current.body.client.fiteatsyClientId);
+  assert.ok(Array.isArray(response.body.provenance.sources));
+  assert.ok(response.body.provenance.sources.some((item: { key: string }) => item.key === 'health_profile'));
+  assert.ok(response.body.access.allowedScopes.includes('client.health_profile.read'));
+  assert.ok(response.body.access.restrictedScopes.includes('report.binary.read'));
+});
+
+test('consultant workspace contract syncs reports and validated biomarkers from source data', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Report Sync Client',
+    email: `report-sync-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  const owner = { accountId: client.current.body.accountId, clientId: client.current.body.client.id };
+
+  const report = await createReportRecord({
+    userId: owner.accountId,
+    clientId: owner.clientId,
+    fileName: 'vitamin-d-panel.pdf',
+    mimeType: 'application/pdf',
+    fileSize: 2048,
+    labName: 'Lal PathLabs',
+    reportDate: '2026-08-01',
+    reportType: 'blood_report'
+  });
+  await pool.query(
+    'update health_reports set processing_status = $2, updated_at = $3 where id = $1',
+    [report.id, 'PUBLISHED', '2026-08-02T08:15:00.000Z']
+  );
+  const biomarker = await upsertBiomarker({
+    canonicalName: 'Vitamin D',
+    aliases: ['25 OH Vitamin D'],
+    category: 'Micronutrient',
+    standardUnit: 'ng/mL'
+  });
+  await createBiomarkerObservation(owner, {
+    biomarkerId: biomarker.id,
+    sourceReportId: report.id,
+    value: 18,
+    unit: 'ng/mL',
+    testDate: '2026-08-01',
+    confidence: 0.98,
+    validationStatus: 'validated',
+    referenceRange: '30-100'
+  });
+
+  const response = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.reports.length, 1);
+  assert.equal(response.body.reports[0].labName, 'Lal PathLabs');
+  assert.equal(response.body.reports[0].processingStatus, 'PUBLISHED');
+  assert.equal(response.body.biomarkers.length, 1);
+  assert.equal(response.body.biomarkers[0].name, 'Vitamin D');
+  assert.equal(response.body.biomarkers[0].value, 18);
+  assert.equal(response.body.biomarkers[0].referenceRange, '30-100');
+  assert.ok(response.body.provenance.sources.some((item: { key: string, freshness: string }) => item.key === 'reports' && item.freshness === 'fresh'));
+});
+
+test('consultant workspace contract syncs wearable summaries and source metadata', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Wearable Sync Client',
+    email: `wearable-sync-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  const owner = { accountId: client.current.body.accountId, clientId: client.current.body.client.id };
+
+  await ingestHealthObservations(owner, [
+    {
+      metricType: 'steps',
+      value: 6842,
+      unit: 'count',
+      measuredAtISO: '2026-08-11T07:30:00.000Z',
+      sourceProvider: 'apple_health',
+      sourceRecordId: 'steps-1'
+    },
+    {
+      metricType: 'resting_heart_rate',
+      value: 62,
+      unit: 'bpm',
+      measuredAtISO: '2026-08-11T07:35:00.000Z',
+      sourceProvider: 'apple_health',
+      sourceRecordId: 'rhr-1'
+    }
+  ]);
+
+  const response = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.wearableSummary.connected, true);
+  assert.equal(response.body.wearableSummary.recordsCount, 2);
+  assert.ok(response.body.wearableSummary.dataSources.includes('apple_health'));
+  assert.ok(response.body.wearableSummary.latestMetrics.some((item: { metricType: string }) => item.metricType === 'steps'));
+  assert.equal(response.body.planWorkflow.gates.wearableSignalsReady, true);
+  assert.equal(response.body.sourceMetadata.lastWearableSyncAt, response.body.wearableSummary.lastSyncedAt);
+});
+
+test('GET /v1/clients/:clientId/workspace denies non-consultant sessions', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Denied Client',
+    email: `denied-client-${Date.now()}@example.com`
+  });
+
+  const response = await getJson(
+    server.baseUrl,
+    `/v1/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(client.token) }
+  );
+
+  assert.equal(response.response.status, 403);
+  assert.equal(response.body.error, 'ROLE_NOT_ALLOWED');
+});
+
+test('consultant workspace contract flags stale synced sources without falling back to mock freshness', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Stale Sync Client',
+    email: `stale-sync-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  const owner = { accountId: client.current.body.accountId, clientId: client.current.body.client.id };
+
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    {
+      dateOfBirthISO: '1990-04-12T00:00:00.000Z',
+      gender: 'Female',
+      heightCm: 165,
+      currentWeightKg: 68,
+      wellnessGoals: ['Reduce inflammation'],
+      activityLevel: 'Sedentary',
+      dietType: 'Vegetarian'
+    },
+    { headers: authHeaders(client.token) }
+  );
+
+  const report = await createReportRecord({
+    userId: owner.accountId,
+    clientId: owner.clientId,
+    fileName: 'stale-report.pdf',
+    mimeType: 'application/pdf',
+    fileSize: 1024,
+    labName: 'Metropolis',
+    reportDate: '2026-07-15',
+    reportType: 'blood_report'
+  });
+
+  await pool.query('update health_profiles set updated_at = $2 where client_id = $1', [owner.clientId, '2026-07-01T09:00:00.000Z']);
+  await pool.query('update health_reports set processing_status = $2, updated_at = $3 where id = $1', [report.id, 'PUBLISHED', '2026-07-02T10:00:00.000Z']);
+  await ingestHealthObservations(owner, [{
+    metricType: 'sleep_duration',
+    value: 6.2,
+    unit: 'hours',
+    measuredAtISO: '2026-07-01T06:00:00.000Z',
+    sourceProvider: 'google_health_connect',
+    sourceRecordId: 'sleep-1'
+  }]);
+
+  const response = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.provenance.freshness, 'stale');
+  assert.ok(response.body.provenance.staleSources.includes('health_profile'));
+  assert.ok(response.body.provenance.staleSources.includes('reports'));
+  assert.ok(response.body.provenance.staleSources.includes('wearables'));
+  assert.equal(response.body.syncMetadata.freshness, 'stale');
 });

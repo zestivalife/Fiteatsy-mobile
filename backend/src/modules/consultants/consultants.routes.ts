@@ -31,7 +31,8 @@ consultantsRouter.get('/clients', async (req, res) => {
 });
 
 consultantsRouter.get('/clients/:clientId/workspace', async (req, res) => {
-  const workspace = await getConsultantClientWorkspace(req.params.clientId);
+  const account = getAuthenticatedAccount(req);
+  const workspace = await getConsultantClientWorkspace(req.params.clientId, account);
   if (!workspace) {
     return res.status(404).json({
       error: 'CLIENT_NOT_FOUND',
@@ -50,4 +51,20 @@ consultantsRouter.get('/clients/:clientId', async (req, res) => {
     });
   }
   return res.status(200).json(client);
+});
+
+
+export const consultantWorkspaceContractRouter = Router();
+consultantWorkspaceContractRouter.use(requireAuthenticatedAccount);
+consultantWorkspaceContractRouter.use(requireConsultantAccount);
+consultantWorkspaceContractRouter.get('/:clientId/workspace', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const workspace = await getConsultantClientWorkspace(req.params.clientId, account);
+  if (!workspace) {
+    return res.status(404).json({
+      error: 'CLIENT_NOT_FOUND',
+      message: 'Client not found or not available for consultant management.'
+    });
+  }
+  return res.status(200).json(workspace);
 });

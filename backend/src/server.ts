@@ -15,7 +15,7 @@ import { platformRouter } from './modules/platform/platform.routes.js';
 import { profileRouter } from './modules/profile/profile.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { biomarkersRouter } from './modules/biomarkers/biomarkers.routes.js';
-import { consultantsRouter } from './modules/consultants/consultants.routes.js';
+import { consultantWorkspaceContractRouter, consultantsRouter } from './modules/consultants/consultants.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.service.js';
 import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
@@ -39,6 +39,7 @@ const REGISTERED_ROUTE_GROUPS = [
   '/v1/health',
   '/v1/biomarkers',
   '/v1/consultants',
+  '/v1/clients',
   '/v1/admin',
   '/v1/platform',
   '/v1/profile'
@@ -127,6 +128,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/health', healthRouter);
   app.use('/v1/biomarkers', biomarkersRouter);
   app.use('/v1/consultants', consultantsRouter);
+  app.use('/v1/clients', consultantWorkspaceContractRouter);
   app.use('/v1/admin', adminRouter);
   app.use('/v1/platform', platformRouter);
   app.use('/v1/profile', profileRouter);
