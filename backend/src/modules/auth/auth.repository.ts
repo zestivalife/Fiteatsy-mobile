@@ -64,6 +64,11 @@ const getIndianNationalMobileNumber = (mobileNumber: string) => {
 };
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 const now = () => new Date();
+const SUPPORTED_CONSULTANT_JWT_ALGORITHMS = {
+  HS256: 'sha256',
+  HS384: 'sha384',
+  HS512: 'sha512'
+} as const;
 
 const base64UrlDecode = (value: string) => {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -81,17 +86,45 @@ const decodeJwtPayloadUnsafe = (token: string): Record<string, unknown> | null =
   }
 };
 
-const getConsultantDashboardJwtSecret = () =>
-  process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEY ??
-  process.env.CONSULTANT_DASHBOARD_JWT_SECRET ??
-  process.env.JWT_SECRET_KEY ??
-  null;
+const splitSecretList = (value: string | undefined) =>
+  (value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 
-const verifyConsultantDashboardJwt = (token: string) => {
-  const secret = getConsultantDashboardJwtSecret();
+export const getConsultantDashboardJwtSecretSources = () => {
+  const candidates = [
+    ...splitSecretList(process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEYS).map((secret, index) => ({
+      source: `CONSULTANT_DASHBOARD_JWT_SECRET_KEYS[${index}]`,
+      secret
+    })),
+    { source: 'CONSULTANT_DASHBOARD_JWT_SECRET_KEY', secret: process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEY?.trim() },
+    { source: 'CONSULTANT_DASHBOARD_JWT_SECRET', secret: process.env.CONSULTANT_DASHBOARD_JWT_SECRET?.trim() },
+    { source: 'AUTH_SERVICE_JWT_SECRET_KEY', secret: process.env.AUTH_SERVICE_JWT_SECRET_KEY?.trim() },
+    { source: 'AUTH_SERVICE_JWT_SECRET', secret: process.env.AUTH_SERVICE_JWT_SECRET?.trim() },
+    { source: 'API_GATEWAY_JWT_SECRET_KEY', secret: process.env.API_GATEWAY_JWT_SECRET_KEY?.trim() },
+    { source: 'API_GATEWAY_JWT_SECRET', secret: process.env.API_GATEWAY_JWT_SECRET?.trim() },
+    { source: 'JWT_SECRET_KEY', secret: process.env.JWT_SECRET_KEY?.trim() },
+    { source: 'JWT_SECRET', secret: process.env.JWT_SECRET?.trim() }
+  ].filter((item): item is { source: string; secret: string } => Boolean(item.secret));
+
+  const seen = new Set<string>();
+  return candidates.filter((item) => {
+    const fingerprint = crypto.createHash('sha256').update(item.secret).digest('hex');
+    if (seen.has(fingerprint)) return false;
+    seen.add(fingerprint);
+    return true;
+  });
+};
+
+export const verifyConsultantDashboardJwt = (token: string) => {
+  const secretSources = getConsultantDashboardJwtSecretSources();
   const parts = token.split('.');
-  if (!secret || parts.length !== 3) {
-    return { payload: null, expiryResult: 'not_configured_or_not_jwt' };
+  if (parts.length !== 3) {
+    return { payload: null, expiryResult: 'not_jwt', matchedSecretSource: null };
+  }
+  if (secretSources.length === 0) {
+    return { payload: null, expiryResult: 'not_configured', matchedSecretSource: null };
   }
 
   const [headerPart, payloadPart, signaturePart] = parts;
@@ -101,33 +134,55 @@ const verifyConsultantDashboardJwt = (token: string) => {
     header = JSON.parse(base64UrlDecode(headerPart).toString('utf8')) as Record<string, unknown>;
     payload = JSON.parse(base64UrlDecode(payloadPart).toString('utf8')) as Record<string, unknown>;
   } catch {
-    return { payload: null, expiryResult: 'invalid_json' };
+    return { payload: null, expiryResult: 'invalid_json', matchedSecretSource: null };
   }
 
-  if (header.alg !== 'HS256') {
-    return { payload, expiryResult: 'unsupported_algorithm' };
+  const algorithm = typeof header.alg === 'string' ? header.alg : '';
+  const digest = SUPPORTED_CONSULTANT_JWT_ALGORITHMS[algorithm as keyof typeof SUPPORTED_CONSULTANT_JWT_ALGORITHMS];
+  if (!digest) {
+    return { payload, expiryResult: 'unsupported_algorithm', matchedSecretSource: null };
   }
 
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(`${headerPart}.${payloadPart}`)
-    .digest('base64url');
   const actual = Buffer.from(signaturePart);
-  const expectedBuffer = Buffer.from(expected);
-  if (actual.length !== expectedBuffer.length || !crypto.timingSafeEqual(actual, expectedBuffer)) {
-    return { payload, expiryResult: 'invalid_signature' };
+  const matchedSecretSource = secretSources.find(({ secret }) => {
+    const expected = crypto
+      .createHmac(digest, secret)
+      .update(`${headerPart}.${payloadPart}`)
+      .digest('base64url');
+    const expectedBuffer = Buffer.from(expected);
+    return actual.length === expectedBuffer.length && crypto.timingSafeEqual(actual, expectedBuffer);
+  });
+
+  if (!matchedSecretSource) {
+    return { payload, expiryResult: 'invalid_signature', matchedSecretSource: null };
   }
 
   const expiresAtSeconds = typeof payload.exp === 'number' ? payload.exp : null;
   if (expiresAtSeconds == null) {
-    return { payload, expiryResult: 'missing_expiry' };
+    return { payload, expiryResult: 'missing_expiry', matchedSecretSource: matchedSecretSource.source };
   }
   if (expiresAtSeconds * 1000 <= Date.now()) {
-    return { payload, expiryResult: 'expired' };
+    return { payload, expiryResult: 'expired', matchedSecretSource: matchedSecretSource.source };
   }
 
-  return { payload, expiryResult: 'valid' };
+  return { payload, expiryResult: 'valid', matchedSecretSource: matchedSecretSource.source };
 };
+
+export const isValidConsultantDashboardBridgePayload = (input: {
+  expiryResult: string;
+  userId: string | null;
+  role: string | null;
+  status: string | null;
+  credentialStatus: string | null;
+  tokenType: string | null;
+}) =>
+  input.expiryResult === 'valid' &&
+  Boolean(input.userId) &&
+  Boolean(input.role) &&
+  CONSULTANT_DASHBOARD_BRIDGE_ROLES.has(input.role ?? '') &&
+  input.tokenType === 'access' &&
+  input.status === 'ACTIVE' &&
+  input.credentialStatus === 'PERMANENT';
 
 const toIso = (value: unknown) => {
   if (!value) return null;
@@ -578,24 +633,30 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
   const bridgeRole = typeof bridgePayload?.role === 'string' ? bridgePayload.role.toLowerCase() : null;
   const bridgeEmail = typeof bridgePayload?.email === 'string' ? normalizeEmail(bridgePayload.email) : null;
   const bridgeStatus = typeof bridgePayload?.status === 'string' ? bridgePayload.status.toUpperCase() : null;
+  const bridgeType = typeof bridgePayload?.type === 'string' ? bridgePayload.type.toLowerCase() : null;
   const credentialStatus = typeof bridgePayload?.credential_status === 'string'
     ? bridgePayload.credential_status.toUpperCase()
     : null;
 
-  if (
-    bridge.expiryResult !== 'valid' ||
-    !bridgeUserId ||
-    !bridgeRole ||
-    !CONSULTANT_DASHBOARD_BRIDGE_ROLES.has(bridgeRole) ||
-    bridgeStatus !== 'ACTIVE' ||
-    credentialStatus !== 'PERMANENT'
-  ) {
+  if (!isValidConsultantDashboardBridgePayload({
+    expiryResult: bridge.expiryResult,
+    userId: bridgeUserId,
+    role: bridgeRole,
+    status: bridgeStatus,
+    credentialStatus,
+    tokenType: bridgeType
+  })) {
     console.info('CONSULTANT_SESSION_DEBUG', {
       tokenUserId: bridgeUserId,
       sessionFound: false,
       sessionStatus: 'missing',
-      expiryResult: bridge.expiryResult
+      expiryResult: bridge.expiryResult,
+      matchedSecretSource: bridge.matchedSecretSource,
+      tokenType: bridgeType ?? null
     });
+    return null;
+  }
+  if (!bridgeUserId || !bridgeRole) {
     return null;
   }
 
@@ -631,7 +692,9 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
       tokenUserId: bridgeUserId,
       sessionFound: false,
       sessionStatus: 'consultant_jwt_bridge',
-      expiryResult: bridge.expiryResult
+      expiryResult: bridge.expiryResult,
+      matchedSecretSource: bridge.matchedSecretSource,
+      tokenType: bridgeType
     });
 
     return rowToAuthenticatedAccount(userRow, {
@@ -645,7 +708,9 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     tokenUserId: bridgeUserId,
     sessionFound: false,
     sessionStatus: 'consultant_jwt_bridge_external',
-    expiryResult: bridge.expiryResult
+    expiryResult: bridge.expiryResult,
+    matchedSecretSource: bridge.matchedSecretSource,
+    tokenType: bridgeType
   });
 
   return {
