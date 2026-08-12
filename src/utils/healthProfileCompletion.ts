@@ -139,6 +139,7 @@ export const buildHealthProfileCompletion = (
       [
         { label: 'Sleep Hours', value: onboarding?.sleepHours },
         { label: 'Sleep Goal', value: onboarding?.sleepGoalHours },
+        { label: 'Sleep Quality', value: onboarding?.sleepQualityLabel },
         { label: 'Water Intake', value: onboarding?.waterIntakeLiters },
         { label: 'Meals Per Day', value: onboarding?.mealsPerDay },
         { label: 'Smoking Status', value: onboarding?.smokingStatus },
@@ -192,6 +193,9 @@ export const buildHealthProfileCompletion = (
         { label: 'Thyroid', value: onboarding?.thyroidStatus },
         { label: 'Diabetes', value: onboarding?.diabetesStatus },
         { label: 'Hypertension', value: onboarding?.hypertensionStatus },
+        { label: 'Cholesterol', value: onboarding?.cholesterolStatus },
+        { label: 'Heart Conditions', value: onboarding?.heartConditionStatus },
+        { label: 'Previous Surgeries', value: onboarding?.previousSurgeries },
         { label: 'Pregnancy', value: onboarding?.pregnancyStatus },
         { label: 'Breastfeeding', value: onboarding?.breastfeedingStatus }
       ],

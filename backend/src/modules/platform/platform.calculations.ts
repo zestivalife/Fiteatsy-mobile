@@ -76,6 +76,7 @@ export const calculateNutritionProfileCompletion = (
       { label: 'Travel Frequency', value: profile.travelFrequency },
       { label: 'Sleep Hours', value: profile.sleepHours },
       { label: 'Sleep Goal', value: profile.sleepGoalHours },
+      { label: 'Sleep Quality', value: profile.sleepQualityLabel },
       { label: 'Smoking Status', value: profile.smokingStatus },
       { label: 'Alcohol Frequency', value: profile.alcoholFrequency },
       { label: 'Exercise Frequency', value: profile.exerciseFrequency },
@@ -114,6 +115,9 @@ export const calculateNutritionProfileCompletion = (
       { label: 'Thyroid', value: profile.thyroidStatus },
       { label: 'Diabetes', value: profile.diabetesStatus },
       { label: 'Hypertension', value: profile.hypertensionStatus },
+      { label: 'Cholesterol', value: profile.cholesterolStatus },
+      { label: 'Heart Conditions', value: profile.heartConditionStatus },
+      { label: 'Previous Surgeries', value: profile.previousSurgeries },
     ]),
     scoreSection('blood_reports', [
       { label: 'Blood Reports', value: reportCount > 0 ? reportCount : null },

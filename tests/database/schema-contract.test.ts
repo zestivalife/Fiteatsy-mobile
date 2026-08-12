@@ -78,6 +78,13 @@ test('database schema defines traceable deterministic health calculations', () =
   assert.equal(hasPattern(/health_calculations_client_type_calculated_idx/i), true);
 });
 
+test('database schema includes progressive health profile completion fields', () => {
+  assert.equal(hasPattern(/sleep_quality_label text/i), true);
+  assert.equal(hasPattern(/cholesterol_status text/i), true);
+  assert.equal(hasPattern(/heart_condition_status text/i), true);
+  assert.equal(hasPattern(/previous_surgeries jsonb not null default '\[\]'::jsonb/i), true);
+});
+
 test('database schema preserves report-to-biomarker extraction lineage', () => {
   assert.equal(hasPattern(/create table if not exists biomarker_observations/i), true);
   assert.equal(hasPattern(/client_id text not null/i), true);

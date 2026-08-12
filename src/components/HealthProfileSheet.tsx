@@ -712,6 +712,13 @@ export const HealthProfileSheet = ({
                         onSelect={(value) => updateOnboardingSection('lifestyle', { sleepGoalHours: Number(value) })}
                       />
                     </View>
+                    <SingleSelectField
+                      label="Sleep Quality"
+                      value={onboarding?.sleepQualityLabel}
+                      options={['Excellent', 'Good', 'Fair', 'Poor']}
+                      palette={palette}
+                      onSelect={(value) => updateOnboardingSection('lifestyle', { sleepQualityLabel: value })}
+                    />
                     <View style={styles.metricGrid}>
                       <SingleSelectField
                         label="Water Intake (L)"
@@ -911,6 +918,28 @@ export const HealthProfileSheet = ({
                       options={['No', 'Borderline', 'Diagnosed']}
                       palette={palette}
                       onSelect={(value) => updateOnboardingSection('medical', { hypertensionStatus: value })}
+                    />
+                    <SingleSelectField
+                      label="Cholesterol Issues"
+                      value={onboarding?.cholesterolStatus}
+                      options={['No', 'Borderline', 'Diagnosed', 'Under evaluation']}
+                      palette={palette}
+                      onSelect={(value) => updateOnboardingSection('medical', { cholesterolStatus: value })}
+                    />
+                    <SingleSelectField
+                      label="Heart Conditions"
+                      value={onboarding?.heartConditionStatus}
+                      options={['No', 'Family risk', 'Diagnosed', 'Under evaluation']}
+                      palette={palette}
+                      onSelect={(value) => updateOnboardingSection('medical', { heartConditionStatus: value })}
+                    />
+                    <ListSuggestionField
+                      label="Previous Surgeries"
+                      value={onboarding?.previousSurgeries ?? []}
+                      placeholder="comma separated"
+                      suggestions={['None', 'Appendix', 'Gallbladder', 'C-section', 'Orthopedic', 'Cardiac']}
+                      palette={palette}
+                      onChange={(value) => updateOnboardingSection('medical', { previousSurgeries: value })}
                     />
                     <SingleSelectField
                       label="Pregnancy"

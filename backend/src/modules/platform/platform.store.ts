@@ -80,6 +80,7 @@ const mapHealthProfile = (row: Record<string, unknown>): HealthProfileRecord => 
   waterIntakeLiters: toNumberOrNull(row.water_intake_liters),
   sleepHours: toNumberOrNull(row.sleep_hours),
   sleepGoalHours: toNumberOrNull(row.sleep_goal_hours),
+  sleepQualityLabel: row.sleep_quality_label == null ? null : String(row.sleep_quality_label),
   outsideFoodFrequency: row.outside_food_frequency == null ? null : String(row.outside_food_frequency),
   cookingAtHome: row.cooking_at_home == null ? null : String(row.cooking_at_home),
   whoCooks: row.who_cooks == null ? null : String(row.who_cooks),
@@ -98,6 +99,9 @@ const mapHealthProfile = (row: Record<string, unknown>): HealthProfileRecord => 
   thyroidStatus: row.thyroid_status == null ? null : String(row.thyroid_status),
   diabetesStatus: row.diabetes_status == null ? null : String(row.diabetes_status),
   hypertensionStatus: row.hypertension_status == null ? null : String(row.hypertension_status),
+  cholesterolStatus: row.cholesterol_status == null ? null : String(row.cholesterol_status),
+  heartConditionStatus: row.heart_condition_status == null ? null : String(row.heart_condition_status),
+  previousSurgeries: toStringArray(row.previous_surgeries),
   assignedConsultantId: row.assigned_consultant_id == null ? null : String(row.assigned_consultant_id),
   assignedMentorId: row.assigned_mentor_id == null ? null : String(row.assigned_mentor_id),
   ...mapAuditFields(row)
@@ -220,6 +224,7 @@ const buildHealthProfileDefaults = (owner: ClientOwnershipContext): HealthProfil
   waterIntakeLiters: null,
   sleepHours: null,
   sleepGoalHours: null,
+  sleepQualityLabel: null,
   outsideFoodFrequency: null,
   cookingAtHome: null,
   whoCooks: null,
@@ -238,6 +243,9 @@ const buildHealthProfileDefaults = (owner: ClientOwnershipContext): HealthProfil
   thyroidStatus: null,
   diabetesStatus: null,
   hypertensionStatus: null,
+  cholesterolStatus: null,
+  heartConditionStatus: null,
+  previousSurgeries: [],
   assignedConsultantId: null,
   assignedMentorId: null,
   createdAtISO: nowIso(),
@@ -474,7 +482,11 @@ const saveHealthProfileProgressiveFields = async (
         pcos_status = $15,
         thyroid_status = $16,
         diabetes_status = $17,
-        hypertension_status = $18
+        hypertension_status = $18,
+        sleep_quality_label = $19,
+        cholesterol_status = $20,
+        heart_condition_status = $21,
+        previous_surgeries = $22::jsonb
       where id = $1
         and client_id = $2
       returning *
@@ -498,6 +510,10 @@ const saveHealthProfileProgressiveFields = async (
       next.thyroidStatus,
       next.diabetesStatus,
       next.hypertensionStatus,
+      next.sleepQualityLabel,
+      next.cholesterolStatus,
+      next.heartConditionStatus,
+      JSON.stringify(next.previousSurgeries),
     ]
   );
   if (updated.rowCount === 0) {

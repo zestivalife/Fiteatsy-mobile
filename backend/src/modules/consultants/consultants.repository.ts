@@ -2,6 +2,45 @@ import { pool } from '../../db/pool.js';
 import { createOrResolveClientForAccount } from '../client/client.repository.js';
 import type { HealthCalculationInput, HealthMetrics } from '../health/health-calculations.service.js';
 
+type ConsultantOnboardingProjection = {
+  age?: number | null;
+  gender?: string | null;
+  height: number | null;
+  weight: number | null;
+  goal: string | null;
+  activityLevel: string | null;
+  dietPreference: string | null;
+  medicalConditions: string[] | null;
+  lifestyle: {
+    sleepHours: number | null;
+    sleepGoalHours: number | null;
+    sleepQuality: string | null;
+    stressLevel: string | null;
+    smoking: string | null;
+    alcohol: string | null;
+    exerciseFrequency: string | null;
+  };
+  nutrition: {
+    dietaryPreference: string | null;
+    preferredCuisines: string[];
+    foodAllergies: string[];
+    foodDislikes: string[];
+    mealFrequency: number | null;
+    waterIntakeLiters: number | null;
+  };
+  healthHistory: {
+    diabetes: string | null;
+    hypertension: string | null;
+    thyroid: string | null;
+    pcos: string | null;
+    cholesterol: string | null;
+    heartConditions: string | null;
+    previousSurgeries: string[];
+    familyMedicalHistory: string[];
+    medications: string[];
+  };
+};
+
 export type ConsultantClientListRecord = {
   clientId: string;
   name: string;
@@ -25,15 +64,9 @@ export type ConsultantClientListRecord = {
   lastHealthUpdate: string | null;
   profileCompleted: boolean;
   lastActiveAt: string | null;
-  onboarding: {
+  onboarding: ConsultantOnboardingProjection & {
     age: number | null;
     gender: string | null;
-    height: number | null;
-    weight: number | null;
-    goal: string | null;
-    activityLevel: string | null;
-    dietPreference: string | null;
-    medicalConditions: string[] | null;
   };
   healthProfile: {
     biomarkerStatus: string | null;
@@ -57,14 +90,7 @@ export type ConsultantClientProfileRecord = {
     age: number | null;
     gender: string | null;
   };
-  onboarding: {
-    height: number | null;
-    weight: number | null;
-    goal: string | null;
-    activityLevel: string | null;
-    dietPreference: string | null;
-    medicalConditions: string[] | null;
-  };
+  onboarding: ConsultantOnboardingProjection;
   healthProfile: {
     biomarkerStatus: string | null;
     reportsCount: number;
@@ -180,6 +206,43 @@ const profileCompleted = (row: Record<string, unknown>) =>
   row.height_cm != null &&
   row.current_weight_kg != null;
 
+const mapOnboardingProjection = (row: Record<string, unknown>): ConsultantOnboardingProjection => ({
+  height: toNumberOrNull(row.height_cm),
+  weight: toNumberOrNull(row.current_weight_kg),
+  goal: firstString(row.wellness_goals),
+  activityLevel: row.activity_level == null ? null : String(row.activity_level),
+  dietPreference: row.diet_type == null ? null : String(row.diet_type),
+  medicalConditions: row.health_profile_id ? toStringArray(row.primary_conditions) : null,
+  lifestyle: {
+    sleepHours: toNumberOrNull(row.sleep_hours),
+    sleepGoalHours: toNumberOrNull(row.sleep_goal_hours),
+    sleepQuality: row.sleep_quality_label == null ? null : String(row.sleep_quality_label),
+    stressLevel: row.stress_level_label == null ? null : String(row.stress_level_label),
+    smoking: row.smoking_status == null ? null : String(row.smoking_status),
+    alcohol: row.alcohol_frequency == null ? null : String(row.alcohol_frequency),
+    exerciseFrequency: row.exercise_frequency == null ? null : String(row.exercise_frequency)
+  },
+  nutrition: {
+    dietaryPreference: row.diet_type == null ? null : String(row.diet_type),
+    preferredCuisines: toStringArray(row.preferred_cuisines),
+    foodAllergies: toStringArray(row.food_allergies),
+    foodDislikes: toStringArray(row.foods_disliked),
+    mealFrequency: toNumberOrNull(row.meals_per_day),
+    waterIntakeLiters: toNumberOrNull(row.water_intake_liters)
+  },
+  healthHistory: {
+    diabetes: row.diabetes_status == null ? null : String(row.diabetes_status),
+    hypertension: row.hypertension_status == null ? null : String(row.hypertension_status),
+    thyroid: row.thyroid_status == null ? null : String(row.thyroid_status),
+    pcos: row.pcos_status == null ? null : String(row.pcos_status),
+    cholesterol: row.cholesterol_status == null ? null : String(row.cholesterol_status),
+    heartConditions: row.heart_condition_status == null ? null : String(row.heart_condition_status),
+    previousSurgeries: toStringArray(row.previous_surgeries),
+    familyMedicalHistory: toStringArray(row.family_history_conditions),
+    medications: toStringArray(row.current_medicines)
+  }
+});
+
 const eligibleUserPredicate = `
   u.deleted_at is null
   and lower(coalesce(u.status, '')) = 'active'
@@ -214,6 +277,27 @@ const listClientSelect = `
     hp.activity_level,
     hp.diet_type,
     hp.primary_conditions,
+    hp.preferred_cuisines,
+    hp.food_allergies,
+    hp.foods_disliked,
+    hp.current_medicines,
+    hp.sleep_hours,
+    hp.sleep_goal_hours,
+    hp.sleep_quality_label,
+    hp.water_intake_liters,
+    hp.meals_per_day,
+    hp.smoking_status,
+    hp.alcohol_frequency,
+    hp.exercise_frequency,
+    hp.stress_level_label,
+    hp.family_history_conditions,
+    hp.pcos_status,
+    hp.thyroid_status,
+    hp.diabetes_status,
+    hp.hypertension_status,
+    hp.cholesterol_status,
+    hp.heart_condition_status,
+    hp.previous_surgeries,
     report_stats.reports_count,
     case
       when hp.updated_at is null and report_stats.last_report_at is null then null
@@ -287,14 +371,9 @@ const mapListRecord = (row: Record<string, unknown>): ConsultantClientListRecord
   profileCompleted: profileCompleted(row),
   lastActiveAt: toIso(row.last_active_at),
   onboarding: {
+    ...mapOnboardingProjection(row),
     age: toNumberOrNull(row.age),
-    gender: row.gender == null ? null : String(row.gender),
-    height: toNumberOrNull(row.height_cm),
-    weight: toNumberOrNull(row.current_weight_kg),
-    goal: firstString(row.wellness_goals),
-    activityLevel: row.activity_level == null ? null : String(row.activity_level),
-    dietPreference: row.diet_type == null ? null : String(row.diet_type),
-    medicalConditions: row.health_profile_id ? toStringArray(row.primary_conditions) : null
+    gender: row.gender == null ? null : String(row.gender)
   },
   healthProfile: {
     biomarkerStatus: null,
@@ -438,14 +517,7 @@ export const getRegisteredConsultantClientProfileContext = async (
       age: toNumberOrNull(row.age),
       gender: row.gender == null ? null : String(row.gender)
     },
-    onboarding: {
-      height: toNumberOrNull(row.height_cm),
-      weight: toNumberOrNull(row.current_weight_kg),
-      goal: firstString(row.wellness_goals),
-      activityLevel: row.activity_level == null ? null : String(row.activity_level),
-      dietPreference: row.diet_type == null ? null : String(row.diet_type),
-      medicalConditions: row.health_profile_id ? toStringArray(row.primary_conditions) : null
-    },
+    onboarding: mapOnboardingProjection(row),
     healthProfile: {
       biomarkerStatus: null,
       reportsCount: Number(row.reports_count ?? 0),

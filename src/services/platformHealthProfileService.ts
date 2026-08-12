@@ -36,6 +36,7 @@ export type PlatformHealthProfile = {
   waterIntakeLiters: number | null;
   sleepHours: number | null;
   sleepGoalHours: number | null;
+  sleepQualityLabel: string | null;
   outsideFoodFrequency: string | null;
   cookingAtHome: string | null;
   whoCooks: string | null;
@@ -54,6 +55,9 @@ export type PlatformHealthProfile = {
   thyroidStatus: string | null;
   diabetesStatus: string | null;
   hypertensionStatus: string | null;
+  cholesterolStatus: string | null;
+  heartConditionStatus: string | null;
+  previousSurgeries: string[];
 };
 
 export type PlatformHealthProfileBundle = {
@@ -128,6 +132,7 @@ export const syncPlatformHealthProfile = async (
     waterIntakeLiters: positiveNumber(onboarding.waterIntakeLiters),
     sleepHours: positiveNumber(onboarding.sleepHours),
     sleepGoalHours: positiveNumber(onboarding.sleepGoalHours),
+    sleepQualityLabel: onboarding.sleepQualityLabel,
     outsideFoodFrequency: onboarding.outsideFoodFrequency,
     cookingAtHome: onboarding.cookingAtHome,
     whoCooks: onboarding.whoCooks,
@@ -145,7 +150,10 @@ export const syncPlatformHealthProfile = async (
     pcosStatus: onboarding.pcosStatus,
     thyroidStatus: onboarding.thyroidStatus,
     diabetesStatus: onboarding.diabetesStatus,
-    hypertensionStatus: onboarding.hypertensionStatus
+    hypertensionStatus: onboarding.hypertensionStatus,
+    cholesterolStatus: onboarding.cholesterolStatus,
+    heartConditionStatus: onboarding.heartConditionStatus,
+    previousSurgeries: nonEmptyArray(onboarding.previousSurgeries)
   });
 
   return apiFetch('/v1/platform/health-profile', {
@@ -202,6 +210,7 @@ export const mergePlatformProfileIntoOnboarding = (
     waterIntakeLiters: profile.waterIntakeLiters ?? onboarding.waterIntakeLiters,
     sleepHours: profile.sleepHours ?? onboarding.sleepHours,
     sleepGoalHours: profile.sleepGoalHours ?? onboarding.sleepGoalHours,
+    sleepQualityLabel: profile.sleepQualityLabel ?? onboarding.sleepQualityLabel,
     outsideFoodFrequency: profile.outsideFoodFrequency ?? onboarding.outsideFoodFrequency,
     cookingAtHome: profile.cookingAtHome ?? onboarding.cookingAtHome,
     whoCooks: profile.whoCooks ?? onboarding.whoCooks,
@@ -221,6 +230,9 @@ export const mergePlatformProfileIntoOnboarding = (
     pcosStatus: profile.pcosStatus ?? onboarding.pcosStatus,
     thyroidStatus: profile.thyroidStatus ?? onboarding.thyroidStatus,
     diabetesStatus: profile.diabetesStatus ?? onboarding.diabetesStatus,
-    hypertensionStatus: profile.hypertensionStatus ?? onboarding.hypertensionStatus
+    hypertensionStatus: profile.hypertensionStatus ?? onboarding.hypertensionStatus,
+    cholesterolStatus: profile.cholesterolStatus ?? onboarding.cholesterolStatus,
+    heartConditionStatus: profile.heartConditionStatus ?? onboarding.heartConditionStatus,
+    previousSurgeries: profile.previousSurgeries.length > 0 ? profile.previousSurgeries : onboarding.previousSurgeries
   };
 };

@@ -1142,12 +1142,12 @@ export const ReportsScreen = () => {
       ) : (
         <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
           <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>
-            {profileCompletion.completionPercent < 80 ? 'Your health profile is incomplete' : 'No health reports yet'}
+            {profileCompletion.completionPercent < 80 ? 'Complete your health profile' : 'Your health baseline is ready'}
           </Text>
           <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
             {profileCompletion.completionPercent < 80
-              ? 'Complete your basics, body metrics, activity level, and goal so Fiteatsy can calculate safer targets while you prepare your first report.'
-              : 'Upload your first report to create a real biomarker baseline. No demo biomarkers are shown here.'}
+              ? 'Complete your basics, body metrics, activity level, and health goal so Fiteatsy can calculate safer targets while you prepare your first report.'
+              : 'Upload a blood report to unlock biomarker analysis, risk indicators, trend comparison, and your AI health summary. No demo biomarkers are shown here.'}
           </Text>
           {profileCompletion.completionPercent < 80 ? (
             <View style={styles.profilePromptBox}>
@@ -1164,8 +1164,27 @@ export const ReportsScreen = () => {
                 Open Home → Health Profile to complete now, or connect health data to enrich recovery intelligence.
               </Text>
             </View>
+          ) : (
+            <View style={styles.profilePromptBox}>
+              <Text style={[styles.profilePromptTitle, !isLight && styles.profilePromptTitleDark]}>
+                Upload your first report to unlock
+              </Text>
+              <Text style={[styles.profilePromptMissing, !isLight && styles.profilePromptMissingDark]}>
+                Biomarker analysis · Risk indicators · AI health summary
+              </Text>
+              <Text style={[styles.profilePromptHint, !isLight && styles.profilePromptHintDark]}>
+                This screen stays empty until your own reports, wearable data, or profile inputs create real health intelligence.
+              </Text>
+            </View>
+          )}
+          {reportsLoadError ? (
+            <View>
+              <Text style={styles.uploadErrorText}>History sync: {reportsLoadError}</Text>
+              <Pressable style={styles.retryBtn} onPress={refreshReportData}>
+                <Text style={styles.retryBtnText}>Retry sync</Text>
+              </Pressable>
+            </View>
           ) : null}
-          {reportsLoadError ? <Text style={styles.uploadErrorText}>History sync: {reportsLoadError}</Text> : null}
         </Card>
       )}
 

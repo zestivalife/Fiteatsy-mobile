@@ -66,6 +66,7 @@ export type HealthProfileRecord = AuditFields & {
   waterIntakeLiters: number | null;
   sleepHours: number | null;
   sleepGoalHours: number | null;
+  sleepQualityLabel: string | null;
   outsideFoodFrequency: string | null;
   cookingAtHome: string | null;
   whoCooks: string | null;
@@ -84,6 +85,9 @@ export type HealthProfileRecord = AuditFields & {
   thyroidStatus: string | null;
   diabetesStatus: string | null;
   hypertensionStatus: string | null;
+  cholesterolStatus: string | null;
+  heartConditionStatus: string | null;
+  previousSurgeries: string[];
   assignedConsultantId: string | null;
   assignedMentorId: string | null;
 };

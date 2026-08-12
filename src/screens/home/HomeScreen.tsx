@@ -17,6 +17,7 @@ import { FamilyRelationshipType, FamilyVisibilityLevel } from '../../types';
 import { relationshipLabel, toRecoveryShareState, toSupportMoment } from '../../services/familyConnectService';
 import { formatConsultantAvailability, getConsultantProfile } from '../../utils/healthProfile';
 import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
+import { buildHealthSnapshotMetrics } from '../../utils/healthMetrics';
 import { getIdentityScopedStorageKey } from '../../utils/identityScopedStorage';
 import { listAnalyzedReports, type ReportDto } from '../../services/reportUploadService';
 
@@ -697,6 +698,18 @@ export const HomeScreen = () => {
     () => buildHealthProfileCompletion(onboarding, assessment, reportHistoryCount),
     [assessment, onboarding, reportHistoryCount]
   );
+  const healthSnapshot = useMemo(
+    () => buildHealthSnapshotMetrics(onboarding, assessment?.weightKg, assessment?.heightCm),
+    [assessment?.heightCm, assessment?.weightKg, onboarding]
+  );
+  const snapshotMissingCopy =
+    healthSnapshot.validation.invalid.length > 0
+      ? `Check ${healthSnapshot.validation.invalid.join(', ')} values.`
+      : healthSnapshot.validation.missing.length > 0
+        ? `Complete ${healthSnapshot.validation.missing.join(', ')} to calculate.`
+        : healthSnapshot.tdee == null
+          ? 'Set gender and activity level to calculate energy needs.'
+          : 'Calculated from your saved profile.';
   const healthProfileMissingCopy = reportHistoryLoading
     ? 'Refreshing health reports...'
     : reportHistoryError
@@ -981,6 +994,48 @@ export const HomeScreen = () => {
             </Text>
           </View>
         </View>
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Your Health Snapshot. Opens health profile completion."
+        style={[styles.healthSnapshotCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
+        onPress={() => setHealthProfileOpen(true)}
+      >
+        <View style={styles.healthSnapshotHead}>
+          <View>
+            <Text style={[styles.healthProfileEyebrow, { color: ui.textSecondary }]}>Your Health Snapshot</Text>
+            <Text style={[styles.healthSnapshotTitle, { color: ui.textPrimary }]}>Calculated from saved profile data</Text>
+          </View>
+          <Ionicons name="calculator-outline" size={20} color="#59BE08" />
+        </View>
+        <View style={styles.healthSnapshotGrid}>
+          <View style={[styles.healthSnapshotMetric, { borderColor: ui.cardBorder }]}>
+            <Text style={[styles.healthSnapshotLabel, { color: ui.textSecondary }]}>BMI</Text>
+            <Text style={[styles.healthSnapshotValue, { color: ui.textPrimary }]}>
+              {healthSnapshot.bmi == null ? 'Pending' : healthSnapshot.bmi}
+            </Text>
+          </View>
+          <View style={[styles.healthSnapshotMetric, { borderColor: ui.cardBorder }]}>
+            <Text style={[styles.healthSnapshotLabel, { color: ui.textSecondary }]}>Daily Energy</Text>
+            <Text style={[styles.healthSnapshotValue, { color: ui.textPrimary }]}>
+              {healthSnapshot.tdee == null ? 'Pending' : `${healthSnapshot.tdee} kcal`}
+            </Text>
+          </View>
+          <View style={[styles.healthSnapshotMetric, { borderColor: ui.cardBorder }]}>
+            <Text style={[styles.healthSnapshotLabel, { color: ui.textSecondary }]}>Protein Goal</Text>
+            <Text style={[styles.healthSnapshotValue, { color: ui.textPrimary }]}>
+              {healthSnapshot.proteinTargetGrams == null ? 'Pending' : `${healthSnapshot.proteinTargetGrams}g/day`}
+            </Text>
+          </View>
+          <View style={[styles.healthSnapshotMetric, { borderColor: ui.cardBorder }]}>
+            <Text style={[styles.healthSnapshotLabel, { color: ui.textSecondary }]}>Hydration</Text>
+            <Text style={[styles.healthSnapshotValue, { color: ui.textPrimary }]}>
+              {healthSnapshot.hydrationTargetLiters == null ? 'Pending' : `${healthSnapshot.hydrationTargetLiters}L/day`}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.healthSnapshotHint, { color: ui.textSecondary }]}>{snapshotMissingCopy}</Text>
       </Pressable>
 
       <Pressable
@@ -2592,5 +2647,48 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: 'Poppins_600SemiBold'
+  },
+  healthSnapshotCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 16,
+    marginTop: 14,
+    gap: 14
+  },
+  healthSnapshotHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12
+  },
+  healthSnapshotTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins_600SemiBold',
+    marginTop: 3
+  },
+  healthSnapshotGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10
+  },
+  healthSnapshotMetric: {
+    width: '48%',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12
+  },
+  healthSnapshotLabel: {
+    fontSize: 11,
+    fontFamily: 'Poppins_500Medium'
+  },
+  healthSnapshotValue: {
+    fontSize: 15,
+    fontFamily: 'Poppins_700Bold',
+    marginTop: 5
+  },
+  healthSnapshotHint: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+    lineHeight: 18
   }
 });

@@ -47,6 +47,7 @@ test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 
       preferredCuisines: ['Maharashtrian'],
       sleepHours: 6.5,
       sleepGoalHours: 8,
+      sleepQualityLabel: 'Fair',
       smokingStatus: 'Never',
       alcoholFrequency: 'Never',
       exerciseFrequency: '3-4x/week',
@@ -58,6 +59,9 @@ test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 
       thyroidStatus: 'No',
       diabetesStatus: 'No',
       hypertensionStatus: 'No',
+      cholesterolStatus: 'Borderline',
+      heartConditionStatus: 'No',
+      previousSurgeries: ['None'],
       wellnessGoals: ['Weight Loss'],
     },
     { headers: authHeaders(session.token) }
@@ -66,8 +70,11 @@ test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 
   assert.equal(patched.body.profile.userId, session.current.body.accountId);
   assert.deepEqual(patched.body.profile.preferredCuisines, ['Maharashtrian']);
   assert.equal(patched.body.profile.sleepHours, 6.5);
+  assert.equal(patched.body.profile.sleepQualityLabel, 'Fair');
   assert.deepEqual(patched.body.profile.familyHistoryConditions, ['Diabetes']);
   assert.equal(patched.body.profile.medicalNotes, 'Prefers vegetarian meals.');
+  assert.equal(patched.body.profile.cholesterolStatus, 'Borderline');
+  assert.deepEqual(patched.body.profile.previousSurgeries, ['None']);
   assert.equal('clientId' in patched.body.profile, false);
   assert.equal('clientId' in patched.body.nutrition, false);
   assert.equal('clientId' in patched.body.careCase, false);
@@ -93,7 +100,19 @@ test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 
 test('PATCH /v1/platform/health-profile returns 400 for invalid body', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const { response, body } = await patchJson(server.baseUrl, '/v1/platform/health-profile', {
-    heightCm: -10,
+    heightCm: 92,
+  }, {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(response.status, 400);
+  assert.equal(body.error, 'INVALID_INPUT');
+});
+
+test('PATCH /v1/platform/health-profile rejects unrealistic age and weight ranges', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const { response, body } = await patchJson(server.baseUrl, '/v1/platform/health-profile', {
+    dateOfBirthISO: '2022-01-01T00:00:00.000Z',
+    currentWeightKg: 12,
   }, {
     headers: authHeaders(session.token)
   });

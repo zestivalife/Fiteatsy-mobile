@@ -139,6 +139,7 @@ export type OnboardingProfile = {
   waterIntakeLiters?: number;
   sleepHours?: number;
   sleepGoalHours?: number;
+  sleepQualityLabel?: string;
   outsideFoodFrequency?: string;
   cookingAtHome?: string;
   whoCooks?: string;
@@ -162,6 +163,9 @@ export type OnboardingProfile = {
   thyroidStatus?: string;
   diabetesStatus?: string;
   hypertensionStatus?: string;
+  cholesterolStatus?: string;
+  heartConditionStatus?: string;
+  previousSurgeries?: string[];
   wearablePreference: WearablePreference;
   careTrack: string;
   assignedConsultantId: string | null;
