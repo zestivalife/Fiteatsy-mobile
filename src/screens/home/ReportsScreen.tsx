@@ -38,6 +38,7 @@ import {
   ReportParameter
 } from '../../services/nuetraService';
 import { useAppContext } from '../../state/AppContext';
+import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
 import {
   BiomarkerHistoryItem,
   deleteAllAnalyzedReports,
@@ -397,6 +398,11 @@ export const ReportsScreen = () => {
     ? `out of 100 · ${totalParams} lab parameters analysed`
     : 'estimated from wellness activity · upload a publishable lab report for a report-backed score';
   const sectionHighlight = overallScore >= 80 ? colors.success : overallScore >= 60 ? colors.warning : colors.danger;
+  const profileCompletion = useMemo(
+    () => buildHealthProfileCompletion(onboarding, null, reports.length),
+    [onboarding, reports.length]
+  );
+  const topMissingProfileFields = profileCompletion.missingItems.slice(0, 4);
 
   const categoryScores = latestReport?.categoryScores ?? {
     Blood: 0,
@@ -1135,10 +1141,30 @@ export const ReportsScreen = () => {
         </Card>
       ) : (
         <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
-          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>No health reports yet</Text>
-          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
-            Upload your first report to create a real biomarker baseline. No demo biomarkers are shown here.
+          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>
+            {profileCompletion.completionPercent < 80 ? 'Your health profile is incomplete' : 'No health reports yet'}
           </Text>
+          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
+            {profileCompletion.completionPercent < 80
+              ? 'Complete your basics, body metrics, activity level, and goal so Fiteatsy can calculate safer targets while you prepare your first report.'
+              : 'Upload your first report to create a real biomarker baseline. No demo biomarkers are shown here.'}
+          </Text>
+          {profileCompletion.completionPercent < 80 ? (
+            <View style={styles.profilePromptBox}>
+              <Text style={[styles.profilePromptTitle, !isLight && styles.profilePromptTitleDark]}>
+                Profile completion · {profileCompletion.completionPercent}%
+              </Text>
+              <View style={[styles.profilePromptTrack, !isLight && styles.profilePromptTrackDark]}>
+                <View style={[styles.profilePromptFill, { width: `${profileCompletion.completionPercent}%` as any }]} />
+              </View>
+              <Text style={[styles.profilePromptMissing, !isLight && styles.profilePromptMissingDark]}>
+                Missing: {topMissingProfileFields.join(' · ') || 'No critical profile gaps'}
+              </Text>
+              <Text style={[styles.profilePromptHint, !isLight && styles.profilePromptHintDark]}>
+                Open Home → Health Profile to complete now, or connect health data to enrich recovery intelligence.
+              </Text>
+            </View>
+          ) : null}
           {reportsLoadError ? <Text style={styles.uploadErrorText}>History sync: {reportsLoadError}</Text> : null}
         </Card>
       )}
@@ -2847,6 +2873,55 @@ const styles = StyleSheet.create({
     color: colors.white
   },
   detailEmptyDark: {
+    color: colors.white
+  },
+  profilePromptBox: {
+    marginTop: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D7DFE7',
+    backgroundColor: '#F8FBFF',
+    padding: 14
+  },
+  profilePromptTitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins_700Bold',
+    color: '#111827'
+  },
+  profilePromptTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#E5EAF0',
+    overflow: 'hidden',
+    marginTop: 10
+  },
+  profilePromptFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#59BE08'
+  },
+  profilePromptMissing: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#475569'
+  },
+  profilePromptHint: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#64748B'
+  },
+  profilePromptTitleDark: {
+    color: colors.white
+  },
+  profilePromptTrackDark: {
+    backgroundColor: '#2A2A2A'
+  },
+  profilePromptMissingDark: {
+    color: colors.white
+  },
+  profilePromptHintDark: {
     color: colors.white
   },
   parameterRowDark: {

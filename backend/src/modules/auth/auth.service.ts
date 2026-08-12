@@ -324,6 +324,7 @@ export const verifyOtpChallenge = async (
       mobileNumber: challenge.user.mobileNumber
     });
     const { token } = await createAuthSession(user.id, metadata);
+    const client = await createOrResolveClientForAccount(user.id);
 
     return {
       sessionToken: token,
@@ -332,6 +333,10 @@ export const verifyOtpChallenge = async (
         name: user.name,
         email: user.email ?? challenge.user.email,
         mobileNumber: user.mobileNumber ?? challenge.user.mobileNumber
+      },
+      client: {
+        fiteatsyClientId: client.fiteatsyClientId,
+        status: client.status
       }
     };
   } catch (error) {

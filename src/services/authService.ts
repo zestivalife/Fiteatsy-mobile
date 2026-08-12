@@ -261,6 +261,25 @@ export const getCurrentAuthSession = (sessionToken: string) =>
     skipJsonBody: true
   });
 
+export const buildSessionFromAuthResponse = (session: AuthSessionResponse): CurrentAuthSession | null => {
+  if (!session.client?.fiteatsyClientId) return null;
+  return {
+    accountId: session.user.id,
+    sessionId: `fresh-login:${session.user.id}`,
+    sessionExpiresAtISO: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    client: {
+      fiteatsyClientId: session.client.fiteatsyClientId,
+      status: session.client.status
+    },
+    user: {
+      id: session.user.id,
+      name: session.user.name,
+      email: session.user.email,
+      mobileNumber: session.user.mobileNumber
+    }
+  };
+};
+
 export const logoutAuthSession = (sessionToken: string) =>
   requestJson<void>('/v1/auth/logout', {
     method: 'POST',

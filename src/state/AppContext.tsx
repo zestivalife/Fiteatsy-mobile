@@ -63,6 +63,7 @@ import {
 } from '../services/familyConnectService';
 import {
   AuthServiceError,
+  buildSessionFromAuthResponse,
   getCurrentAuthSession,
   logoutAuthSession,
   type AuthSessionResponse,
@@ -70,7 +71,11 @@ import {
 } from '../services/authService';
 import { registerAccessTokenProvider } from '../services/apiClient';
 import { queueHealthEvent } from '../services/platformEventService';
-import { syncPlatformHealthProfile } from '../services/platformHealthProfileService';
+import {
+  getPlatformHealthProfile,
+  mergePlatformProfileIntoOnboarding,
+  syncPlatformHealthProfile
+} from '../services/platformHealthProfileService';
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
 import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/identityScopedStorage';
 
@@ -320,11 +325,26 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const completeAuthentication = useCallback(async (session: AuthSessionResponse) => {
-    const current = await getCurrentAuthSession(session.sessionToken);
-    persistAuthSession({
-      ...current,
-      sessionToken: session.sessionToken
-    });
+    const fallback = buildSessionFromAuthResponse(session);
+    if (fallback) {
+      persistAuthSession({
+        ...fallback,
+        sessionToken: session.sessionToken
+      });
+    }
+
+    try {
+      const current = await getCurrentAuthSession(session.sessionToken);
+      persistAuthSession({
+        ...current,
+        sessionToken: session.sessionToken
+      });
+    } catch (error) {
+      if (!fallback) throw error;
+      console.warn('[AppContext] auth/me refresh deferred after fresh login', {
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
+    }
   }, [persistAuthSession]);
 
   useEffect(() => {
@@ -427,6 +447,43 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (storedAssessment) {
           const parsed = safeParse<AssessmentProfile | null>(storedAssessment, null);
           if (parsed && typeof parsed === 'object') setAssessmentState(parsed);
+        }
+        try {
+          const remoteBundle = await getPlatformHealthProfile();
+          setOnboardingState((previous) => {
+            if (!previous) return previous;
+            const normalized = normalizeOnboardingProfile(mergePlatformProfileIntoOnboarding(previous, remoteBundle.profile));
+            const scopedKey = getSessionScopedKey(STORAGE_KEYS.onboarding, sessionForStorage);
+            if (scopedKey) {
+              AsyncStorage.setItem(scopedKey, JSON.stringify(normalized));
+            }
+            return normalized;
+          });
+          setAssessmentState((previous) => {
+            const next = {
+              ...(previous ?? {
+                completedAtISO: new Date().toISOString(),
+                goal: 'Become Better' as const,
+                mood: 'Neutral' as const,
+                soughtHelpBefore: 'No' as const,
+                physicalDistress: 'No' as const,
+                sleepQuality: 'Fair' as const,
+                stressLevel: 3 as const,
+                voiceReflection: ''
+              }),
+              heightCm: remoteBundle.profile.heightCm ?? previous?.heightCm ?? 0,
+              weightKg: remoteBundle.profile.currentWeightKg ?? previous?.weightKg ?? 0
+            };
+            const scopedKey = getSessionScopedKey(STORAGE_KEYS.assessment, sessionForStorage);
+            if (scopedKey) {
+              AsyncStorage.setItem(scopedKey, JSON.stringify(next));
+            }
+            return next;
+          });
+        } catch (error) {
+          console.warn('[AppContext] platform health profile hydration skipped', {
+            errorMessage: error instanceof Error ? error.message : String(error)
+          });
         }
         if (storedSelectedDeviceId) {
           setSelectedDeviceIdState(storedSelectedDeviceId);
