@@ -89,6 +89,43 @@ export type ConsultantBiomarkerSummary = {
   previousTestDate: string | null;
 };
 
+export type ConsultantReportSummary = {
+  id: string;
+  reportType: string;
+  originalFilename: string;
+  processingStatus: string;
+  reportDate: string | null;
+  labName: string | null;
+  fileSize: number;
+  uploadedAt: string;
+  updatedAt: string;
+};
+
+export type ConsultantWearableMetricSummary = {
+  metricType: string;
+  latestValue: number;
+  unit: string;
+  measuredAt: string;
+  sourceProvider: string;
+  acceptedRecords: number;
+};
+
+export type ConsultantWearableSummary = {
+  connected: boolean;
+  lastSyncedAt: string | null;
+  dataSources: string[];
+  recordsCount: number;
+  latestMetrics: ConsultantWearableMetricSummary[];
+};
+
+export type ConsultantTimelineEvent = {
+  type: string;
+  title: string;
+  detail: string;
+  timestamp: string;
+  source: 'account' | 'profile' | 'report' | 'biomarker' | 'wearable';
+};
+
 export type ConsultantClientProfileContext = {
   accountId: string;
   internalClientId: string;
@@ -494,4 +531,190 @@ export const listValidatedBiomarkerSummaryForClient = async (
       previousTestDate: row.previous_test_date == null ? null : new Date(String(row.previous_test_date)).toISOString().slice(0, 10)
     };
   });
+};
+
+export const listConsultantReportSummariesForClient = async (
+  internalClientId: string,
+  accountId: string,
+  limit = 12
+): Promise<ConsultantReportSummary[]> => {
+  const result = await pool.query(
+    `
+      select
+        id,
+        report_type,
+        original_filename,
+        processing_status,
+        report_date,
+        lab_name,
+        file_size,
+        created_at,
+        updated_at
+      from health_reports
+      where client_id = $1
+        and user_id = $2
+        and deleted_at is null
+      order by updated_at desc, created_at desc
+      limit $3
+    `,
+    [internalClientId, accountId, limit]
+  );
+
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    reportType: String(row.report_type),
+    originalFilename: String(row.original_filename),
+    processingStatus: String(row.processing_status),
+    reportDate: row.report_date == null ? null : String(row.report_date),
+    labName: row.lab_name == null ? null : String(row.lab_name),
+    fileSize: Number(row.file_size),
+    uploadedAt: new Date(String(row.created_at)).toISOString(),
+    updatedAt: new Date(String(row.updated_at)).toISOString()
+  }));
+};
+
+export const getConsultantWearableSummaryForClient = async (
+  internalClientId: string,
+  accountId: string
+): Promise<ConsultantWearableSummary> => {
+  const summaryResult = await pool.query(
+    `
+      select
+        count(*)::int as records_count,
+        max(measured_at) as last_synced_at,
+        array_remove(array_agg(distinct source_provider), null) as data_sources
+      from health_observations
+      where client_id = $1
+        and user_id = $2
+        and quality_status in ('accepted', 'estimated')
+    `,
+    [internalClientId, accountId]
+  );
+  const metricResult = await pool.query(
+    `
+      with ranked as (
+        select
+          metric_type,
+          value,
+          unit,
+          measured_at,
+          source_provider,
+          count(*) over (partition by metric_type)::int as accepted_records,
+          row_number() over (partition by metric_type order by measured_at desc, created_at desc) as metric_rank
+        from health_observations
+        where client_id = $1
+          and user_id = $2
+          and quality_status in ('accepted', 'estimated')
+      )
+      select *
+      from ranked
+      where metric_rank = 1
+      order by measured_at desc
+      limit 10
+    `,
+    [internalClientId, accountId]
+  );
+  const summary = summaryResult.rows[0] ?? {};
+  const dataSources = Array.isArray(summary.data_sources) ? summary.data_sources.map((item: unknown) => String(item)) : [];
+
+  return {
+    connected: Number(summary.records_count ?? 0) > 0,
+    lastSyncedAt: toIso(summary.last_synced_at),
+    dataSources,
+    recordsCount: Number(summary.records_count ?? 0),
+    latestMetrics: metricResult.rows.map((row) => ({
+      metricType: String(row.metric_type),
+      latestValue: Number(row.value),
+      unit: String(row.unit),
+      measuredAt: new Date(String(row.measured_at)).toISOString(),
+      sourceProvider: String(row.source_provider),
+      acceptedRecords: Number(row.accepted_records ?? 0)
+    }))
+  };
+};
+
+export const listConsultantTimelineForClient = async (
+  internalClientId: string,
+  accountId: string,
+  limit = 20
+): Promise<ConsultantTimelineEvent[]> => {
+  const result = await pool.query(
+    `
+      select *
+      from (
+        select
+          'registration' as type,
+          'Client registered' as title,
+          coalesce(u.name, 'Client') || ' joined Fiteatsy.' as detail,
+          u.created_at as timestamp,
+          'account' as source
+        from users u
+        where u.id = $2
+
+        union all
+
+        select
+          'profile_updated' as type,
+          'Health profile updated' as title,
+          'Profile and onboarding information changed.' as detail,
+          hp.updated_at as timestamp,
+          'profile' as source
+        from health_profiles hp
+        where hp.client_id = $1
+          and hp.user_id = $2
+          and hp.deleted_at is null
+
+        union all
+
+        select
+          'report_uploaded' as type,
+          'Report uploaded' as title,
+          hr.original_filename || ' is ' || lower(hr.processing_status) || '.' as detail,
+          coalesce(hr.updated_at, hr.created_at) as timestamp,
+          'report' as source
+        from health_reports hr
+        where hr.client_id = $1
+          and hr.user_id = $2
+          and hr.deleted_at is null
+
+        union all
+
+        select
+          'biomarker_validated' as type,
+          'Biomarker validated' as title,
+          b.canonical_name || ' captured at ' || bo.value::text || ' ' || bo.unit || '.' as detail,
+          bo.created_at as timestamp,
+          'biomarker' as source
+        from biomarker_observations bo
+        join biomarkers b on b.id = bo.biomarker_id
+        where bo.client_id = $1
+          and bo.user_id = $2
+          and bo.validation_status = 'validated'
+
+        union all
+
+        select
+          'wearable_synced' as type,
+          'Health data synced' as title,
+          ho.metric_type || ' updated from ' || ho.source_provider || '.' as detail,
+          ho.measured_at as timestamp,
+          'wearable' as source
+        from health_observations ho
+        where ho.client_id = $1
+          and ho.user_id = $2
+          and ho.quality_status in ('accepted', 'estimated')
+      ) events
+      order by timestamp desc
+      limit $3
+    `,
+    [internalClientId, accountId, limit]
+  );
+
+  return result.rows.map((row) => ({
+    type: String(row.type),
+    title: String(row.title),
+    detail: String(row.detail),
+    timestamp: new Date(String(row.timestamp)).toISOString(),
+    source: String(row.source) as ConsultantTimelineEvent['source']
+  }));
 };

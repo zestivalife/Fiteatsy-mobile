@@ -254,3 +254,87 @@ test('consultant client profile returns real onboarding fields only', async () =
   assert.deepEqual(profile.body.biomarkers, []);
   assert.equal('recommendations' in profile.body, false);
 });
+
+test('GET /v1/consultants/clients/:clientId/workspace returns incomplete states for a new user', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Workspace New Client',
+    email: `workspace-new-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+
+  const workspace = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+
+  assert.equal(workspace.response.status, 200);
+  assert.equal(workspace.body.client.id, client.current.body.client.fiteatsyClientId);
+  assert.equal(workspace.body.completeness.onboardingStatus, 'INCOMPLETE');
+  assert.equal(workspace.body.completeness.profileCompletionScore, 20);
+  assert.ok(workspace.body.completeness.missingFields.includes('height'));
+  assert.equal(workspace.body.bodyMetrics.bmi, null);
+  assert.equal(workspace.body.bodyMetrics.unavailableReasons.bmi, 'Height and weight are required.');
+  assert.equal(workspace.body.nutritionProtocol.calorieTarget, null);
+  assert.equal(workspace.body.nutritionProtocol.macroTargets, null);
+  assert.equal(workspace.body.wearableSummary.connected, false);
+  assert.equal(workspace.body.wearableSummary.recordsCount, 0);
+  assert.deepEqual(workspace.body.reports, []);
+  assert.deepEqual(workspace.body.biomarkers, []);
+  assert.ok(workspace.body.recommendations.some((item: { title: string }) => item.title === 'Complete onboarding inputs'));
+  assert.ok(workspace.body.timeline.some((item: { type: string }) => item.type === 'registration'));
+  assert.equal(workspace.body.syncMetadata.dataSource, 'Fiteatsy production database');
+});
+
+test('GET /v1/consultants/clients/:clientId/workspace exposes calculated health intelligence for onboarded users', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Workspace Onboarded Client',
+    email: `workspace-onboarded-client-${Date.now()}@example.com`,
+    mobileNumber: '+919811113333'
+  });
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    {
+      dateOfBirthISO: '1991-06-14T00:00:00.000Z',
+      gender: 'Female',
+      heightCm: 162,
+      currentWeightKg: 61,
+      waistCm: 78,
+      hipCm: 94,
+      neckCm: 32,
+      wellnessGoals: ['Improve energy'],
+      activityLevel: 'Moderate',
+      dietType: 'Vegetarian',
+      primaryConditions: ['Vitamin D deficiency']
+    },
+    { headers: authHeaders(client.token) }
+  );
+  const consultant = await createConsultantSession();
+
+  const workspace = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+
+  assert.equal(workspace.response.status, 200);
+  assert.equal(workspace.body.onboarding.height, 162);
+  assert.equal(workspace.body.onboarding.weight, 61);
+  assert.equal(workspace.body.bodyMetrics.bmi, 23.2);
+  assert.equal(workspace.body.bodyMetrics.bmiCategory, 'Normal');
+  assert.equal(workspace.body.bodyMetrics.bmr > 0, true);
+  assert.equal(workspace.body.bodyMetrics.tdee > workspace.body.bodyMetrics.bmr, true);
+  assert.equal(workspace.body.nutritionProtocol.calorieTarget, workspace.body.bodyMetrics.tdee);
+  assert.equal(workspace.body.nutritionProtocol.macroTargets.caloriesKcal, workspace.body.bodyMetrics.tdee);
+  assert.equal(workspace.body.nutritionProtocol.hydrationTargetLiters, 2.1);
+  assert.equal(workspace.body.completeness.profileCompletionScore > 20, true);
+  assert.equal(Array.isArray(workspace.body.syncMetadata.dataSources), true);
+  assert.ok(workspace.body.syncMetadata.dataSources.includes('health_profile'));
+
+  const calculationRows = await pool.query(
+    'select count(*)::int as total from health_calculations where user_id = $1 and client_id = $2',
+    [client.current.body.accountId, client.current.body.client.id]
+  );
+  assert.equal(calculationRows.rows[0].total >= 6, true);
+});

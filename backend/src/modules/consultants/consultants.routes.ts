@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import {
   canAccessConsultantClientApi,
+  getConsultantClientWorkspace,
   getConsultantClientProfile,
   listConsultantClients
 } from './consultants.service.js';
@@ -27,6 +28,17 @@ consultantsRouter.get('/clients', async (req, res) => {
   const account = getAuthenticatedAccount(req);
   const clients = await listConsultantClients(account);
   return res.status(200).json({ clients });
+});
+
+consultantsRouter.get('/clients/:clientId/workspace', async (req, res) => {
+  const workspace = await getConsultantClientWorkspace(req.params.clientId);
+  if (!workspace) {
+    return res.status(404).json({
+      error: 'CLIENT_NOT_FOUND',
+      message: 'Client not found or not available for consultant management.'
+    });
+  }
+  return res.status(200).json(workspace);
 });
 
 consultantsRouter.get('/clients/:clientId', async (req, res) => {
