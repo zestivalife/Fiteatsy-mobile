@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import {
+  getConsultantDashboardJwtDiagnostics,
   getConsultantDashboardJwtSecretSources,
   isValidConsultantDashboardBridgePayload,
   verifyConsultantDashboardJwt
@@ -136,6 +137,60 @@ test('consultant bridge de-duplicates identical configured secrets', () => {
     getConsultantDashboardJwtSecretSources().map((item) => item.source),
     ['CONSULTANT_DASHBOARD_JWT_SECRET_KEY']
   );
+});
+
+test('consultant bridge tolerates accidentally quoted Railway secret values', () => {
+  clearEnv();
+  process.env.AUTH_SERVICE_JWT_SECRET_KEY = '"auth-service-production-secret"';
+  const token = signJwt({
+    secret: 'auth-service-production-secret',
+    payload: {
+      sub: 'quoted-secret-user',
+      role: 'consultant',
+      status: 'ACTIVE',
+      credential_status: 'PERMANENT',
+      type: 'access',
+      exp: Math.floor(Date.now() / 1000) + 600
+    }
+  });
+
+  const result = verifyConsultantDashboardJwt(token);
+
+  assert.equal(result.expiryResult, 'valid');
+  assert.equal(result.matchedSecretSource, 'AUTH_SERVICE_JWT_SECRET_KEY:unquoted');
+});
+
+test('consultant bridge accepts dashboard access token claim aliases', () => {
+  clearEnv();
+  process.env.AUTH_SERVICE_JWT_SECRET_KEY = 'auth-service-production-secret';
+  const token = signJwt({
+    secret: 'auth-service-production-secret',
+    payload: {
+      sub: 'alias-user',
+      user_role: 'consultant',
+      account_status: 'ACTIVE',
+      credentialStatus: 'PERMANENT',
+      tokenType: 'access',
+      exp: Math.floor(Date.now() / 1000) + 600
+    }
+  });
+
+  const result = verifyConsultantDashboardJwt(token);
+  const diagnostics = getConsultantDashboardJwtDiagnostics(token, result);
+
+  assert.equal(result.expiryResult, 'valid');
+  assert.equal(diagnostics.role, 'consultant');
+  assert.equal(diagnostics.status, 'ACTIVE');
+  assert.equal(diagnostics.credentialStatus, 'PERMANENT');
+  assert.equal(diagnostics.tokenType, 'access');
+  assert.equal(isValidConsultantDashboardBridgePayload({
+    expiryResult: result.expiryResult,
+    userId: String(result.payload?.sub),
+    role: diagnostics.role,
+    status: diagnostics.status,
+    credentialStatus: diagnostics.credentialStatus,
+    tokenType: diagnostics.tokenType
+  }), true);
 });
 
 test('consultant bridge accepts access tokens and rejects refresh tokens for dashboard API access', () => {

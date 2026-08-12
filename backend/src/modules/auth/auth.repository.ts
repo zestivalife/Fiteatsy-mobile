@@ -76,6 +76,16 @@ const base64UrlDecode = (value: string) => {
   return Buffer.from(`${normalized}${padding}`, 'base64');
 };
 
+const decodeJwtHeaderUnsafe = (token: string): Record<string, unknown> | null => {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    return JSON.parse(base64UrlDecode(parts[0]).toString('utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
 const decodeJwtPayloadUnsafe = (token: string): Record<string, unknown> | null => {
   const parts = token.split('.');
   if (parts.length !== 3) return null;
@@ -92,21 +102,40 @@ const splitSecretList = (value: string | undefined) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const expandSecretVariants = (source: string, secret: string) => {
+  const trimmed = secret.trim();
+  const variants = [{ source, secret: trimmed }];
+  const unquoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1)
+      : null;
+  if (unquoted && unquoted.trim()) {
+    variants.push({ source: `${source}:unquoted`, secret: unquoted.trim() });
+  }
+  const escapedNewline = trimmed.replace(/\\n/g, '\n');
+  if (escapedNewline !== trimmed) {
+    variants.push({ source: `${source}:escaped_newline`, secret: escapedNewline });
+  }
+  return variants;
+};
+
+const configuredSecret = (source: string, value: string | undefined) =>
+  value ? expandSecretVariants(source, value) : [];
+
 export const getConsultantDashboardJwtSecretSources = () => {
   const candidates = [
-    ...splitSecretList(process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEYS).map((secret, index) => ({
-      source: `CONSULTANT_DASHBOARD_JWT_SECRET_KEYS[${index}]`,
-      secret
-    })),
-    { source: 'CONSULTANT_DASHBOARD_JWT_SECRET_KEY', secret: process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEY?.trim() },
-    { source: 'CONSULTANT_DASHBOARD_JWT_SECRET', secret: process.env.CONSULTANT_DASHBOARD_JWT_SECRET?.trim() },
-    { source: 'AUTH_SERVICE_JWT_SECRET_KEY', secret: process.env.AUTH_SERVICE_JWT_SECRET_KEY?.trim() },
-    { source: 'AUTH_SERVICE_JWT_SECRET', secret: process.env.AUTH_SERVICE_JWT_SECRET?.trim() },
-    { source: 'API_GATEWAY_JWT_SECRET_KEY', secret: process.env.API_GATEWAY_JWT_SECRET_KEY?.trim() },
-    { source: 'API_GATEWAY_JWT_SECRET', secret: process.env.API_GATEWAY_JWT_SECRET?.trim() },
-    { source: 'JWT_SECRET_KEY', secret: process.env.JWT_SECRET_KEY?.trim() },
-    { source: 'JWT_SECRET', secret: process.env.JWT_SECRET?.trim() }
-  ].filter((item): item is { source: string; secret: string } => Boolean(item.secret));
+    ...splitSecretList(process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEYS).flatMap((secret, index) =>
+      expandSecretVariants(`CONSULTANT_DASHBOARD_JWT_SECRET_KEYS[${index}]`, secret)
+    ),
+    ...configuredSecret('CONSULTANT_DASHBOARD_JWT_SECRET_KEY', process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEY),
+    ...configuredSecret('CONSULTANT_DASHBOARD_JWT_SECRET', process.env.CONSULTANT_DASHBOARD_JWT_SECRET),
+    ...configuredSecret('AUTH_SERVICE_JWT_SECRET_KEY', process.env.AUTH_SERVICE_JWT_SECRET_KEY),
+    ...configuredSecret('AUTH_SERVICE_JWT_SECRET', process.env.AUTH_SERVICE_JWT_SECRET),
+    ...configuredSecret('API_GATEWAY_JWT_SECRET_KEY', process.env.API_GATEWAY_JWT_SECRET_KEY),
+    ...configuredSecret('API_GATEWAY_JWT_SECRET', process.env.API_GATEWAY_JWT_SECRET),
+    ...configuredSecret('JWT_SECRET_KEY', process.env.JWT_SECRET_KEY),
+    ...configuredSecret('JWT_SECRET', process.env.JWT_SECRET)
+  ].filter((item) => Boolean(item.secret));
 
   const seen = new Set<string>();
   return candidates.filter((item) => {
@@ -166,6 +195,43 @@ export const verifyConsultantDashboardJwt = (token: string) => {
   }
 
   return { payload, expiryResult: 'valid', matchedSecretSource: matchedSecretSource.source };
+};
+
+const safeClaim = (value: unknown) => {
+  if (typeof value === 'string') return value.slice(0, 120);
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string').slice(0, 5);
+  }
+  return null;
+};
+
+const readStringClaim = (payload: Record<string, unknown> | null | undefined, keys: string[]) => {
+  for (const key of keys) {
+    const value = payload?.[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return null;
+};
+
+export const getConsultantDashboardJwtDiagnostics = (
+  token: string,
+  bridge: { payload: Record<string, unknown> | null; expiryResult: string; matchedSecretSource: string | null }
+) => {
+  const header = decodeJwtHeaderUnsafe(token);
+  const payload = bridge.payload ?? decodeJwtPayloadUnsafe(token);
+  return {
+    issuer: safeClaim(payload?.iss),
+    audience: safeClaim(payload?.aud),
+    algorithm: safeClaim(header?.alg),
+    keyId: safeClaim(header?.kid),
+    tokenType: readStringClaim(payload, ['type', 'token_type', 'tokenType', 'typ'])?.toLowerCase() ?? null,
+    role: readStringClaim(payload, ['role', 'user_role'])?.toLowerCase() ?? null,
+    status: readStringClaim(payload, ['status', 'account_status'])?.toUpperCase() ?? null,
+    credentialStatus: readStringClaim(payload, ['credential_status', 'credentialStatus'])?.toUpperCase() ?? null,
+    verificationResult: bridge.expiryResult,
+    matchedVerifierSource: bridge.matchedSecretSource,
+    configuredVerifierSources: getConsultantDashboardJwtSecretSources().map((item) => item.source)
+  };
 };
 
 export const isValidConsultantDashboardBridgePayload = (input: {
@@ -630,13 +696,13 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
   const bridge = verifyConsultantDashboardJwt(token);
   const bridgePayload = bridge.payload ?? unsafePayload;
   const bridgeUserId = typeof bridgePayload?.sub === 'string' ? bridgePayload.sub : tokenUserId;
-  const bridgeRole = typeof bridgePayload?.role === 'string' ? bridgePayload.role.toLowerCase() : null;
+  const bridgeDiagnostics = getConsultantDashboardJwtDiagnostics(token, bridge);
+  const bridgeRole = readStringClaim(bridgePayload, ['role', 'user_role'])?.toLowerCase() ?? null;
   const bridgeEmail = typeof bridgePayload?.email === 'string' ? normalizeEmail(bridgePayload.email) : null;
-  const bridgeStatus = typeof bridgePayload?.status === 'string' ? bridgePayload.status.toUpperCase() : null;
-  const bridgeType = typeof bridgePayload?.type === 'string' ? bridgePayload.type.toLowerCase() : null;
-  const credentialStatus = typeof bridgePayload?.credential_status === 'string'
-    ? bridgePayload.credential_status.toUpperCase()
-    : null;
+  const bridgeStatus = readStringClaim(bridgePayload, ['status', 'account_status'])?.toUpperCase() ?? null;
+  const bridgeType = readStringClaim(bridgePayload, ['type', 'token_type', 'tokenType', 'typ'])?.toLowerCase() ?? null;
+  const credentialStatus =
+    readStringClaim(bridgePayload, ['credential_status', 'credentialStatus'])?.toUpperCase() ?? null;
 
   if (!isValidConsultantDashboardBridgePayload({
     expiryResult: bridge.expiryResult,
@@ -652,7 +718,8 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
       sessionStatus: 'missing',
       expiryResult: bridge.expiryResult,
       matchedSecretSource: bridge.matchedSecretSource,
-      tokenType: bridgeType ?? null
+      tokenType: bridgeType ?? null,
+      bridge: bridgeDiagnostics
     });
     return null;
   }
@@ -694,7 +761,8 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
       sessionStatus: 'consultant_jwt_bridge',
       expiryResult: bridge.expiryResult,
       matchedSecretSource: bridge.matchedSecretSource,
-      tokenType: bridgeType
+      tokenType: bridgeType,
+      bridge: bridgeDiagnostics
     });
 
     return rowToAuthenticatedAccount(userRow, {
@@ -710,7 +778,8 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     sessionStatus: 'consultant_jwt_bridge_external',
     expiryResult: bridge.expiryResult,
     matchedSecretSource: bridge.matchedSecretSource,
-    tokenType: bridgeType
+    tokenType: bridgeType,
+    bridge: bridgeDiagnostics
   });
 
   return {
