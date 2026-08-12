@@ -6,7 +6,10 @@ import { assignRoleAsAdmin, getAdminStatus } from './admin.service.js';
 export const adminRouter = Router();
 
 const roleAssignmentSchema = z.object({
-  role: z.enum(['user', 'consultant', 'admin']),
+  role: z.preprocess(
+    (value) => (typeof value === 'string' ? value.toLowerCase() : value),
+    z.enum(['user', 'consultant', 'admin'])
+  ),
   reason: z.string().trim().max(240).optional()
 });
 

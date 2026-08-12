@@ -618,8 +618,8 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
       from users u
       where (u.id = $1 or ($2::text is not null and u.email_normalized = $2))
         and u.deleted_at is null
-        and u.status = 'active'
-        and coalesce(u.role, 'user') = any($3)
+        and lower(coalesce(u.status, '')) = 'active'
+        and lower(coalesce(u.role, 'user')) = any($3)
       limit 1
     `,
     [bridgeUserId, bridgeEmail, Array.from(CONSULTANT_DASHBOARD_BRIDGE_ROLES)]

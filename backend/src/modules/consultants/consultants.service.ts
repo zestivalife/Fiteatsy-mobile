@@ -12,7 +12,7 @@ import {
 const CONSULTANT_ROLES = new Set(['consultant', 'practitioner', 'admin', 'super_admin']);
 
 export const canAccessConsultantClientApi = (account: AuthenticatedAccount) =>
-  CONSULTANT_ROLES.has(account.user.role ?? '');
+  CONSULTANT_ROLES.has(account.user.role?.toLowerCase() ?? '');
 
 export const listConsultantClients = async (account: AuthenticatedAccount) => {
   const clientsBackfilled = await ensureRegisteredClientsForEligibleUsers();

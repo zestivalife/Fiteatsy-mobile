@@ -36,6 +36,7 @@ export const assignUserRole = async (input: {
   role: ManagedRole;
   reason?: string | null;
 }) => {
+  const normalizedRole = input.role.toLowerCase() as ManagedRole;
   const client = await pool.connect();
   try {
     await client.query('begin');
@@ -67,7 +68,7 @@ export const assignUserRole = async (input: {
           and deleted_at is null
         returning id, role
       `,
-      [input.targetUserId, input.role, timestamp]
+      [input.targetUserId, normalizedRole, timestamp]
     );
 
     const audit = await client.query(
@@ -88,7 +89,7 @@ export const assignUserRole = async (input: {
         input.performedByUserId,
         input.targetUserId,
         oldRole,
-        input.role,
+        normalizedRole,
         input.reason?.trim() || null,
         timestamp
       ]
@@ -125,8 +126,8 @@ export const countActiveAdmins = async () => {
       select count(*)::int as count
       from users
       where deleted_at is null
-        and status = 'active'
-        and role = 'admin'
+        and lower(coalesce(status, '')) = 'active'
+        and lower(coalesce(role, '')) = 'admin'
     `
   );
   return Number(result.rows[0]?.count ?? 0);
@@ -140,7 +141,7 @@ export const findActiveVerifiedUserIdByMobile = async (mobile: string) => {
       select id
       from users
       where deleted_at is null
-        and status = 'active'
+        and lower(coalesce(status, '')) = 'active'
         and mobile_verified_at is not null
         and (
           regexp_replace(coalesce(mobile_number_normalized, ''), '[^0-9]', '', 'g') = $1

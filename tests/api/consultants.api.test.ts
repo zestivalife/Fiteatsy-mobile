@@ -61,6 +61,18 @@ test('GET /v1/consultants/clients denies normal user sessions', async () => {
   assert.equal(response.body.error, 'ROLE_NOT_ALLOWED');
 });
 
+test('GET /v1/consultants/clients allows historical uppercase consultant role casing', async () => {
+  const consultant = await createConsultantSession();
+  await pool.query('update users set status = $2, role = $3 where id = $1', [consultant.current.body.accountId, 'ACTIVE', 'CONSULTANT']);
+
+  const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+
+  assert.equal(response.response.status, 200);
+  assert.deepEqual(response.body.clients, []);
+});
+
 test('registered Fiteatsy users appear in consultant client discovery without dummy data', async () => {
   const email = `real-client-${Date.now()}@example.com`;
   const client = await createAuthenticatedSession(server.baseUrl, {

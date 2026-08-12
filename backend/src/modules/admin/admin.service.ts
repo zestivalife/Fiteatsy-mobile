@@ -11,7 +11,7 @@ import {
 
 const INITIAL_ADMIN_BOOTSTRAP_REASON = 'initial_admin_bootstrap';
 
-export const canManageRoles = (account: AuthenticatedAccount) => account.user.role === 'admin';
+export const canManageRoles = (account: AuthenticatedAccount) => account.user.role?.toLowerCase() === 'admin';
 
 export const getAdminStatus = async (account: AuthenticatedAccount) => {
   if (!canManageRoles(account)) {
@@ -48,7 +48,8 @@ export const assignRoleAsAdmin = async (
     };
   }
 
-  if (!isManagedRole(role)) {
+  const normalizedRole = role.toLowerCase();
+  if (!isManagedRole(normalizedRole)) {
     return {
       ok: false as const,
       status: 400,
@@ -60,7 +61,7 @@ export const assignRoleAsAdmin = async (
   const result = await assignUserRole({
     performedByUserId: actor.user.id,
     targetUserId,
-    role,
+    role: normalizedRole,
     reason
   });
 

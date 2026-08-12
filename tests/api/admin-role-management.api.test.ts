@@ -122,6 +122,35 @@ test('admin assigns consultant role and creates an audit event', async () => {
   assert.equal(typeof status.body.bootstrapConfigured, 'boolean');
 });
 
+test('admin role management accepts historical uppercase admin casing and normalizes writes', async () => {
+  const admin = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Uppercase Admin',
+    email: `uppercase-admin-${Date.now()}@example.com`
+  });
+  const target = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Uppercase Consultant Candidate',
+    email: `uppercase-consultant-${Date.now()}@example.com`
+  });
+  await pool.query('update users set status = $2, role = $3 where id = $1', [admin.current.body.accountId, 'ACTIVE', 'ADMIN']);
+
+  const assigned = await postJson(
+    server.baseUrl,
+    `/v1/admin/users/${target.current.body.accountId}/role`,
+    {
+      role: 'CONSULTANT',
+      reason: 'Uppercase role compatibility'
+    },
+    { headers: authHeaders(admin.token) }
+  );
+
+  assert.equal(assigned.response.status, 200);
+  assert.equal(assigned.body.user.role, 'consultant');
+  assert.equal(assigned.body.auditEvent.newRole, 'consultant');
+
+  const targetRole = await pool.query('select role from users where id = $1', [target.current.body.accountId]);
+  assert.equal(targetRole.rows[0].role, 'consultant');
+});
+
 test('consultant cannot assign roles', async () => {
   const consultant = await createAuthenticatedSession(server.baseUrl, {
     name: 'QA Consultant',
