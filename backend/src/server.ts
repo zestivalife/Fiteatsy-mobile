@@ -23,12 +23,52 @@ type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
 };
 
+const REGISTERED_ROUTE_GROUPS = [
+  'GET /',
+  'GET /health',
+  'GET /ready',
+  'GET /v1/version',
+  '/v1/intelligence',
+  '/v1/checkins',
+  '/v1/nudges',
+  '/v1/employer',
+  '/v1/wearables',
+  '/v1/auth',
+  '/v1/reports',
+  '/v1/health',
+  '/v1/biomarkers',
+  '/v1/consultants',
+  '/v1/admin',
+  '/v1/platform'
+];
+
+const logStartupRoutes = () => {
+  console.log('Fiteatsy backend startup', {
+    service: env.serviceName,
+    version: env.version,
+    environment: env.environment,
+    gitCommit: env.gitCommit,
+    routeGroups: REGISTERED_ROUTE_GROUPS
+  });
+};
+
 export const createApp = (options: CreateAppOptions = {}) => {
   const app = express();
   const readinessCheck = options.readinessCheck ?? checkDatabaseReadiness;
 
   app.use(cors());
   app.use(express.json());
+
+  app.get('/', (_req, res) => {
+    res.json({
+      ok: true,
+      service: env.serviceName,
+      version: env.version,
+      environment: env.environment,
+      git_commit: env.gitCommit,
+      route_groups: REGISTERED_ROUTE_GROUPS
+    });
+  });
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true, service: env.serviceName });
@@ -116,6 +156,7 @@ export const initializeBackend = async () => {
 
 export const startServer = async () => {
   await initializeBackend();
+  logStartupRoutes();
   return app.listen(env.port, () => {
     console.log(`Fiteatsy backend listening on ${env.port}`);
   });
