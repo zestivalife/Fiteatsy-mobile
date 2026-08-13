@@ -161,7 +161,7 @@ export type TimelineEventRecord = AuditFields & {
   metadata: Record<string, unknown>;
 };
 
-export type HealthEventType = TimelineEventKind | 'medication_logged' | 'meal_logged' | 'water_logged' | 'sleep_logged' | 'exercise_logged' | 'cycle_updated' | 'mood_logged' | 'chat_sent' | 'voice_note_uploaded' | 'followup_completed';
+export type HealthEventType = TimelineEventKind | 'medication_logged' | 'meal_logged' | 'water_logged' | 'sleep_logged' | 'exercise_logged' | 'cycle_updated' | 'mood_logged' | 'chat_sent' | 'voice_note_uploaded' | 'followup_completed' | 'stress_assessment_completed' | 'wellness_checkin_logged';
 
 export type HealthEventRecord = AuditFields & {
   id: string;
@@ -307,6 +307,23 @@ export type NutritionPlanSourceSnapshot = {
   calorieTarget: number | null;
   proteinTargetGrams: number | null;
   hydrationTargetLiters: number | null;
+  wellnessScores?: {
+    nourishment: number | null;
+    energyBalance: number | null;
+    bodySupport: number | null;
+    recovery: number | null;
+    activePerformance: number | null;
+    physicalWellnessIndex: number | null;
+    stressResilience: number | null;
+  };
+  stressAssessment?: {
+    scale: 'PSS-10';
+    totalScore: number;
+    stressPercent: number;
+    resilienceScore: number;
+    stressBand: 'low' | 'moderate' | 'high';
+    calculatedAtISO: string;
+  } | null;
   generatedAtISO: string;
 };
 
@@ -326,6 +343,49 @@ export type NutritionIntelligence = {
   nutritionFocus: string[];
   foodRecommendations: string[];
   consultantActions: string[];
+  clientSummary: {
+    goal: string | null;
+    age: number | null;
+    gender: string | null;
+    weightKg: number | null;
+    bmi: number | null;
+    activityLevel: string | null;
+    sleepQuality: string | null;
+    stressBand: 'low' | 'moderate' | 'high' | null;
+    stressPercent: number | null;
+    hydrationTargetLiters: number | null;
+    waterIntakeLiters: number | null;
+  };
+  biomarkerSnapshot: Array<{
+    name: string;
+    value: number;
+    unit: string;
+    status: string;
+    referenceRange: string | null;
+    testDate: string;
+  }>;
+  abnormalities: string[];
+  deficiencies: string[];
+  wellnessScores: {
+    nourishment: number | null;
+    energyBalance: number | null;
+    bodySupport: number | null;
+    recovery: number | null;
+    activePerformance: number | null;
+    physicalWellnessIndex: number | null;
+    stressResilience: number | null;
+  };
+  generationInputs: {
+    caloriesTarget: number | null;
+    proteinTargetGrams: number | null;
+    carbohydrateTargetGrams: number | null;
+    fatTargetGrams: number | null;
+    hydrationTargetLiters: number | null;
+    dietPreference: string | null;
+    medicalConditions: string[];
+    lifestyleSummary: string;
+    wearableConnected: boolean;
+  };
 };
 
 export type DietPlanRecord = AuditFields & {

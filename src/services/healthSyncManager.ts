@@ -55,17 +55,18 @@ const scoreOrExisting = (value: number | null | undefined, existing: number) =>
 
 export const wellnessFromHealthScores = (
   previous: WellnessSnapshot,
-  payload: WearableSyncPayload,
+  payload: Pick<WearableSyncPayload, 'metrics'> | null,
   scores: HealthScoreSummary
 ): WellnessSnapshot => {
+  const metrics = payload?.metrics;
   const next = recalculateWellness({
     ...previous,
-    heartRateAvg: payload.metrics.heartRateAvg > 0 ? payload.metrics.heartRateAvg : previous.heartRateAvg,
-    sleepHours: payload.metrics.sleepHours > 0 ? payload.metrics.sleepHours : previous.sleepHours,
-    movementMinutes: payload.metrics.movementMinutes > 0 ? payload.metrics.movementMinutes : previous.movementMinutes,
-    focusMinutes: payload.metrics.focusMinutes > 0 ? payload.metrics.focusMinutes : previous.focusMinutes,
-    breathingMinutes: payload.metrics.breathingMinutes > 0 ? payload.metrics.breathingMinutes : previous.breathingMinutes,
-    hydrationLiters: payload.metrics.hydrationLiters > 0 ? payload.metrics.hydrationLiters : previous.hydrationLiters,
+    heartRateAvg: metrics && metrics.heartRateAvg > 0 ? metrics.heartRateAvg : previous.heartRateAvg,
+    sleepHours: metrics && metrics.sleepHours > 0 ? metrics.sleepHours : previous.sleepHours,
+    movementMinutes: metrics && metrics.movementMinutes > 0 ? metrics.movementMinutes : previous.movementMinutes,
+    focusMinutes: metrics && metrics.focusMinutes > 0 ? metrics.focusMinutes : previous.focusMinutes,
+    breathingMinutes: metrics && metrics.breathingMinutes > 0 ? metrics.breathingMinutes : previous.breathingMinutes,
+    hydrationLiters: metrics && metrics.hydrationLiters > 0 ? metrics.hydrationLiters : previous.hydrationLiters,
     recoveryScore: scoreOrExisting(scores.recoveryScore, previous.recoveryScore),
     nourishmentScore: scoreOrExisting(scores.nourishmentScore ?? scores.nutritionScore, previous.nourishmentScore),
     wellnessScore: scoreOrExisting(scores.physicalWellnessIndex ?? scores.overallScore, previous.wellnessScore),

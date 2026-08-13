@@ -348,7 +348,7 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
     const sleepScore = sleepToScore(sleepQuality);
     const energyScore = Math.max(1, Math.min(5, 6 - stressLevel)) as 1 | 2 | 3 | 4 | 5;
 
-    submitCheckIn({ mood: moodScore, energy: energyScore, sleepQuality: sleepScore });
+    void submitCheckIn({ mood: moodScore, energy: energyScore, sleepQuality: sleepScore, stressLevel });
     setMood(moodScore >= 4 ? '🙂' : moodScore === 3 ? '😐' : '☹️');
 
     navigation.reset({ index: 0, routes: [{ name: 'SyncWearable' }] });

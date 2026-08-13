@@ -19,6 +19,7 @@ import {
   generateTrackerMetricCoaching
 } from './nuetra.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
+import { addHealthEvent, getCareCaseByClientId } from '../platform/platform.store.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 import {
   HealthScoreType,
@@ -26,6 +27,7 @@ import {
   listLatestHealthScores
 } from './health-scores.repository.js';
 import { calculateHealthScores } from './health-calculation-engine.js';
+import { ingestHealthObservations } from '../health/health-observations.repository.js';
 import { getReport } from '../reports/reports.store.js';
 
 export const intelligenceRouter = Router();
@@ -219,14 +221,52 @@ intelligenceRouter.get('/stress/questions', requireAuthenticatedAccount, (req, r
   });
 });
 
-intelligenceRouter.post('/stress/assessments', requireAuthenticatedAccount, (req, res) => {
-  getAuthenticatedAccount(req);
+intelligenceRouter.post('/stress/assessments', requireAuthenticatedAccount, async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const owner = currentOwner(account);
   const parsed = pssAssessmentSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
   try {
-    return res.status(200).json(computePss10Assessment(parsed.data));
+    const result = computePss10Assessment(parsed.data);
+    await ingestHealthObservations(owner, [{
+      metricType: 'stress_score',
+      value: result.stressPercent,
+      unit: 'percent',
+      measuredAtISO: result.calculatedAtISO,
+      sourceProvider: 'pss10',
+      sourceRecordId: result.scale,
+      syncKey: `pss10:${owner.clientId}:${result.calculatedAtISO}`,
+      qualityStatus: 'accepted',
+    }]);
+    const careCase = await getCareCaseByClientId(owner.clientId);
+    if (careCase) {
+      await addHealthEvent({
+        careCaseId: careCase.id,
+        userId: owner.accountId,
+        type: 'stress_assessment_completed',
+        summary: `PSS-10 completed with ${result.stressBand} stress load.`,
+        payload: { scale: result.scale, answers: parsed.data.answers, result },
+        replayKey: `stress-assessment:${owner.clientId}:${result.calculatedAtISO}`,
+        eventTimeISO: result.calculatedAtISO,
+      });
+    }
+    const scores = await calculateHealthScores(owner);
+    return res.status(200).json({
+      ...result,
+      persisted: true,
+      intelligence: {
+        recalculated: true,
+        scores: scores.map((score) => ({
+          scoreType: score.scoreType,
+          scoreValue: score.scoreValue,
+          scoreStatus: score.scoreStatus,
+          confidence: score.confidence,
+          calculatedAtISO: score.calculatedAtISO,
+        })),
+      },
+    });
   } catch (error) {
     return res.status(400).json({ error: 'INVALID_PSS_INPUT', message: error instanceof Error ? error.message : 'Invalid stress assessment.' });
   }

@@ -62,6 +62,17 @@ export type PssAssessmentResult = {
   stressBand: 'low' | 'moderate' | 'high';
   reverseScoredQuestionIds: string[];
   calculatedAtISO: string;
+  persisted?: boolean;
+  intelligence?: {
+    recalculated: boolean;
+    scores: Array<{
+      scoreType: HealthScoreType;
+      scoreValue: number | null;
+      scoreStatus: HealthScoreStatus;
+      confidence: number;
+      calculatedAtISO: string;
+    }>;
+  };
 };
 
 export const getHealthScores = () =>

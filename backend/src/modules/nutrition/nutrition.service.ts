@@ -8,7 +8,8 @@ import {
   type ConsultantBiomarkerSummary,
 } from '../consultants/consultants.repository.js';
 import { calculateHealthMetrics } from '../health/health-calculations.service.js';
-import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId } from '../platform/platform.store.js';
+import { listLatestHealthScores } from '../intelligence/health-scores.repository.js';
+import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId, listHealthEvents } from '../platform/platform.store.js';
 import type {
   ClientOwnershipContext,
   DietPlanVersionRecord,
@@ -119,6 +120,10 @@ const buildFoodRecommendations = (input: {
 };
 
 const buildNutritionIntelligence = (input: {
+  goal: string | null;
+  age: number | null;
+  gender: string | null;
+  weightKg: number | null;
   bmi: number | null;
   dietPreference: string | null;
   activityLevel: string | null;
@@ -126,9 +131,16 @@ const buildNutritionIntelligence = (input: {
   waterIntakeLiters: number | null;
   hydrationTargetLiters: number | null;
   proteinTargetGrams: number | null;
+  carbohydrateTargetGrams: number | null;
+  fatTargetGrams: number | null;
+  caloriesTarget: number | null;
   conditions: string[];
   biomarkers: ConsultantBiomarkerSummary[];
   reportsCount: number;
+  lifestyleSummary: string;
+  wearableConnected: boolean;
+  wellnessScores: NutritionIntelligence['wellnessScores'];
+  stressAssessment: NutritionPlanSourceSnapshot['stressAssessment'];
 }): NutritionIntelligence => {
   const observations: NutritionIntelligence['observations'] = [];
   const recommendations: NutritionIntelligence['recommendations'] = [];
@@ -251,6 +263,14 @@ const buildNutritionIntelligence = (input: {
     });
   }
 
+  const abnormalities = input.biomarkers
+    .filter((item) => lower(item.status) !== 'normal')
+    .map((item) => `${item.name} ${item.value} ${item.unit}`);
+
+  const deficiencies = input.biomarkers
+    .filter((item) => /b12|vitamin|ferritin|iron|folate/i.test(item.name) && lower(item.status) !== 'normal')
+    .map((item) => item.name);
+
   return {
     riskLevel: inferRiskLevel({
       bmi: input.bmi,
@@ -267,6 +287,41 @@ const buildNutritionIntelligence = (input: {
       biomarkers: input.biomarkers,
     }),
     consultantActions: Array.from(consultantActions).slice(0, 5),
+    clientSummary: {
+      goal: input.goal,
+      age: input.age,
+      gender: input.gender,
+      weightKg: input.weightKg,
+      bmi: input.bmi,
+      activityLevel: input.activityLevel,
+      sleepQuality: input.sleepQuality,
+      stressBand: input.stressAssessment?.stressBand ?? null,
+      stressPercent: input.stressAssessment?.stressPercent ?? null,
+      hydrationTargetLiters: input.hydrationTargetLiters,
+      waterIntakeLiters: input.waterIntakeLiters,
+    },
+    biomarkerSnapshot: input.biomarkers.map((item) => ({
+      name: item.name,
+      value: item.value,
+      unit: item.unit,
+      status: item.status,
+      referenceRange: item.referenceRange,
+      testDate: item.testDate,
+    })),
+    abnormalities: abnormalities.slice(0, 8),
+    deficiencies: unique(deficiencies).slice(0, 6),
+    wellnessScores: input.wellnessScores,
+    generationInputs: {
+      caloriesTarget: input.caloriesTarget,
+      proteinTargetGrams: input.proteinTargetGrams,
+      carbohydrateTargetGrams: input.carbohydrateTargetGrams,
+      fatTargetGrams: input.fatTargetGrams,
+      hydrationTargetLiters: input.hydrationTargetLiters,
+      dietPreference: input.dietPreference,
+      medicalConditions: input.conditions,
+      lifestyleSummary: input.lifestyleSummary,
+      wearableConnected: input.wearableConnected,
+    },
   };
 };
 
@@ -411,6 +466,8 @@ const buildSourceSnapshot = (input: {
   calorieTarget: number | null;
   proteinTargetGrams: number | null;
   hydrationTargetLiters: number | null;
+  wellnessScores: NutritionPlanSourceSnapshot['wellnessScores'];
+  stressAssessment: NutritionPlanSourceSnapshot['stressAssessment'];
 }): NutritionPlanSourceSnapshot => ({
   bmi: input.bmi,
   weightKg: input.weightKg,
@@ -426,6 +483,8 @@ const buildSourceSnapshot = (input: {
   calorieTarget: input.calorieTarget,
   proteinTargetGrams: input.proteinTargetGrams,
   hydrationTargetLiters: input.hydrationTargetLiters,
+  wellnessScores: input.wellnessScores,
+  stressAssessment: input.stressAssessment,
   generatedAtISO: new Date().toISOString(),
 });
 
@@ -474,7 +533,7 @@ const buildMacroTargets = (tdee: number | null) => {
 const getWorkspaceContext = async (publicClientId: string) => {
   const context = await getRegisteredConsultantClientProfileContext(publicClientId);
   if (!context) return null;
-  const [healthProfile, nutritionProfile, careCase, reports, biomarkers, wearableSummary, timeline] = await Promise.all([
+  const [healthProfile, nutritionProfile, careCase, reports, biomarkers, wearableSummary, timeline, healthScores] = await Promise.all([
     getHealthProfileByClientId(context.internalClientId),
     getNutritionProfileByClientId(context.internalClientId),
     getCareCaseByClientId(context.internalClientId),
@@ -482,6 +541,7 @@ const getWorkspaceContext = async (publicClientId: string) => {
     listValidatedBiomarkerSummaryForClient(context.internalClientId, context.accountId),
     getConsultantWearableSummaryForClient(context.internalClientId, context.accountId),
     listConsultantTimelineForClient(context.internalClientId, context.accountId),
+    listLatestHealthScores({ accountId: context.accountId, clientId: context.internalClientId }),
   ]);
   const metrics = calculateHealthMetrics(context.calculationInput);
   const tdee = metrics.tdee.status === 'AVAILABLE' ? metrics.tdee.value : null;
@@ -489,6 +549,12 @@ const getWorkspaceContext = async (publicClientId: string) => {
   const hydrationTargetLiters = context.calculationInput.weightKg
     ? round(Math.max(2, context.calculationInput.weightKg * 0.035), 1)
     : null;
+  const healthEvents = careCase ? await listHealthEvents(careCase.id) : [];
+  const latestStressAssessment = healthEvents
+    .filter((event) => event.type === 'stress_assessment_completed')
+    .sort((a, b) => b.eventTimeISO.localeCompare(a.eventTimeISO))[0] ?? null;
+  const scoreByType = new Map(healthScores.map((item) => [item.scoreType, item.scoreValue]));
+
   return {
     context,
     healthProfile,
@@ -498,10 +564,14 @@ const getWorkspaceContext = async (publicClientId: string) => {
     biomarkers,
     wearableSummary,
     timeline,
+    healthScores,
+    healthEvents,
+    latestStressAssessment,
     metrics,
     tdee,
     macroTargets,
     hydrationTargetLiters,
+    scoreByType,
   };
 };
 
@@ -509,6 +579,27 @@ export const getConsultantNutritionIntelligence = async (publicClientId: string)
   const workspace = await getWorkspaceContext(publicClientId);
   if (!workspace) return null;
   const { context, healthProfile, reports, biomarkers, metrics, macroTargets, hydrationTargetLiters } = workspace;
+  const conditions = unique([
+    ...(healthProfile?.primaryConditions ?? []),
+    ...(context.profile.onboarding.medicalConditions ?? []),
+  ]);
+  const lifestyleSummary = summarizeLifestyle({
+    occupation: healthProfile?.occupation,
+    workMode: healthProfile?.workMode,
+    wakeTime: healthProfile?.wakeTime,
+    sleepTime: healthProfile?.sleepTime,
+    activityLevel: healthProfile?.activityLevel,
+  });
+  const wellnessScores = {
+    nourishment: workspace.scoreByType.get('nourishment') ?? workspace.scoreByType.get('nutrition') ?? null,
+    energyBalance: workspace.scoreByType.get('energy_balance') ?? workspace.scoreByType.get('sleep') ?? null,
+    bodySupport: workspace.scoreByType.get('body_support') ?? workspace.scoreByType.get('clinical') ?? null,
+    recovery: workspace.scoreByType.get('recovery') ?? null,
+    activePerformance: workspace.scoreByType.get('active_performance') ?? workspace.scoreByType.get('activity') ?? null,
+    physicalWellnessIndex: workspace.scoreByType.get('physical_wellness_index') ?? workspace.scoreByType.get('overall') ?? null,
+    stressResilience: workspace.scoreByType.get('stress_resilience') ?? workspace.scoreByType.get('calm') ?? null,
+  } as const;
+  const stressAssessment = (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'];
   const intelligence = buildNutritionIntelligence({
     bmi: metrics.bmi.status === 'AVAILABLE' ? metrics.bmi.value : null,
     dietPreference: healthProfile?.dietType ?? context.profile.onboarding.dietPreference,
@@ -516,13 +607,21 @@ export const getConsultantNutritionIntelligence = async (publicClientId: string)
     sleepQuality: healthProfile?.sleepQualityLabel ?? context.profile.onboarding.lifestyle.sleepQuality,
     waterIntakeLiters: healthProfile?.waterIntakeLiters ?? context.profile.onboarding.nutrition.waterIntakeLiters,
     hydrationTargetLiters,
+    goal: context.profile.onboarding.goal,
+    age: context.profile.client.age,
+    gender: context.profile.client.gender,
+    weightKg: context.calculationInput.weightKg,
     proteinTargetGrams: macroTargets?.proteinGrams ?? null,
-    conditions: unique([
-      ...(healthProfile?.primaryConditions ?? []),
-      ...(context.profile.onboarding.medicalConditions ?? []),
-    ]),
+    carbohydrateTargetGrams: macroTargets?.carbohydrateGrams ?? null,
+    fatTargetGrams: macroTargets?.fatGrams ?? null,
+    caloriesTarget: macroTargets?.caloriesKcal ?? null,
+    conditions,
     biomarkers,
     reportsCount: reports.length,
+    lifestyleSummary,
+    wearableConnected: workspace.wearableSummary.connected,
+    wellnessScores,
+    stressAssessment,
   });
 
   return {
@@ -537,6 +636,12 @@ export const getConsultantNutritionIntelligence = async (publicClientId: string)
       activityLevel: healthProfile?.activityLevel ?? context.profile.onboarding.activityLevel,
       dietPreference: healthProfile?.dietType ?? context.profile.onboarding.dietPreference,
       reportsCount: reports.length,
+      sleepQuality: healthProfile?.sleepQualityLabel ?? context.profile.onboarding.lifestyle.sleepQuality,
+      stressBand: stressAssessment?.stressBand ?? null,
+      stressPercent: stressAssessment?.stressPercent ?? null,
+      deficiencies: intelligence.deficiencies,
+      abnormalities: intelligence.abnormalities,
+      wearableConnected: workspace.wearableSummary.connected,
     },
     intelligence,
     sourceMetadata: {
@@ -571,6 +676,16 @@ export const generateConsultantDietPlanDraft = async (
   if (!intelligencePayload) return null;
 
   const { context, healthProfile, careCase, metrics, macroTargets, hydrationTargetLiters, biomarkers } = workspace;
+  const wellnessScores = {
+    nourishment: workspace.scoreByType.get('nourishment') ?? workspace.scoreByType.get('nutrition') ?? null,
+    energyBalance: workspace.scoreByType.get('energy_balance') ?? workspace.scoreByType.get('sleep') ?? null,
+    bodySupport: workspace.scoreByType.get('body_support') ?? workspace.scoreByType.get('clinical') ?? null,
+    recovery: workspace.scoreByType.get('recovery') ?? null,
+    activePerformance: workspace.scoreByType.get('active_performance') ?? workspace.scoreByType.get('activity') ?? null,
+    physicalWellnessIndex: workspace.scoreByType.get('physical_wellness_index') ?? workspace.scoreByType.get('overall') ?? null,
+    stressResilience: workspace.scoreByType.get('stress_resilience') ?? workspace.scoreByType.get('calm') ?? null,
+  } as const;
+  const stressAssessment = (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'];
   const consultantDisplayName = unique([
     input?.consultantName,
     account.user.name,
@@ -622,6 +737,8 @@ export const generateConsultantDietPlanDraft = async (
     calorieTarget: macroTargets?.caloriesKcal ?? null,
     proteinTargetGrams: macroTargets?.proteinGrams ?? null,
     hydrationTargetLiters,
+    wellnessScores,
+    stressAssessment,
   });
   const saved = await createOrUpdateDietPlanDraft({
     careCaseId: careCase.id,
@@ -673,6 +790,16 @@ export const updateConsultantDietPlanDraft = async (
     calorieTarget: workspace.macroTargets?.caloriesKcal ?? null,
     proteinTargetGrams: workspace.macroTargets?.proteinGrams ?? null,
     hydrationTargetLiters: workspace.hydrationTargetLiters,
+    wellnessScores: {
+      nourishment: workspace.scoreByType.get('nourishment') ?? workspace.scoreByType.get('nutrition') ?? null,
+      energyBalance: workspace.scoreByType.get('energy_balance') ?? workspace.scoreByType.get('sleep') ?? null,
+      bodySupport: workspace.scoreByType.get('body_support') ?? workspace.scoreByType.get('clinical') ?? null,
+      recovery: workspace.scoreByType.get('recovery') ?? null,
+      activePerformance: workspace.scoreByType.get('active_performance') ?? workspace.scoreByType.get('activity') ?? null,
+      physicalWellnessIndex: workspace.scoreByType.get('physical_wellness_index') ?? workspace.scoreByType.get('overall') ?? null,
+      stressResilience: workspace.scoreByType.get('stress_resilience') ?? workspace.scoreByType.get('calm') ?? null,
+    },
+    stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
   });
 
   const version = await updateDietPlanVersionContent({
@@ -727,6 +854,16 @@ export const approveConsultantDietPlan = async (
     calorieTarget: workspace.macroTargets?.caloriesKcal ?? null,
     proteinTargetGrams: workspace.macroTargets?.proteinGrams ?? null,
     hydrationTargetLiters: workspace.hydrationTargetLiters,
+    wellnessScores: {
+      nourishment: workspace.scoreByType.get('nourishment') ?? workspace.scoreByType.get('nutrition') ?? null,
+      energyBalance: workspace.scoreByType.get('energy_balance') ?? workspace.scoreByType.get('sleep') ?? null,
+      bodySupport: workspace.scoreByType.get('body_support') ?? workspace.scoreByType.get('clinical') ?? null,
+      recovery: workspace.scoreByType.get('recovery') ?? null,
+      activePerformance: workspace.scoreByType.get('active_performance') ?? workspace.scoreByType.get('activity') ?? null,
+      physicalWellnessIndex: workspace.scoreByType.get('physical_wellness_index') ?? workspace.scoreByType.get('overall') ?? null,
+      stressResilience: workspace.scoreByType.get('stress_resilience') ?? workspace.scoreByType.get('calm') ?? null,
+    },
+    stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
   });
   return updateDietPlanLifecycle({
     dietPlanId: plan.id,
@@ -766,6 +903,16 @@ export const publishConsultantDietPlan = async (
     calorieTarget: workspace.macroTargets?.caloriesKcal ?? null,
     proteinTargetGrams: workspace.macroTargets?.proteinGrams ?? null,
     hydrationTargetLiters: workspace.hydrationTargetLiters,
+    wellnessScores: {
+      nourishment: workspace.scoreByType.get('nourishment') ?? workspace.scoreByType.get('nutrition') ?? null,
+      energyBalance: workspace.scoreByType.get('energy_balance') ?? workspace.scoreByType.get('sleep') ?? null,
+      bodySupport: workspace.scoreByType.get('body_support') ?? workspace.scoreByType.get('clinical') ?? null,
+      recovery: workspace.scoreByType.get('recovery') ?? null,
+      activePerformance: workspace.scoreByType.get('active_performance') ?? workspace.scoreByType.get('activity') ?? null,
+      physicalWellnessIndex: workspace.scoreByType.get('physical_wellness_index') ?? workspace.scoreByType.get('overall') ?? null,
+      stressResilience: workspace.scoreByType.get('stress_resilience') ?? workspace.scoreByType.get('calm') ?? null,
+    },
+    stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
   });
   const result = await updateDietPlanLifecycle({
     dietPlanId: plan.id,

@@ -82,7 +82,9 @@ import {
   syncPlatformHealthProfile
 } from '../services/platformHealthProfileService';
 import { getPublishedNutritionPlan } from '../services/nutritionPlanService';
+import { getHealthScoreSummary, submitPssAssessment } from '../services/healthIntelligenceService';
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
+import { wellnessFromHealthScores } from '../services/healthSyncManager';
 import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/identityScopedStorage';
 
 type StoredAuthSession = CurrentAuthSession & {
@@ -106,7 +108,7 @@ type AppContextValue = {
   completeAuthentication: (session: AuthSessionResponse) => Promise<void>;
   setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
   checkIns: DailyCheckIn[];
-  submitCheckIn: (checkIn: Omit<DailyCheckIn, 'dateISO'>) => void;
+  submitCheckIn: (checkIn: Omit<DailyCheckIn, 'dateISO'> & { stressLevel?: 1 | 2 | 3 | 4 | 5 }) => Promise<void>;
   hasCheckedInToday: boolean;
   priorityPlan: PriorityPlan | null;
   decisionLogs: DecisionLog[];
@@ -1344,11 +1346,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, []);
 
-  const submitCheckIn = useCallback(
-    (checkIn: Omit<DailyCheckIn, 'dateISO'>) => {
+  const submitCheckIn = useCallback<AppContextValue['submitCheckIn']>(
+    async (checkIn) => {
       const nowISO = new Date().toISOString();
+      const { stressLevel, ...dailyCheckInPayload } = checkIn;
       const nextCheckIn: DailyCheckIn = {
-        ...checkIn,
+        ...dailyCheckInPayload,
         dateISO: nowISO
       };
 
@@ -1380,19 +1383,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           4: '🙂',
           5: '😀'
         };
-        const moodFromCheckIn = moodMap[checkIn.mood];
+        const moodFromCheckIn = moodMap[dailyCheckInPayload.mood];
         setMood((_) => moodFromCheckIn);
 
-        const normalizedEnergy = checkIn.energy / 5;
+        const normalizedEnergy = dailyCheckInPayload.energy / 5;
         setWellnessState((current) =>
           applyMoodImpact(
             {
               ...current,
-              sleepHours: Number((6 + checkIn.sleepQuality * 0.5).toFixed(1)),
+              sleepHours: Number((6 + dailyCheckInPayload.sleepQuality * 0.5).toFixed(1)),
               focusMinutes: Math.max(0, current.focusMinutes + Math.round((normalizedEnergy - 0.5) * 6)),
-              breathingMinutes: Math.max(0, current.breathingMinutes + (checkIn.mood <= 2 ? 3 : 1)),
-              movementMinutes: Math.max(0, current.movementMinutes + (checkIn.energy >= 4 ? 2 : 1)),
-              heartRateAvg: Math.max(52, Math.min(120, current.heartRateAvg + (checkIn.mood <= 2 ? 2 : -1)))
+              breathingMinutes: Math.max(0, current.breathingMinutes + (dailyCheckInPayload.mood <= 2 ? 3 : 1)),
+              movementMinutes: Math.max(0, current.movementMinutes + (dailyCheckInPayload.energy >= 4 ? 2 : 1)),
+              heartRateAvg: Math.max(52, Math.min(120, current.heartRateAvg + (dailyCheckInPayload.mood <= 2 ? 2 : -1)))
             },
             moodFromCheckIn
           )
@@ -1408,9 +1411,27 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           eventType: 'daily_check_in_submitted',
           eventSource: 'mobile.tracker',
           eventPayload: nextCheckIn,
-          priority: checkIn.mood <= 2 ? 'medium' : 'low',
-          shouldEvaluateTicket: checkIn.mood <= 2
+          priority: dailyCheckInPayload.mood <= 2 ? 'medium' : 'low',
+          shouldEvaluateTicket: dailyCheckInPayload.mood <= 2
         });
+      }
+
+      if (stressLevel != null) {
+        try {
+          const answers = [
+            { questionId: 'pss_01', score: Math.max(0, Math.min(4, stressLevel - 1)) },
+            { questionId: 'pss_03', score: Math.max(0, Math.min(4, stressLevel)) },
+            { questionId: 'pss_06', score: Math.max(0, Math.min(4, stressLevel - 1)) },
+            { questionId: 'pss_10', score: Math.max(0, Math.min(4, stressLevel)) },
+          ];
+          await submitPssAssessment(answers);
+          const scores = await getHealthScoreSummary();
+          setWellnessState((current) => wellnessFromHealthScores(current, null, scores));
+        } catch (error) {
+          console.warn('[AppContext] stress assessment sync skipped', {
+            errorMessage: error instanceof Error ? error.message : String(error)
+          });
+        }
       }
     },
     [clientId, nudges, onboarding, userId]
