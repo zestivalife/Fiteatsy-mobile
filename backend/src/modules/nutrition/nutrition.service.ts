@@ -44,10 +44,10 @@ export class NutritionPlanWorkflowError extends Error {
 }
 
 const isConsultantRole = (account: AuthenticatedAccount) =>
-  ['consultant', 'practitioner', 'admin', 'super_admin'].includes(account.user.role?.toLowerCase() ?? '');
+  ['consultant', 'practitioner', 'admin', 'super_admin', 'superuser'].includes(account.user.role?.toLowerCase() ?? '');
 
 const canApproveOrPublishDietPlan = (account: AuthenticatedAccount) =>
-  ['consultant', 'admin', 'super_admin'].includes(account.user.role?.toLowerCase() ?? '');
+  ['consultant', 'admin', 'super_admin', 'superuser'].includes(account.user.role?.toLowerCase() ?? '');
 
 const unique = (values: Array<string | null | undefined>) =>
   Array.from(new Set(values.map((value) => (value ?? '').trim()).filter(Boolean)));
