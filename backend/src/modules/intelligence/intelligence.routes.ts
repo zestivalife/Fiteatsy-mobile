@@ -2,8 +2,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import {
   checkinSchema,
+  computePss10Assessment,
   generateOnePriority,
   generateTrackerAnalysis,
+  getRandomizedPss10Questions,
+  pssAssessmentSchema,
   trackerAnalysisSchema
 } from './intelligence.service.js';
 import {
@@ -168,7 +171,7 @@ intelligenceRouter.get('/scores/history', requireAuthenticatedAccount, async (re
   const offset = Math.max(0, Number(req.query.offset || 0));
   const scoreType =
     typeof req.query.scoreType === 'string' &&
-    ['nutrition', 'clinical', 'activity', 'sleep', 'calm', 'recovery', 'overall'].includes(req.query.scoreType)
+    ['energy_balance', 'body_support', 'nourishment', 'recovery', 'physical_wellness_index', 'active_performance', 'stress_resilience', 'nutrition', 'clinical', 'activity', 'sleep', 'calm', 'overall'].includes(req.query.scoreType)
       ? (req.query.scoreType as HealthScoreType)
       : undefined;
   const items = await listHealthScoreHistory(owner, { scoreType, limit, offset });
@@ -188,7 +191,13 @@ intelligenceRouter.get('/summary', requireAuthenticatedAccount, async (req, res)
     scores = await calculateHealthScores(owner);
   }
   return res.status(200).json({
+    energyBalanceScore: getScoreValue(scores, 'energy_balance'),
+    bodySupportScore: getScoreValue(scores, 'body_support'),
+    nourishmentScore: getScoreValue(scores, 'nourishment'),
     recoveryScore: getScoreValue(scores, 'recovery'),
+    physicalWellnessIndex: getScoreValue(scores, 'physical_wellness_index'),
+    activePerformanceScore: getScoreValue(scores, 'active_performance'),
+    stressResilienceScore: getScoreValue(scores, 'stress_resilience'),
     nutritionScore: getScoreValue(scores, 'nutrition'),
     clinicalScore: getScoreValue(scores, 'clinical'),
     activityScore: getScoreValue(scores, 'activity'),
@@ -199,6 +208,28 @@ intelligenceRouter.get('/summary', requireAuthenticatedAccount, async (req, res)
     status: scores.some((score) => score.scoreStatus === 'calculated') ? 'calculated' : 'insufficient_data',
     calculatedAtISO: scores[0]?.calculatedAtISO ?? null
   });
+});
+
+intelligenceRouter.get('/stress/questions', requireAuthenticatedAccount, (req, res) => {
+  getAuthenticatedAccount(req);
+  const count = Math.max(4, Math.min(10, Number(req.query.count || 4)));
+  return res.status(200).json({
+    scale: 'PSS-10',
+    items: getRandomizedPss10Questions(count)
+  });
+});
+
+intelligenceRouter.post('/stress/assessments', requireAuthenticatedAccount, (req, res) => {
+  getAuthenticatedAccount(req);
+  const parsed = pssAssessmentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+  try {
+    return res.status(200).json(computePss10Assessment(parsed.data));
+  } catch (error) {
+    return res.status(400).json({ error: 'INVALID_PSS_INPUT', message: error instanceof Error ? error.message : 'Invalid stress assessment.' });
+  }
 });
 
 intelligenceRouter.post('/priority', requireAuthenticatedAccount, (req, res) => {

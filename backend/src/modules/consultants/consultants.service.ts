@@ -527,10 +527,13 @@ export const getConsultantClientWorkspace = async (
     reports,
     wearableSummary,
     recoveryMetrics: {
-      activityScore: scoreByType.get('activity') ?? null,
-      sleepScore: scoreByType.get('sleep') ?? null,
-      calmScore: scoreByType.get('calm') ?? null,
+      activityScore: scoreByType.get('active_performance') ?? scoreByType.get('activity') ?? null,
+      sleepScore: scoreByType.get('energy_balance') ?? scoreByType.get('sleep') ?? null,
+      calmScore: scoreByType.get('stress_resilience') ?? scoreByType.get('calm') ?? null,
       recoveryScore: scoreByType.get('recovery') ?? null,
+      nourishmentScore: scoreByType.get('nourishment') ?? scoreByType.get('nutrition') ?? null,
+      bodySupportScore: scoreByType.get('body_support') ?? scoreByType.get('clinical') ?? null,
+      physicalWellnessIndex: scoreByType.get('physical_wellness_index') ?? overallScore,
       overallScore
     },
     nutritionProtocol: {

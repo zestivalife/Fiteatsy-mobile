@@ -154,10 +154,12 @@ test('GET /v1/intelligence/scores calculates traceable scores from validated cli
     headers: authHeaders(session.token)
   });
   assert.equal(scores.response.status, 200);
+  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'nourishment' && item.scoreStatus === 'calculated'), true);
+  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'active_performance' && item.scoreStatus === 'calculated'), true);
+  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'energy_balance' && item.scoreStatus === 'calculated'), true);
+  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'stress_resilience' && item.scoreStatus === 'calculated'), true);
+  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'physical_wellness_index' && item.scoreStatus === 'calculated'), true);
   assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'nutrition' && item.scoreStatus === 'calculated'), true);
-  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'activity' && item.scoreStatus === 'calculated'), true);
-  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'sleep' && item.scoreStatus === 'calculated'), true);
-  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'calm' && item.scoreStatus === 'calculated'), true);
   assert.equal(scores.body.items[0].clientId, undefined);
   assert.equal(scores.body.items[0].inputSummary != null, true);
 
@@ -166,6 +168,9 @@ test('GET /v1/intelligence/scores calculates traceable scores from validated cli
   });
   assert.equal(summary.response.status, 200);
   assert.equal(summary.body.status, 'calculated');
+  assert.equal(typeof summary.body.energyBalanceScore, 'number');
+  assert.equal(typeof summary.body.stressResilienceScore, 'number');
+  assert.equal(typeof summary.body.physicalWellnessIndex, 'number');
   assert.equal(typeof summary.body.sleepScore, 'number');
   assert.equal(typeof summary.body.calmScore, 'number');
 });
@@ -215,4 +220,28 @@ test('foundation endpoints reject missing auth', async () => {
 
   const scores = await getJson(server.baseUrl, '/v1/intelligence/scores');
   assert.equal(scores.response.status, 401);
+});
+
+
+test('stress intelligence exposes randomized PSS-10 questions and computes reverse-scored results', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const questions = await getJson(server.baseUrl, '/v1/intelligence/stress/questions?count=4', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(questions.response.status, 200);
+  assert.equal(questions.body.scale, 'PSS-10');
+  assert.equal(questions.body.items.length, 4);
+
+  const answers = questions.body.items.map((item: { id: string }, index: number) => ({
+    questionId: item.id,
+    score: index % 2 === 0 ? 3 : 1
+  }));
+  const assessment = await postJson(server.baseUrl, '/v1/intelligence/stress/assessments', { answers }, {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(assessment.response.status, 200);
+  assert.equal(assessment.body.scale, 'PSS-10');
+  assert.equal(typeof assessment.body.totalScore, 'number');
+  assert.equal(typeof assessment.body.resilienceScore, 'number');
+  assert.equal(['low', 'moderate', 'high'].includes(assessment.body.stressBand), true);
 });

@@ -67,17 +67,21 @@ export const wellnessFromHealthScores = (
     breathingMinutes: payload.metrics.breathingMinutes > 0 ? payload.metrics.breathingMinutes : previous.breathingMinutes,
     hydrationLiters: payload.metrics.hydrationLiters > 0 ? payload.metrics.hydrationLiters : previous.hydrationLiters,
     recoveryScore: scoreOrExisting(scores.recoveryScore, previous.recoveryScore),
-    nourishmentScore: scoreOrExisting(scores.nutritionScore, previous.nourishmentScore),
-    wellnessScore: scoreOrExisting(scores.overallScore, previous.wellnessScore),
-    stressScore: scores.calmScore == null ? previous.stressScore : Math.max(0, 100 - scores.calmScore)
+    nourishmentScore: scoreOrExisting(scores.nourishmentScore ?? scores.nutritionScore, previous.nourishmentScore),
+    wellnessScore: scoreOrExisting(scores.physicalWellnessIndex ?? scores.overallScore, previous.wellnessScore),
+    stressScore: scores.stressResilienceScore == null
+      ? (scores.calmScore == null ? previous.stressScore : Math.max(0, 100 - scores.calmScore))
+      : Math.max(0, 100 - scores.stressResilienceScore)
   });
 
   return {
     ...next,
     recoveryScore: scoreOrExisting(scores.recoveryScore, next.recoveryScore),
-    nourishmentScore: scoreOrExisting(scores.nutritionScore, next.nourishmentScore),
-    wellnessScore: scoreOrExisting(scores.overallScore, next.wellnessScore),
-    stressScore: scores.calmScore == null ? next.stressScore : Math.max(0, 100 - scores.calmScore)
+    nourishmentScore: scoreOrExisting(scores.nourishmentScore ?? scores.nutritionScore, next.nourishmentScore),
+    wellnessScore: scoreOrExisting(scores.physicalWellnessIndex ?? scores.overallScore, next.wellnessScore),
+    stressScore: scores.stressResilienceScore == null
+      ? (scores.calmScore == null ? next.stressScore : Math.max(0, 100 - scores.calmScore))
+      : Math.max(0, 100 - scores.stressResilienceScore)
   };
 };
 

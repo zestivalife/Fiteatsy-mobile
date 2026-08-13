@@ -34,6 +34,28 @@ export const trackerAnalysisSchema = z.object({
     .optional()
 });
 
+export const pssAssessmentSchema = z.object({
+  answers: z.array(
+    z.object({
+      questionId: z.string().min(1),
+      score: z.number().int().min(0).max(4)
+    })
+  ).min(4).max(10)
+});
+
+const PSS_10_QUESTION_BANK = [
+  { id: 'pss_01', text: 'In the last week, how often have you felt upset because something happened unexpectedly?', reverseScored: false },
+  { id: 'pss_02', text: 'In the last week, how often have you felt unable to control the important things in your life?', reverseScored: false },
+  { id: 'pss_03', text: 'In the last week, how often have you felt nervous or stressed?', reverseScored: false },
+  { id: 'pss_04', text: 'In the last week, how often have you felt confident about your ability to handle personal problems?', reverseScored: true },
+  { id: 'pss_05', text: 'In the last week, how often have you felt that things were going your way?', reverseScored: true },
+  { id: 'pss_06', text: 'In the last week, how often have you found that you could not cope with all the things you had to do?', reverseScored: false },
+  { id: 'pss_07', text: 'In the last week, how often have you been able to control irritations in your life?', reverseScored: true },
+  { id: 'pss_08', text: 'In the last week, how often have you felt that you were on top of things?', reverseScored: true },
+  { id: 'pss_09', text: 'In the last week, how often have you been angered because of things that were outside of your control?', reverseScored: false },
+  { id: 'pss_10', text: 'In the last week, how often have you felt difficulties were piling up so high that you could not overcome them?', reverseScored: false }
+] as const;
+
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 const mean = (values: number[]) => {
@@ -62,6 +84,43 @@ const calcSlope = (values: number[]) => {
   return den === 0 ? 0 : num / den;
 };
 
+export const getRandomizedPss10Questions = (count = 4) => {
+  const normalizedCount = Math.max(4, Math.min(10, count));
+  const shuffled = [...PSS_10_QUESTION_BANK]
+    .map((question) => ({ question, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .map((item) => item.question);
+  return shuffled.slice(0, normalizedCount);
+};
+
+export const computePss10Assessment = (input: z.infer<typeof pssAssessmentSchema>) => {
+  const lookup = new Map<string, (typeof PSS_10_QUESTION_BANK)[number]>(PSS_10_QUESTION_BANK.map((question) => [question.id, question] as const));
+  const normalizedAnswers = input.answers.map((answer) => {
+    const question = lookup.get(answer.questionId);
+    if (!question) {
+      throw new Error(`Unknown PSS question: ${answer.questionId}`);
+    }
+    const normalizedScore = question.reverseScored ? 4 - answer.score : answer.score;
+    return { ...answer, reverseScored: question.reverseScored, normalizedScore };
+  });
+  const totalScore = normalizedAnswers.reduce((sum, answer) => sum + answer.normalizedScore, 0);
+  const maxScore = normalizedAnswers.length * 4;
+  const stressPercent = Math.round((totalScore / Math.max(1, maxScore)) * 100);
+  const stressBand = totalScore >= 20 ? 'high' : totalScore >= 14 ? 'moderate' : 'low';
+  const resilienceScore = Math.max(0, 100 - stressPercent);
+
+  return {
+    scale: 'PSS-10',
+    totalScore,
+    answeredQuestions: normalizedAnswers.length,
+    stressPercent,
+    resilienceScore,
+    stressBand,
+    reverseScoredQuestionIds: normalizedAnswers.filter((answer) => answer.reverseScored).map((answer) => answer.questionId),
+    calculatedAtISO: new Date().toISOString()
+  };
+};
+
 export const computeRisk = (input: z.infer<typeof checkinSchema>) => {
   const recent = input.history.slice(-14);
   const values = recent.length > 0 ? recent : [{ mood: input.mood, energy: input.energy, sleepQuality: input.sleepQuality }];
@@ -82,16 +141,16 @@ export const computeRisk = (input: z.infer<typeof checkinSchema>) => {
 export const generateOnePriority = (input: z.infer<typeof checkinSchema>) => {
   const risk = computeRisk(input);
 
-  let priority = 'Take a 2-minute breathing reset before your next meeting.';
+  let priority = 'Take a 2-minute breathing reset before your next meal or work block.';
   if (risk.energyDeficit >= 60) {
-    priority = 'Take a 5-minute walk before your next deep-work block.';
+    priority = 'Take a 5-minute walk and a hydration reset before your next work block.';
   }
 
   const nudge = input.calendarLoad >= 3
     ? {
         type: 'break',
         timing: '15 minutes before your busiest meeting block',
-        text: 'Two-minute movement reset before your next meeting.'
+        text: 'Two-minute recovery reset before your next heavy block.'
       }
     : {
         type: 'hydration',
@@ -190,6 +249,6 @@ export const generateTrackerAnalysis = (input: z.infer<typeof trackerAnalysisSch
     summary,
     suggestions,
     generatedAtISO: new Date().toISOString(),
-    model: 'nuetra-intel-v1'
+    model: 'fiteatsy-intel-v2'
   };
 };

@@ -2,7 +2,20 @@ import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 
-export type HealthScoreType = 'nutrition' | 'clinical' | 'activity' | 'sleep' | 'calm' | 'recovery' | 'overall';
+export type HealthScoreType =
+  | 'energy_balance'
+  | 'body_support'
+  | 'nourishment'
+  | 'recovery'
+  | 'physical_wellness_index'
+  | 'active_performance'
+  | 'stress_resilience'
+  | 'nutrition'
+  | 'clinical'
+  | 'activity'
+  | 'sleep'
+  | 'calm'
+  | 'overall';
 export type HealthScoreStatus = 'calculated' | 'insufficient_data';
 
 export type HealthScoreRecord = {

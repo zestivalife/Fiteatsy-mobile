@@ -65,7 +65,7 @@ test('database schema defines traceable health intelligence scores', () => {
   assert.equal(hasPattern(/score_status text not null default 'insufficient_data'/i), true);
   assert.equal(hasPattern(/input_summary jsonb not null default/i), true);
   assert.equal(hasPattern(/calculation_version text not null/i), true);
-  assert.equal(hasPattern(/check \(score_type in \('nutrition', 'clinical', 'activity', 'sleep', 'calm', 'recovery', 'overall'\)\)/i), true);
+  assert.equal(hasPattern(/check \(score_type in \('energy_balance', 'body_support', 'nourishment', 'recovery', 'physical_wellness_index', 'active_performance', 'stress_resilience', 'nutrition', 'clinical', 'activity', 'sleep', 'calm', 'overall'\)\)/i), true);
 });
 
 test('database schema defines traceable deterministic health calculations', () => {
