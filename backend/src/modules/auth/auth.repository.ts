@@ -332,6 +332,92 @@ const isUniqueViolation = (error: unknown) =>
   typeof (error as { code?: unknown }).code === 'string' &&
   (error as { code: string }).code === '23505';
 
+const ensureConsultantDashboardBridgeUser = async (input: {
+  bridgeUserId: string;
+  bridgeEmail: string | null;
+  bridgeRole: string;
+  bridgeName: string | null;
+}) => {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      const existing = await client.query(
+        `
+          select *
+          from users
+          where (id = $1 or ($2::text is not null and email_normalized = $2))
+            and deleted_at is null
+          order by case when id = $1 then 0 else 1 end, created_at asc
+          for update
+          limit 1
+        `,
+        [input.bridgeUserId, input.bridgeEmail],
+      );
+
+      const timestamp = now().toISOString();
+      const resolvedName = input.bridgeName?.trim() || input.bridgeEmail || 'Consultant Dashboard User';
+
+      if (existing.rowCount === 0) {
+        const inserted = await client.query(
+          `
+            insert into users (
+              id,
+              name,
+              email_normalized,
+              mobile_number_normalized,
+              email_verified_at,
+              mobile_verified_at,
+              role,
+              status,
+              version,
+              created_at,
+              updated_at,
+              last_login_at
+            ) values (
+              $1, $2, $3, null, $4, null, $5, 'active', 1, $4, $4, $4
+            )
+            returning *
+          `,
+          [input.bridgeUserId, resolvedName, input.bridgeEmail, timestamp, input.bridgeRole],
+        );
+        await client.query('commit');
+        return mapUser(inserted.rows[0]);
+      }
+
+      const updated = await client.query(
+        `
+          update users
+          set
+            name = coalesce($2, name),
+            email_normalized = coalesce($3, email_normalized),
+            role = $4,
+            status = 'active',
+            email_verified_at = coalesce(email_verified_at, $5),
+            updated_at = $5,
+            last_login_at = $5,
+            version = version + 1
+          where id = $1
+          returning *
+        `,
+        [String(existing.rows[0].id), resolvedName, input.bridgeEmail, input.bridgeRole, timestamp],
+      );
+      await client.query('commit');
+      return mapUser(updated.rows[0]);
+    } catch (error) {
+      await client.query('rollback');
+      if (isUniqueViolation(error)) {
+        continue;
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  throw new Error('Failed to materialize consultant dashboard bridge user after retrying.');
+};
+
 const findUserCandidates = async (
   email: string,
   mobileNumber: string,
@@ -703,6 +789,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
   const bridgeDiagnostics = getConsultantDashboardJwtDiagnostics(token, bridge);
   const bridgeRole = readStringClaim(bridgePayload, ['role', 'user_role'])?.toLowerCase() ?? null;
   const bridgeEmail = typeof bridgePayload?.email === 'string' ? normalizeEmail(bridgePayload.email) : null;
+  const bridgeName = readStringClaim(bridgePayload, ['name', 'full_name', 'display_name']);
   const bridgeStatus = readStringClaim(bridgePayload, ['status', 'account_status'])?.toUpperCase() ?? null;
   const bridgeType = readStringClaim(bridgePayload, ['type', 'token_type', 'tokenType', 'typ'])?.toLowerCase() ?? null;
   const credentialStatus =
@@ -731,55 +818,18 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     return null;
   }
 
-  const bridgedUser = await pool.query(
-    `
-      select
-        u.id as user_id_value,
-        u.name,
-        u.email_normalized,
-        u.mobile_number_normalized,
-        u.role,
-        u.status as user_status,
-        u.version as user_version,
-        u.created_at as user_created_at,
-        u.updated_at as user_updated_at,
-        u.deleted_at as user_deleted_at,
-        u.last_login_at as user_last_login_at,
-        u.email_verified_at,
-        u.mobile_verified_at
-      from users u
-      where (u.id = $1 or ($2::text is not null and u.email_normalized = $2))
-        and u.deleted_at is null
-        and lower(coalesce(u.status, '')) = 'active'
-        and lower(coalesce(u.role, 'user')) = any($3)
-      limit 1
-    `,
-    [bridgeUserId, bridgeEmail, Array.from(CONSULTANT_DASHBOARD_BRIDGE_ROLES)]
-  );
-
-  const userRow = bridgedUser.rows[0];
-  if (userRow) {
-    console.info('CONSULTANT_SESSION_DEBUG', {
-      tokenUserId: bridgeUserId,
-      sessionFound: false,
-      sessionStatus: 'consultant_jwt_bridge',
-      expiryResult: bridge.expiryResult,
-      matchedSecretSource: bridge.matchedSecretSource,
-      tokenType: bridgeType,
-      bridge: bridgeDiagnostics
-    });
-
-    return rowToAuthenticatedAccount(userRow, {
-      token,
-      sessionId: `consultant-dashboard:${bridgeUserId}`,
-      sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString()
-    });
-  }
+  const bridgedUser = await ensureConsultantDashboardBridgeUser({
+    bridgeUserId,
+    bridgeEmail,
+    bridgeRole,
+    bridgeName
+  });
 
   console.info('CONSULTANT_SESSION_DEBUG', {
     tokenUserId: bridgeUserId,
+    resolvedAccountId: bridgedUser.id,
     sessionFound: false,
-    sessionStatus: 'consultant_jwt_bridge_external',
+    sessionStatus: bridgedUser.id === bridgeUserId ? 'consultant_jwt_bridge_materialized' : 'consultant_jwt_bridge_linked',
     expiryResult: bridge.expiryResult,
     matchedSecretSource: bridge.matchedSecretSource,
     tokenType: bridgeType,
@@ -787,26 +837,12 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
   });
 
   return {
-    accountId: bridgeUserId,
+    accountId: bridgedUser.id,
     sessionId: `consultant-dashboard:${bridgeUserId}`,
     sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString(),
     token,
     authProvider: 'consultant_dashboard',
-    user: {
-      id: bridgeUserId,
-      name: bridgeEmail ?? 'Consultant Dashboard User',
-      email: bridgeEmail,
-      mobileNumber: null,
-      role: bridgeRole,
-      status: 'active',
-      version: 1,
-      createdAtISO: new Date(0).toISOString(),
-      updatedAtISO: new Date(0).toISOString(),
-      deletedAtISO: null,
-      lastLoginAtISO: null,
-      emailVerifiedAtISO: null,
-      mobileVerifiedAtISO: null
-    },
+    user: bridgedUser,
     client: undefined as unknown as PersistedClient
   };
 };
