@@ -211,27 +211,29 @@ export const getCurrentDietPlanVersion = async (dietPlanId: string) => {
 export const getLatestPublishedDietPlanByClientId = async (owner: ClientOwnershipContext) => {
   const result = await pool.query(
     `
-      select dp.*, dpv.*
+      select dp.*
       from care_cases cc
       join diet_plans dp on dp.care_case_id = cc.id
-      join diet_plan_versions dpv on dpv.id = dp.latest_published_version_id
       where cc.client_id = $1
         and cc.user_id = $2
         and cc.deleted_at is null
         and dp.deleted_at is null
         and dp.status = 'active'
         and dp.plan_status = 'published'
-        and dpv.deleted_at is null
-        and dpv.status = 'active'
       order by dp.published_at desc nulls last, dp.updated_at desc
       limit 1
     `,
     [owner.clientId, owner.accountId],
   );
   if (result.rowCount === 0) return null;
+  const plan = mapDietPlan(result.rows[0]);
+  const version = plan.latestPublishedVersionId
+    ? await getDietPlanVersionById(plan.latestPublishedVersionId)
+    : null;
+  if (!version || version.deletedAtISO || version.status !== 'active') return null;
   return {
-    plan: mapDietPlan(result.rows[0]),
-    version: mapDietPlanVersion(result.rows[0]),
+    plan,
+    version,
   };
 };
 
@@ -472,4 +474,3 @@ export const updateDietPlanVersionExportPaths = async (input: {
   if (updated.rowCount === 0) return null;
   return mapDietPlanVersion(updated.rows[0]);
 };
-
