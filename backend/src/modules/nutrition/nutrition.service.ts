@@ -32,6 +32,8 @@ import {
   updateDietPlanVersionExportPaths,
 } from './nutrition.store.js';
 import { generateDietPlanDocument } from './nutrition.document.js';
+import { buildRecommendationSets, deriveMealTargets } from './meal-engine.js';
+import { listMealLibrarySlotsForTarget } from './nutrition.library.store.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 
@@ -328,25 +330,38 @@ const buildNutritionIntelligence = (input: {
       lifestyleSummary: input.lifestyleSummary,
       wearableConnected: input.wearableConnected,
     },
+    mealTargets: deriveMealTargets({
+      caloriesTarget: input.caloriesTarget,
+      proteinTargetGrams: input.proteinTargetGrams,
+    }),
   };
 };
 
 const mealSection = (
+  mealKey: keyof NutritionPlanContent['mealPlan'],
   window: string,
   focus: string,
-  kcalTarget: number,
-  proteinTarget: number,
+  target: ReturnType<typeof deriveMealTargets>[keyof ReturnType<typeof deriveMealTargets>],
   options: Array<{ meal: string; portion: string; prepNote: string }>,
 ): NutritionMealSection => ({
   window,
   focus,
+  target,
+  recommendationSets: [],
   options: options.map((option, index) => ({
+    id: `${mealKey}-generated-${index + 1}`,
     slot: index + 1,
     meal: option.meal,
     portion: option.portion,
     prepNote: option.prepNote,
-    approxKcal: kcalTarget,
-    proteinGrams: proteinTarget,
+    approxKcal: target.calories,
+    proteinGrams: target.proteinGrams,
+    matchClassification: 'best_match',
+    sourceType: 'generated_template',
+    recommendationReason: 'Starter draft generated from current Fiteatsy nutrition targets while consultant meal-library curation is in progress.',
+    cuisineTags: [],
+    dietaryTags: [],
+    isApproved: false,
   })),
 });
 
@@ -367,15 +382,10 @@ const buildDraftContent = (input: {
   proteinTargetGrams: number | null;
   hydrationTargetLiters: number | null;
 }) => {
-  const calories = input.calorieTarget ?? 1800;
-  const protein = input.proteinTargetGrams ?? 90;
-  const earlyCalories = Math.round(calories * 0.08);
-  const breakfastCalories = Math.round(calories * 0.22);
-  const snackCalories = Math.round(calories * 0.1);
-  const lunchCalories = Math.round(calories * 0.26);
-  const eveningCalories = Math.round(calories * 0.1);
-  const dinnerCalories = Math.round(calories * 0.18);
-  const bedtimeCalories = Math.round(calories * 0.06);
+  const mealTargets = deriveMealTargets({
+    caloriesTarget: input.calorieTarget,
+    proteinTargetGrams: input.proteinTargetGrams,
+  });
 
   const vegetarian = lower(input.dietPreference).includes('veg');
   const proteinOptions = vegetarian
@@ -403,31 +413,31 @@ const buildDraftContent = (input: {
       movement: '20-30 min walk or consultant-approved movement block',
     },
     mealPlan: {
-      earlyMorning: mealSection('6:00-7:30 AM', 'Gentle metabolic wake-up', Math.round(earlyCalories / 2), Math.round(protein * 0.06), [
+      earlyMorning: mealSection('earlyMorning', '6:00-7:30 AM', 'Gentle metabolic wake-up', mealTargets.earlyMorning, [
         { meal: 'Warm water with soaked seeds', portion: '1 glass + 1 tbsp seeds', prepNote: 'Simple hydration anchor to start the day.' },
         { meal: 'Jeera-ajwain water + nuts', portion: '1 glass + 6 almonds', prepNote: 'Useful when appetite is low in the morning.' },
       ]),
-      breakfast: mealSection('8:00-9:30 AM', 'Protein-first breakfast', Math.round(breakfastCalories / 2), Math.round(protein * 0.22), [
+      breakfast: mealSection('breakfast', '8:00-9:30 AM', 'Protein-first breakfast', mealTargets.breakfast, [
         { meal: `${proteinOptions[0]} + vegetable side`, portion: '1 plate', prepNote: 'Keep oil moderate and add a fruit if energy is low.' },
         { meal: `${proteinOptions[1]} + chutney`, portion: '2 medium', prepNote: 'Choose a convenient repeatable option on busy mornings.' },
       ]),
-      midMorningSnack: mealSection('11:00-11:30 AM', 'Steady energy between meals', Math.round(snackCalories / 2), Math.round(protein * 0.1), [
+      midMorningSnack: mealSection('midMorningSnack', '11:00-11:30 AM', 'Steady energy between meals', mealTargets.midMorningSnack, [
         { meal: 'Curd or buttermilk + seeds', portion: '1 cup', prepNote: 'Supports hydration and protein distribution.' },
         { meal: 'Fruit + handful roasted chana', portion: '1 serving', prepNote: 'Pair fruit with protein for steadier energy.' },
       ]),
-      lunch: mealSection('1:00-2:30 PM', 'Balanced lunch plate', Math.round(lunchCalories / 2), Math.round(protein * 0.26), [
+      lunch: mealSection('lunch', '1:00-2:30 PM', 'Balanced lunch plate', mealTargets.lunch, [
         { meal: `${proteinOptions[4]} + sabzi + roti/rice`, portion: '1 balanced plate', prepNote: 'Half plate vegetables, quarter protein, quarter carbs.' },
         { meal: `${proteinOptions[3]} + salad + millet`, portion: '1 balanced plate', prepNote: 'Use regional staples to improve adherence.' },
       ]),
-      eveningSnack: mealSection('4:30-5:30 PM', 'Prevent cravings and energy dips', Math.round(eveningCalories / 2), Math.round(protein * 0.1), [
+      eveningSnack: mealSection('eveningSnack', '4:30-5:30 PM', 'Prevent cravings and energy dips', mealTargets.eveningSnack, [
         { meal: 'Sprouts / makhana / boiled chana', portion: '1 bowl', prepNote: 'Useful before long work blocks or commute.' },
         { meal: 'Protein smoothie or curd bowl', portion: '1 serving', prepNote: 'Choose low-sugar options on low-energy days.' },
       ]),
-      dinner: mealSection('7:30-9:00 PM', 'Lighter dinner for recovery', Math.round(dinnerCalories / 2), Math.round(protein * 0.18), [
+      dinner: mealSection('dinner', '7:30-9:00 PM', 'Lighter dinner for recovery', mealTargets.dinner, [
         { meal: `${proteinOptions[2]} + sauteed vegetables`, portion: '1 serving', prepNote: 'Keep dinner simpler than lunch when sleep support is needed.' },
         { meal: 'Dal soup + paneer/tofu/chicken + vegetables', portion: '1 bowl + side', prepNote: 'Aim for easy digestion and stable overnight hunger.' },
       ]),
-      bedtimeNutrition: mealSection('9:30-10:30 PM', 'Support sleep and overnight satiety', Math.round(bedtimeCalories / 2), Math.round(protein * 0.08), [
+      bedtimeNutrition: mealSection('bedtimeNutrition', '9:30-10:30 PM', 'Support sleep and overnight satiety', mealTargets.bedtimeNutrition, [
         { meal: 'Haldi milk / unsweetened milk / soy milk', portion: '1 cup', prepNote: 'Use only if it improves hunger control or sleep quality.' },
         { meal: 'Small curd bowl or nuts', portion: '1 small serving', prepNote: 'Avoid heavy or sugary bedtime add-ons.' },
       ]),
@@ -462,6 +472,65 @@ const buildDraftContent = (input: {
       { supplement: '', dose: '', timing: '', duration: '', note: '' },
     ],
   } satisfies NutritionPlanContent;
+};
+
+const enrichRecommendationSets = (content: NutritionPlanContent): NutritionPlanContent => {
+  const nextMealPlan = Object.fromEntries(
+    Object.entries(content.mealPlan).map(([mealKey, section]) => [
+      mealKey,
+      {
+        ...section,
+        recommendationSets: buildRecommendationSets(section.options),
+      },
+    ]),
+  ) as NutritionPlanContent['mealPlan'];
+
+  return {
+    ...content,
+    mealPlan: nextMealPlan,
+  };
+};
+
+const enrichMealPlanWithLibraryMatches = async (input: {
+  content: NutritionPlanContent;
+  consultantId: string;
+  dietPreference: string | null;
+  allergies: string[];
+}) => {
+  const nextMealPlanEntries = await Promise.all(
+    Object.entries(input.content.mealPlan).map(async ([mealKey, section]) => {
+      const verifiedMatches = await listMealLibrarySlotsForTarget({
+        mealKey,
+        target: section.target,
+        consultantId: input.consultantId,
+        dietPreference: input.dietPreference,
+        allergyTags: input.allergies,
+        limit: 6,
+      });
+
+      if (!verifiedMatches.length) {
+        return [mealKey, section] as const;
+      }
+
+      const generatedFallback = section.options.map((option, index) => ({
+        ...option,
+        slot: verifiedMatches.length + index + 1,
+      }));
+
+      return [
+        mealKey,
+        {
+          ...section,
+          options: [...verifiedMatches, ...generatedFallback],
+        },
+      ] as const;
+    }),
+  );
+
+  return {
+    ...input.content,
+    mealPlan: Object.fromEntries(nextMealPlanEntries) as NutritionPlanContent['mealPlan'],
+  };
 };
 
 const buildSourceSnapshot = (input: {
@@ -725,7 +794,7 @@ export const generateConsultantDietPlanDraft = async (
     ...(healthProfile?.foodIntolerances ?? []),
     ...(healthProfile?.foodsDisliked ?? []),
   ]);
-  const content = buildDraftContent({
+  const draftTemplate = buildDraftContent({
     clientName: context.profile.client.name,
     age: context.profile.client.age,
     gender: context.profile.client.gender,
@@ -751,6 +820,12 @@ export const generateConsultantDietPlanDraft = async (
     proteinTargetGrams: macroTargets?.proteinGrams ?? null,
     hydrationTargetLiters,
   });
+  const content = enrichRecommendationSets(await enrichMealPlanWithLibraryMatches({
+    content: draftTemplate,
+    consultantId: account.accountId,
+    dietPreference: healthProfile?.dietType ?? context.profile.onboarding.dietPreference,
+    allergies,
+  }));
   const sourceSnapshot = buildSourceSnapshot({
     bmi: metrics.bmi.status === 'AVAILABLE' ? metrics.bmi.value : null,
     weightKg: context.calculationInput.weightKg,
