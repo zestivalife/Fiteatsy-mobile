@@ -222,17 +222,67 @@ export type NutritionPlanLifecycle =
   | 'archived';
 
 export type NutritionMealSlot = {
+  id?: string;
   slot: number;
   meal: string;
   portion: string;
   prepNote: string;
   approxKcal: number | null;
   proteinGrams: number | null;
+  carbsGrams?: number | null;
+  fatGrams?: number | null;
+  fibreGrams?: number | null;
+  matchClassification?: 'best_match' | 'good_match' | 'acceptable' | 'outside_target';
+  sourceType?: 'verified_library' | 'consultant_custom' | 'template_variant' | 'generated_template';
+  recommendationReason?: string | null;
+  cuisineTags?: string[];
+  dietaryTags?: string[];
+  isApproved?: boolean;
+  components?: NutritionMealComponent[];
+};
+
+export type NutritionMealTarget = {
+  calories: number | null;
+  proteinGrams: number | null;
+  caloriesBand: {
+    min: number | null;
+    max: number | null;
+  };
+  proteinBand: {
+    min: number | null;
+    max: number | null;
+  };
+  allocationBasis: string;
+};
+
+export type NutritionMealRecommendationSet = {
+  key: string;
+  label: string;
+  description?: string | null;
+  optionIds: string[];
+};
+
+export type NutritionMealComponent = {
+  id?: string;
+  foodId?: string | null;
+  componentName: string;
+  quantity: number | null;
+  quantityUnit: string;
+  householdLabel?: string | null;
+  canonicalGrams?: number | null;
+  calories: number | null;
+  proteinGrams: number | null;
+  carbsGrams?: number | null;
+  fatGrams?: number | null;
+  fibreGrams?: number | null;
+  locked?: boolean;
 };
 
 export type NutritionMealSection = {
   window: string;
   focus: string;
+  target?: NutritionMealTarget;
+  recommendationSets?: NutritionMealRecommendationSet[];
   options: NutritionMealSlot[];
 };
 
@@ -386,6 +436,7 @@ export type NutritionIntelligence = {
     lifestyleSummary: string;
     wearableConnected: boolean;
   };
+  mealTargets?: Record<string, NutritionMealTarget>;
 };
 
 export type DietPlanRecord = AuditFields & {

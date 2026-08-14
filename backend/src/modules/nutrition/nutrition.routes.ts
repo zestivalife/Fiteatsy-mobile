@@ -18,17 +18,67 @@ import {
 } from './nutrition.service.js';
 
 const mealOptionSchema = z.object({
+  id: z.string().optional(),
   slot: z.number().int().min(1),
   meal: z.string(),
   portion: z.string(),
   prepNote: z.string(),
   approxKcal: z.number().nullable(),
   proteinGrams: z.number().nullable(),
+  carbsGrams: z.number().nullable().optional(),
+  fatGrams: z.number().nullable().optional(),
+  fibreGrams: z.number().nullable().optional(),
+  matchClassification: z.enum(['best_match', 'good_match', 'acceptable', 'outside_target']).optional(),
+  sourceType: z.enum(['verified_library', 'consultant_custom', 'template_variant', 'generated_template']).optional(),
+  recommendationReason: z.string().nullable().optional(),
+  cuisineTags: z.array(z.string()).optional(),
+  dietaryTags: z.array(z.string()).optional(),
+  isApproved: z.boolean().optional(),
+  components: z.array(
+    z.object({
+      id: z.string().optional(),
+      foodId: z.string().nullable().optional(),
+      componentName: z.string(),
+      quantity: z.number().nullable(),
+      quantityUnit: z.string(),
+      householdLabel: z.string().nullable().optional(),
+      canonicalGrams: z.number().nullable().optional(),
+      calories: z.number().nullable(),
+      proteinGrams: z.number().nullable(),
+      carbsGrams: z.number().nullable().optional(),
+      fatGrams: z.number().nullable().optional(),
+      fibreGrams: z.number().nullable().optional(),
+      locked: z.boolean().optional(),
+    }),
+  ).optional(),
+});
+
+const mealTargetSchema = z.object({
+  calories: z.number().nullable(),
+  proteinGrams: z.number().nullable(),
+  caloriesBand: z.object({
+    min: z.number().nullable(),
+    max: z.number().nullable(),
+  }),
+  proteinBand: z.object({
+    min: z.number().nullable(),
+    max: z.number().nullable(),
+  }),
+  allocationBasis: z.string(),
+});
+
+const recommendationSetSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  description: z.string().nullable().optional(),
+  optionIds: z.array(z.string()),
 });
 
 const mealSectionSchema = z.object({
   window: z.string(),
   focus: z.string(),
+  target: mealTargetSchema.optional(),
+  recommendationSets: z.array(recommendationSetSchema).optional(),
   options: z.array(mealOptionSchema),
 });
 
@@ -139,11 +189,13 @@ const buildTodayNutritionView = (content: NutritionPlanContent) => {
       label: formatMealSectionLabel(key),
       window: section.window,
       focus: section.focus,
+      target: section.target ?? null,
       primaryMeal: section.options[0]?.meal ?? null,
       portion: section.options[0]?.portion ?? null,
       note: section.options[0]?.prepNote ?? null,
       kcal: section.options[0]?.approxKcal ?? null,
       proteinGrams: section.options[0]?.proteinGrams ?? null,
+      recommendationSets: section.recommendationSets ?? [],
       options: section.options,
     };
   });
