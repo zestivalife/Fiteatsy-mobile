@@ -54,7 +54,7 @@ export type AuthenticatedAccount = {
 };
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const CONSULTANT_DASHBOARD_BRIDGE_ROLES = new Set(['consultant', 'practitioner', 'admin', 'super_admin', 'superuser']);
+const CONSULTANT_DASHBOARD_BRIDGE_ROLES = new Set(['consultant', 'provider', 'dietician', 'senior_consultant']);
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const normalizeMobileNumber = (mobileNumber: string) => mobileNumber.trim();
