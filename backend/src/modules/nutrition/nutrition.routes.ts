@@ -80,6 +80,7 @@ const mealSectionSchema = z.object({
   target: mealTargetSchema.optional(),
   recommendationSets: z.array(recommendationSetSchema).optional(),
   options: z.array(mealOptionSchema),
+  availableOptions: z.array(mealOptionSchema).optional(),
 });
 
 const hydrationRhythmEntrySchema = z.object({

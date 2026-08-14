@@ -284,6 +284,7 @@ export type NutritionMealSection = {
   target?: NutritionMealTarget;
   recommendationSets?: NutritionMealRecommendationSet[];
   options: NutritionMealSlot[];
+  availableOptions?: NutritionMealSlot[];
 };
 
 export type HydrationRhythmEntry = {

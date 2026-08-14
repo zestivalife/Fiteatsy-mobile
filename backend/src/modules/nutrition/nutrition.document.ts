@@ -28,11 +28,11 @@ const flattenMealOptions = (section: NutritionPlanContent['mealPlan'][keyof Nutr
   Array.from({ length: 5 }, (_, index) => {
     const option = section.options[index];
     return {
-      meal: option?.meal || 'Not specified',
-      portion: option?.portion || 'Flexible portion',
-      prep: option?.prepNote || 'Consultant to review preparation note.',
-      kcal: option?.approxKcal != null ? `${option.approxKcal} kcal` : 'Flexible kcal',
-      protein: option?.proteinGrams != null ? `${option.proteinGrams} g` : 'Flexible protein',
+      meal: option?.meal || '',
+      portion: option?.portion || '',
+      prep: option?.prepNote || '',
+      kcal: option?.approxKcal != null ? `${option.approxKcal} kcal` : '',
+      protein: option?.proteinGrams != null ? `${option.proteinGrams} g` : '',
     };
   });
 
@@ -197,7 +197,8 @@ export const generateDietPlanDocument = async (plan: DietPlanRecord, version: Di
   );
 
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
-  const filename = `${sanitizeName(version.content.nutritionSnapshot.client || 'client')}-diet-plan-v${version.versionNumber}.docx`;
+  const issueDate = new Date(version.updatedAtISO).toISOString().slice(0, 10);
+  const filename = `${sanitizeName(version.content.nutritionSnapshot.client || 'client')}_Diet_Plan_${issueDate}.docx`;
   const outputPath = path.join(OUTPUT_DIR, filename);
   const outputBuffer = await zip.generateAsync({ type: 'nodebuffer' });
   await fs.writeFile(outputPath, outputBuffer);
