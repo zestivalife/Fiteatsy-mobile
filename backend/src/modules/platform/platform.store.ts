@@ -806,30 +806,49 @@ export const listTimelineEvents = async (careCaseId: string) => {
 
 export const addHealthEvent = async (input: Omit<HealthEventRecord, 'id' | 'createdAtISO' | 'updatedAtISO' | 'deletedAtISO' | 'version' | 'status'>) => {
   const createdAtISO = nowIso();
-  const inserted = await pool.query(
-    `
-      insert into health_events (
-        id, care_case_id, user_id, event_type, summary, payload, replay_key, event_time,
-        status, version, created_at, updated_at, deleted_at
-      ) values (
-        $1, $2, $3, $4, $5, $6::jsonb, $7, $8,
-        'active', 1, $9, $9, null
-      )
-      returning *
-    `,
-    [
-      crypto.randomUUID(),
-      input.careCaseId,
-      input.userId,
-      input.type,
-      input.summary,
-      JSON.stringify(input.payload),
-      input.replayKey,
-      input.eventTimeISO,
-      createdAtISO
-    ]
-  );
-  return mapHealthEvent(inserted.rows[0]);
+  try {
+    const inserted = await pool.query(
+      `
+        insert into health_events (
+          id, care_case_id, user_id, event_type, summary, payload, replay_key, event_time,
+          status, version, created_at, updated_at, deleted_at
+        ) values (
+          $1, $2, $3, $4, $5, $6::jsonb, $7, $8,
+          'active', 1, $9, $9, null
+        )
+        returning *
+      `,
+      [
+        crypto.randomUUID(),
+        input.careCaseId,
+        input.userId,
+        input.type,
+        input.summary,
+        JSON.stringify(input.payload),
+        input.replayKey,
+        input.eventTimeISO,
+        createdAtISO
+      ]
+    );
+    return mapHealthEvent(inserted.rows[0]);
+  } catch (error) {
+    if ((error as { code?: string } | null)?.code === '23505') {
+      const existing = await pool.query(
+        `
+          select *
+          from health_events
+          where replay_key = $1
+            and deleted_at is null
+          limit 1
+        `,
+        [input.replayKey],
+      );
+      if ((existing.rowCount ?? 0) > 0) {
+        return mapHealthEvent(existing.rows[0]);
+      }
+    }
+    throw error;
+  }
 };
 
 export const listHealthEvents = async (careCaseId: string) => {
