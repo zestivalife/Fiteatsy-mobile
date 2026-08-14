@@ -11,6 +11,7 @@ import { calculateHealthMetrics } from '../health/health-calculations.service.js
 import { listLatestHealthScores } from '../intelligence/health-scores.repository.js';
 import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId, listHealthEvents } from '../platform/platform.store.js';
 import type {
+  CareCaseRecord,
   ClientOwnershipContext,
   DietPlanVersionRecord,
   NutritionIntelligence,
@@ -491,6 +492,25 @@ const buildSourceSnapshot = (input: {
   generatedAtISO: new Date().toISOString(),
 });
 
+const transitionCareCaseStageBestEffort = async (
+  careCase: CareCaseRecord,
+  nextStage: CareCaseRecord['currentStage'],
+  detail: string,
+) => {
+  try {
+    await transitionCareCaseStage(careCase, nextStage, detail);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('[nutrition] skipped care case stage transition', {
+      careCaseId: careCase.id,
+      clientId: careCase.clientId,
+      fromStage: careCase.currentStage,
+      toStage: nextStage,
+      message,
+    });
+  }
+};
+
 const contentSummaryFromContent = (content: NutritionPlanContent): DietPlanVersionRecord['contentSummary'] => ({
   calories: content.dailyTargets.calories,
   protein: content.dailyTargets.protein,
@@ -754,7 +774,11 @@ export const generateConsultantDietPlanDraft = async (
     contentSummary: contentSummaryFromContent(content),
     generatedBy: account.accountId,
   });
-  await transitionCareCaseStage(careCase, 'ai_draft_generated', 'Nutrition draft generated for consultant review.');
+  await transitionCareCaseStageBestEffort(
+    careCase,
+    'ai_draft_generated',
+    'Nutrition draft generated for consultant review.',
+  );
 
   return {
     plan: saved.plan,
@@ -925,7 +949,11 @@ export const publishConsultantDietPlan = async (
     approvedBy: account.accountId,
     sourceSnapshot,
   });
-  await transitionCareCaseStage(workspace.careCase, 'diet_published', 'Consultant published the nutrition plan.');
+  await transitionCareCaseStageBestEffort(
+    workspace.careCase,
+    'diet_published',
+    'Consultant published the nutrition plan.',
+  );
   return result;
 };
 
