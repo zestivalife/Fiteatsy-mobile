@@ -47,11 +47,13 @@ export class NutritionPlanWorkflowError extends Error {
   }
 }
 
+const CONSULTANT_DIET_WORKFLOW_ROLES = ['consultant', 'provider', 'dietician', 'senior_consultant'];
+
 const isConsultantRole = (account: AuthenticatedAccount) =>
-  ['consultant', 'practitioner', 'admin', 'super_admin', 'superuser'].includes(account.user.role?.toLowerCase() ?? '');
+  CONSULTANT_DIET_WORKFLOW_ROLES.includes(account.user.role?.toLowerCase() ?? '');
 
 const canApproveOrPublishDietPlan = (account: AuthenticatedAccount) =>
-  ['consultant', 'admin', 'super_admin', 'superuser'].includes(account.user.role?.toLowerCase() ?? '');
+  CONSULTANT_DIET_WORKFLOW_ROLES.includes(account.user.role?.toLowerCase() ?? '');
 
 const unique = (values: Array<string | null | undefined>) =>
   Array.from(new Set(values.map((value) => (value ?? '').trim()).filter(Boolean)));

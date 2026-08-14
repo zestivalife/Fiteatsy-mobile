@@ -15,7 +15,7 @@ import {
   listRegisteredConsultantClients
 } from './consultants.repository.js';
 
-const CONSULTANT_ROLES = new Set(['consultant', 'practitioner', 'admin', 'super_admin', 'superuser']);
+const CONSULTANT_ROLES = new Set(['consultant', 'provider', 'dietician', 'senior_consultant']);
 const WORKSPACE_CONTRACT_VERSION = '2026-08-12.fiteatsy-client-workspace.v1';
 const WORKSPACE_ALLOWED_SCOPES = [
   'client.identity.read',
