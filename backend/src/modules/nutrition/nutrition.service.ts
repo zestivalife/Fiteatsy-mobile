@@ -129,6 +129,27 @@ const normalizeNutritionPlanContent = (content: NutritionPlanContent): Nutrition
   },
 });
 
+const stripAvailableOptionsFromSection = (section: NutritionMealSection): NutritionMealSection => {
+  const { availableOptions: _availableOptions, ...sectionWithoutAvailableOptions } = section;
+  return {
+    ...sectionWithoutAvailableOptions,
+    options: normalizeMealOptions(section.options),
+  };
+};
+
+export const sanitizePublishedNutritionPlanContent = (content: NutritionPlanContent): NutritionPlanContent => ({
+  ...content,
+  mealPlan: {
+    earlyMorning: stripAvailableOptionsFromSection(content.mealPlan.earlyMorning),
+    breakfast: stripAvailableOptionsFromSection(content.mealPlan.breakfast),
+    midMorningSnack: stripAvailableOptionsFromSection(content.mealPlan.midMorningSnack),
+    lunch: stripAvailableOptionsFromSection(content.mealPlan.lunch),
+    eveningSnack: stripAvailableOptionsFromSection(content.mealPlan.eveningSnack),
+    dinner: stripAvailableOptionsFromSection(content.mealPlan.dinner),
+    bedtimeNutrition: stripAvailableOptionsFromSection(content.mealPlan.bedtimeNutrition),
+  },
+});
+
 const getLatestDownloadableDietPlanVersion = async (plan: Awaited<ReturnType<typeof getDietPlanById>>) => {
   if (!plan) return null;
   const currentVersion = plan.currentVersionId ? await getCurrentDietPlanVersion(plan.id) : null;
@@ -1821,5 +1842,14 @@ export const logNutritionMealConsumption = async (
   };
 };
 
-export const getPublishedDietPlanForClient = async (owner: ClientOwnershipContext) =>
-  getLatestPublishedDietPlanByClientId(owner);
+export const getPublishedDietPlanForClient = async (owner: ClientOwnershipContext) => {
+  const payload = await getLatestPublishedDietPlanByClientId(owner);
+  if (!payload) return null;
+  return {
+    ...payload,
+    version: {
+      ...payload.version,
+      content: sanitizePublishedNutritionPlanContent(payload.version.content),
+    },
+  };
+};
