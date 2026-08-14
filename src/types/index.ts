@@ -594,6 +594,8 @@ export type PublishedNutritionPlan = {
     id: string;
     versionNumber: number;
     lifecycleStatus: 'draft' | 'review_ready' | 'approved' | 'published' | 'archived';
+    exportedDocPath?: string | null;
+    exportedPdfPath?: string | null;
     contentSummary: {
       calories: number | null;
       protein: number | null;
@@ -626,6 +628,13 @@ export type PublishedNutritionPlan = {
       movement: string;
     };
   };
+};
+
+export type NutritionMealConsumptionResult = {
+  ok: boolean;
+  consumedAtISO: string;
+  mealKey: string;
+  mealLabel: string;
 };
 
 export type RecoveryProgramRef = {

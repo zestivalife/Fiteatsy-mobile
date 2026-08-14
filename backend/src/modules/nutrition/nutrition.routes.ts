@@ -1,4 +1,5 @@
 import { type Response, Router } from 'express';
+import { promises as fs } from 'node:fs';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import type { NutritionPlanContent } from '../platform/platform.types.js';
@@ -12,6 +13,8 @@ import {
   NutritionPlanWorkflowError,
   publishConsultantDietPlan,
   updateConsultantDietPlanDraft,
+  exportConsultantDietPlanDocument,
+  logNutritionMealConsumption,
 } from './nutrition.service.js';
 
 const mealOptionSchema = z.object({
@@ -94,6 +97,17 @@ const generateDraftSchema = z.object({
 const updateDraftSchema = z.object({
   content: nutritionPlanContentSchema,
   reviewNotes: z.string().trim().nullable().optional(),
+});
+
+const markMealConsumedSchema = z.object({
+  planId: z.string().trim().min(1),
+  versionId: z.string().trim().min(1),
+  mealKey: z.string().trim().min(1),
+  mealLabel: z.string().trim().min(1),
+  mealName: z.string().trim().nullable().optional(),
+  quantityLabel: z.string().trim().nullable().optional(),
+  consumedAtISO: z.string().datetime().optional(),
+  notes: z.string().trim().nullable().optional(),
 });
 
 const mealSectionOrder = [
@@ -269,6 +283,27 @@ consultantNutritionRouter.post('/clients/:clientId/diet-plans/:dietPlanId/publis
   return res.status(200).json(payload);
 });
 
+consultantNutritionRouter.get('/clients/:clientId/diet-plans/:dietPlanId/download', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  let payload;
+  try {
+    payload = await exportConsultantDietPlanDocument(req.params.clientId, account, req.params.dietPlanId);
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
+  if (!payload) {
+    return res.status(404).json({
+      error: 'DIET_PLAN_NOT_FOUND',
+      message: 'Unable to export the requested diet plan.',
+    });
+  }
+
+  const buffer = await fs.readFile(payload.document.path);
+  res.setHeader('Content-Type', payload.document.mimeType);
+  res.setHeader('Content-Disposition', `attachment; filename="${payload.document.filename}"`);
+  return res.status(200).send(buffer);
+});
+
 export const platformNutritionRouter = Router();
 platformNutritionRouter.use(requireAuthenticatedAccount);
 
@@ -309,4 +344,26 @@ platformNutritionRouter.get('/nutrition-plan/today', async (req, res) => {
     publishedAtISO: payload.plan.publishedAtISO,
     today: buildTodayNutritionView(payload.version.content),
   });
+});
+
+platformNutritionRouter.post('/nutrition-plan/consume', async (req, res) => {
+  const parsed = markMealConsumedSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  }
+  const account = getAuthenticatedAccount(req);
+  try {
+    const payload = await logNutritionMealConsumption(
+      { accountId: account.accountId, clientId: account.client.id },
+      {
+        ...parsed.data,
+        mealName: parsed.data.mealName ?? null,
+        quantityLabel: parsed.data.quantityLabel ?? null,
+        consumedAtISO: parsed.data.consumedAtISO ?? null,
+      },
+    );
+    return res.status(201).json(payload);
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
 });

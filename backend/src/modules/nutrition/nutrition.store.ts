@@ -439,3 +439,37 @@ export const updateDietPlanLifecycle = async (input: {
     version: updatedVersion.rowCount ? mapDietPlanVersion(updatedVersion.rows[0]) : null,
   };
 };
+
+
+export const updateDietPlanVersionExportPaths = async (input: {
+  dietPlanId: string;
+  versionId: string;
+  exportedDocPath?: string | null;
+  exportedPdfPath?: string | null;
+}) => {
+  const timestamp = nowIso();
+  const updated = await pool.query(
+    `
+      update diet_plan_versions
+      set
+        exported_doc_path = coalesce($3, exported_doc_path),
+        exported_pdf_path = coalesce($4, exported_pdf_path),
+        updated_at = $5,
+        version = version + 1
+      where id = $1
+        and diet_plan_id = $2
+        and deleted_at is null
+      returning *
+    `,
+    [
+      input.versionId,
+      input.dietPlanId,
+      input.exportedDocPath ?? null,
+      input.exportedPdfPath ?? null,
+      timestamp,
+    ],
+  );
+  if (updated.rowCount === 0) return null;
+  return mapDietPlanVersion(updated.rows[0]);
+};
+

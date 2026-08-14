@@ -7,6 +7,7 @@ import { Screen } from '../../components/Screen';
 import { getThemeColors, spacing, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
+import { markNutritionMealConsumed } from '../../services/nutritionPlanService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -25,6 +26,8 @@ export const NutritionPlanScreen = () => {
   const { themeMode, publishedNutritionPlan } = useAppContext();
   const palette = getThemeColors(themeMode);
   const content = publishedNutritionPlan?.version.content;
+  const [mealLogState, setMealLogState] = React.useState<Record<string, 'idle' | 'saving' | 'saved'>>({});
+  const [mealLogError, setMealLogError] = React.useState<string | null>(null);
 
   if (!publishedNutritionPlan || !content) {
     return (
@@ -94,11 +97,65 @@ export const NutritionPlanScreen = () => {
                     <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.approxKcal != null ? `${option.approxKcal} kcal` : 'Calories flexible'}</Text>
                     <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.proteinGrams != null ? `${option.proteinGrams} g protein` : 'Protein flexible'}</Text>
                   </View>
+                  {option.slot === 1 ? (
+                    <Pressable
+                      onPress={async () => {
+                        if (!publishedNutritionPlan) return;
+                        const actionKey = `${key}-${option.slot}`;
+                        setMealLogError(null);
+                        setMealLogState((current) => ({ ...current, [actionKey]: 'saving' }));
+                        try {
+                          await markNutritionMealConsumed({
+                            planId: publishedNutritionPlan.plan.id,
+                            versionId: publishedNutritionPlan.version.id,
+                            mealKey: key,
+                            mealLabel: label,
+                            mealName: option.meal,
+                            quantityLabel: option.portion,
+                          });
+                          setMealLogState((current) => ({ ...current, [actionKey]: 'saved' }));
+                        } catch (error) {
+                          setMealLogState((current) => ({ ...current, [actionKey]: 'idle' }));
+                          setMealLogError(error instanceof Error ? error.message : 'Unable to save this meal check right now.');
+                        }
+                      }}
+                      style={[
+                        styles.consumeButton,
+                        {
+                          backgroundColor: mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.successSoft : palette.card,
+                          borderColor: mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.success : palette.stroke,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={mealLogState[`${key}-${option.slot}`] === 'saved' ? 'checkmark-circle' : 'restaurant-outline'}
+                        size={16}
+                        color={mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.success : palette.textPrimary}
+                      />
+                      <Text
+                        style={[
+                          styles.consumeButtonText,
+                          { color: mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.success : palette.textPrimary },
+                        ]}
+                      >
+                        {mealLogState[`${key}-${option.slot}`] === 'saving'
+                          ? 'Saving...'
+                          : mealLogState[`${key}-${option.slot}`] === 'saved'
+                            ? 'Marked consumed'
+                            : 'Mark consumed'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ))}
             </View>
           );
         })}
+        {mealLogError ? (
+          <View style={[styles.inlineMessage, { backgroundColor: palette.errorSoft, borderColor: palette.error }]}>
+            <Text style={[styles.inlineMessageText, { color: palette.error }]}>{mealLogError}</Text>
+          </View>
+        ) : null}
 
         <SectionTitle title="Hydration rhythm" color={palette.textPrimary} />
         <View style={[styles.sectionCard, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
@@ -291,6 +348,31 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   optionMeta: {
+    ...typography.caption,
+  },
+  consumeButton: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  consumeButtonText: {
+    ...typography.caption,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  inlineMessage: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  inlineMessageText: {
     ...typography.caption,
   },
   timelineRow: {

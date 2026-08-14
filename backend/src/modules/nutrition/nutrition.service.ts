@@ -19,6 +19,7 @@ import type {
   NutritionPlanSourceSnapshot,
 } from '../platform/platform.types.js';
 import { transitionCareCaseStage } from '../platform/platform.lifecycle.js';
+import { addHealthEvent } from '../platform/platform.store.js';
 import {
   createOrUpdateDietPlanDraft,
   getDietPlanByCareCaseId,
@@ -27,7 +28,9 @@ import {
   getLatestPublishedDietPlanByClientId,
   updateDietPlanLifecycle,
   updateDietPlanVersionContent,
+  updateDietPlanVersionExportPaths,
 } from './nutrition.store.js';
+import { generateDietPlanDocument } from './nutrition.document.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 
@@ -933,6 +936,98 @@ export const getConsultantLatestDietPlan = async (publicClientId: string) => {
   if (!plan) return null;
   const version = plan.currentVersionId ? await getCurrentDietPlanVersion(plan.id) : null;
   return version ? { plan, version } : null;
+};
+
+
+export const exportConsultantDietPlanDocument = async (
+  publicClientId: string,
+  account: AuthenticatedAccount,
+  dietPlanId: string,
+) => {
+  if (!isConsultantRole(account)) return null;
+  const workspace = await getWorkspaceContext(publicClientId);
+  if (!workspace || !workspace.careCase) return null;
+  const plan = await getDietPlanById(dietPlanId);
+  if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
+  const version = await getCurrentDietPlanVersion(plan.id);
+  if (!version) return null;
+
+  const exported = await generateDietPlanDocument(plan, version);
+  const updatedVersion = await updateDietPlanVersionExportPaths({
+    dietPlanId: plan.id,
+    versionId: version.id,
+    exportedDocPath: exported.outputPath,
+  });
+
+  return {
+    plan,
+    version: updatedVersion ?? version,
+    document: {
+      path: exported.outputPath,
+      filename: exported.filename,
+      mimeType: exported.mimeType,
+    },
+  };
+};
+
+export const logNutritionMealConsumption = async (
+  owner: ClientOwnershipContext,
+  input: {
+    planId: string;
+    versionId: string;
+    mealKey: string;
+    mealLabel: string;
+    mealName: string | null;
+    quantityLabel: string | null;
+    consumedAtISO?: string | null;
+    notes?: string | null;
+  },
+) => {
+  const published = await getLatestPublishedDietPlanByClientId(owner);
+  if (!published) {
+    throw new NutritionPlanWorkflowError(
+      'DIET_PLAN_NOT_FOUND',
+      'A published nutrition plan is required before meal completion can be tracked.',
+      404,
+    );
+  }
+  if (published.plan.id != input.planId || published.version.id != input.versionId) {
+    throw new NutritionPlanWorkflowError(
+      'DIET_PLAN_VERSION_MISMATCH',
+      'Meal completion can only be logged against the latest published nutrition plan.',
+      409,
+    );
+  }
+  const careCase = await getCareCaseByClientId(owner.clientId);
+  if (!careCase) {
+    throw new NutritionPlanWorkflowError('CARE_CASE_NOT_FOUND', 'Care case not found for this client.', 404);
+  }
+
+  const consumedAtISO = input.consumedAtISO ?? new Date().toISOString();
+  await addHealthEvent({
+    careCaseId: careCase.id,
+    userId: owner.accountId,
+    type: 'meal_logged',
+    summary: `${input.mealLabel} marked as consumed`,
+    payload: {
+      planId: input.planId,
+      versionId: input.versionId,
+      mealKey: input.mealKey,
+      mealLabel: input.mealLabel,
+      mealName: input.mealName,
+      quantityLabel: input.quantityLabel,
+      notes: input.notes ?? null,
+    },
+    replayKey: `${careCase.id}:meal_logged:${input.versionId}:${input.mealKey}:${consumedAtISO}`,
+    eventTimeISO: consumedAtISO,
+  });
+
+  return {
+    ok: true,
+    consumedAtISO,
+    mealKey: input.mealKey,
+    mealLabel: input.mealLabel,
+  };
 };
 
 export const getPublishedDietPlanForClient = async (owner: ClientOwnershipContext) =>

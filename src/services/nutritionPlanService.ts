@@ -1,5 +1,5 @@
 import { apiFetch } from './apiClient';
-import { PublishedNutritionPlan } from '../types';
+import { NutritionMealConsumptionResult, PublishedNutritionPlan } from '../types';
 
 export const getPublishedNutritionPlan = () =>
   apiFetch<PublishedNutritionPlan>('/v1/platform/nutrition-plan');
@@ -11,3 +11,18 @@ export const getTodayNutritionPlan = () =>
     versionId: string;
     publishedAtISO: string | null;
   }>('/v1/platform/nutrition-plan/today');
+
+export const markNutritionMealConsumed = (payload: {
+  planId: string;
+  versionId: string;
+  mealKey: string;
+  mealLabel: string;
+  mealName: string | null;
+  quantityLabel: string | null;
+  consumedAtISO?: string;
+  notes?: string | null;
+}) =>
+  apiFetch<NutritionMealConsumptionResult>('/v1/platform/nutrition-plan/consume', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
