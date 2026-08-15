@@ -280,7 +280,7 @@ const HomeHeader = ({
     <Text style={styles.headerGreeting} numberOfLines={1}>Hi!, {name}</Text>
     <View style={styles.headerActions}>
       <HeaderIcon icon="search-outline" onPress={onSearch} />
-      <HeaderIcon icon="barbell-outline" onPress={onAdd} />
+      <HeaderIcon icon="trophy-outline" onPress={onAdd} />
       <HeaderIcon icon="notifications-outline" onPress={onNotifications} badge="9" />
       <Pressable onPress={onProfile} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Open profile">
         <Ionicons name="person-outline" size={23} color="#EDF3EE" />
