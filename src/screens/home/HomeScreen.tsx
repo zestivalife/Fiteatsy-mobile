@@ -28,6 +28,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/recoveryIntelligenceEngine';
 import { listAnalyzedReports, type ReportDto } from '../../services/reportUploadService';
 import { useAppContext } from '../../state/AppContext';
+import type { DailyCheckIn, Medication, MedicationLogStatus } from '../../types';
 import { getIdentityScopedStorageKey } from '../../utils/identityScopedStorage';
 
 const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
@@ -49,6 +50,7 @@ type RecoveryMetric = {
   key: Exclude<MetricKey, 'recovery'>;
   label: string;
   score: number | null;
+  color: string;
   position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
   DefaultIcon: SvgAsset | ImageSourcePropType;
   ActiveIcon: SvgAsset | ImageSourcePropType;
@@ -62,6 +64,12 @@ type HealthProfileReportSummary = {
   abnormal: number;
   score: number;
   uploadedAtISO?: string;
+};
+
+type MedicationTimelineEntry = {
+  medication: Medication;
+  scheduledForISO: string;
+  status: MedicationLogStatus;
 };
 
 const toHealthProfileReportSummary = (report: ReportDto): HealthProfileReportSummary | null => {
@@ -104,6 +112,32 @@ const driverScore = (drivers: RecoveryDriver[], key: RecoveryDriver['key'], requ
   return drivers.find((driver) => driver.key === key && driver.weight > 0)?.score ?? null;
 };
 
+const normalizeScore = (value: number | null | undefined) => {
+  if (value == null || !Number.isFinite(value)) return null;
+  return Math.max(0, Math.min(100, Math.round(value)));
+};
+
+const averageScores = (scores: Array<number | null>) => {
+  const available = scores.filter((score): score is number => score != null);
+  if (available.length === 0) return null;
+  return Math.round(available.reduce((sum, score) => sum + score, 0) / available.length);
+};
+
+const buildDomainTrend = (scores: Array<number | null>, checkIns: DailyCheckIn[]) => {
+  const todayScore = averageScores(scores);
+  if (todayScore == null) return [];
+
+  const recentCheckIns = [...checkIns]
+    .sort((a, b) => (+new Date(a.dateISO)) - (+new Date(b.dateISO)))
+    .slice(-6);
+
+  const historical = recentCheckIns.map((entry) =>
+    normalizeScore(((entry.mood / 5) * 34) + ((entry.energy / 5) * 33) + ((entry.sleepQuality / 5) * 33)) ?? todayScore
+  );
+
+  return [...historical, todayScore].slice(-7);
+};
+
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
   const {
@@ -111,7 +145,9 @@ export const HomeScreen = () => {
     wellness,
     checkIns,
     wearableSyncData,
-    authSession
+    authSession,
+    publishedNutritionPlan,
+    getMedicationTimelineForDate
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
   const [reportHistory, setReportHistory] = useState<HealthProfileReportSummary[]>([]);
@@ -169,13 +205,19 @@ export const HomeScreen = () => {
     };
   }, [reportHistoryStorageKey]);
 
-  const hasTrendData = !recoveryIntel.isCalibrating && recoveryIntel.trendValues7d.some((value) => value > 0);
-  const trendValues = hasTrendData ? recoveryIntel.trendValues7d.slice(0, 7) : [];
+  const nutritionProtein = publishedNutritionPlan?.version.contentSummary.protein ?? null;
+  const nutritionCalories = publishedNutritionPlan?.version.contentSummary.calories ?? null;
+  const nutritionScore = normalizeScore(
+    nutritionProtein != null && nutritionCalories != null
+      ? Math.min(100, Math.round((nutritionProtein / 120) * 55 + (nutritionCalories / 2200) * 45))
+      : wellness.nourishmentScore
+  );
   const metrics: RecoveryMetric[] = [
     {
       key: 'calm',
       label: 'Calm',
-      score: recoveryIntel.calmScore,
+      score: normalizeScore(recoveryIntel.calmScore),
+      color: '#FF1717',
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
       ActiveIcon: CalmActiveIcon,
@@ -184,7 +226,8 @@ export const HomeScreen = () => {
     {
       key: 'activity',
       label: 'Activity',
-      score: driverScore(recoveryIntel.recoveryDrivers, 'activity', recoveryIntel.signalCoverage.workouts),
+      score: normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'activity', recoveryIntel.signalCoverage.steps || recoveryIntel.signalCoverage.workouts)),
+      color: '#F27A1A',
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
       ActiveIcon: ActivityActiveIcon,
@@ -193,7 +236,8 @@ export const HomeScreen = () => {
     {
       key: 'nutrition',
       label: 'Nutrition',
-      score: null,
+      score: nutritionScore,
+      color: '#77FF22',
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
       ActiveIcon: NutritionActiveIcon,
@@ -201,10 +245,11 @@ export const HomeScreen = () => {
     },
     {
       key: 'mind',
-      label: onboarding?.gender === 'Female' ? 'Rhythm' : 'Mind',
+      label: 'Mind',
       score: checkIns.length > 0
-        ? driverScore(recoveryIntel.recoveryDrivers, 'emotional_checkins', true)
+        ? normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'emotional_checkins', true))
         : null,
+      color: '#BFE8D0',
       position: 'bottomLeft',
       DefaultIcon: MindDefaultIcon,
       ActiveIcon: MindActiveIcon
@@ -212,18 +257,23 @@ export const HomeScreen = () => {
     {
       key: 'sleep',
       label: 'Sleep',
-      score: driverScore(recoveryIntel.recoveryDrivers, 'sleep', recoveryIntel.signalCoverage.sleep),
+      score: normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'sleep', recoveryIntel.signalCoverage.sleep)),
+      color: '#0F80FF',
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
       ActiveIcon: SleepActiveIcon,
       iconType: 'image'
     }
   ];
+  const trendValues = buildDomainTrend(metrics.map((metric) => metric.score), checkIns);
+  const hasTrendData = trendValues.length > 0;
 
   const selected = selectedMetric === 'recovery'
-    ? { label: 'Recovery Core', score: recoveryIntel.recoveryScore }
-    : metrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryIntel.recoveryScore };
+    ? { label: 'Recovery Core', score: normalizeScore(recoveryIntel.recoveryScore), color: '#D5062D' }
+    : metrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: normalizeScore(recoveryIntel.recoveryScore), color: '#D5062D' };
   const selectedState = stateFromScore(selected.score);
+  const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
+  const goToSessions = () => (navigation.getParent() as { navigate?: (screen: string) => void } | undefined)?.navigate?.('Sessions');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -240,7 +290,7 @@ export const HomeScreen = () => {
           <RecoveryTrend values={trendValues} hasData={hasTrendData} />
 
           <View style={styles.actionRow}>
-            <ActionPill label="Assist" Icon={AssistIcon} onPress={() => setSelectedMetric('calm')} />
+            <ActionPill label="Assist" Icon={AssistIcon} onPress={goToSessions} />
             <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable')} />
           </View>
 
@@ -249,13 +299,14 @@ export const HomeScreen = () => {
             selectedMetric={selectedMetric}
             selectedLabel={selected.label}
             selectedScore={selected.score}
+            selectedColor={selected.color}
             selectedState={selectedState}
             onSelectMetric={setSelectedMetric}
           />
 
           <View style={styles.summaryRow}>
-            <MedicationCard />
-            <StressCard score={recoveryIntel.stressRecoveryScore} />
+            <MedicationCard timeline={todayMedicationTimeline} onPress={() => navigation.navigate('MedicationCalendar')} />
+            <StressCard score={normalizeScore(recoveryIntel.stressRecoveryScore)} onPress={() => navigation.navigate('BreathingSession')} />
           </View>
         </View>
       </ScrollView>
@@ -332,6 +383,7 @@ const RecoveryPanel = ({
   selectedMetric,
   selectedLabel,
   selectedScore,
+  selectedColor,
   selectedState,
   onSelectMetric
 }: {
@@ -339,6 +391,7 @@ const RecoveryPanel = ({
   selectedMetric: MetricKey;
   selectedLabel: string;
   selectedScore: number | null;
+  selectedColor: string;
   selectedState: { label: string; Asset: SvgAsset };
   onSelectMetric: (metric: MetricKey) => void;
 }) => {
@@ -347,7 +400,7 @@ const RecoveryPanel = ({
 
   return (
     <View style={styles.recoveryPanel}>
-      <RecoveryStarAsset width={338} height={410} style={styles.starAsset} />
+      <RecoveryStarAsset width={406} height={492} style={styles.starAsset} />
       <RecoveryCoreAsset width={151} height={159} style={styles.coreAsset} />
       <StateAsset width={72} height={100} style={styles.stateAsset} />
       <Svg width={118} height={118} viewBox="0 0 118 118" style={styles.arcLayer}>
@@ -357,7 +410,7 @@ const RecoveryPanel = ({
             cx="59"
             cy="59"
             r="42"
-            stroke="#D5062D"
+            stroke={selectedColor}
             strokeWidth={15}
             fill="transparent"
             strokeLinecap="round"
@@ -387,7 +440,7 @@ const RecoveryPanel = ({
       >
         <Text style={styles.coreScore}>{selectedScore == null ? '--/100' : `${selectedScore}/100`}</Text>
         <Text style={styles.coreLabel}>{selectedLabel}</Text>
-        <View style={styles.stateChip}>
+        <View style={[styles.stateChip, { backgroundColor: selectedScore == null ? '#23272D' : selectedColor }]}>
           <Text style={styles.stateChipText}>{selectedState.label}</Text>
         </View>
       </Pressable>
@@ -423,17 +476,23 @@ const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; s
   );
 };
 
-const MedicationCard = () => (
-  <Pressable style={styles.infoCard} accessibilityRole="button" accessibilityLabel="Open medication logs">
+const MedicationCard = ({ timeline, onPress }: { timeline: MedicationTimelineEntry[]; onPress: () => void }) => {
+  const taken = timeline.filter((entry) => entry.status === 'taken').length;
+  const pending = timeline.filter((entry) => entry.status === 'upcoming' || entry.status === 'snoozed').length;
+  const missed = timeline.filter((entry) => entry.status === 'missed' || entry.status === 'skipped').length;
+  const total = Math.max(1, timeline.length);
+
+  return (
+  <Pressable onPress={onPress} style={styles.infoCard} accessibilityRole="button" accessibilityLabel="Open medication logs">
     <View style={styles.cardTitleRow}>
       <Text style={styles.cardTitle}>Medication</Text>
       <Ionicons name="medical-outline" size={22} color="#F4F7F4" />
     </View>
     <View style={styles.medicationMetrics}>
       {[
-        ['5/10', 'Taken'],
-        ['2/10', 'Pending'],
-        ['3/10', 'Missed']
+        [`${taken}/${total}`, 'Taken'],
+        [`${pending}/${total}`, 'Pending'],
+        [`${missed}/${total}`, 'Missed']
       ].map(([value, label], index) => (
         <View key={label} style={[styles.medMetric, index > 0 && styles.medMetricDivider]}>
           <Text style={styles.medValue}>{value}</Text>
@@ -443,10 +502,11 @@ const MedicationCard = () => (
     </View>
     <Text style={styles.cardAction}>Medication Logs +</Text>
   </Pressable>
-);
+  );
+};
 
-const StressCard = ({ score }: { score: number | null }) => (
-  <View style={styles.infoCard}>
+const StressCard = ({ score, onPress }: { score: number | null; onPress: () => void }) => (
+  <Pressable onPress={onPress} style={styles.infoCard} accessibilityRole="button" accessibilityLabel="Open stress recovery breathing">
     <View style={styles.cardTitleRow}>
       <Text style={styles.cardTitle}>Stress Recovery</Text>
       <Ionicons name="headset-outline" size={20} color="#F4F7F4" />
@@ -458,29 +518,29 @@ const StressCard = ({ score }: { score: number | null }) => (
       <View style={styles.stressBar} />
       <View style={styles.stressBar} />
     </View>
-  </View>
+  </Pressable>
 );
 
 const nodePositions = StyleSheet.create({
   top: {
-    top: 42,
+    top: 52,
     left: 150
   },
   left: {
-    top: 119,
+    top: 138,
     left: 40
   },
   right: {
-    top: 119,
+    top: 138,
     right: 36
   },
   bottomLeft: {
     left: 88,
-    bottom: 42
+    bottom: 54
   },
   bottomRight: {
     right: 84,
-    bottom: 42
+    bottom: 54
   }
 });
 
@@ -496,7 +556,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 390,
     alignSelf: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 8
   },
   header: {
@@ -619,38 +679,38 @@ const styles = StyleSheet.create({
     lineHeight: 15
   },
   recoveryPanel: {
-    height: 311,
-    marginTop: -4,
+    height: 347,
+    marginTop: -2,
     position: 'relative',
     alignItems: 'center',
     overflow: 'visible'
   },
   starAsset: {
     position: 'absolute',
-    top: -54,
-    left: 10
+    top: -86,
+    left: -20
   },
   coreAsset: {
     position: 'absolute',
-    top: 72,
-    left: 103,
+    top: 91,
+    left: 108,
     opacity: 0.94
   },
   stateAsset: {
     position: 'absolute',
-    top: 98,
-    left: 142,
+    top: 117,
+    left: 147,
     opacity: 0.08
   },
   arcLayer: {
     position: 'absolute',
-    top: 94,
-    left: 118
+    top: 113,
+    left: 124
   },
   coreCenter: {
     position: 'absolute',
-    top: 100,
-    left: 118,
+    top: 119,
+    left: 124,
     width: 118,
     height: 118,
     borderRadius: 59,
@@ -707,7 +767,7 @@ const styles = StyleSheet.create({
     height: 53
   },
   summaryRow: {
-    marginTop: -3,
+    marginTop: -6,
     flexDirection: 'row',
     gap: 10
   },
