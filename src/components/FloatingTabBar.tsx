@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { getThemeColors, radius, spacing, typography } from '../design/tokens';
+import { getThemeColors, typography } from '../design/tokens';
 import { MainTabParamList } from '../navigation/types';
 import { useAppContext } from '../state/AppContext';
 
@@ -18,11 +18,11 @@ const iconMap: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = 
 };
 
 const labelMap: Record<keyof MainTabParamList, string> = {
-  Home: 'Journey',
+  Home: 'Home',
   Tracker: 'Tracker',
   Reports: 'Reports',
-  Sessions: 'Care',
-  Cycle: 'Profile'
+  Sessions: 'Sessions',
+  Cycle: 'Cycle'
 };
 
 export const FloatingTabBar = ({ state, navigation }: BottomTabBarProps) => {
@@ -75,7 +75,7 @@ export const FloatingTabBar = ({ state, navigation }: BottomTabBarProps) => {
                 >
                   <Ionicons
                     name={iconMap[routeName]}
-                    size={22}
+                    size={20}
                     color={isFocused ? '#FFFFFF' : palette.textMuted}
                   />
                   <Text
@@ -103,21 +103,21 @@ export const FloatingTabBar = ({ state, navigation }: BottomTabBarProps) => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
-    bottom: spacing.xs
+    left: 20,
+    right: 20,
+    bottom: 14
   },
   blurShell: {
     overflow: 'hidden',
-    borderRadius: 34,
+    borderRadius: 28,
     borderWidth: 1
   },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingTop: 8,
-    minHeight: 78
+    paddingHorizontal: 6,
+    paddingTop: 7,
+    minHeight: 68
   },
   item: {
     flex: 1,
@@ -125,8 +125,8 @@ const styles = StyleSheet.create({
   },
   itemInner: {
     width: '100%',
-    minHeight: 58,
-    borderRadius: 24,
+    minHeight: 55,
+    borderRadius: 25,
     borderWidth: 1,
     paddingHorizontal: 6,
     paddingVertical: 8,
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   label: {
     ...typography.caption,
     fontSize: 10,
-    lineHeight: 14,
+    lineHeight: 12,
     textAlign: 'center'
   }
 });
