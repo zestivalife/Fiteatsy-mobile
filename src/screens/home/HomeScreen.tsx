@@ -109,8 +109,6 @@ export const HomeScreen = () => {
     wellness,
     checkIns,
     wearableSyncData,
-    publishedNutritionPlan,
-    refreshPublishedNutritionPlan,
     authSession
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
@@ -141,10 +139,6 @@ export const HomeScreen = () => {
       }),
     [wellness, checkIns, wearableSyncData]
   );
-
-  useEffect(() => {
-    void refreshPublishedNutritionPlan();
-  }, [refreshPublishedNutritionPlan]);
 
   useEffect(() => {
     let alive = true;
@@ -195,7 +189,7 @@ export const HomeScreen = () => {
     {
       key: 'nutrition',
       label: 'Nutrition',
-      score: publishedNutritionPlan ? null : null,
+      score: null,
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
       ActiveIcon: NutritionActiveIcon
@@ -280,7 +274,7 @@ const HomeHeader = ({
     <Text style={styles.headerGreeting} numberOfLines={1}>Hi!, {name}</Text>
     <View style={styles.headerActions}>
       <HeaderIcon icon="search-outline" onPress={onSearch} />
-      <HeaderIcon icon="business-outline" onPress={onAdd} />
+      <HeaderIcon icon="barbell-outline" onPress={onAdd} />
       <HeaderIcon icon="notifications-outline" onPress={onNotifications} badge="9" />
       <Pressable onPress={onProfile} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Open profile">
         <Ionicons name="person-outline" size={23} color="#EDF3EE" />
@@ -418,9 +412,9 @@ const MedicationCard = () => (
     </View>
     <View style={styles.medicationMetrics}>
       {[
-        ['0/0', 'Taken'],
-        ['0/0', 'Pending'],
-        ['0/0', 'Missed']
+        ['5/10', 'Taken'],
+        ['2/10', 'Pending'],
+        ['3/10', 'Missed']
       ].map(([value, label], index) => (
         <View key={label} style={[styles.medMetric, index > 0 && styles.medMetricDivider]}>
           <Text style={styles.medValue}>{value}</Text>
