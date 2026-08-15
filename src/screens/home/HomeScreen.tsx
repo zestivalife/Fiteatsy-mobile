@@ -1,30 +1,32 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { HealthProfileSheet } from '../../components/HealthProfileSheet';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Path, Stop } from 'react-native-svg';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
+import { radius, spacing } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
-import { getHealthConnectRuntimeDiagnostics, type HealthConnectRuntimeDiagnostics } from '../../services/healthConnectService';
-import { FamilyRelationshipType, FamilyVisibilityLevel } from '../../types';
-import { relationshipLabel, toRecoveryShareState, toSupportMoment } from '../../services/familyConnectService';
-import { formatConsultantAvailability, getConsultantProfile } from '../../utils/healthProfile';
 import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
 import { buildHealthSnapshotMetrics } from '../../utils/healthMetrics';
 import { getIdentityScopedStorageKey } from '../../utils/identityScopedStorage';
 import { listAnalyzedReports, type ReportDto } from '../../services/reportUploadService';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
-
-const WEEK_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
+const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+const font = {
+  regular: 'Exo_400Regular',
+  medium: 'Exo_500Medium',
+  semiBold: 'Exo_600SemiBold',
+  bold: 'Exo_700Bold'
+} as const;
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 type HealthProfileReportSummary = {
   id: string;
@@ -33,6 +35,16 @@ type HealthProfileReportSummary = {
   abnormal: number;
   score: number;
   uploadedAtISO?: string;
+};
+
+type RecoveryNode = {
+  key: string;
+  label: string;
+  value: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
+  active: boolean;
+  onPress: () => void;
 };
 
 const toHealthProfileReportSummary = (report: ReportDto): HealthProfileReportSummary | null => {
@@ -48,2722 +60,1026 @@ const toHealthProfileReportSummary = (report: ReportDto): HealthProfileReportSum
     uploadedAtISO: report.createdAtISO
   };
 };
-type RecoveryDimension = 'calm' | 'activity' | 'nutrition' | 'rhythm' | 'sleep';
 
-type DimensionVisual = {
-  key: RecoveryDimension;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  iconMuted: keyof typeof Ionicons.glyphMap;
-  gradient: [string, string];
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Hi!,';
+  if (hour < 17) return 'Hi!,';
+  return 'Hi!,';
 };
 
-const DIMENSION_VISUALS: DimensionVisual[] = [
-  { key: 'calm', label: 'Calm', icon: 'heart', iconMuted: 'heart-outline', gradient: ['#F86C6C', '#E51A1A'] },
-  { key: 'activity', label: 'Activity', icon: 'walk', iconMuted: 'walk-outline', gradient: ['#F7AA6A', '#F9700E'] },
-  { key: 'nutrition', label: 'Nutrition', icon: 'leaf', iconMuted: 'leaf-outline', gradient: ['#CCFF80', '#60AF00'] },
-  { key: 'rhythm', label: 'Cycle', icon: 'flower', iconMuted: 'flower-outline', gradient: ['#F7A7F0', '#DC1DC9'] },
-  { key: 'sleep', label: 'Sleep', icon: 'moon', iconMuted: 'moon-outline', gradient: ['#8BB4E8', '#237AFC'] }
-];
-
-const getGlobalRecoveryMicroState = (score: number) => {
-  if (score <= 29) return 'Strained';
-  if (score <= 49) return 'Fragile';
-  if (score <= 69) return 'Recovering';
-  if (score <= 84) return 'Stable';
-  return 'Thriving';
+const firstName = (name?: string | null) => {
+  const trimmed = name?.trim();
+  if (!trimmed) return 'there';
+  return trimmed.split(/\s+/)[0];
 };
 
-const scoreColor = (value: number, index: number) => {
-  if (index === 0 || index === 6) return { bg: '#000000', text: '#F2F2F2' };
-  if (value <= 15) return { bg: '#FF6666', text: '#111111' };
-  if (value <= 30) return { bg: '#F8E67A', text: '#111111' };
-  if (value <= 60) return { bg: '#84CFFF', text: '#111111' };
-  return { bg: '#8DF591', text: '#111111' };
+const compactDate = (value?: string | null) => {
+  if (!value) return 'Not synced yet';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not synced yet';
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 };
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-const RecoveryRing = ({
-  value,
-  pulse,
-  gradient,
-  isLight
-}: {
-  value: number;
-  pulse: Animated.Value;
-  gradient: [string, string];
-  isLight: boolean;
-}) => {
-  const size = HERO_RING_SIZE;
-  const stroke = 18;
-  const radius = (size - stroke) / 2;
-  const canvas = size;
-  const center = canvas / 2;
-  const c = 2 * Math.PI * radius;
-  const p = Math.min(100, Math.max(0, value));
-  const targetDash = c * (p / 100);
-  const fillAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    fillAnim.setValue(0);
-    Animated.timing(fillAnim, {
-      toValue: 1,
-      duration: 900,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false
-    }).start();
-  }, [p, fillAnim]);
-
-  const glowScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1.03] });
-  const gradientId = `arcGradient-${gradient[0].replace('#', '')}-${gradient[1].replace('#', '')}`;
-  const dashOffset = fillAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [c, c - targetDash]
-  });
-
-  return (
-    <Animated.View style={[styles.ringWrap, { width: canvas, height: canvas, transform: [{ scale: glowScale }] }]}>
-      <Svg width={canvas} height={canvas}>
-        <Defs>
-          <SvgLinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor={gradient[0]} stopOpacity={1} />
-            <Stop offset="56%" stopColor={gradient[0]} stopOpacity={0.95} />
-            <Stop offset="100%" stopColor={gradient[1]} stopOpacity={1} />
-          </SvgLinearGradient>
-        </Defs>
-        <AnimatedCircle
-          cx={center}
-          cy={center}
-          r={radius}
-          stroke={gradient[1]}
-          strokeWidth={stroke}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${c} ${c}`}
-          strokeDashoffset={dashOffset as unknown as number}
-          rotation={-90}
-          originX={center}
-          originY={center}
-        />
-      </Svg>
-      <Text style={[styles.ringCenter, { top: size * 0.38 - 8, color: isLight ? '#0F172A' : '#DDE5EF' }]}>{p}/100</Text>
-      <Text style={[styles.ringSub, { top: (size * 0.64) - 8, color: isLight ? '#1E293B' : '#D6DBE0' }]}>Recovery Core</Text>
-    </Animated.View>
-  );
+const trendTone = (value: number) => {
+  if (value >= 80) return { bg: '#8DF58B', text: '#111111' };
+  if (value >= 60) return { bg: '#C8FF70', text: '#111111' };
+  if (value >= 35) return { bg: '#77D3F6', text: '#111111' };
+  if (value >= 16) return { bg: '#F5ED78', text: '#111111' };
+  return { bg: '#F75C67', text: '#FFFFFF' };
 };
 
-const StarCircleShape = ({ isLight }: { isLight: boolean }) => (
-  <Svg width="100%" height="100%" viewBox="0 0 216 216" fill="none">
-    <Defs>
-      <SvgLinearGradient id="sc-paint0" x1="225.054" y1="-122.714" x2="-44.6283" y2="334.195" gradientUnits="userSpaceOnUse">
-        <Stop offset="0.226599" stopColor={isLight ? '#E8EDF3' : '#353A40'} />
-        <Stop offset="0.697917" stopColor={isLight ? '#C9D3DF' : '#121416'} />
-      </SvgLinearGradient>
-      <SvgLinearGradient id="sc-paint1" x1="185.751" y1="4.25001" x2="-32.2699" y2="105.989" gradientUnits="userSpaceOnUse">
-        <Stop offset="0.0709612" stopColor={isLight ? '#B6C1CE' : '#505962'} />
-        <Stop offset="0.507086" stopOpacity="0" />
-        <Stop offset="1" stopColor={isLight ? '#EDF2F8' : '#000000'} />
-      </SvgLinearGradient>
-      <SvgLinearGradient id="sc-paint2" x1="388.833" y1="359.667" x2="78.329" y2="-74.4648" gradientUnits="userSpaceOnUse">
-        <Stop stopColor={isLight ? '#F3F6FA' : '#32383E'} />
-        <Stop offset="1" stopColor={isLight ? '#D8E0E9' : '#17191C'} />
-      </SvgLinearGradient>
-      <SvgLinearGradient id="sc-paint3" x1="283.521" y1="265.292" x2="89.4556" y2="-6.04052" gradientUnits="userSpaceOnUse">
-        <Stop stopColor={isLight ? '#E7EDF4' : '#32383E'} />
-        <Stop offset="1" stopColor={isLight ? '#C5CFDB' : '#17191C'} />
-      </SvgLinearGradient>
-    </Defs>
-    <Circle cx="108" cy="108" r="95" transform="rotate(-90 108 108)" fill="url(#sc-paint0)" />
-    <Circle cx="108" cy="108" r="94.5" transform="rotate(-90 108 108)" stroke="url(#sc-paint1)" strokeOpacity="0.4" />
-    <Circle cx="108" cy="108" r="80" transform="rotate(-90 108 108)" fill="url(#sc-paint2)" />
-    <Circle cx="108" cy="108" r="50" transform="rotate(-90 108 108)" fill="url(#sc-paint3)" />
-  </Svg>
-);
-
-const HERO_SCALE = 358 / 375;
-const HERO_RING_SIZE = 162 * HERO_SCALE * 0.8;
-const HERO_CENTER_CIRCLE_SIZE = 220 * 1.2 * 0.8 * 0.9 * 0.95;
-
-const FitStarShape = ({ isLight }: { isLight: boolean }) => (
-  <Svg width="100%" height="100%" viewBox="0 0 334 321" fill="none">
-    <Path
-      d="M123.454 26.1973C138.6 11.7458 146.173 4.52013 154.828 1.79736C162.446 -0.59916 170.616 -0.59916 178.234 1.79736C186.89 4.52013 194.462 11.7458 209.608 26.1972L241.13 56.2743C243.401 58.442 244.537 59.5258 245.752 60.5116C246.831 61.3876 247.957 62.2053 249.123 62.9611C250.436 63.8116 251.818 64.557 254.582 66.0478L292.928 86.7325C311.352 96.671 320.564 101.64 325.828 109.03C330.461 115.535 332.986 123.306 333.061 131.291C333.146 140.364 328.614 149.799 319.55 168.669L300.686 207.943C299.327 210.773 298.647 212.188 298.085 213.648C297.585 214.945 297.155 216.268 296.797 217.611C296.394 219.123 296.112 220.667 295.548 223.756L287.725 266.617C283.966 287.211 282.087 297.508 276.685 304.798C271.931 311.215 265.321 316.017 257.749 318.556C249.146 321.441 238.773 320.046 218.025 317.257L174.845 311.452C171.733 311.034 170.177 310.825 168.615 310.741C167.227 310.667 165.836 310.667 164.447 310.741C162.885 310.825 161.329 311.034 158.217 311.452L115.037 317.257C94.2895 320.046 83.9158 321.441 75.3132 318.556C67.7413 316.017 61.1315 311.215 56.3769 304.798C50.9751 297.508 49.0958 287.211 45.3371 266.617L37.5143 223.756C36.9505 220.667 36.6686 219.123 36.2654 217.611C35.9071 216.268 35.4772 214.945 34.9776 213.648C34.4154 212.188 33.7357 210.773 32.3761 207.943L13.5119 168.669C4.44798 149.799 -0.0839579 140.364 0.00114587 131.291C0.0760522 123.306 2.60079 115.535 7.23415 109.03C12.4983 101.64 21.7104 96.671 40.1348 86.7324L78.4806 66.0478C81.2442 64.557 82.626 63.8116 83.9388 62.9611C85.1055 62.2053 86.2309 61.3876 87.3102 60.5116C88.5249 59.5258 89.6608 58.442 91.9325 56.2743L123.454 26.1973Z"
-      fill="url(#starFill)"
-    />
-    <Path
-      d="M154.978 2.27441C162.499 -0.091216 170.564 -0.0912165 178.084 2.27441C182.327 3.60911 186.327 6.05353 191.172 9.9873C196.021 13.9249 201.684 19.3275 209.263 26.5586L240.784 56.6357C243.05 58.7982 244.204 59.8981 245.437 60.8994C246.531 61.7866 247.67 62.6154 248.851 63.3809C250.185 64.2448 251.588 65.0011 254.345 66.4883L292.69 87.1729C301.909 92.1458 308.798 95.8619 314.041 99.2568C319.279 102.648 322.84 105.698 325.421 109.32C329.995 115.742 332.487 123.412 332.561 131.296C332.603 135.744 331.515 140.304 329.27 146.127C327.024 151.956 323.635 159.011 319.099 168.453L300.235 207.727C298.879 210.55 298.189 211.986 297.618 213.469C297.112 214.782 296.676 216.122 296.313 217.482C295.904 219.018 295.619 220.585 295.057 223.667L287.233 266.527C285.352 276.832 283.947 284.532 282.339 290.568C280.732 296.598 278.932 300.927 276.284 304.501C271.59 310.835 265.064 315.576 257.59 318.082C253.373 319.496 248.7 319.87 242.469 319.535C236.231 319.2 228.473 318.157 218.092 316.762L174.912 310.957C171.807 310.54 170.228 310.327 168.641 310.242C167.236 310.167 165.827 310.167 164.421 310.242C162.834 310.327 161.255 310.54 158.15 310.957L114.971 316.762C104.589 318.157 96.8312 319.2 90.5936 319.535C84.3624 319.87 79.6894 319.496 75.4725 318.082C67.9978 315.576 61.4718 310.835 56.7782 304.501C54.1302 300.927 52.3305 296.598 50.7235 290.568C49.115 284.532 47.7098 276.832 45.829 266.527L38.0057 223.667C37.4433 220.585 37.1585 219.018 36.7489 217.482C36.386 216.122 35.9502 214.782 35.4442 213.469C34.8732 211.986 34.1832 210.55 32.827 207.727L13.9628 168.453C9.42738 159.011 6.03833 151.956 3.79187 146.127C1.54758 140.304 0.459136 135.744 0.500854 131.296C0.574831 123.412 3.06755 115.742 7.64148 109.32C10.222 105.698 13.7831 102.648 19.0214 99.2568C24.2647 95.8619 31.1529 92.1458 40.3719 87.1729L78.7177 66.4883C81.4746 65.0011 82.8773 64.2448 84.2108 63.3809C85.3924 62.6154 86.5317 61.7866 87.6249 60.8994C88.8586 59.8981 90.011 58.7981 92.2772 56.6357L123.8 26.5586C131.378 19.3275 137.041 13.9249 141.891 9.9873C146.735 6.05353 150.736 3.60911 154.978 2.27441Z"
-      stroke="url(#starStroke)"
-      strokeOpacity={0.4}
-    />
-    <Defs>
-      <SvgLinearGradient id="starFill" x1="398.174" y1="-283.477" x2="-135.512" y2="620.723" gradientUnits="userSpaceOnUse">
-        <Stop offset="0.144231" stopColor={isLight ? '#F0F3F7' : '#353A40'} />
-        <Stop offset="0.543269" stopColor={isLight ? '#D5DCE5' : '#121416'} />
-      </SvgLinearGradient>
-      <SvgLinearGradient id="starStroke" x1="320.397" y1="-32.221" x2="-111.056" y2="169.115" gradientUnits="userSpaceOnUse">
-        <Stop offset="0.0709612" stopColor={isLight ? '#AAB5C2' : '#505962'} />
-        <Stop offset="0.507086" stopOpacity={0} />
-        <Stop offset="1" stopColor={isLight ? '#F7FAFD' : '#DCDCDC'} />
-      </SvgLinearGradient>
-    </Defs>
-  </Svg>
-);
-
-const FitDimensionIcon = ({ dimension, active, isLight }: { dimension: RecoveryDimension; active: boolean; isLight: boolean }) => {
-  const inactivePrimary = isLight ? '#7A8694' : '#6D737A';
-  const inactiveSecondary = isLight ? '#AAB4BF' : '#97A2AB';
-  const inactiveSoft = isLight ? '#C1CAD4' : '#D6E1EF';
-
-  if (dimension === 'activity') {
-    return (
-      <Svg width={36} height={36} viewBox="0 0 32 32">
-        <Path
-          d="M21.4785 22.0371C21.5578 22.0335 21.638 22.0392 21.7158 22.0557C23.9646 22.4382 27.68 23.3899 27.958 25.5176L28 25.5781V25.8779C27.9753 26.4399 27.6964 26.9424 27.2217 27.3906C27.1992 27.4127 27.1768 27.4352 27.1533 27.457C27.1398 27.4691 27.1261 27.4811 27.1123 27.4932C25.3342 29.1011 21.0617 29.9316 16.6699 29.9961L16.667 29.9902C16.41 29.9954 16.1527 30 15.8955 30C9.95569 30 4.008 28.6052 4 25.8018C4 23.4794 7.92459 22.4816 10.2617 22.084C10.3813 22.0588 10.5057 22.0569 10.626 22.0791C10.7462 22.1012 10.8598 22.1472 10.96 22.2129C11.0602 22.2786 11.1451 22.363 11.208 22.4609C11.2709 22.5589 11.3114 22.668 11.3262 22.7812C11.3532 22.8934 11.3547 23.0102 11.3311 23.123C11.3074 23.2356 11.2587 23.3423 11.1885 23.4365C11.1181 23.5309 11.0271 23.6108 10.9219 23.6709C10.8167 23.7309 10.6994 23.7705 10.5771 23.7861C6.96721 24.3649 5.7982 25.4733 5.79785 25.8779C5.79785 26.7846 9.40812 28.3886 15.9922 28.3887C15.9934 28.3887 15.9949 28.3877 15.9961 28.3877L15.9854 28.3613C18.704 28.3613 20.914 28.0861 22.5723 27.7012C24.0562 27.3463 25.0992 26.907 25.6758 26.5098C26.0041 26.2727 26.1717 26.0459 26.1719 25.8506C26.1719 25.6729 25.9209 25.3408 25.2939 24.9746C24.7396 24.6883 24.1614 24.4476 23.5654 24.2539C23.0385 24.0927 22.4183 23.9416 21.6934 23.8105C21.5687 23.7916 21.4438 23.7728 21.3184 23.7578C21.1962 23.7423 21.0788 23.7035 20.9736 23.6436C20.8685 23.5835 20.7774 23.5035 20.707 23.4092C20.6366 23.3148 20.5881 23.2075 20.5645 23.0947C20.5467 23.01 20.5428 22.9233 20.5537 22.8379L20.585 22.6699C20.6054 22.5866 20.6402 22.5062 20.6875 22.4326C20.7504 22.3348 20.8345 22.2502 20.9346 22.1846C21.0348 22.1188 21.1493 22.0739 21.2695 22.0518C21.3385 22.0391 21.4086 22.0342 21.4785 22.0371ZM17.1836 8.33789C17.7519 8.3434 18.3128 8.46051 18.8291 8.68164C19.3453 8.90278 19.8055 9.22299 20.1797 9.62109L20.165 9.60645L23.8652 13.5127C23.9622 13.6063 24.0166 13.7313 24.0166 13.8613C24.0166 13.9914 23.9622 14.1164 23.8652 14.21L22.6064 15.4092C22.5571 15.4566 22.4981 15.4943 22.4326 15.5195C22.3669 15.5447 22.2957 15.557 22.2246 15.5557C22.1533 15.553 22.0829 15.5366 22.0186 15.5078C21.9544 15.4791 21.8973 15.4386 21.8506 15.3887L19.1914 12.4873V25.2646C19.1924 25.3281 19.1796 25.3913 19.1543 25.4502C19.1288 25.5094 19.0901 25.5639 19.042 25.6094C18.9941 25.6546 18.9369 25.6903 18.874 25.7148C18.8108 25.7395 18.7423 25.7529 18.6738 25.7529H16.8984C16.8301 25.7529 16.7623 25.7394 16.6992 25.7148C16.6361 25.6902 16.5783 25.6547 16.5303 25.6094C16.4822 25.564 16.4445 25.5093 16.4189 25.4502C16.3936 25.3912 16.3809 25.3282 16.3818 25.2646V17.8223H15.6328V25.2646C15.6338 25.3282 15.6211 25.3912 15.5957 25.4502C15.5702 25.5094 15.5325 25.5639 15.4844 25.6094C15.4363 25.6548 15.3786 25.6902 15.3154 25.7148C15.2523 25.7394 15.1847 25.7529 15.1162 25.7529H13.333C13.2646 25.7529 13.1969 25.7394 13.1338 25.7148C13.0707 25.6902 13.0129 25.6548 12.9648 25.6094C12.9168 25.564 12.879 25.5094 12.8535 25.4502C12.8282 25.3912 12.8155 25.3282 12.8164 25.2646V12.4873L10.1572 15.3887C10.1124 15.4392 10.0564 15.4799 9.99316 15.5088C9.92986 15.5377 9.8605 15.5537 9.79004 15.5557C9.71773 15.5584 9.64523 15.5467 9.57812 15.5215C9.51115 15.4962 9.45028 15.4579 9.40039 15.4092L8.12695 14.2236C8.03011 14.1301 7.97656 14.005 7.97656 13.875C7.9766 13.745 8.03007 13.6199 8.12695 13.5264L11.8574 9.62109C12.2317 9.22289 12.6927 8.90278 13.209 8.68164C13.7251 8.46059 14.2854 8.34345 14.8535 8.33789H17.1836ZM15.9883 2C16.3813 2 16.7707 2.07446 17.1318 2.21875C17.4931 2.3631 17.819 2.57455 18.0898 2.83984C18.3606 3.10505 18.5706 3.41862 18.707 3.76172C18.8435 4.10485 18.9037 4.47052 18.8838 4.83594C18.8917 5.19608 18.8228 5.55426 18.6816 5.88965C18.5405 6.22503 18.3302 6.53179 18.0615 6.79102C17.7928 7.05027 17.4712 7.25706 17.1162 7.40039C16.7612 7.54372 16.3791 7.62054 15.9922 7.62598C15.6051 7.62049 15.2225 7.5436 14.8672 7.40039C14.512 7.25715 14.1901 7.05006 13.9209 6.79102C13.6518 6.53193 13.4398 6.22596 13.2979 5.89062C13.1558 5.55517 13.0868 5.19645 13.0938 4.83594C13.0738 4.47052 13.1341 4.10485 13.2705 3.76172C13.407 3.41862 13.617 3.10505 13.8877 2.83984C14.1585 2.57455 14.4845 2.3631 14.8457 2.21875C15.2067 2.07452 15.5954 2.00006 15.9883 2Z"
-          fill={active ? '#F9700E' : inactivePrimary}
-        />
-        <Path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M21.4785 22.001C21.5578 21.9973 21.638 22.0041 21.7158 22.0205C23.9645 22.4031 27.6799 23.3539 27.958 25.4814L28 25.542V25.8418C27.9753 26.4037 27.6963 26.9062 27.2217 27.3545C27.1992 27.3766 27.1768 27.3991 27.1533 27.4209C27.1398 27.433 27.1261 27.445 27.1123 27.457C25.3343 29.065 21.0618 29.8954 16.6699 29.9599L16.667 29.9541C16.41 29.9593 16.1527 29.9638 15.8955 29.9639C9.95556 29.9639 4.00775 28.5692 4 25.7656C4 23.4433 7.92459 22.4454 10.2617 22.0478C10.3813 22.0226 10.5057 22.0208 10.626 22.043C10.7461 22.0651 10.8598 22.1111 10.96 22.1767C11.0602 22.2424 11.1451 22.3269 11.208 22.4248C11.2709 22.5227 11.3114 22.6319 11.3262 22.7451C11.3532 22.8573 11.3547 22.9741 11.3311 23.0869C11.3074 23.1996 11.2589 23.307 11.1885 23.4014C11.1181 23.4956 11.027 23.5747 10.9219 23.6348C10.8167 23.6948 10.6994 23.7344 10.5771 23.75C6.96774 24.3287 5.79855 25.437 5.79785 25.8418C5.79785 26.7484 9.40812 28.3525 15.9922 28.3525C15.9934 28.3525 15.9949 28.3515 15.9961 28.3515L15.9854 28.3252C18.6602 28.3252 20.8431 28.0607 22.4922 27.6855C24.019 27.3275 25.0889 26.878 25.6758 26.4736C26.0041 26.2365 26.1718 26.0098 26.1719 25.8144C26.1719 25.6355 25.9169 25.3008 25.2803 24.9316C24.7301 24.6484 24.1565 24.4099 23.5654 24.2178C23.0385 24.0565 22.4183 23.9054 21.6934 23.7744C21.5687 23.7555 21.4438 23.7367 21.3184 23.7217C21.1962 23.7061 21.0788 23.6673 20.9736 23.6074C20.8684 23.5474 20.7774 23.4674 20.707 23.373C20.6366 23.2786 20.5881 23.1714 20.5645 23.0586C20.5408 22.9458 20.5423 22.8298 20.5693 22.7178C20.5841 22.6045 20.6246 22.4954 20.6875 22.3974C20.7504 22.2995 20.8343 22.2142 20.9346 22.1484C21.0348 22.0827 21.1493 22.0378 21.2695 22.0156C21.3385 22.0029 21.4086 21.998 21.4785 22.001Z"
-          fill={inactiveSoft}
-          fillOpacity={0.8}
-        />
-      </Svg>
-    );
-  }
-
-  if (dimension === 'calm') {
-    return (
-      <Svg width={28} height={25} viewBox="0 0 28 25">
-        <Path
-          d="M25.4021 1.96985C22.2973 -1.05187 17.4639 -0.272442 14.0012 2.124C10.5386 -0.272209 5.705 -1.05257 2.60022 1.96985C1.77616 2.76971 1.1222 3.72069 0.675965 4.7681C0.229724 5.81551 0 6.9387 0 8.07307C0 9.20744 0.229724 10.3306 0.675965 11.378C1.1222 12.4255 1.77616 13.3764 2.60022 14.1763L3.74881 15.2942L14.0012 25L24.0585 15.4841L25.4021 14.1761C26.2255 13.3759 26.8789 12.4248 27.3247 11.3774C27.7705 10.3301 28 9.20711 28 8.07295C28 6.9388 27.7705 5.81582 27.3247 4.76847C26.8789 3.72113 26.2255 2.77005 25.4021 1.96985Z"
-          fill={active ? '#FF1A1A' : inactivePrimary}
-        />
-        <Path
-          d="M11.3311 12.667L11.4121 12.6621C11.5985 12.6393 11.7678 12.5377 11.877 12.3818L14.1309 9.16211L16.3848 12.3818C16.5094 12.5599 16.7133 12.6669 16.9307 12.667C17.1482 12.667 17.3528 12.5601 17.4775 12.3818L19.6777 9.23828H21.998C22.3661 9.23811 22.6641 8.93937 22.6641 8.57129C22.664 8.20327 22.366 7.90447 21.998 7.9043H19.3311C19.1135 7.9043 18.9099 8.01123 18.7852 8.18945L16.9307 10.8379L14.6768 7.61816C14.552 7.43995 14.3484 7.33301 14.1309 7.33301C13.9134 7.33307 13.7097 7.44 13.585 7.61816L10.9844 11.333H7.33105C6.96286 11.333 6.66406 11.6318 6.66406 12C6.66406 12.3682 6.96286 12.667 7.33105 12.667H11.3311Z"
-          fill={active ? '#E7EEF5' : inactiveSecondary}
-        />
-      </Svg>
-    );
-  }
-
-  if (dimension === 'nutrition') {
-    return (
-      <Svg width={32} height={32} viewBox="0 0 32 32">
-        <Path d="M24.4059 12.1318C25.7867 20.7075 22.5409 24.3697 18.9385 25.8862C18.1569 25.8566 17.5663 25.6046 17.1852 25.1342C17.0971 25.0259 17.0231 24.9092 16.9596 24.7882C19.6771 23.478 22.4976 21.4627 22.5486 18.7293C22.6258 14.6611 21.1109 20.495 16.7371 24.192C16.5262 23.3507 16.674 22.5028 16.6758 22.4916L16.6848 22.4443L16.6824 22.3967C16.3634 19.1612 16.9935 19.1612 14 16.4038C14 16.4038 15.4969 14.8282 18.963 14.8282C22.4298 14.8279 23.1516 13.4539 24.4059 12.1318Z" fill={active ? '#60AF00' : inactivePrimary} />
-        <Path d="M7.80748 20.5614C6.50535 15.126 10.9774 24.5623 18.6384 26.6896L18.6875 26.2914C15.2895 26.1915 15.9893 22.3934 15.9893 22.3934C15.6893 15.3967 7.99324 14.7965 7.99324 14.7965C3.69511 14.1969 2.03361 12.0977 2.03361 12.0977C1.1341 31.6891 18.588 27.091 18.588 27.091L18.6244 26.8016C14.8714 26.2534 8.80532 24.7288 7.80748 20.5614Z" fill={active ? '#60AF00' : inactivePrimary} />
-        <Path d="M28.7465 4.00025C26.2107 4.87674 23.7446 7.74765 22.1372 9.97543V9.97605C20.0949 9.5585 16.8923 9.28905 13.2896 9.28905C7.12147 9.28905 2.12109 10.0775 2.12109 11.0498C2.12109 11.454 2.98576 11.8258 4.43631 12.1229C5.06357 11.5928 8.81346 11.1855 13.3477 11.1855C16.3341 11.1855 18.9782 11.3622 20.616 11.6344L19.8176 12.0143C18.2682 11.8 15.994 11.6643 13.4588 11.6643C9.59256 11.6643 6.33459 11.9798 5.32431 12.4101C7.69677 12.8921 14.1399 13.8853 21.2722 12.3053C21.8485 12.235 22.281 12.1248 22.5806 12.0262C22.6182 12.0172 22.6578 12.0084 22.6942 11.9997C22.7324 11.9904 22.7713 11.9807 22.8083 11.9714C22.8535 11.9599 22.8952 11.9484 22.9384 11.9369C22.9773 11.9263 23.0168 11.9157 23.0545 11.9048C23.0952 11.8933 23.1341 11.8818 23.173 11.8703C23.2119 11.8588 23.2495 11.8473 23.2859 11.8354C23.3217 11.8242 23.3572 11.8134 23.3911 11.8018C23.4325 11.7878 23.472 11.7741 23.5109 11.7601C23.5377 11.7508 23.5657 11.7409 23.5918 11.7315C23.6512 11.7088 23.7072 11.6864 23.7607 11.6637C23.7838 11.6537 23.8059 11.6438 23.8276 11.6341C23.8603 11.6192 23.8933 11.6043 23.9244 11.5887C23.9456 11.5781 23.9664 11.5675 23.9863 11.557C24.0156 11.5414 24.0442 11.5259 24.0703 11.51C24.0875 11.5003 24.1049 11.4904 24.1207 11.4804C24.1534 11.4599 24.1839 11.439 24.2119 11.4182C24.2191 11.4129 24.2265 11.4086 24.2324 11.4033C24.2657 11.3778 24.2944 11.3516 24.3205 11.3258C24.3289 11.3174 24.3364 11.3087 24.3441 11.3C24.3606 11.2816 24.3759 11.2629 24.3886 11.2446C24.3952 11.2352 24.4014 11.2253 24.407 11.2156C24.4185 11.1967 24.4269 11.178 24.4344 11.159C24.4381 11.1503 24.4422 11.1419 24.4446 11.1329C24.4524 11.1058 24.458 11.0778 24.458 11.0501C24.458 11.023 24.4524 10.9957 24.4446 10.9686C24.4422 10.9602 24.439 10.9521 24.4356 10.9443C24.4285 10.9247 24.4191 10.9054 24.4076 10.8858C24.4026 10.8771 24.398 10.8687 24.3924 10.8603C24.3759 10.8367 24.3572 10.8127 24.3345 10.7891C24.332 10.7863 24.3301 10.7835 24.328 10.781C24.3031 10.7552 24.2732 10.7296 24.2412 10.7044C24.2303 10.6957 24.2188 10.6876 24.2066 10.6789C24.183 10.6612 24.1568 10.6438 24.1295 10.626C24.1155 10.6173 24.1021 10.6086 24.0868 10.5999C24.0529 10.5797 24.0162 10.5594 23.9779 10.5392C23.9683 10.5342 23.9602 10.5296 23.9505 10.5246C23.9505 10.5246 23.9499 10.5243 23.9493 10.5243C25.5999 9.05632 27.6065 7.47945 27.6065 7.47945C32.2154 3.90411 28.7465 4.00025 28.7465 4.00025Z" fill={active ? '#CCFF80' : inactiveSecondary} />
-      </Svg>
-    );
-  }
-
-  if (dimension === 'rhythm') {
-    return <Ionicons name="flower-outline" size={32} color={active ? '#F7A7F0' : (isLight ? '#8694A3' : '#9AA6B1')} />;
-  }
-
-  if (dimension === 'sleep') {
-    return (
-      <Svg width={32} height={32} viewBox="0 0 32 32">
-        <Path d="M20.8187 12.0624L24.1768 10.3439L27.5349 12.0624L26.8939 8.42337L29.6109 5.84422L25.8574 5.3143L24.1736 2L22.4961 5.31124L18.7426 5.84116L21.4597 8.4203L20.8187 12.0624ZM23.2647 21.6867C16.2615 21.6867 10.585 16.2006 10.585 9.43726C10.585 7.04496 11.3057 4.82114 12.5303 2.93732C6.46788 4.51789 2 9.85997 2 16.2221C2 23.8309 8.38132 30 16.2519 30C22.8405 30 28.3672 25.6718 30 19.7998C28.0483 20.9883 25.7426 21.6867 23.2647 21.6867Z" fill={active ? '#237AFC' : inactivePrimary} />
-        <Path d="M20.8183 12.0624L24.1764 10.3439L27.5344 12.0624L26.8934 8.42337L29.6105 5.84422L25.857 5.3143L24.1732 2L22.4957 5.31124L18.7422 5.84116L21.4593 8.4203L20.8183 12.0624Z" fill={active ? '#8BB4E8' : inactiveSoft} fillOpacity={0.8} />
-      </Svg>
-    );
-  }
-
-  return (
-    <Svg width={32} height={32} viewBox="0 0 32 32">
-      <Path d="M21.4785 22.0371C21.5578 22.0335 21.638 22.0392 21.7158 22.0557C23.9646 22.4382 27.68 23.3899 27.958 25.5176L28 25.5781V25.8779C27.9753 26.4399 27.6964 26.9424 27.2217 27.3906C27.1992 27.4127 27.1768 27.4352 27.1533 27.457C27.1398 27.4691 27.1261 27.4811 27.1123 27.4932C25.3342 29.1011 21.0617 29.9316 16.6699 29.9961L16.667 29.9902C16.41 29.9954 16.1527 30 15.8955 30C9.95569 30 4.008 28.6052 4 25.8018C4 23.4794 7.92459 22.4816 10.2617 22.084C10.3813 22.0588 10.5057 22.0569 10.626 22.0791C10.7462 22.1012 10.8598 22.1472 10.96 22.2129C11.0602 22.2786 11.1451 22.363 11.208 22.4609C11.2709 22.5589 11.3114 22.668 11.3262 22.7812C11.3532 22.8934 11.3547 23.0102 11.3311 23.123C11.3074 23.2356 11.2587 23.3423 11.1885 23.4365C11.1181 23.5309 11.0271 23.6108 10.9219 23.6709C10.8167 23.7309 10.6994 23.7705 10.5771 23.7861C6.96721 24.3649 5.7982 25.4733 5.79785 25.8779C5.79785 26.7846 9.40812 28.3886 15.9922 28.3887C15.9934 28.3887 15.9949 28.3877 15.9961 28.3877L15.9854 28.3613C18.704 28.3613 20.914 28.0861 22.5723 27.7012C24.0562 27.3463 25.0992 26.907 25.6758 26.5098C26.0041 26.2727 26.1717 26.0459 26.1719 25.8506C26.1719 25.6729 25.9209 25.3408 25.2939 24.9746C24.7396 24.6883 24.1614 24.4476 23.5654 24.2539C23.0385 24.0927 22.4183 23.9416 21.6934 23.8105C21.5687 23.7916 21.4438 23.7728 21.3184 23.7578C21.1962 23.7423 21.0788 23.7035 20.9736 23.6436C20.8685 23.5835 20.7774 23.5035 20.707 23.4092C20.6366 23.3148 20.5881 23.2075 20.5645 23.0947C20.5467 23.01 20.5428 22.9233 20.5537 22.8379L20.585 22.6699C20.6054 22.5866 20.6402 22.5062 20.6875 22.4326C20.7504 22.3348 20.8345 22.2502 20.9346 22.1846C21.0348 22.1188 21.1493 22.0739 21.2695 22.0518C21.3385 22.0391 21.4086 22.0342 21.4785 22.0371Z" fill={active ? '#F9700E' : inactiveSecondary} />
-      <Path d="M21.4785 22.001C21.5578 21.9973 21.638 22.0041 21.7158 22.0205C23.9645 22.4031 27.6799 23.3539 27.958 25.4814L28 25.542V25.8418C27.9753 26.4037 27.6963 26.9062 27.2217 27.3545C27.1992 27.3766 27.1768 27.3991 27.1533 27.4209C27.1398 27.433 27.1261 27.445 27.1123 27.457C25.3343 29.065 21.0618 29.8954 16.6699 29.9599L16.667 29.9541C16.41 29.9593 16.1527 29.9638 15.8955 29.9639C9.95556 29.9639 4.00775 28.5692 4 25.7656C4 23.4433 7.92459 22.4454 10.2617 22.0478C10.3813 22.0226 10.5057 22.0208 10.626 22.043C10.7461 22.0651 10.8598 22.1111 10.96 22.1767C11.0602 22.2424 11.1451 22.3269 11.208 22.4248C11.2709 22.5227 11.3114 22.6319 11.3262 22.7451C11.3532 22.8573 11.3547 22.9741 11.3311 23.0869C11.3074 23.1996 11.2589 23.307 11.1885 23.4014C11.1181 23.4956 11.027 23.5747 10.9219 23.6348C10.8167 23.6948 10.6994 23.7344 10.5771 23.75C6.96774 24.3287 5.79855 25.437 5.79785 25.8418C5.79785 26.7484 9.40812 28.3525 15.9922 28.3525C15.9934 28.3525 15.9949 28.3515 15.9961 28.3515L15.9854 28.3252C18.6602 28.3252 20.8431 28.0607 22.4922 27.6855C24.019 27.3275 25.0889 26.878 25.6758 26.4736C26.0041 26.2365 26.1718 26.0098 26.1719 25.8144C26.1719 25.6355 25.9169 25.3008 25.2803 24.9316C24.7301 24.6484 24.1565 24.4099 23.5654 24.2178C23.0385 24.0565 22.4183 23.9054 21.6934 23.7744C21.5687 23.7555 21.4438 23.7367 21.3184 23.7217C21.1962 23.7061 21.0788 23.6673 20.9736 23.6074C20.8684 23.5474 20.7774 23.4674 20.707 23.373C20.6366 23.2786 20.5881 23.1714 20.5645 23.0586C20.5408 22.9458 20.5423 22.8298 20.5693 22.7178C20.5841 22.6045 20.6246 22.4954 20.6875 22.3974C20.7504 22.2995 20.8343 22.2142 20.9346 22.1484C21.0348 22.0827 21.1493 22.0378 21.2695 22.0156C21.3385 22.0029 21.4086 21.998 21.4785 22.001Z" fill={active ? '#D6E1EF' : '#E7EEF5'} fillOpacity={0.8} />
-    </Svg>
-  );
-};
-
-const buildLinePath = (values: number[], width: number, height: number) => {
-  const min = Math.min(...values, 0);
-  const max = Math.max(...values, 100);
-  const range = Math.max(1, max - min);
-  const points = values.map((value, index) => {
-    const x = (index / Math.max(1, values.length - 1)) * width;
-    const y = height - ((value - min) / range) * height;
-    return { x, y };
-  });
-  return points.reduce((acc, point, index) => `${acc}${index === 0 ? 'M' : ' L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`, '');
+const recoveryStateLabel = (direction: 'improving' | 'declining' | 'stable', score: number | null) => {
+  if (score == null) return 'Calibrating';
+  if (direction === 'improving') return 'Improving';
+  if (direction === 'declining') return 'Lower Today';
+  return 'Stable';
 };
 
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
-  const [medicationOpen, setMedicationOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [activeDimension, setActiveDimension] = useState<RecoveryDimension>('calm');
-  const [devPanelOpen, setDevPanelOpen] = useState(false);
-  const [familyCareOpen, setFamilyCareOpen] = useState(false);
-  const [addTrustedOpen, setAddTrustedOpen] = useState(false);
-  const [supportName, setSupportName] = useState('');
-  const [supportRelationship, setSupportRelationship] = useState<FamilyRelationshipType>('parent');
-  const [supportContactMethod, setSupportContactMethod] = useState<'phone' | 'whatsapp'>('phone');
-  const [supportContactValue, setSupportContactValue] = useState('');
-  const [supportVisibilityLevel, setSupportVisibilityLevel] = useState<FamilyVisibilityLevel>('basic_support');
-  const [supportError, setSupportError] = useState<string | null>(null);
-  const [devDiagnostics, setDevDiagnostics] = useState<HealthConnectRuntimeDiagnostics | null>(null);
-  const [devLoading, setDevLoading] = useState(false);
-  const [devError, setDevError] = useState<string | null>(null);
-  const [healthProfileOpen, setHealthProfileOpen] = useState(false);
-  const [reportHistoryCount, setReportHistoryCount] = useState(0);
-  const [reportHistory, setReportHistory] = useState<HealthProfileReportSummary[]>([]);
-  const [reportHistoryLoading, setReportHistoryLoading] = useState(false);
-  const [reportHistoryError, setReportHistoryError] = useState<string | null>(null);
-  const [sessionAntiManipulation, setSessionAntiManipulation] = useState({
-    todaySessionCount: 0,
-    recentCooldownPenalty: 1,
-    sessionInfluenceMultiplier: 1
-  });
-  const heroPulse = useRef(new Animated.Value(0)).current;
-  const ctaNeonColor = useRef(new Animated.Value(0)).current;
-  const ctaNeonGlow = useRef(new Animated.Value(0)).current;
   const {
     onboarding,
-    setOnboarding,
-    wellness,
     assessment,
-    setAssessment,
-    wearableSyncData,
+    wellness,
     checkIns,
-    devices,
-    selectedDeviceId,
-    medications,
-    getMedicationTimelineForDate,
-    markMedicationAction,
-    pauseMedication,
-    deleteMedication,
-    cyclePrediction,
-    getCycleDaySnapshot,
-    familyConnections,
-    getFamilySummary,
-    generateFamilyInvite,
-    requestFamilyConnection,
-    updateFamilyPermissions,
-    setFamilySharingPaused,
-    sendFamilyPing,
-    familyEmergencyEvents,
     themeMode,
-    authSession,
+    selectedDeviceId,
+    wearableSyncData,
+    devices,
     publishedNutritionPlan,
-    refreshPublishedNutritionPlan
+    refreshPublishedNutritionPlan,
+    authSession
   } = useAppContext();
-  const isLight = themeMode === 'light';
-  const authStorageIdentity = useMemo(
+  const [reportHistory, setReportHistory] = useState<HealthProfileReportSummary[]>([]);
+
+  const reportHistoryStorageKey = useMemo(
     () =>
-      authSession
-        ? {
-            userId: authSession.accountId,
-            clientId: authSession.client.fiteatsyClientId
-          }
-        : null,
+      getIdentityScopedStorageKey(
+        REPORT_HISTORY_STORAGE_KEY,
+        authSession
+          ? {
+              userId: authSession.accountId,
+              clientId: authSession.client.fiteatsyClientId
+            }
+          : null
+      ),
     [authSession]
   );
-  const reportHistoryStorageKey = useMemo(
-    () => getIdentityScopedStorageKey(REPORT_HISTORY_STORAGE_KEY, authStorageIdentity),
-    [authStorageIdentity]
+
+  const profileCompletion = useMemo(
+    () => buildHealthProfileCompletion(onboarding, assessment, reportHistory.length),
+    [onboarding, assessment, reportHistory.length]
   );
-  const sessionSignalsStorageKey = useMemo(
-    () => getIdentityScopedStorageKey('fiteatsy.sessionSignals.v1', authStorageIdentity),
-    [authStorageIdentity]
+  const healthMetrics = useMemo(
+    () => buildHealthSnapshotMetrics(onboarding, assessment?.weightKg, assessment?.heightCm),
+    [onboarding, assessment]
   );
-  const ui = useMemo(() => ({
-    textPrimary: isLight ? '#0F172A' : '#F4F4F4',
-    textSecondary: isLight ? '#334155' : '#9A9A9A',
-    cardBg: isLight ? '#FFFFFF' : '#131313',
-    cardBorder: isLight ? '#CBD5E1' : '#2A2A2A',
-    focusBg: isLight ? '#F8FAFC' : '#0F151D',
-    focusBorder: isLight ? '#C7D2DF' : '#1D232A',
-    trendBg1: isLight ? '#FFFFFF' : '#1B1B1B',
-    trendBg2: isLight ? '#F4F7FB' : '#111111'
-  }), [isLight]);
-
-  const connectedDevice = devices.find((d) => d.id === selectedDeviceId) ?? null;
-  const latestHealthSync = wearableSyncData[0] ?? null;
-  const hasWellnessData = Boolean(
-    assessment ||
-    selectedDeviceId ||
-    wearableSyncData.length > 0 ||
-    checkIns.length > 0 ||
-    reportHistoryCount > 0
+  const recoveryIntel = useMemo(
+    () =>
+      buildRecoveryIntelligence({
+        wellness,
+        checkIns,
+        medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
+        hasWearable: wearableSyncData.length > 0,
+        wearableSyncData
+      }),
+    [wellness, checkIns, wearableSyncData]
   );
-  const latestHealthMetrics = latestHealthSync?.dataQuality.connectedMetrics ?? {};
-  const syncedHealthDomainCount = ['steps', 'sleep', 'heart_rate', 'hrv', 'workouts'].filter(
-    (key) => latestHealthMetrics[key as keyof typeof latestHealthMetrics] === 'synced'
-  ).length;
-  const healthSyncHomeState = !selectedDeviceId
-    ? {
-        title: 'Connect Health Data',
-        body: 'Unlock Activity, Sleep, Calm, and Recovery scores from real Health Connect signals.',
-        badge: 'Not connected',
-        icon: 'link-outline' as const
-      }
-    : syncedHealthDomainCount === 0
-      ? {
-          title: 'Health Data Needs Signals',
-          body: 'Health Connect is linked, but Fiteatsy needs recent records before showing intelligence.',
-          badge: 'INSUFFICIENT_DATA',
-          icon: 'information-circle-outline' as const
-        }
-      : syncedHealthDomainCount < 4
-        ? {
-            title: 'Partial Health Intelligence',
-            body: `${syncedHealthDomainCount}/5 signal groups synced. Missing domains stay out of score claims.`,
-            badge: 'Partial sync',
-            icon: 'analytics-outline' as const
-          }
-        : {
-            title: 'Health Intelligence Active',
-            body: 'Backend-calculated scores are using your latest connected health observations.',
-            badge: 'Active',
-            icon: 'pulse-outline' as const
-          };
-
-  const todayTimeline = useMemo(() => getMedicationTimelineForDate(new Date().toISOString()), [getMedicationTimelineForDate, medications]);
-  const todayISO = new Date().toISOString();
-  const cycleSnapshot = getCycleDaySnapshot(todayISO);
-  const medicationPending = todayTimeline.filter((item) => item.status === 'upcoming' || item.status === 'missed' || item.status === 'snoozed').length;
-  const cycleLabel = cycleSnapshot.phase === 'ovulation_window'
-    ? 'Ovulation Window'
-    : cycleSnapshot.phase === 'follicular'
-      ? 'Follicular Phase'
-      : cycleSnapshot.phase === 'luteal'
-        ? 'Luteal Phase'
-        : 'Menstrual Phase';
-  const familyConnected = familyConnections.filter((member) => member.status === 'connected');
-  const familyConnectedSummaries = familyConnected.map((member) => ({
-    member,
-    summary: getFamilySummary(member.id)
-  }));
-  const familyPending = familyConnected.filter((member) => {
-    const summary = getFamilySummary(member.id);
-    return summary?.medicationAdherence === 'needs_attention' || summary?.checkInStatus === 'pending';
-  }).length;
-  const aiInsight = medicationPending > 0
-    ? 'Complete pending medication reminders to protect energy consistency.'
-    : cycleSnapshot.phase === 'ovulation_window'
-      ? 'Hydration and gentle movement can support this cycle window.'
-      : 'Protect energy dips with protein-first meals.';
-
-  const recoveryIntel = useMemo(() => {
-    const scheduledToday = todayTimeline.length;
-    const takenToday = todayTimeline.filter((item) => item.status === 'taken').length;
-    const skippedToday = todayTimeline.filter((item) => item.status === 'skipped').length;
-    const missedToday = todayTimeline.filter((item) => item.status === 'missed').length;
-    const pendingToday = todayTimeline.filter((item) => item.status === 'upcoming' || item.status === 'snoozed').length;
-
-    return buildRecoveryIntelligence({
-      wellness,
-      checkIns,
-      medication: { scheduledToday, takenToday, pendingToday, skippedToday, missedToday },
-      hasWearable: Boolean(connectedDevice),
-      wearableSyncData,
-      sessionAntiManipulation
-    });
-  }, [todayTimeline, wellness, checkIns, connectedDevice, wearableSyncData, sessionAntiManipulation]);
-
-  const dimensionData = useMemo(() => {
-    const driverMap = Object.fromEntries(recoveryIntel.recoveryDrivers.map((driver) => [driver.key, driver]));
-    const recoveryBase = recoveryIntel.recoveryScore ?? 0;
-    const calmScore = Math.round(
-      ((driverMap.stress_recovery?.score ?? recoveryBase) * 0.6) +
-      ((driverMap.emotional_checkins?.score ?? recoveryBase) * 0.4)
-    );
-
-    const byKey: Record<RecoveryDimension, { score: number; reason: string; trend: number[] }> = {
-      calm: {
-        score: Math.max(0, Math.min(100, calmScore)),
-        reason: driverMap.stress_recovery?.reason ?? 'Calm data is available from stress and emotional check-ins.',
-        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 6 + idx * 0.5)))) : [0, 0, 0, 0, 0, 0, 0]
-      },
-      activity: {
-        score: driverMap.activity?.score ?? recoveryBase,
-        reason: driverMap.activity?.reason ?? 'Activity data sync is in progress.',
-        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 8 + idx)))) : [0, 0, 0, 0, 0, 0, 0]
-      },
-      nutrition: {
-        score: driverMap.emotional_checkins?.score ?? recoveryBase,
-        reason: driverMap.emotional_checkins?.reason ?? 'Nutrition data is calibration-aware and updates with real signals.',
-        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 4 + idx * 0.6)))) : [0, 0, 0, 0, 0, 0, 0]
-      },
-      rhythm: {
-        score: driverMap.wellness_sessions?.score ?? recoveryBase,
-        reason: driverMap.wellness_sessions?.reason ?? 'Rhythm data tracks routine consistency signals.',
-        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 5 + idx * 0.4)))) : [0, 0, 0, 0, 0, 0, 0]
-      },
-      sleep: {
-        score: driverMap.sleep?.score ?? recoveryBase,
-        reason: driverMap.sleep?.reason ?? 'Sleep data sync is in progress.',
-        trend: recoveryIntel.trendValues7d.length ? recoveryIntel.trendValues7d.map((v, idx) => Math.max(0, Math.min(100, Math.round(v - 2 + idx * 0.3)))) : [0, 0, 0, 0, 0, 0, 0]
-      }
-    };
-    return byKey;
-  }, [recoveryIntel]);
-
-  const activeVisual = DIMENSION_VISUALS.find((item) => item.key === activeDimension) ?? DIMENSION_VISUALS[0];
-  const activeDimensionStats = dimensionData[activeDimension];
-
-  const attentionItems = [
-    ...recoveryIntel.blockers,
-    familyConnected.length > 0 && familyPending > 0 ? `${familyPending} family check-in${familyPending > 1 ? 's' : ''} needs reassurance` : null
-  ].filter(Boolean) as string[];
-
-  const highestImpactActions = [
-    ...recoveryIntel.highestImpactActions,
-    familyConnected.length > 0 && familyPending > 0
-      ? 'Send one calm family wellness check-in update.'
-      : cycleSnapshot.phase === 'ovulation_window'
-        ? 'Prioritize hydration and light movement in this cycle window.'
-        : 'Review one report trend and align tomorrow’s routine.'
-  ].slice(0, 3);
-
-  const todayFocus = highestImpactActions[0] ?? 'Take one small wellness action today to support consistency.';
-  const careCircleLabel = familyConnected.length > 0
-    ? `Care Circle • ${familyConnected.length} connected`
-    : 'Recovery support inactive';
-  const careCircleSubLabel = familyConnected.length > 0
-    ? `${familyPending} can use a supportive check-in`
-    : 'Add trusted support to share gentle recovery states.';
-  const heroState = recoveryIntel.isCalibrating ? 'Calibrating' : getGlobalRecoveryMicroState(activeDimensionStats.score);
-  const celebrationLine =
-    recoveryIntel.recoveryDirection === 'improving'
-      ? 'Consistency improved over recent days. Keep this rhythm.'
-      : medicationPending === 0
-        ? 'Medication consistency is stable today.'
-        : 'You are still building momentum. Small consistency wins count.';
 
   useEffect(() => {
-    setActiveDimension('calm');
-  }, []);
-
-  const openDevPanel = async () => {
-    setDevPanelOpen(true);
-    setDevLoading(true);
-    setDevError(null);
-    try {
-      const diagnostics = await getHealthConnectRuntimeDiagnostics();
-      setDevDiagnostics(diagnostics);
-    } catch (error) {
-      setDevError(error instanceof Error ? error.message : 'dev_runtime_diagnostics_failed');
-      setDevDiagnostics(null);
-    } finally {
-      setDevLoading(false);
-    }
-  };
+    void refreshPublishedNutritionPlan();
+  }, [refreshPublishedNutritionPlan]);
 
   useEffect(() => {
-    const hydrateSessionAntiManipulation = async () => {
-      if (!sessionSignalsStorageKey) {
-        setSessionAntiManipulation({
-          todaySessionCount: 0,
-          sessionInfluenceMultiplier: 1,
-          recentCooldownPenalty: 1
-        });
+    let alive = true;
+
+    const loadReportHistory = async () => {
+      if (!reportHistoryStorageKey) {
+        if (alive) setReportHistory([]);
         return;
       }
+
       try {
-        const raw = await AsyncStorage.getItem(sessionSignalsStorageKey);
-        const parsedRaw = raw ? (JSON.parse(raw) as unknown) : [];
-        const parsed = Array.isArray(parsedRaw) ? (parsedRaw as Array<{ timestamp?: string }>) : [];
-        const now = Date.now();
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-        const dayStartMs = startOfDay.getTime();
-        const todaySessions = parsed.filter((item) => {
-          if (!item?.timestamp) return false;
-          const t = +new Date(item.timestamp);
-          return Number.isFinite(t) && t >= dayStartMs;
-        });
-        const todaySessionCount = todaySessions.length;
-        const sessionInfluenceMultiplier = todaySessionCount <= 1 ? 1 : todaySessionCount === 2 ? 0.6 : todaySessionCount === 3 ? 0.3 : 0.15;
-        const lastTimestamp = todaySessions[0]?.timestamp;
-        const lastMs = lastTimestamp ? +new Date(lastTimestamp) : NaN;
-        const minutesSinceLast = Number.isFinite(lastMs) ? Math.max(0, (now - lastMs) / 60000) : Number.POSITIVE_INFINITY;
-        const recentCooldownPenalty = minutesSinceLast < 15 ? 0.5 : minutesSinceLast < 30 ? 0.75 : 1;
-
-        setSessionAntiManipulation({
-          todaySessionCount,
-          sessionInfluenceMultiplier,
-          recentCooldownPenalty
-        });
+        const reportDtos = await listAnalyzedReports();
+        const reports = reportDtos.map(toHealthProfileReportSummary).filter(Boolean) as HealthProfileReportSummary[];
+        if (!alive) return;
+        setReportHistory(reports);
+        await AsyncStorage.setItem(reportHistoryStorageKey, JSON.stringify(reports));
       } catch {
-        setSessionAntiManipulation({
-          todaySessionCount: 0,
-          sessionInfluenceMultiplier: 1,
-          recentCooldownPenalty: 1
-        });
+        if (alive) setReportHistory([]);
       }
     };
 
-    hydrateSessionAntiManipulation();
-  }, [sessionSignalsStorageKey, wellness.breathingMinutes, wellness.focusMinutes, wellness.moodScore]);
+    void loadReportHistory();
 
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(heroPulse, {
-          toValue: 1,
-          duration: 2200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        }),
-        Animated.timing(heroPulse, {
-          toValue: 0,
-          duration: 2200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        })
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [heroPulse]);
-
-  useEffect(() => {
-    const colorLoop = Animated.loop(
-      Animated.timing(ctaNeonColor, {
-        toValue: 1,
-        duration: 2400,
-        easing: Easing.linear,
-        useNativeDriver: false
-      })
-    );
-    const glowLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(ctaNeonGlow, {
-          toValue: 1,
-          duration: 1100,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false
-        }),
-        Animated.timing(ctaNeonGlow, {
-          toValue: 0,
-          duration: 1100,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false
-        })
-      ])
-    );
-    colorLoop.start();
-    glowLoop.start();
     return () => {
-      colorLoop.stop();
-      glowLoop.stop();
+      alive = false;
     };
-  }, [ctaNeonColor, ctaNeonGlow]);
+  }, [reportHistoryStorageKey]);
 
-  const neonBorderColor = ctaNeonColor.interpolate({
-    inputRange: [0, 0.25, 0.5, 0.75, 1],
-    outputRange: ['#7FFFD4', '#00E5FF', '#66FCF1', '#22D3EE', '#7FFFD4']
-  });
-  const neonGlowOpacity = ctaNeonGlow.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.32, 0.82]
-  });
-  const neonGlowRadius = ctaNeonGlow.interpolate({
-    inputRange: [0, 1],
-    outputRange: [5, 11]
-  });
+  const connectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? null;
+  const latestSync = wearableSyncData[0] ?? null;
+  const latestReport = reportHistory[0] ?? null;
+  const hasWearableSignals = wearableSyncData.length > 0;
+  const hasTrendData = !recoveryIntel.isCalibrating && recoveryIntel.trendValues7d.some((value) => value > 0);
+  const trendValues = hasTrendData ? recoveryIntel.trendValues7d.slice(0, 7) : [];
+  const displayScore = recoveryIntel.recoveryScore;
+  const cycleLabel = onboarding?.gender === 'Female' ? 'Rhythm' : 'Mind';
+  const cycleValue = onboarding?.gender === 'Female'
+    ? onboarding?.pcosStatus || onboarding?.pregnancyStatus || 'Track cycle'
+    : checkIns.length > 0
+      ? `Mood ${Math.max(1, Math.round(wellness.moodScore))}/5`
+      : 'Check in';
 
-  const supportiveAttention = attentionItems.map((item) =>
-    item
-      .replace('is reducing recovery', 'may benefit from one small step today')
-      .replace('is reducing', 'may improve with a small step')
-      .replace('needs reassurance', 'can use a supportive check-in')
-  );
-
-  const assistanceActions = useMemo(() => {
-    const suggestions: string[] = [];
-    recoveryIntel.highestImpactActions.forEach((item) => {
-      if (!suggestions.includes(item)) suggestions.push(item);
-    });
-    supportiveAttention.slice(0, 2).forEach((item) => {
-      if (!suggestions.includes(item)) suggestions.push(item);
-    });
-    if (medicationPending > 0) {
-      suggestions.push(`Complete ${medicationPending} pending medication reminder${medicationPending > 1 ? 's' : ''} today.`);
+  const recoveryNodes: RecoveryNode[] = [
+    {
+      key: 'calm',
+      label: 'Calm',
+      value: recoveryIntel.calmScore == null ? 'Calibrating' : `${recoveryIntel.calmScore}/100`,
+      icon: 'heart',
+      position: 'top',
+      active: recoveryIntel.calmScore != null,
+      onPress: () => navigation.getParent()?.navigate('Sessions')
+    },
+    {
+      key: 'activity',
+      label: 'Activity',
+      value: hasWearableSignals ? `${Math.round(wellness.movementMinutes)} min` : 'Not connected',
+      icon: 'walk-outline',
+      position: 'left',
+      active: hasWearableSignals,
+      onPress: () => navigation.getParent()?.navigate('Tracker')
+    },
+    {
+      key: 'nutrition',
+      label: 'Nutrition',
+      value: publishedNutritionPlan ? `${publishedNutritionPlan.version.contentSummary.protein}g protein` : 'Plan pending',
+      icon: 'leaf-outline',
+      position: 'right',
+      active: Boolean(publishedNutritionPlan),
+      onPress: () => navigation.getParent()?.navigate('Nutrition')
+    },
+    {
+      key: 'rhythm',
+      label: cycleLabel,
+      value: cycleValue,
+      icon: onboarding?.gender === 'Female' ? 'flower-outline' : 'sparkles-outline',
+      position: 'bottomLeft',
+      active: checkIns.length > 0 || onboarding?.gender === 'Female',
+      onPress: () => navigation.getParent()?.navigate('Sessions')
+    },
+    {
+      key: 'sleep',
+      label: 'Sleep',
+      value: recoveryIntel.signalCoverage.sleep ? `${wellness.sleepHours.toFixed(1)} hrs` : 'No data',
+      icon: 'moon-outline',
+      position: 'bottomRight',
+      active: recoveryIntel.signalCoverage.sleep,
+      onPress: () => navigation.getParent()?.navigate('Tracker')
     }
-    if (!connectedDevice) {
-      suggestions.push('Connect a health app to improve sleep and activity accuracy.');
-    }
-    if (suggestions.length === 0) {
-      suggestions.push('Maintain hydration, movement, and stress-reset sessions to keep recovery stable.');
-    }
-    return suggestions.slice(0, 5);
-  }, [connectedDevice, medicationPending, recoveryIntel.highestImpactActions, supportiveAttention]);
+  ];
 
-  const consultant = getConsultantProfile(onboarding ?? null);
-  const healthProfile = useMemo(
-    () => buildHealthProfileCompletion(onboarding, assessment, reportHistoryCount),
-    [assessment, onboarding, reportHistoryCount]
-  );
-  const healthSnapshot = useMemo(
-    () => buildHealthSnapshotMetrics(onboarding, assessment?.weightKg, assessment?.heightCm),
-    [assessment?.heightCm, assessment?.weightKg, onboarding]
-  );
-  const snapshotMissingCopy =
-    healthSnapshot.validation.invalid.length > 0
-      ? `Check ${healthSnapshot.validation.invalid.join(', ')} values.`
-      : healthSnapshot.validation.missing.length > 0
-        ? `Complete ${healthSnapshot.validation.missing.join(', ')} to calculate.`
-        : healthSnapshot.tdee == null
-          ? 'Set gender and activity level to calculate energy needs.'
-          : 'Calculated from your saved profile.';
-  const healthProfileMissingCopy = reportHistoryLoading
-    ? 'Refreshing health reports...'
-    : reportHistoryError
-      ? 'Health reports could not refresh. Pull reports again when the network is available.'
-      : healthProfile.missingItems.slice(0, 3).join(' • ') || 'Profile is ready for consultant review';
-
-  useFocusEffect(
-    React.useCallback(() => {
-      let active = true;
-      setReportHistory([]);
-      setReportHistoryCount(0);
-      setReportHistoryError(null);
-      if (!authSession || !reportHistoryStorageKey) {
-        setReportHistoryLoading(false);
-        return () => {
-          active = false;
-        };
-      }
-
-      setReportHistoryLoading(true);
-      listAnalyzedReports()
-        .then((reportDtos) => {
-          if (!active) return;
-          const reports = reportDtos.map(toHealthProfileReportSummary).filter(Boolean) as HealthProfileReportSummary[];
-          setReportHistory(reports);
-          setReportHistoryCount(reports.length);
-          void AsyncStorage.setItem(reportHistoryStorageKey, JSON.stringify(reports)).catch(() => undefined);
-        })
-        .catch((error) => {
-          if (!active) return;
-          setReportHistory([]);
-          setReportHistoryCount(0);
-          setReportHistoryError(error instanceof Error ? error.message : 'Unable to refresh health reports.');
-        })
-        .finally(() => {
-          if (active) setReportHistoryLoading(false);
-        });
-      return () => {
-        active = false;
-      };
-    }, [authSession, reportHistoryStorageKey])
-  );
-
-  useFocusEffect(
-    React.useCallback(() => {
-      void refreshPublishedNutritionPlan();
-    }, [refreshPublishedNutritionPlan])
-  );
-
-  const onConnectTrustedSupport = () => {
-    const trimmedName = supportName.trim();
-    const trimmedContact = supportContactValue.trim();
-    if (!trimmedName) {
-      setSupportError('Enter member name.');
-      return;
-    }
-    if (!trimmedContact) {
-      setSupportError('Enter phone number or WhatsApp number.');
-      return;
-    }
-
-    const invite = generateFamilyInvite('CARE');
-    const response = requestFamilyConnection({
-      code: invite.code,
-      memberName: trimmedName,
-      relationship: supportRelationship,
-      visibilityLevel: supportVisibilityLevel,
-      contactMethod: supportContactMethod,
-      contactValue: trimmedContact
-    });
-
-    if (!response.ok) {
-      setSupportError(response.reason ?? 'Could not add trusted support.');
-      return;
-    }
-
-    if (response.connectionId) {
-      updateFamilyPermissions(response.connectionId, {
-        appointment_reminders: supportVisibilityLevel === 'wellness_support',
-        uploaded_reports: false,
-        wellness_trends: true,
-        emergency_alerts: true
-      });
-    }
-
-    setSupportName('');
-    setSupportContactValue('');
-    setSupportVisibilityLevel('basic_support');
-    setSupportContactMethod('phone');
-    setSupportError('Trusted support request sent. Approval is required before sharing starts.');
-  };
+  const connectionCopy = connectedDevice
+    ? `Synced ${compactDate(latestSync?.syncedAtISO)} from ${connectedDevice.model}.`
+    : 'Unlock Activity, Sleep, Calm, and Recovery scores from real Health Connect or Apple Health signals.';
 
   return (
-    <Screen scroll contentStyle={styles.content}>
-      <View style={styles.headerRow}>
-        <Pressable onLongPress={openDevPanel}>
-          <Text style={[styles.greeting, { color: ui.textPrimary }]}>Hi!, {onboarding?.name ?? 'Rahul'}</Text>
-        </Pressable>
+    <Screen contentStyle={styles.screen}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <Header
+          name={firstName(onboarding?.name)}
+          onSearch={() => navigation.navigate('Search')}
+          onAdd={() => navigation.navigate('Leadership')}
+          onNotifications={() => navigation.navigate('Notifications')}
+          onProfile={() => navigation.navigate('Profile')}
+        />
 
-        <View style={styles.topRightRow}>
-          <View style={styles.actionRail}>
-            <Pressable style={[styles.actionBtn, isLight && { backgroundColor: '#EEF2F7', borderColor: '#CBD5E1' }]} onPress={() => navigation.navigate('Search')}>
-              <Ionicons name="search-outline" size={18} color={ui.textPrimary} />
-            </Pressable>
-            <Pressable style={[styles.actionBtn, isLight && { backgroundColor: '#EEF2F7', borderColor: '#CBD5E1' }]} onPress={() => navigation.navigate('Main')}>
-              <MaterialCommunityIcons name="hospital-box-outline" size={18} color={ui.textPrimary} />
-            </Pressable>
-            <Pressable style={[styles.actionBtn, isLight && { backgroundColor: '#EEF2F7', borderColor: '#CBD5E1' }]} onPress={() => navigation.navigate('Notifications')}>
-              <Ionicons name="notifications-outline" size={18} color={ui.textPrimary} />
-              <View style={styles.notifyBadge}><Text style={styles.notifyBadgeText}>9</Text></View>
-            </Pressable>
-          </View>
-          <Pressable style={styles.avatar} onPress={() => navigation.navigate('Profile')} />
-        </View>
-      </View>
+        <RecoveryTrendCard values={trendValues} hasData={hasTrendData} />
 
-      <LinearGradient colors={[ui.trendBg1, ui.trendBg2]} style={[styles.card, isLight && { borderColor: ui.cardBorder }]}>
-        <Text style={[styles.cardTitle, { color: ui.textPrimary }]}>Your 7 day’s Recovery Trend</Text>
-        <View style={styles.trendRow}>
-          {activeDimensionStats.trend.map((value, index) => {
-            const chip = scoreColor(value, index);
-            return (
-              <View key={`chip-${index}-${value}`} style={[styles.trendChip, { backgroundColor: chip.bg }]}>
-                <Text style={[styles.trendChipText, { color: chip.text }]}>{Math.round(value)}%</Text>
-              </View>
-            );
-          })}
-        </View>
-        <View style={styles.trendWeekRow}>
-          {WEEK_LABELS.map((label, idx) => (
-            <Text key={`day-${idx}-${label}`} style={[styles.trendWeekLabel, { color: ui.textPrimary }]}>{label}</Text>
-          ))}
-        </View>
-      </LinearGradient>
+        <RecoveryCoreCard
+          score={displayScore}
+          state={recoveryStateLabel(recoveryIntel.recoveryDirection, displayScore)}
+          insight={recoveryIntel.contextualInsights[0] ?? recoveryIntel.insufficientReason ?? 'Recovery calibration adapting to your rhythm.'}
+          nodes={recoveryNodes}
+          onAssist={() => navigation.getParent()?.navigate('Sessions')}
+          onSync={() => navigation.navigate('SyncWearable')}
+        />
 
-      <View style={styles.heroZone}>
-        <Animated.View
-          style={[
-            styles.heroAssistButton,
-            {
-              borderColor: neonBorderColor,
-              shadowColor: '#66FCF1',
-              shadowOpacity: neonGlowOpacity,
-              shadowRadius: neonGlowRadius
-            }
-          ]}
-        >
-          <Pressable style={styles.heroCtaTouch} onPress={() => setAiOpen(true)}>
-            <Text style={styles.heroSyncText}>Assist</Text>
-          </Pressable>
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.heroSyncButton,
-            {
-              borderColor: neonBorderColor,
-              shadowColor: '#66FCF1',
-              shadowOpacity: neonGlowOpacity,
-              shadowRadius: neonGlowRadius
-            }
-          ]}
-        >
-          <Pressable style={styles.heroCtaTouch} onPress={() => navigation.navigate('SyncWearable')}>
-            <Text style={styles.heroSyncText}>Sync</Text>
-          </Pressable>
-        </Animated.View>
-        <View style={styles.starLayerContainer}>
-          <View style={styles.starLayerGlowWrap}>
-            <View style={styles.starLayerDarkWrap}>
-              <View style={styles.starLayerImage}>
-                <FitStarShape key="star-refresh-v3" isLight={isLight} />
-              </View>
-            </View>
-          </View>
-        </View>
-        <Pressable style={[styles.dimensionNode, styles.nodeCalm]} onPress={() => setActiveDimension('calm')}>
-          <FitDimensionIcon dimension="calm" active={activeDimension === 'calm'} isLight={isLight} />
-          <Text style={[styles.dimensionNodeText, { color: ui.textPrimary }]}>Calm</Text>
-        </Pressable>
-        <Pressable style={[styles.dimensionNode, styles.nodeActivity]} onPress={() => setActiveDimension('activity')}>
-          <FitDimensionIcon dimension="activity" active={activeDimension === 'activity'} isLight={isLight} />
-          <Text style={[styles.dimensionNodeText, { color: ui.textPrimary }]}>Activity</Text>
-        </Pressable>
-        <Pressable style={[styles.dimensionNode, styles.nodeNutrition]} onPress={() => setActiveDimension('nutrition')}>
-          <FitDimensionIcon dimension="nutrition" active={activeDimension === 'nutrition'} isLight={isLight} />
-          <Text style={[styles.dimensionNodeText, { color: ui.textPrimary }]}>Nutrition</Text>
-        </Pressable>
-        <Pressable style={[styles.dimensionNode, styles.nodeRhythm]} onPress={() => setActiveDimension('rhythm')}>
-          <FitDimensionIcon dimension="rhythm" active={activeDimension === 'rhythm'} isLight={isLight} />
-          <Text style={[styles.dimensionNodeText, { color: ui.textPrimary }]}>Cycle</Text>
-        </Pressable>
-        <Pressable style={[styles.dimensionNode, styles.nodeSleep]} onPress={() => setActiveDimension('sleep')}>
-          <FitDimensionIcon dimension="sleep" active={activeDimension === 'sleep'} isLight={isLight} />
-          <Text style={[styles.dimensionNodeText, { color: ui.textPrimary }]}>Sleep</Text>
-        </Pressable>
-        <View style={styles.centerOrb}>
-          <View style={styles.starCircleLayer}>
-            <StarCircleShape isLight={isLight} />
-          </View>
-          <RecoveryRing value={activeDimensionStats.score} pulse={heroPulse} gradient={activeVisual.gradient} isLight={isLight} />
-          <View style={styles.lowerTag}><Text style={styles.lowerTagText} numberOfLines={1}>{recoveryIntel.isCalibrating ? 'Calibration' : heroState}</Text></View>
-        </View>
-      </View>
-      {!hasWellnessData ? (
-        <View style={[styles.noWellnessCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}>
-          <Text style={[styles.noWellnessTitle, { color: ui.textPrimary }]}>No wellness data available yet</Text>
-          <Text style={[styles.noWellnessBody, { color: ui.textSecondary }]}>
-            Upload a report, complete your assessment, or connect Health Connect to start building your personal intelligence.
-          </Text>
-        </View>
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${healthSyncHomeState.title}. ${healthSyncHomeState.body}`}
-        style={[styles.healthSyncCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
-        onPress={() => navigation.navigate('SyncWearable')}
-      >
-        <View style={styles.healthSyncHeader}>
-          <View style={styles.healthSyncTitleRow}>
-            <Ionicons name={healthSyncHomeState.icon} size={19} color={isLight ? '#087B6C' : '#66FCF1'} />
-            <Text style={[styles.healthSyncTitle, { color: ui.textPrimary }]}>{healthSyncHomeState.title}</Text>
-          </View>
-          <Text style={[styles.healthSyncBadge, { color: isLight ? '#087B6C' : '#66FCF1' }]}>{healthSyncHomeState.badge}</Text>
-        </View>
-        <Text style={[styles.healthSyncBody, { color: ui.textSecondary }]}>{healthSyncHomeState.body}</Text>
-        <Text style={styles.healthSyncLink}>{selectedDeviceId ? 'Sync now +' : 'Connect now +'}</Text>
-      </Pressable>
-      <View style={styles.lowerRow}>
-        <Pressable style={[styles.lowerCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]} onPress={() => setMedicationOpen(true)}>
-          <View style={styles.lowerCardTop}>
-            <Text style={[styles.lowerCardTitle, { color: ui.textPrimary }]}>Medication</Text>
-            <Ionicons name="medical-outline" size={20} color={ui.textSecondary} />
-          </View>
-          <View style={styles.lowerStatsRow}>
-            <View><Text style={[styles.lowerStatValue, { color: ui.textPrimary }]}>{todayTimeline.filter((i) => i.status === 'taken').length}/10</Text><Text style={[styles.lowerStatLabel, { color: ui.textSecondary }]}>Taken</Text></View>
-            <View><Text style={[styles.lowerStatValue, { color: ui.textPrimary }]}>{medicationPending}/10</Text><Text style={[styles.lowerStatLabel, { color: ui.textSecondary }]}>Pending</Text></View>
-            <View><Text style={[styles.lowerStatValue, { color: ui.textPrimary }]}>{todayTimeline.filter((i) => i.status === 'missed').length}/10</Text><Text style={[styles.lowerStatLabel, { color: ui.textSecondary }]}>Missed</Text></View>
-          </View>
-          <Text style={styles.lowerLink}>Medication logs +</Text>
-        </Pressable>
-        <View style={[styles.lowerCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}>
-          <View style={styles.lowerCardTop}>
-            <Text style={[styles.lowerCardTitle, { color: ui.textPrimary }]}>Stress Recovery</Text>
-            <Ionicons name="fitness-outline" size={18} color={ui.textSecondary} />
-          </View>
-          <Text style={[styles.lowerScore, { color: ui.textPrimary }]}>{recoveryIntel.stressRecoveryScore == null ? '—' : `${recoveryIntel.stressRecoveryScore}/100`}</Text>
-          <Text style={[styles.lowerHint, { color: ui.textSecondary }]}>
-            {recoveryIntel.isCalibrating ? 'Not enough recent real signals yet' : 'Adjusted by sleep, HRV, and calm sessions'}
-          </Text>
-          <View style={styles.lowerBarRow}>
-            <View style={[styles.lowerBar, { backgroundColor: '#FF808A' }]} />
-            <View style={styles.lowerBar} />
-            <View style={styles.lowerBar} />
-          </View>
-        </View>
-      </View>
-
-      <Pressable
-        style={[styles.healthProfileCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
-        onPress={() => (publishedNutritionPlan ? navigation.navigate('NutritionPlan') : setHealthProfileOpen(true))}
-      >
-        <View style={styles.healthProfileTop}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.healthProfileEyebrow, { color: '#59BE08' }]}>
-              {publishedNutritionPlan ? 'Your Nutrition Plan' : 'Your Health Journey'}
-            </Text>
-            <Text style={[styles.healthProfileName, { color: ui.textPrimary }]}>
-              {publishedNutritionPlan ? 'Your consultant-approved plan is now live:' : 'Complete your profile to unlock:'}
-            </Text>
-            <View style={styles.healthJourneyUnlockList}>
-              {(publishedNutritionPlan
-                ? [
-                    publishedNutritionPlan.today.todaysMeals[0]?.primaryMeal
-                      ? `Next meal: ${publishedNutritionPlan.today.todaysMeals[0].primaryMeal}`
-                      : 'Meals prepared for today',
-                    publishedNutritionPlan.today.dailyTargets.calories != null
-                      ? `Calories target: ${publishedNutritionPlan.today.dailyTargets.calories} kcal`
-                      : 'Calories target available in your plan',
-                    publishedNutritionPlan.today.dailyTargets.protein != null
-                      ? `Protein target: ${publishedNutritionPlan.today.dailyTargets.protein} g`
-                      : 'Protein guidance available in your plan',
-                    publishedNutritionPlan.today.consultantNotes[0] || 'Consultant notes are included in your plan',
-                  ]
-                : ['Personalised diet plan', 'Recovery score', 'Health insights', 'Consultant recommendations']
-              ).map((item) => (
-                <View key={item} style={styles.healthJourneyUnlockRow}>
-                  <Ionicons name="checkmark-circle" size={16} color="#59BE08" />
-                  <Text style={[styles.healthJourneyUnlockText, { color: ui.textSecondary }]}>{item}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-          <View style={[styles.healthProfileBadge, { backgroundColor: isLight ? '#EEF6E8' : '#19250D' }]}>
-            <Text style={styles.healthProfileBadgeText}>{healthProfile.completionPercent}%</Text>
-            <Text style={[styles.healthJourneyBadgeLabel, { color: ui.textSecondary }]}>strength</Text>
-          </View>
-        </View>
-        <View style={[styles.healthJourneyProgressTrack, { backgroundColor: isLight ? '#DDE8D7' : '#2A3326' }]}>
-          <View
-            style={[
-              styles.healthJourneyProgressFill,
-              {
-                width: `${
-                  publishedNutritionPlan
-                    ? 100
-                    : Math.min(100, Math.max(0, healthProfile.completionPercent))
-                }%`,
-              },
-            ]}
+        <View style={styles.twoCardRow}>
+          <MiniStatusCard
+            title="Medication"
+            icon="medical-outline"
+            value="Not set"
+            body="Add medication reminders to track taken, pending, and missed doses."
+            action="Medication Logs +"
+            onPress={() => navigation.navigate('MedicationCalendar')}
+          />
+          <MiniStatusCard
+            title="Stress Recovery"
+            icon="headset-outline"
+            value={recoveryIntel.stressRecoveryScore == null ? 'Calibrating' : `${recoveryIntel.stressRecoveryScore}/100`}
+            body={recoveryIntel.stressRecoveryScore == null ? 'Adjusted after sleep, HRV, and calm signals sync.' : 'Based on recent calm, sleep, and HRV signals.'}
+            action="Open Care"
+            onPress={() => navigation.getParent()?.navigate('Sessions')}
           />
         </View>
-        <View style={styles.healthProfileBottom}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.healthProfileSectionTitle, { color: ui.textPrimary }]}>Profile strength</Text>
-            <Text style={[styles.healthProfileMissing, { color: ui.textSecondary }]}>
-              {publishedNutritionPlan
-                ? 'Open your full meal cards, hydration rhythm, substitutions, and consultant notes.'
-                : healthProfileMissingCopy || 'Keep building your health story for sharper recommendations.'}
-            </Text>
-          </View>
-          <View style={[styles.healthProfileCta, { backgroundColor: '#59BE08' }]}>
-            <Text style={styles.healthProfileCtaText}>
-              {publishedNutritionPlan ? 'Open My Plan' : 'Update My Health Profile'}
-            </Text>
-          </View>
-        </View>
-      </Pressable>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Your Health Snapshot. Opens health profile completion."
-        style={[styles.healthSnapshotCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
-        onPress={() => setHealthProfileOpen(true)}
-      >
-        <View style={styles.healthSnapshotHead}>
-          <View>
-            <Text style={[styles.healthProfileEyebrow, { color: ui.textSecondary }]}>Your Health Snapshot</Text>
-            <Text style={[styles.healthSnapshotTitle, { color: ui.textPrimary }]}>Calculated from saved profile data</Text>
-          </View>
-          <Ionicons name="calculator-outline" size={20} color="#59BE08" />
-        </View>
-        <View style={styles.healthSnapshotGrid}>
-          <View style={[styles.healthSnapshotMetric, { borderColor: ui.cardBorder }]}>
-            <Text style={[styles.healthSnapshotLabel, { color: ui.textSecondary }]}>BMI</Text>
-            <Text style={[styles.healthSnapshotValue, { color: ui.textPrimary }]}>
-              {healthSnapshot.bmi == null ? 'Pending' : healthSnapshot.bmi}
-            </Text>
-          </View>
-          <View style={[styles.healthSnapshotMetric, { borderColor: ui.cardBorder }]}>
-            <Text style={[styles.healthSnapshotLabel, { color: ui.textSecondary }]}>Daily Energy</Text>
-            <Text style={[styles.healthSnapshotValue, { color: ui.textPrimary }]}>
-              {healthSnapshot.tdee == null ? 'Pending' : `${healthSnapshot.tdee} kcal`}
-            </Text>
-          </View>
-          <View style={[styles.healthSnapshotMetric, { borderColor: ui.cardBorder }]}>
-            <Text style={[styles.healthSnapshotLabel, { color: ui.textSecondary }]}>Protein Goal</Text>
-            <Text style={[styles.healthSnapshotValue, { color: ui.textPrimary }]}>
-              {healthSnapshot.proteinTargetGrams == null ? 'Pending' : `${healthSnapshot.proteinTargetGrams}g/day`}
-            </Text>
-          </View>
-          <View style={[styles.healthSnapshotMetric, { borderColor: ui.cardBorder }]}>
-            <Text style={[styles.healthSnapshotLabel, { color: ui.textSecondary }]}>Hydration</Text>
-            <Text style={[styles.healthSnapshotValue, { color: ui.textPrimary }]}>
-              {healthSnapshot.hydrationTargetLiters == null ? 'Pending' : `${healthSnapshot.hydrationTargetLiters}L/day`}
-            </Text>
-          </View>
-        </View>
-        <Text style={[styles.healthSnapshotHint, { color: ui.textSecondary }]}>{snapshotMissingCopy}</Text>
-      </Pressable>
+        {!connectedDevice ? (
+          <HealthConnectionCard status="NOT CONNECTED" body={connectionCopy} onPress={() => navigation.navigate('SyncWearable')} />
+        ) : (
+          <SyncStrip body={connectionCopy} onPress={() => navigation.navigate('ConnectedMetrics')} />
+        )}
 
-      <Pressable
-        style={[styles.careCircleChip, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
-        onPress={() => {
-          setAddTrustedOpen(false);
-          setFamilyCareOpen(true);
-        }}
-      >
-        <View>
-          <Text style={[styles.careCircleChipTitle, { color: ui.textPrimary }]}>Recovery Support</Text>
-          <Text style={[styles.careCircleChipSubtitle, { color: ui.textSecondary }]}>{careCircleLabel} • {careCircleSubLabel}</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color={ui.textSecondary} />
-      </Pressable>
+        <HealthSnapshotCard metrics={healthMetrics} />
 
-      <Modal visible={medicationOpen} animationType="slide" transparent onRequestClose={() => setMedicationOpen(false)}>
-        <View style={styles.sheetOverlay}>
-          <Pressable style={styles.sheetBackdrop} onPress={() => setMedicationOpen(false)} />
-          <View style={styles.sheetWrap}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Medication Dashboard</Text>
-
-            <ScrollView contentContainerStyle={styles.sheetContent}>
-              <Text style={styles.section}>Today&apos;s Medications</Text>
-              {todayTimeline.length === 0 ? (
-                <Text style={styles.empty}>No medications scheduled for today.</Text>
-              ) : (
-                todayTimeline.map((item) => (
-                  <View key={`${item.medication.id}-${item.scheduledForISO}`} style={styles.medRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.medName}>{item.medication.name}</Text>
-                      <Text style={styles.medTime}>{new Date(item.scheduledForISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                    </View>
-                    <View style={styles.statusBadge}>
-                      <Text style={styles.statusText}>{item.status}</Text>
-                    </View>
-                  </View>
-                ))
-              )}
-
-              <Text style={styles.section}>Quick Actions</Text>
-              {todayTimeline.slice(0, 3).map((item) => (
-                <View key={`quick-${item.medication.id}-${item.scheduledForISO}`} style={styles.quickRow}>
-                  <Text style={styles.quickLabel}>{item.medication.name}</Text>
-                  <View style={styles.quickActions}>
-                    <Pressable style={styles.quickBtn} onPress={() => markMedicationAction({ medicationId: item.medication.id, scheduledForISO: item.scheduledForISO, status: 'taken' })}><Text style={styles.quickBtnText}>Taken</Text></Pressable>
-                    <Pressable style={styles.quickBtn} onPress={() => markMedicationAction({ medicationId: item.medication.id, scheduledForISO: item.scheduledForISO, status: 'snoozed', snoozeMinutes: 10 })}><Text style={styles.quickBtnText}>Snooze</Text></Pressable>
-                    <Pressable style={styles.quickBtn} onPress={() => markMedicationAction({ medicationId: item.medication.id, scheduledForISO: item.scheduledForISO, status: 'skipped' })}><Text style={styles.quickBtnText}>Skip</Text></Pressable>
-                  </View>
-                </View>
-              ))}
-
-              <View style={styles.ctaRow}>
-                <Pressable style={styles.ctaBtn} onPress={() => { setMedicationOpen(false); navigation.navigate('MedicationForm'); }}><Text style={styles.ctaText}>+ Add Medication</Text></Pressable>
-                <Pressable style={styles.ctaBtn} onPress={() => { setMedicationOpen(false); navigation.navigate('MedicationCalendar'); }}><Text style={styles.ctaText}>View Calendar</Text></Pressable>
-                <Pressable style={styles.ctaBtn} onPress={() => { setMedicationOpen(false); navigation.navigate('MedicationNotifications'); }}><Text style={styles.ctaText}>Manage Notifications</Text></Pressable>
-                <Pressable style={styles.ctaBtn} onPress={() => setMedicationOpen(false)}><Text style={styles.ctaText}>Close</Text></Pressable>
-              </View>
-
-              <Text style={styles.section}>Existing Medications</Text>
-              {medications.length === 0 ? (
-                <Text style={styles.empty}>No medications yet.</Text>
-              ) : (
-                medications.map((medication) => (
-                  <View key={medication.id} style={styles.medCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.medName}>{medication.name}</Text>
-                      <Text style={styles.medTime}>{medication.dosage} • {medication.status}</Text>
-                    </View>
-                    <View style={styles.manageRow}>
-                      <Pressable onPress={() => { setMedicationOpen(false); navigation.navigate('MedicationForm', { medicationId: medication.id }); }}><Text style={styles.link}>Edit</Text></Pressable>
-                      <Pressable onPress={() => pauseMedication(medication.id)}><Text style={styles.link}>Pause</Text></Pressable>
-                      <Pressable onPress={() => deleteMedication(medication.id)}><Text style={styles.deleteLink}>Delete</Text></Pressable>
-                    </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <HealthProfileSheet
-        visible={healthProfileOpen}
-        onboarding={onboarding}
-        assessment={assessment}
-        reportCount={reportHistoryCount}
-        reports={reportHistory}
-        themeMode={themeMode}
-        onClose={() => setHealthProfileOpen(false)}
-        onOpenReports={() => {
-          setHealthProfileOpen(false);
-          navigation.getParent()?.navigate('Reports' as never);
-        }}
-        onUpdateOnboarding={(patch) => {
-          if (!onboarding) return;
-          setOnboarding({ ...onboarding, ...patch });
-        }}
-        onUpdateAssessment={(patch) => {
-          if (!assessment) return;
-          setAssessment({ ...assessment, ...patch });
-        }}
-      />
-
-      <Modal visible={aiOpen} animationType="slide" transparent onRequestClose={() => setAiOpen(false)}>
-        <View style={styles.sheetOverlay}>
-          <Pressable style={styles.sheetBackdrop} onPress={() => setAiOpen(false)} />
-          <View style={styles.sheetWrap}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Fiteatsy Assistant</Text>
-            <ScrollView contentContainerStyle={styles.sheetContent}>
-              <View style={styles.assistantCard}>
-                <View style={styles.assistantHeader}>
-                  <Text style={styles.assistantTitle}>Fiteatsy Assistant</Text>
-                  <Text style={styles.assistantBadge}>AI-guided</Text>
-                </View>
-                <Text style={styles.assistantCopy}>
-                  Corrective actions generated from your latest trackers and recovery signals:
-                </Text>
-                {assistanceActions.map((item, index) => (
-                  <View key={`assist-${index}-${item}`} style={styles.assistantPoint}>
-                    <Text style={styles.assistantBullet}>•</Text>
-                    <Text style={styles.assistantPointText}>{item}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.consultantCard}>
-                <View style={styles.consultantHeaderRow}>
-                  <Text style={styles.consultantLabel}>Assigned Consultant</Text>
-                  <Ionicons name="medkit-outline" size={15} color="#59BE08" />
-                </View>
-                <Text style={styles.consultantName}>{consultant.fullName}</Text>
-                <Text style={styles.consultantSpecialty}>{consultant.specialization}</Text>
-                <Text style={styles.consultantHint}>{formatConsultantAvailability(consultant.availability)}</Text>
-              </View>
-              <Pressable style={styles.ctaBtn} onPress={() => setAiOpen(false)}><Text style={styles.ctaText}>Close</Text></Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={familyCareOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => {
-          setAddTrustedOpen(false);
-          setFamilyCareOpen(false);
-        }}
-      >
-        <View style={styles.sheetOverlay}>
-          <Pressable
-            style={styles.sheetBackdrop}
-            onPress={() => {
-              setAddTrustedOpen(false);
-              setFamilyCareOpen(false);
-            }}
+        {profileCompletion.completionPercent < 85 ? (
+          <ProfileStrengthCard
+            percent={profileCompletion.completionPercent}
+            missing={profileCompletion.missingItems.slice(0, 3)}
+            onPress={() => navigation.navigate('Profile')}
           />
-          <View style={styles.sheetWrap}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Family Care</Text>
-            <ScrollView contentContainerStyle={styles.sheetContent}>
-              <View style={[styles.familySupportCard, isLight && styles.familySupportCardLight]}>
-                <Text style={styles.familySupportTitle}>Trusted People</Text>
-                {familyConnectedSummaries.length === 0 ? (
-                  <Text style={styles.familySupportBody}>Recovery feels easier with trusted support.</Text>
-                ) : (
-                  familyConnectedSummaries.map(({ member, summary }) => (
-                    <View key={member.id} style={styles.familySupportRow}>
-                      <View style={styles.familySupportAvatar}>
-                        <Text style={styles.familySupportAvatarText}>{member.memberName.slice(0, 1).toUpperCase()}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.familySupportMember}>{member.memberName}</Text>
-                        <Text style={styles.familySupportMeta}>{relationshipLabel(member.relationship)} • {toRecoveryShareState(summary)}</Text>
-                      </View>
-                      <Pressable onPress={() => setFamilySharingPaused(member.id, !member.sharingPaused)}>
-                        <Text style={styles.familyActionText}>{member.sharingPaused ? 'Resume' : 'Pause'}</Text>
-                      </Pressable>
-                    </View>
-                  ))
-                )}
-              </View>
+        ) : null}
 
-              <View style={styles.familySupportCard}>
-                <Text style={styles.familySupportTitle}>Quick Actions</Text>
-                <View style={styles.familyActionRow}>
-                  <Pressable style={[styles.familyActionBtn, isLight && styles.familyActionBtnLight]} onPress={() => setAddTrustedOpen(true)}>
-                    <Text style={styles.familyActionText}>Add Trusted Support</Text>
-                  </Pressable>
-                  <Pressable style={[styles.familyActionBtn, isLight && styles.familyActionBtnLight]} onPress={() => navigation.navigate('FamilyDashboard')}>
-                    <Text style={styles.familyActionText}>Adjust Sharing</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.familyActionRow}>
-                  <Pressable
-                    style={[styles.familyActionBtn, isLight && styles.familyActionBtnLight]}
-                    onPress={() => {
-                      const first = familyConnected[0];
-                      if (first) {
-                        sendFamilyPing(first.id, 'How are you feeling today?');
-                      }
-                    }}
-                  >
-                    <Text style={styles.familyActionText}>Send Check-in</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.familyActionBtn, isLight && styles.familyActionBtnLight]}
-                    onPress={() => {
-                      setAddTrustedOpen(false);
-                      setFamilyCareOpen(false);
-                    }}
-                  >
-                    <Text style={styles.familyActionText}>Close</Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              <View style={[styles.familySupportCard, isLight && styles.familySupportCardLight]}>
-                <Text style={styles.familySupportTitle}>Support Moments</Text>
-                {familyConnectedSummaries.length === 0 ? (
-                  <Text style={styles.familySupportBody}>Recovery support active when you connect trusted people.</Text>
-                ) : (
-                  familyConnectedSummaries.map(({ member, summary }) => (
-                    <Text key={`moment-${member.id}`} style={styles.familySupportBody}>
-                      • {member.memberName}: {toSupportMoment(summary)}
-                    </Text>
-                  ))
-                )}
-                {familyEmergencyEvents.length > 0 ? (
-                  <Text style={styles.familySupportBody}>• Recent support event logged {new Date(familyEmergencyEvents[0].createdAtISO).toLocaleDateString()}.</Text>
-                ) : null}
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={addTrustedOpen} animationType="slide" transparent onRequestClose={() => setAddTrustedOpen(false)}>
-        <View style={styles.sheetOverlay}>
-          <Pressable style={styles.sheetBackdrop} onPress={() => setAddTrustedOpen(false)} />
-          <View style={styles.sheetWrap}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Add Trusted Support</Text>
-            <ScrollView contentContainerStyle={styles.sheetContent}>
-              <Text style={styles.familySupportBody}>Recovery feels easier with trusted support.</Text>
-              <TextInput
-                style={[styles.familyInput, isLight && styles.familyInputLight]}
-                value={supportName}
-                onChangeText={setSupportName}
-                placeholder="Name"
-                placeholderTextColor="#8D8D8D"
-              />
-              <View style={styles.familyPillRow}>
-                {(['spouse', 'parent', 'child', 'caregiver', 'family_member'] as FamilyRelationshipType[]).map((item) => (
-                  <Pressable
-                    key={item}
-                    style={[styles.familyPill, supportRelationship === item && styles.familyPillActive, isLight && styles.familyPillLight]}
-                    onPress={() => setSupportRelationship(item)}
-                  >
-                    <Text style={styles.familyPillText}>{relationshipLabel(item)}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <View style={styles.familyPillRow}>
-                <Pressable
-                  style={[styles.familyPill, supportContactMethod === 'phone' && styles.familyPillActive, isLight && styles.familyPillLight]}
-                  onPress={() => setSupportContactMethod('phone')}
-                >
-                  <Text style={styles.familyPillText}>Phone</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.familyPill, supportContactMethod === 'whatsapp' && styles.familyPillActive, isLight && styles.familyPillLight]}
-                  onPress={() => setSupportContactMethod('whatsapp')}
-                >
-                  <Text style={styles.familyPillText}>WhatsApp Invite</Text>
-                </Pressable>
-              </View>
-              <TextInput
-                style={[styles.familyInput, isLight && styles.familyInputLight]}
-                value={supportContactValue}
-                onChangeText={setSupportContactValue}
-                placeholder={supportContactMethod === 'phone' ? 'Phone number' : 'WhatsApp number'}
-                placeholderTextColor="#8D8D8D"
-                keyboardType="phone-pad"
-              />
-
-              <Text style={styles.familySupportTitle}>Sharing Level</Text>
-              <View style={styles.familyPillRow}>
-                <Pressable
-                  style={[styles.familyPill, supportVisibilityLevel === 'basic_support' && styles.familyPillActive, isLight && styles.familyPillLight]}
-                  onPress={() => setSupportVisibilityLevel('basic_support')}
-                >
-                  <Text style={styles.familyPillText}>Basic Support</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.familyPill, supportVisibilityLevel === 'wellness_support' && styles.familyPillActive, isLight && styles.familyPillLight]}
-                  onPress={() => setSupportVisibilityLevel('wellness_support')}
-                >
-                  <Text style={styles.familyPillText}>Wellness Support</Text>
-                </Pressable>
-              </View>
-
-              {supportError ? <Text style={[styles.familySupportBody, { color: '#D18A8A' }]}>{supportError}</Text> : null}
-              <Pressable style={styles.focusCta} onPress={onConnectTrustedSupport}>
-                <Text style={styles.focusCtaText}>Continue</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={devPanelOpen} animationType="slide" transparent onRequestClose={() => setDevPanelOpen(false)}>
-        <View style={styles.sheetOverlay}>
-          <Pressable style={styles.sheetBackdrop} onPress={() => setDevPanelOpen(false)} />
-          <View style={styles.sheetWrap}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Runtime Trust QA</Text>
-            <ScrollView contentContainerStyle={styles.sheetContent}>
-              {devLoading ? <Text style={styles.assistantCopy}>Loading runtime diagnostics...</Text> : null}
-              {devError ? <Text style={[styles.assistantCopy, { color: '#FF808A' }]}>{devError}</Text> : null}
-
-              <View style={styles.assistantCard}>
-                <Text style={styles.assistantTitle}>Health Connect Status</Text>
-                <Text style={styles.assistantPointText}>SDK: {devDiagnostics?.sdkStatus ?? 'unknown'}</Text>
-                <Text style={styles.assistantPointText}>Initialized: {devDiagnostics?.initialized ? 'yes' : 'no'}</Text>
-                <Text style={styles.assistantPointText}>Last checked: {devDiagnostics?.lastCheckedISO ?? 'n/a'}</Text>
-              </View>
-
-              <View style={styles.assistantCard}>
-                <Text style={styles.assistantTitle}>Permissions</Text>
-                <Text style={styles.assistantPointText}>Steps: {devDiagnostics?.permissionStates?.Steps ? 'granted' : 'missing'}</Text>
-                <Text style={styles.assistantPointText}>Sleep: {devDiagnostics?.permissionStates?.SleepSession ? 'granted' : 'missing'}</Text>
-                <Text style={styles.assistantPointText}>Resting HR: {devDiagnostics?.permissionStates?.RestingHeartRate ? 'granted' : 'missing'}</Text>
-                <Text style={styles.assistantPointText}>HRV: {devDiagnostics?.permissionStates?.HeartRateVariabilityRmssd ? 'granted' : 'missing'}</Text>
-                <Text style={styles.assistantPointText}>Workouts: {devDiagnostics?.permissionStates?.ExerciseSession ? 'granted' : 'missing'}</Text>
-              </View>
-
-              <View style={styles.assistantCard}>
-                <Text style={styles.assistantTitle}>Signal Runtime</Text>
-                <Text style={styles.assistantPointText}>Steps: {devDiagnostics?.metricDebug.steps.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.steps.stale ? 'yes' : 'no'}</Text>
-                <Text style={styles.assistantPointText}>Sleep: {devDiagnostics?.metricDebug.sleep.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.sleep.stale ? 'yes' : 'no'}</Text>
-                <Text style={styles.assistantPointText}>Resting HR: {devDiagnostics?.metricDebug.restingHeartRate.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.restingHeartRate.stale ? 'yes' : 'no'}</Text>
-                <Text style={styles.assistantPointText}>HRV: {devDiagnostics?.metricDebug.hrv.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.hrv.stale ? 'yes' : 'no'}</Text>
-                <Text style={styles.assistantPointText}>Workouts: {devDiagnostics?.metricDebug.workouts.recordCount ?? 0} records • stale: {devDiagnostics?.metricDebug.workouts.stale ? 'yes' : 'no'}</Text>
-              </View>
-
-              <View style={styles.assistantCard}>
-                <Text style={styles.assistantTitle}>Recovery Engine</Text>
-                <Text style={styles.assistantPointText}>Raw score: {recoveryIntel.debug.rawRecoveryScore}</Text>
-                <Text style={styles.assistantPointText}>Smoothed score: {recoveryIntel.debug.smoothedRecoveryScore ?? 'calibrating'}</Text>
-                <Text style={styles.assistantPointText}>Raw calm: {recoveryIntel.debug.rawCalmScore}</Text>
-                <Text style={styles.assistantPointText}>Smoothed calm: {recoveryIntel.debug.smoothedCalmScore ?? 'calibrating'}</Text>
-                <Text style={styles.assistantPointText}>Raw stress recovery: {recoveryIntel.debug.rawStressRecoveryScore}</Text>
-                <Text style={styles.assistantPointText}>Smoothed stress recovery: {recoveryIntel.debug.smoothedStressRecoveryScore ?? 'calibrating'}</Text>
-                <Text style={styles.assistantPointText}>Coverage: {recoveryIntel.debug.signalCoverageCount}/5</Text>
-                <Text style={styles.assistantPointText}>Confidence: {recoveryIntel.debug.confidenceState}</Text>
-                <Text style={styles.assistantPointText}>Calibration: {recoveryIntel.isCalibrating ? 'yes' : 'no'}</Text>
-              </View>
-
-              <View style={styles.assistantCard}>
-                <Text style={styles.assistantTitle}>Session Influence</Text>
-                <Text style={styles.assistantPointText}>Today sessions: {sessionAntiManipulation.todaySessionCount}</Text>
-                <Text style={styles.assistantPointText}>Multiplier: {recoveryIntel.debug.sessionInfluenceMultiplier.toFixed(2)}</Text>
-                <Text style={styles.assistantPointText}>Cooldown penalty: {recoveryIntel.debug.recentCooldownPenalty.toFixed(2)}</Text>
-                <Text style={styles.assistantPointText}>Effective influence: {recoveryIntel.debug.effectiveSessionInfluence.toFixed(2)}</Text>
-              </View>
-
-              <Pressable style={styles.ctaBtn} onPress={() => setDevPanelOpen(false)}><Text style={styles.ctaText}>Close</Text></Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
+        <JourneyIntelligenceCard
+          title={latestReport ? `${latestReport.labName} analysed` : 'Reports unlock biomarker intelligence'}
+          body={
+            latestReport
+              ? `${latestReport.abnormal} markers need attention from your latest report on ${latestReport.date}.`
+              : 'Upload blood reports to unlock HbA1c, vitamin, lipid, thyroid, and CBC intelligence.'
+          }
+          action={latestReport ? 'Review report' : 'Upload report'}
+          onPress={() => navigation.navigate('HealthReports')}
+        />
+      </ScrollView>
     </Screen>
   );
 };
 
+const Header = ({
+  name,
+  onSearch,
+  onAdd,
+  onNotifications,
+  onProfile
+}: {
+  name: string;
+  onSearch: () => void;
+  onAdd: () => void;
+  onNotifications: () => void;
+  onProfile: () => void;
+}) => (
+  <View style={styles.header}>
+    <View>
+      <Text style={styles.headerHello}>{getGreeting()}</Text>
+      <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
+    </View>
+    <View style={styles.headerActions}>
+      <HeaderIcon icon="search-outline" onPress={onSearch} />
+      <HeaderIcon icon="add-circle-outline" onPress={onAdd} />
+      <HeaderIcon icon="notifications-outline" onPress={onNotifications} badge="9" />
+      <Pressable onPress={onProfile} style={styles.avatar}>
+        <Ionicons name="person-outline" size={24} color="#E9F0EA" />
+      </Pressable>
+    </View>
+  </View>
+);
+
+const HeaderIcon = ({ icon, onPress, badge }: { icon: keyof typeof Ionicons.glyphMap; onPress: () => void; badge?: string }) => (
+  <Pressable onPress={onPress} style={styles.headerIcon}>
+    <Ionicons name={icon} size={21} color="#F4F7F4" />
+    {badge ? (
+      <View style={styles.headerBadge}>
+        <Text style={styles.headerBadgeText}>{badge}</Text>
+      </View>
+    ) : null}
+  </Pressable>
+);
+
+const RecoveryTrendCard = ({ values, hasData }: { values: number[]; hasData: boolean }) => (
+  <View style={styles.trendCard}>
+    <Text style={styles.trendTitle}>Your 7 day’s Recovery Trend</Text>
+    <View style={styles.trendRow}>
+      {trendDays.map((day, index) => {
+        const value = values[index];
+        const tone = hasData ? trendTone(value) : { bg: index === 0 || index === 6 ? '#050505' : '#232629', text: '#FFFFFF' };
+        return (
+          <View key={`${day}-${index}`} style={styles.trendItem}>
+            <View style={[styles.trendPill, { backgroundColor: tone.bg }]}>
+              <Text style={[styles.trendValue, { color: tone.text }]}>{hasData ? `${Math.round(value)}%` : '--'}</Text>
+            </View>
+            <Text style={styles.trendDay}>{day}</Text>
+          </View>
+        );
+      })}
+    </View>
+  </View>
+);
+
+const RecoveryCoreCard = ({
+  score,
+  state,
+  insight,
+  nodes,
+  onAssist,
+  onSync
+}: {
+  score: number | null;
+  state: string;
+  insight: string;
+  nodes: RecoveryNode[];
+  onAssist: () => void;
+  onSync: () => void;
+}) => (
+  <View style={styles.recoveryCard}>
+    <View style={styles.recoveryActions}>
+      <ActionPill label="Assist" icon="sparkles-outline" onPress={onAssist} />
+      <ActionPill label="Sync" icon="watch-outline" onPress={onSync} />
+    </View>
+
+    <View style={styles.organicWrap}>
+      <Svg width="100%" height="100%" viewBox="0 0 340 310" style={StyleSheet.absoluteFillObject}>
+        <Defs>
+          <SvgLinearGradient id="organicFill" x1="44" y1="10" x2="300" y2="298" gradientUnits="userSpaceOnUse">
+            <Stop offset="0" stopColor="#24272B" />
+            <Stop offset="0.52" stopColor="#141719" />
+            <Stop offset="1" stopColor="#0B0D0E" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="coreGlow" x1="110" y1="80" x2="220" y2="230" gradientUnits="userSpaceOnUse">
+            <Stop offset="0" stopColor="#7A7E85" stopOpacity="0.38" />
+            <Stop offset="1" stopColor="#070808" stopOpacity="0.92" />
+          </SvgLinearGradient>
+        </Defs>
+        <Path
+          d="M157.9 21.2C176.5 8.6 201.8 16.1 210.6 36.7L230.4 83.2C235.7 95.7 247.7 104.2 261.2 105L300.8 107.3C324.7 108.7 340.1 133.1 329.8 154.7L312.9 190.1C307.2 202.1 309.1 216.3 317.8 226.4L332.2 243.1C347.2 260.6 335.7 287.8 312.7 289.4L225.9 295.5C218.2 296.1 210.8 299 204.8 303.8C185.6 319.2 158.4 319.2 139.2 303.8C133.2 299 125.8 296.1 118.1 295.5L31.3 289.4C8.3 287.8 -3.2 260.6 11.8 243.1L26.2 226.4C34.9 216.3 36.8 202.1 31.1 190.1L14.2 154.7C3.9 133.1 19.3 108.7 43.2 107.3L82.8 105C96.3 104.2 108.3 95.7 113.6 83.2L133.4 36.7C138.2 25.4 147.1 28.6 157.9 21.2Z"
+          fill="url(#organicFill)"
+        />
+        <Circle cx="170" cy="164" r="73" fill="url(#coreGlow)" />
+        <Circle cx="170" cy="164" r="54" fill="#1B1C20" opacity="0.94" />
+      </Svg>
+
+      {nodes.map((node) => (
+        <RecoveryNodeChip key={node.key} node={node} />
+      ))}
+
+      <View style={styles.coreCenter}>
+        <Text style={styles.coreScore}>{score == null ? '...' : `${score}/100`}</Text>
+        <Text style={styles.coreLabel}>Recovery Core</Text>
+        <View style={[styles.coreState, state === 'Lower Today' ? styles.coreStateAlert : styles.coreStateNeutral]}>
+          <Text style={styles.coreStateText}>{state}</Text>
+        </View>
+      </View>
+    </View>
+
+    <View style={styles.recoveryFooter}>
+      <Text style={styles.recoveryFooterTitle}>{insight}</Text>
+      <Text style={styles.recoveryFooterBody}>Tap Activity, Nutrition, Sleep, Recovery, or Mind to open focused intelligence.</Text>
+    </View>
+  </View>
+);
+
+const RecoveryNodeChip = ({ node }: { node: RecoveryNode }) => (
+  <Pressable onPress={node.onPress} style={[styles.nodeChip, nodePositions[node.position]]}>
+    <View style={[styles.nodeIcon, node.active ? styles.nodeIconActive : null]}>
+      <Ionicons name={node.icon} size={24} color={node.active ? '#F4F7F4' : '#A8B1AA'} />
+    </View>
+    <Text style={styles.nodeLabel}>{node.label}</Text>
+    <Text style={styles.nodeValue} numberOfLines={1}>{node.value}</Text>
+  </Pressable>
+);
+
+const ActionPill = ({ label, icon, onPress }: { label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }) => (
+  <Pressable onPress={onPress} style={styles.actionPill}>
+    <Ionicons name={icon} size={16} color="#FFFFFF" />
+    <Text style={styles.actionPillText}>{label}</Text>
+  </Pressable>
+);
+
+const MiniStatusCard = ({
+  title,
+  icon,
+  value,
+  body,
+  action,
+  onPress
+}: {
+  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  value: string;
+  body: string;
+  action: string;
+  onPress: () => void;
+}) => (
+  <Pressable onPress={onPress} style={styles.miniCard}>
+    <View style={styles.miniTop}>
+      <Text style={styles.miniTitle}>{title}</Text>
+      <Ionicons name={icon} size={22} color="#F4F7F4" />
+    </View>
+    <Text style={styles.miniValue}>{value}</Text>
+    <Text style={styles.miniBody}>{body}</Text>
+    <Text style={styles.miniAction}>{action}</Text>
+  </Pressable>
+);
+
+const HealthConnectionCard = ({ status, body, onPress }: { status: string; body: string; onPress: () => void }) => (
+  <Pressable onPress={onPress} style={styles.connectCard}>
+    <View style={styles.connectTop}>
+      <View style={styles.connectTitleRow}>
+        <Ionicons name="link-outline" size={22} color="#7BE2D0" />
+        <Text style={styles.connectTitle}>Connect Health Data</Text>
+      </View>
+      <Text style={styles.connectBadge}>{status}</Text>
+    </View>
+    <Text style={styles.connectBody}>{body}</Text>
+    <Text style={styles.connectAction}>Connect now +</Text>
+  </Pressable>
+);
+
+const SyncStrip = ({ body, onPress }: { body: string; onPress: () => void }) => (
+  <Pressable onPress={onPress} style={styles.syncStrip}>
+    <Ionicons name="checkmark-circle-outline" size={20} color="#8DF58B" />
+    <Text style={styles.syncStripText}>{body}</Text>
+    <Ionicons name="chevron-forward" size={18} color="#9FA7A1" />
+  </Pressable>
+);
+
+const HealthSnapshotCard = ({ metrics }: { metrics: ReturnType<typeof buildHealthSnapshotMetrics> }) => {
+  const items = [
+    { label: 'BMI', value: metrics.bmi != null ? metrics.bmi.toFixed(1) : 'Pending' },
+    { label: 'Daily Energy', value: metrics.calorieTarget ? `${metrics.calorieTarget} kcal` : 'Pending' },
+    { label: 'Protein', value: metrics.proteinTargetGrams ? `${metrics.proteinTargetGrams} g` : 'Pending' },
+    { label: 'Hydration', value: metrics.hydrationTargetLiters ? `${metrics.hydrationTargetLiters} L` : 'Pending' }
+  ];
+
+  return (
+    <View style={styles.snapshotCard}>
+      <Text style={styles.sectionTitle}>Your Health Snapshot</Text>
+      <Text style={styles.sectionSubtitle}>Calculated from saved profile data</Text>
+      <View style={styles.snapshotGrid}>
+        {items.map((item) => (
+          <View key={item.label} style={styles.snapshotTile}>
+            <Text style={styles.snapshotLabel}>{item.label}</Text>
+            <Text style={styles.snapshotValue}>{item.value}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const ProfileStrengthCard = ({ percent, missing, onPress }: { percent: number; missing: string[]; onPress: () => void }) => (
+  <LinearGradient colors={['#101713', '#090D0B']} style={styles.profileCard}>
+    <Text style={styles.profileEyebrow}>Your Health Journey</Text>
+    <Text style={styles.profileTitle}>Strength: {percent}%</Text>
+    <Text style={styles.profileBody}>You unlocked basic insights. Complete the next sections to improve consultant recommendations.</Text>
+    <View style={styles.profileProgress}>
+      <View style={[styles.profileProgressFill, { width: `${Math.max(8, percent)}%` }]} />
+    </View>
+    {missing.length ? (
+      <View style={styles.missingList}>
+        {missing.map((item) => (
+          <Text key={item} style={styles.missingText}>○ {item}</Text>
+        ))}
+      </View>
+    ) : null}
+    <Pressable onPress={onPress} style={styles.profileButton}>
+      <Text style={styles.profileButtonText}>Continue Journey</Text>
+    </Pressable>
+  </LinearGradient>
+);
+
+const JourneyIntelligenceCard = ({
+  title,
+  body,
+  action,
+  onPress
+}: {
+  title: string;
+  body: string;
+  action: string;
+  onPress: () => void;
+}) => (
+  <Pressable onPress={onPress} style={styles.journeyCard}>
+    <View style={styles.journeyIcon}>
+      <Ionicons name="document-text-outline" size={22} color="#DDE6DD" />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.journeyTitle}>{title}</Text>
+      <Text style={styles.journeyBody}>{body}</Text>
+      <Text style={styles.journeyAction}>{action}</Text>
+    </View>
+  </Pressable>
+);
+
+const nodePositions = StyleSheet.create({
+  top: {
+    top: 32,
+    left: '50%',
+    marginLeft: -50
+  },
+  left: {
+    left: 12,
+    top: 124
+  },
+  right: {
+    right: 12,
+    top: 124
+  },
+  bottomLeft: {
+    left: 56,
+    bottom: 20
+  },
+  bottomRight: {
+    right: 56,
+    bottom: 20
+  }
+});
+
 const styles = StyleSheet.create({
-  content: {
-    paddingBottom: 84,
-    gap: 12
+  screen: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: 0
   },
-  headerRow: {
-    marginTop: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
+  scrollContent: {
+    paddingBottom: 118,
+    gap: 16
   },
-  greeting: {
-    color: '#F5F5F5',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    lineHeight: 18
-  },
-  focusCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1D232A',
-    backgroundColor: '#0F151D',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12
-  },
-  focusTextWrap: {
-    flex: 1,
-    paddingRight: 6
-  },
-  focusTitle: {
-    color: '#F3F5F7',
-    fontSize: 14,
-    fontFamily: 'Poppins_700Bold',
-    marginBottom: 6
-  },
-  focusBody: {
-    color: '#8E9399',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    lineHeight: 17,
-    maxWidth: 236
-  },
-  focusCta: {
-    minHeight: 30,
-    borderRadius: 15,
-    backgroundColor: '#59BE08',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 11,
-    alignSelf: 'flex-start',
-    marginTop: 2
-  },
-  focusCtaText: {
-    color: '#F4F8F1',
-    fontSize: 14,
-    fontFamily: 'Poppins_700Bold'
-  },
-  topRightRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  actionRail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#121212',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#000000',
-    overflow: 'hidden'
-  },
-  actionBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  notifyBadge: {
-    position: 'absolute',
-    right: 5,
-    top: 3,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#D04053',
-    borderWidth: 1,
-    borderColor: '#F5E1E1',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  notifyBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontFamily: 'Poppins_700Bold'
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#CFCFCF'
-  },
-  cardPrimary: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#222222',
-    padding: 16
-  },
-  heroZone: {
-    height: 340,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    position: 'relative',
-    overflow: 'visible'
-  },
-  starLayerContainer: {
-    position: 'absolute',
-    top: -14,
-    right: -12,
-    bottom: -14,
-    left: -12,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  starLayerGlowWrap: {
-    shadowColor: '#000000',
-    shadowOffset: { width: -6, height: -6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14
-  },
-  starLayerDarkWrap: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 10, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 6
-  },
-  starLayerImage: {
-    width: 342,
-    height: 342
-  },
-  card: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#242424',
-    padding: 12,
-    backgroundColor: '#151515'
-  },
-  cardTitle: {
-    color: '#F4F4F4',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    marginBottom: 8
-  },
-  cardSub: {
-    color: '#848484',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    marginBottom: 10
-  },
-  heroState: {
-    color: '#DCECDD',
-    fontSize: 16,
-    fontFamily: 'Poppins_600SemiBold',
-    marginBottom: 6
-  },
-  heroScoreRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
-    marginBottom: 8
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
-  },
-  heroTextCol: {
-    flex: 1
-  },
-  heroScoreValue: {
-    color: '#F4F4F4',
-    fontSize: 38,
-    fontFamily: 'Poppins_700Bold',
-    lineHeight: 40
-  },
-  heroScoreSlash: {
-    color: '#9A9A9A',
-    fontSize: 14,
-    fontFamily: 'Poppins_500Medium',
-    marginBottom: 5
-  },
-  heroTrendPill: {
-    marginLeft: 'auto',
-    minHeight: 26,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#355841',
-    backgroundColor: '#1A2D22',
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5
-  },
-  heroTrendText: {
-    color: '#9AC7AE',
-    fontSize: 11,
-    fontFamily: 'Poppins_600SemiBold',
-    textTransform: 'capitalize'
-  },
-  heroSentence: {
-    color: '#BFC7C0',
-    fontSize: 13,
-    fontFamily: 'Poppins_400Regular',
-    lineHeight: 18,
+    gap: 14,
     marginTop: 8
   },
-  dimensionNode: {
-    position: 'absolute',
-    alignItems: 'center',
-    gap: 3,
-    overflow: 'visible'
+  headerHello: {
+    color: '#B9C5BB',
+    fontFamily: font.semiBold,
+    fontSize: 16,
+    lineHeight: 20
   },
-  nodeCalm: {
-    top: 30 * HERO_SCALE
+  headerName: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 40,
+    lineHeight: 42,
+    maxWidth: 120
   },
-  nodeActivity: {
-    left: (37 * HERO_SCALE) - 4,
-    top: 119 * HERO_SCALE
-  },
-  nodeNutrition: {
-    left: (307 * HERO_SCALE) - 8,
-    top: 119 * HERO_SCALE
-  },
-  nodeRhythm: {
-    left: (95 * HERO_SCALE) - 4,
-    top: 276 * HERO_SCALE
-  },
-  nodeSleep: {
-    left: (258 * HERO_SCALE) + 4,
-    top: 276 * HERO_SCALE
-  },
-  dimensionNodeText: {
-    color: '#D5DADE',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'Poppins_400Regular'
-  },
-  scoreBody: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8
+    gap: 9
   },
-  pillGrid: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 8
-  },
-  metricPill: {
-    width: '49%',
-    minHeight: 32,
-    borderRadius: 16,
-    backgroundColor: '#000000',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8
-  },
-  metricPillText: {
-    fontSize: 12,
-    color: '#59BE08',
-    fontFamily: 'Poppins_400Regular',
-    flexShrink: 1
-  },
-  ringWrap: {
-    width: HERO_RING_SIZE,
-    height: HERO_RING_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  ringGlow: {
-    position: 'absolute',
-    width: 116,
-    height: 116,
-    borderRadius: 58
-  },
-  ringCenter: {
-    position: 'absolute',
-    fontSize: 20,
-    lineHeight: 32,
-    color: '#DDE5EF',
-    fontFamily: 'Poppins_700Bold',
-    textAlign: 'center'
-  },
-  ringSub: {
-    position: 'absolute',
-    color: '#D6DBE0',
-    fontSize: 10,
-    lineHeight: 18,
-    fontFamily: 'Poppins_500Medium',
-    textAlign: 'center'
-  },
-  centerOrb: {
-    position: 'absolute',
-    left: 100 * HERO_SCALE,
-    top: 93 * HERO_SCALE,
-    width: 191 * HERO_SCALE,
-    height: 191 * HERO_SCALE,
-    borderRadius: (191 * HERO_SCALE) / 2,
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#303642',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'visible'
+    position: 'relative'
   },
-  starCircleLayer: {
-    position: 'absolute',
-    left: '50%',
-    top: '50%',
-    width: HERO_CENTER_CIRCLE_SIZE,
-    height: HERO_CENTER_CIRCLE_SIZE,
-    marginLeft: -(HERO_CENTER_CIRCLE_SIZE / 2),
-    marginTop: -(HERO_CENTER_CIRCLE_SIZE / 2),
-    opacity: 0.95
-  },
-  orbCore: {
-    position: 'absolute',
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    shadowColor: '#94A3B8',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3
-  },
-  lowerTag: {
-    position: 'absolute',
-    bottom: 14,
-    transform: [{ translateY: 16 }],
-    minHeight: 21,
-    borderRadius: 16,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#E51A1A',
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#153923',
     alignItems: 'center',
     justifyContent: 'center'
   },
-  lowerTagText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    lineHeight: 14,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  bodyCopy: {
-    color: '#888888',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    lineHeight: 16,
-    marginBottom: 10
-  },
-  syncButton: {
-    alignSelf: 'flex-start',
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#59BE08',
-    flexDirection: 'row',
+  headerBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4B5C',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12
+    justifyContent: 'center',
+    paddingHorizontal: 4
   },
-  syncText: {
+  headerBadgeText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: font.bold,
+    fontSize: 10,
+    lineHeight: 12
+  },
+  trendCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#1D2A23',
+    backgroundColor: '#070A08',
+    padding: 10,
+    gap: 9
+  },
+  trendTitle: {
+    color: '#F4F7F4',
+    fontFamily: font.semiBold,
+    fontSize: 13,
+    lineHeight: 17
   },
   trendRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 6,
-    marginBottom: 8
+    gap: 6
   },
-  sparklineWrap: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#253127',
-    backgroundColor: '#121714',
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    marginBottom: 8
-  },
-  trendChip: {
+  trendItem: {
     flex: 1,
-    minHeight: 28,
-    borderRadius: 10,
+    alignItems: 'center',
+    gap: 5
+  },
+  trendPill: {
+    width: '100%',
+    minWidth: 38,
+    height: 28,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center'
   },
-  trendChipText: {
-    fontSize: 11,
-    fontFamily: 'Poppins_500Medium'
+  trendValue: {
+    fontFamily: font.bold,
+    fontSize: 12,
+    lineHeight: 14
   },
-  trendWeekRow: {
+  trendDay: {
+    color: '#D8E0D9',
+    fontFamily: font.medium,
+    fontSize: 11,
+    lineHeight: 13
+  },
+  recoveryCard: {
+    borderRadius: 28,
+    backgroundColor: '#0F1D15',
+    borderWidth: 1,
+    borderColor: '#203B2D',
+    padding: 12,
+    overflow: 'hidden'
+  },
+  recoveryActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 6
+    marginBottom: -6,
+    zIndex: 2
   },
-  trendWeekLabel: {
-    color: '#EEEEEE',
+  actionPill: {
+    minHeight: 32,
+    borderRadius: radius.pill,
+    backgroundColor: '#050505',
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  actionPillText: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 12
+  },
+  organicWrap: {
+    height: 318,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  coreCenter: {
+    width: 144,
+    height: 144,
+    borderRadius: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(12,13,14,0.26)'
+  },
+  coreScore: {
+    color: '#E5E9ED',
+    fontFamily: font.bold,
+    fontSize: 28,
+    lineHeight: 32
+  },
+  coreLabel: {
+    color: '#CED4D0',
+    fontFamily: font.medium,
     fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    width: 20,
+    lineHeight: 16
+  },
+  coreState: {
+    marginTop: 4,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 7
+  },
+  coreStateAlert: {
+    backgroundColor: '#F63737'
+  },
+  coreStateNeutral: {
+    backgroundColor: '#23262B'
+  },
+  coreStateText: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 12,
+    lineHeight: 14
+  },
+  nodeChip: {
+    position: 'absolute',
+    width: 100,
+    alignItems: 'center',
+    gap: 3
+  },
+  nodeIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#17291E',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  nodeIconActive: {
+    backgroundColor: '#1C3828'
+  },
+  nodeLabel: {
+    color: '#F4F7F4',
+    fontFamily: font.bold,
+    fontSize: 14,
+    lineHeight: 17,
     textAlign: 'center'
   },
-  noWellnessCard: {
-    borderWidth: 1,
-    borderRadius: 18,
+  nodeValue: {
+    color: '#AEB8B0',
+    fontFamily: font.medium,
+    fontSize: 11,
+    lineHeight: 14,
+    textAlign: 'center'
+  },
+  recoveryFooter: {
+    marginTop: 4,
     padding: 16,
-    gap: 8,
-    marginBottom: 12
-  },
-  noWellnessTitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins_700Bold'
-  },
-  noWellnessBody: {
-    fontSize: 13,
-    lineHeight: 20,
-    fontFamily: 'Poppins_400Regular'
-  },
-  healthSyncCard: {
+    borderRadius: 24,
+    backgroundColor: '#143522',
     borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
-    gap: 8,
-    marginBottom: 12
+    borderColor: '#2B523E',
+    gap: 8
   },
-  healthSyncHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10
-  },
-  healthSyncTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1
-  },
-  healthSyncTitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins_700Bold',
-    flex: 1
-  },
-  healthSyncBadge: {
-    fontSize: 11,
-    fontFamily: 'Poppins_700Bold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
-  healthSyncBody: {
-    fontSize: 12,
-    lineHeight: 17,
-    fontFamily: 'Poppins_400Regular'
-  },
-  healthSyncLink: {
-    color: '#59BE08',
-    fontSize: 13,
-    fontFamily: 'Poppins_700Bold'
-  },
-  lowerRow: {
-    flexDirection: 'row',
-    gap: 10
-  },
-  lowerCard: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    backgroundColor: '#131313',
-    padding: 12,
-    minHeight: 130
-  },
-  lowerCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10
-  },
-  lowerCardTitle: {
-    color: '#EAEAEA',
-    fontSize: 14,
-    fontFamily: 'Poppins_700Bold'
-  },
-  lowerStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10
-  },
-  lowerStatValue: {
-    color: '#F2F2F2',
-    fontSize: 12,
-    fontFamily: 'Poppins_700Bold'
-  },
-  lowerStatLabel: {
-    color: '#7C848C',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular'
-  },
-  lowerLink: {
-    marginTop: 'auto',
-    color: '#8ADE67',
-    fontSize: 14,
-    fontFamily: 'Poppins_700Bold'
-  },
-  lowerScore: {
-    color: '#F2F2F2',
-    fontSize: 12,
-    fontFamily: 'Poppins_700Bold',
-    marginBottom: 4
-  },
-  lowerHint: {
-    color: '#7C848C',
-    fontSize: 12,
-    fontFamily: 'Poppins_700Bold',
-    marginBottom: 10
-  },
-  heroSyncButton: {
-    position: 'absolute',
-    right: 8,
-    top: 6,
-    minHeight: 32,
-    borderRadius: 16,
-    backgroundColor: '#000000',
-    borderWidth: 0.5,
-    borderColor: '#7FFFD4',
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 12,
-    elevation: 7,
-    shadowOffset: { width: 0, height: 0 }
-  },
-  heroAssistButton: {
-    position: 'absolute',
-    left: 8,
-    top: 6,
-    minHeight: 32,
-    borderRadius: 16,
-    backgroundColor: '#000000',
-    borderWidth: 0.5,
-    borderColor: '#7FFFD4',
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 12,
-    elevation: 7,
-    shadowOffset: { width: 0, height: 0 }
-  },
-  heroCtaTouch: {
-    minHeight: 32,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  heroSyncText: {
+  recoveryFooterTitle: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: font.bold,
+    fontSize: 20,
+    lineHeight: 27,
+    textAlign: 'center'
   },
-  lowerBarRow: {
+  recoveryFooterBody: {
+    color: '#B6C5B9',
+    fontFamily: font.regular,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center'
+  },
+  twoCardRow: {
     flexDirection: 'row',
-    gap: 6
+    gap: 10
   },
-  lowerBar: {
+  miniCard: {
     flex: 1,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#3E4247'
-  },
-  assistantCard: {
-    borderRadius: 20,
+    minHeight: 136,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#59BE08',
-    backgroundColor: '#000000',
+    borderColor: '#282E2B',
+    backgroundColor: '#111211',
     padding: 12,
-    marginTop: 2
+    gap: 7
   },
-  assistantHeader: {
+  miniTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8
+    gap: 8
   },
-  assistantTitle: {
-    color: '#F5F5F5',
+  miniTitle: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
     fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
+    lineHeight: 17
   },
-  assistantBadge: {
-    color: '#00C92C',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
+  miniValue: {
+    color: '#E9EFEA',
+    fontFamily: font.semiBold,
+    fontSize: 17,
+    lineHeight: 20
   },
-  assistantCopy: {
-    color: '#8D8D8D',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    lineHeight: 16,
-    marginBottom: 2
-  },
-  assistantPoint: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginTop: 6
-  },
-  assistantBullet: {
-    color: '#59BE08',
-    fontSize: 14,
-    lineHeight: 16,
-    marginTop: 1
-  },
-  assistantPointText: {
-    flex: 1,
-    color: '#8D8D8D',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    lineHeight: 16
-  },
-  consultantCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#59BE08',
-    backgroundColor: '#0A0A0A',
-    padding: 12
-  },
-  consultantHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6
-  },
-  consultantLabel: {
-    color: '#59BE08',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  consultantName: {
-    color: '#F4F4F4',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  consultantSpecialty: {
-    color: '#CDD2D6',
-    fontSize: 12,
-    marginTop: 3
-  },
-  consultantHint: {
-    color: '#9AA0A6',
+  miniBody: {
+    color: '#97A19A',
+    fontFamily: font.regular,
     fontSize: 11,
-    marginTop: 8,
     lineHeight: 15
   },
-  medicationCta: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#59BE08',
-    backgroundColor: '#000000',
-    padding: 12
-  },
-  medicationCtaTitle: {
-    color: '#F4F4F4',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    marginBottom: 8
-  },
-  medicationCtaBody: {
-    color: '#C2C2C2',
+  miniAction: {
+    marginTop: 'auto',
+    color: '#9BE95E',
+    fontFamily: font.bold,
     fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    lineHeight: 16
+    lineHeight: 15
   },
-  sheetOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.52)',
-    justifyContent: 'flex-end'
+  connectCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#2B523E',
+    backgroundColor: '#102217',
+    padding: 16,
+    gap: 11
   },
-  sheetBackdrop: {
+  connectTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10
+  },
+  connectTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     flex: 1
   },
-  sheetWrap: {
-    maxHeight: '82%',
-    backgroundColor: '#121212',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    padding: 14
+  connectTitle: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 18,
+    lineHeight: 22
   },
-  sheetHandle: {
-    alignSelf: 'center',
-    width: 48,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: '#6F6F6F',
-    marginBottom: 10
-  },
-  sheetTitle: {
-    color: '#F4F4F4',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
-    marginBottom: 10
-  },
-  sheetContent: {
-    gap: 10,
-    paddingBottom: 20
-  },
-  section: {
-    color: '#F4F4F4',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  empty: {
-    color: '#9A9A9A',
+  connectBadge: {
+    color: '#16B8AA',
+    fontFamily: font.bold,
     fontSize: 12,
-    fontFamily: 'Poppins_400Regular'
+    lineHeight: 15
   },
-  medRow: {
+  connectBody: {
+    color: '#D4DDD5',
+    fontFamily: font.regular,
+    fontSize: 14,
+    lineHeight: 20
+  },
+  connectAction: {
+    color: '#5FC100',
+    fontFamily: font.bold,
+    fontSize: 15,
+    lineHeight: 18
+  },
+  syncStrip: {
+    minHeight: 52,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
-    borderRadius: 12,
-    backgroundColor: '#0B0B0B',
-    padding: 10,
+    borderColor: '#254633',
+    backgroundColor: '#101A14',
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  medName: {
-    color: '#F4F4F4',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  medTime: {
-    color: '#9A9A9A',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular'
-  },
-  statusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#59BE08'
-  },
-  statusText: {
-    color: '#000000',
-    fontSize: 11,
-    fontFamily: 'Poppins_600SemiBold',
-    textTransform: 'capitalize'
-  },
-  quickRow: {
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 10,
-    backgroundColor: '#0B0B0B'
-  },
-  quickLabel: {
-    color: '#F4F4F4',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: 8
-  },
-  quickBtn: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#3A3A3A',
-    paddingHorizontal: 10,
-    paddingVertical: 6
-  },
-  quickBtnText: {
-    color: '#F4F4F4',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular'
-  },
-  ctaRow: {
-    gap: 8
-  },
-  ctaBtn: {
-    minHeight: 44,
-    borderRadius: 12,
-    backgroundColor: '#171717',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#59BE08'
-  },
-  ctaText: {
-    color: '#F4F4F4',
-    fontSize: 14,
-    fontFamily: 'Poppins_700Bold'
-  },
-  medCard: {
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    borderRadius: 12,
-    backgroundColor: '#0B0B0B',
-    padding: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 10
   },
-  manageRow: {
-    flexDirection: 'row',
-    gap: 10
-  },
-  link: {
-    color: '#59BE08',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  deleteLink: {
-    color: '#D04053',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  summaryCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#202020',
-    backgroundColor: '#151515',
-    padding: 12,
-    gap: 8
-  },
-  summaryTitle: {
-    color: '#F4F4F4',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  summaryKey: {
-    color: '#9A9A9A',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular'
-  },
-  summaryValue: {
-    color: '#F4F4F4',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  attentionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8
-  },
-  attentionText: {
+  syncStripText: {
     flex: 1,
-    color: '#D8D8D8',
+    color: '#DCE8DE',
+    fontFamily: font.medium,
     fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    lineHeight: 17
-  },
-  driverRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8
-  },
-  driverArrow: {
-    width: 14,
-    textAlign: 'center',
-    fontSize: 12,
-    fontFamily: 'Poppins_700Bold',
-    marginTop: 1
-  },
-  driverTitle: {
-    color: '#EAEAEA',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold',
-    marginBottom: 2
-  },
-  driverBody: {
-    color: '#9FA5A1',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
     lineHeight: 16
   },
-  quickActionRow: {
-    gap: 8,
-    paddingRight: 8
-  },
-  quickActionPill: {
-    minHeight: 38,
-    borderRadius: 20,
+  snapshotCard: {
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#2B342D',
-    backgroundColor: '#111714',
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6
+    borderColor: '#203B2D',
+    backgroundColor: '#0F1D15',
+    padding: 16,
+    gap: 12
   },
-  quickActionPillPressed: {
-    opacity: 0.76
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 22,
+    lineHeight: 27
   },
-  quickActionText: {
-    color: '#DBE8DE',
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium'
-  },
-  aiCompactCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#273027',
-    backgroundColor: '#121713',
-    padding: 12,
-    gap: 6
-  },
-  aiCompactTitle: {
-    color: '#59BE08',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  aiCompactBody: {
-    color: '#E2E2E2',
+  sectionSubtitle: {
+    color: '#B3C0B6',
+    fontFamily: font.regular,
     fontSize: 13,
-    fontFamily: 'Poppins_400Regular',
     lineHeight: 18
   },
-  aiCompactLink: {
-    color: '#A6D97A',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  celebrationCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#294332',
-    backgroundColor: '#132017',
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  celebrationText: {
-    flex: 1,
-    color: '#C7D8CC',
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium',
-    lineHeight: 17
-  },
-  careCircleChip: {
-    marginTop: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  careCircleChipTitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  careCircleChipSubtitle: {
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    marginTop: 2
-  },
-  familySupportCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#2C2C2C',
-    backgroundColor: '#141414',
-    padding: 12,
-    gap: 8
-  },
-  familySupportCardLight: {
-    borderColor: '#C9D2DE',
-    backgroundColor: '#FFFFFF'
-  },
-  familySupportTitle: {
-    color: '#F1F1F1',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  familySupportBody: {
-    color: '#BDBDBD',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    lineHeight: 18
-  },
-  familySupportRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10
-  },
-  familySupportAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: '#59BE08',
-    backgroundColor: '#1A1A1A',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  familySupportAvatarText: {
-    color: '#F4F4F4',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  familySupportMember: {
-    color: '#F2F2F2',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  familySupportMeta: {
-    color: '#A0A0A0',
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular'
-  },
-  familyActionRow: {
-    flexDirection: 'row',
-    gap: 8
-  },
-  familyActionBtn: {
-    flex: 1,
-    minHeight: 38,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2F2F2F',
-    backgroundColor: '#111111',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10
-  },
-  familyActionBtnLight: {
-    borderColor: '#C3D0DC',
-    backgroundColor: '#F8FAFD'
-  },
-  familyActionText: {
-    color: '#D8E8D0',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  familyInput: {
-    minHeight: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2E2E2E',
-    backgroundColor: '#111111',
-    color: '#E8E8E8',
-    paddingHorizontal: 12,
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular'
-  },
-  familyInputLight: {
-    borderColor: '#C3D0DC',
-    backgroundColor: '#FFFFFF',
-    color: '#1B2430'
-  },
-  familyPillRow: {
+  snapshotGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8
-  },
-  familyPill: {
-    minHeight: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: '#2F2F2F',
-    backgroundColor: '#111111',
-    justifyContent: 'center',
-    paddingHorizontal: 12
-  },
-  familyPillLight: {
-    borderColor: '#C3D0DC',
-    backgroundColor: '#FFFFFF'
-  },
-  familyPillActive: {
-    borderColor: '#59BE08',
-    backgroundColor: '#1D2B14'
-  },
-  familyPillText: {
-    color: '#D8D8D8',
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium'
-  },
-  familyCircleCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#232323',
-    backgroundColor: '#131313',
-    padding: 12,
     gap: 10
   },
-  familyCircleHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  snapshotTile: {
+    width: '48%',
+    minHeight: 76,
+    borderRadius: 18,
+    backgroundColor: '#1A3B28',
+    padding: 12,
     justifyContent: 'space-between'
   },
-  familyCircleTitle: {
-    color: '#F4F4F4',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  familyCircleAdd: {
-    color: '#59BE08',
+  snapshotLabel: {
+    color: '#B3C3B7',
+    fontFamily: font.semiBold,
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
+    lineHeight: 15
   },
-  familyCircleList: {
-    gap: 10,
-    paddingRight: 8
+  snapshotValue: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 18,
+    lineHeight: 22
   },
-  familyCircleEmpty: {
-    color: '#9A9A9A',
+  profileCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#29342D',
+    padding: 16,
+    gap: 12
+  },
+  profileEyebrow: {
+    color: '#66BF11',
+    fontFamily: font.bold,
     fontSize: 12,
-    fontFamily: 'Poppins_400Regular'
+    letterSpacing: 1,
+    textTransform: 'uppercase'
   },
-  familyCircleMember: {
-    width: 96,
-    alignItems: 'center',
-    gap: 4
+  profileTitle: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 22,
+    lineHeight: 27
   },
-  familyCircleAvatar: {
+  profileBody: {
+    color: '#C7D1CA',
+    fontFamily: font.regular,
+    fontSize: 13,
+    lineHeight: 19
+  },
+  profileProgress: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: '#243B2B',
+    overflow: 'hidden'
+  },
+  profileProgressFill: {
+    height: '100%',
+    borderRadius: radius.pill,
+    backgroundColor: '#62C800'
+  },
+  missingList: {
+    gap: 5
+  },
+  missingText: {
+    color: '#D9E1DA',
+    fontFamily: font.medium,
+    fontSize: 12,
+    lineHeight: 15
+  },
+  profileButton: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    backgroundColor: '#5FC100',
+    paddingHorizontal: 18,
+    paddingVertical: 11
+  },
+  profileButtonText: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 14
+  },
+  journeyCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2C332F',
+    backgroundColor: '#111211',
+    padding: 14,
+    flexDirection: 'row',
+    gap: 12
+  },
+  journeyIcon: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#59BE08',
-    backgroundColor: '#1B1B1B',
+    backgroundColor: '#1B251E',
     alignItems: 'center',
     justifyContent: 'center'
   },
-  familyCircleAvatarText: {
-    color: '#F4F4F4',
-    fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
+  journeyTitle: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 15,
+    lineHeight: 19
   },
-  familyCircleName: {
-    color: '#F4F4F4',
+  journeyBody: {
+    color: '#AFB8B0',
+    fontFamily: font.regular,
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  familyCircleStatus: {
-    color: '#9A9A9A',
-    fontSize: 11,
-    fontFamily: 'Poppins_400Regular'
-  },
-  healthProfileCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 16,
-    marginTop: 14,
-    gap: 14
-  },
-  healthProfileTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12
-  },
-  healthProfileEyebrow: {
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium'
-  },
-  healthProfileName: {
-    fontSize: 18,
-    fontFamily: 'Poppins_600SemiBold',
+    lineHeight: 17,
     marginTop: 4
   },
-  healthProfileMeta: {
+  journeyAction: {
+    color: '#9BE95E',
+    fontFamily: font.bold,
     fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    marginTop: 4,
-    maxWidth: 220
-  },
-  healthJourneyUnlockList: {
-    marginTop: 10,
-    gap: 7
-  },
-  healthJourneyUnlockRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7
-  },
-  healthJourneyUnlockText: {
-    fontSize: 12,
-    fontFamily: 'Poppins_500Medium'
-  },
-  healthProfileBadge: {
-    minWidth: 96,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  healthProfileBadgeText: {
-    color: '#59BE08',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold',
-    textAlign: 'center'
-  },
-  healthJourneyBadgeLabel: {
-    fontSize: 10,
-    fontFamily: 'Poppins_600SemiBold',
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: 2
-  },
-  healthJourneyProgressTrack: {
-    height: 8,
-    borderRadius: 999,
-    overflow: 'hidden'
-  },
-  healthJourneyProgressFill: {
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: '#59BE08'
-  },
-  healthProfileBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
-  },
-  healthProfileSectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  healthProfileMissing: {
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    marginTop: 4,
-    lineHeight: 18
-  },
-  healthProfileCta: {
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 12
-  },
-  healthProfileCtaText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
-  },
-  healthSnapshotCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 16,
-    marginTop: 14,
-    gap: 14
-  },
-  healthSnapshotHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12
-  },
-  healthSnapshotTitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins_600SemiBold',
-    marginTop: 3
-  },
-  healthSnapshotGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10
-  },
-  healthSnapshotMetric: {
-    width: '48%',
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 12
-  },
-  healthSnapshotLabel: {
-    fontSize: 11,
-    fontFamily: 'Poppins_500Medium'
-  },
-  healthSnapshotValue: {
-    fontSize: 15,
-    fontFamily: 'Poppins_700Bold',
-    marginTop: 5
-  },
-  healthSnapshotHint: {
-    fontSize: 12,
-    fontFamily: 'Poppins_400Regular',
-    lineHeight: 18
+    lineHeight: 15,
+    marginTop: 7
   }
 });

@@ -11,6 +11,12 @@ import {
   Poppins_600SemiBold,
   Poppins_700Bold
 } from '@expo-google-fonts/poppins';
+import {
+  Exo_400Regular,
+  Exo_500Medium,
+  Exo_600SemiBold,
+  Exo_700Bold
+} from '@expo-google-fonts/exo';
 import { AppNavigation } from './src/navigation/AppNavigation';
 import { AppProvider, useAppContext } from './src/state/AppContext';
 import { getThemeColors } from './src/design/tokens';
@@ -41,6 +47,10 @@ export default function App() {
     Poppins_500Medium,
     Poppins_600SemiBold,
     Poppins_700Bold,
+    Exo_400Regular,
+    Exo_500Medium,
+    Exo_600SemiBold,
+    Exo_700Bold,
     ...Ionicons.font,
     ...MaterialCommunityIcons.font
   });
