@@ -1,9 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
+import { RootStackParamList } from '../../navigation/types';
+import type { MedicationLogStatus } from '../../types';
 import { useAppContext } from '../../state/AppContext';
 
 const statusColor: Record<string, string> = {
@@ -15,12 +18,14 @@ const statusColor: Record<string, string> = {
 };
 
 const toDateOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export const MedicationCalendarScreen = () => {
-  const navigation = useNavigation();
-  const { getMedicationTimelineForDate, themeMode } = useAppContext();
+  const navigation = useNavigation<Nav>();
+  const { getMedicationTimelineForDate, markMedicationAction, themeMode } = useAppContext();
   const [cursor, setCursor] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
+  const [savingLogId, setSavingLogId] = useState<string | null>(null);
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
   const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
@@ -33,6 +38,21 @@ export const MedicationCalendarScreen = () => {
   }, [cursor]);
 
   const selectedTimeline = useMemo(() => getMedicationTimelineForDate(selectedDay.toISOString()), [getMedicationTimelineForDate, selectedDay]);
+
+  const recordMedicationStatus = async (
+    medicationId: string,
+    scheduledForISO: string,
+    status: Extract<MedicationLogStatus, 'taken' | 'snoozed' | 'skipped'>,
+    snoozeMinutes?: 5 | 10 | 15 | 30
+  ) => {
+    const logKey = `${medicationId}-${scheduledForISO}-${status}`;
+    setSavingLogId(logKey);
+    try {
+      await markMedicationAction({ medicationId, scheduledForISO, status, snoozeMinutes });
+    } finally {
+      setSavingLogId(null);
+    }
+  };
 
   const statusForDay = (day: Date) => {
     const timeline = getMedicationTimelineForDate(day.toISOString());
@@ -72,16 +92,48 @@ export const MedicationCalendarScreen = () => {
       <ScrollView contentContainerStyle={styles.logs}>
         <Text style={[styles.logsTitle, { color: darkGraySurfaceText }]}>Medication Logs</Text>
         {selectedTimeline.length === 0 ? (
-          <Text style={[styles.empty, { color: darkGraySurfaceText }]}>No logs for this date.</Text>
+          <View style={[styles.emptyCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
+            <Text style={[styles.emptyTitle, { color: darkGraySurfaceText }]}>No medication scheduled for this date.</Text>
+            <Text style={[styles.empty, { color: darkGraySurfaceText }]}>Add a medication plan to start tracking taken, pending, missed, and skipped doses.</Text>
+            <Pressable style={styles.addMedicationButton} onPress={() => navigation.navigate('MedicationForm')} accessibilityRole="button">
+              <Text style={styles.addMedicationText}>Add Medication</Text>
+            </Pressable>
+          </View>
         ) : (
           selectedTimeline.map((entry) => (
             <View key={`${entry.medication.id}-${entry.scheduledForISO}`} style={[styles.logCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
-              <View>
-                <Text style={[styles.logName, { color: darkGraySurfaceText }]}>{entry.medication.name}</Text>
-                <Text style={[styles.logTime, { color: darkGraySurfaceText }]}>{new Date(entry.scheduledForISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+              <View style={styles.logHeader}>
+                <View>
+                  <Text style={[styles.logName, { color: darkGraySurfaceText }]}>{entry.medication.name}</Text>
+                  <Text style={[styles.logTime, { color: darkGraySurfaceText }]}>{new Date(entry.scheduledForISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                </View>
+                <View style={[styles.badge, { backgroundColor: statusColor[entry.status] ?? colors.info }]}>
+                  <Text style={styles.badgeText}>{entry.status}</Text>
+                </View>
               </View>
-              <View style={[styles.badge, { backgroundColor: statusColor[entry.status] ?? colors.info }]}>
-                <Text style={styles.badgeText}>{entry.status}</Text>
+              <View style={styles.logActions}>
+                {([
+                  { label: 'Taken', status: 'taken' as const },
+                  { label: 'Snooze 10m', status: 'snoozed' as const, snoozeMinutes: 10 as const },
+                  { label: 'Skip', status: 'skipped' as const }
+                ]).map((action) => {
+                  const logKey = `${entry.medication.id}-${entry.scheduledForISO}-${action.status}`;
+                  const active = entry.status === action.status;
+                  return (
+                    <Pressable
+                      key={action.label}
+                      disabled={savingLogId === logKey}
+                      onPress={() => recordMedicationStatus(entry.medication.id, entry.scheduledForISO, action.status, action.snoozeMinutes)}
+                      style={[styles.logActionButton, active && { backgroundColor: statusColor[action.status] }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Mark ${entry.medication.name} as ${action.label}`}
+                    >
+                      <Text style={[styles.logActionText, active && styles.logActionTextActive]}>
+                        {savingLogId === logKey ? 'Saving...' : action.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
           ))
@@ -151,9 +203,29 @@ const styles = StyleSheet.create({
   logsTitle: {
     ...typography.bodyStrong
   },
+  emptyCard: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: 14,
+    gap: 10
+  },
+  emptyTitle: {
+    ...typography.bodyStrong
+  },
   empty: {
     ...typography.body,
     color: colors.textMuted
+  },
+  addMedicationButton: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    backgroundColor: '#5AC400',
+    paddingHorizontal: 14,
+    paddingVertical: 8
+  },
+  addMedicationText: {
+    ...typography.caption,
+    color: '#000000'
   },
   logCard: {
     borderWidth: 1,
@@ -161,6 +233,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.card,
     padding: 12,
+    gap: 12
+  },
+  logHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center'
@@ -178,6 +253,26 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...typography.caption,
+    color: colors.white
+  },
+  logActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  logActionButton: {
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(255,255,255,0.04)'
+  },
+  logActionText: {
+    ...typography.caption,
+    color: colors.textPrimary
+  },
+  logActionTextActive: {
     color: colors.white
   }
 });

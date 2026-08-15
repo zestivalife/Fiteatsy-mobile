@@ -8,8 +8,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, SvgProps } from 'react-native-svg';
 import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
 import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
-import RecoveryCoreAsset from '../../assets/fiteatsy-home/recovery-core.svg';
+import RecoveryFrameAsset from '../../assets/fiteatsy-home/recovery-frame-20.png';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
+import ProgressDeclineAsset from '../../assets/fiteatsy-home/progress-decline.svg';
 import StateBorderlineAsset from '../../assets/fiteatsy-home/state-borderline.svg';
 import StateDeclineAsset from '../../assets/fiteatsy-home/state-decline.svg';
 import StateDefaultAsset from '../../assets/fiteatsy-home/state-default.svg';
@@ -267,10 +268,11 @@ export const HomeScreen = () => {
   ];
   const trendValues = buildDomainTrend(metrics.map((metric) => metric.score), checkIns);
   const hasTrendData = trendValues.length > 0;
+  const recoveryCoreScore = averageScores(metrics.map((metric) => metric.score));
 
   const selected = selectedMetric === 'recovery'
-    ? { label: 'Recovery Core', score: normalizeScore(recoveryIntel.recoveryScore), color: '#D5062D' }
-    : metrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: normalizeScore(recoveryIntel.recoveryScore), color: '#D5062D' };
+    ? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D' }
+    : metrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D' };
   const selectedState = stateFromScore(selected.score);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
   const goToSessions = () => (navigation.getParent() as { navigate?: (screen: string) => void } | undefined)?.navigate?.('Sessions');
@@ -396,54 +398,62 @@ const RecoveryPanel = ({
   onSelectMetric: (metric: MetricKey) => void;
 }) => {
   const StateAsset = selectedState.Asset;
-  const dashOffset = selectedScore == null ? ARC_CIRCUMFERENCE : ARC_CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, selectedScore)) / 100);
+  const progress = selectedScore == null ? 0 : Math.max(0, Math.min(100, selectedScore));
+  const dashOffset = selectedScore == null ? ARC_CIRCUMFERENCE : ARC_CIRCUMFERENCE * (1 - progress / 100);
 
   return (
     <View style={styles.recoveryPanel}>
-      <RecoveryStarAsset width={406} height={492} style={styles.starAsset} />
-      <RecoveryCoreAsset width={151} height={159} style={styles.coreAsset} />
-      <StateAsset width={72} height={100} style={styles.stateAsset} />
-      <Svg width={118} height={118} viewBox="0 0 118 118" style={styles.arcLayer}>
-        <Circle cx="59" cy="59" r="42" stroke="rgba(255,255,255,0.04)" strokeWidth={15} fill="transparent" />
-        {selectedScore != null ? (
-          <Circle
-            cx="59"
-            cy="59"
-            r="42"
-            stroke={selectedColor}
-            strokeWidth={15}
-            fill="transparent"
-            strokeLinecap="round"
-            strokeDasharray={`${ARC_CIRCUMFERENCE} ${ARC_CIRCUMFERENCE}`}
-            strokeDashoffset={dashOffset}
-            rotation="-84"
-            originX="59"
-            originY="59"
-          />
-        ) : null}
-      </Svg>
-
-      {metrics.map((metric) => (
-        <RecoveryNode
-          key={metric.key}
-          metric={metric}
-          selected={selectedMetric === metric.key}
-          onPress={() => onSelectMetric(metric.key)}
-        />
-      ))}
-
-      <Pressable
-        onPress={() => onSelectMetric('recovery')}
-        style={styles.coreCenter}
-        accessibilityRole="button"
-        accessibilityLabel="View today's Recovery Core score"
-      >
-        <Text style={styles.coreScore}>{selectedScore == null ? '--/100' : `${selectedScore}/100`}</Text>
-        <Text style={styles.coreLabel}>{selectedLabel}</Text>
-        <View style={[styles.stateChip, { backgroundColor: selectedScore == null ? '#23272D' : selectedColor }]}>
-          <Text style={styles.stateChipText}>{selectedState.label}</Text>
+      <View style={styles.recoveryStage}>
+        <RecoveryStarAsset width={406} height={492} style={styles.starAsset} />
+        <Image source={RecoveryFrameAsset} resizeMode="contain" style={styles.frameAsset} />
+        <View style={styles.progressShapeFrame} pointerEvents="none">
+          <View style={[styles.progressShapeClip, { height: `${progress}%` }]}>
+            <ProgressDeclineAsset width={95} height={158} color={selectedColor} style={styles.progressShapeAsset} />
+          </View>
         </View>
-      </Pressable>
+        <StateAsset width={72} height={100} style={styles.stateAsset} />
+        <Svg width={118} height={118} viewBox="0 0 118 118" style={styles.arcLayer}>
+          <Circle cx="59" cy="59" r="42" stroke="rgba(255,255,255,0.04)" strokeWidth={15} fill="transparent" />
+          {selectedScore != null ? (
+            <Circle
+              cx="59"
+              cy="59"
+              r="42"
+              stroke={selectedColor}
+              strokeWidth={15}
+              fill="transparent"
+              strokeLinecap="round"
+              strokeDasharray={`${ARC_CIRCUMFERENCE} ${ARC_CIRCUMFERENCE}`}
+              strokeDashoffset={dashOffset}
+              rotation="-84"
+              originX="59"
+              originY="59"
+            />
+          ) : null}
+        </Svg>
+
+        {metrics.map((metric) => (
+          <RecoveryNode
+            key={metric.key}
+            metric={metric}
+            selected={selectedMetric === metric.key}
+            onPress={() => onSelectMetric(metric.key)}
+          />
+        ))}
+
+        <Pressable
+          onPress={() => onSelectMetric('recovery')}
+          style={styles.coreCenter}
+          accessibilityRole="button"
+          accessibilityLabel="View today's Recovery Core score"
+        >
+          <Text style={styles.coreScore}>{selectedScore == null ? '--/100' : `${selectedScore}/100`}</Text>
+          <Text style={styles.coreLabel}>{selectedLabel}</Text>
+          <View style={[styles.stateChip, { backgroundColor: selectedScore == null ? '#23272D' : selectedColor }]}>
+            <Text style={styles.stateChipText}>{selectedState.label}</Text>
+          </View>
+        </Pressable>
+      </View>
     </View>
   );
 };
@@ -470,7 +480,7 @@ const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; s
           ]}
         />
       ) : (
-        <SvgIcon width={selected ? 41 : 37} height={selected ? 50 : 45} />
+        <SvgIcon width={selected ? 45 : 41} height={selected ? 55 : 50} />
       )}
     </Pressable>
   );
@@ -523,24 +533,24 @@ const StressCard = ({ score, onPress }: { score: number | null; onPress: () => v
 
 const nodePositions = StyleSheet.create({
   top: {
-    top: 52,
+    top: 44,
     left: 150
   },
   left: {
-    top: 138,
-    left: 40
+    top: 132,
+    left: 26
   },
   right: {
-    top: 138,
-    right: 36
+    top: 132,
+    right: 22
   },
   bottomLeft: {
-    left: 88,
-    bottom: 54
+    left: 78,
+    bottom: 64
   },
   bottomRight: {
-    right: 84,
-    bottom: 54
+    right: 78,
+    bottom: 64
   }
 });
 
@@ -685,16 +695,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'visible'
   },
+  recoveryStage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    transform: [{ translateY: -16 }]
+  },
   starAsset: {
     position: 'absolute',
-    top: -86,
+    top: -68,
     left: -20
   },
-  coreAsset: {
+  frameAsset: {
     position: 'absolute',
-    top: 91,
-    left: 108,
-    opacity: 0.94
+    top: 63,
+    left: 68,
+    width: 230,
+    height: 230,
+    opacity: 0.96
+  },
+  progressShapeFrame: {
+    position: 'absolute',
+    top: 99,
+    left: 135,
+    width: 95,
+    height: 158,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+    opacity: 0.88
+  },
+  progressShapeClip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden'
+  },
+  progressShapeAsset: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0
   },
   stateAsset: {
     position: 'absolute',
@@ -755,16 +797,16 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.04 }]
   },
   nodeImage: {
-    width: 45,
-    height: 50
+    width: 50,
+    height: 55
   },
   nodeImageCalmActive: {
-    width: 42,
-    height: 58
+    width: 46,
+    height: 64
   },
   nodeImageCalmDefault: {
-    width: 33,
-    height: 53
+    width: 36,
+    height: 58
   },
   summaryRow: {
     marginTop: -6,
