@@ -12,7 +12,7 @@ import { useAppContext } from '../state/AppContext';
 const iconMap: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = {
   Home: 'home-outline',
   Tracker: 'pulse-outline',
-  Nutrition: 'document-text-outline',
+  Reports: 'document-text-outline',
   Sessions: 'sparkles-outline',
   Cycle: 'person-circle-outline'
 };
@@ -20,7 +20,7 @@ const iconMap: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = 
 const labelMap: Record<keyof MainTabParamList, string> = {
   Home: 'Journey',
   Tracker: 'Tracker',
-  Nutrition: 'Nutrition',
+  Reports: 'Reports',
   Sessions: 'Care',
   Cycle: 'Profile'
 };

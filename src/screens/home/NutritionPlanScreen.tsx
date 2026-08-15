@@ -152,8 +152,8 @@ export const NutritionPlanScreen = () => {
           );
         })}
         {mealLogError ? (
-          <View style={[styles.inlineMessage, { backgroundColor: palette.errorSoft, borderColor: palette.error }]}>
-            <Text style={[styles.inlineMessageText, { color: palette.error }]}>{mealLogError}</Text>
+          <View style={[styles.inlineMessage, { backgroundColor: '#FDE8EC', borderColor: '#D94F63' }]}>
+            <Text style={[styles.inlineMessageText, { color: '#D94F63' }]}>{mealLogError}</Text>
           </View>
         ) : null}
 
