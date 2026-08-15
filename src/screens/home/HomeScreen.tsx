@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -14,15 +14,16 @@ import StateBorderlineAsset from '../../assets/fiteatsy-home/state-borderline.sv
 import StateDeclineAsset from '../../assets/fiteatsy-home/state-decline.svg';
 import StateDefaultAsset from '../../assets/fiteatsy-home/state-default.svg';
 import StateSuccessAsset from '../../assets/fiteatsy-home/state-success.svg';
-import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-default.svg';
-import ActivityActiveIcon from '../../assets/fiteatsy-home/activity-active.svg';
-import NutritionDefaultIcon from '../../assets/fiteatsy-home/nutrition-default.svg';
-import NutritionActiveIcon from '../../assets/fiteatsy-home/nutrition-active.svg';
+import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-default.png';
+import ActivityActiveIcon from '../../assets/fiteatsy-home/activity-active.png';
+import NutritionDefaultIcon from '../../assets/fiteatsy-home/nutrition-default.png';
+import NutritionActiveIcon from '../../assets/fiteatsy-home/nutrition-active.png';
 import MindDefaultIcon from '../../assets/fiteatsy-home/mind-default.svg';
 import MindActiveIcon from '../../assets/fiteatsy-home/mind-active.svg';
-import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-default.svg';
-import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-active.svg';
-import CalmActiveIcon from '../../assets/fiteatsy-home/calm-active.svg';
+import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-default.png';
+import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-active.png';
+import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-default.png';
+import CalmActiveIcon from '../../assets/fiteatsy-home/calm-active.png';
 import { RootStackParamList } from '../../navigation/types';
 import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/recoveryIntelligenceEngine';
 import { listAnalyzedReports, type ReportDto } from '../../services/reportUploadService';
@@ -49,8 +50,9 @@ type RecoveryMetric = {
   label: string;
   score: number | null;
   position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
-  DefaultIcon: SvgAsset;
-  ActiveIcon: SvgAsset;
+  DefaultIcon: SvgAsset | ImageSourcePropType;
+  ActiveIcon: SvgAsset | ImageSourcePropType;
+  iconType?: 'svg' | 'image';
 };
 
 type HealthProfileReportSummary = {
@@ -175,8 +177,9 @@ export const HomeScreen = () => {
       label: 'Calm',
       score: recoveryIntel.calmScore,
       position: 'top',
-      DefaultIcon: CalmActiveIcon,
-      ActiveIcon: CalmActiveIcon
+      DefaultIcon: CalmDefaultIcon,
+      ActiveIcon: CalmActiveIcon,
+      iconType: 'image'
     },
     {
       key: 'activity',
@@ -184,7 +187,8 @@ export const HomeScreen = () => {
       score: driverScore(recoveryIntel.recoveryDrivers, 'activity', recoveryIntel.signalCoverage.workouts),
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
-      ActiveIcon: ActivityActiveIcon
+      ActiveIcon: ActivityActiveIcon,
+      iconType: 'image'
     },
     {
       key: 'nutrition',
@@ -192,7 +196,8 @@ export const HomeScreen = () => {
       score: null,
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
-      ActiveIcon: NutritionActiveIcon
+      ActiveIcon: NutritionActiveIcon,
+      iconType: 'image'
     },
     {
       key: 'mind',
@@ -210,7 +215,8 @@ export const HomeScreen = () => {
       score: driverScore(recoveryIntel.recoveryDrivers, 'sleep', recoveryIntel.signalCoverage.sleep),
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
-      ActiveIcon: SleepActiveIcon
+      ActiveIcon: SleepActiveIcon,
+      iconType: 'image'
     }
   ];
 
@@ -391,6 +397,8 @@ const RecoveryPanel = ({
 
 const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; selected: boolean; onPress: () => void }) => {
   const Icon = selected ? metric.ActiveIcon : metric.DefaultIcon;
+  const isImage = metric.iconType === 'image';
+  const SvgIcon = Icon as SvgAsset;
   return (
     <Pressable
       onPress={onPress}
@@ -398,8 +406,19 @@ const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; s
       accessibilityRole="button"
       accessibilityLabel={`View today's ${metric.label} score`}
     >
-      <Icon width={selected ? 33 : 30} height={selected ? 38 : 35} />
-      <Text style={styles.nodeLabel}>{metric.label}</Text>
+      {isImage ? (
+        <Image
+          source={Icon as ImageSourcePropType}
+          resizeMode="contain"
+          style={[
+            styles.nodeImage,
+            metric.key === 'calm' && selected ? styles.nodeImageCalmActive : null,
+            metric.key === 'calm' && !selected ? styles.nodeImageCalmDefault : null
+          ]}
+        />
+      ) : (
+        <SvgIcon width={selected ? 41 : 37} height={selected ? 50 : 45} />
+      )}
     </Pressable>
   );
 };
@@ -675,13 +694,17 @@ const styles = StyleSheet.create({
   recoveryNodeSelected: {
     transform: [{ scale: 1.04 }]
   },
-  nodeLabel: {
-    marginTop: 2,
-    color: '#FFFFFF',
-    fontFamily: font.medium,
-    fontSize: 8,
-    lineHeight: 10,
-    textAlign: 'center'
+  nodeImage: {
+    width: 45,
+    height: 50
+  },
+  nodeImageCalmActive: {
+    width: 42,
+    height: 58
+  },
+  nodeImageCalmDefault: {
+    width: 33,
+    height: 53
   },
   summaryRow: {
     marginTop: -3,
