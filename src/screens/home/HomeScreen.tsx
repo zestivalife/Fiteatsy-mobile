@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useMemo, useState } from 'react';
-import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -36,11 +36,12 @@ const DONUT_ASSET_SIZE = 276;
 const DONUT_ASSET_VISUAL_CENTER = 126;
 const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
 const CORE_SIZE = 150;
-const SCORE_ARC_SIZE = 172;
-const SCORE_ARC_RADIUS = 54;
-const SCORE_ARC_STROKE_WIDTH = 23;
+const SCORE_ARC_SIZE = 190;
+const SCORE_ARC_RADIUS = 63;
+const SCORE_ARC_STROKE_WIDTH = 22;
 const SCORE_ARC_CIRCUMFERENCE = 2 * Math.PI * SCORE_ARC_RADIUS;
 const ENABLE_HOME_RECOVERY_UI_FIXTURE = true;
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const font = {
   regular: 'Exo_400Regular',
@@ -436,8 +437,20 @@ const RecoveryPanel = ({
   onSelectMetric: (metric: MetricKey) => void;
 }) => {
   const clampedScore = selectedScore == null ? 0 : Math.max(0, Math.min(100, selectedScore));
-  const scoreArcOffset = SCORE_ARC_CIRCUMFERENCE * (1 - clampedScore / 100);
+  const scoreArcProgress = useRef(new Animated.Value(clampedScore)).current;
+  const scoreArcOffset = scoreArcProgress.interpolate({
+    inputRange: [0, 100],
+    outputRange: [SCORE_ARC_CIRCUMFERENCE, 0]
+  });
   const [arcStart, arcEnd] = arcGradientForMetric(selectedMetric);
+
+  useEffect(() => {
+    Animated.timing(scoreArcProgress, {
+      toValue: clampedScore,
+      duration: 620,
+      useNativeDriver: false
+    }).start();
+  }, [clampedScore, scoreArcProgress]);
 
   return (
     <View style={styles.recoveryPanel}>
@@ -452,7 +465,7 @@ const RecoveryPanel = ({
                 <Stop offset="1" stopColor={arcEnd} />
               </SvgLinearGradient>
             </Defs>
-            <Circle
+            <AnimatedCircle
               cx={SCORE_ARC_SIZE / 2}
               cy={SCORE_ARC_SIZE / 2}
               r={SCORE_ARC_RADIUS}
@@ -759,8 +772,8 @@ const styles = StyleSheet.create({
   },
   scoreArc: {
     position: 'absolute',
-    top: STAR_CENTER_Y - SCORE_ARC_SIZE / 2 + DONUT_VERTICAL_OFFSET - 9,
-    left: STAR_CENTER_X - SCORE_ARC_SIZE / 2 + 7,
+    top: STAR_CENTER_Y - SCORE_ARC_SIZE / 2 + DONUT_VERTICAL_OFFSET,
+    left: STAR_CENTER_X - SCORE_ARC_SIZE / 2,
     zIndex: 2
   },
   coreCenter: {
@@ -778,8 +791,8 @@ const styles = StyleSheet.create({
   coreScore: {
     color: '#E4E8ED',
     fontFamily: font.bold,
-    fontSize: 34,
-    lineHeight: 39,
+    fontSize: 26,
+    lineHeight: 31,
     textAlign: 'center'
   },
   coreLabel: {
