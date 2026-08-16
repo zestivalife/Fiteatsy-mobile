@@ -34,6 +34,7 @@ const STAR_CENTER_X = 183;
 const STAR_CENTER_Y = 178;
 const DONUT_ASSET_SIZE = 276;
 const DONUT_ASSET_VISUAL_CENTER = 126;
+const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
 const CORE_SIZE = 150;
 const ENABLE_HOME_RECOVERY_UI_FIXTURE = __DEV__ && process.env.EXPO_PUBLIC_HOME_RECOVERY_UI_FIXTURE === 'true';
 
@@ -703,12 +704,12 @@ const styles = StyleSheet.create({
   },
   progressDonutAsset: {
     position: 'absolute',
-    top: STAR_CENTER_Y - DONUT_ASSET_VISUAL_CENTER,
+    top: STAR_CENTER_Y - DONUT_ASSET_VISUAL_CENTER + DONUT_VERTICAL_OFFSET,
     left: STAR_CENTER_X - DONUT_ASSET_VISUAL_CENTER
   },
   coreCenter: {
     position: 'absolute',
-    top: STAR_CENTER_Y - CORE_SIZE / 2,
+    top: STAR_CENTER_Y - CORE_SIZE / 2 + DONUT_VERTICAL_OFFSET,
     left: STAR_CENTER_X - CORE_SIZE / 2,
     width: CORE_SIZE,
     height: CORE_SIZE,
