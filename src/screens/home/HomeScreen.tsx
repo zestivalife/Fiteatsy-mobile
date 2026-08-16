@@ -6,15 +6,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
+import { SvgProps } from 'react-native-svg';
 import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
 import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
-import RecoveryFrameAsset from '../../assets/fiteatsy-home/recovery-frame-20.png';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
-import StateBorderlineAsset from '../../assets/fiteatsy-home/state-borderline.svg';
-import StateDeclineAsset from '../../assets/fiteatsy-home/state-decline.svg';
-import StateDefaultAsset from '../../assets/fiteatsy-home/state-default.svg';
-import StateSuccessAsset from '../../assets/fiteatsy-home/state-success.svg';
 import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-inactive.svg';
 import ActivityActiveIcon from '../../assets/fiteatsy-home/activity-selected.svg';
 import NutritionDefaultIcon from '../../assets/fiteatsy-home/nutrition-inactive.svg';
@@ -36,12 +31,7 @@ const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
 const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const STAR_CENTER_X = 183;
 const STAR_CENTER_Y = 178;
-const ORB_SIZE = 336;
-const DONUT_SIZE = 190;
-const DONUT_CENTER = DONUT_SIZE / 2;
-const DONUT_RADIUS = 67;
-const DONUT_STROKE = 23;
-const ARC_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
+const CORE_SIZE = 190;
 const ENABLE_HOME_RECOVERY_UI_FIXTURE = __DEV__ && process.env.EXPO_PUBLIC_HOME_RECOVERY_UI_FIXTURE === 'true';
 
 const font = {
@@ -68,7 +58,6 @@ type RecoveryMetric = {
   label: string;
   score: number | null;
   color: string;
-  gradient: readonly [string, string];
   position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
   DefaultIcon: SvgAsset | ImageSourcePropType;
   ActiveIcon: SvgAsset | ImageSourcePropType;
@@ -120,10 +109,10 @@ const trendTone = (value: number) => {
 };
 
 const stateFromScore = (score: number | null) => {
-  if (score == null) return { label: 'No data', Asset: StateDefaultAsset };
-  if (score >= 80) return { label: 'Strong Today', Asset: StateSuccessAsset };
-  if (score >= 55) return { label: 'Borderline', Asset: StateBorderlineAsset };
-  return { label: 'Lower Today', Asset: StateDeclineAsset };
+  if (score == null) return { label: 'No data' };
+  if (score >= 80) return { label: 'Strong Today' };
+  if (score >= 55) return { label: 'Borderline' };
+  return { label: 'Lower Today' };
 };
 
 const scoreForHomeUi = (key: MetricKey, score: number | null) => (
@@ -241,7 +230,6 @@ export const HomeScreen = () => {
       label: 'Calm',
       score: normalizeScore(recoveryIntel.calmScore),
       color: '#FF1717',
-      gradient: ['#FF2A2A', '#7A0017'],
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
       ActiveIcon: CalmActiveIcon
@@ -251,7 +239,6 @@ export const HomeScreen = () => {
       label: 'Activity',
       score: normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'activity', recoveryIntel.signalCoverage.steps || recoveryIntel.signalCoverage.workouts)),
       color: '#F27A1A',
-      gradient: ['#FF8A1A', '#8E3300'],
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
       ActiveIcon: ActivityActiveIcon
@@ -261,7 +248,6 @@ export const HomeScreen = () => {
       label: 'Nutrition',
       score: nutritionScore,
       color: '#77FF22',
-      gradient: ['#A7FF4C', '#1B6F00'],
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
       ActiveIcon: NutritionActiveIcon
@@ -273,7 +259,6 @@ export const HomeScreen = () => {
         ? normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'emotional_checkins', true))
         : null,
       color: '#BFE8D0',
-      gradient: ['#DFFFEA', '#4E7F65'],
       position: 'bottomLeft',
       DefaultIcon: MindDefaultIcon,
       ActiveIcon: MindActiveIcon
@@ -283,7 +268,6 @@ export const HomeScreen = () => {
       label: 'Sleep',
       score: normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'sleep', recoveryIntel.signalCoverage.sleep)),
       color: '#0F80FF',
-      gradient: ['#49A8FF', '#003C96'],
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
       ActiveIcon: SleepActiveIcon
@@ -298,8 +282,8 @@ export const HomeScreen = () => {
   const recoveryCoreScore = scoreForHomeUi('recovery', averageScores(displayMetrics.map((metric) => metric.score)));
 
   const selected = selectedMetric === 'recovery'
-    ? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D', gradient: ['#FF2A2A', '#7A0017'] as const }
-    : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D', gradient: ['#FF2A2A', '#7A0017'] as const };
+    ? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D' }
+    : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D' };
   const selectedState = stateFromScore(selected.score);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
   const goToSessions = () => (navigation.getParent() as { navigate?: (screen: string) => void } | undefined)?.navigate?.('Sessions');
@@ -328,12 +312,11 @@ export const HomeScreen = () => {
               metrics={displayMetrics}
               selectedMetric={selectedMetric}
               selectedLabel={selected.label}
-              selectedScore={selected.score}
-              selectedColor={selected.color}
-              selectedGradient={selected.gradient}
-              selectedState={selectedState}
-              onSelectMetric={setSelectedMetric}
-            />
+            selectedScore={selected.score}
+            selectedColor={selected.color}
+            selectedState={selectedState}
+            onSelectMetric={setSelectedMetric}
+          />
 
             <View style={styles.summaryRow}>
               <MedicationCard timeline={todayMedicationTimeline} onPress={() => navigation.navigate('MedicationCalendar')} />
@@ -416,7 +399,6 @@ const RecoveryPanel = ({
   selectedLabel,
   selectedScore,
   selectedColor,
-  selectedGradient,
   selectedState,
   onSelectMetric
 }: {
@@ -425,52 +407,13 @@ const RecoveryPanel = ({
   selectedLabel: string;
   selectedScore: number | null;
   selectedColor: string;
-  selectedGradient: readonly [string, string];
-  selectedState: { label: string; Asset: SvgAsset };
+  selectedState: { label: string };
   onSelectMetric: (metric: MetricKey) => void;
 }) => {
-  const StateAsset = selectedState.Asset;
-  const progress = selectedScore == null ? 0 : Math.max(0, Math.min(100, selectedScore));
-  const dashOffset = selectedScore == null ? ARC_CIRCUMFERENCE : ARC_CIRCUMFERENCE * (1 - progress / 100);
-
   return (
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
         <RecoveryStarAsset width={406} height={492} style={styles.starAsset} />
-        <Image source={RecoveryFrameAsset} resizeMode="contain" style={styles.frameAsset} />
-        <StateAsset width={72} height={100} style={styles.stateAsset} />
-        <Svg width={DONUT_SIZE} height={DONUT_SIZE} viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} style={styles.arcLayer}>
-          <Defs>
-            <SvgLinearGradient id="selectedMetricDonut" x1="22" y1="18" x2="118" y2="120" gradientUnits="userSpaceOnUse">
-              <Stop offset="0" stopColor={selectedGradient[0]} />
-              <Stop offset="1" stopColor={selectedGradient[1]} />
-            </SvgLinearGradient>
-          </Defs>
-          <Circle
-            cx={DONUT_CENTER}
-            cy={DONUT_CENTER}
-            r={DONUT_RADIUS}
-            stroke="rgba(255,255,255,0.045)"
-            strokeWidth={DONUT_STROKE}
-            fill="transparent"
-          />
-          {selectedScore != null ? (
-            <Circle
-              cx={DONUT_CENTER}
-              cy={DONUT_CENTER}
-              r={DONUT_RADIUS}
-              stroke="url(#selectedMetricDonut)"
-              strokeWidth={DONUT_STROKE}
-              fill="transparent"
-              strokeLinecap="round"
-              strokeDasharray={`${ARC_CIRCUMFERENCE} ${ARC_CIRCUMFERENCE}`}
-              strokeDashoffset={dashOffset}
-              rotation="-84"
-              originX={DONUT_CENTER}
-              originY={DONUT_CENTER}
-            />
-          ) : null}
-        </Svg>
 
         {metrics.map((metric) => (
           <RecoveryNode
@@ -753,54 +696,13 @@ const styles = StyleSheet.create({
     top: -68,
     left: -20
   },
-  frameAsset: {
-    position: 'absolute',
-    top: STAR_CENTER_Y - ORB_SIZE / 2,
-    left: STAR_CENTER_X - ORB_SIZE / 2,
-    width: ORB_SIZE,
-    height: ORB_SIZE,
-    opacity: 0.96
-  },
-  progressShapeFrame: {
-    position: 'absolute',
-    top: 99,
-    left: 135,
-    width: 95,
-    height: 158,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-    opacity: 0.88
-  },
-  progressShapeClip: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'hidden'
-  },
-  progressShapeAsset: {
-    position: 'absolute',
-    left: 0,
-    bottom: 0
-  },
-  stateAsset: {
-    position: 'absolute',
-    top: STAR_CENTER_Y - 50,
-    left: STAR_CENTER_X - 36,
-    opacity: 0.045
-  },
-  arcLayer: {
-    position: 'absolute',
-    top: STAR_CENTER_Y - DONUT_SIZE / 2,
-    left: STAR_CENTER_X - DONUT_SIZE / 2
-  },
   coreCenter: {
     position: 'absolute',
-    top: STAR_CENTER_Y - DONUT_SIZE / 2,
-    left: STAR_CENTER_X - DONUT_SIZE / 2,
-    width: DONUT_SIZE,
-    height: DONUT_SIZE,
-    borderRadius: DONUT_SIZE / 2,
+    top: STAR_CENTER_Y - CORE_SIZE / 2,
+    left: STAR_CENTER_X - CORE_SIZE / 2,
+    width: CORE_SIZE,
+    height: CORE_SIZE,
+    borderRadius: CORE_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6
