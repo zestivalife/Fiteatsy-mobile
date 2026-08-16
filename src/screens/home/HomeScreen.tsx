@@ -10,6 +10,7 @@ import { SvgProps } from 'react-native-svg';
 import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
 import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
+import ProgressDonutChartAsset from '../../assets/fiteatsy-home/progress-donut-chart.svg';
 import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-inactive.svg';
 import ActivityActiveIcon from '../../assets/fiteatsy-home/activity-selected.svg';
 import NutritionDefaultIcon from '../../assets/fiteatsy-home/nutrition-inactive.svg';
@@ -31,7 +32,9 @@ const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
 const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const STAR_CENTER_X = 183;
 const STAR_CENTER_Y = 178;
-const CORE_SIZE = 190;
+const DONUT_ASSET_SIZE = 276;
+const DONUT_ASSET_VISUAL_CENTER = 126;
+const CORE_SIZE = 150;
 const ENABLE_HOME_RECOVERY_UI_FIXTURE = __DEV__ && process.env.EXPO_PUBLIC_HOME_RECOVERY_UI_FIXTURE === 'true';
 
 const font = {
@@ -312,11 +315,11 @@ export const HomeScreen = () => {
               metrics={displayMetrics}
               selectedMetric={selectedMetric}
               selectedLabel={selected.label}
-            selectedScore={selected.score}
-            selectedColor={selected.color}
-            selectedState={selectedState}
-            onSelectMetric={setSelectedMetric}
-          />
+              selectedScore={selected.score}
+              selectedColor={selected.color}
+              selectedState={selectedState}
+              onSelectMetric={setSelectedMetric}
+            />
 
             <View style={styles.summaryRow}>
               <MedicationCard timeline={todayMedicationTimeline} onPress={() => navigation.navigate('MedicationCalendar')} />
@@ -414,6 +417,7 @@ const RecoveryPanel = ({
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
         <RecoveryStarAsset width={406} height={492} style={styles.starAsset} />
+        <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} />
 
         {metrics.map((metric) => (
           <RecoveryNode
@@ -542,12 +546,13 @@ const nodePositions = StyleSheet.create({
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#16191D'
+    backgroundColor: '#262B2F'
   },
   screenGradient: {
     flex: 1
   },
   scrollContent: {
+    flexGrow: 1,
     paddingBottom: 116
   },
   referenceFrame: {
@@ -695,6 +700,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -68,
     left: -20
+  },
+  progressDonutAsset: {
+    position: 'absolute',
+    top: STAR_CENTER_Y - DONUT_ASSET_VISUAL_CENTER,
+    left: STAR_CENTER_X - DONUT_ASSET_VISUAL_CENTER
   },
   coreCenter: {
     position: 'absolute',
