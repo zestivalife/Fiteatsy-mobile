@@ -15,15 +15,15 @@ import StateBorderlineAsset from '../../assets/fiteatsy-home/state-borderline.sv
 import StateDeclineAsset from '../../assets/fiteatsy-home/state-decline.svg';
 import StateDefaultAsset from '../../assets/fiteatsy-home/state-default.svg';
 import StateSuccessAsset from '../../assets/fiteatsy-home/state-success.svg';
-import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-default.png';
+import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-inactive.svg';
 import ActivityActiveIcon from '../../assets/fiteatsy-home/activity-active.png';
-import NutritionDefaultIcon from '../../assets/fiteatsy-home/nutrition-default.png';
+import NutritionDefaultIcon from '../../assets/fiteatsy-home/nutrition-inactive.svg';
 import NutritionActiveIcon from '../../assets/fiteatsy-home/nutrition-active.png';
-import MindDefaultIcon from '../../assets/fiteatsy-home/mind-default.svg';
+import MindDefaultIcon from '../../assets/fiteatsy-home/mind-inactive.svg';
 import MindActiveIcon from '../../assets/fiteatsy-home/mind-active.svg';
-import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-default.png';
+import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-inactive.svg';
 import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-active.png';
-import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-default.png';
+import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-inactive.svg';
 import CalmActiveIcon from '../../assets/fiteatsy-home/calm-active.png';
 import { RootStackParamList } from '../../navigation/types';
 import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/recoveryIntelligenceEngine';
@@ -55,7 +55,8 @@ type RecoveryMetric = {
   position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
   DefaultIcon: SvgAsset | ImageSourcePropType;
   ActiveIcon: SvgAsset | ImageSourcePropType;
-  iconType?: 'svg' | 'image';
+  defaultIconType?: 'svg' | 'image';
+  activeIconType?: 'svg' | 'image';
 };
 
 type HealthProfileReportSummary = {
@@ -222,7 +223,7 @@ export const HomeScreen = () => {
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
       ActiveIcon: CalmActiveIcon,
-      iconType: 'image'
+      activeIconType: 'image'
     },
     {
       key: 'activity',
@@ -232,7 +233,7 @@ export const HomeScreen = () => {
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
       ActiveIcon: ActivityActiveIcon,
-      iconType: 'image'
+      activeIconType: 'image'
     },
     {
       key: 'nutrition',
@@ -242,7 +243,7 @@ export const HomeScreen = () => {
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
       ActiveIcon: NutritionActiveIcon,
-      iconType: 'image'
+      activeIconType: 'image'
     },
     {
       key: 'mind',
@@ -263,7 +264,7 @@ export const HomeScreen = () => {
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
       ActiveIcon: SleepActiveIcon,
-      iconType: 'image'
+      activeIconType: 'image'
     }
   ];
   const trendValues = buildDomainTrend(metrics.map((metric) => metric.score), checkIns);
@@ -460,7 +461,7 @@ const RecoveryPanel = ({
 
 const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; selected: boolean; onPress: () => void }) => {
   const Icon = selected ? metric.ActiveIcon : metric.DefaultIcon;
-  const isImage = metric.iconType === 'image';
+  const isImage = (selected ? metric.activeIconType : metric.defaultIconType) === 'image';
   const SvgIcon = Icon as SvgAsset;
   return (
     <Pressable
