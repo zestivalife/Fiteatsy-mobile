@@ -36,7 +36,7 @@ const DONUT_ASSET_SIZE = 276;
 const DONUT_ASSET_VISUAL_CENTER = 126;
 const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
 const CORE_SIZE = 150;
-const ENABLE_HOME_RECOVERY_UI_FIXTURE = __DEV__ && process.env.EXPO_PUBLIC_HOME_RECOVERY_UI_FIXTURE === 'true';
+const ENABLE_HOME_RECOVERY_UI_FIXTURE = true;
 
 const font = {
   regular: 'Exo_400Regular',
@@ -49,12 +49,12 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 type MetricKey = 'recovery' | 'calm' | 'activity' | 'nutrition' | 'mind' | 'sleep';
 type SvgAsset = React.FC<SvgProps>;
 const HOME_RECOVERY_UI_FIXTURE: Record<MetricKey, number> = {
-  recovery: 67,
+  recovery: 64,
   calm: 72,
-  activity: 45,
-  nutrition: 81,
-  mind: 58,
-  sleep: 35
+  activity: 48,
+  nutrition: 83,
+  mind: 59,
+  sleep: 36
 };
 
 type RecoveryMetric = {
