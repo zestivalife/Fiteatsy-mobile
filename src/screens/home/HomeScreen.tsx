@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SvgProps } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
 import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
 import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
@@ -36,6 +36,10 @@ const DONUT_ASSET_SIZE = 276;
 const DONUT_ASSET_VISUAL_CENTER = 126;
 const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
 const CORE_SIZE = 150;
+const SCORE_ARC_SIZE = 172;
+const SCORE_ARC_RADIUS = 54;
+const SCORE_ARC_STROKE_WIDTH = 23;
+const SCORE_ARC_CIRCUMFERENCE = 2 * Math.PI * SCORE_ARC_RADIUS;
 const ENABLE_HOME_RECOVERY_UI_FIXTURE = true;
 
 const font = {
@@ -117,6 +121,23 @@ const stateFromScore = (score: number | null) => {
   if (score >= 80) return { label: 'Strong Today' };
   if (score >= 55) return { label: 'Borderline' };
   return { label: 'Lower Today' };
+};
+
+const arcGradientForMetric = (key: MetricKey) => {
+  switch (key) {
+    case 'activity':
+      return ['#FF8A1E', '#A74200'];
+    case 'nutrition':
+      return ['#96FF45', '#2F9400'];
+    case 'mind':
+      return ['#D8F6E3', '#7BA78D'];
+    case 'sleep':
+      return ['#2E92FF', '#0643B5'];
+    case 'calm':
+    case 'recovery':
+    default:
+      return ['#F4052D', '#8C071E'];
+  }
 };
 
 const scoreForHomeUi = (key: MetricKey, score: number | null) => (
@@ -414,11 +435,39 @@ const RecoveryPanel = ({
   selectedState: { label: string };
   onSelectMetric: (metric: MetricKey) => void;
 }) => {
+  const clampedScore = selectedScore == null ? 0 : Math.max(0, Math.min(100, selectedScore));
+  const scoreArcOffset = SCORE_ARC_CIRCUMFERENCE * (1 - clampedScore / 100);
+  const [arcStart, arcEnd] = arcGradientForMetric(selectedMetric);
+
   return (
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
         <RecoveryStarAsset width={406} height={492} style={styles.starAsset} />
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} />
+        {selectedScore != null ? (
+          <Svg width={SCORE_ARC_SIZE} height={SCORE_ARC_SIZE} viewBox={`0 0 ${SCORE_ARC_SIZE} ${SCORE_ARC_SIZE}`} style={styles.scoreArc}>
+            <Defs>
+              <SvgLinearGradient id="homeRecoveryScoreArc" x1="42" y1="12" x2="135" y2="126" gradientUnits="userSpaceOnUse">
+                <Stop offset="0" stopColor={arcStart} />
+                <Stop offset="1" stopColor={arcEnd} />
+              </SvgLinearGradient>
+            </Defs>
+            <Circle
+              cx={SCORE_ARC_SIZE / 2}
+              cy={SCORE_ARC_SIZE / 2}
+              r={SCORE_ARC_RADIUS}
+              fill="transparent"
+              stroke="url(#homeRecoveryScoreArc)"
+              strokeWidth={SCORE_ARC_STROKE_WIDTH}
+              strokeLinecap="round"
+              strokeDasharray={`${SCORE_ARC_CIRCUMFERENCE} ${SCORE_ARC_CIRCUMFERENCE}`}
+              strokeDashoffset={scoreArcOffset}
+              originX={SCORE_ARC_SIZE / 2}
+              originY={SCORE_ARC_SIZE / 2}
+              rotation="-72"
+            />
+          </Svg>
+        ) : null}
 
         {metrics.map((metric) => (
           <RecoveryNode
@@ -705,7 +754,14 @@ const styles = StyleSheet.create({
   progressDonutAsset: {
     position: 'absolute',
     top: STAR_CENTER_Y - DONUT_ASSET_VISUAL_CENTER + DONUT_VERTICAL_OFFSET,
-    left: STAR_CENTER_X - DONUT_ASSET_VISUAL_CENTER
+    left: STAR_CENTER_X - DONUT_ASSET_VISUAL_CENTER,
+    zIndex: 1
+  },
+  scoreArc: {
+    position: 'absolute',
+    top: STAR_CENTER_Y - SCORE_ARC_SIZE / 2 + DONUT_VERTICAL_OFFSET - 9,
+    left: STAR_CENTER_X - SCORE_ARC_SIZE / 2 + 7,
+    zIndex: 2
   },
   coreCenter: {
     position: 'absolute',
@@ -716,7 +772,8 @@ const styles = StyleSheet.create({
     borderRadius: CORE_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6
+    gap: 6,
+    zIndex: 3
   },
   coreScore: {
     color: '#E4E8ED',
