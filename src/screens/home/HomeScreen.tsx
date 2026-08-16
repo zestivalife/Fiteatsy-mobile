@@ -16,15 +16,15 @@ import StateDeclineAsset from '../../assets/fiteatsy-home/state-decline.svg';
 import StateDefaultAsset from '../../assets/fiteatsy-home/state-default.svg';
 import StateSuccessAsset from '../../assets/fiteatsy-home/state-success.svg';
 import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-inactive.svg';
-import ActivityActiveIcon from '../../assets/fiteatsy-home/activity-active.png';
+import ActivityActiveIcon from '../../assets/fiteatsy-home/activity-selected.svg';
 import NutritionDefaultIcon from '../../assets/fiteatsy-home/nutrition-inactive.svg';
-import NutritionActiveIcon from '../../assets/fiteatsy-home/nutrition-active.png';
+import NutritionActiveIcon from '../../assets/fiteatsy-home/nutrition-selected.svg';
 import MindDefaultIcon from '../../assets/fiteatsy-home/mind-inactive.svg';
-import MindActiveIcon from '../../assets/fiteatsy-home/mind-active.svg';
+import MindActiveIcon from '../../assets/fiteatsy-home/mind-selected.svg';
 import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-inactive.svg';
-import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-active.png';
+import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-selected.svg';
 import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-inactive.svg';
-import CalmActiveIcon from '../../assets/fiteatsy-home/calm-active.png';
+import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
 import { RootStackParamList } from '../../navigation/types';
 import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/recoveryIntelligenceEngine';
 import { listAnalyzedReports, type ReportDto } from '../../services/reportUploadService';
@@ -222,8 +222,7 @@ export const HomeScreen = () => {
       color: '#FF1717',
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
-      ActiveIcon: CalmActiveIcon,
-      activeIconType: 'image'
+      ActiveIcon: CalmActiveIcon
     },
     {
       key: 'activity',
@@ -232,8 +231,7 @@ export const HomeScreen = () => {
       color: '#F27A1A',
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
-      ActiveIcon: ActivityActiveIcon,
-      activeIconType: 'image'
+      ActiveIcon: ActivityActiveIcon
     },
     {
       key: 'nutrition',
@@ -242,8 +240,7 @@ export const HomeScreen = () => {
       color: '#77FF22',
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
-      ActiveIcon: NutritionActiveIcon,
-      activeIconType: 'image'
+      ActiveIcon: NutritionActiveIcon
     },
     {
       key: 'mind',
@@ -263,8 +260,7 @@ export const HomeScreen = () => {
       color: '#0F80FF',
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
-      ActiveIcon: SleepActiveIcon,
-      activeIconType: 'image'
+      ActiveIcon: SleepActiveIcon
     }
   ];
   const trendValues = buildDomainTrend(metrics.map((metric) => metric.score), checkIns);
@@ -463,6 +459,7 @@ const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; s
   const Icon = selected ? metric.ActiveIcon : metric.DefaultIcon;
   const isImage = (selected ? metric.activeIconType : metric.defaultIconType) === 'image';
   const SvgIcon = Icon as SvgAsset;
+  const iconSize = selected ? 35 : 32;
   return (
     <Pressable
       onPress={onPress}
@@ -481,8 +478,9 @@ const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; s
           ]}
         />
       ) : (
-        <SvgIcon width={selected ? 45 : 41} height={selected ? 55 : 50} />
+        <SvgIcon width={iconSize} height={iconSize} />
       )}
+      <Text style={[styles.recoveryNodeLabel, selected && { color: metric.color }]}>{metric.label}</Text>
     </Pressable>
   );
 };
@@ -534,24 +532,24 @@ const StressCard = ({ score, onPress }: { score: number | null; onPress: () => v
 
 const nodePositions = StyleSheet.create({
   top: {
-    top: 44,
+    top: 40,
     left: 150
   },
   left: {
     top: 132,
-    left: 26
+    left: 24
   },
   right: {
     top: 132,
-    right: 22
+    right: 24
   },
   bottomLeft: {
-    left: 78,
-    bottom: 64
+    left: 76,
+    bottom: 60
   },
   bottomRight: {
-    right: 78,
-    bottom: 64
+    right: 76,
+    bottom: 60
   }
 });
 
@@ -790,12 +788,20 @@ const styles = StyleSheet.create({
   recoveryNode: {
     position: 'absolute',
     width: 66,
-    minHeight: 58,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center'
   },
   recoveryNodeSelected: {
-    transform: [{ scale: 1.04 }]
+    transform: [{ scale: 1.02 }]
+  },
+  recoveryNodeLabel: {
+    marginTop: 2,
+    color: '#F4F7F4',
+    fontFamily: font.medium,
+    fontSize: 8,
+    lineHeight: 10,
+    textAlign: 'center'
   },
   nodeImage: {
     width: 50,
