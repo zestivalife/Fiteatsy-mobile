@@ -518,15 +518,15 @@ const StressCard = ({ score, onPress }: { score: number | null; onPress: () => v
 
 const nodePositions = StyleSheet.create({
   top: {
-    top: 40,
+    top: 23,
     left: 150
   },
   left: {
-    top: 132,
+    top: 115,
     left: 24
   },
   right: {
-    top: 132,
+    top: 115,
     right: 24
   },
   bottomLeft: {
