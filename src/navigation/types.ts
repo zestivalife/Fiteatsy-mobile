@@ -18,6 +18,7 @@ export type RootStackParamList = {
   MovementSession: undefined;
   HydrationSession: undefined;
   Leadership: undefined;
+  ConsultantBooking: undefined;
   Search: undefined;
   Notifications: undefined;
   Profile: undefined;

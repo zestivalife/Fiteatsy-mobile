@@ -284,7 +284,7 @@ export const HomeScreen = () => {
       score: checkIns.length > 0
         ? normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'emotional_checkins', true))
         : null,
-      color: '#BFE8D0',
+      color: '#763CEF',
       position: 'bottomLeft',
       DefaultIcon: MindDefaultIcon,
       ActiveIcon: MindActiveIcon
@@ -312,7 +312,6 @@ export const HomeScreen = () => {
     : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D' };
   const selectedState = stateFromScore(selected.score);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
-  const goToSessions = () => (navigation.getParent() as { navigate?: (screen: string) => void } | undefined)?.navigate?.('Sessions');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -330,8 +329,8 @@ export const HomeScreen = () => {
             <RecoveryTrend values={trendValues} hasData={hasTrendData} />
 
             <View style={styles.actionRow}>
-              <ActionPill label="Assist" Icon={AssistIcon} onPress={goToSessions} />
-              <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable')} />
+              <ActionPill label="Assist" Icon={AssistIcon} onPress={() => navigation.navigate('ConsultantBooking')} />
+              <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable', { autoSync: true })} />
             </View>
 
             <RecoveryPanel
@@ -905,8 +904,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: '#777C79',
     fontFamily: font.regular,
-    fontSize: 7,
-    lineHeight: 9
+    fontSize: 11,
+    lineHeight: 13
   },
   cardAction: {
     marginTop: 'auto',
@@ -926,8 +925,8 @@ const styles = StyleSheet.create({
     marginTop: 7,
     color: '#777C79',
     fontFamily: font.regular,
-    fontSize: 8,
-    lineHeight: 10
+    fontSize: 12,
+    lineHeight: 14
   },
   stressBars: {
     marginTop: 10,

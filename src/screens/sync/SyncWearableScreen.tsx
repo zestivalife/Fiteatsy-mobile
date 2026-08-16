@@ -182,7 +182,7 @@ const formatSyncTime = (iso?: string | null) => {
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
 };
 
-export const SyncWearableScreen = ({ navigation }: Props) => {
+export const SyncWearableScreen = ({ navigation, route }: Props) => {
   const {
     themeMode,
     setWearableSetupCompleted,
@@ -210,6 +210,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const isMountedRef = useRef(true);
   const inFlightRef = useRef(false);
+  const autoSyncStartedRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -411,6 +412,11 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   // avoid auto-triggering Health Connect permission/data reads during
   // screen transitions (logout/login/home sync navigation), which can crash
   // on some Android builds. Sync starts via explicit user action.
+  useEffect(() => {
+    if (!route.params?.autoSync || autoSyncStartedRef.current) return;
+    autoSyncStartedRef.current = true;
+    void runRecoveryConnection();
+  }, [route.params?.autoSync, runRecoveryConnection]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
