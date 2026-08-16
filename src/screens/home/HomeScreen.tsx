@@ -36,9 +36,9 @@ const DONUT_ASSET_SIZE = 276;
 const DONUT_ASSET_VISUAL_CENTER = 126;
 const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
 const CORE_SIZE = 150;
-const SCORE_ARC_SIZE = 190;
-const SCORE_ARC_RADIUS = 63;
-const SCORE_ARC_STROKE_WIDTH = 22;
+const SCORE_ARC_SIZE = 209;
+const SCORE_ARC_RADIUS = 69;
+const SCORE_ARC_STROKE_WIDTH = 20;
 const SCORE_ARC_CIRCUMFERENCE = 2 * Math.PI * SCORE_ARC_RADIUS;
 const ENABLE_HOME_RECOVERY_UI_FIXTURE = true;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -131,7 +131,7 @@ const arcGradientForMetric = (key: MetricKey) => {
     case 'nutrition':
       return ['#96FF45', '#2F9400'];
     case 'mind':
-      return ['#D8F6E3', '#7BA78D'];
+      return ['#9B70FF', '#763CEF'];
     case 'sleep':
       return ['#2E92FF', '#0643B5'];
     case 'calm':
