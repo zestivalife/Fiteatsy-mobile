@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,11 +34,15 @@ import { getIdentityScopedStorageKey } from '../../utils/identityScopedStorage';
 
 const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
 const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const DONUT_SIZE = 142;
+const STAR_CENTER_X = 183;
+const STAR_CENTER_Y = 178;
+const ORB_SIZE = 336;
+const DONUT_SIZE = 190;
 const DONUT_CENTER = DONUT_SIZE / 2;
-const DONUT_RADIUS = 50;
-const DONUT_STROKE = 18;
+const DONUT_RADIUS = 67;
+const DONUT_STROKE = 23;
 const ARC_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
+const ENABLE_HOME_RECOVERY_UI_FIXTURE = __DEV__ && process.env.EXPO_PUBLIC_HOME_RECOVERY_UI_FIXTURE === 'true';
 
 const font = {
   regular: 'Exo_400Regular',
@@ -49,6 +54,14 @@ const font = {
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type MetricKey = 'recovery' | 'calm' | 'activity' | 'nutrition' | 'mind' | 'sleep';
 type SvgAsset = React.FC<SvgProps>;
+const HOME_RECOVERY_UI_FIXTURE: Record<MetricKey, number> = {
+  recovery: 67,
+  calm: 72,
+  activity: 45,
+  nutrition: 81,
+  mind: 58,
+  sleep: 35
+};
 
 type RecoveryMetric = {
   key: Exclude<MetricKey, 'recovery'>;
@@ -112,6 +125,10 @@ const stateFromScore = (score: number | null) => {
   if (score >= 55) return { label: 'Borderline', Asset: StateBorderlineAsset };
   return { label: 'Lower Today', Asset: StateDeclineAsset };
 };
+
+const scoreForHomeUi = (key: MetricKey, score: number | null) => (
+  ENABLE_HOME_RECOVERY_UI_FIXTURE ? HOME_RECOVERY_UI_FIXTURE[key] : score
+);
 
 const driverScore = (drivers: RecoveryDriver[], key: RecoveryDriver['key'], requireSignal: boolean) => {
   if (!requireSignal) return null;
@@ -272,53 +289,59 @@ export const HomeScreen = () => {
       ActiveIcon: SleepActiveIcon
     }
   ];
-  const trendValues = buildDomainTrend(metrics.map((metric) => metric.score), checkIns);
+  const displayMetrics = metrics.map((metric) => ({
+    ...metric,
+    score: scoreForHomeUi(metric.key, metric.score)
+  }));
+  const trendValues = buildDomainTrend(displayMetrics.map((metric) => metric.score), checkIns);
   const hasTrendData = trendValues.length > 0;
-  const recoveryCoreScore = averageScores(metrics.map((metric) => metric.score));
+  const recoveryCoreScore = scoreForHomeUi('recovery', averageScores(displayMetrics.map((metric) => metric.score)));
 
   const selected = selectedMetric === 'recovery'
     ? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D', gradient: ['#FF2A2A', '#7A0017'] as const }
-    : metrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D', gradient: ['#FF2A2A', '#7A0017'] as const };
+    : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D', gradient: ['#FF2A2A', '#7A0017'] as const };
   const selectedState = stateFromScore(selected.score);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
   const goToSessions = () => (navigation.getParent() as { navigate?: (screen: string) => void } | undefined)?.navigate?.('Sessions');
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.referenceFrame}>
-          <HomeHeader
-            name={firstName(onboarding?.name)}
-            onSearch={() => navigation.navigate('Search')}
-            onAdd={() => navigation.navigate('Leadership')}
-            onNotifications={() => navigation.navigate('Notifications')}
-            onProfile={() => navigation.navigate('Profile')}
-          />
+      <LinearGradient colors={['#262B2F', '#16191D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.screenGradient}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.referenceFrame}>
+            <HomeHeader
+              name={firstName(onboarding?.name)}
+              onSearch={() => navigation.navigate('Search')}
+              onAdd={() => navigation.navigate('Leadership')}
+              onNotifications={() => navigation.navigate('Notifications')}
+              onProfile={() => navigation.navigate('Profile')}
+            />
 
-          <RecoveryTrend values={trendValues} hasData={hasTrendData} />
+            <RecoveryTrend values={trendValues} hasData={hasTrendData} />
 
-          <View style={styles.actionRow}>
-            <ActionPill label="Assist" Icon={AssistIcon} onPress={goToSessions} />
-            <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable')} />
+            <View style={styles.actionRow}>
+              <ActionPill label="Assist" Icon={AssistIcon} onPress={goToSessions} />
+              <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable')} />
+            </View>
+
+            <RecoveryPanel
+              metrics={displayMetrics}
+              selectedMetric={selectedMetric}
+              selectedLabel={selected.label}
+              selectedScore={selected.score}
+              selectedColor={selected.color}
+              selectedGradient={selected.gradient}
+              selectedState={selectedState}
+              onSelectMetric={setSelectedMetric}
+            />
+
+            <View style={styles.summaryRow}>
+              <MedicationCard timeline={todayMedicationTimeline} onPress={() => navigation.navigate('MedicationCalendar')} />
+              <StressCard score={normalizeScore(recoveryIntel.stressRecoveryScore)} onPress={() => navigation.navigate('BreathingSession')} />
+            </View>
           </View>
-
-          <RecoveryPanel
-            metrics={metrics}
-            selectedMetric={selectedMetric}
-            selectedLabel={selected.label}
-            selectedScore={selected.score}
-            selectedColor={selected.color}
-            selectedGradient={selected.gradient}
-            selectedState={selectedState}
-            onSelectMetric={setSelectedMetric}
-          />
-
-          <View style={styles.summaryRow}>
-            <MedicationCard timeline={todayMedicationTimeline} onPress={() => navigation.navigate('MedicationCalendar')} />
-            <StressCard score={normalizeScore(recoveryIntel.stressRecoveryScore)} onPress={() => navigation.navigate('BreathingSession')} />
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 };
@@ -564,19 +587,22 @@ const nodePositions = StyleSheet.create({
     right: 24
   },
   bottomLeft: {
-    left: 76,
-    bottom: 29
+    left: 67,
+    bottom: 16
   },
   bottomRight: {
-    right: 76,
-    bottom: 29
+    right: 67,
+    bottom: 16
   }
 });
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#1C2225'
+    backgroundColor: '#16191D'
+  },
+  screenGradient: {
+    flex: 1
   },
   scrollContent: {
     paddingBottom: 116
@@ -720,7 +746,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: '100%',
-    transform: [{ translateY: -69 }]
+    transform: [{ translateY: -46 }]
   },
   starAsset: {
     position: 'absolute',
@@ -729,10 +755,10 @@ const styles = StyleSheet.create({
   },
   frameAsset: {
     position: 'absolute',
-    top: 40,
-    left: 45,
-    width: 276,
-    height: 276,
+    top: STAR_CENTER_Y - ORB_SIZE / 2,
+    left: STAR_CENTER_X - ORB_SIZE / 2,
+    width: ORB_SIZE,
+    height: ORB_SIZE,
     opacity: 0.96
   },
   progressShapeFrame: {
@@ -759,51 +785,53 @@ const styles = StyleSheet.create({
   },
   stateAsset: {
     position: 'absolute',
-    top: 106,
-    left: 147,
-    opacity: 0.08
+    top: STAR_CENTER_Y - 50,
+    left: STAR_CENTER_X - 36,
+    opacity: 0.045
   },
   arcLayer: {
     position: 'absolute',
-    top: 107,
-    left: 112
+    top: STAR_CENTER_Y - DONUT_SIZE / 2,
+    left: STAR_CENTER_X - DONUT_SIZE / 2
   },
   coreCenter: {
     position: 'absolute',
-    top: 107,
-    left: 112,
-    width: 142,
-    height: 142,
-    borderRadius: 71,
+    top: STAR_CENTER_Y - DONUT_SIZE / 2,
+    left: STAR_CENTER_X - DONUT_SIZE / 2,
+    width: DONUT_SIZE,
+    height: DONUT_SIZE,
+    borderRadius: DONUT_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4
+    gap: 6
   },
   coreScore: {
     color: '#E4E8ED',
     fontFamily: font.bold,
-    fontSize: 25,
-    lineHeight: 29
+    fontSize: 34,
+    lineHeight: 39,
+    textAlign: 'center'
   },
   coreLabel: {
     color: '#E1E4E3',
     fontFamily: font.regular,
-    fontSize: 11,
-    lineHeight: 13
+    fontSize: 15,
+    lineHeight: 18,
+    textAlign: 'center'
   },
   stateChip: {
-    minHeight: 22,
-    borderRadius: 12,
+    minHeight: 24,
+    borderRadius: 13,
     backgroundColor: '#FF1717',
-    paddingHorizontal: 9,
+    paddingHorizontal: 11,
     alignItems: 'center',
     justifyContent: 'center'
   },
   stateChipText: {
     color: '#FFFFFF',
     fontFamily: font.bold,
-    fontSize: 9,
-    lineHeight: 11
+    fontSize: 11,
+    lineHeight: 13
   },
   recoveryNode: {
     position: 'absolute',
