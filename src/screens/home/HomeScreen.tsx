@@ -455,10 +455,16 @@ const RecoveryPanel = ({
   return (
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
-        <RecoveryStarAsset width={406} height={492} style={styles.starAsset} />
-        <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} />
+        <RecoveryStarAsset width={406} height={492} style={styles.starAsset} pointerEvents="none" />
+        <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
         {selectedScore != null ? (
-          <Svg width={SCORE_ARC_SIZE} height={SCORE_ARC_SIZE} viewBox={`0 0 ${SCORE_ARC_SIZE} ${SCORE_ARC_SIZE}`} style={styles.scoreArc}>
+          <Svg
+            width={SCORE_ARC_SIZE}
+            height={SCORE_ARC_SIZE}
+            viewBox={`0 0 ${SCORE_ARC_SIZE} ${SCORE_ARC_SIZE}`}
+            style={styles.scoreArc}
+            pointerEvents="none"
+          >
             <Defs>
               <SvgLinearGradient id="homeRecoveryScoreArc" x1="42" y1="12" x2="135" y2="126" gradientUnits="userSpaceOnUse">
                 <Stop offset="0" stopColor={arcStart} />
@@ -517,6 +523,7 @@ const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; s
     <Pressable
       onPress={onPress}
       style={[styles.recoveryNode, nodePositions[metric.position], selected && styles.recoveryNodeSelected]}
+      hitSlop={14}
       accessibilityRole="button"
       accessibilityLabel={`View today's ${metric.label} score`}
     >
@@ -586,22 +593,22 @@ const StressCard = ({ score, onPress }: { score: number | null; onPress: () => v
 const nodePositions = StyleSheet.create({
   top: {
     top: 23,
-    left: 150
+    left: 135
   },
   left: {
     top: 115,
-    left: 24
+    left: 9
   },
   right: {
     top: 115,
-    right: 24
+    right: 9
   },
   bottomLeft: {
-    left: 67,
+    left: 52,
     bottom: 16
   },
   bottomRight: {
-    right: 67,
+    right: 52,
     bottom: 16
   }
 });
@@ -818,10 +825,11 @@ const styles = StyleSheet.create({
   },
   recoveryNode: {
     position: 'absolute',
-    width: 74,
-    minHeight: 58,
+    width: 104,
+    minHeight: 86,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    zIndex: 5
   },
   recoveryNodeSelected: {
     transform: [{ scale: 1.02 }]
