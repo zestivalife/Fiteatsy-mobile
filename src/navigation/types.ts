@@ -19,6 +19,7 @@ export type RootStackParamList = {
   HydrationSession: undefined;
   Leadership: undefined;
   ConsultantBooking: undefined;
+  SubscriptionPlans: undefined;
   Search: undefined;
   Notifications: undefined;
   Profile: undefined;

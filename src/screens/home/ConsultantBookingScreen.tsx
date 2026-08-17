@@ -111,6 +111,18 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
         <Text style={styles.errorText}>No consultant booking channel is available yet. Please check your assignment status from Profile.</Text>
       ) : null}
 
+      <Pressable
+        onPress={() => navigation.navigate('SubscriptionPlans')}
+        style={[styles.planButton, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}
+        accessibilityRole="button"
+      >
+        <View style={styles.planButtonCopy}>
+          <Text style={[styles.planButtonTitle, { color: palette.textPrimary }]}>View recommended plans</Text>
+          <Text style={[styles.planButtonBody, { color: palette.textSecondary }]}>See the best Fiteatsy support option based on your profile and goals.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={palette.textPrimary} />
+      </Pressable>
+
       <PrimaryButton title="Request Booking" onPress={requestBooking} disabled={!isAssigned} />
     </Screen>
   );
@@ -235,6 +247,27 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.danger,
     fontFamily: 'Exo_600SemiBold',
+    fontSize: 13,
+    lineHeight: 18
+  },
+  planButton: {
+    alignItems: 'center',
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md
+  },
+  planButtonCopy: {
+    flex: 1,
+    gap: 4
+  },
+  planButtonTitle: {
+    fontFamily: 'Exo_700Bold',
+    fontSize: 16
+  },
+  planButtonBody: {
+    fontFamily: 'Exo_400Regular',
     fontSize: 13,
     lineHeight: 18
   }
