@@ -3,6 +3,7 @@
     "name": "Fiteatsy",
     "slug": "fiteatsy-health-app",
     "version": "1.0.0",
+    "runtimeVersion": "1.0.0-native-20260818",
     "orientation": "portrait",
     "icon": "./src/assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -43,6 +44,12 @@
     "web": {
       "bundler": "metro",
       "favicon": "./src/assets/favicon.png"
+    },
+    "updates": {
+      "enabled": true,
+      "url": "https://u.expo.dev/70254234-571c-4351-87d9-33e8f851dde1",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     },
     "extra": {
       "apiBaseUrl": "https://fiteatsy-mobile-production.up.railway.app",
