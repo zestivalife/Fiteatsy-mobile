@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { colors, radius, spacing, typography } from '../../design/tokens';
-import { RootStackParamList } from '../../navigation/types';
+import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import {
   getTrackerImprovementInsights,
@@ -15,8 +16,13 @@ import {
 } from '../../services/trackerAnalysisService';
 import { toDayKey } from '../../utils/date';
 import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
+import { listAnalyzedReports, listBiomarkerHistory, type ReportDto } from '../../services/reportUploadService';
 
 type RangeMode = '7D' | '30D';
+type TrackerNavigation = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Tracker'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 type DayData = {
   key: string;
@@ -35,6 +41,14 @@ type DayData = {
 };
 
 type MetricKind = 'spark' | 'bars';
+
+type ReportSummaryState = {
+  loading: boolean;
+  error: string | null;
+  reportCount: number;
+  biomarkerCount: number;
+  latestScore: number | null;
+};
 
 type MetricConfig = {
   key: string;
@@ -63,6 +77,11 @@ const toPct = (value: number, min: number, max: number) => {
     return 0;
   }
   return (value - min) / (max - min);
+};
+
+const latestReportScore = (reports: ReportDto[]) => {
+  const scored = reports.find((report) => report.analysis?.score != null);
+  return scored?.analysis?.score ?? null;
 };
 
 const MetricSparkCard = ({
@@ -271,7 +290,7 @@ const MetricBarsCard = ({
 };
 
 export const TrackerScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<TrackerNavigation>();
   const { themeMode, checkIns, wearableSyncData, wellness } = useAppContext();
   const isLight = themeMode === 'light';
   const todayWeekIndex = new Date().getDay();
@@ -282,6 +301,13 @@ export const TrackerScreen = () => {
   const [rangeMode, setRangeMode] = useState<RangeMode>('7D');
   const [selectedDay, setSelectedDay] = useState(todayWeekIndex);
   const [compareYesterday, setCompareYesterday] = useState(false);
+  const [reportSummary, setReportSummary] = useState<ReportSummaryState>({
+    loading: true,
+    error: null,
+    reportCount: 0,
+    biomarkerCount: 0,
+    latestScore: null
+  });
   const [trackerInsightsLoading, setTrackerInsightsLoading] = useState(false);
   const [trackerInsights, setTrackerInsights] = useState<TrackerSectionImprovementResult>({
     summary: "Fiteatsy is preparing personalized guidance for today's tracker values.",
@@ -294,6 +320,41 @@ export const TrackerScreen = () => {
     model: 'fiteatsy-seed-v1'
   });
   const contentAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    let active = true;
+
+    const loadReportSummary = async () => {
+      setReportSummary((current) => ({ ...current, loading: true, error: null }));
+      try {
+        const [reports, biomarkers] = await Promise.all([listAnalyzedReports(), listBiomarkerHistory()]);
+        if (!active) return;
+        const biomarkerKeys = new Set(
+          biomarkers.map((item) => item.biomarkerId || item.biomarkerName).filter(Boolean)
+        );
+        setReportSummary({
+          loading: false,
+          error: null,
+          reportCount: reports.length,
+          biomarkerCount: biomarkerKeys.size,
+          latestScore: latestReportScore(reports)
+        });
+      } catch (error) {
+        if (!active) return;
+        setReportSummary((current) => ({
+          ...current,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Unable to load report summary.'
+        }));
+      }
+    };
+
+    void loadReportSummary();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const days = useMemo<DayData[]>(() => {
     const latestSync = wearableSyncData[0];
@@ -628,6 +689,10 @@ export const TrackerScreen = () => {
     });
   };
 
+  const openReports = () => {
+    navigation.navigate('Reports');
+  };
+
   return (
     <Screen scroll contentStyle={styles.screenContent}>
       <View style={styles.topRow}>
@@ -659,6 +724,55 @@ export const TrackerScreen = () => {
           <Text style={[styles.rangeText, rangeMode === '30D' && styles.rangeTextActive]}>{rangeMode}</Text>
         </Pressable>
       </View>
+
+      <Card style={[styles.healthReportsCard, !isLight && styles.healthReportsCardDark]}>
+        <View style={styles.healthReportsTopRow}>
+          <View style={styles.healthReportsIconBox}>
+            <Text style={styles.healthReportsIcon}>⚗</Text>
+          </View>
+          <View style={styles.healthReportsCopy}>
+            <Text style={[styles.healthReportsTitle, !isLight && styles.healthReportsTitleDark]}>Health Reports</Text>
+            <Text style={[styles.healthReportsSubtitle, !isLight && styles.healthReportsSubtitleDark]}>
+              Upload lab reports, understand your results and track changes over time.
+            </Text>
+          </View>
+        </View>
+        <View style={styles.healthReportsStatsRow}>
+          <View style={styles.healthReportsStat}>
+            <Text style={styles.healthReportsStatValue}>{reportSummary.loading ? '--' : reportSummary.reportCount}</Text>
+            <Text style={[styles.healthReportsStatLabel, !isLight && styles.healthReportsStatLabelDark]}>
+              {reportSummary.reportCount === 1 ? 'report' : 'reports'}
+            </Text>
+          </View>
+          <View style={styles.healthReportsDivider} />
+          <View style={styles.healthReportsStat}>
+            <Text style={[styles.healthReportsStatValueMuted, !isLight && styles.healthReportsStatLabelDark]}>
+              {reportSummary.loading ? '--' : reportSummary.biomarkerCount}
+            </Text>
+            <Text style={[styles.healthReportsStatLabel, !isLight && styles.healthReportsStatLabelDark]}>
+              biomarkers tracked
+            </Text>
+          </View>
+          <View style={styles.healthReportsDivider} />
+          <View style={styles.healthReportsStat}>
+            <Text style={[styles.healthReportsStatValueMuted, !isLight && styles.healthReportsStatLabelDark]}>
+              {reportSummary.loading ? '--' : reportSummary.latestScore ?? '--'}
+            </Text>
+            <Text style={[styles.healthReportsStatLabel, !isLight && styles.healthReportsStatLabelDark]}>Score /100</Text>
+          </View>
+        </View>
+        {reportSummary.error ? (
+          <Text style={styles.healthReportsError}>Report summary unavailable. Open Reports to refresh.</Text>
+        ) : null}
+        <Pressable
+          style={styles.healthReportsButton}
+          onPress={openReports}
+          accessibilityRole="button"
+          accessibilityLabel="View Health Reports"
+        >
+          <Text style={styles.healthReportsButtonText}>View Health Reports</Text>
+        </Pressable>
+      </Card>
 
       <Card style={[styles.summaryCard, !isLight && styles.summaryCardDark]}>
         <View style={styles.summaryStatsRow}>
@@ -869,6 +983,127 @@ const styles = StyleSheet.create({
   rangeChipDark: {
     backgroundColor: colors.cardRaised,
     borderColor: colors.strokeStrong
+  },
+  healthReportsCard: {
+    borderRadius: 28,
+    backgroundColor: '#10210F',
+    borderColor: '#2F7000',
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 16
+  },
+  healthReportsCardDark: {
+    backgroundColor: '#10210F',
+    borderColor: '#2F7000'
+  },
+  healthReportsTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 12
+  },
+  healthReportsIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(96,175,0,0.18)'
+  },
+  healthReportsIcon: {
+    fontSize: 30,
+    lineHeight: 34,
+    color: '#60AF00'
+  },
+  healthReportsCopy: {
+    flex: 1,
+    gap: 4
+  },
+  healthReportsTitle: {
+    ...typography.section,
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: 'Poppins_700Bold',
+    color: colors.textPrimary
+  },
+  healthReportsTitleDark: {
+    color: '#FFFFFF'
+  },
+  healthReportsSubtitle: {
+    ...typography.body,
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: 'Poppins_500Medium',
+    color: colors.textSecondary
+  },
+  healthReportsSubtitleDark: {
+    color: '#8F96A3'
+  },
+  healthReportsStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginLeft: 80,
+    marginBottom: 16
+  },
+  healthReportsStat: {
+    flex: 1
+  },
+  healthReportsDivider: {
+    width: 1,
+    height: 4,
+    marginTop: 8,
+    backgroundColor: '#8F96A3',
+    opacity: 0.5
+  },
+  healthReportsStatValue: {
+    ...typography.bodyStrong,
+    fontSize: 14,
+    lineHeight: 18,
+    fontFamily: 'Poppins_700Bold',
+    color: '#60AF00'
+  },
+  healthReportsStatValueMuted: {
+    ...typography.bodyStrong,
+    fontSize: 14,
+    lineHeight: 18,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#8F96A3'
+  },
+  healthReportsStatLabel: {
+    ...typography.caption,
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'Poppins_500Medium',
+    color: colors.textSecondary
+  },
+  healthReportsStatLabelDark: {
+    color: '#8F96A3'
+  },
+  healthReportsError: {
+    ...typography.caption,
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'Poppins_600SemiBold',
+    color: '#FF8188',
+    marginBottom: 12
+  },
+  healthReportsButton: {
+    minHeight: 48,
+    borderRadius: radius.pill,
+    backgroundColor: '#60AF00',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12
+  },
+  healthReportsButtonText: {
+    ...typography.bodyStrong,
+    fontSize: 16,
+    lineHeight: 22,
+    fontFamily: 'Poppins_700Bold',
+    color: '#FFFFFF'
   },
   summaryCard: {
     borderRadius: 32,
