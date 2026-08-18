@@ -19,7 +19,14 @@ export type RootStackParamList = {
   HydrationSession: undefined;
   Leadership: undefined;
   ConsultantBooking: undefined;
-  SubscriptionPlans: undefined;
+  SubscriptionPlans: {
+    source?: 'assist' | 'talk_to_expert' | 'get_assistance' | 'book_consultation' | 'subscription_management';
+    requiredEntitlement?: string | null;
+    returnDestination?: keyof RootStackParamList;
+  } | undefined;
+  PaymentSuccess: {
+    returnDestination?: keyof RootStackParamList;
+  } | undefined;
   Search: undefined;
   Notifications: undefined;
   Profile: undefined;

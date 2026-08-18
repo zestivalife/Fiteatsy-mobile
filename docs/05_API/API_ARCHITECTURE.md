@@ -35,6 +35,9 @@ Target logical families:
 /v1/reports/*
 /v1/biomarkers/*
 /v1/medications/*
+/v1/subscriptions/*
+/v1/payments/*
+/v1/webhooks/*
 /v1/progress/*
 /v1/integrations/*
 ```

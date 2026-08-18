@@ -105,4 +105,17 @@ export const env = {
   get initialAdminPhone() {
     return process.env.INITIAL_ADMIN_PHONE?.trim() || '';
   },
+  get razorpayKeyId() {
+    return process.env.RAZORPAY_KEY_ID?.trim() ?? '';
+  },
+  get razorpayKeySecret() {
+    return process.env.RAZORPAY_KEY_SECRET?.trim() ?? '';
+  },
+  get razorpayWebhookSecret() {
+    return process.env.RAZORPAY_WEBHOOK_SECRET?.trim() ?? '';
+  },
+  get subscriptionExpiryWarningDays() {
+    const parsed = Number(process.env.SUBSCRIPTION_EXPIRY_WARNING_DAYS?.trim() || 7);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+  },
 };

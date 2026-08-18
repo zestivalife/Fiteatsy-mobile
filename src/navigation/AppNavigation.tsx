@@ -26,6 +26,7 @@ import { HydrationScreen } from '../screens/wellness/HydrationScreen';
 import { FloatingTabBar } from '../components/FloatingTabBar';
 import { LeadershipScreen } from '../screens/home/LeadershipScreen';
 import { ConsultantBookingScreen } from '../screens/home/ConsultantBookingScreen';
+import { PaymentSuccessScreen } from '../screens/home/PaymentSuccessScreen';
 import { SubscriptionPlansScreen } from '../screens/home/SubscriptionPlansScreen';
 import { SearchScreen } from '../screens/home/SearchScreen';
 import { NotificationsScreen } from '../screens/home/NotificationsScreen';
@@ -117,6 +118,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="Leadership" component={LeadershipScreen} />
         <Stack.Screen name="ConsultantBooking" component={ConsultantBookingScreen} />
         <Stack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
+        <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} />
         <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />

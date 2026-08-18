@@ -71,6 +71,10 @@ Server-side ownership comes from the authenticated account context and no longer
 - `OPENAI_MODEL`
 - `DOCUMENT_INTELLIGENCE_PROVIDER` (`openai` enables advanced report re-analysis)
 - `OPENAI_VISION_MODEL`
+- `RAZORPAY_KEY_ID` (safe to return to authenticated mobile checkout responses)
+- `RAZORPAY_KEY_SECRET` (server-only; verifies and queries Razorpay payment state)
+- `RAZORPAY_WEBHOOK_SECRET` (server-only; verifies `/v1/webhooks/razorpay`)
+- `SUBSCRIPTION_EXPIRY_WARNING_DAYS` (optional; defaults to 7)
 
 ### Environment Notes
 
@@ -79,6 +83,8 @@ Server-side ownership comes from the authenticated account context and no longer
 - `OTP_DEBUG_RESPONSE_ENABLED=true` only exposes `debugOtp` outside production. Production never returns `debugOtp`.
 - `GET /v1/version` returns `service`, `version`, `environment`, and `git_commit`.
 - `GET /ready` checks PostgreSQL readiness and returns `200` when ready or `503` when not ready.
+- Subscription checkout is backend-authoritative. Mobile receives plans from `GET /v1/subscriptions/plans`, starts Razorpay orders through `POST /v1/subscriptions/checkout`, and never activates entitlements until `POST /v1/payments/razorpay/verify` or a verified Razorpay webhook confirms payment.
+- Razorpay webhook URLs must point to `/v1/webhooks/razorpay`; webhook events are stored idempotently and raw-body signature verification must remain enabled.
 - Current CORS remains the default permissive mobile-staging setup and should be hardened before production.
 
 ### Admin / Consultant Role Management

@@ -87,6 +87,24 @@ export const ProfileScreen = ({ navigation }: Props) => {
       </Card>
 
       <Card>
+        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Subscription</Text>
+        <Text style={[styles.valueSecondary, { color: palette.textSecondary }]}>
+          Manage your Fiteatsy plan, premium access, and payment history from the backend-controlled subscription centre.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          style={styles.securityRow}
+          onPress={() => navigation.navigate('SubscriptionPlans', { source: 'subscription_management' })}
+        >
+          <View>
+            <Text style={[styles.securityTitle, { color: palette.textPrimary }]}>Plan and Entitlements</Text>
+            <Text style={[styles.securitySubtitle, { color: palette.textSecondary }]}>View active access or choose a plan</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={palette.textSecondary} />
+        </Pressable>
+      </Card>
+
+      <Card>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Member Profile</Text>
         <Text style={[styles.valuePrimary, { color: palette.textPrimary }]}>{onboarding?.name ?? 'Member'}</Text>
         <Text style={[styles.valueSecondary, { color: palette.textSecondary }]}>{onboarding?.careTrack ?? 'Foundational Recovery Care'}</Text>

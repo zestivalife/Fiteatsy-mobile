@@ -5,6 +5,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Screen } from '../../components/Screen';
 import { colors, getThemeColors, radius, spacing } from '../../design/tokens';
+import { useEntitlementGate } from '../../hooks/useEntitlementGate';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import { formatConsultantAvailability, getConsultantProfile } from '../../utils/healthProfile';
@@ -21,6 +22,7 @@ const bookingWindows = [
 export const ConsultantBookingScreen = ({ navigation }: Props) => {
   const { onboarding, themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
+  const { checkingEntitlement, requireEntitlement } = useEntitlementGate(navigation);
   const consultant = useMemo(() => getConsultantProfile(onboarding), [onboarding]);
   const [selectedWindow, setSelectedWindow] = useState(bookingWindows[1]);
   const [requestState, setRequestState] = useState<'idle' | 'sent' | 'blocked'>('idle');
@@ -33,7 +35,7 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
     'Please confirm the next available appointment.'
   ].join('\n');
 
-  const requestBooking = async () => {
+  const openBookingChannel = async () => {
     if (consultant.whatsappNumber) {
       const phone = consultant.whatsappNumber.replace(/\D/g, '');
       await Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(requestCopy)}`);
@@ -48,6 +50,15 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
     }
 
     setRequestState('blocked');
+  };
+
+  const requestBooking = async () => {
+    await requireEntitlement({
+      source: 'book_consultation',
+      entitlement: 'EXPERT_CONSULTATION',
+      returnDestination: 'ConsultantBooking',
+      onAllowed: openBookingChannel
+    });
   };
 
   return (
@@ -112,7 +123,7 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
       ) : null}
 
       <Pressable
-        onPress={() => navigation.navigate('SubscriptionPlans')}
+        onPress={() => navigation.navigate('SubscriptionPlans', { source: 'subscription_management' })}
         style={[styles.planButton, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}
         accessibilityRole="button"
       >
@@ -123,7 +134,7 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
         <Ionicons name="chevron-forward" size={20} color={palette.textPrimary} />
       </Pressable>
 
-      <PrimaryButton title="Request Booking" onPress={requestBooking} disabled={!isAssigned} />
+      <PrimaryButton title={checkingEntitlement ? 'Checking access...' : 'Request Booking'} onPress={requestBooking} disabled={!isAssigned || checkingEntitlement} />
     </Screen>
   );
 };

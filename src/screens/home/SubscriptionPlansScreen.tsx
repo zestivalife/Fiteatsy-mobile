@@ -1,18 +1,32 @@
-import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import RazorpayCheckout from 'react-native-razorpay';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Screen } from '../../components/Screen';
+import { ApiClientError } from '../../services/apiClient';
 import { colors, getThemeColors, radius, spacing } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import {
   DurationPreference,
   PlanPriority,
   SupportPreference,
-  fiteatsyPlanCatalog,
   recommendPlan
 } from '../../services/planRecommendationService';
+import {
+  EntitlementCode,
+  PremiumSource,
+  SubscriptionPlan,
+  createSubscriptionCheckout,
+  formatPlanDuration,
+  formatPlanPrice,
+  getCurrentSubscription,
+  getSubscriptionPlans,
+  hasEntitlement,
+  premiumSourceEntitlements,
+  verifyRazorpayPayment
+} from '../../services/subscriptionService';
 import { useAppContext } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SubscriptionPlans'>;
@@ -21,6 +35,12 @@ type Choice<T extends string | null> = {
   label: string;
   value: T;
   helper: string;
+};
+
+type RazorpaySuccess = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
 };
 
 const supportChoices: Choice<SupportPreference>[] = [
@@ -43,13 +63,50 @@ const priorityChoices: Choice<PlanPriority>[] = [
   { label: 'Long-term accountability', value: 'accountability', helper: 'Stay consistent over time.' }
 ];
 
-export const SubscriptionPlansScreen = ({ navigation }: Props) => {
+const generateIdempotencyKey = (planId: string) => `${planId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const planDailyCostLabel = (plan: SubscriptionPlan) => {
+  if (plan.durationDays <= 0) return null;
+  const dailyMinor = Math.ceil(plan.priceMinor / plan.durationDays);
+  return `${formatPlanPrice({ ...plan, priceMinor: dailyMinor })}/day`;
+};
+
+export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
   const { onboarding, publishedNutritionPlan, themeMode, wearableSyncData } = useAppContext();
   const palette = getThemeColors(themeMode);
+  const source = (route.params?.source ?? 'subscription_management') as PremiumSource;
+  const requiredEntitlement = (route.params?.requiredEntitlement ?? premiumSourceEntitlements[source]) as EntitlementCode | null;
+  const returnDestination = route.params?.returnDestination;
   const [supportPreference, setSupportPreference] = useState<SupportPreference>(null);
   const [durationPreference, setDurationPreference] = useState<DurationPreference>(null);
   const [priority, setPriority] = useState<PlanPriority>(null);
   const [whyVisible, setWhyVisible] = useState(false);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [activeEntitlements, setActiveEntitlements] = useState<EntitlementCode[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const loadPlans = useCallback(async () => {
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const [plansResponse, subscription] = await Promise.all([
+        getSubscriptionPlans(),
+        getCurrentSubscription().catch(() => null)
+      ]);
+      setPlans(plansResponse.plans);
+      setActiveEntitlements(subscription?.entitlements ?? []);
+    } catch (error) {
+      setErrorMessage(error instanceof ApiClientError ? error.message : 'Unable to load subscription plans right now.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPlans();
+  }, [loadPlans]);
 
   const recommendation = useMemo(
     () =>
@@ -57,12 +114,71 @@ export const SubscriptionPlansScreen = ({ navigation }: Props) => {
         onboarding,
         publishedNutritionPlan,
         wearableSyncData,
+        planCatalog: plans,
         supportPreference,
         durationPreference,
         priority
       }),
-    [durationPreference, onboarding, priority, publishedNutritionPlan, supportPreference, wearableSyncData]
+    [durationPreference, onboarding, plans, priority, publishedNutritionPlan, supportPreference, wearableSyncData]
   );
+
+  const navigateAfterActivation = useCallback(() => {
+    navigation.replace('PaymentSuccess', { returnDestination });
+  }, [navigation, returnDestination]);
+
+  const startCheckout = async (plan: SubscriptionPlan) => {
+    setCheckoutPlanId(plan.id);
+    setErrorMessage(null);
+    try {
+      const checkoutResponse = await createSubscriptionCheckout({
+        planId: plan.id,
+        source,
+        requiredEntitlement,
+        returnDestination: returnDestination ?? null,
+        idempotencyKey: generateIdempotencyKey(plan.id)
+      });
+
+      if (checkoutResponse.alreadyEntitled) {
+        navigateAfterActivation();
+        return;
+      }
+
+      if (!checkoutResponse.checkout) {
+        throw new Error('Payment provider did not return checkout details.');
+      }
+
+      const checkout = checkoutResponse.checkout;
+      const result = await RazorpayCheckout.open({
+        key: checkout.keyId,
+        amount: checkout.amount,
+        currency: checkout.currency,
+        name: 'Fiteatsy',
+        description: checkout.description,
+        order_id: checkout.orderId,
+        prefill: checkout.prefill,
+        notes: checkout.notes,
+        theme: {
+          color: '#64D900'
+        }
+      }) as RazorpaySuccess;
+
+      await verifyRazorpayPayment(result);
+      navigateAfterActivation();
+    } catch (error) {
+      const message =
+        error instanceof ApiClientError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Payment could not be completed.';
+      setErrorMessage(message);
+    } finally {
+      setCheckoutPlanId(null);
+    }
+  };
+
+  const entitledForRequiredFeature = requiredEntitlement ? activeEntitlements.includes(requiredEntitlement) : false;
+  const recommendedPlan = recommendation.primary;
 
   return (
     <Screen scroll contentStyle={styles.screen}>
@@ -72,49 +188,86 @@ export const SubscriptionPlansScreen = ({ navigation }: Props) => {
       </Pressable>
 
       <View style={[styles.hero, { backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0E120F', borderColor: palette.stroke }]}>
-        <Text style={styles.eyebrow}>Recommended plans</Text>
+        <Text style={styles.eyebrow}>Fiteatsy subscriptions</Text>
         <Text style={[styles.title, { color: palette.textPrimary }]}>Choose support that matches your health journey.</Text>
         <Text style={[styles.body, { color: palette.textSecondary }]}>
-          We use your profile, goals, tracking signals, and choices below to recommend a plan. No diagnosis or medical necessity is inferred.
+          Plans and entitlements come from the Fiteatsy backend. Premium features unlock only after server-verified payment.
         </Text>
+        {requiredEntitlement ? (
+          <View style={[styles.entitlementPill, entitledForRequiredFeature ? styles.entitlementPillActive : null]}>
+            <Ionicons name={entitledForRequiredFeature ? 'checkmark-circle' : 'lock-closed'} size={16} color={entitledForRequiredFeature ? '#0D2503' : '#FFFFFF'} />
+            <Text style={[styles.entitlementText, entitledForRequiredFeature ? styles.entitlementTextActive : null]}>
+              {entitledForRequiredFeature ? 'Required access active' : `Requires ${requiredEntitlement.replace(/_/g, ' ')}`}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
-      <View style={[styles.recommendationCard, { backgroundColor: '#111A12', borderColor: '#2D5226' }]}>
-        <View style={styles.badgeRow}>
-          <Text style={styles.badge}>Recommended for you</Text>
-          <Text style={styles.confidence}>{recommendation.confidenceLabel}</Text>
+      {loading ? (
+        <View style={[styles.stateCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}>
+          <ActivityIndicator color="#64D900" />
+          <Text style={[styles.stateText, { color: palette.textSecondary }]}>Loading live plans...</Text>
         </View>
-        <Text style={styles.planName}>{recommendation.primary.name}</Text>
-        <Text style={styles.planReason}>{recommendation.reason}</Text>
-        <View style={styles.planMetaRow}>
-          <Text style={styles.planMeta}>{recommendation.primary.durationLabel}</Text>
-          <Text style={styles.planPrice}>{recommendation.primary.priceLabel}</Text>
-          {recommendation.primary.dailyCostLabel ? <Text style={styles.planMeta}>{recommendation.primary.dailyCostLabel}</Text> : null}
-        </View>
-        {recommendation.primary.valueLabel ? <Text style={styles.valueLabel}>{recommendation.primary.valueLabel}</Text> : null}
-        <View style={styles.benefitList}>
-          {recommendation.primary.benefits.slice(0, 4).map((benefit) => (
-            <View key={benefit} style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={16} color="#64D900" />
-              <Text style={styles.benefitText}>{benefit}</Text>
-            </View>
-          ))}
-        </View>
-        <View style={styles.recommendationActions}>
-          <PrimaryButton title="Choose Recommended Plan" onPress={() => navigation.navigate('ConsultantBooking')} style={styles.chooseButton} />
-          <Pressable onPress={() => setWhyVisible(true)} style={styles.whyButton} accessibilityRole="button">
-            <Text style={styles.whyText}>Why this plan?</Text>
-          </Pressable>
-        </View>
-      </View>
+      ) : null}
 
-      {recommendation.secondary ? (
+      {!loading && errorMessage ? (
+        <View style={[styles.errorCard, { borderColor: '#B83B4B' }]}>
+          <Text style={styles.errorTitle}>Unable to load plans</Text>
+          <Text style={styles.errorBody}>{errorMessage}</Text>
+          <PrimaryButton title="Retry" onPress={() => { void loadPlans(); }} />
+        </View>
+      ) : null}
+
+      {!loading && !errorMessage && recommendedPlan ? (
+        <View style={[styles.recommendationCard, { backgroundColor: '#111A12', borderColor: '#2D5226' }]}>
+          <View style={styles.badgeRow}>
+            <Text style={styles.badge}>{recommendedPlan.badge ?? 'Recommended for you'}</Text>
+            <Text style={styles.confidence}>{recommendation.confidenceLabel}</Text>
+          </View>
+          <Text style={styles.planName}>{recommendedPlan.name}</Text>
+          <Text style={styles.planReason}>{recommendation.reason}</Text>
+          <View style={styles.planMetaRow}>
+            <Text style={styles.planMeta}>{formatPlanDuration(recommendedPlan.durationDays)}</Text>
+            <Text style={styles.planPrice}>{formatPlanPrice(recommendedPlan)}</Text>
+            {planDailyCostLabel(recommendedPlan) ? <Text style={styles.planMeta}>{planDailyCostLabel(recommendedPlan)}</Text> : null}
+          </View>
+          <View style={styles.benefitList}>
+            {recommendedPlan.benefits.slice(0, 4).map((benefit) => (
+              <View key={benefit} style={styles.benefitRow}>
+                <Ionicons name="checkmark-circle" size={16} color="#64D900" />
+                <Text style={styles.benefitText}>{benefit}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.recommendationActions}>
+            <PrimaryButton
+              title={checkoutPlanId === recommendedPlan.id ? 'Opening secure checkout...' : 'Subscribe & Continue'}
+              onPress={() => { void startCheckout(recommendedPlan); }}
+              disabled={Boolean(checkoutPlanId)}
+              style={styles.chooseButton}
+            />
+            <Pressable onPress={() => setWhyVisible(true)} style={styles.whyButton} accessibilityRole="button">
+              <Text style={styles.whyText}>Why this plan?</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {!loading && !errorMessage && recommendation.secondary ? (
         <View style={[styles.secondaryCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}>
           <Text style={[styles.secondaryLabel, { color: palette.textSecondary }]}>Also worth considering</Text>
           <Text style={[styles.secondaryName, { color: palette.textPrimary }]}>{recommendation.secondary.name}</Text>
           <Text style={[styles.secondaryCopy, { color: palette.textSecondary }]}>
-            {recommendation.secondary.durationLabel} · {recommendation.secondary.priceLabel}
+            {formatPlanDuration(recommendation.secondary.durationDays)} · {formatPlanPrice(recommendation.secondary)}
           </Text>
+          <Pressable
+            onPress={() => { void startCheckout(recommendation.secondary as SubscriptionPlan); }}
+            disabled={Boolean(checkoutPlanId)}
+            style={styles.secondaryAction}
+            accessibilityRole="button"
+          >
+            <Text style={styles.secondaryActionText}>Choose this plan</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -125,21 +278,32 @@ export const SubscriptionPlansScreen = ({ navigation }: Props) => {
         <ChoiceGroup title="What matters most right now?" choices={priorityChoices} value={priority} onSelect={setPriority} />
       </View>
 
-      <View style={styles.catalogSection}>
-        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>All plans</Text>
-        {fiteatsyPlanCatalog.map((plan) => (
-          <View key={plan.id} style={[styles.catalogCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}>
-            <View style={styles.catalogTop}>
-              <Text style={[styles.catalogName, { color: palette.textPrimary }]}>{plan.name}</Text>
-              <Text style={styles.catalogPrice}>{plan.priceLabel}</Text>
-            </View>
-            <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>
-              {plan.durationLabel}{plan.dailyCostLabel ? ` · ${plan.dailyCostLabel}` : ''}
-            </Text>
-            {plan.valueLabel ? <Text style={styles.catalogValue}>{plan.valueLabel}</Text> : null}
-          </View>
-        ))}
-      </View>
+      {!loading && !errorMessage ? (
+        <View style={styles.catalogSection}>
+          <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>All live plans</Text>
+          {plans.map((plan) => (
+            <Pressable
+              key={plan.id}
+              onPress={() => { void startCheckout(plan); }}
+              disabled={Boolean(checkoutPlanId)}
+              style={[styles.catalogCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}
+              accessibilityRole="button"
+            >
+              <View style={styles.catalogTop}>
+                <Text style={[styles.catalogName, { color: palette.textPrimary }]}>{plan.name}</Text>
+                <Text style={styles.catalogPrice}>{formatPlanPrice(plan)}</Text>
+              </View>
+              <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>
+                {formatPlanDuration(plan.durationDays)}{planDailyCostLabel(plan) ? ` · ${planDailyCostLabel(plan)}` : ''}
+              </Text>
+              {plan.badge ? <Text style={styles.catalogValue}>{plan.badge}</Text> : null}
+              <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>
+                Unlocks {plan.entitlements.slice(0, 3).map((item) => item.replace(/_/g, ' ')).join(', ')}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <Modal visible={whyVisible} transparent animationType="slide" onRequestClose={() => setWhyVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -232,6 +396,57 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22
   },
+  entitlementPill: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#22282E',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  entitlementPillActive: {
+    backgroundColor: '#64D900'
+  },
+  entitlementText: {
+    color: '#FFFFFF',
+    fontFamily: 'Exo_700Bold',
+    fontSize: 12,
+    textTransform: 'uppercase'
+  },
+  entitlementTextActive: {
+    color: '#0D2503'
+  },
+  stateCard: {
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 24,
+    gap: spacing.sm,
+    padding: spacing.xl
+  },
+  stateText: {
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 14
+  },
+  errorCard: {
+    backgroundColor: '#32141A',
+    borderWidth: 1,
+    borderRadius: 24,
+    gap: spacing.sm,
+    padding: spacing.lg
+  },
+  errorTitle: {
+    color: '#FFFFFF',
+    fontFamily: 'Exo_700Bold',
+    fontSize: 18
+  },
+  errorBody: {
+    color: '#F5B7C1',
+    fontFamily: 'Exo_400Regular',
+    fontSize: 14,
+    lineHeight: 20
+  },
   recommendationCard: {
     borderWidth: 1,
     borderRadius: 30,
@@ -264,79 +479,63 @@ const styles = StyleSheet.create({
   planName: {
     color: '#FFFFFF',
     fontFamily: 'Exo_700Bold',
-    fontSize: 27,
-    lineHeight: 33
+    fontSize: 26,
+    lineHeight: 31
   },
   planReason: {
-    color: '#DDE8D8',
+    color: '#D7E6D0',
     fontFamily: 'Exo_400Regular',
     fontSize: 15,
     lineHeight: 22
   },
   planMetaRow: {
+    alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8
+    gap: 10
   },
   planMeta: {
-    backgroundColor: '#1C261B',
-    borderRadius: radius.pill,
-    color: '#FFFFFF',
+    color: '#D8F3CC',
     fontFamily: 'Exo_600SemiBold',
-    fontSize: 13,
-    paddingHorizontal: 12,
-    paddingVertical: 8
+    fontSize: 13
   },
   planPrice: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.pill,
-    color: '#101510',
+    color: '#FFFFFF',
     fontFamily: 'Exo_700Bold',
-    fontSize: 13,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  valueLabel: {
-    color: colors.warning,
-    fontFamily: 'Exo_700Bold',
-    fontSize: 13,
-    lineHeight: 18
+    fontSize: 22
   },
   benefitList: {
     gap: 8
   },
   benefitRow: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 8
   },
   benefitText: {
-    color: '#FFFFFF',
+    color: '#ECF7E7',
     flex: 1,
-    fontFamily: 'Exo_500Medium',
+    fontFamily: 'Exo_400Regular',
     fontSize: 14
   },
   recommendationActions: {
     gap: 10
   },
   chooseButton: {
-    backgroundColor: '#64D900'
+    marginTop: spacing.xs
   },
   whyButton: {
     alignItems: 'center',
-    borderColor: '#31502B',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    paddingVertical: 14
+    paddingVertical: 10
   },
   whyText: {
-    color: '#FFFFFF',
+    color: '#64D900',
     fontFamily: 'Exo_700Bold',
     fontSize: 15
   },
   secondaryCard: {
-    borderRadius: 22,
     borderWidth: 1,
+    borderRadius: 22,
     gap: 6,
     padding: spacing.md
   },
@@ -351,11 +550,20 @@ const styles = StyleSheet.create({
   },
   secondaryCopy: {
     fontFamily: 'Exo_400Regular',
-    fontSize: 13
+    fontSize: 14
+  },
+  secondaryAction: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8
+  },
+  secondaryActionText: {
+    color: '#64D900',
+    fontFamily: 'Exo_700Bold',
+    fontSize: 14
   },
   helpCard: {
-    borderRadius: 26,
     borderWidth: 1,
+    borderRadius: 26,
     gap: spacing.lg,
     padding: spacing.lg
   },
@@ -373,27 +581,28 @@ const styles = StyleSheet.create({
   },
   choiceRow: {
     alignItems: 'center',
-    borderColor: '#2A2F2D',
-    borderRadius: 18,
+    backgroundColor: '#161C18',
+    borderRadius: 17,
     borderWidth: 1,
+    borderColor: '#26342B',
     flexDirection: 'row',
     gap: 12,
     padding: 13
   },
   choiceRowSelected: {
-    backgroundColor: '#163512',
-    borderColor: '#64D900'
+    borderColor: '#64D900',
+    backgroundColor: '#1A3313'
   },
   radio: {
-    borderColor: '#7D8981',
-    borderRadius: 9,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     borderWidth: 2,
-    height: 18,
-    width: 18
+    borderColor: '#7D8B7B'
   },
   radioSelected: {
-    backgroundColor: '#64D900',
-    borderColor: '#64D900'
+    borderColor: '#64D900',
+    backgroundColor: '#64D900'
   },
   choiceCopy: {
     flex: 1,
@@ -405,62 +614,62 @@ const styles = StyleSheet.create({
     fontSize: 14
   },
   choiceHelper: {
-    color: '#BFC8C1',
+    color: '#AEB9AD',
     fontFamily: 'Exo_400Regular',
     fontSize: 12,
     lineHeight: 17
   },
   catalogSection: {
-    gap: 10
+    gap: spacing.sm
   },
   catalogCard: {
-    borderRadius: 20,
     borderWidth: 1,
-    gap: 7,
+    borderRadius: 20,
+    gap: 6,
     padding: spacing.md
   },
   catalogTop: {
-    alignItems: 'flex-start',
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.sm,
     justifyContent: 'space-between'
   },
   catalogName: {
     flex: 1,
     fontFamily: 'Exo_700Bold',
-    fontSize: 16
+    fontSize: 17
   },
   catalogPrice: {
     color: '#64D900',
     fontFamily: 'Exo_700Bold',
-    fontSize: 16
+    fontSize: 17
   },
   catalogMeta: {
     fontFamily: 'Exo_400Regular',
-    fontSize: 13
+    fontSize: 13,
+    lineHeight: 18
   },
   catalogValue: {
-    color: colors.warning,
-    fontFamily: 'Exo_600SemiBold',
+    color: '#F0B44C',
+    fontFamily: 'Exo_700Bold',
     fontSize: 12
   },
   modalOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.64)',
     flex: 1,
-    justifyContent: 'flex-end'
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.58)'
   },
   sheet: {
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     gap: spacing.md,
     padding: spacing.lg
   },
   sheetHandle: {
     alignSelf: 'center',
-    backgroundColor: '#69716C',
-    borderRadius: 3,
+    backgroundColor: '#7C847B',
+    borderRadius: radius.pill,
     height: 5,
-    width: 48
+    width: 54
   },
   sheetTitle: {
     fontFamily: 'Exo_700Bold',
@@ -472,7 +681,7 @@ const styles = StyleSheet.create({
     lineHeight: 22
   },
   signalRow: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
     gap: 10
   },
@@ -483,6 +692,6 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   closeButton: {
-    marginTop: spacing.xs
+    marginTop: spacing.sm
   }
 });

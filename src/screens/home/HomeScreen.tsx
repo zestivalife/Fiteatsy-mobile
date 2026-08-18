@@ -21,6 +21,7 @@ import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-inactive.svg';
 import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-selected.svg';
 import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-inactive.svg';
 import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
+import { useEntitlementGate } from '../../hooks/useEntitlementGate';
 import { RootStackParamList } from '../../navigation/types';
 import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/recoveryIntelligenceEngine';
 import { listAnalyzedReports, type ReportDto } from '../../services/reportUploadService';
@@ -178,6 +179,7 @@ const buildDomainTrend = (scores: Array<number | null>, checkIns: DailyCheckIn[]
 
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { requireEntitlement } = useEntitlementGate(navigation);
   const {
     onboarding,
     wellness,
@@ -329,7 +331,18 @@ export const HomeScreen = () => {
             <RecoveryTrend values={trendValues} hasData={hasTrendData} />
 
             <View style={styles.actionRow}>
-              <ActionPill label="Assist" Icon={AssistIcon} onPress={() => navigation.navigate('ConsultantBooking')} />
+              <ActionPill
+                label="Assist"
+                Icon={AssistIcon}
+                onPress={() => {
+                  void requireEntitlement({
+                    source: 'assist',
+                    entitlement: 'AI_ASSIST',
+                    returnDestination: 'ConsultantBooking',
+                    onAllowed: () => navigation.navigate('ConsultantBooking')
+                  });
+                }}
+              />
               <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable', { autoSync: true })} />
             </View>
 
