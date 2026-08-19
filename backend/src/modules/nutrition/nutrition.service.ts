@@ -1120,6 +1120,8 @@ const buildDraftContent = (input: {
   dietPreference: string | null;
   allergies: string[];
   avoidedFoods?: string[];
+  avoidedFoodIds?: string[];
+  likedFoodIds?: string[];
   preferredCuisines?: string[];
   regionalCuisine: string | null;
   lifestyleSummary: string;
@@ -1205,6 +1207,8 @@ const enrichMealPlanWithLibraryMatches = async (input: {
   dietPreference: string | null;
   allergies: string[];
   avoidedFoods?: string[];
+  avoidedFoodIds?: string[];
+  likedFoodIds?: string[];
   preferredCuisines?: string[];
 }) => {
   const nextMealPlanEntries = await Promise.all(
@@ -1216,6 +1220,8 @@ const enrichMealPlanWithLibraryMatches = async (input: {
         dietPreference: input.dietPreference,
         allergyTags: input.allergies,
         avoidedFoods: input.avoidedFoods,
+        avoidedFoodIds: input.avoidedFoodIds,
+        likedFoodIds: input.likedFoodIds,
         preferredCuisines: input.preferredCuisines,
         limit: AVAILABLE_LIBRARY_MATCH_LIMIT,
       });
@@ -1540,6 +1546,11 @@ export const generateConsultantDietPlanDraft = async (
     dietPreference: healthProfile?.dietType ?? context.profile.onboarding.dietPreference,
     allergies,
     avoidedFoods: foodPreferences?.profile.foodsAvoided.concat(foodPreferences.profile.foodsDisliked) ?? [],
+    avoidedFoodIds: [
+      ...(foodPreferences?.profile.avoidedFoodIds ?? []),
+      ...(foodPreferences?.profile.dislikedFoodIds ?? []),
+    ],
+    likedFoodIds: foodPreferences?.profile.likedFoodIds ?? [],
     preferredCuisines: foodPreferences?.profile.cuisines ?? [],
   }));
   const sourceSnapshot = buildSourceSnapshot({

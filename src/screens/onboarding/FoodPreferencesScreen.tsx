@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
@@ -11,6 +11,8 @@ import {
   emptyFoodPreferenceProfile,
   getFoodPreferences,
   saveFoodPreferences,
+  searchFoodCatalogue,
+  type FoodCatalogueItem,
   type FoodPreferenceProfile
 } from '../../services/foodPreferenceService';
 
@@ -31,7 +33,6 @@ const proteins: Choice[] = [
   { label: 'Mutton', value: 'mutton' }
 ];
 const cuisines: Choice[] = ['Maharashtrian', 'North Indian', 'South Indian', 'Gujarati', 'Punjabi', 'Bengali', 'Rajasthani', 'Other Indian', 'International / Other'].map((label) => ({ label, value: label }));
-const foods: Choice[] = ['Poha', 'Idli', 'Paneer', 'Dal', 'Rice', 'Roti', 'Oats', 'Bitter gourd', 'Peanuts', 'Soy'].map((label) => ({ label, value: label }));
 const practicality: Choice[] = ['Home-cooked', 'Office-friendly', 'Quick preparation', 'Travel-friendly', 'Minimal cooking', 'Family-friendly'].map((label) => ({ label, value: label }));
 
 const toggle = (values: string[], value: string) => values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
@@ -45,16 +46,33 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [foodQuery, setFoodQuery] = useState('');
+  const [foodMode, setFoodMode] = useState<'likedFoodIds' | 'dislikedFoodIds' | 'avoidedFoodIds'>('likedFoodIds');
+  const [foodItems, setFoodItems] = useState<FoodCatalogueItem[]>([]);
+  const [foodLoading, setFoodLoading] = useState(false);
+  const [foodError, setFoodError] = useState<string | null>(null);
 
   useEffect(() => {
     getFoodPreferences()
       .then((response) => {
-        setProfile(response.profile);
+        setProfile({ ...emptyFoodPreferenceProfile(), ...response.profile, likedFoodIds: response.profile.likedFoodIds ?? [], dislikedFoodIds: response.profile.dislikedFoodIds ?? [], avoidedFoodIds: response.profile.avoidedFoodIds ?? [] });
         setSavedAt(response.updatedAtISO);
       })
       .catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'Unable to load food preferences.'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFoodLoading(true);
+      setFoodError(null);
+      searchFoodCatalogue(foodQuery)
+        .then((response) => setFoodItems(response.items))
+        .catch((requestError) => setFoodError(requestError instanceof Error ? requestError.message : 'Unable to load foods.'))
+        .finally(() => setFoodLoading(false));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [foodQuery]);
 
   const proteinVisible = profile.dietType === 'eggetarian' || profile.dietType === 'non_vegetarian';
   const selectedDietLabel = useMemo(() => diets.find((item) => item.value === profile.dietType)?.label ?? 'Not selected', [profile.dietType]);
@@ -118,22 +136,9 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
         <Text style={[styles.helper, { color: palette.textSecondary }]}>Medical intolerances are kept in your Health Profile.</Text>
       </Card>
 
-      <Card>
-        <SectionTitle title="Foods you enjoy" color={palette.textPrimary} />
-        <Text style={[styles.helper, { color: palette.textSecondary }]}>Choose foods you'd like us to consider more often.</Text>
-        <ChoiceGrid choices={foods} selected={profile.foodsLiked} onToggle={(value) => update('foodsLiked', toggle(profile.foodsLiked, value))} palette={palette} />
-      </Card>
-
-      <Card>
-        <SectionTitle title="Foods you don't enjoy" color={palette.textPrimary} />
-        <Text style={[styles.helper, { color: palette.textSecondary }]}>Dislikes are different from allergies.</Text>
-        <ChoiceGrid choices={foods} selected={profile.foodsDisliked} onToggle={(value) => update('foodsDisliked', toggle(profile.foodsDisliked, value))} palette={palette} />
-      </Card>
-
-      <Card>
-        <SectionTitle title="Anything you specifically avoid?" color={palette.textPrimary} />
-        <ChoiceGrid choices={foods} selected={profile.foodsAvoided} onToggle={(value) => update('foodsAvoided', toggle(profile.foodsAvoided, value))} palette={palette} />
-      </Card>
+      <FoodPicker title="Foods you enjoy" helper="Choose verified foods you'd like us to consider more often." mode="likedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.likedFoodIds} onToggle={(id) => update('likedFoodIds', toggle(profile.likedFoodIds, id))} palette={palette} />
+      <FoodPicker title="Foods you don't enjoy" helper="Dislikes are different from allergies." mode="dislikedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.dislikedFoodIds} onToggle={(id) => update('dislikedFoodIds', toggle(profile.dislikedFoodIds, id))} palette={palette} />
+      <FoodPicker title="Anything you specifically avoid?" helper="Avoided foods are not treated as medical allergies." mode="avoidedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.avoidedFoodIds} onToggle={(id) => update('avoidedFoodIds', toggle(profile.avoidedFoodIds, id))} palette={palette} />
 
       <Card>
         <SectionTitle title="What works for your routine?" color={palette.textPrimary} />
@@ -163,6 +168,36 @@ const ChoiceGrid = ({ choices, selected, onToggle, palette }: { choices: Choice[
   </View>
 );
 
+const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery, items, loading, error, selected, onToggle, palette }: {
+  title: string;
+  helper: string;
+  mode: 'likedFoodIds' | 'dislikedFoodIds' | 'avoidedFoodIds';
+  activeMode: 'likedFoodIds' | 'dislikedFoodIds' | 'avoidedFoodIds';
+  setMode: (mode: 'likedFoodIds' | 'dislikedFoodIds' | 'avoidedFoodIds') => void;
+  query: string;
+  setQuery: (query: string) => void;
+  items: FoodCatalogueItem[];
+  loading: boolean;
+  error: string | null;
+  selected: string[];
+  onToggle: (id: string) => void;
+  palette: ReturnType<typeof getThemeColors>;
+}) => {
+  return <Card>
+    <SectionTitle title={title} color={palette.textPrimary} />
+    <Text style={[styles.helper, { color: palette.textSecondary }]}>{helper}</Text>
+    <TextInput accessibilityLabel={`Search ${title}`} value={activeMode === mode ? query : ''} onFocus={() => setMode(mode)} onChangeText={(value) => { setMode(mode); setQuery(value); }} placeholder="Search verified foods" placeholderTextColor={palette.textSecondary} style={[styles.searchInput, { color: palette.textPrimary, backgroundColor: palette.cardMuted, borderColor: palette.stroke }]} />
+    {activeMode === mode && loading ? <Text style={[styles.helper, { color: palette.textSecondary }]}>Searching verified foods...</Text> : null}
+    {activeMode === mode && error ? <Text style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
+    {activeMode === mode && !loading && !error && !items.length ? <Text style={[styles.helper, { color: palette.textSecondary }]}>No verified foods found.</Text> : null}
+    <View style={styles.choiceGrid}>{(activeMode === mode ? items : []).map((item) => {
+      const active = selected.includes(item.id);
+      return <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => onToggle(item.id)} style={[styles.choice, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }, active && { backgroundColor: palette.blue, borderColor: palette.blue }]}><Text style={[styles.choiceText, { color: active ? '#FFFFFF' : palette.textPrimary }]}>{item.displayName}</Text></Pressable>;
+    })}</View>
+    {selected.length ? <Text style={[styles.selectedCount, { color: palette.textSecondary }]}>{selected.length} selected</Text> : null}
+  </Card>;
+};
+
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   eyebrow: { ...typography.caption, marginBottom: 8 },
@@ -173,6 +208,8 @@ const styles = StyleSheet.create({
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   choice: { minHeight: 44, paddingHorizontal: 14, borderWidth: 1, borderRadius: radius.sm, justifyContent: 'center' },
   choiceText: { ...typography.caption },
+  searchInput: { minHeight: 46, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 12, marginBottom: 10, ...typography.body },
+  selectedCount: { ...typography.caption, marginTop: 10 },
   saved: { ...typography.caption, textAlign: 'center', marginVertical: 12 },
   error: { ...typography.caption, textAlign: 'center', marginVertical: 12 }
 });

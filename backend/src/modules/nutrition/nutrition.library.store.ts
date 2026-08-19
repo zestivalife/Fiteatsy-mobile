@@ -232,6 +232,8 @@ export const listEligibleMealVariantRecords = async (input: {
   dietPreference?: string | null;
   allergyTags?: string[];
   avoidedFoods?: string[];
+  avoidedFoodIds?: string[];
+  likedFoodIds?: string[];
   preferredCuisines?: string[];
   limit?: number;
 }) => {
@@ -375,10 +377,19 @@ export const listEligibleMealVariantRecords = async (input: {
     sourceType: row.source_type,
     components: componentsByVariantId.get(row.id) ?? [],
   } satisfies MealVariantRecord));
-  return mappedVariants.filter((variant) => {
+  const likedIds = new Set(input.likedFoodIds ?? []);
+  return mappedVariants
+    .filter((variant) => {
     const blocked = (input.avoidedFoods ?? []).map(normalizeText).filter(Boolean);
-    return blocked.every((food) => !variant.components.some((component) => normalizeText(component.componentName).includes(food)));
-  });
+    const blockedIds = new Set(input.avoidedFoodIds ?? []);
+    return blocked.every((food) => !variant.components.some((component) => normalizeText(component.componentName).includes(food))) &&
+      !variant.components.some((component) => component.foodId != null && blockedIds.has(component.foodId));
+    })
+    .sort((left, right) => {
+      const leftMatches = left.components.filter((component) => component.foodId != null && likedIds.has(component.foodId)).length;
+      const rightMatches = right.components.filter((component) => component.foodId != null && likedIds.has(component.foodId)).length;
+      return rightMatches - leftMatches;
+    });
 };
 
 export const listMealLibrarySlotsForTarget = async (input: {
@@ -388,6 +399,8 @@ export const listMealLibrarySlotsForTarget = async (input: {
   dietPreference?: string | null;
   allergyTags?: string[];
   avoidedFoods?: string[];
+  avoidedFoodIds?: string[];
+  likedFoodIds?: string[];
   preferredCuisines?: string[];
   limit?: number;
 }) => {

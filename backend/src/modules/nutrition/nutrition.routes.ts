@@ -16,7 +16,7 @@ import {
   exportConsultantDietPlanDocument,
   logNutritionMealConsumption,
 } from './nutrition.service.js';
-import { getFoodPreferenceProfile, updateFoodPreferenceProfile } from './food-preferences.service.js';
+import { getFoodPreferenceProfile, listVerifiedFoodCatalogue, updateFoodPreferenceProfile } from './food-preferences.service.js';
 
 const mealOptionSchema = z.object({
   id: z.string().optional(),
@@ -372,6 +372,13 @@ consultantNutritionRouter.get('/clients/:clientId/diet-plans/:dietPlanId/downloa
 
 export const platformNutritionRouter = Router();
 platformNutritionRouter.use(requireAuthenticatedAccount);
+
+platformNutritionRouter.get('/food-catalogue', async (req, res) => {
+  const query = typeof req.query.q === 'string' ? req.query.q : '';
+  const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : 30;
+  const offset = typeof req.query.offset === 'string' ? Number(req.query.offset) : 0;
+  return res.status(200).json(await listVerifiedFoodCatalogue(query, Number.isFinite(limit) ? limit : 30, Number.isFinite(offset) ? offset : 0));
+});
 
 platformNutritionRouter.get('/food-preferences', async (req, res) => {
   const account = getAuthenticatedAccount(req);

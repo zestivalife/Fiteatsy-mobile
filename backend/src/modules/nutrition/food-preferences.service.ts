@@ -13,6 +13,9 @@ export type FoodPreferenceProfile = {
   foodsLiked: string[];
   foodsDisliked: string[];
   foodsAvoided: string[];
+  likedFoodIds: string[];
+  dislikedFoodIds: string[];
+  avoidedFoodIds: string[];
   restrictions: string[];
   staplePreference: (typeof STAPLE_PREFERENCES)[number] | null;
   dairyPreference: (typeof DAIRY_PREFERENCES)[number] | null;
@@ -26,6 +29,9 @@ const emptyProfile = (): FoodPreferenceProfile => ({
   foodsLiked: [],
   foodsDisliked: [],
   foodsAvoided: [],
+  likedFoodIds: [],
+  dislikedFoodIds: [],
+  avoidedFoodIds: [],
   restrictions: [],
   staplePreference: null,
   dairyPreference: null,
@@ -41,6 +47,9 @@ export const normalizeFoodPreferenceProfile = (input: Partial<FoodPreferenceProf
   foodsLiked: cleanList(input.foodsLiked),
   foodsDisliked: cleanList(input.foodsDisliked),
   foodsAvoided: cleanList(input.foodsAvoided),
+  likedFoodIds: cleanList(input.likedFoodIds),
+  dislikedFoodIds: cleanList(input.dislikedFoodIds),
+  avoidedFoodIds: cleanList(input.avoidedFoodIds),
   restrictions: cleanList(input.restrictions),
   staplePreference: input.staplePreference && STAPLE_PREFERENCES.includes(input.staplePreference) ? input.staplePreference : null,
   dairyPreference: input.dairyPreference && DAIRY_PREFERENCES.includes(input.dairyPreference) ? input.dairyPreference : null,
@@ -63,6 +72,38 @@ export const getFoodPreferenceProfile = async (publicClientId: string) => {
     profile: normalizeFoodPreferenceProfile((row?.food_preference_profile ?? {}) as Partial<FoodPreferenceProfile>),
     updatedBy: row?.food_preference_updated_by ?? null,
     updatedAtISO: row?.food_preference_updated_at ? new Date(row.food_preference_updated_at).toISOString() : null,
+  };
+};
+
+export const listVerifiedFoodCatalogue = async (query: string, limit = 30, offset = 0) => {
+  const safeLimit = Math.min(Math.max(limit, 1), 50);
+  const safeOffset = Math.max(offset, 0);
+  const result = await pool.query(
+    `select id, canonical_name, display_name, food_category, dietary_classification,
+            cuisine_tags, allergen_tags
+       from nutrition_foods
+      where deleted_at is null and status = 'active' and verification_status = 'verified'
+        and ($1 = '' or lower(display_name) like '%' || lower($1) || '%'
+          or lower(canonical_name) like '%' || lower($1) || '%'
+          or exists (select 1 from jsonb_array_elements_text(aliases) alias where lower(alias) like '%' || lower($1) || '%'))
+      order by lower(display_name), id
+      limit $2 offset $3`,
+    [query.trim(), safeLimit, safeOffset],
+  );
+  return {
+    items: result.rows.map((row) => ({
+      id: String(row.id),
+      canonicalName: String(row.canonical_name),
+      displayName: String(row.display_name),
+      category: row.food_category == null ? null : String(row.food_category),
+      dietaryClassification: row.dietary_classification == null ? null : String(row.dietary_classification),
+      cuisineTags: Array.isArray(row.cuisine_tags) ? row.cuisine_tags.map(String) : [],
+      allergenTags: Array.isArray(row.allergen_tags) ? row.allergen_tags.map(String) : [],
+    })),
+    query: query.trim(),
+    limit: safeLimit,
+    offset: safeOffset,
+    hasMore: result.rowCount === safeLimit,
   };
 };
 
