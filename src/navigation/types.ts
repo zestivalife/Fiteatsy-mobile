@@ -42,6 +42,7 @@ export type RootStackParamList = {
   CycleNotifications: undefined;
   FamilyDashboard: undefined;
   FamilyMemberDetail: { connectionId: string };
+  Pss10Assessment: { mode?: 'intro' | 'history' } | undefined;
   TrackerDetail: {
     metricKey: string;
     metricTitle: string;

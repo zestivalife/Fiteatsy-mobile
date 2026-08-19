@@ -44,6 +44,7 @@ import { CycleInsightsScreen } from '../screens/cycle/CycleInsightsScreen';
 import { CycleNotificationsScreen } from '../screens/cycle/CycleNotificationsScreen';
 import { FamilyDashboardScreen } from '../screens/family/FamilyDashboardScreen';
 import { FamilyMemberDetailScreen } from '../screens/family/FamilyMemberDetailScreen';
+import { Pss10AssessmentScreen } from '../screens/assessments/Pss10AssessmentScreen';
 import { useAppContext } from '../state/AppContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -134,6 +135,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="CycleNotifications" component={CycleNotificationsScreen} />
         <Stack.Screen name="FamilyDashboard" component={FamilyDashboardScreen} />
         <Stack.Screen name="FamilyMemberDetail" component={FamilyMemberDetailScreen} />
+        <Stack.Screen name="Pss10Assessment" component={Pss10AssessmentScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

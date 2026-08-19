@@ -11,6 +11,11 @@ import {
 } from '../medications/medications.service.js';
 import type { MedicationExceptionRecord } from '../medications/medication-exceptions.repository.js';
 import { getConsultantLatestDietPlan, getConsultantNutritionIntelligence } from '../nutrition/nutrition.service.js';
+import {
+  getAssessmentResultById,
+  getLatestAssessmentResult,
+  listAssessmentResults
+} from '../assessments/assessments.repository.js';
 import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId } from '../platform/platform.store.js';
 import {
   ensureRegisteredClientsForEligibleUsers,
@@ -35,6 +40,7 @@ const WORKSPACE_ALLOWED_SCOPES = [
   'client.reports.read',
   'client.wearables.read',
   'client.medications.read',
+  'client.assessments.read',
   'client.timeline.read',
   'client.nutrition_protocol.read'
 ] as const;
@@ -482,6 +488,84 @@ const resolveAssignedClientMedicationAccess = async (publicClientId: string, acc
   };
 };
 
+const resolveAssignedClientAssessmentAccess = async (publicClientId: string, account: AuthenticatedAccount) => {
+  await ensureRegisteredClientsForEligibleUsers();
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId);
+  if (!context) return null;
+  const [healthProfile, careCase] = await Promise.all([
+    getHealthProfileByClientId(context.internalClientId),
+    getCareCaseByClientId(context.internalClientId)
+  ]);
+  const assignmentValidation = buildAssignmentValidation({ account, healthProfile, careCase });
+  return {
+    context,
+    assignmentValidation,
+    allowed: assignmentValidation.status === 'assigned_to_requestor'
+  };
+};
+
+const assessmentChange = (latest: Awaited<ReturnType<typeof getLatestAssessmentResult>>['result'], previous: Awaited<ReturnType<typeof getLatestAssessmentResult>>['previousResult']) =>
+  latest && previous ? latest.rawScore - previous.rawScore : null;
+
+const consultantAssessmentAccess = (account: AuthenticatedAccount, assignmentValidation: ReturnType<typeof buildAssignmentValidation>) => ({
+  requestAccountId: account.accountId,
+  requestRole: account.user.role ?? null,
+  assignmentValidation,
+  readOnly: true
+});
+
+export const getConsultantClientAssessmentSummary = async (
+  publicClientId: string,
+  account: AuthenticatedAccount
+) => {
+  const access = await resolveAssignedClientAssessmentAccess(publicClientId, account);
+  if (!access) return null;
+  if (!access.allowed) {
+    return { error: 'CLIENT_ASSESSMENT_ACCESS_DENIED' as const, assignmentValidation: access.assignmentValidation };
+  }
+
+  const owner = { accountId: access.context.accountId, clientId: access.context.internalClientId };
+  const [latest, history] = await Promise.all([
+    getLatestAssessmentResult(owner),
+    listAssessmentResults(owner, 100)
+  ]);
+  return {
+    client: access.context.profile.client,
+    access: consultantAssessmentAccess(account, access.assignmentValidation),
+    assessment: {
+      assessmentType: 'PSS10',
+      latest: latest.result,
+      previous: latest.previousResult,
+      change: assessmentChange(latest.result, latest.previousResult),
+      history
+    }
+  };
+};
+
+export const getConsultantClientAssessmentResult = async (
+  publicClientId: string,
+  resultId: string,
+  account: AuthenticatedAccount
+) => {
+  const access = await resolveAssignedClientAssessmentAccess(publicClientId, account);
+  if (!access) return null;
+  if (!access.allowed) {
+    return { error: 'CLIENT_ASSESSMENT_ACCESS_DENIED' as const, assignmentValidation: access.assignmentValidation };
+  }
+
+  const result = await getAssessmentResultById(
+    { accountId: access.context.accountId, clientId: access.context.internalClientId },
+    resultId
+  );
+  return result
+    ? {
+        client: access.context.profile.client,
+        access: consultantAssessmentAccess(account, access.assignmentValidation),
+        result
+      }
+    : null;
+};
+
 export const getConsultantClientMedicationMonitoring = async (
   publicClientId: string,
   account: AuthenticatedAccount
@@ -692,6 +776,21 @@ export const getConsultantClientWorkspace = async (
     careCase
   });
   const consentValidation = buildConsentValidation(account);
+  const stressAssessment = assignmentValidation.status === 'assigned_to_requestor'
+    ? await (async () => {
+        const [latest, history] = await Promise.all([
+          getLatestAssessmentResult(owner),
+          listAssessmentResults(owner, 100)
+        ]);
+        return {
+          assessmentType: 'PSS10',
+          latest: latest.result,
+          previous: latest.previousResult,
+          change: assessmentChange(latest.result, latest.previousResult),
+          history
+        };
+      })()
+    : null;
   const provenance = buildProvenance({
     healthProfile,
     nutritionProfile,
@@ -756,6 +855,7 @@ export const getConsultantClientWorkspace = async (
     biomarkers,
     reports,
     medicationMonitoring,
+    stressAssessment,
     wearableSummary,
     recoveryMetrics: {
       activityScore: scoreByType.get('active_performance') ?? scoreByType.get('activity') ?? null,

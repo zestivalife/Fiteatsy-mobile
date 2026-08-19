@@ -6,6 +6,8 @@ import {
   canAccessConsultantClientApi,
   getConsultantClientMedicationExceptions,
   getConsultantClientMedicationMonitoring,
+  getConsultantClientAssessmentResult,
+  getConsultantClientAssessmentSummary,
   getConsultantClientWorkspace,
   getConsultantMedicationExceptionDetail,
   getConsultantClientProfile,
@@ -106,6 +108,58 @@ consultantsRouter.get('/clients/:clientId/medications', async (req, res) => {
     });
   }
   return res.status(200).json(medicationMonitoring);
+});
+
+const sendAssessmentAccessResponse = (res: Response, payload: Awaited<ReturnType<typeof getConsultantClientAssessmentSummary>>) => {
+  if (!payload) {
+    return res.status(404).json({
+      error: 'CLIENT_NOT_FOUND',
+      message: 'Client not found or not available for consultant management.'
+    });
+  }
+  if ('error' in payload) {
+    return res.status(403).json({
+      error: payload.error,
+      message: 'Perceived-stress assessment access requires an assigned client relationship.',
+      assignmentValidation: payload.assignmentValidation
+    });
+  }
+  return res.status(200).json(payload);
+};
+
+consultantsRouter.get('/clients/:clientId/assessments/PSS10/summary', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const summary = await getConsultantClientAssessmentSummary(req.params.clientId, account);
+  return sendAssessmentAccessResponse(res, summary);
+});
+
+consultantsRouter.get('/clients/:clientId/assessments/PSS10/history', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const summary = await getConsultantClientAssessmentSummary(req.params.clientId, account);
+  if (!summary) return sendAssessmentAccessResponse(res, summary);
+  if ('error' in summary) return sendAssessmentAccessResponse(res, summary);
+  return res.status(200).json({
+    client: summary.client,
+    access: summary.access,
+    assessmentType: summary.assessment.assessmentType,
+    history: summary.assessment.history
+  });
+});
+
+consultantsRouter.get('/clients/:clientId/assessments/results/:resultId', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const result = await getConsultantClientAssessmentResult(req.params.clientId, req.params.resultId, account);
+  if (!result) {
+    return res.status(404).json({ error: 'ASSESSMENT_RESULT_NOT_FOUND', message: 'Assessment result not found.' });
+  }
+  if ('error' in result) {
+    return res.status(403).json({
+      error: result.error,
+      message: 'Perceived-stress assessment access requires an assigned client relationship.',
+      assignmentValidation: result.assignmentValidation
+    });
+  }
+  return res.status(200).json(result);
 });
 
 consultantsRouter.get('/clients/:clientId/medication-exceptions', async (req, res) => {
