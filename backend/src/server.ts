@@ -47,6 +47,7 @@ const REGISTERED_ROUTE_GROUPS = [
   '/v1/clients',
   '/v1/consultants/*/diet-plans',
   '/v1/admin',
+  '/v1/admin/qa-identities',
   '/v1/subscriptions',
   '/v1/payments',
   '/v1/webhooks/razorpay',
