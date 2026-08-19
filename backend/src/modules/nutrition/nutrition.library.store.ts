@@ -231,6 +231,8 @@ export const listEligibleMealVariantRecords = async (input: {
   consultantId?: string | null;
   dietPreference?: string | null;
   allergyTags?: string[];
+  avoidedFoods?: string[];
+  preferredCuisines?: string[];
   limit?: number;
 }) => {
   const params: unknown[] = [input.mealKey, input.consultantId ?? null, input.limit ?? 12];
@@ -275,11 +277,15 @@ export const listEligibleMealVariantRecords = async (input: {
     const allergenTags = normalizeTagArray(row.allergen_tags).map(normalizeText);
     const requestedDiet = normalizeText(input.dietPreference);
     const blockedAllergens = (input.allergyTags ?? []).map(normalizeText).filter(Boolean);
+    const avoidedFoods = (input.avoidedFoods ?? []).map(normalizeText).filter(Boolean);
+    const preferredCuisines = (input.preferredCuisines ?? []).map(normalizeText).filter(Boolean);
 
     const dietCompatible = !requestedDiet || !dietaryTags.length || dietaryTags.some((tag) => requestedDiet.includes(tag) || tag.includes(requestedDiet));
     const allergyCompatible = blockedAllergens.every((blocked) => !allergenTags.includes(blocked));
+    const foodCompatible = avoidedFoods.every((blocked) => !normalizeText(row.variant_name).includes(blocked));
+    const cuisineCompatible = !preferredCuisines.length || normalizeTagArray(row.cuisine_tags).some((tag) => preferredCuisines.includes(normalizeText(tag)));
 
-    return dietCompatible && allergyCompatible;
+    return dietCompatible && allergyCompatible && foodCompatible && cuisineCompatible;
   });
 
   if (!candidateRows.length) return [] as MealVariantRecord[];
@@ -358,7 +364,7 @@ export const listEligibleMealVariantRecords = async (input: {
     componentsByVariantId.set(component.meal_variant_id, next);
   });
 
-  return candidateRows.map((row) => ({
+  const mappedVariants = candidateRows.map((row) => ({
     id: row.id,
     mealKey: row.meal_key,
     name: row.variant_name,
@@ -369,6 +375,10 @@ export const listEligibleMealVariantRecords = async (input: {
     sourceType: row.source_type,
     components: componentsByVariantId.get(row.id) ?? [],
   } satisfies MealVariantRecord));
+  return mappedVariants.filter((variant) => {
+    const blocked = (input.avoidedFoods ?? []).map(normalizeText).filter(Boolean);
+    return blocked.every((food) => !variant.components.some((component) => normalizeText(component.componentName).includes(food)));
+  });
 };
 
 export const listMealLibrarySlotsForTarget = async (input: {
@@ -377,6 +387,8 @@ export const listMealLibrarySlotsForTarget = async (input: {
   consultantId?: string | null;
   dietPreference?: string | null;
   allergyTags?: string[];
+  avoidedFoods?: string[];
+  preferredCuisines?: string[];
   limit?: number;
 }) => {
   const variants = await listEligibleMealVariantRecords(input);

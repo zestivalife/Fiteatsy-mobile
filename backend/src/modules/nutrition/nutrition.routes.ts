@@ -16,6 +16,7 @@ import {
   exportConsultantDietPlanDocument,
   logNutritionMealConsumption,
 } from './nutrition.service.js';
+import { getFoodPreferenceProfile, updateFoodPreferenceProfile } from './food-preferences.service.js';
 
 const mealOptionSchema = z.object({
   id: z.string().optional(),
@@ -246,6 +247,18 @@ consultantNutritionRouter.get('/clients/:clientId/nutrition-intelligence', async
       message: 'Nutrition intelligence is not available for this client.',
     });
   }
+  return res.status(200).json(payload);
+});
+
+consultantNutritionRouter.get('/clients/:clientId/food-preferences', async (req, res) => {
+  const payload = await getFoodPreferenceProfile(req.params.clientId);
+  if (!payload) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'Client was not found.' });
+  return res.status(200).json(payload);
+});
+
+consultantNutritionRouter.put('/clients/:clientId/food-preferences', async (req, res) => {
+  const payload = await updateFoodPreferenceProfile(req.params.clientId, getAuthenticatedAccount(req).accountId, 'consultant', req.body ?? {});
+  if (!payload) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'Client was not found.' });
   return res.status(200).json(payload);
 });
 

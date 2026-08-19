@@ -36,6 +36,7 @@ import {
 import { generateDietPlanDocument } from './nutrition.document.js';
 import { buildRecommendationSets, calculateMealNutritionTotals, classifyMealMatch, deriveMealTargets } from './meal-engine.js';
 import { listMealLibrarySlotsForTarget } from './nutrition.library.store.js';
+import { getFoodPreferenceProfile } from './food-preferences.service.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
@@ -1118,6 +1119,8 @@ const buildDraftContent = (input: {
   conditions: string[];
   dietPreference: string | null;
   allergies: string[];
+  avoidedFoods?: string[];
+  preferredCuisines?: string[];
   regionalCuisine: string | null;
   lifestyleSummary: string;
   programmeName: string;
@@ -1201,6 +1204,8 @@ const enrichMealPlanWithLibraryMatches = async (input: {
   consultantId: string;
   dietPreference: string | null;
   allergies: string[];
+  avoidedFoods?: string[];
+  preferredCuisines?: string[];
 }) => {
   const nextMealPlanEntries = await Promise.all(
     Object.entries(input.content.mealPlan).map(async ([mealKey, section]) => {
@@ -1210,6 +1215,8 @@ const enrichMealPlanWithLibraryMatches = async (input: {
         consultantId: input.consultantId,
         dietPreference: input.dietPreference,
         allergyTags: input.allergies,
+        avoidedFoods: input.avoidedFoods,
+        preferredCuisines: input.preferredCuisines,
         limit: AVAILABLE_LIBRARY_MATCH_LIMIT,
       });
       const fallbackMatches = buildCanonicalMealLibraryFallback({
@@ -1500,6 +1507,7 @@ export const generateConsultantDietPlanDraft = async (
     ...(healthProfile?.foodIntolerances ?? []),
     ...(healthProfile?.foodsDisliked ?? []),
   ]);
+  const foodPreferences = await getFoodPreferenceProfile(publicClientId);
   const draftTemplate = buildDraftContent({
     clientName: context.profile.client.name,
     age: context.profile.client.age,
@@ -1531,6 +1539,8 @@ export const generateConsultantDietPlanDraft = async (
     consultantId: account.accountId,
     dietPreference: healthProfile?.dietType ?? context.profile.onboarding.dietPreference,
     allergies,
+    avoidedFoods: foodPreferences?.profile.foodsAvoided.concat(foodPreferences.profile.foodsDisliked) ?? [],
+    preferredCuisines: foodPreferences?.profile.cuisines ?? [],
   }));
   const sourceSnapshot = buildSourceSnapshot({
     bmi: metrics.bmi.status === 'AVAILABLE' ? metrics.bmi.value : null,
