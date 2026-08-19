@@ -20,6 +20,7 @@ import { consultantNutritionRouter, platformNutritionRouter } from './modules/nu
 import { medicationsRouter } from './modules/medications/medications.routes.js';
 import { assessmentsRouter } from './modules/assessments/assessments.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
+import { delegatedRouter } from './modules/admin/delegated.routes.js';
 import { paymentsRouter, razorpayWebhookRouter, subscriptionsRouter } from './modules/subscriptions/subscriptions.routes.js';
 import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.service.js';
 import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
@@ -48,6 +49,7 @@ const REGISTERED_ROUTE_GROUPS = [
   '/v1/consultants/*/diet-plans',
   '/v1/admin',
   '/v1/admin/qa-identities',
+  '/v1/internal/delegated',
   '/v1/subscriptions',
   '/v1/payments',
   '/v1/webhooks/razorpay',
@@ -145,6 +147,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/consultants', consultantNutritionRouter);
   app.use('/v1/clients', consultantWorkspaceContractRouter);
   app.use('/v1/admin', adminRouter);
+  app.use('/v1/internal/delegated', delegatedRouter);
   app.use('/v1/subscriptions', subscriptionsRouter);
   app.use('/v1/payments', paymentsRouter);
   app.use('/v1/platform/medications', medicationsRouter);
