@@ -2,6 +2,14 @@ import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { persistHealthCalculations } from '../health/health-calculations.repository.js';
 import { type HealthMetrics, calculateHealthMetrics } from '../health/health-calculations.service.js';
 import { listLatestHealthScores } from '../intelligence/health-scores.repository.js';
+import {
+  acknowledgeMedicationExceptionForConsultant,
+  getActiveMedicationExceptionsForOwner,
+  getMedicationException,
+  getMedicationExceptionsForOwner,
+  getMedicationMonitoringForOwner
+} from '../medications/medications.service.js';
+import type { MedicationExceptionRecord } from '../medications/medication-exceptions.repository.js';
 import { getConsultantLatestDietPlan, getConsultantNutritionIntelligence } from '../nutrition/nutrition.service.js';
 import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId } from '../platform/platform.store.js';
 import {
@@ -9,6 +17,7 @@ import {
   getConsultantClientSyncDiagnostics,
   getConsultantWearableSummaryForClient,
   getRegisteredConsultantClientProfileContext,
+  listAssignedConsultantClientContexts,
   listConsultantReportSummariesForClient,
   listConsultantTimelineForClient,
   listValidatedBiomarkerSummaryForClient,
@@ -25,6 +34,7 @@ const WORKSPACE_ALLOWED_SCOPES = [
   'client.biomarkers.read',
   'client.reports.read',
   'client.wearables.read',
+  'client.medications.read',
   'client.timeline.read',
   'client.nutrition_protocol.read'
 ] as const;
@@ -235,6 +245,46 @@ const buildAssignmentValidation = ({
   };
 };
 
+const severityRank: Record<string, number> = {
+  ATTENTION: 0,
+  WATCH: 1,
+  INFO: 2
+};
+
+const exceptionTypeLabels: Record<string, string> = {
+  REPEATED_MISSED_DOSES: 'Repeated missed doses',
+  LOW_7_DAY_ADHERENCE: 'Low 7-day adherence',
+  ADHERENCE_DROP: 'Adherence drop',
+  CONSECUTIVE_UNRESOLVED_DOSES: 'Consecutive unresolved doses'
+};
+
+const mapMedicationExceptionForConsultant = (
+  exception: MedicationExceptionRecord,
+  client?: { id: string; name: string; email?: string | null; mobileNumberMasked?: string | null }
+) => ({
+  id: exception.id,
+  clientId: client?.id ?? null,
+  clientName: client?.name ?? 'Client',
+  clientEmail: client?.email ?? null,
+  clientMobileMasked: client?.mobileNumberMasked ?? null,
+  type: exception.type,
+  typeLabel: exceptionTypeLabels[exception.type] ?? exception.type,
+  severity: exception.severity,
+  status: exception.status,
+  detectedAt: exception.detectedAt,
+  acknowledgedAt: exception.acknowledgedAt,
+  resolvedAt: exception.resolvedAt,
+  ruleVersion: exception.ruleVersion,
+  title: exception.title,
+  summary: exception.summary,
+  evidence: exception.evidence,
+  actions: {
+    canAcknowledge: exception.status === 'OPEN',
+    canCreateFollowUp: exception.status !== 'RESOLVED',
+    canViewMedication: true
+  }
+});
+
 const buildPlanWorkflow = ({
   careCase,
   reportsCount,
@@ -409,6 +459,185 @@ const buildProvenance = ({
   };
 };
 
+const resolveAssignedClientMedicationAccess = async (publicClientId: string, account: AuthenticatedAccount) => {
+  await ensureRegisteredClientsForEligibleUsers();
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId);
+  if (!context) return null;
+  const [healthProfile, careCase] = await Promise.all([
+    getHealthProfileByClientId(context.internalClientId),
+    getCareCaseByClientId(context.internalClientId)
+  ]);
+  const assignmentValidation = buildAssignmentValidation({ account, healthProfile, careCase });
+  if (assignmentValidation.status !== 'assigned_to_requestor') {
+    return {
+      status: 'forbidden' as const,
+      context,
+      assignmentValidation
+    };
+  }
+  return {
+    status: 'allowed' as const,
+    context,
+    assignmentValidation
+  };
+};
+
+export const getConsultantClientMedicationMonitoring = async (
+  publicClientId: string,
+  account: AuthenticatedAccount
+) => {
+  const access = await resolveAssignedClientMedicationAccess(publicClientId, account);
+  if (!access) return null;
+  if (access.status === 'forbidden') {
+    return {
+      error: 'CLIENT_MEDICATION_ACCESS_DENIED' as const,
+      assignmentValidation: access.assignmentValidation
+    };
+  }
+  const owner = { accountId: access.context.accountId, clientId: access.context.internalClientId };
+  return {
+    client: access.context.profile.client,
+    access: {
+      requestAccountId: account.accountId,
+      requestRole: account.user.role ?? null,
+      assignmentValidation: access.assignmentValidation,
+      readOnly: true
+    },
+    medicationMonitoring: await getMedicationMonitoringForOwner(owner)
+  };
+};
+
+export const listConsultantMedicationExceptions = async (account: AuthenticatedAccount) => {
+  await ensureRegisteredClientsForEligibleUsers();
+  const assignedClients = await listAssignedConsultantClientContexts(account.accountId);
+  const exceptionsByClient = await Promise.all(
+    assignedClients.map(async (client) => {
+      const owner = { accountId: client.accountId, clientId: client.internalClientId };
+      const exceptions = await getActiveMedicationExceptionsForOwner(owner);
+      return {
+        client,
+        exceptions
+      };
+    })
+  );
+
+  const exceptions = exceptionsByClient
+    .flatMap(({ client, exceptions: clientExceptions }) =>
+      clientExceptions.map((exception) => mapMedicationExceptionForConsultant(exception, {
+        id: client.publicClientId,
+        name: client.name,
+        email: client.email,
+        mobileNumberMasked: client.mobileNumberMasked
+      }))
+    )
+    .sort((left, right) => {
+      const severityDelta = (severityRank[left.severity] ?? 9) - (severityRank[right.severity] ?? 9);
+      if (severityDelta !== 0) return severityDelta;
+      const dateDelta = new Date(right.detectedAt).getTime() - new Date(left.detectedAt).getTime();
+      if (dateDelta !== 0) return dateDelta;
+      return left.clientName.localeCompare(right.clientName);
+    });
+
+  const clientsRequiringAttention = new Set(exceptions.filter((item) => item.status === 'OPEN').map((item) => item.clientId)).size;
+  const byType = exceptions.reduce<Record<string, number>>((counts, exception) => {
+    counts[exception.type] = (counts[exception.type] ?? 0) + 1;
+    return counts;
+  }, {});
+  const bySeverity = exceptions.reduce<Record<string, number>>((counts, exception) => {
+    counts[exception.severity] = (counts[exception.severity] ?? 0) + 1;
+    return counts;
+  }, {});
+  const byStatus = exceptions.reduce<Record<string, number>>((counts, exception) => {
+    counts[exception.status] = (counts[exception.status] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  return {
+    summary: {
+      clientsRequiringAttention,
+      activeExceptionCount: exceptions.length,
+      byType,
+      bySeverity,
+      byStatus,
+      ruleVersion: 'medication-exceptions-v1',
+      generatedAt: new Date().toISOString()
+    },
+    exceptions
+  };
+};
+
+export const getConsultantClientMedicationExceptions = async (
+  publicClientId: string,
+  account: AuthenticatedAccount
+) => {
+  const access = await resolveAssignedClientMedicationAccess(publicClientId, account);
+  if (!access) return null;
+  if (access.status === 'forbidden') {
+    return {
+      error: 'CLIENT_MEDICATION_ACCESS_DENIED' as const,
+      assignmentValidation: access.assignmentValidation
+    };
+  }
+  const owner = { accountId: access.context.accountId, clientId: access.context.internalClientId };
+  const exceptions = await getMedicationExceptionsForOwner(owner);
+  return {
+    client: access.context.profile.client,
+    access: {
+      requestAccountId: account.accountId,
+      requestRole: account.user.role ?? null,
+      assignmentValidation: access.assignmentValidation,
+      readOnly: true
+    },
+    exceptions: exceptions.map((exception) => mapMedicationExceptionForConsultant(exception, {
+      id: access.context.profile.client.id,
+      name: access.context.profile.client.name,
+      email: access.context.profile.client.email,
+      mobileNumberMasked: access.context.profile.client.mobileNumberMasked
+    }))
+  };
+};
+
+export const getConsultantMedicationExceptionDetail = async (
+  exceptionId: string,
+  account: AuthenticatedAccount
+) => {
+  const exception = await getMedicationException(exceptionId);
+  if (!exception) return null;
+  const assignedClients = await listAssignedConsultantClientContexts(account.accountId);
+  const matchedClient = assignedClients.find((client) =>
+    client.internalClientId === exception.clientId && client.accountId === exception.userId
+  );
+  if (!matchedClient) {
+    return {
+      error: 'CLIENT_MEDICATION_ACCESS_DENIED' as const
+    };
+  }
+  return mapMedicationExceptionForConsultant(exception, {
+    id: matchedClient.publicClientId,
+    name: matchedClient.name,
+    email: matchedClient.email,
+    mobileNumberMasked: matchedClient.mobileNumberMasked
+  });
+};
+
+export const acknowledgeConsultantMedicationException = async (
+  exceptionId: string,
+  account: AuthenticatedAccount
+) => {
+  const detail = await getConsultantMedicationExceptionDetail(exceptionId, account);
+  if (!detail || ('error' in detail)) return detail;
+  const acknowledged = await acknowledgeMedicationExceptionForConsultant(exceptionId, account.accountId);
+  if (!acknowledged) return null;
+  return {
+    exception: mapMedicationExceptionForConsultant(acknowledged, {
+      id: detail.clientId ?? '',
+      name: detail.clientName,
+      email: detail.clientEmail,
+      mobileNumberMasked: detail.clientMobileMasked
+    })
+  };
+};
+
 export const getConsultantClientWorkspace = async (
   publicClientId: string,
   account: AuthenticatedAccount
@@ -418,7 +647,7 @@ export const getConsultantClientWorkspace = async (
   if (!context) return null;
 
   const owner = { accountId: context.accountId, clientId: context.internalClientId };
-  const [healthProfile, nutritionProfile, careCase, reports, biomarkers, wearableSummary, timeline, healthScores] = await Promise.all([
+  const [healthProfile, nutritionProfile, careCase, reports, biomarkers, wearableSummary, timeline, healthScores, medicationMonitoring] = await Promise.all([
     getHealthProfileByClientId(context.internalClientId),
     getNutritionProfileByClientId(context.internalClientId),
     getCareCaseByClientId(context.internalClientId),
@@ -426,7 +655,8 @@ export const getConsultantClientWorkspace = async (
     listValidatedBiomarkerSummaryForClient(context.internalClientId, context.accountId),
     getConsultantWearableSummaryForClient(context.internalClientId, context.accountId),
     listConsultantTimelineForClient(context.internalClientId, context.accountId),
-    listLatestHealthScores(owner)
+    listLatestHealthScores(owner),
+    getMedicationMonitoringForOwner(owner)
   ]);
   const healthMetrics = calculateHealthMetrics(context.calculationInput);
   await persistHealthCalculations(owner, healthMetrics);
@@ -525,6 +755,7 @@ export const getConsultantClientWorkspace = async (
     },
     biomarkers,
     reports,
+    medicationMonitoring,
     wearableSummary,
     recoveryMetrics: {
       activityScore: scoreByType.get('active_performance') ?? scoreByType.get('activity') ?? null,
@@ -585,6 +816,7 @@ export const getConsultantClientWorkspace = async (
         nutritionProfile ? 'nutrition_profile' : null,
         careCase ? 'care_case' : null,
         reports.length ? 'reports' : null,
+        medicationMonitoring.summary.activeMedicationCount > 0 ? 'medications' : null,
         biomarkers.length ? 'biomarkers' : null,
         wearableSummary.connected ? 'wearables' : null,
         healthScores.length ? 'health_scores' : null

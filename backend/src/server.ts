@@ -17,6 +17,7 @@ import { healthRouter } from './modules/health/health.routes.js';
 import { biomarkersRouter } from './modules/biomarkers/biomarkers.routes.js';
 import { consultantWorkspaceContractRouter, consultantsRouter } from './modules/consultants/consultants.routes.js';
 import { consultantNutritionRouter, platformNutritionRouter } from './modules/nutrition/nutrition.routes.js';
+import { medicationsRouter } from './modules/medications/medications.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { paymentsRouter, razorpayWebhookRouter, subscriptionsRouter } from './modules/subscriptions/subscriptions.routes.js';
 import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.service.js';
@@ -41,6 +42,7 @@ const REGISTERED_ROUTE_GROUPS = [
   '/v1/health',
   '/v1/biomarkers',
   '/v1/consultants',
+  '/v1/consultants/medication-exceptions',
   '/v1/clients',
   '/v1/consultants/*/diet-plans',
   '/v1/admin',
@@ -48,6 +50,7 @@ const REGISTERED_ROUTE_GROUPS = [
   '/v1/payments',
   '/v1/webhooks/razorpay',
   '/v1/platform',
+  '/v1/platform/medications',
   '/v1/platform/nutrition-plan',
   '/v1/profile'
 ];
@@ -141,6 +144,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/admin', adminRouter);
   app.use('/v1/subscriptions', subscriptionsRouter);
   app.use('/v1/payments', paymentsRouter);
+  app.use('/v1/platform/medications', medicationsRouter);
   app.use('/v1/platform', platformRouter);
   app.use('/v1/platform', platformNutritionRouter);
   app.use('/v1/profile', profileRouter);

@@ -5,7 +5,7 @@ import { createBiomarkerObservation, upsertBiomarker } from '../../backend/src/m
 import { ingestHealthObservations } from '../../backend/src/modules/health/health-observations.repository.js';
 import { createReportRecord } from '../../backend/src/modules/reports/reports.store.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
-import { getJson, patchJson } from '../helpers/http.js';
+import { getJson, patchJson, postJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
@@ -312,6 +312,527 @@ test('GET /v1/consultants/clients/:clientId/workspace returns incomplete states 
   assert.ok(workspace.body.recommendations.some((item: { title: string }) => item.title === 'Complete onboarding inputs'));
   assert.ok(workspace.body.timeline.some((item: { type: string }) => item.type === 'registration'));
   assert.equal(workspace.body.syncMetadata.dataSource, 'Fiteatsy production database');
+});
+
+test('consultant medication monitoring uses client tracker data and enforces assignment access', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Medication Client',
+    email: `medication-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  const otherConsultant = await createConsultantSession();
+  const baseDate = '2026-08-19';
+  const medicationId = 'med-test-metformin';
+  const medication = {
+    id: medicationId,
+    name: 'Metformin',
+    type: 'tablet',
+    dosage: '500 mg · 1 tablet',
+    schedule: {
+      frequency: { preset: 'every_day' },
+      timeSlots: [
+        { id: 'morning', time24h: '08:00', mealRelation: 'after_meal' },
+        { id: 'evening', time24h: '20:00', mealRelation: 'after_meal' }
+      ],
+      duration: {
+        startDateISO: `${baseDate}T00:00:00.000Z`,
+        endDateISO: null,
+        ongoing: true
+      }
+    },
+    reminderSound: 'default',
+    status: 'active',
+    notificationEnabled: true,
+    createdAtISO: `${baseDate}T00:00:00.000Z`,
+    updatedAtISO: `${baseDate}T00:00:00.000Z`
+  };
+
+  const snapshot = await postJson(
+    server.baseUrl,
+    '/v1/platform/medications/snapshot',
+    {
+      medications: [medication],
+      logs: [
+        {
+          id: 'log-metformin-morning',
+          medicationId,
+          scheduledForISO: `${baseDate}T08:00:00.000Z`,
+          status: 'taken',
+          actionedAtISO: `${baseDate}T08:04:00.000Z`,
+          snoozedUntilISO: null,
+          note: null
+        },
+        {
+          id: 'log-metformin-evening',
+          medicationId,
+          scheduledForISO: `${baseDate}T20:00:00.000Z`,
+          status: 'snoozed',
+          actionedAtISO: `${baseDate}T19:58:00.000Z`,
+          snoozedUntilISO: `${baseDate}T20:15:00.000Z`,
+          note: null
+        }
+      ]
+    },
+    { headers: authHeaders(client.token) }
+  );
+  assert.equal(snapshot.response.status, 200, JSON.stringify(snapshot.body));
+  assert.equal(snapshot.body.medicationCount, 1);
+  assert.equal(snapshot.body.logCount, 2);
+
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    {
+      assignedConsultantId: consultant.current.body.accountId
+    },
+    { headers: authHeaders(client.token) }
+  );
+
+  const monitoring = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/medications`,
+    { headers: authHeaders(consultant.token) }
+  );
+
+  assert.equal(monitoring.response.status, 200);
+  assert.equal(monitoring.body.access.readOnly, true);
+  assert.equal(monitoring.body.access.assignmentValidation.status, 'assigned_to_requestor');
+  assert.equal(monitoring.body.medicationMonitoring.summary.activeMedicationCount, 1);
+  assert.equal(monitoring.body.medicationMonitoring.summary.today.scheduled, 2);
+  assert.equal(monitoring.body.medicationMonitoring.summary.today.taken, 1);
+  assert.equal(monitoring.body.medicationMonitoring.summary.today.snoozed, 1);
+  assert.equal(monitoring.body.medicationMonitoring.summary.today.adherencePercent, 50);
+  assert.equal(monitoring.body.medicationMonitoring.summary.supplyTrackingAvailable, false);
+  assert.equal(monitoring.body.medicationMonitoring.activeMedications[0].name, 'Metformin');
+  assert.equal(monitoring.body.medicationMonitoring.activeMedications[0].scheduledTimes.length, 2);
+  assert.equal(monitoring.body.medicationMonitoring.todaysDoses.length, 2);
+  assert.equal(monitoring.body.medicationMonitoring.todaysDoses[0].status, 'TAKEN');
+  assert.equal(monitoring.body.medicationMonitoring.todaysDoses[1].status, 'SNOOZED');
+  assert.equal(monitoring.body.medicationMonitoring.dataSource, 'client_medication_tracker');
+
+  const workspace = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(workspace.response.status, 200);
+  assert.equal(workspace.body.medicationMonitoring.summary.activeMedicationCount, 1);
+  assert.ok(workspace.body.syncMetadata.dataSources.includes('medications'));
+
+  const denied = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/medications`,
+    { headers: authHeaders(otherConsultant.token) }
+  );
+  assert.equal(denied.response.status, 403);
+  assert.equal(denied.body.error, 'CLIENT_MEDICATION_ACCESS_DENIED');
+});
+
+const isoDay = (offsetDays: number) => {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+};
+
+const buildDailyMedication = (startOffsetDays: number, id = 'med-exception-metformin') => ({
+  id,
+  name: 'Metformin',
+  type: 'tablet',
+  dosage: '500 mg · 1 tablet',
+  schedule: {
+    frequency: { preset: 'every_day' },
+    timeSlots: [
+      { id: 'morning', time24h: '00:00', mealRelation: 'after_meal' }
+    ],
+    duration: {
+      startDateISO: `${isoDay(startOffsetDays)}T00:00:00.000Z`,
+      endDateISO: null,
+      ongoing: true
+    }
+  },
+  reminderSound: 'default',
+  status: 'active',
+  notificationEnabled: true,
+  createdAtISO: `${isoDay(startOffsetDays)}T00:00:00.000Z`,
+  updatedAtISO: `${isoDay(0)}T00:00:00.000Z`
+});
+
+const buildDenseDailyMedication = (startOffsetDays: number, id = 'med-exception-dense', slotCount = 100) => ({
+  ...buildDailyMedication(startOffsetDays, id),
+  schedule: {
+    frequency: { preset: 'every_day' },
+    timeSlots: Array.from({ length: slotCount }, (_item, index) => {
+      const hour = Math.floor(index / 60);
+      const minute = index % 60;
+      return {
+        id: `slot-${index}`,
+        time24h: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+        mealRelation: 'after_meal'
+      };
+    }),
+    duration: {
+      startDateISO: `${isoDay(startOffsetDays)}T00:00:00.000Z`,
+      endDateISO: null,
+      ongoing: true
+    }
+  }
+});
+
+const buildDenseTakenLogs = (
+  medicationId: string,
+  dayOffsets: number[],
+  takenPerDay: number,
+  slotCount = 100
+) =>
+  dayOffsets.flatMap((offset) =>
+    Array.from({ length: takenPerDay }, (_item, index) => {
+      const hour = Math.floor(index / 60);
+      const minute = index % 60;
+      const time24h = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      return {
+        id: `log-${medicationId}-${offset}-${index}`,
+        medicationId,
+        scheduledForISO: `${isoDay(offset)}T${time24h}:00.000Z`,
+        status: 'taken',
+        actionedAtISO: `${isoDay(offset)}T${time24h}:10.000Z`,
+        snoozedUntilISO: null,
+        note: null
+      };
+    }).slice(0, slotCount)
+  );
+
+test('consultant medication exception intelligence detects operational adherence signals and preserves lifecycle', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Exception Client',
+    email: `exception-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  const otherConsultant = await createConsultantSession();
+  const medication = buildDailyMedication(-20);
+  const logs = [
+    ...[-13, -12, -11, -10, -9, -8, -7].map((offset) => ({
+      id: `log-taken-prev-${offset}`,
+      medicationId: medication.id,
+      scheduledForISO: `${isoDay(offset)}T00:00:00.000Z`,
+      status: 'taken',
+      actionedAtISO: `${isoDay(offset)}T00:04:00.000Z`,
+      snoozedUntilISO: null,
+      note: null
+    })),
+    ...[-6, -5, -4, -3].map((offset) => ({
+      id: `log-taken-current-${offset}`,
+      medicationId: medication.id,
+      scheduledForISO: `${isoDay(offset)}T00:00:00.000Z`,
+      status: 'taken',
+      actionedAtISO: `${isoDay(offset)}T00:04:00.000Z`,
+      snoozedUntilISO: null,
+      note: null
+    })),
+    ...[-2, -1, 0].map((offset) => ({
+      id: `log-missed-current-${offset}`,
+      medicationId: medication.id,
+      scheduledForISO: `${isoDay(offset)}T00:00:00.000Z`,
+      status: 'missed',
+      actionedAtISO: null,
+      snoozedUntilISO: null,
+      note: null
+    }))
+  ];
+
+  const emptyClient = await createAuthenticatedSession(server.baseUrl, {
+    name: 'No Medication Client',
+    email: `no-medication-client-${Date.now()}@example.com`
+  });
+
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    { assignedConsultantId: consultant.current.body.accountId },
+    { headers: authHeaders(emptyClient.token) }
+  );
+
+  const emptyFeed = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(emptyFeed.response.status, 200);
+  assert.equal(emptyFeed.body.summary.activeExceptionCount, 0);
+  assert.deepEqual(emptyFeed.body.exceptions, []);
+
+  const snapshot = await postJson(
+    server.baseUrl,
+    '/v1/platform/medications/snapshot',
+    { medications: [medication], logs },
+    { headers: authHeaders(client.token) }
+  );
+  assert.equal(snapshot.response.status, 200, JSON.stringify(snapshot.body));
+
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    { assignedConsultantId: consultant.current.body.accountId },
+    { headers: authHeaders(client.token) }
+  );
+
+  const feed = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(feed.response.status, 200);
+  assert.equal(feed.body.summary.clientsRequiringAttention, 1);
+  assert.equal(feed.body.summary.ruleVersion, 'medication-exceptions-v1');
+  const exceptionTypes = feed.body.exceptions.map((item: { type: string }) => item.type).sort();
+  assert.deepEqual(exceptionTypes, [
+    'ADHERENCE_DROP',
+    'CONSECUTIVE_UNRESOLVED_DOSES',
+    'LOW_7_DAY_ADHERENCE',
+    'REPEATED_MISSED_DOSES'
+  ]);
+  assert.ok(feed.body.exceptions.every((item: { severity: string }) => item.severity === 'ATTENTION'));
+  assert.ok(feed.body.exceptions.every((item: { summary: string }) => !/critical|emergency|non-compliant|increase dose/i.test(item.summary)));
+  const lowAdherence = feed.body.exceptions.find((item: { type: string }) => item.type === 'LOW_7_DAY_ADHERENCE');
+  assert.equal(lowAdherence.evidence.current7DayAdherence, 57);
+  assert.equal(lowAdherence.evidence.scheduledDoses, 7);
+  assert.equal(lowAdherence.status, 'OPEN');
+
+  const secondFeed = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(secondFeed.response.status, 200);
+  assert.equal(secondFeed.body.exceptions.length, 4);
+  assert.deepEqual(
+    secondFeed.body.exceptions.map((item: { id: string }) => item.id).sort(),
+    feed.body.exceptions.map((item: { id: string }) => item.id).sort()
+  );
+
+  const clientExceptions = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/medication-exceptions`,
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(clientExceptions.response.status, 200);
+  assert.equal(clientExceptions.body.exceptions.length, 4);
+
+  const denied = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
+    headers: authHeaders(otherConsultant.token)
+  });
+  assert.equal(denied.response.status, 200);
+  assert.equal(denied.body.summary.activeExceptionCount, 0);
+
+  const directDenied = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/medication-exceptions`,
+    { headers: authHeaders(otherConsultant.token) }
+  );
+  assert.equal(directDenied.response.status, 403);
+  assert.equal(directDenied.body.error, 'CLIENT_MEDICATION_ACCESS_DENIED');
+
+  const acknowledge = await postJson(
+    server.baseUrl,
+    `/v1/consultants/medication-exceptions/${encodeURIComponent(lowAdherence.id)}/acknowledge`,
+    {},
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(acknowledge.response.status, 200);
+  assert.equal(acknowledge.body.exception.status, 'ACKNOWLEDGED');
+  assert.equal(typeof acknowledge.body.exception.acknowledgedAt, 'string');
+
+  const detail = await getJson(
+    server.baseUrl,
+    `/v1/consultants/medication-exceptions/${encodeURIComponent(lowAdherence.id)}`,
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(detail.response.status, 200);
+  assert.equal(detail.body.exception.status, 'ACKNOWLEDGED');
+});
+
+test('medication exception rule thresholds handle non-trigger edge cases', async () => {
+  const consultant = await createConsultantSession();
+
+  const oneMissedClient = await createAuthenticatedSession(server.baseUrl, {
+    name: 'One Missed Medication Client',
+    email: `one-missed-medication-client-${Date.now()}@example.com`
+  });
+  const oneMissedMedication = buildDailyMedication(0, 'med-one-missed');
+  await postJson(
+    server.baseUrl,
+    '/v1/platform/medications/snapshot',
+    {
+      medications: [oneMissedMedication],
+      logs: [{
+        id: 'log-one-missed',
+        medicationId: oneMissedMedication.id,
+        scheduledForISO: `${isoDay(0)}T00:00:00.000Z`,
+        status: 'missed',
+        actionedAtISO: null,
+        snoozedUntilISO: null,
+        note: null
+      }]
+    },
+    { headers: authHeaders(oneMissedClient.token) }
+  );
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    { assignedConsultantId: consultant.current.body.accountId },
+    { headers: authHeaders(oneMissedClient.token) }
+  );
+
+  const seventyNineClient = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Seventy Nine Adherence Client',
+    email: `seventy-nine-medication-client-${Date.now()}@example.com`
+  });
+  const seventyNineMedication = buildDenseDailyMedication(0, 'med-seventy-nine');
+  await postJson(
+    server.baseUrl,
+    '/v1/platform/medications/snapshot',
+    {
+      medications: [seventyNineMedication],
+      logs: buildDenseTakenLogs(seventyNineMedication.id, [0], 79)
+    },
+    { headers: authHeaders(seventyNineClient.token) }
+  );
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    { assignedConsultantId: consultant.current.body.accountId },
+    { headers: authHeaders(seventyNineClient.token) }
+  );
+
+  const noDropClient = await createAuthenticatedSession(server.baseUrl, {
+    name: 'No Drop Medication Client',
+    email: `no-drop-medication-client-${Date.now()}@example.com`
+  });
+  const noDropMedication = buildDenseDailyMedication(-13, 'med-no-drop');
+  await postJson(
+    server.baseUrl,
+    '/v1/platform/medications/snapshot',
+    {
+      medications: [noDropMedication],
+      logs: [
+        ...buildDenseTakenLogs(noDropMedication.id, [-13, -12, -11, -10, -9, -8, -7], 90),
+        ...buildDenseTakenLogs(noDropMedication.id, [-6, -5, -4, -3, -2, -1, 0], 76)
+      ]
+    },
+    { headers: authHeaders(noDropClient.token) }
+  );
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    { assignedConsultantId: consultant.current.body.accountId },
+    { headers: authHeaders(noDropClient.token) }
+  );
+
+  const snoozedTakenClient = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Snoozed Taken Medication Client',
+    email: `snoozed-taken-medication-client-${Date.now()}@example.com`
+  });
+  const snoozedTakenMedication = buildDailyMedication(-2, 'med-snoozed-taken');
+  await postJson(
+    server.baseUrl,
+    '/v1/platform/medications/snapshot',
+    {
+      medications: [snoozedTakenMedication],
+      logs: [
+        {
+          id: 'log-snoozed-taken-snoozed',
+          medicationId: snoozedTakenMedication.id,
+          scheduledForISO: `${isoDay(-2)}T00:00:00.000Z`,
+          status: 'snoozed',
+          actionedAtISO: `${isoDay(-2)}T00:04:00.000Z`,
+          snoozedUntilISO: `${isoDay(-2)}T00:30:00.000Z`,
+          note: null
+        },
+        {
+          id: 'log-snoozed-taken-taken',
+          medicationId: snoozedTakenMedication.id,
+          scheduledForISO: `${isoDay(-1)}T00:00:00.000Z`,
+          status: 'taken',
+          actionedAtISO: `${isoDay(-1)}T00:04:00.000Z`,
+          snoozedUntilISO: null,
+          note: null
+        },
+        {
+          id: 'log-snoozed-taken-missed',
+          medicationId: snoozedTakenMedication.id,
+          scheduledForISO: `${isoDay(0)}T00:00:00.000Z`,
+          status: 'missed',
+          actionedAtISO: null,
+          snoozedUntilISO: null,
+          note: null
+        }
+      ]
+    },
+    { headers: authHeaders(snoozedTakenClient.token) }
+  );
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    { assignedConsultantId: consultant.current.body.accountId },
+    { headers: authHeaders(snoozedTakenClient.token) }
+  );
+
+  const feed = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(feed.response.status, 200);
+
+  const exceptionsByClient = new Map(
+    feed.body.exceptions.map((item: { clientId: string; type: string; evidence: Record<string, unknown> }) => [
+      item.clientId,
+      feed.body.exceptions.filter((candidate: { clientId: string }) => candidate.clientId === item.clientId)
+    ])
+  );
+
+  const oneMissedExceptions = exceptionsByClient.get(oneMissedClient.current.body.client.fiteatsyClientId) ?? [];
+  assert.equal(oneMissedExceptions.some((item: { type: string }) => item.type === 'REPEATED_MISSED_DOSES'), false);
+
+  const seventyNineExceptions = exceptionsByClient.get(seventyNineClient.current.body.client.fiteatsyClientId) ?? [];
+  const lowAdherence = seventyNineExceptions.find((item: { type: string }) => item.type === 'LOW_7_DAY_ADHERENCE');
+  assert.ok(lowAdherence);
+  assert.equal(lowAdherence.evidence.current7DayAdherence, 79);
+
+  const noDropExceptions = exceptionsByClient.get(noDropClient.current.body.client.fiteatsyClientId) ?? [];
+  assert.equal(noDropExceptions.some((item: { type: string }) => item.type === 'ADHERENCE_DROP'), false);
+
+  const snoozedTakenExceptions = exceptionsByClient.get(snoozedTakenClient.current.body.client.fiteatsyClientId) ?? [];
+  assert.equal(snoozedTakenExceptions.some((item: { type: string }) => item.type === 'CONSECUTIVE_UNRESOLVED_DOSES'), false);
+});
+
+test('80 percent medication adherence does not create a low-adherence exception', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Threshold Medication Client',
+    email: `threshold-medication-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  const medication = buildDailyMedication(-4, 'med-threshold');
+  const logs = [-4, -3, -2, -1].map((offset) => ({
+    id: `log-threshold-${offset}`,
+    medicationId: medication.id,
+    scheduledForISO: `${isoDay(offset)}T00:00:00.000Z`,
+    status: 'taken',
+    actionedAtISO: `${isoDay(offset)}T00:04:00.000Z`,
+    snoozedUntilISO: null,
+    note: null
+  }));
+
+  await postJson(
+    server.baseUrl,
+    '/v1/platform/medications/snapshot',
+    { medications: [medication], logs },
+    { headers: authHeaders(client.token) }
+  );
+  await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    { assignedConsultantId: consultant.current.body.accountId },
+    { headers: authHeaders(client.token) }
+  );
+
+  const feed = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(feed.response.status, 200);
+  assert.equal(feed.body.exceptions.some((item: { type: string }) => item.type === 'LOW_7_DAY_ADHERENCE'), false);
 });
 
 test('GET /v1/consultants/clients/:clientId/workspace exposes calculated health intelligence for onboarded users', async () => {

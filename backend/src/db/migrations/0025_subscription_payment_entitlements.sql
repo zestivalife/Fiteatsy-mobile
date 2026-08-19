@@ -256,7 +256,7 @@ set
 insert into plan_entitlements (id, plan_id, entitlement_code)
 select
   'pe_' || md5(plan_code || ':' || entitlement_code),
-  plan_id,
+  plans.id,
   entitlement_code
 from (
   values

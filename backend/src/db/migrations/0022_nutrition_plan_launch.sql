@@ -1,3 +1,31 @@
+create table if not exists diet_plans (
+  id uuid primary key,
+  care_case_id uuid not null references care_cases(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  current_version_id uuid,
+  plan_status text,
+  readiness_score numeric,
+  status text not null default 'active',
+  version integer not null default 1,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+
+create table if not exists diet_plan_versions (
+  id uuid primary key,
+  diet_plan_id uuid not null references diet_plans(id) on delete cascade,
+  version_number integer not null,
+  generated_by text references users(id),
+  content jsonb not null default '{}'::jsonb,
+  exported_doc_path text,
+  exported_pdf_path text,
+  status text not null default 'active',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+
 alter table diet_plans
   add column if not exists consultant_id text references users(id),
   add column if not exists latest_published_version_id uuid,

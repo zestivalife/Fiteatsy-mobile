@@ -163,6 +163,16 @@ export type ConsultantClientProfileContext = {
   calculationInput: HealthCalculationInput;
 };
 
+export type ConsultantAssignedClientContext = {
+  accountId: string;
+  internalClientId: string;
+  publicClientId: string;
+  name: string;
+  email: string | null;
+  mobileNumberMasked: string | null;
+  assignedConsultantId: string | null;
+};
+
 export type ConsultantClientSyncDiagnostics = {
   totalUsersFound: number;
   clientsMapped: number;
@@ -491,6 +501,52 @@ export const listRegisteredConsultantClients = async (): Promise<ConsultantClien
   );
 
   return result.rows.map((row) => mapListRecord(row));
+};
+
+export const listAssignedConsultantClientContexts = async (
+  consultantAccountId: string
+): Promise<ConsultantAssignedClientContext[]> => {
+  const result = await pool.query(
+    `
+      select
+        c.id as internal_client_id,
+        c.fiteatsy_client_id,
+        u.id as account_user_id,
+        u.name,
+        u.email_normalized,
+        u.mobile_number_normalized,
+        coalesce(cc.assigned_consultant_id, hp.assigned_consultant_id) as assigned_consultant_id
+      from users u
+      join fiteatsy_clients c
+        on c.account_user_id = u.id
+        and c.deleted_at is null
+        and lower(coalesce(c.status, '')) = 'active'
+      left join health_profiles hp
+        on hp.client_id = c.id
+        and hp.user_id = u.id
+        and hp.deleted_at is null
+        and lower(coalesce(hp.status, '')) = 'active'
+      left join care_cases cc
+        on cc.client_id = c.id
+        and cc.user_id = u.id
+        and cc.deleted_at is null
+        and lower(coalesce(cc.status, '')) = 'active'
+      where ${eligibleUserPredicate}
+        and coalesce(cc.assigned_consultant_id, hp.assigned_consultant_id) = $${AUTHENTICATED_USER_EXCLUSION_ROLES.length + 1}
+      order by u.name asc, u.created_at desc
+    `,
+    [...AUTHENTICATED_USER_EXCLUSION_ROLES, consultantAccountId]
+  );
+
+  return result.rows.map((row) => ({
+    accountId: String(row.account_user_id),
+    internalClientId: String(row.internal_client_id),
+    publicClientId: String(row.fiteatsy_client_id),
+    name: String(row.name),
+    email: row.email_normalized == null ? null : String(row.email_normalized),
+    mobileNumberMasked: maskMobileNumber(row.mobile_number_normalized),
+    assignedConsultantId: row.assigned_consultant_id == null ? null : String(row.assigned_consultant_id)
+  }));
 };
 
 export const getRegisteredConsultantClientProfile = async (

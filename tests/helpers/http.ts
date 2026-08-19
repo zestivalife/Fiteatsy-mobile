@@ -10,24 +10,24 @@ export const getJson = async (baseUrl: string, path: string, init?: RequestInit)
 
 export const postJson = async (baseUrl: string, path: string, body: unknown, init?: RequestInit) =>
   getJson(baseUrl, path, {
+    ...init,
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       ...(init?.headers ?? {}),
     },
     body: JSON.stringify(body),
-    ...init,
   });
 
 export const patchJson = async (baseUrl: string, path: string, body: unknown, init?: RequestInit) =>
   getJson(baseUrl, path, {
+    ...init,
     method: 'PATCH',
     headers: {
       'content-type': 'application/json',
       ...(init?.headers ?? {}),
     },
     body: JSON.stringify(body),
-    ...init,
   });
 
 export const deleteRequest = async (baseUrl: string, path: string, init?: RequestInit) =>
