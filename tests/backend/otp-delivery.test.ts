@@ -107,14 +107,11 @@ test('PingMate provider sends the required WhatsApp template payload without har
       assert.equal(body.message.message_type, 'template');
       assert.equal(body.message.template_name, 'auth_otp');
       assert.equal(body.message.template_language, 'en');
-      assert.equal(
-        body.message.buttons[0].button_payload,
-        'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp123456'
-      );
+      assert.equal(body.message.buttons[0].button_payload, '123456');
       assert.deepEqual(body.message.buttons[0], {
         button_type: 'url',
         button_index: 0,
-        button_payload: 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp123456'
+        button_payload: '123456'
       });
 
       const serializedLogs = JSON.stringify(capturedLogs);
@@ -136,7 +133,7 @@ test('PingMate provider accepts a configured full send endpoint without duplicat
   await withEnv(
     {
       PINGMATE_API_KEY: 'test-pingmate-key',
-      PINGMATE_BASE_URL: 'https://new.theultimate.io/api/v1/messages/send'
+      PINGMATE_BASE_URL: 'https://api.pingmate.app/api/v1/messages/send'
     },
     async () => {
       let capturedUrl = '';
@@ -146,7 +143,7 @@ test('PingMate provider accepts a configured full send endpoint without duplicat
       });
 
       await provider.sendOtp({ challengeId: 'challenge-id', mobileNumber: '+919876543210', otp: '123456' });
-      assert.equal(capturedUrl, 'https://new.theultimate.io/api/v1/messages/send');
+      assert.equal(capturedUrl, 'https://api.pingmate.app/api/v1/messages/send');
     }
   );
 });
@@ -300,7 +297,7 @@ test('OTP expiry rejects verification without creating a session', async () => {
       try {
         const requested = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', signupPayload);
         assert.equal(requested.response.status, 201);
-        expireOtpChallengeForTests(requested.body.challengeId);
+        await expireOtpChallengeForTests(requested.body.challengeId);
 
         const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
           challengeId: requested.body.challengeId,
@@ -329,7 +326,7 @@ test('OTP request rate limit allows five requests per hour per mobile number', a
             email: `rate-limit-${index}@example.com`
           });
           assert.equal(requested.response.status, 201);
-          expireOtpChallengeForTests(requested.body.challengeId);
+          await expireOtpChallengeForTests(requested.body.challengeId);
         }
 
         const limited = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {

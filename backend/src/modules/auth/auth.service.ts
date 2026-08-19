@@ -15,6 +15,7 @@ import { createOrResolveClientForAccount } from '../client/client.repository.js'
 import { NotificationService } from '../notifications/notification.service.js';
 import { OtpDeliveryError } from '../notifications/notification.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
+import { otpStore, type StoredOtpChallenge } from './otp-store.js';
 
 type SignupInput = {
   name: string;
@@ -22,15 +23,7 @@ type SignupInput = {
   mobileNumber: string;
 };
 
-type OtpChallenge = {
-  challengeId: string;
-  user: SignupInput;
-  otpHash: string;
-  expiresAtMs: number;
-  resendAvailableAtMs: number;
-  attemptsRemaining: number;
-  verified: boolean;
-};
+type OtpChallenge = StoredOtpChallenge;
 
 export type OtpDomainError = {
   code:
@@ -55,14 +48,11 @@ const RESEND_COOLDOWN_MS = 30 * 1000;
 const OTP_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const OTP_REQUEST_LIMIT_PER_HOUR = 5;
 const MAX_ATTEMPTS = 5;
-const ACTIVE_CHALLENGE_LIMIT = 5_000;
 const DEFAULT_PIN = '123456';
 const PIN_LENGTH = 6;
 const PIN_LOCK_MS = 15 * 60 * 1000;
 const PIN_BCRYPT_ROUNDS = 12;
 
-const challengeStore = new Map<string, OtpChallenge>();
-const otpRequestTimestampsByMobile = new Map<string, number[]>();
 
 export const buildOtpHashForTests = (challengeId: string, otp: string) =>
   crypto.createHash('sha256').update(`${challengeId}:${otp}`).digest('hex');
@@ -76,19 +66,6 @@ export const setOtpGeneratorForTests = (generator: (() => string) | null) => {
 };
 
 const now = () => Date.now();
-
-const pruneOldChallenges = () => {
-  const current = now();
-  for (const [key, challenge] of challengeStore.entries()) {
-    if (challenge.verified || challenge.expiresAtMs + 10 * 60 * 1000 < current) {
-      challengeStore.delete(key);
-    }
-  }
-  if (challengeStore.size <= ACTIVE_CHALLENGE_LIMIT) return;
-  const overflow = challengeStore.size - ACTIVE_CHALLENGE_LIMIT;
-  const keys = Array.from(challengeStore.keys()).slice(0, overflow);
-  for (const key of keys) challengeStore.delete(key);
-};
 
 const asDomainError = (error: OtpDomainError): OtpDomainError => error;
 
@@ -111,34 +88,22 @@ const createOrReplaceChallenge = (user: SignupInput) => {
 
 const normalizeRateLimitKey = (mobileNumber: string) => mobileNumber.replace(/\D/g, '');
 
-const findActiveChallengeForMobile = (mobileNumber: string) => {
-  const key = normalizeRateLimitKey(mobileNumber);
-  const current = now();
-  return Array.from(challengeStore.values()).find(
-    (challenge) =>
-      !challenge.verified &&
-      current <= challenge.expiresAtMs &&
-      normalizeRateLimitKey(challenge.user.mobileNumber) === key
-  );
+const findActiveChallengeForMobile = async (mobileNumber: string) => {
+  const id = await otpStore.getActiveId(normalizeRateLimitKey(mobileNumber));
+  return id ? otpStore.get(id) : null;
 };
 
-const invalidateActiveChallengesForMobile = (mobileNumber: string) => {
-  const key = normalizeRateLimitKey(mobileNumber);
-  for (const [challengeId, challenge] of challengeStore.entries()) {
-    if (!challenge.verified && normalizeRateLimitKey(challenge.user.mobileNumber) === key) {
-      challengeStore.delete(challengeId);
-    }
-  }
+const invalidateActiveChallengesForMobile = async (mobileNumber: string) => {
+  await otpStore.invalidateMobile(normalizeRateLimitKey(mobileNumber));
 };
 
-const assertOtpRequestQuota = (mobileNumber: string) => {
+const assertOtpRequestQuota = async (mobileNumber: string) => {
   const current = now();
   const key = normalizeRateLimitKey(mobileNumber);
-  const recentRequests = (otpRequestTimestampsByMobile.get(key) ?? []).filter(
+  const recentRequests = (await otpStore.rateTimestamps(key)).filter(
     (timestamp) => current - timestamp < OTP_RATE_LIMIT_WINDOW_MS
   );
   if (recentRequests.length >= OTP_REQUEST_LIMIT_PER_HOUR) {
-    otpRequestTimestampsByMobile.set(key, recentRequests);
     throw asDomainError({
       code: 'OTP_RATE_LIMITED',
       message: 'Too many OTP requests. Please try again later.',
@@ -146,7 +111,7 @@ const assertOtpRequestQuota = (mobileNumber: string) => {
     });
   }
   recentRequests.push(current);
-  otpRequestTimestampsByMobile.set(key, recentRequests);
+  await otpStore.recordRateTimestamp(key, current, OTP_RATE_LIMIT_WINDOW_MS);
 };
 
 const deliveryFailureToDomainError = (error: unknown): OtpDomainError => {
@@ -197,13 +162,12 @@ const recordFailedPinLogin = async (
 };
 
 export const createOtpChallenge = async (input: SignupInput) => {
-  pruneOldChallenges();
   const user = {
     name: input.name.trim(),
     email: input.email.trim().toLowerCase(),
     mobileNumber: normalizeCanonicalPhoneNumber(input.mobileNumber)
   };
-  const activeChallenge = findActiveChallengeForMobile(user.mobileNumber);
+  const activeChallenge = await findActiveChallengeForMobile(user.mobileNumber);
   const current = now();
   if (activeChallenge && current < activeChallenge.resendAvailableAtMs) {
     throw asDomainError({
@@ -212,8 +176,8 @@ export const createOtpChallenge = async (input: SignupInput) => {
       retryAfterSec: Math.ceil((activeChallenge.resendAvailableAtMs - current) / 1000)
     });
   }
-  invalidateActiveChallengesForMobile(user.mobileNumber);
-  assertOtpRequestQuota(user.mobileNumber);
+  await invalidateActiveChallengesForMobile(user.mobileNumber);
+  await assertOtpRequestQuota(user.mobileNumber);
   const { challenge, otp } = createOrReplaceChallenge(user);
   try {
     await NotificationService.sendOTP({
@@ -224,7 +188,8 @@ export const createOtpChallenge = async (input: SignupInput) => {
   } catch (error) {
     throw asDomainError(deliveryFailureToDomainError(error));
   }
-  challengeStore.set(challenge.challengeId, challenge);
+  await otpStore.set(challenge, OTP_TTL_MS);
+  await otpStore.setActiveId(user.mobileNumber, challenge.challengeId, OTP_TTL_MS);
   return {
     challengeId: challenge.challengeId,
     expiresAtISO: new Date(challenge.expiresAtMs).toISOString(),
@@ -238,8 +203,7 @@ export const createOtpChallenge = async (input: SignupInput) => {
 };
 
 export const resendOtpChallenge = async (challengeId: string) => {
-  pruneOldChallenges();
-  const challenge = challengeStore.get(challengeId);
+  const challenge = await otpStore.get(challengeId);
   if (!challenge) throw asDomainError({ code: 'OTP_NOT_FOUND', message: 'Challenge not found.' });
 
   const current = now();
@@ -252,7 +216,7 @@ export const resendOtpChallenge = async (challengeId: string) => {
     });
   }
 
-  assertOtpRequestQuota(challenge.user.mobileNumber);
+  await assertOtpRequestQuota(challenge.user.mobileNumber);
   const otp = buildOtpForTests();
   const nextOtpHash = buildOtpHashForTests(challenge.challengeId, otp);
   try {
@@ -269,6 +233,8 @@ export const resendOtpChallenge = async (challengeId: string) => {
   challenge.resendAvailableAtMs = current + RESEND_COOLDOWN_MS;
   challenge.expiresAtMs = current + OTP_TTL_MS;
   challenge.attemptsRemaining = MAX_ATTEMPTS;
+  await otpStore.set(challenge, OTP_TTL_MS);
+  await otpStore.setActiveId(challenge.user.mobileNumber, challenge.challengeId, OTP_TTL_MS);
 
   return {
     challengeId: challenge.challengeId,
@@ -283,13 +249,12 @@ export const verifyOtpChallenge = async (
   otp: string,
   metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
 ) => {
-  pruneOldChallenges();
-  const challenge = challengeStore.get(challengeId);
+  const challenge = await otpStore.get(challengeId);
   if (!challenge) throw asDomainError({ code: 'OTP_NOT_FOUND', message: 'Challenge not found.' });
 
   const current = now();
   if (current > challenge.expiresAtMs) {
-    challengeStore.delete(challengeId);
+    await otpStore.delete(challengeId);
     throw asDomainError({ code: 'OTP_EXPIRED', message: 'OTP expired. Please request a new OTP.' });
   }
 
@@ -304,6 +269,7 @@ export const verifyOtpChallenge = async (
   const matches = buildOtpHashForTests(challengeId, otp) === challenge.otpHash;
   if (!matches) {
     challenge.attemptsRemaining -= 1;
+    await otpStore.set(challenge, Math.max(1, challenge.expiresAtMs - current));
     throw asDomainError({
       code: challenge.attemptsRemaining <= 0 ? 'OTP_TOO_MANY_ATTEMPTS' : 'OTP_INVALID',
       message:
@@ -316,7 +282,7 @@ export const verifyOtpChallenge = async (
   }
 
   challenge.verified = true;
-  challengeStore.delete(challengeId);
+  await otpStore.delete(challengeId);
   try {
     const { user } = await resolveVerifiedAccountIdentity({
       name: challenge.user.name,
@@ -460,14 +426,14 @@ export const changePin = async (
 };
 
 export const resetOtpChallengesForTests = () => {
-  challengeStore.clear();
-  otpRequestTimestampsByMobile.clear();
+  otpStore.resetForTests();
   setOtpGeneratorForTests(null);
 };
 
-export const expireOtpChallengeForTests = (challengeId: string) => {
-  const challenge = challengeStore.get(challengeId);
+export const expireOtpChallengeForTests = async (challengeId: string) => {
+  const challenge = await otpStore.get(challengeId);
   if (challenge) {
     challenge.expiresAtMs = now() - 1;
+    await otpStore.set(challenge, 1);
   }
 };

@@ -32,6 +32,11 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 const OTP_LENGTH = 6;
 const LAST_COUNTRY_KEY = 'fiteatsy.auth.lastCountry';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const formatCountdown = (totalSeconds: number) => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
 
 export const SignUpScreen = ({ navigation }: Props) => {
   const { completeAuthentication, setOnboarding, themeMode } = useAppContext();
@@ -301,6 +306,9 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Text style={[styles.verifySubTitle, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>
               Enter the 6-digit code sent to WhatsApp at {selectedCountry.dialCode} {nationalNumber}.
             </Text>
+            <Text style={[styles.senderInfo, { color: themeMode === 'light' ? '#64748B' : '#CBD5E1' }]}>
+              You'll receive the OTP from TalentedMindz.
+            </Text>
             <TextInput
               ref={hiddenOtpRef}
               value={otp}
@@ -334,7 +342,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
             </Pressable>
 
             <Text style={[styles.timerText, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>
-              {otpExpired ? 'OTP expired. Please resend.' : `Code expires in ${Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000))}s`}
+              {otpExpired ? 'OTP expired' : `Code expires in ${formatCountdown(Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000)))}`}
             </Text>
             <Text style={[styles.timerText, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>Attempts remaining: {attemptsRemaining}</Text>
 
@@ -376,6 +384,10 @@ const styles = StyleSheet.create({
   },
   verifySubTitle: {
     ...typography.body
+  },
+  senderInfo: {
+    ...typography.caption,
+    marginTop: -8
   },
   hiddenOtpInput: {
     position: 'absolute',

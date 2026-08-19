@@ -7,9 +7,7 @@ type FetchLike = typeof fetch;
 
 const PINGMATE_PROVIDER_NAME = 'pingmate';
 
-const PINGMATE_COPY_CODE_BUTTON_PAYLOAD_PREFIX = 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp';
-
-const buildCopyCodePayload = (otp: string) => `${PINGMATE_COPY_CODE_BUTTON_PAYLOAD_PREFIX}${otp}`;
+const buildCopyCodePayload = (otp: string) => otp;
 
 const providerRequestIdHeaders = [
   'x-request-id',
@@ -125,7 +123,7 @@ export class PingMateProvider implements WhatsappProvider {
       buttonCount: 1,
       buttonType: 'url',
       buttonIndex: 0,
-      buttonPayloadShape: 'whatsapp_copy_code_url_with_otp',
+      buttonPayloadShape: 'otp_digits_only',
       sanitizedOutgoingPayload,
       outboundRequestBody: JSON.stringify(sanitizePayload(requestPayload, input))
     };
