@@ -132,6 +132,25 @@ test('PingMate provider sends the required WhatsApp template payload without har
   );
 });
 
+test('PingMate provider accepts a configured full send endpoint without duplicating the path', async () => {
+  await withEnv(
+    {
+      PINGMATE_API_KEY: 'test-pingmate-key',
+      PINGMATE_BASE_URL: 'https://new.theultimate.io/api/v1/messages/send'
+    },
+    async () => {
+      let capturedUrl = '';
+      const provider = createPingMateProvider(async (url) => {
+        capturedUrl = String(url);
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      });
+
+      await provider.sendOtp({ challengeId: 'challenge-id', mobileNumber: '+919876543210', otp: '123456' });
+      assert.equal(capturedUrl, 'https://new.theultimate.io/api/v1/messages/send');
+    }
+  );
+});
+
 test('PingMate provider logs sanitized provider rejection bodies for diagnostics', async () => {
   await withEnv(
     {

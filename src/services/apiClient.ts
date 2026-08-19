@@ -21,12 +21,31 @@ export class ApiClientError extends Error {
 
 export const getApiBaseUrl = () => {
   const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-  if (fromEnv) return fromEnv;
+  if (fromEnv) {
+    try {
+      const parsed = new URL(fromEnv);
+      const isLoopback = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost' || parsed.hostname === '::1';
+      if (!isLoopback) return fromEnv;
+      console.warn('[ApiClient] Ignoring loopback API URL; use a LAN or HTTPS gateway URL for the iOS simulator.', {
+        configuredUrl: fromEnv
+      });
+    } catch {
+      throw new Error('Fiteatsy API base URL is invalid. Configure EXPO_PUBLIC_API_BASE_URL with a reachable HTTP(S) URL.');
+    }
+  }
 
   const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
-  if (fromExtra) return fromExtra;
+  if (fromExtra) {
+    try {
+      const parsed = new URL(fromExtra);
+      const isLoopback = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost' || parsed.hostname === '::1';
+      if (!isLoopback) return fromExtra;
+    } catch {
+      throw new Error('Configured Fiteatsy API base URL is invalid.');
+    }
+  }
 
-  throw new Error('Fiteatsy API base URL is not configured.');
+  throw new Error('Fiteatsy API base URL is not configured with a reachable HTTP(S) gateway.');
 };
 
 export const apiBaseUrl = getApiBaseUrl();

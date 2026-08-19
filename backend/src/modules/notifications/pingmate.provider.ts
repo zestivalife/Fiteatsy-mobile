@@ -83,8 +83,10 @@ export class PingMateProvider implements WhatsappProvider {
     const startedAt = Date.now();
     const correlationId = crypto.randomUUID();
     const apiKey = env.pingmateApiKey;
-    const baseUrl = env.pingmateBaseUrl.replace(/\/+$/, '');
-    const requestUrl = `${baseUrl}/messages/send`;
+    const configuredBaseUrl = env.pingmateBaseUrl.replace(/\/+$/, '');
+    const requestUrl = configuredBaseUrl.endsWith('/messages/send')
+      ? configuredBaseUrl
+      : `${configuredBaseUrl}/messages/send`;
     const normalizedRecipient = normalizeCanonicalPhoneNumber(input.mobileNumber);
     const requestPayload = {
       to: normalizedRecipient,

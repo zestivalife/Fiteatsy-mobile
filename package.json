@@ -6,6 +6,7 @@
   "scripts": {
     "start": "expo start --clear --lan",
     "start:lan": "expo start --clear --lan",
+    "start:ios:configured": "sh ./scripts/start-ios-configured.sh",
     "start:tunnel": "expo start --clear --tunnel",
     "ios": "expo run:ios",
     "android": "expo run:android",
