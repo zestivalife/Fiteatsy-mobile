@@ -1,0 +1,178 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Screen } from '../../components/Screen';
+import { Card } from '../../components/Card';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { getThemeColors, radius, typography } from '../../design/tokens';
+import { RootStackParamList } from '../../navigation/types';
+import { useAppContext } from '../../state/AppContext';
+import {
+  emptyFoodPreferenceProfile,
+  getFoodPreferences,
+  saveFoodPreferences,
+  type FoodPreferenceProfile
+} from '../../services/foodPreferenceService';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'FoodPreferences'>;
+type Choice = { label: string; value: string };
+
+const diets: Choice[] = [
+  { label: 'Vegetarian', value: 'vegetarian' },
+  { label: 'Eggetarian', value: 'eggetarian' },
+  { label: 'Non-Vegetarian', value: 'non_vegetarian' },
+  { label: 'Vegan', value: 'vegan' },
+  { label: 'Jain', value: 'jain' }
+];
+const proteins: Choice[] = [
+  { label: 'Eggs', value: 'egg' },
+  { label: 'Chicken', value: 'chicken' },
+  { label: 'Fish', value: 'fish' },
+  { label: 'Mutton', value: 'mutton' }
+];
+const cuisines: Choice[] = ['Maharashtrian', 'North Indian', 'South Indian', 'Gujarati', 'Punjabi', 'Bengali', 'Rajasthani', 'Other Indian', 'International / Other'].map((label) => ({ label, value: label }));
+const foods: Choice[] = ['Poha', 'Idli', 'Paneer', 'Dal', 'Rice', 'Roti', 'Oats', 'Bitter gourd', 'Peanuts', 'Soy'].map((label) => ({ label, value: label }));
+const practicality: Choice[] = ['Home-cooked', 'Office-friendly', 'Quick preparation', 'Travel-friendly', 'Minimal cooking', 'Family-friendly'].map((label) => ({ label, value: label }));
+
+const toggle = (values: string[], value: string) => values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+
+export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
+  const { themeMode, onboarding } = useAppContext();
+  const palette = getThemeColors(themeMode);
+  const mode = route.params?.mode ?? 'profile';
+  const [profile, setProfile] = useState<FoodPreferenceProfile>(emptyFoodPreferenceProfile());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    getFoodPreferences()
+      .then((response) => {
+        setProfile(response.profile);
+        setSavedAt(response.updatedAtISO);
+      })
+      .catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'Unable to load food preferences.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const proteinVisible = profile.dietType === 'eggetarian' || profile.dietType === 'non_vegetarian';
+  const selectedDietLabel = useMemo(() => diets.find((item) => item.value === profile.dietType)?.label ?? 'Not selected', [profile.dietType]);
+
+  const update = <K extends keyof FoodPreferenceProfile>(key: K, value: FoodPreferenceProfile[K]) => setProfile((current) => ({ ...current, [key]: value }));
+  const save = async () => {
+    if (!profile.dietType) {
+      setError('Choose the diet that best describes you.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await saveFoodPreferences(profile);
+      setProfile(response.profile);
+      setSavedAt(response.updatedAtISO);
+      if (mode === 'onboarding') navigation.navigate('OnboardingAssessment');
+      else navigation.goBack();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Unable to save food preferences. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <Screen><View style={styles.center}><Text style={[styles.body, { color: palette.textSecondary }]}>Loading your food preferences...</Text></View></Screen>;
+  }
+
+  return (
+    <Screen scroll>
+      <Text style={[styles.eyebrow, { color: palette.blue }]}>FOOD PREFERENCES</Text>
+      <Text style={[styles.title, { color: palette.textPrimary }]}>{mode === 'onboarding' ? 'Make meals feel like yours' : 'Food Preferences'}</Text>
+      <Text style={[styles.body, { color: palette.textSecondary }]}>Your choices help your consultant personalise recommendations. Clinical restrictions remain managed separately.</Text>
+
+      <Card>
+        <SectionTitle title="Your diet" color={palette.textPrimary} />
+        <Text style={[styles.helper, { color: palette.textSecondary }]}>We'll use this to personalise your meal recommendations.</Text>
+        <ChoiceGrid choices={diets} selected={profile.dietType ? [profile.dietType] : []} onToggle={(value) => update('dietType', value as FoodPreferenceProfile['dietType'])} palette={palette} />
+      </Card>
+
+      {proteinVisible ? <Card>
+        <SectionTitle title="Which of these do you eat?" color={palette.textPrimary} />
+        <ChoiceGrid choices={proteins} selected={profile.proteins} onToggle={(value) => update('proteins', toggle(profile.proteins, value))} palette={palette} />
+      </Card> : null}
+
+      <Card>
+        <SectionTitle title="Cuisines you usually prefer" color={palette.textPrimary} />
+        <Text style={[styles.helper, { color: palette.textSecondary }]}>We'll prioritise familiar foods where they fit your nutrition plan.</Text>
+        <ChoiceGrid choices={cuisines} selected={profile.cuisines} onToggle={(value) => update('cuisines', toggle(profile.cuisines, value))} palette={palette} />
+      </Card>
+
+      <Card>
+        <SectionTitle title="Main-meal staples" color={palette.textPrimary} />
+        <ChoiceGrid choices={[{ label: 'Roti', value: 'roti' }, { label: 'Rice', value: 'rice' }, { label: 'Both', value: 'both' }, { label: 'No preference', value: 'none' }]} selected={profile.staplePreference ? [profile.staplePreference] : []} onToggle={(value) => update('staplePreference', value as FoodPreferenceProfile['staplePreference'])} palette={palette} />
+      </Card>
+
+      <Card>
+        <SectionTitle title="Dairy" color={palette.textPrimary} />
+        <ChoiceGrid choices={[{ label: 'Yes', value: 'allowed' }, { label: 'Prefer limited', value: 'limited' }, { label: 'No', value: 'avoid' }]} selected={profile.dairyPreference ? [profile.dairyPreference] : []} onToggle={(value) => update('dairyPreference', value as FoodPreferenceProfile['dairyPreference'])} palette={palette} />
+        <Text style={[styles.helper, { color: palette.textSecondary }]}>Medical intolerances are kept in your Health Profile.</Text>
+      </Card>
+
+      <Card>
+        <SectionTitle title="Foods you enjoy" color={palette.textPrimary} />
+        <Text style={[styles.helper, { color: palette.textSecondary }]}>Choose foods you'd like us to consider more often.</Text>
+        <ChoiceGrid choices={foods} selected={profile.foodsLiked} onToggle={(value) => update('foodsLiked', toggle(profile.foodsLiked, value))} palette={palette} />
+      </Card>
+
+      <Card>
+        <SectionTitle title="Foods you don't enjoy" color={palette.textPrimary} />
+        <Text style={[styles.helper, { color: palette.textSecondary }]}>Dislikes are different from allergies.</Text>
+        <ChoiceGrid choices={foods} selected={profile.foodsDisliked} onToggle={(value) => update('foodsDisliked', toggle(profile.foodsDisliked, value))} palette={palette} />
+      </Card>
+
+      <Card>
+        <SectionTitle title="Anything you specifically avoid?" color={palette.textPrimary} />
+        <ChoiceGrid choices={foods} selected={profile.foodsAvoided} onToggle={(value) => update('foodsAvoided', toggle(profile.foodsAvoided, value))} palette={palette} />
+      </Card>
+
+      <Card>
+        <SectionTitle title="What works for your routine?" color={palette.textPrimary} />
+        <ChoiceGrid choices={practicality} selected={profile.practicality} onToggle={(value) => update('practicality', toggle(profile.practicality, value))} palette={palette} />
+      </Card>
+
+      <Card>
+        <SectionTitle title="Health restrictions already considered" color={palette.textPrimary} />
+        <Text style={[styles.body, { color: palette.textSecondary }]}>{onboarding?.primaryConditions?.join(', ') || 'Your allergies and clinical restrictions are managed in your Health Profile.'}</Text>
+      </Card>
+
+      {savedAt ? <Text style={[styles.saved, { color: palette.textSecondary }]}>Last updated {new Date(savedAt).toLocaleDateString()}</Text> : null}
+      {error ? <Text style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
+      <PrimaryButton title={saving ? 'Saving...' : 'Save food preferences'} onPress={save} disabled={saving} />
+    </Screen>
+  );
+};
+
+const SectionTitle = ({ title, color }: { title: string; color: string }) => <Text style={[styles.sectionTitle, { color }]}>{title}</Text>;
+
+const ChoiceGrid = ({ choices, selected, onToggle, palette }: { choices: Choice[]; selected: string[]; onToggle: (value: string) => void; palette: ReturnType<typeof getThemeColors> }) => (
+  <View style={styles.choiceGrid}>
+    {choices.map((choice) => {
+      const active = selected.includes(choice.value);
+      return <Pressable key={choice.value} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => onToggle(choice.value)} style={[styles.choice, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }, active && { backgroundColor: palette.blue, borderColor: palette.blue }]}><Text style={[styles.choiceText, { color: active ? '#FFFFFF' : palette.textPrimary }]}>{choice.label}</Text></Pressable>;
+    })}
+  </View>
+);
+
+const styles = StyleSheet.create({
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  eyebrow: { ...typography.caption, marginBottom: 8 },
+  title: { ...typography.title, fontSize: 28, marginBottom: 8 },
+  body: { ...typography.body, lineHeight: 22 },
+  helper: { ...typography.caption, lineHeight: 18, marginBottom: 12 },
+  sectionTitle: { ...typography.bodyStrong, fontSize: 17, marginBottom: 6 },
+  choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  choice: { minHeight: 44, paddingHorizontal: 14, borderWidth: 1, borderRadius: radius.sm, justifyContent: 'center' },
+  choiceText: { ...typography.caption },
+  saved: { ...typography.caption, textAlign: 'center', marginVertical: 12 },
+  error: { ...typography.caption, textAlign: 'center', marginVertical: 12 }
+});

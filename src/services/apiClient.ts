@@ -108,3 +108,10 @@ export const postJson = async <T>(path: string, body: unknown, headers?: Headers
     headers,
     body: JSON.stringify(body)
   });
+
+export const putJson = async <T>(path: string, body: unknown, headers?: HeadersInit) =>
+  apiFetch<T>(path, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body)
+  });

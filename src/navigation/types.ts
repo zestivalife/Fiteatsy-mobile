@@ -7,6 +7,7 @@ export type RootStackParamList = {
   OnboardingCalendar: undefined;
   OnboardingNotifications: undefined;
   OnboardingAssessment: undefined;
+  FoodPreferences: { mode?: 'onboarding' | 'profile' } | undefined;
   SignIn: undefined;
   SignUp: undefined;
   ChangePin: { force?: boolean } | undefined;
@@ -24,6 +25,11 @@ export type RootStackParamList = {
     requiredEntitlement?: string | null;
     returnDestination?: keyof RootStackParamList;
   } | undefined;
+  SubscriptionPlanDetails: { planId: string };
+  SubscriptionCompare: undefined;
+  MySubscription: undefined;
+  SubscriptionCheckout: { planId: string };
+  SubscriptionPaymentPlaceholder: undefined;
   PaymentSuccess: {
     returnDestination?: keyof RootStackParamList;
   } | undefined;

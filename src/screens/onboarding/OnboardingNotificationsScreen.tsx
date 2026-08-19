@@ -53,7 +53,7 @@ export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
       allowNotifications();
     }
     setWearableSetupCompleted(false);
-    navigation.navigate('OnboardingAssessment');
+    navigation.navigate('FoodPreferences', { mode: 'onboarding' });
   };
 
   return (

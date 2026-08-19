@@ -373,6 +373,20 @@ consultantNutritionRouter.get('/clients/:clientId/diet-plans/:dietPlanId/downloa
 export const platformNutritionRouter = Router();
 platformNutritionRouter.use(requireAuthenticatedAccount);
 
+platformNutritionRouter.get('/food-preferences', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const payload = await getFoodPreferenceProfile(account.client.fiteatsyClientId);
+  if (!payload) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'Your client profile was not found.' });
+  return res.status(200).json(payload);
+});
+
+platformNutritionRouter.put('/food-preferences', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const payload = await updateFoodPreferenceProfile(account.client.fiteatsyClientId, account.user.id, 'client', req.body ?? {});
+  if (!payload) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'Your client profile was not found.' });
+  return res.status(200).json(payload);
+});
+
 platformNutritionRouter.get('/nutrition-plan', async (req, res) => {
   const account = getAuthenticatedAccount(req);
   const payload = await getPublishedDietPlanForClient({

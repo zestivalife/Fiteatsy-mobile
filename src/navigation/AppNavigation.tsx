@@ -9,6 +9,7 @@ import { OnboardingBasicsScreen } from '../screens/onboarding/OnboardingBasicsSc
 import { OnboardingCalendarScreen } from '../screens/onboarding/OnboardingCalendarScreen';
 import { OnboardingNotificationsScreen } from '../screens/onboarding/OnboardingNotificationsScreen';
 import { OnboardingAssessmentScreen } from '../screens/onboarding/OnboardingAssessmentScreen';
+import { FoodPreferencesScreen } from '../screens/onboarding/FoodPreferencesScreen';
 import { SignInScreen } from '../screens/auth/SignInScreen';
 import { SignUpScreen } from '../screens/auth/SignUpScreen';
 import { ChangePinScreen } from '../screens/auth/ChangePinScreen';
@@ -27,7 +28,12 @@ import { FloatingTabBar } from '../components/FloatingTabBar';
 import { LeadershipScreen } from '../screens/home/LeadershipScreen';
 import { ConsultantBookingScreen } from '../screens/home/ConsultantBookingScreen';
 import { PaymentSuccessScreen } from '../screens/home/PaymentSuccessScreen';
-import { SubscriptionPlansScreen } from '../screens/home/SubscriptionPlansScreen';
+import { PlansScreen } from '../screens/home/PlansScreen';
+import { SubscriptionPlanDetailsScreen } from '../screens/home/SubscriptionPlanDetailsScreen';
+import { SubscriptionCompareScreen } from '../screens/home/SubscriptionCompareScreen';
+import { MySubscriptionScreen } from '../screens/home/MySubscriptionScreen';
+import { SubscriptionCheckoutScreen } from '../screens/home/SubscriptionCheckoutScreen';
+import { SubscriptionPaymentPlaceholderScreen } from '../screens/home/SubscriptionPaymentPlaceholderScreen';
 import { SearchScreen } from '../screens/home/SearchScreen';
 import { NotificationsScreen } from '../screens/home/NotificationsScreen';
 import { ProfileScreen } from '../screens/home/ProfileScreen';
@@ -105,6 +111,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="OnboardingCalendar" component={OnboardingCalendarScreen} />
         <Stack.Screen name="OnboardingNotifications" component={OnboardingNotificationsScreen} />
         <Stack.Screen name="OnboardingAssessment" component={OnboardingAssessmentScreen} />
+        <Stack.Screen name="FoodPreferences" component={FoodPreferencesScreen} />
         <Stack.Screen name="SignIn" component={SignInScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="ChangePin" component={ChangePinScreen} />
@@ -118,7 +125,12 @@ export const AppNavigation = () => {
         <Stack.Screen name="HydrationSession" component={HydrationScreen} />
         <Stack.Screen name="Leadership" component={LeadershipScreen} />
         <Stack.Screen name="ConsultantBooking" component={ConsultantBookingScreen} />
-        <Stack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
+        <Stack.Screen name="SubscriptionPlans" component={PlansScreen} />
+        <Stack.Screen name="SubscriptionPlanDetails" component={SubscriptionPlanDetailsScreen} />
+        <Stack.Screen name="SubscriptionCompare" component={SubscriptionCompareScreen} />
+        <Stack.Screen name="MySubscription" component={MySubscriptionScreen} />
+        <Stack.Screen name="SubscriptionCheckout" component={SubscriptionCheckoutScreen} />
+        <Stack.Screen name="SubscriptionPaymentPlaceholder" component={SubscriptionPaymentPlaceholderScreen} />
         <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} />
         <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />

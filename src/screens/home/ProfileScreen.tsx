@@ -94,7 +94,7 @@ export const ProfileScreen = ({ navigation }: Props) => {
         <Pressable
           accessibilityRole="button"
           style={styles.securityRow}
-          onPress={() => navigation.navigate('SubscriptionPlans', { source: 'subscription_management' })}
+          onPress={() => navigation.navigate('MySubscription')}
         >
           <View>
             <Text style={[styles.securityTitle, { color: palette.textPrimary }]}>Plan and Entitlements</Text>
@@ -207,6 +207,13 @@ export const ProfileScreen = ({ navigation }: Props) => {
 
       <Card>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Preferences</Text>
+        <Pressable accessibilityRole="button" style={styles.securityRow} onPress={() => navigation.navigate('FoodPreferences', { mode: 'profile' })}>
+          <View>
+            <Text style={[styles.securityTitle, { color: palette.textPrimary }]}>Food Preferences</Text>
+            <Text style={[styles.securitySubtitle, { color: palette.textSecondary }]}>View or update meal preferences</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={palette.textSecondary} />
+        </Pressable>
         <Pressable accessibilityRole="button" style={styles.securityRow} onPress={() => navigation.navigate('ChangePin')}>
           <View>
             <Text style={[styles.securityTitle, { color: palette.textPrimary }]}>Security</Text>
