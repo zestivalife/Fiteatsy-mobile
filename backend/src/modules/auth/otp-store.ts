@@ -54,7 +54,7 @@ const readRedisReply = (buffer: Buffer, offset = 0): { value: unknown; offset: n
   throw new Error('Unsupported Redis response.');
 };
 
-const redisCommand = async (parts: string[]) => {
+export const redisCommand = async (parts: string[]) => {
   const configured = env.redisUrl;
   if (!configured) throw new Error('REDIS_URL is required for OTP persistence outside tests.');
   const url = new URL(configured);

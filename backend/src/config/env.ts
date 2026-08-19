@@ -99,6 +99,22 @@ export const env = {
   get redisUrl() {
     return process.env.REDIS_URL?.trim() || process.env.REDIS_PRIVATE_URL?.trim() || '';
   },
+  get zestivaDelegationPublicKey() {
+    return process.env.ZESTIVA_DELEGATION_PUBLIC_KEY?.replace(/\\n/g, '\n').trim() ?? '';
+  },
+  get zestivaDelegationKeyId() {
+    return process.env.ZESTIVA_DELEGATION_KEY_ID?.trim() ?? '';
+  },
+  get zestivaDelegationIssuer() {
+    return process.env.ZESTIVA_DELEGATION_ISSUER?.trim() || 'zestiva-platform';
+  },
+  get zestivaDelegationAudience() {
+    return process.env.ZESTIVA_DELEGATION_AUDIENCE?.trim() || 'fiteatsy-backend';
+  },
+  get zestivaDelegationClockSkewSeconds() {
+    const parsed = Number(process.env.ZESTIVA_DELEGATION_CLOCK_SKEW_SECONDS?.trim() || 5);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 5;
+  },
   get pingmateTemplate() {
     return process.env.PINGMATE_TEMPLATE?.trim() || 'auth_otp';
   },
