@@ -364,8 +364,10 @@ export const getPlatformHealthProfileSyncDiagnostics = async (
   identity?: StorageIdentity | null
 ): Promise<HealthProfileSyncDiagnostics> => getHealthProfileSyncDiagnostics(identity);
 
-export const getPlatformHealthProfile = () =>
-  apiFetch<PlatformHealthProfileBundle>('/v1/platform/health-profile');
+export const getPlatformHealthProfile = (sessionToken?: string) =>
+  apiFetch<PlatformHealthProfileBundle>('/v1/platform/health-profile', sessionToken ? {
+    headers: { Authorization: `Bearer ${sessionToken}` }
+  } : undefined);
 
 const firstGoal = (profile: PlatformHealthProfile) =>
   profile.wellnessGoals.find(Boolean) as OnboardingProfile['primaryGoal'] | undefined;

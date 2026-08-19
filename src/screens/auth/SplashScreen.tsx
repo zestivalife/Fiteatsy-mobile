@@ -29,7 +29,7 @@ const FiteatsyWordmark = ({ width }: { width: number }) => {
 };
 
 export const SplashScreen = ({ navigation }: Props) => {
-  const { onboarding, assessment, isAuthenticated, bootstrapped, wearableSetupCompleted } = useAppContext();
+  const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep } = useAppContext();
   const { width } = useWindowDimensions();
 
   const introOpacity = useRef(new Animated.Value(0)).current;
@@ -128,18 +128,13 @@ export const SplashScreen = ({ navigation }: Props) => {
         return;
       }
 
-      if (!onboarding) {
+      if (onboardingStatus === 'NOT_STARTED' || onboardingResumeStep === 'basics') {
         navigation.replace('OnboardingBasics');
         return;
       }
 
-      if (!assessment) {
+      if (onboardingStatus === 'IN_PROGRESS' && onboardingResumeStep === 'assessment') {
         navigation.replace('OnboardingAssessment');
-        return;
-      }
-
-      if (!wearableSetupCompleted) {
-        navigation.replace('SyncWearable');
         return;
       }
 
@@ -154,7 +149,7 @@ export const SplashScreen = ({ navigation }: Props) => {
       sweepX.stopAnimation();
       bgShift.stopAnimation();
     };
-  }, [bootstrapped, introOpacity, introScale, isAuthenticated, navigation, onboarding, assessment, wearableSetupCompleted, glowOpacity, sweepX, bgShift]);
+  }, [bootstrapped, introOpacity, introScale, isAuthenticated, navigation, onboardingStatus, onboardingResumeStep, glowOpacity, sweepX, bgShift]);
 
   const logoWidth = Math.min(width * 0.78, 420);
 

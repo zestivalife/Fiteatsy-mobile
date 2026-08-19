@@ -86,6 +86,7 @@ import { getHealthScoreSummary, submitPssAssessment } from '../services/healthIn
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
 import { wellnessFromHealthScores } from '../services/healthSyncManager';
 import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/identityScopedStorage';
+import { deriveOnboardingGate, type OnboardingResumeStep, type OnboardingStatus } from '../utils/onboardingGate';
 
 type StoredAuthSession = CurrentAuthSession & {
   sessionToken: string;
@@ -93,6 +94,8 @@ type StoredAuthSession = CurrentAuthSession & {
 
 type AppContextValue = {
   bootstrapped: boolean;
+  onboardingStatus: OnboardingStatus;
+  onboardingResumeStep: OnboardingResumeStep;
   devices: WearableDevice[];
   setDevices: React.Dispatch<React.SetStateAction<WearableDevice[]>>;
   wellness: WellnessSnapshot;
@@ -265,6 +268,8 @@ const safeParse = <T,>(raw: string | null, fallback: T): T => {
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [bootstrapped, setBootstrapped] = useState(false);
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus>('NOT_STARTED');
+  const [onboardingResumeStep, setOnboardingResumeStep] = useState<OnboardingResumeStep>('basics');
   const [devices, setDevicesState] = useState<WearableDevice[]>([]);
   const [wellness, setWellnessState] = useState<WellnessSnapshot>(initialWellness);
   const [mood, setMood] = useState<MoodSelection | null>(null);
@@ -367,6 +372,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const clearPersistedAuth = useCallback((sessionToClear: StoredAuthSession | null = null) => {
     setAuthSessionState(null);
+    setOnboardingStatus('NOT_STARTED');
+    setOnboardingResumeStep('basics');
     AsyncStorage.removeItem(STORAGE_KEYS.auth);
     void removeUserStorage(sessionToClear);
   }, []);
@@ -395,8 +402,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         ...current,
         sessionToken: session.sessionToken
       });
+      const remoteBundle = await getPlatformHealthProfile(session.sessionToken);
+      const gate = deriveOnboardingGate(remoteBundle.profile);
+      setOnboardingStatus(gate.status);
+      setOnboardingResumeStep(gate.resumeStep);
     } catch (error) {
       if (!fallback) throw error;
+      setOnboardingStatus('NOT_STARTED');
+      setOnboardingResumeStep('basics');
       console.warn('[AppContext] auth/me refresh deferred after fresh login', {
         errorMessage: error instanceof Error ? error.message : String(error)
       });
@@ -449,6 +462,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         if (!sessionForStorage) {
+          setOnboardingStatus('NOT_STARTED');
+          setOnboardingResumeStep('basics');
           return;
         }
 
@@ -507,6 +522,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         try {
           await processPendingHealthProfileSync(toSessionStorageIdentity(sessionForStorage));
           const remoteBundle = await getPlatformHealthProfile();
+          const gate = deriveOnboardingGate(remoteBundle.profile);
+          setOnboardingStatus(gate.status);
+          setOnboardingResumeStep(gate.resumeStep);
           setOnboardingState((previous) => {
             const baseProfile = previous ?? normalizeOnboardingProfile({
               name: sessionForStorage?.user.name ?? 'Fiteatsy Client',
@@ -560,6 +578,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const diagnostics = await getPlatformHealthProfileSyncDiagnostics(toSessionStorageIdentity(sessionForStorage));
           setHealthProfileSyncDiagnosticsState(diagnostics);
           setPublishedNutritionPlan(null);
+          setOnboardingStatus('IN_PROGRESS');
+          setOnboardingResumeStep('basics');
         }
         if (storedSelectedDeviceId) {
           setSelectedDeviceIdState(storedSelectedDeviceId);
@@ -1473,6 +1493,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     clearPersistedAuth(authSession);
     setMood(null);
     setOnboardingState(null);
+    setOnboardingStatus('NOT_STARTED');
+    setOnboardingResumeStep('basics');
     setAssessmentState(null);
     setDevicesState([]);
     setSelectedDeviceId(null);
@@ -1522,6 +1544,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const value = useMemo(
     () => ({
       bootstrapped,
+      onboardingStatus,
+      onboardingResumeStep,
       devices,
       setDevices,
       wellness,
@@ -1593,6 +1617,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       assessment,
       authSession,
       bootstrapped,
+      onboardingResumeStep,
+      onboardingStatus,
       checkIns,
       decisionLogs,
       devices,

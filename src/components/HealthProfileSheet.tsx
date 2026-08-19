@@ -502,19 +502,9 @@ export const HealthProfileSheet = ({
     reportCount > 0 ? 'Report-aware insights' : null
   ].filter(Boolean);
 
-  const journeySteps = [
-    { key: 'about', label: 'About You' },
-    { key: 'goal', label: 'Your Goal' },
-    { key: 'lifestyle', label: 'Lifestyle' },
-    { key: 'medical', label: 'Medical History' },
-    { key: 'reports', label: 'Reports' },
-    { key: 'body', label: 'Measurements' },
-    { key: 'summary', label: 'Summary' }
-  ];
-
   const StepIntro = ({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) => (
     <View style={styles.journeyIntro}>
-      <Text style={[styles.journeyEyebrow, { color: '#59BE08' }]}>{eyebrow}</Text>
+      {!/^Step \d+$/.test(eyebrow) ? <Text style={[styles.journeyEyebrow, { color: '#59BE08' }]}>{eyebrow}</Text> : null}
       <Text style={[styles.journeyTitle, { color: palette.textPrimary }]}>{title}</Text>
       <Text style={[styles.journeyCopy, { color: palette.textSecondary }]}>{copy}</Text>
     </View>
@@ -619,21 +609,6 @@ export const HealthProfileSheet = ({
               <Text style={[styles.summaryLabel, { color: palette.textSecondary }]}>Reports linked</Text>
               <Text style={[styles.summaryValue, { color: palette.textPrimary }]}>{reportCount}</Text>
             </View>
-          </View>
-
-          <View style={styles.journeyStepTrack}>
-            {journeySteps.map((step, index) => (
-              <Pressable
-                key={step.key}
-                style={[
-                  styles.journeyStepDot,
-                  { backgroundColor: index <= activeStep ? '#59BE08' : palette.stroke }
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${step.label}`}
-                onPress={() => setActiveStep(index)}
-              />
-            ))}
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
