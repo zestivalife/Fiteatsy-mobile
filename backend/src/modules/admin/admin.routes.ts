@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
-import { assignFiteatsyClient, assignRoleAsAdmin, getAdminStatus, getFiteatsyClientDirectory } from './admin.service.js';
+import { assignRoleAsAdmin, getAdminStatus } from './admin.service.js';
 import { assignQaClient, deactivateQa, getQaAssignmentsForAdmin, getQaIdentityForAdmin, issueQaSession, provisionQa, revokeQaClientAssignment } from './qa-provisioning.service.js';
 
 export const adminRouter = Router();
@@ -25,7 +25,6 @@ const qaIdentitySchema = z.object({
 const qaSessionSchema = z.object({ reason: z.string().trim().min(3).max(240) });
 const qaAssignmentSchema = z.object({ consultantUserId: z.string().trim().min(1), clientUserId: z.string().trim().min(1), reason: z.string().trim().min(3).max(240) });
 const qaRevokeSchema = z.object({ reason: z.string().trim().min(3).max(240) });
-const directoryAssignmentSchema = z.object({ consultantUserId: z.string().trim().min(1), clientUserId: z.string().trim().min(1), reason: z.string().trim().min(3).max(240) });
 
 adminRouter.use(requireAuthenticatedAccount);
 
@@ -47,20 +46,6 @@ adminRouter.get('/status', async (req, res) => {
   });
 });
 
-adminRouter.get('/fiteatsy-clients', async (req, res) => {
-  const assignment = req.query.assignment === 'assigned' || req.query.assignment === 'unassigned' ? req.query.assignment : 'all';
-  const clients = await getFiteatsyClientDirectory(getAuthenticatedAccount(req), assignment);
-  if (!clients) return res.status(403).json({ error: 'ROLE_NOT_ALLOWED', message: 'An admin account is required to view the Fiteatsy client directory.' });
-  return res.status(200).json({ clients, counts: { registered: clients.length, assigned: clients.filter((client) => client.assignmentStatus === 'assigned').length, unassigned: clients.filter((client) => client.assignmentStatus === 'unassigned').length } });
-});
-
-adminRouter.post('/fiteatsy-client-assignments', async (req, res) => {
-  const parsed = directoryAssignmentSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
-  const assignment = await assignFiteatsyClient(getAuthenticatedAccount(req), parsed.data);
-  if (!assignment) return res.status(400).json({ error: 'INVALID_CLIENT_ASSIGNMENT', message: 'The client or consultant is not active or is not a supported Fiteatsy account.' });
-  return res.status(201).json({ assignment });
-});
 
 adminRouter.post('/users/:userId/role', async (req, res) => {
   const parsed = roleAssignmentSchema.safeParse(req.body);

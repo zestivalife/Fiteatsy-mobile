@@ -8,23 +8,10 @@ import {
   isManagedRole,
   type ManagedRole
 } from './admin.repository.js';
-import { createFiteatsyClientAssignment, listFiteatsyClientDirectory } from './admin.repository.js';
 
 const INITIAL_ADMIN_BOOTSTRAP_REASON = 'initial_admin_bootstrap';
 
 export const canManageRoles = (account: AuthenticatedAccount) => account.user.role?.toLowerCase() === 'admin';
-
-export const canManageFiteatsyClientDirectory = canManageRoles;
-
-export const getFiteatsyClientDirectory = async (account: AuthenticatedAccount, assignment: 'all' | 'assigned' | 'unassigned') => {
-  if (!canManageFiteatsyClientDirectory(account)) return null;
-  return listFiteatsyClientDirectory(assignment);
-};
-
-export const assignFiteatsyClient = async (account: AuthenticatedAccount, input: { consultantUserId: string; clientUserId: string; reason: string }) => {
-  if (!canManageFiteatsyClientDirectory(account)) return null;
-  return createFiteatsyClientAssignment({ ...input, actorUserId: account.user.id });
-};
 
 export const getAdminStatus = async (account: AuthenticatedAccount) => {
   if (!canManageRoles(account)) {

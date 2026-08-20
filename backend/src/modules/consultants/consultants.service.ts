@@ -17,6 +17,7 @@ import {
   listAssessmentResults
 } from '../assessments/assessments.repository.js';
 import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId } from '../platform/platform.store.js';
+import { getFoodPreferenceProfile } from '../nutrition/food-preferences.service.js';
 import {
   ensureRegisteredClientsForEligibleUsers,
   getConsultantClientSyncDiagnostics,
@@ -141,6 +142,12 @@ const buildCompleteness = (profile: Awaited<ReturnType<typeof getNutritionProfil
     sectionScores: profile.sectionScores,
     aiReady: profile.aiReady
   };
+};
+
+const foodPreferenceStatus = (foodPreferences: Awaited<ReturnType<typeof getFoodPreferenceProfile>>) => {
+  if (!foodPreferences?.updatedAtISO) return 'NOT_SET' as const;
+  const hasValues = Object.values(foodPreferences.profile).some((value) => Array.isArray(value) ? value.length > 0 : value != null);
+  return hasValues ? 'COMPLETE' as const : 'INCOMPLETE' as const;
 };
 
 const buildRecommendations = ({
@@ -731,7 +738,7 @@ export const getConsultantClientWorkspace = async (
   if (!context) return null;
 
   const owner = { accountId: context.accountId, clientId: context.internalClientId };
-  const [healthProfile, nutritionProfile, careCase, reports, biomarkers, wearableSummary, timeline, healthScores, medicationMonitoring] = await Promise.all([
+  const [healthProfile, nutritionProfile, careCase, reports, biomarkers, wearableSummary, timeline, healthScores, medicationMonitoring, foodPreferences] = await Promise.all([
     getHealthProfileByClientId(context.internalClientId),
     getNutritionProfileByClientId(context.internalClientId),
     getCareCaseByClientId(context.internalClientId),
@@ -740,7 +747,8 @@ export const getConsultantClientWorkspace = async (
     getConsultantWearableSummaryForClient(context.internalClientId, context.accountId),
     listConsultantTimelineForClient(context.internalClientId, context.accountId),
     listLatestHealthScores(owner),
-    getMedicationMonitoringForOwner(owner)
+    getMedicationMonitoringForOwner(owner),
+    getFoodPreferenceProfile(publicClientId)
   ]);
   const healthMetrics = calculateHealthMetrics(context.calculationInput);
   await persistHealthCalculations(owner, healthMetrics);
@@ -883,6 +891,12 @@ export const getConsultantClientWorkspace = async (
         hydrationTargetLiters: context.calculationInput.weightKg ? null : 'Weight is required.'
       }
     },
+    foodPreferences: foodPreferences
+      ? {
+          ...foodPreferences,
+          status: foodPreferenceStatus(foodPreferences)
+        }
+      : null,
     nutritionIntelligence: nutritionIntelligencePayload?.intelligence ?? null,
     nutritionSnapshot: nutritionIntelligencePayload?.nutritionSnapshot ?? null,
     dietPlan:
