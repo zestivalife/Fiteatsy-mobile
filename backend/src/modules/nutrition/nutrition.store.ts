@@ -184,7 +184,15 @@ export const listDietPlanReviewQueue = async () => {
   const result = await pool.query(
     `select dp.id, dp.user_id, dp.consultant_id, dp.plan_status, dp.updated_at, dp.submitted_at,
             dp.review_comment, client.name as client_name, consultant.name as consultant_name,
-            dpv.id as version_id, dpv.version_number, dpv.content_summary, dpv.lifecycle_status
+            dpv.id as version_id, dpv.version_number, dpv.content, dpv.content_summary, dpv.lifecycle_status,
+            coalesce((select json_agg(json_build_object(
+              'eventType', events.event_type,
+              'comment', events.comment,
+              'actorUserId', events.actor_user_id,
+              'createdAtISO', events.created_at
+            ) order by events.created_at asc)
+            from diet_plan_review_events events
+            where events.diet_plan_id = dp.id), '[]'::json) as review_history
        from diet_plans dp
        join diet_plan_versions dpv on dpv.id = dp.current_version_id
        join users client on client.id = dp.user_id
@@ -208,8 +216,10 @@ export const listDietPlanReviewQueue = async () => {
       id: String(row.version_id),
       versionNumber: Number(row.version_number),
       lifecycleStatus: String(row.lifecycle_status),
+      content: toRecord(row.content, {}),
       contentSummary: toRecord(row.content_summary, {}),
     },
+    reviewHistory: Array.isArray(row.review_history) ? row.review_history : [],
   }));
 };
 
@@ -420,6 +430,67 @@ export const updateDietPlanVersionContent = async (input: {
   );
   if (updatedVersion.rowCount === 0) return null;
   return mapDietPlanVersion(updatedVersion.rows[0]);
+};
+
+export const createDietPlanDraftVersion = async (input: {
+  dietPlanId: string;
+  content: NutritionPlanContent;
+  contentSummary: DietPlanVersionRecord['contentSummary'];
+  sourceSnapshot: NutritionPlanSourceSnapshot;
+  generatedBy: string;
+  reviewNotes?: string | null;
+}) => {
+  const timestamp = nowIso();
+  const nextVersion = await pool.query(
+    `
+      with next_number as (
+        select coalesce(max(version_number), 0) + 1 as version_number
+        from diet_plan_versions
+        where diet_plan_id = $8 and deleted_at is null
+      )
+      insert into diet_plan_versions (
+        id, diet_plan_id, version_number, generated_by, content, source_snapshot, content_summary,
+        lifecycle_status, review_notes, exported_doc_path, exported_pdf_path, status, created_at, updated_at, deleted_at
+      )
+      values (
+        $1, $8, (select version_number from next_number), $2, $3::jsonb, $4::jsonb, $5::jsonb,
+        'draft', $6, null, null, 'active', $7, $7, null
+      )
+      returning *
+    `,
+    [
+      crypto.randomUUID(),
+      input.generatedBy,
+      JSON.stringify(input.content),
+      JSON.stringify(input.sourceSnapshot),
+      JSON.stringify(input.contentSummary),
+      input.reviewNotes ?? null,
+      timestamp,
+      input.dietPlanId,
+    ],
+  );
+  const updatedPlan = await pool.query(
+    `
+      update diet_plans
+      set current_version_id = $2,
+          plan_status = 'draft',
+          submitted_at = null,
+          reviewed_by = null,
+          reviewed_at = null,
+          review_comment = null,
+          source_snapshot = $3::jsonb,
+          updated_at = $4,
+          version = version + 1
+      where id = $1 and deleted_at is null
+      returning *
+    `,
+    [input.dietPlanId, nextVersion.rows[0].id, JSON.stringify(input.sourceSnapshot), timestamp],
+  );
+  if (updatedPlan.rowCount === 0) return null;
+  return {
+    plan: mapDietPlan(updatedPlan.rows[0]),
+    version: mapDietPlanVersion(nextVersion.rows[0]),
+  };
 };
 
 export const updateDietPlanLifecycle = async (input: {

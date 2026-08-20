@@ -24,6 +24,7 @@ import { transitionCareCaseStage } from '../platform/platform.lifecycle.js';
 import { addHealthEvent } from '../platform/platform.store.js';
 import {
   createOrUpdateDietPlanDraft,
+  createDietPlanDraftVersion,
   getDietPlanByCareCaseId,
   getCurrentDietPlanVersion,
   getDietPlanById,
@@ -1636,27 +1637,42 @@ export const updateConsultantDietPlanDraft = async (
   });
 
   const normalizedContent = normalizeNutritionPlanContent(input.content);
-  const version = await updateDietPlanVersionContent({
-    dietPlanId: plan.id,
-    versionId: currentVersion.id,
-    content: normalizedContent,
-    contentSummary: contentSummaryFromContent(normalizedContent),
-    sourceSnapshot,
-    lifecycleStatus: 'draft',
-    reviewNotes: input.reviewNotes ?? null,
-  });
-  if (!version) return null;
-  assertLifecycleTransition(currentVersion.lifecycleStatus, 'draft');
-  const lifecycle = await updateDietPlanLifecycle({
-    dietPlanId: plan.id,
-    consultantId: account.accountId,
-    currentVersionId: version.id,
-    lifecycle: 'draft',
-    sourceSnapshot,
-  });
+  const saved = currentVersion.lifecycleStatus === 'changes_requested'
+    ? await createDietPlanDraftVersion({
+      dietPlanId: plan.id,
+      content: normalizedContent,
+      contentSummary: contentSummaryFromContent(normalizedContent),
+      sourceSnapshot,
+      generatedBy: account.accountId,
+      reviewNotes: input.reviewNotes ?? null,
+    })
+    : await updateDietPlanVersionContent({
+      dietPlanId: plan.id,
+      versionId: currentVersion.id,
+      content: normalizedContent,
+      contentSummary: contentSummaryFromContent(normalizedContent),
+      sourceSnapshot,
+      lifecycleStatus: 'draft',
+      reviewNotes: input.reviewNotes ?? null,
+    }).then((version) => version ? { plan, version } : null);
+  if (!saved) return null;
+  if (currentVersion.lifecycleStatus !== 'changes_requested') {
+    assertLifecycleTransition(currentVersion.lifecycleStatus, 'draft');
+    const lifecycle = await updateDietPlanLifecycle({
+      dietPlanId: plan.id,
+      consultantId: account.accountId,
+      currentVersionId: saved.version.id,
+      lifecycle: 'draft',
+      sourceSnapshot,
+    });
+    return {
+      plan: lifecycle?.plan ?? plan,
+      version: lifecycle?.version ?? saved.version,
+    };
+  }
   return {
-    plan: lifecycle?.plan ?? plan,
-    version,
+    plan: saved.plan,
+    version: saved.version,
   };
 };
 
