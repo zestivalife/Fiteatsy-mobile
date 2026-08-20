@@ -4,6 +4,18 @@ import { pool } from '../../db/pool.js';
 export const PROFESSIONAL_TYPES = ['CONSULTANT', 'PRACTITIONER', 'MENTOR'] as const;
 export type ProfessionalType = typeof PROFESSIONAL_TYPES[number];
 
+const GENERIC_PROFESSIONAL_NAMES = new Set([
+  'consultant dashboard user',
+  'consultant',
+]);
+
+const resolveProfessionalName = (row: { name?: unknown; email_normalized?: unknown }) => {
+  const name = String(row.name ?? '').trim();
+  if (name && !GENERIC_PROFESSIONAL_NAMES.has(name.toLowerCase())) return name;
+  const email = String(row.email_normalized ?? '').trim();
+  return email || 'Consultant';
+};
+
 const audit = async (input: { assignmentId: string; action: string; actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string }) => {
   await pool.query(
     `insert into professional_assignment_audit_events
@@ -102,7 +114,7 @@ export const discoverProfessionalsForAssignment = async (professionalType?: Prof
       order by name asc`,
     [professionalType ?? null]
   );
-  return result.rows.map((row) => ({ userId: String(row.id), name: String(row.name), email: row.email_normalized == null ? null : String(row.email_normalized), role: String(row.role) }));
+  return result.rows.map((row) => ({ userId: String(row.id), name: resolveProfessionalName(row), displayName: resolveProfessionalName(row), email: row.email_normalized == null ? null : String(row.email_normalized), role: String(row.role) }));
 };
 
 export const createProfessionalAssignment = async (input: { actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string }) => {
