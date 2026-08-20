@@ -9,7 +9,9 @@ const GENERIC_PROFESSIONAL_NAMES = new Set([
   'consultant',
 ]);
 
-const resolveProfessionalName = (row: { id?: unknown; name?: unknown; email_normalized?: unknown }) => {
+const resolveProfessionalName = (row: { id?: unknown; name?: unknown; first_name?: unknown; last_name?: unknown; email_normalized?: unknown }) => {
+  const firstLast = [row.first_name, row.last_name].map((value) => String(value ?? '').trim()).filter(Boolean).join(' ');
+  if (firstLast) return firstLast;
   const name = String(row.name ?? '').trim();
   if (name && !GENERIC_PROFESSIONAL_NAMES.has(name.toLowerCase())) return name;
   const email = String(row.email_normalized ?? '').trim();
@@ -43,7 +45,7 @@ export const discoverClientsForAssignment = async (query: string, limit: number,
           order by updated_at desc limit 1
        ) hp on true
        left join lateral (
-         select a.id, a.consultant_user_id, a.created_at, professional.name as professional_name, professional.role as professional_role
+           select a.id, a.consultant_user_id, a.created_at, coalesce(nullif(trim(concat_ws(' ', professional.first_name, professional.last_name)), ''), professional.name) as professional_name, professional.role as professional_role
            from consultant_client_assignments a
            join users professional on professional.id = a.consultant_user_id
           where a.client_user_id = u.id and a.status = 'active' and a.product = 'FITEATSY'
@@ -83,7 +85,7 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
           order by updated_at desc limit 1
        ) hp on true
        left join lateral (
-         select a.id, a.consultant_user_id, a.created_at, professional.name as professional_name, professional.role as professional_role
+           select a.id, a.consultant_user_id, a.created_at, coalesce(nullif(trim(concat_ws(' ', professional.first_name, professional.last_name)), ''), professional.name) as professional_name, professional.role as professional_role
            from consultant_client_assignments a
            join users professional on professional.id = a.consultant_user_id
           where a.client_user_id = u.id and a.status = 'active' and a.product = 'FITEATSY'
@@ -107,7 +109,7 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
 
 export const discoverProfessionalsForAssignment = async (professionalType?: ProfessionalType) => {
   const result = await pool.query(
-    `select id, name, email_normalized, role from users
+    `select id, name, first_name, last_name, email_normalized, role from users
       where deleted_at is null and lower(coalesce(status, '')) = 'active'
         and lower(coalesce(role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
         and ($1::text is null or upper(case when lower(role) in ('provider', 'dietician', 'senior_consultant') then 'CONSULTANT' else role end) = $1)

@@ -338,6 +338,8 @@ const ensureConsultantDashboardBridgeUser = async (input: {
   bridgeEmail: string | null;
   bridgeRole: string;
   bridgeName: string | null;
+  bridgeFirstName: string | null;
+  bridgeLastName: string | null;
 }) => {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const client = await pool.connect();
@@ -357,7 +359,9 @@ const ensureConsultantDashboardBridgeUser = async (input: {
       );
 
       const timestamp = now().toISOString();
-      const resolvedName = input.bridgeName?.trim() || input.bridgeEmail || 'Consultant Dashboard User';
+      const firstName = input.bridgeFirstName?.trim() || null;
+      const lastName = input.bridgeLastName?.trim() || null;
+      const resolvedName = input.bridgeName?.trim() || [firstName, lastName].filter(Boolean).join(' ') || input.bridgeEmail || 'Consultant Dashboard User';
 
       if (existing.rowCount === 0) {
         const inserted = await client.query(
@@ -365,6 +369,8 @@ const ensureConsultantDashboardBridgeUser = async (input: {
             insert into users (
               id,
               name,
+              first_name,
+              last_name,
               email_normalized,
               mobile_number_normalized,
               email_verified_at,
@@ -376,11 +382,11 @@ const ensureConsultantDashboardBridgeUser = async (input: {
               updated_at,
               last_login_at
             ) values (
-              $1, $2, $3, null, $4, null, $5, 'active', 1, $4, $4, $4
+              $1, $2, $3, $4, $5, null, $6, null, $7, 'active', 1, $6, $6, $6
             )
             returning *
           `,
-          [input.bridgeUserId, resolvedName, input.bridgeEmail, timestamp, input.bridgeRole],
+          [input.bridgeUserId, resolvedName, firstName, lastName, input.bridgeEmail, timestamp, input.bridgeRole],
         );
         await client.query('commit');
         return mapUser(inserted.rows[0]);
@@ -391,17 +397,19 @@ const ensureConsultantDashboardBridgeUser = async (input: {
           update users
           set
             name = coalesce($2, name),
-            email_normalized = coalesce($3, email_normalized),
-            role = $4,
+            first_name = coalesce($3, first_name),
+            last_name = coalesce($4, last_name),
+            email_normalized = coalesce($5, email_normalized),
+            role = $6,
             status = 'active',
-            email_verified_at = coalesce(email_verified_at, $5),
-            updated_at = $5,
-            last_login_at = $5,
+            email_verified_at = coalesce(email_verified_at, $7),
+            updated_at = $7,
+            last_login_at = $7,
             version = version + 1
           where id = $1
           returning *
         `,
-        [String(existing.rows[0].id), resolvedName, input.bridgeEmail, input.bridgeRole, timestamp],
+        [String(existing.rows[0].id), resolvedName, firstName, lastName, input.bridgeEmail, input.bridgeRole, timestamp],
       );
       await client.query('commit');
       return mapUser(updated.rows[0]);
@@ -791,6 +799,8 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
   const bridgeRole = readStringClaim(bridgePayload, ['role', 'user_role'])?.toLowerCase() ?? null;
   const bridgeEmail = typeof bridgePayload?.email === 'string' ? normalizeEmail(bridgePayload.email) : null;
   const bridgeName = readStringClaim(bridgePayload, ['name', 'full_name', 'display_name']);
+  const bridgeFirstName = readStringClaim(bridgePayload, ['first_name', 'firstName', 'given_name']);
+  const bridgeLastName = readStringClaim(bridgePayload, ['last_name', 'lastName', 'family_name']);
   const bridgeStatus = readStringClaim(bridgePayload, ['status', 'account_status'])?.toUpperCase() ?? null;
   const bridgeType = readStringClaim(bridgePayload, ['type', 'token_type', 'tokenType', 'typ'])?.toLowerCase() ?? null;
   const credentialStatus =
@@ -823,7 +833,9 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     bridgeUserId,
     bridgeEmail,
     bridgeRole,
-    bridgeName
+    bridgeName,
+    bridgeFirstName,
+    bridgeLastName,
   });
 
   console.info('CONSULTANT_SESSION_DEBUG', {
