@@ -12,6 +12,13 @@ import {
   processRazorpayWebhook,
   verifyRazorpayPayment
 } from './subscriptions.service.js';
+import {
+  getFoundationPlanDetails,
+  getFoundationPlanList,
+  getMyEntitlementFoundation,
+  getMySubscriptionFoundation,
+  getMySubscriptionHistoryFoundation
+} from './subscription-foundation.service.js';
 
 export const subscriptionsRouter = Router();
 export const paymentsRouter = Router();
@@ -45,8 +52,12 @@ const handleDomainError = (res: express.Response, error: unknown) => {
 };
 
 subscriptionsRouter.get('/plans', async (_req, res) => {
-  const plans = await getSubscriptionPlans();
-  return res.status(200).json(plans);
+  return res.status(200).json(await getFoundationPlanList());
+});
+
+subscriptionsRouter.get('/plans/:planId', async (req, res) => {
+  const plan = await getFoundationPlanDetails(req.params.planId);
+  return plan ? res.status(200).json({ plan }) : res.status(404).json({ error: 'PLAN_NOT_FOUND', message: 'Subscription plan is not available.' });
 });
 
 subscriptionsRouter.use(requireAuthenticatedAccount);
@@ -55,6 +66,10 @@ subscriptionsRouter.get('/current', async (req, res) => {
   const current = await getCurrentSubscription(getAuthenticatedAccount(req));
   return res.status(200).json(current);
 });
+
+subscriptionsRouter.get('/me', async (req, res) => res.status(200).json(await getMySubscriptionFoundation(getAuthenticatedAccount(req))));
+subscriptionsRouter.get('/me/entitlements', async (req, res) => res.status(200).json(await getMyEntitlementFoundation(getAuthenticatedAccount(req))));
+subscriptionsRouter.get('/me/history', async (req, res) => res.status(200).json(await getMySubscriptionHistoryFoundation(getAuthenticatedAccount(req))));
 
 subscriptionsRouter.post('/checkout', async (req, res) => {
   const parsed = checkoutSchema.safeParse(req.body);

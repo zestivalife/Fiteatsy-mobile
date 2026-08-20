@@ -1,6 +1,17 @@
 import { apiFetch, postJson } from './apiClient';
 
 export type EntitlementCode =
+  | 'health_tracking'
+  | 'wearable_sync'
+  | 'medication_tracker'
+  | 'medication_reminders'
+  | 'stress_test'
+  | 'stress_recovery'
+  | 'health_reports'
+  | 'progress_tracking'
+  | 'diet_plan'
+  | 'consultant_access'
+  | 'consultations_per_month'
   | 'AI_ASSIST'
   | 'EXPERT_ASSISTANCE'
   | 'EXPERT_CONSULTATION'
@@ -29,8 +40,34 @@ export type SubscriptionPlan = {
   currency: string;
   badge: string | null;
   isActive: boolean;
+  developmentOnly?: boolean;
+  recommended?: boolean;
+  displayOrder?: number;
+  dailyCostMinor?: number;
+  version?: {
+    id: string;
+    number: number;
+    effectiveFromISO: string;
+    effectiveToISO: string | null;
+    termsText: string;
+  };
   entitlements: EntitlementCode[];
+  entitlementValues?: Array<{ code: string; valueType: string; booleanValue?: boolean | null; limitValue?: number | null; enumValue?: string | null }>;
   benefits: string[];
+};
+
+export type FoundationSubscription = {
+  status: 'NONE' | 'PENDING' | 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'CANCELLED' | 'PAYMENT_PENDING' | 'PROCESSING' | 'PAYMENT_FAILED' | string;
+  subscription: (CurrentSubscription['subscription'] & {
+    planId: string;
+    planVersionId: string | null;
+    durationDays: number;
+    amountMinor: number;
+    currency: string;
+    autoRenew: boolean;
+  }) | null;
+  entitlements: Record<string, { valueType: string; value: boolean | number | string | null }>;
+  entitlementsKnown: boolean;
 };
 
 export type CurrentSubscription = {
@@ -84,12 +121,12 @@ export type PaymentHistoryItem = {
   planName: string | null;
 };
 
-export const formatPlanPrice = (plan: Pick<SubscriptionPlan, 'priceMinor' | 'currency'>) =>
+export const formatPlanPrice = (plan: { priceMinor?: number; amountMinor?: number; currency: string }) =>
   new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: plan.currency,
     maximumFractionDigits: 0
-  }).format(plan.priceMinor / 100);
+  }).format((plan.priceMinor ?? plan.amountMinor ?? 0) / 100);
 
 export const formatPlanDuration = (durationDays: number) => {
   if (durationDays >= 360) return '12 months';
@@ -101,6 +138,15 @@ export const formatPlanDuration = (durationDays: number) => {
 
 export const getSubscriptionPlans = () =>
   apiFetch<{ plans: SubscriptionPlan[] }>('/v1/subscriptions/plans');
+
+export const getSubscriptionPlan = (planId: string) =>
+  apiFetch<{ plan: SubscriptionPlan }>(`/v1/subscriptions/plans/${encodeURIComponent(planId)}`);
+
+export const getMySubscription = () => apiFetch<FoundationSubscription>('/v1/subscriptions/me');
+
+export const getMyEntitlements = () => apiFetch<Pick<FoundationSubscription, 'entitlements' | 'entitlementsKnown'> & { status: 'KNOWN' | 'UNKNOWN' }>('/v1/subscriptions/me/entitlements');
+
+export const getMySubscriptionHistory = () => apiFetch<{ history: FoundationSubscription['subscription'][] }>('/v1/subscriptions/me/history');
 
 export const getCurrentSubscription = () =>
   apiFetch<CurrentSubscription>('/v1/subscriptions/current');

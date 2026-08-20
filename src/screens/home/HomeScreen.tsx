@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -21,11 +21,11 @@ import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-inactive.svg';
 import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-selected.svg';
 import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-inactive.svg';
 import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
-import { useEntitlementGate } from '../../hooks/useEntitlementGate';
 import { RootStackParamList } from '../../navigation/types';
 import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/recoveryIntelligenceEngine';
 import { listAnalyzedReports, type ReportDto } from '../../services/reportUploadService';
 import { useAppContext } from '../../state/AppContext';
+import { getMySubscription } from '../../services/subscriptionService';
 import type { DailyCheckIn, Medication, MedicationLogStatus } from '../../types';
 import { getIdentityScopedStorageKey } from '../../utils/identityScopedStorage';
 
@@ -179,7 +179,6 @@ const buildDomainTrend = (scores: Array<number | null>, checkIns: DailyCheckIn[]
 
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { requireEntitlement } = useEntitlementGate(navigation);
   const {
     onboarding,
     wellness,
@@ -190,6 +189,34 @@ export const HomeScreen = () => {
     getMedicationTimelineForDate
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
+  const openAssist = useCallback(async () => {
+    try {
+      const subscription = await getMySubscription();
+      const hasAssist = subscription.entitlements.AI_ASSIST?.value === true;
+      if (['PENDING', 'PAYMENT_PENDING', 'PROCESSING'].includes(subscription.status)) {
+        navigation.navigate('SubscriptionPaymentPlaceholder', {
+          status: subscription.status as 'PENDING' | 'PAYMENT_PENDING' | 'PROCESSING',
+          returnDestination: 'AssistHub'
+        });
+        return;
+      }
+      if (subscription.status === 'PAYMENT_FAILED') {
+        navigation.navigate('SubscriptionPaymentPlaceholder', { status: 'PAYMENT_FAILED', returnDestination: 'AssistHub' });
+        return;
+      }
+      if (hasAssist && ['ACTIVE', 'EXPIRING_SOON', 'CANCELLED'].includes(subscription.status)) {
+        navigation.navigate('AssistHub');
+        return;
+      }
+      navigation.navigate('SubscriptionPlans', {
+        source: 'assist',
+        requiredEntitlement: 'AI_ASSIST',
+        returnDestination: 'AssistHub'
+      });
+    } catch {
+      Alert.alert('Subscription unavailable', 'We could not check Assist access right now. Please try again.');
+    }
+  }, [navigation]);
   const [reportHistory, setReportHistory] = useState<HealthProfileReportSummary[]>([]);
 
   const reportHistoryStorageKey = useMemo(
@@ -334,14 +361,7 @@ export const HomeScreen = () => {
               <ActionPill
                 label="Assist"
                 Icon={AssistIcon}
-                onPress={() => {
-                  void requireEntitlement({
-                    source: 'assist',
-                    entitlement: 'AI_ASSIST',
-                    returnDestination: 'ConsultantBooking',
-                    onAllowed: () => navigation.navigate('ConsultantBooking')
-                  });
-                }}
+                onPress={() => { void openAssist(); }}
               />
               <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable', { autoSync: true })} />
             </View>

@@ -20,6 +20,7 @@ export type RootStackParamList = {
   HydrationSession: undefined;
   Leadership: undefined;
   ConsultantBooking: undefined;
+  AssistHub: undefined;
   SubscriptionPlans: {
     source?: 'assist' | 'talk_to_expert' | 'get_assistance' | 'book_consultation' | 'subscription_management';
     requiredEntitlement?: string | null;
@@ -29,7 +30,10 @@ export type RootStackParamList = {
   SubscriptionCompare: undefined;
   MySubscription: undefined;
   SubscriptionCheckout: { planId: string };
-  SubscriptionPaymentPlaceholder: undefined;
+  SubscriptionPaymentPlaceholder: {
+    status?: 'PENDING' | 'PAYMENT_PENDING' | 'PROCESSING' | 'PAYMENT_FAILED';
+    returnDestination?: keyof RootStackParamList;
+  } | undefined;
   PaymentSuccess: {
     returnDestination?: keyof RootStackParamList;
   } | undefined;

@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, NativeModules, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import RazorpayCheckout from 'react-native-razorpay';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Screen } from '../../components/Screen';
 import { ApiClientError } from '../../services/apiClient';
@@ -41,6 +40,47 @@ type RazorpaySuccess = {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
+};
+
+type RazorpayCheckoutModule = {
+  open(options: {
+    key: string;
+    amount: number;
+    currency: string;
+    name: string;
+    description: string;
+    order_id: string;
+    prefill: Record<string, unknown>;
+    notes: Record<string, unknown>;
+    theme: {
+      color: string;
+    };
+  }): Promise<unknown>;
+};
+
+const RAZORPAY_RUNTIME_UNAVAILABLE_MESSAGE = 'Payment checkout is unavailable in this development build.';
+
+const getRazorpayCheckout = (): RazorpayCheckoutModule | null => {
+  const hasNativeRazorpay =
+    Boolean(NativeModules.RNRazorpayCheckout) &&
+    Boolean(NativeModules.RazorpayEventEmitter);
+
+  if (!hasNativeRazorpay) {
+    return null;
+  }
+
+  try {
+    const razorpayModule = require('react-native-razorpay') as {
+      default?: RazorpayCheckoutModule;
+      open?: RazorpayCheckoutModule['open'];
+    };
+    const checkoutModule = razorpayModule.default ?? (
+      typeof razorpayModule.open === 'function' ? razorpayModule as RazorpayCheckoutModule : null
+    );
+    return checkoutModule && typeof checkoutModule.open === 'function' ? checkoutModule : null;
+  } catch {
+    return null;
+  }
 };
 
 const supportChoices: Choice<SupportPreference>[] = [
@@ -130,6 +170,11 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
     setCheckoutPlanId(plan.id);
     setErrorMessage(null);
     try {
+      const RazorpayCheckout = getRazorpayCheckout();
+      if (!RazorpayCheckout) {
+        throw new Error(RAZORPAY_RUNTIME_UNAVAILABLE_MESSAGE);
+      }
+
       const checkoutResponse = await createSubscriptionCheckout({
         planId: plan.id,
         source,

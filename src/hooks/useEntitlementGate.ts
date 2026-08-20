@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { useCallback, useState } from 'react';
 import { RootStackParamList } from '../navigation/types';
 import {
@@ -38,7 +39,8 @@ export const useEntitlementGate = (navigation: Navigation) => {
           return true;
         }
       } catch {
-        // Network or auth failures should not open premium surfaces without server confirmation.
+        Alert.alert('Subscription unavailable', 'We could not confirm your subscription right now. Please try again.');
+        return false;
       } finally {
         setCheckingEntitlement(false);
       }
