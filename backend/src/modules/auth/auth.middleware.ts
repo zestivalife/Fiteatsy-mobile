@@ -25,10 +25,12 @@ export const requireAuthenticatedAccount = async (req: Request, res: Response, n
     }
 
     const consultantWorkspaceRouteAllowed = /^\/v1\/clients\/[^/]+\/workspace(?:$|[?#/])/.test(req.originalUrl);
-    if (account.authProvider === 'consultant_dashboard' && !req.originalUrl.startsWith('/v1/consultants') && !consultantWorkspaceRouteAllowed) {
+    const seniorAllocationRouteAllowed = req.originalUrl.startsWith('/v1/professional-assignments')
+      && ['senior_consultant', 'admin', 'super_admin', 'platform_owner'].includes(String(account.user.role ?? '').toLowerCase());
+    if (account.authProvider === 'consultant_dashboard' && !req.originalUrl.startsWith('/v1/consultants') && !consultantWorkspaceRouteAllowed && !seniorAllocationRouteAllowed) {
       return res.status(403).json({
         error: 'EXTERNAL_SESSION_SCOPE_NOT_ALLOWED',
-        message: 'Consultant dashboard sessions are only valid for consultant APIs.'
+        message: 'This dashboard session is not authorised for the requested API.'
       });
     }
 
