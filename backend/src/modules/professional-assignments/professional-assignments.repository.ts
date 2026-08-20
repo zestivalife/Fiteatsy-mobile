@@ -18,6 +18,24 @@ const resolveProfessionalName = (row: { id?: unknown; name?: unknown; first_name
   return email || `Consultant ${String(row.id ?? '').slice(0, 8)}`;
 };
 
+const mapProfessional = (row: { id?: unknown; name?: unknown; first_name?: unknown; last_name?: unknown; email_normalized?: unknown; role?: unknown; status?: unknown }) => {
+  const firstName = String(row.first_name ?? '').trim() || null;
+  const lastName = String(row.last_name ?? '').trim() || null;
+  const displayName = resolveProfessionalName(row);
+  return {
+    professionalId: String(row.id),
+    userId: String(row.id),
+    firstName,
+    lastName,
+    displayName,
+    name: displayName,
+    email: row.email_normalized == null ? null : String(row.email_normalized),
+    role: String(row.role),
+    status: String(row.status ?? 'active').toUpperCase(),
+    productAccess: ['FITEATSY'],
+  };
+};
+
 const audit = async (input: { assignmentId: string; action: string; actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string }) => {
   await pool.query(
     `insert into professional_assignment_audit_events
@@ -109,14 +127,14 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
 
 export const discoverProfessionalsForAssignment = async (professionalType?: ProfessionalType) => {
   const result = await pool.query(
-    `select id, name, first_name, last_name, email_normalized, role from users
+    `select id, name, first_name, last_name, email_normalized, role, status from users
       where deleted_at is null and lower(coalesce(status, '')) = 'active'
         and lower(coalesce(role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
         and ($1::text is null or upper(case when lower(role) in ('provider', 'dietician', 'senior_consultant') then 'CONSULTANT' else role end) = $1)
       order by name asc`,
     [professionalType ?? null]
   );
-  return result.rows.map((row) => ({ userId: String(row.id), name: resolveProfessionalName(row), displayName: resolveProfessionalName(row), email: row.email_normalized == null ? null : String(row.email_normalized), role: String(row.role) }));
+  return result.rows.map(mapProfessional);
 };
 
 export const createProfessionalAssignment = async (input: { actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string }) => {
