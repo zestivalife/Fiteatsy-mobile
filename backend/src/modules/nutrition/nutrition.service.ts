@@ -32,6 +32,7 @@ import {
   updateDietPlanLifecycle,
   updateDietPlanVersionContent,
   updateDietPlanVersionExportPaths,
+  listDietPlanReviewQueue,
 } from './nutrition.store.js';
 import { generateDietPlanDocument } from './nutrition.document.js';
 import { buildRecommendationSets, calculateMealNutritionTotals, classifyMealMatch, deriveMealTargets } from './meal-engine.js';
@@ -59,8 +60,8 @@ const CONSULTANT_DIET_WORKFLOW_ROLES = ['consultant', 'provider', 'dietician', '
 const isConsultantRole = (account: AuthenticatedAccount) =>
   CONSULTANT_DIET_WORKFLOW_ROLES.includes(account.user.role?.toLowerCase() ?? '');
 
-const canApproveOrPublishDietPlan = (account: AuthenticatedAccount) =>
-  CONSULTANT_DIET_WORKFLOW_ROLES.includes(account.user.role?.toLowerCase() ?? '');
+export const canApproveOrPublishDietPlan = (account: AuthenticatedAccount) =>
+  ['senior_consultant', 'admin', 'superuser', 'platform_owner'].includes(account.user.role?.toLowerCase() ?? '');
 
 const unique = (values: Array<string | null | undefined>) =>
   Array.from(new Set(values.map((value) => (value ?? '').trim()).filter(Boolean)));
@@ -1311,14 +1312,15 @@ const contentSummaryFromContent = (content: NutritionPlanContent): DietPlanVersi
   ]),
 });
 
-const assertLifecycleTransition = (
+export const assertLifecycleTransition = (
   currentLifecycle: DietPlanVersionRecord['lifecycleStatus'] | null,
   nextLifecycle: DietPlanVersionRecord['lifecycleStatus'],
 ) => {
   const current = currentLifecycle ?? 'draft';
   const allowedTransitions: Record<DietPlanVersionRecord['lifecycleStatus'], DietPlanVersionRecord['lifecycleStatus'][]> = {
-    draft: ['review_ready'],
-    review_ready: ['review_ready', 'approved'],
+    draft: ['draft', 'submitted_for_review'],
+    submitted_for_review: ['submitted_for_review', 'changes_requested', 'approved'],
+    changes_requested: ['draft', 'submitted_for_review'],
     approved: ['published'],
     published: ['archived'],
     archived: [],
@@ -1607,10 +1609,10 @@ export const updateConsultantDietPlanDraft = async (
   if (!plan || plan.careCaseId !== workspace.careCase?.id) return null;
   const currentVersion = plan.currentVersionId ? await getCurrentDietPlanVersion(plan.id) : null;
   if (!currentVersion) return null;
-  if (['approved', 'published', 'archived'].includes(currentVersion.lifecycleStatus)) {
+  if (!['draft', 'changes_requested'].includes(currentVersion.lifecycleStatus)) {
     throw new NutritionPlanWorkflowError(
       'DIET_PLAN_NOT_EDITABLE',
-      'Only draft plans can be edited. Regenerate a new draft to make changes.',
+      'Only draft plans or plans returned for changes can be edited.',
     );
   }
   const sourceSnapshot = buildSourceSnapshot({
@@ -1640,22 +1642,79 @@ export const updateConsultantDietPlanDraft = async (
     content: normalizedContent,
     contentSummary: contentSummaryFromContent(normalizedContent),
     sourceSnapshot,
-    lifecycleStatus: 'review_ready',
+    lifecycleStatus: 'draft',
     reviewNotes: input.reviewNotes ?? null,
   });
   if (!version) return null;
-  assertLifecycleTransition(currentVersion.lifecycleStatus, 'review_ready');
+  assertLifecycleTransition(currentVersion.lifecycleStatus, 'draft');
   const lifecycle = await updateDietPlanLifecycle({
     dietPlanId: plan.id,
     consultantId: account.accountId,
     currentVersionId: version.id,
-    lifecycle: 'review_ready',
+    lifecycle: 'draft',
     sourceSnapshot,
   });
   return {
     plan: lifecycle?.plan ?? plan,
     version,
   };
+};
+
+export const submitConsultantDietPlanForReview = async (
+  publicClientId: string,
+  account: AuthenticatedAccount,
+  dietPlanId: string,
+) => {
+  if (!isConsultantRole(account) || account.user.role?.toLowerCase() === 'senior_consultant') return null;
+  const workspace = await getWorkspaceContext(publicClientId);
+  if (!workspace?.careCase) return null;
+  const plan = await getDietPlanById(dietPlanId);
+  if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
+  const version = await getCurrentDietPlanVersion(plan.id);
+  if (!version) return null;
+  assertLifecycleTransition(version.lifecycleStatus, 'submitted_for_review');
+  return updateDietPlanLifecycle({
+    dietPlanId: plan.id,
+    consultantId: account.accountId,
+    currentVersionId: version.id,
+    lifecycle: 'submitted_for_review',
+    reviewEventType: version.lifecycleStatus === 'changes_requested' ? 'resubmitted' : 'submitted_for_review',
+    sourceSnapshot: version.sourceSnapshot,
+  });
+};
+
+export const requestConsultantDietPlanChanges = async (
+  publicClientId: string,
+  account: AuthenticatedAccount,
+  dietPlanId: string,
+  comment: string,
+) => {
+  if (!canApproveOrPublishDietPlan(account)) {
+    throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can request changes.', 403);
+  }
+  const workspace = await getWorkspaceContext(publicClientId);
+  if (!workspace?.careCase) return null;
+  const plan = await getDietPlanById(dietPlanId);
+  if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
+  const version = await getCurrentDietPlanVersion(plan.id);
+  if (!version) return null;
+  assertLifecycleTransition(version.lifecycleStatus, 'changes_requested');
+  return updateDietPlanLifecycle({
+    dietPlanId: plan.id,
+    consultantId: account.accountId,
+    currentVersionId: version.id,
+    lifecycle: 'changes_requested',
+    reviewComment: comment,
+    reviewEventType: 'changes_requested',
+    sourceSnapshot: version.sourceSnapshot,
+  });
+};
+
+export const getSeniorConsultantDietPlanReviewQueue = async (account: AuthenticatedAccount) => {
+  if (!canApproveOrPublishDietPlan(account)) {
+    throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can access the review queue.', 403);
+  }
+  return listDietPlanReviewQueue();
 };
 
 export const approveConsultantDietPlan = async (
@@ -1667,7 +1726,7 @@ export const approveConsultantDietPlan = async (
   if (!canApproveOrPublishDietPlan(account)) {
     throw new NutritionPlanWorkflowError(
       'ROLE_NOT_ALLOWED',
-      'Only consultant or admin accounts can approve nutrition plans.',
+      'Only Senior Consultants can approve nutrition plans.',
       403,
     );
   }
@@ -1675,6 +1734,9 @@ export const approveConsultantDietPlan = async (
   if (!workspace) return null;
   const plan = await getDietPlanById(dietPlanId);
   if (!plan || plan.careCaseId !== workspace.careCase?.id || !plan.currentVersionId) return null;
+  if (plan.consultantId === account.accountId) {
+    throw new NutritionPlanWorkflowError('SELF_APPROVAL_NOT_ALLOWED', 'A Consultant cannot approve their own diet plan.', 403);
+  }
   const currentVersion = await getCurrentDietPlanVersion(plan.id);
   if (!currentVersion) return null;
   assertLifecycleTransition(currentVersion.lifecycleStatus, 'approved');
@@ -1703,6 +1765,7 @@ export const approveConsultantDietPlan = async (
     currentVersionId: plan.currentVersionId,
     lifecycle: 'approved',
     approvedBy: account.accountId,
+    reviewEventType: 'approved',
     sourceSnapshot,
   });
 };
@@ -1716,7 +1779,7 @@ export const publishConsultantDietPlan = async (
   if (!canApproveOrPublishDietPlan(account)) {
     throw new NutritionPlanWorkflowError(
       'ROLE_NOT_ALLOWED',
-      'Only consultant or admin accounts can publish nutrition plans.',
+      'Only Senior Consultants can publish nutrition plans.',
       403,
     );
   }
@@ -1752,6 +1815,7 @@ export const publishConsultantDietPlan = async (
     currentVersionId: plan.currentVersionId,
     lifecycle: 'published',
     approvedBy: account.accountId,
+    reviewEventType: 'published',
     sourceSnapshot,
   });
   await transitionCareCaseStageBestEffort(

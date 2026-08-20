@@ -7,11 +7,14 @@ import { canAccessConsultantClientApi } from '../consultants/consultants.service
 import {
   approveConsultantDietPlan,
   generateConsultantDietPlanDraft,
+  getSeniorConsultantDietPlanReviewQueue,
   getConsultantLatestDietPlan,
   getConsultantNutritionIntelligence,
   getPublishedDietPlanForClient,
   NutritionPlanWorkflowError,
   publishConsultantDietPlan,
+  requestConsultantDietPlanChanges,
+  submitConsultantDietPlanForReview,
   updateConsultantDietPlanDraft,
   exportConsultantDietPlanDocument,
   logNutritionMealConsumption,
@@ -151,6 +154,10 @@ const updateDraftSchema = z.object({
   reviewNotes: z.string().trim().nullable().optional(),
 });
 
+const reviewCommentSchema = z.object({
+  comment: z.string().trim().min(1).max(2000),
+});
+
 const markMealConsumedSchema = z.object({
   planId: z.string().trim().min(1),
   versionId: z.string().trim().min(1),
@@ -273,6 +280,14 @@ consultantNutritionRouter.get('/clients/:clientId/diet-plans/latest', async (req
   return res.status(200).json(payload);
 });
 
+consultantNutritionRouter.get('/diet-plan-reviews', async (req, res) => {
+  try {
+    return res.status(200).json({ reviews: await getSeniorConsultantDietPlanReviewQueue(getAuthenticatedAccount(req)) });
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
+});
+
 consultantNutritionRouter.post('/clients/:clientId/diet-plans/draft', async (req, res) => {
   const parsed = generateDraftSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
@@ -312,6 +327,30 @@ consultantNutritionRouter.patch('/clients/:clientId/diet-plans/:dietPlanId', asy
       message: 'Unable to update the requested nutrition draft.',
     });
   }
+  return res.status(200).json(payload);
+});
+
+consultantNutritionRouter.post('/clients/:clientId/diet-plans/:dietPlanId/submit-review', async (req, res) => {
+  let payload;
+  try {
+    payload = await submitConsultantDietPlanForReview(req.params.clientId, getAuthenticatedAccount(req), req.params.dietPlanId);
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
+  if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Unable to submit the requested diet plan.' });
+  return res.status(200).json(payload);
+});
+
+consultantNutritionRouter.post('/clients/:clientId/diet-plans/:dietPlanId/request-changes', async (req, res) => {
+  const parsed = reviewCommentSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: 'REVIEW_COMMENT_REQUIRED', details: parsed.error.flatten() });
+  let payload;
+  try {
+    payload = await requestConsultantDietPlanChanges(req.params.clientId, getAuthenticatedAccount(req), req.params.dietPlanId, parsed.data.comment);
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
+  if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Unable to request changes for the requested diet plan.' });
   return res.status(200).json(payload);
 });
 

@@ -49,6 +49,10 @@ const mapDietPlan = (row: Record<string, unknown>): DietPlanRecord => ({
   approvedAtISO: toIso(row.approved_at),
   publishedAtISO: toIso(row.published_at),
   archivedAtISO: toIso(row.archived_at),
+  submittedAtISO: toIso(row.submitted_at),
+  reviewedBy: row.reviewed_by == null ? null : String(row.reviewed_by),
+  reviewedAtISO: toIso(row.reviewed_at),
+  reviewComment: row.review_comment == null ? null : String(row.review_comment),
   sourceSnapshot: toRecord<NutritionPlanSourceSnapshot>(row.source_snapshot, {
     bmi: null,
     weightKg: null,
@@ -174,6 +178,39 @@ export const getDietPlanById = async (dietPlanId: string) => {
   );
   if (result.rowCount === 0) return null;
   return mapDietPlan(result.rows[0]);
+};
+
+export const listDietPlanReviewQueue = async () => {
+  const result = await pool.query(
+    `select dp.id, dp.user_id, dp.consultant_id, dp.plan_status, dp.updated_at, dp.submitted_at,
+            dp.review_comment, client.name as client_name, consultant.name as consultant_name,
+            dpv.id as version_id, dpv.version_number, dpv.content_summary, dpv.lifecycle_status
+       from diet_plans dp
+       join diet_plan_versions dpv on dpv.id = dp.current_version_id
+       join users client on client.id = dp.user_id
+       left join users consultant on consultant.id = dp.consultant_id
+      where dp.deleted_at is null
+        and dpv.deleted_at is null
+        and dp.plan_status in ('submitted_for_review', 'changes_requested')
+      order by dp.submitted_at desc nulls last, dp.updated_at desc`,
+  );
+  return result.rows.map((row) => ({
+    dietPlanId: String(row.id),
+    clientUserId: String(row.user_id),
+    clientName: String(row.client_name),
+    consultantUserId: row.consultant_id == null ? null : String(row.consultant_id),
+    consultantName: row.consultant_name == null ? null : String(row.consultant_name),
+    planStatus: String(row.plan_status),
+    submittedAtISO: toIso(row.submitted_at),
+    updatedAtISO: toIso(row.updated_at),
+    reviewComment: row.review_comment == null ? null : String(row.review_comment),
+    version: {
+      id: String(row.version_id),
+      versionNumber: Number(row.version_number),
+      lifecycleStatus: String(row.lifecycle_status),
+      contentSummary: toRecord(row.content_summary, {}),
+    },
+  }));
 };
 
 export const getDietPlanVersionById = async (versionId: string) => {
@@ -317,6 +354,10 @@ export const createOrUpdateDietPlanDraft = async (input: {
         template_version = $5,
         approved_by = null,
         approved_at = null,
+        submitted_at = null,
+        reviewed_by = null,
+        reviewed_at = null,
+        review_comment = null,
         source_snapshot = $6::jsonb,
         updated_at = $7,
         version = version + 1
@@ -387,6 +428,8 @@ export const updateDietPlanLifecycle = async (input: {
   lifecycle: NutritionPlanLifecycle;
   currentVersionId: string;
   approvedBy?: string | null;
+  reviewComment?: string | null;
+  reviewEventType?: 'submitted_for_review' | 'changes_requested' | 'resubmitted' | 'approved' | 'published';
   sourceSnapshot: NutritionPlanSourceSnapshot;
 }) => {
   const timestamp = nowIso();
@@ -402,6 +445,10 @@ export const updateDietPlanLifecycle = async (input: {
         approved_at = case when $4 in ('approved', 'published') then coalesce(approved_at, $6) else approved_at end,
         published_at = case when $4 = 'published' then $6 else published_at end,
         archived_at = case when $4 = 'archived' then $6 else archived_at end,
+        submitted_at = case when $4 in ('submitted_for_review', 'changes_requested') and submitted_at is null then $6 else submitted_at end,
+        reviewed_by = case when $4 in ('changes_requested', 'approved', 'published') then $2 else reviewed_by end,
+        reviewed_at = case when $4 in ('changes_requested', 'approved', 'published') then $6 else reviewed_at end,
+        review_comment = case when $4 = 'changes_requested' then $8 else review_comment end,
         source_snapshot = $7::jsonb,
         updated_at = $6,
         version = version + 1
@@ -417,6 +464,7 @@ export const updateDietPlanLifecycle = async (input: {
       input.approvedBy ?? null,
       timestamp,
       JSON.stringify(input.sourceSnapshot),
+      input.reviewComment ?? null,
     ],
   );
   if (updatedPlan.rowCount === 0) return null;
@@ -435,6 +483,14 @@ export const updateDietPlanLifecycle = async (input: {
     `,
     [input.currentVersionId, input.dietPlanId, input.lifecycle, timestamp],
   );
+
+  if (input.reviewEventType) {
+    await pool.query(
+      `insert into diet_plan_review_events (id, diet_plan_id, diet_plan_version_id, actor_user_id, event_type, comment)
+       values ($1, $2, $3, $4, $5, $6)`,
+      [crypto.randomUUID(), input.dietPlanId, input.currentVersionId, input.consultantId, input.reviewEventType, input.reviewComment ?? null],
+    );
+  }
 
   return {
     plan: mapDietPlan(updatedPlan.rows[0]),

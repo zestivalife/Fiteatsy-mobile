@@ -216,7 +216,8 @@ export type NotificationRecord = AuditFields & {
 
 export type NutritionPlanLifecycle =
   | 'draft'
-  | 'review_ready'
+  | 'submitted_for_review'
+  | 'changes_requested'
   | 'approved'
   | 'published'
   | 'archived';
@@ -454,6 +455,10 @@ export type DietPlanRecord = AuditFields & {
   approvedAtISO: string | null;
   publishedAtISO: string | null;
   archivedAtISO: string | null;
+  submittedAtISO: string | null;
+  reviewedBy: string | null;
+  reviewedAtISO: string | null;
+  reviewComment: string | null;
   sourceSnapshot: NutritionPlanSourceSnapshot;
 };
 
