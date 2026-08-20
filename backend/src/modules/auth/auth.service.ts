@@ -12,6 +12,7 @@ import {
   setUserPinHash
 } from './auth.repository.js';
 import { createOrResolveClientForAccount } from '../client/client.repository.js';
+import { createOrUpdateHealthProfile } from '../platform/platform.store.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { OtpDeliveryError } from '../notifications/notification.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
@@ -52,6 +53,10 @@ const DEFAULT_PIN = '123456';
 const PIN_LENGTH = 6;
 const PIN_LOCK_MS = 15 * 60 * 1000;
 const PIN_BCRYPT_ROUNDS = 12;
+
+const ensureClientHealthProfile = async (userId: string, clientId: string) => {
+  await createOrUpdateHealthProfile({ accountId: userId, clientId }, {});
+};
 
 
 export const buildOtpHashForTests = (challengeId: string, otp: string) =>
@@ -291,6 +296,7 @@ export const verifyOtpChallenge = async (
     });
     const { token } = await createAuthSession(user.id, metadata);
     const client = await createOrResolveClientForAccount(user.id);
+    await ensureClientHealthProfile(user.id, client.id);
 
     return {
       sessionToken: token,
@@ -363,6 +369,7 @@ export const loginWithPin = async (
   });
   const { token } = await createAuthSession(pinUser.id, metadata);
   const client = await createOrResolveClientForAccount(pinUser.id);
+  await ensureClientHealthProfile(pinUser.id, client.id);
 
   return {
     sessionToken: token,
