@@ -492,12 +492,31 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
   return result.rowCount;
 };
 
-export const listRegisteredConsultantClients = async (): Promise<ConsultantClientListRecord[]> => {
+export const listRegisteredConsultantClients = async (consultantAccountId?: string): Promise<ConsultantClientListRecord[]> => {
+  const assignmentClause = consultantAccountId
+    ? `
+        and (
+          hp.assigned_consultant_id = $6
+          or exists (
+            select 1
+            from care_cases assigned_case
+            where assigned_case.client_id = c.id
+              and assigned_case.user_id = u.id
+              and assigned_case.deleted_at is null
+              and lower(coalesce(assigned_case.status, '')) = 'active'
+              and assigned_case.assigned_consultant_id = $6
+          )
+        )
+      `
+    : '';
   const result = await pool.query(
     `${listClientSelect}
+      ${assignmentClause}
       order by u.created_at desc
     `,
-    [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES]
+    consultantAccountId
+      ? [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, consultantAccountId]
+      : [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES]
   );
 
   return result.rows.map((row) => mapListRecord(row));
@@ -557,15 +576,35 @@ export const getRegisteredConsultantClientProfile = async (
 };
 
 export const getRegisteredConsultantClientProfileContext = async (
-  publicClientId: string
+  publicClientId: string,
+  consultantAccountId?: string
 ): Promise<ConsultantClientProfileContext | null> => {
+  const assignmentClause = consultantAccountId
+    ? `
+        and (
+          hp.assigned_consultant_id = $7
+          or exists (
+            select 1
+            from care_cases assigned_case
+            where assigned_case.client_id = c.id
+              and assigned_case.user_id = u.id
+              and assigned_case.deleted_at is null
+              and lower(coalesce(assigned_case.status, '')) = 'active'
+              and assigned_case.assigned_consultant_id = $7
+          )
+        )
+      `
+    : '';
   const result = await pool.query(
     `${listClientSelect}
       and c.fiteatsy_client_id = $6
+      ${assignmentClause}
       order by hp.updated_at desc nulls last
       limit 1
     `,
-    [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId]
+    consultantAccountId
+      ? [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId, consultantAccountId]
+      : [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId]
   );
 
   const row = result.rows[0];

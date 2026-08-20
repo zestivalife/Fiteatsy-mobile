@@ -31,6 +31,19 @@ const createConsultantSession = async () => {
   return session;
 };
 
+const assignClientToConsultant = async (
+  client: Awaited<ReturnType<typeof createAuthenticatedSession>>,
+  consultant: Awaited<ReturnType<typeof createConsultantSession>>
+) => {
+  const response = await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    { assignedConsultantId: consultant.current.body.accountId },
+    { headers: authHeaders(client.token) }
+  );
+  assert.equal(response.response.status, 200, JSON.stringify(response.body));
+};
+
 const ageFromDob = (dobISO: string) => {
   const dob = new Date(dobISO);
   const now = new Date();
@@ -84,6 +97,7 @@ test('registered Fiteatsy users appear in consultant client discovery without du
     mobileNumber: '+919900001234'
   });
   const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
 
   const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(consultant.token)
@@ -106,6 +120,36 @@ test('registered Fiteatsy users appear in consultant client discovery without du
   assert.equal(typeof response.body.clients[0].lastActiveAt, 'string');
 });
 
+test('consultant client discovery is assignment-scoped and independent of subscription', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Unsubscribed Assigned Client',
+    email: `unsubscribed-assigned-${Date.now()}@example.com`
+  });
+  const assignedConsultant = await createConsultantSession();
+  const unrelatedConsultant = await createConsultantSession();
+
+  const beforeAssignment = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(assignedConsultant.token)
+  });
+  assert.equal(beforeAssignment.response.status, 200);
+  assert.deepEqual(beforeAssignment.body.clients, []);
+
+  await assignClientToConsultant(client, assignedConsultant);
+
+  const assigned = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(assignedConsultant.token)
+  });
+  assert.equal(assigned.response.status, 200);
+  assert.equal(assigned.body.clients.length, 1);
+  assert.equal(assigned.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+
+  const unrelated = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(unrelatedConsultant.token)
+  });
+  assert.equal(unrelated.response.status, 200);
+  assert.deepEqual(unrelated.body.clients, []);
+});
+
 test('consultant discovery backfills missing client records for registered users', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Legacy Client',
@@ -114,6 +158,12 @@ test('consultant discovery backfills missing client records for registered users
   await pool.query('delete from fiteatsy_clients where account_user_id = $1', [client.current.body.accountId]);
 
   const consultant = await createConsultantSession();
+  const initialResponse = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(initialResponse.response.status, 200);
+  assert.deepEqual(initialResponse.body.clients, []);
+  await assignClientToConsultant(client, consultant);
   const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(consultant.token)
   });
@@ -136,6 +186,7 @@ test('consultant discovery repairs inactive client mappings and preserves client
   );
 
   const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
   const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(consultant.token)
   });
@@ -163,6 +214,7 @@ test('consultant discovery accepts production status and role casing', async () 
   await pool.query('update fiteatsy_clients set status = $2 where account_user_id = $1', [client.current.body.accountId, 'ACTIVE']);
 
   const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
   const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(consultant.token)
   });
@@ -223,6 +275,7 @@ test('consultant client profile returns real onboarding fields only', async () =
     { headers: authHeaders(client.token) }
   );
   const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
 
   const list = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(consultant.token)

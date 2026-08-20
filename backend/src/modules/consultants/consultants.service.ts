@@ -56,7 +56,7 @@ export const canAccessConsultantClientApi = (account: AuthenticatedAccount) =>
 
 export const listConsultantClients = async (account: AuthenticatedAccount) => {
   const clientsBackfilled = await ensureRegisteredClientsForEligibleUsers();
-  const clients = await listRegisteredConsultantClients();
+  const clients = await listRegisteredConsultantClients(account.accountId);
   const diagnostics = await getConsultantClientSyncDiagnostics();
 
   console.info('CONSULTANT_CLIENT_SYNC', {
@@ -74,9 +74,9 @@ export const listConsultantClients = async (account: AuthenticatedAccount) => {
   return clients;
 };
 
-export const getConsultantClientProfile = async (publicClientId: string) => {
+export const getConsultantClientProfile = async (publicClientId: string, account: AuthenticatedAccount) => {
   await ensureRegisteredClientsForEligibleUsers();
-  const context = await getRegisteredConsultantClientProfileContext(publicClientId);
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId, account.accountId);
   if (!context) return null;
 
   const healthMetrics = calculateHealthMetrics(context.calculationInput);
@@ -727,7 +727,7 @@ export const getConsultantClientWorkspace = async (
   account: AuthenticatedAccount
 ) => {
   await ensureRegisteredClientsForEligibleUsers();
-  const context = await getRegisteredConsultantClientProfileContext(publicClientId);
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId, account.accountId);
   if (!context) return null;
 
   const owner = { accountId: context.accountId, clientId: context.internalClientId };

@@ -182,7 +182,7 @@ consultantsRouter.get('/clients/:clientId/medication-exceptions', async (req, re
 });
 
 consultantsRouter.get('/clients/:clientId', async (req, res) => {
-  const client = await getConsultantClientProfile(req.params.clientId);
+  const client = await getConsultantClientProfile(req.params.clientId, getAuthenticatedAccount(req));
   if (!client) {
     return res.status(404).json({
       error: 'CLIENT_NOT_FOUND',
