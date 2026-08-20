@@ -42,6 +42,7 @@ import { ConnectedMetricsScreen } from '../screens/sync/ConnectedMetricsScreen';
 import { HealthSyncDebugScreen } from '../screens/sync/HealthSyncDebugScreen';
 import { ReportsChatScreen } from '../screens/home/ReportsChatScreen';
 import { NutritionPlanScreen } from '../screens/home/NutritionPlanScreen';
+import { NutritionExperienceScreen } from '../screens/home/NutritionExperienceScreen';
 import { MedicationFormScreen } from '../screens/medication/MedicationFormScreen';
 import { MedicationCalendarScreen } from '../screens/medication/MedicationCalendarScreen';
 import { MedicationNotificationsScreen } from '../screens/medication/MedicationNotificationsScreen';
@@ -73,6 +74,7 @@ const MainTabs = () => {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Tracker" component={TrackerScreen} />
+      <Tab.Screen name="Nutrition" component={NutritionExperienceScreen} />
       <Tab.Screen name="Reports" component={ReportsScreen} />
       <Tab.Screen name="Sessions" component={SessionsScreen} />
       <Tab.Screen name="Cycle" component={CycleScreen} />
@@ -141,6 +143,7 @@ export const AppNavigation = () => {
         {__DEV__ ? <Stack.Screen name="HealthSyncDebug" component={HealthSyncDebugScreen} /> : null}
         <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
         <Stack.Screen name="NutritionPlan" component={NutritionPlanScreen} />
+        <Stack.Screen name="NutritionExperience" component={NutritionExperienceScreen} />
         <Stack.Screen name="MedicationForm" component={MedicationFormScreen} />
         <Stack.Screen name="MedicationCalendar" component={MedicationCalendarScreen} />
         <Stack.Screen name="MedicationNotifications" component={MedicationNotificationsScreen} />

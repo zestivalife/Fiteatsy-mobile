@@ -18,6 +18,9 @@ import {
   updateConsultantDietPlanDraft,
   exportConsultantDietPlanDocument,
   logNutritionMealConsumption,
+  getClientNutritionExperience,
+  getClientNutritionPattern,
+  logClientNutritionEvent,
 } from './nutrition.service.js';
 import { getFoodPreferenceProfile, listVerifiedFoodCatalogue, updateFoodPreferenceProfile } from './food-preferences.service.js';
 
@@ -168,6 +171,16 @@ const markMealConsumedSchema = z.object({
   consumedAtISO: z.string().datetime().optional(),
   notes: z.string().trim().nullable().optional(),
 });
+
+const nutritionEventSchema = z.object({
+  planId: z.string().trim().min(1), versionId: z.string().trim().min(1), mealKey: z.string().trim().min(1),
+  state: z.enum(['PENDING', 'CONSUMED_APPROVED', 'CONSUMED_OUT_OF_PLAN', 'SKIPPED']), optionId: z.string().nullable().optional(),
+  mealName: z.string().nullable().optional(), calories: z.number().nullable().optional(), proteinGrams: z.number().nullable().optional(),
+  carbsGrams: z.number().nullable().optional(), fatGrams: z.number().nullable().optional(), fibreGrams: z.number().nullable().optional(),
+  consumedAtISO: z.string().datetime().nullable().optional(),
+});
+
+const waterEventSchema = z.object({ planId: z.string().trim().min(1), versionId: z.string().trim().min(1), litres: z.number().positive().max(5), consumedAtISO: z.string().datetime().nullable().optional() });
 
 const mealSectionOrder = [
   'earlyMorning',
@@ -470,6 +483,38 @@ platformNutritionRouter.get('/nutrition-plan/today', async (req, res) => {
     publishedAtISO: payload.plan.publishedAtISO,
     today: buildTodayNutritionView(payload.version.content),
   });
+});
+
+platformNutritionRouter.get('/nutrition-experience', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const payload = await getClientNutritionExperience({ accountId: account.accountId, clientId: account.client.id });
+  if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Your nutrition plan is being prepared.' });
+  return res.status(200).json(payload);
+});
+
+platformNutritionRouter.get('/nutrition-experience/pattern', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const payload = await getClientNutritionPattern({ accountId: account.accountId, clientId: account.client.id });
+  if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Your nutrition plan is being prepared.' });
+  return res.status(200).json(payload);
+});
+
+platformNutritionRouter.post('/nutrition-experience/event', async (req, res) => {
+  const parsed = nutritionEventSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  const account = getAuthenticatedAccount(req);
+  try {
+    return res.status(201).json(await logClientNutritionEvent({ accountId: account.accountId, clientId: account.client.id }, parsed.data));
+  } catch (error) { return handleNutritionRouteError(res, error); }
+});
+
+platformNutritionRouter.post('/nutrition-experience/water', async (req, res) => {
+  const parsed = waterEventSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  const account = getAuthenticatedAccount(req);
+  try {
+    return res.status(201).json(await logClientNutritionEvent({ accountId: account.accountId, clientId: account.client.id }, { ...parsed.data, mealKey: 'water', state: 'CONSUMED_APPROVED', litres: parsed.data.litres }));
+  } catch (error) { return handleNutritionRouteError(res, error); }
 });
 
 platformNutritionRouter.post('/nutrition-plan/consume', async (req, res) => {
