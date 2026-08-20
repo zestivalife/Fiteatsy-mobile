@@ -30,7 +30,7 @@ import {
   listRegisteredConsultantClients
 } from './consultants.repository.js';
 
-const CONSULTANT_ROLES = new Set(['consultant', 'provider', 'dietician', 'senior_consultant']);
+const CONSULTANT_ROLES = new Set(['consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor']);
 const WORKSPACE_CONTRACT_VERSION = '2026-08-12.fiteatsy-client-workspace.v1';
 const WORKSPACE_ALLOWED_SCOPES = [
   'client.identity.read',
@@ -55,9 +55,11 @@ const WORKSPACE_RESTRICTED_SCOPES = [
 export const canAccessConsultantClientApi = (account: AuthenticatedAccount) =>
   CONSULTANT_ROLES.has(account.user.role?.toLowerCase() ?? '');
 
+const professionalTypeForAccount = (account: AuthenticatedAccount) => account.user.role?.toLowerCase() === 'practitioner' ? 'PRACTITIONER' : account.user.role?.toLowerCase() === 'mentor' ? 'MENTOR' : 'CONSULTANT';
+
 export const listConsultantClients = async (account: AuthenticatedAccount) => {
   const clientsBackfilled = await ensureRegisteredClientsForEligibleUsers();
-  const clients = await listRegisteredConsultantClients(account.accountId);
+  const clients = await listRegisteredConsultantClients(account.accountId, professionalTypeForAccount(account));
   const diagnostics = await getConsultantClientSyncDiagnostics();
 
   console.info('CONSULTANT_CLIENT_SYNC', {
@@ -77,7 +79,7 @@ export const listConsultantClients = async (account: AuthenticatedAccount) => {
 
 export const getConsultantClientProfile = async (publicClientId: string, account: AuthenticatedAccount) => {
   await ensureRegisteredClientsForEligibleUsers();
-  const context = await getRegisteredConsultantClientProfileContext(publicClientId, account.accountId);
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId, account.accountId, professionalTypeForAccount(account));
   if (!context) return null;
 
   const healthMetrics = calculateHealthMetrics(context.calculationInput);
@@ -232,16 +234,20 @@ const buildConsentValidation = (account: AuthenticatedAccount) => ({
 const buildAssignmentValidation = ({
   account,
   healthProfile,
-  careCase
+  careCase,
+  cap003Assigned = false
 }: {
   account: AuthenticatedAccount;
   healthProfile: Awaited<ReturnType<typeof getHealthProfileByClientId>>;
   careCase: Awaited<ReturnType<typeof getCareCaseByClientId>>;
+  cap003Assigned?: boolean;
 }) => {
   const assignedConsultantId = careCase?.assignedConsultantId ?? healthProfile?.assignedConsultantId ?? null;
   const assignedMentorId = careCase?.assignedMentorId ?? healthProfile?.assignedMentorId ?? null;
   const matchedRequestAccount = assignedConsultantId != null && assignedConsultantId === account.accountId;
-  const status = assignedConsultantId == null
+  const status = cap003Assigned
+    ? 'assigned_to_requestor'
+    : assignedConsultantId == null
     ? 'unassigned'
     : matchedRequestAccount
       ? 'assigned_to_requestor'
@@ -252,8 +258,8 @@ const buildAssignmentValidation = ({
     validatedAt: new Date().toISOString(),
     assignedConsultantId,
     assignedMentorId,
-    matchedRequestAccount,
-    source: assignedConsultantId || assignedMentorId ? 'source_health_profile_or_care_case' : 'no_source_assignment',
+    matchedRequestAccount: cap003Assigned || matchedRequestAccount,
+    source: cap003Assigned ? 'cap003_professional_assignment' : assignedConsultantId || assignedMentorId ? 'source_health_profile_or_care_case' : 'no_source_assignment',
     careCaseStage: careCase?.currentStage ?? null
   };
 };
@@ -474,13 +480,13 @@ const buildProvenance = ({
 
 const resolveAssignedClientMedicationAccess = async (publicClientId: string, account: AuthenticatedAccount) => {
   await ensureRegisteredClientsForEligibleUsers();
-  const context = await getRegisteredConsultantClientProfileContext(publicClientId);
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId, account.accountId, professionalTypeForAccount(account));
   if (!context) return null;
   const [healthProfile, careCase] = await Promise.all([
     getHealthProfileByClientId(context.internalClientId),
     getCareCaseByClientId(context.internalClientId)
   ]);
-  const assignmentValidation = buildAssignmentValidation({ account, healthProfile, careCase });
+  const assignmentValidation = buildAssignmentValidation({ account, healthProfile, careCase, cap003Assigned: true });
   if (assignmentValidation.status !== 'assigned_to_requestor') {
     return {
       status: 'forbidden' as const,
@@ -497,13 +503,13 @@ const resolveAssignedClientMedicationAccess = async (publicClientId: string, acc
 
 const resolveAssignedClientAssessmentAccess = async (publicClientId: string, account: AuthenticatedAccount) => {
   await ensureRegisteredClientsForEligibleUsers();
-  const context = await getRegisteredConsultantClientProfileContext(publicClientId);
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId, account.accountId, professionalTypeForAccount(account));
   if (!context) return null;
   const [healthProfile, careCase] = await Promise.all([
     getHealthProfileByClientId(context.internalClientId),
     getCareCaseByClientId(context.internalClientId)
   ]);
-  const assignmentValidation = buildAssignmentValidation({ account, healthProfile, careCase });
+  const assignmentValidation = buildAssignmentValidation({ account, healthProfile, careCase, cap003Assigned: true });
   return {
     context,
     assignmentValidation,
@@ -734,7 +740,7 @@ export const getConsultantClientWorkspace = async (
   account: AuthenticatedAccount
 ) => {
   await ensureRegisteredClientsForEligibleUsers();
-  const context = await getRegisteredConsultantClientProfileContext(publicClientId, account.accountId);
+  const context = await getRegisteredConsultantClientProfileContext(publicClientId, account.accountId, professionalTypeForAccount(account));
   if (!context) return null;
 
   const owner = { accountId: context.accountId, clientId: context.internalClientId };
@@ -781,7 +787,8 @@ export const getConsultantClientWorkspace = async (
   const assignmentValidation = buildAssignmentValidation({
     account,
     healthProfile,
-    careCase
+    careCase,
+    cap003Assigned: true
   });
   const consentValidation = buildConsentValidation(account);
   const stressAssessment = assignmentValidation.status === 'assigned_to_requestor'

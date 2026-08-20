@@ -27,6 +27,18 @@ export const discoverClientsForAssignment = async (query: string, limit: number,
   return result.rows.map((row) => ({ clientId: String(row.fiteatsy_client_id), userId: String(row.user_id), name: String(row.name), status: String(row.status), accountPurpose: String(row.account_purpose), assignmentStatus: row.assigned ? 'ASSIGNED' : 'UNASSIGNED', product: 'FITEATSY' }));
 };
 
+export const discoverProfessionalsForAssignment = async (professionalType?: ProfessionalType) => {
+  const result = await pool.query(
+    `select id, name, email_normalized, role from users
+      where deleted_at is null and lower(coalesce(status, '')) = 'active'
+        and lower(coalesce(role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
+        and ($1::text is null or upper(case when lower(role) in ('provider', 'dietician', 'senior_consultant') then 'CONSULTANT' else role end) = $1)
+      order by name asc`,
+    [professionalType ?? null]
+  );
+  return result.rows.map((row) => ({ userId: String(row.id), name: String(row.name), email: row.email_normalized == null ? null : String(row.email_normalized), role: String(row.role) }));
+};
+
 export const createProfessionalAssignment = async (input: { actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string }) => {
   const result = await pool.query(
     `insert into consultant_client_assignments

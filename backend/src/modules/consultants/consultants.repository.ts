@@ -492,7 +492,7 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
   return result.rowCount;
 };
 
-export const listRegisteredConsultantClients = async (consultantAccountId?: string): Promise<ConsultantClientListRecord[]> => {
+export const listRegisteredConsultantClients = async (consultantAccountId?: string, professionalType = 'CONSULTANT'): Promise<ConsultantClientListRecord[]> => {
   const assignmentClause = consultantAccountId
       ? `
         and (
@@ -501,7 +501,7 @@ export const listRegisteredConsultantClients = async (consultantAccountId?: stri
             where cap003.client_user_id = u.id
               and cap003.consultant_user_id = $6
               and cap003.product = 'FITEATSY'
-              and cap003.professional_type = 'CONSULTANT'
+              and cap003.professional_type = $7
               and cap003.status = 'active'
           )
         )
@@ -513,7 +513,7 @@ export const listRegisteredConsultantClients = async (consultantAccountId?: stri
       order by u.created_at desc
     `,
     consultantAccountId
-      ? [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, consultantAccountId]
+      ? [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, consultantAccountId, professionalType]
       : [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES]
   );
 
@@ -582,7 +582,8 @@ export const getRegisteredConsultantClientProfile = async (
 
 export const getRegisteredConsultantClientProfileContext = async (
   publicClientId: string,
-  consultantAccountId?: string
+  consultantAccountId?: string,
+  professionalType = 'CONSULTANT'
 ): Promise<ConsultantClientProfileContext | null> => {
   const assignmentClause = consultantAccountId
     ? `
@@ -592,7 +593,7 @@ export const getRegisteredConsultantClientProfileContext = async (
             where cap003.client_user_id = u.id
               and cap003.consultant_user_id = $7
               and cap003.product = 'FITEATSY'
-              and cap003.professional_type = 'CONSULTANT'
+              and cap003.professional_type = $8
               and cap003.status = 'active'
           )
         )
@@ -606,7 +607,7 @@ export const getRegisteredConsultantClientProfileContext = async (
       limit 1
     `,
     consultantAccountId
-      ? [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId, consultantAccountId]
+      ? [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId, consultantAccountId, professionalType]
       : [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId]
   );
 

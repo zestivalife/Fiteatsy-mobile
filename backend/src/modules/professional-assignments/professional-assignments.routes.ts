@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
-import { createProfessionalAssignment, discoverClientsForAssignment, listProfessionalAssignments, revokeProfessionalAssignment, type ProfessionalType } from './professional-assignments.repository.js';
+import { createProfessionalAssignment, discoverClientsForAssignment, discoverProfessionalsForAssignment, listProfessionalAssignments, revokeProfessionalAssignment, type ProfessionalType } from './professional-assignments.repository.js';
 
 export const professionalAssignmentsRouter = Router();
 professionalAssignmentsRouter.use(requireAuthenticatedAccount);
@@ -15,6 +15,12 @@ professionalAssignmentsRouter.get('/clients/search', async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 25, 1), 100);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
   return res.status(200).json({ clients: await discoverClientsForAssignment(query, limit, offset) });
+});
+
+professionalAssignmentsRouter.get('/professionals', async (req, res) => {
+  if (!canManage(getAuthenticatedAccount(req).user.role)) return res.status(403).json({ error: 'ASSIGNMENT_PERMISSION_REQUIRED' });
+  const type = typeof req.query.type === 'string' && ['CONSULTANT', 'PRACTITIONER', 'MENTOR'].includes(req.query.type) ? req.query.type as ProfessionalType : undefined;
+  return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type) });
 });
 
 professionalAssignmentsRouter.get('/', async (req, res) => {
