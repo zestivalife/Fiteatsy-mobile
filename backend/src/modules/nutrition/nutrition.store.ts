@@ -183,7 +183,9 @@ export const getDietPlanById = async (dietPlanId: string) => {
 export const listDietPlanReviewQueue = async () => {
   const result = await pool.query(
     `select dp.id, dp.user_id, dp.consultant_id, dp.plan_status, dp.updated_at, dp.submitted_at,
-            dp.review_comment, client.name as client_name, consultant.name as consultant_name,
+            dp.review_comment, client.name as client_name,
+            coalesce(nullif(trim(concat_ws(' ', consultant.first_name, consultant.last_name)), ''), consultant.name) as consultant_name,
+            fiteatsy_client.fiteatsy_client_id as public_client_id,
             dpv.id as version_id, dpv.version_number, dpv.content, dpv.content_summary, dpv.lifecycle_status,
             coalesce((select json_agg(json_build_object(
               'eventType', events.event_type,
@@ -197,6 +199,15 @@ export const listDietPlanReviewQueue = async () => {
        join diet_plan_versions dpv on dpv.id = dp.current_version_id
        join users client on client.id = dp.user_id
        left join users consultant on consultant.id = dp.consultant_id
+       left join lateral (
+         select c.fiteatsy_client_id
+         from fiteatsy_clients c
+         where c.account_user_id = dp.user_id
+           and c.deleted_at is null
+           and lower(coalesce(c.status, '')) = 'active'
+         order by c.updated_at desc
+         limit 1
+       ) fiteatsy_client on true
       where dp.deleted_at is null
         and dpv.deleted_at is null
         and dp.plan_status in ('submitted_for_review', 'changes_requested')
@@ -205,6 +216,7 @@ export const listDietPlanReviewQueue = async () => {
   return result.rows.map((row) => ({
     dietPlanId: String(row.id),
     clientUserId: String(row.user_id),
+    clientId: row.public_client_id == null ? null : String(row.public_client_id),
     clientName: String(row.client_name),
     consultantUserId: row.consultant_id == null ? null : String(row.consultant_id),
     consultantName: row.consultant_name == null ? null : String(row.consultant_name),
@@ -217,7 +229,17 @@ export const listDietPlanReviewQueue = async () => {
       versionNumber: Number(row.version_number),
       lifecycleStatus: String(row.lifecycle_status),
       content: toRecord(row.content, {}),
-      contentSummary: toRecord(row.content_summary, {}),
+      contentSummary: (() => {
+        const summary = toRecord<Record<string, unknown>>(row.content_summary, {});
+        const content = toRecord<Record<string, unknown>>(row.content, {});
+        const dailyTargets = toRecord<Record<string, unknown>>(content.dailyTargets, {});
+        return {
+          ...summary,
+          calories: summary.calories ?? dailyTargets.calories ?? null,
+          protein: summary.protein ?? dailyTargets.protein ?? null,
+          hydration: summary.hydration ?? dailyTargets.hydration ?? null,
+        };
+      })(),
     },
     reviewHistory: Array.isArray(row.review_history) ? row.review_history : [],
   }));
