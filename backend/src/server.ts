@@ -20,6 +20,7 @@ import { consultantNutritionRouter, platformNutritionRouter } from './modules/nu
 import { medicationsRouter } from './modules/medications/medications.routes.js';
 import { assessmentsRouter } from './modules/assessments/assessments.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
+import { professionalAssignmentsRouter } from './modules/professional-assignments/professional-assignments.routes.js';
 import { delegatedRouter } from './modules/admin/delegated.routes.js';
 import { paymentsRouter, razorpayWebhookRouter, subscriptionsRouter } from './modules/subscriptions/subscriptions.routes.js';
 import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.service.js';
@@ -147,6 +148,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/consultants', consultantNutritionRouter);
   app.use('/v1/clients', consultantWorkspaceContractRouter);
   app.use('/v1/admin', adminRouter);
+  app.use('/v1/professional-assignments', professionalAssignmentsRouter);
   app.use('/v1/internal/delegated', delegatedRouter);
   app.use('/v1/subscriptions', subscriptionsRouter);
   app.use('/v1/payments', paymentsRouter);

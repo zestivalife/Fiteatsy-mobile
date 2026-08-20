@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
+import { syncLegacyProfessionalAssignment } from '../professional-assignments/professional-assignments.repository.js';
 import {
   CareCaseRecord,
   CareCaseStage,
@@ -455,6 +456,8 @@ export const createOrUpdateHealthProfile = async (
   if (updated.rowCount === 0) {
     throw new Error('Health profile ownership mismatch.');
   }
+  await syncLegacyProfessionalAssignment({ clientUserId: owner.accountId, professionalUserId: next.assignedConsultantId ?? null, professionalType: 'CONSULTANT', actorUserId: owner.accountId });
+  await syncLegacyProfessionalAssignment({ clientUserId: owner.accountId, professionalUserId: next.assignedMentorId ?? null, professionalType: 'MENTOR', actorUserId: owner.accountId });
   return saveHealthProfileProgressiveFields(updated.rows[0].id, owner.clientId, next);
 };
 
@@ -759,6 +762,8 @@ export const updateCareCase = async (careCaseId: string, clientId: string, patch
     ]
   );
   if (updated.rowCount === 0) return null;
+  await syncLegacyProfessionalAssignment({ clientUserId: existing.userId, professionalUserId: next.assignedConsultantId ?? null, professionalType: 'CONSULTANT', actorUserId: existing.userId });
+  await syncLegacyProfessionalAssignment({ clientUserId: existing.userId, professionalUserId: next.assignedMentorId ?? null, professionalType: 'MENTOR', actorUserId: existing.userId });
   return mapCareCase(updated.rows[0]);
 };
 

@@ -494,17 +494,15 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
 
 export const listRegisteredConsultantClients = async (consultantAccountId?: string): Promise<ConsultantClientListRecord[]> => {
   const assignmentClause = consultantAccountId
-    ? `
+      ? `
         and (
-          hp.assigned_consultant_id = $6
-          or exists (
-            select 1
-            from care_cases assigned_case
-            where assigned_case.client_id = c.id
-              and assigned_case.user_id = u.id
-              and assigned_case.deleted_at is null
-              and lower(coalesce(assigned_case.status, '')) = 'active'
-              and assigned_case.assigned_consultant_id = $6
+          exists (
+            select 1 from consultant_client_assignments cap003
+            where cap003.client_user_id = u.id
+              and cap003.consultant_user_id = $6
+              and cap003.product = 'FITEATSY'
+              and cap003.professional_type = 'CONSULTANT'
+              and cap003.status = 'active'
           )
         )
       `
@@ -551,7 +549,14 @@ export const listAssignedConsultantClientContexts = async (
         and cc.deleted_at is null
         and lower(coalesce(cc.status, '')) = 'active'
       where ${eligibleUserPredicate}
-        and coalesce(cc.assigned_consultant_id, hp.assigned_consultant_id) = $${AUTHENTICATED_USER_EXCLUSION_ROLES.length + 1}
+        and exists (
+          select 1 from consultant_client_assignments cap003
+          where cap003.client_user_id = u.id
+            and cap003.consultant_user_id = $${AUTHENTICATED_USER_EXCLUSION_ROLES.length + 1}
+            and cap003.product = 'FITEATSY'
+            and cap003.professional_type = 'CONSULTANT'
+            and cap003.status = 'active'
+        )
       order by u.name asc, u.created_at desc
     `,
     [...AUTHENTICATED_USER_EXCLUSION_ROLES, consultantAccountId]
@@ -582,15 +587,13 @@ export const getRegisteredConsultantClientProfileContext = async (
   const assignmentClause = consultantAccountId
     ? `
         and (
-          hp.assigned_consultant_id = $7
-          or exists (
-            select 1
-            from care_cases assigned_case
-            where assigned_case.client_id = c.id
-              and assigned_case.user_id = u.id
-              and assigned_case.deleted_at is null
-              and lower(coalesce(assigned_case.status, '')) = 'active'
-              and assigned_case.assigned_consultant_id = $7
+          exists (
+            select 1 from consultant_client_assignments cap003
+            where cap003.client_user_id = u.id
+              and cap003.consultant_user_id = $7
+              and cap003.product = 'FITEATSY'
+              and cap003.professional_type = 'CONSULTANT'
+              and cap003.status = 'active'
           )
         )
       `
