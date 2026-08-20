@@ -9,11 +9,11 @@ const GENERIC_PROFESSIONAL_NAMES = new Set([
   'consultant',
 ]);
 
-const resolveProfessionalName = (row: { name?: unknown; email_normalized?: unknown }) => {
+const resolveProfessionalName = (row: { id?: unknown; name?: unknown; email_normalized?: unknown }) => {
   const name = String(row.name ?? '').trim();
   if (name && !GENERIC_PROFESSIONAL_NAMES.has(name.toLowerCase())) return name;
   const email = String(row.email_normalized ?? '').trim();
-  return email || 'Consultant';
+  return email || `Consultant ${String(row.id ?? '').slice(0, 8)}`;
 };
 
 const audit = async (input: { assignmentId: string; action: string; actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string }) => {
