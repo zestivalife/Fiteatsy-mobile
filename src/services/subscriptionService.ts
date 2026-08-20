@@ -37,6 +37,12 @@ export type SubscriptionPlan = {
   description: string | null;
   durationDays: number;
   priceMinor: number;
+  cgstRatePercent?: number;
+  cgstAmountMinor?: number;
+  sgstRatePercent?: number;
+  sgstAmountMinor?: number;
+  totalTaxMinor?: number;
+  totalAmountMinor?: number;
   currency: string;
   badge: string | null;
   isActive: boolean;
@@ -102,7 +108,18 @@ export type CheckoutResponse = {
       contact?: string | null;
     };
     notes: Record<string, string>;
+    priceBreakup: PriceBreakup;
   } | null;
+};
+
+export type PriceBreakup = {
+  baseAmountMinor: number;
+  cgstRatePercent: number;
+  cgstAmountMinor: number;
+  sgstRatePercent: number;
+  sgstAmountMinor: number;
+  totalTaxMinor: number;
+  totalAmountMinor: number;
 };
 
 export type RazorpayPaymentResult = {
@@ -114,11 +131,14 @@ export type RazorpayPaymentResult = {
 export type PaymentHistoryItem = {
   id: string;
   provider: string;
+  dateISO?: string;
   status: string;
   amountMinor: number;
   currency: string;
   createdAt: string;
   planName: string | null;
+  paymentReference: string | null;
+  priceBreakup?: PriceBreakup;
 };
 
 export const formatPlanPrice = (plan: { priceMinor?: number; amountMinor?: number; currency: string }) =>
@@ -127,6 +147,9 @@ export const formatPlanPrice = (plan: { priceMinor?: number; amountMinor?: numbe
     currency: plan.currency,
     maximumFractionDigits: 0
   }).format((plan.priceMinor ?? plan.amountMinor ?? 0) / 100);
+
+export const formatMinorPrice = (amountMinor: number, currency = 'INR') =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amountMinor / 100);
 
 export const formatPlanDuration = (durationDays: number) => {
   if (durationDays >= 360) return '12 months';
@@ -160,7 +183,7 @@ export const createSubscriptionCheckout = (body: {
 }) => postJson<CheckoutResponse>('/v1/subscriptions/checkout', body);
 
 export const verifyRazorpayPayment = (body: RazorpayPaymentResult) =>
-  postJson<{ subscription: CurrentSubscription }>('/v1/payments/razorpay/verify', body);
+  postJson<{ subscription: CurrentSubscription; priceBreakup: PriceBreakup }>('/v1/payments/razorpay/verify', body);
 
 export const getPaymentHistory = () =>
   apiFetch<{ payments: PaymentHistoryItem[] }>('/v1/payments/history');

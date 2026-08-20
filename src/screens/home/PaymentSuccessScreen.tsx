@@ -6,7 +6,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { Screen } from '../../components/Screen';
 import { getThemeColors, spacing } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
-import { FoundationSubscription, getMySubscription } from '../../services/subscriptionService';
+import { formatMinorPrice, FoundationSubscription, getMySubscription } from '../../services/subscriptionService';
 import { useAppContext } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PaymentSuccess'>;
@@ -15,6 +15,7 @@ export const PaymentSuccessScreen = ({ navigation, route }: Props) => {
   const { themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
   const returnDestination = route.params?.returnDestination;
+  const priceBreakup = route.params?.priceBreakup;
   const [subscription, setSubscription] = useState<FoundationSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -55,6 +56,12 @@ export const PaymentSuccessScreen = ({ navigation, route }: Props) => {
           <Text style={[styles.title, { color: palette.textPrimary }]}>You’re all set</Text>
           <Text style={[styles.body, { color: palette.textSecondary }]}>Your Fiteatsy subscription is active and premium access follows your account.</Text>
           <Text style={[styles.detail, { color: palette.textPrimary }]}>{subscription.subscription?.planName}</Text>
+          {priceBreakup ? <View style={styles.breakup}>
+            <Text style={[styles.breakupText, { color: palette.textSecondary }]}>Plan price {formatMinorPrice(priceBreakup.baseAmountMinor)}</Text>
+            <Text style={[styles.breakupText, { color: palette.textSecondary }]}>CGST @ 9% {formatMinorPrice(priceBreakup.cgstAmountMinor)}</Text>
+            <Text style={[styles.breakupText, { color: palette.textSecondary }]}>SGST @ 9% {formatMinorPrice(priceBreakup.sgstAmountMinor)}</Text>
+            <Text style={[styles.total, { color: palette.textPrimary }]}>Total paid {formatMinorPrice(priceBreakup.totalAmountMinor)}</Text>
+          </View> : null}
           <Text style={[styles.body, { color: palette.textSecondary }]}>Valid until {subscription.subscription?.expiresAt ? new Date(subscription.subscription.expiresAt).toLocaleDateString() : 'Not available'}</Text>
           <PrimaryButton title="Continue" onPress={continueFlow} />
         </> : <>
@@ -110,5 +117,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Exo_700Bold',
     fontSize: 15,
     textAlign: 'center'
+  },
+  breakup: {
+    gap: 4,
+    marginTop: 4
+  },
+  breakupText: {
+    fontFamily: 'Exo_400Regular',
+    fontSize: 14
+  },
+  total: {
+    fontFamily: 'Exo_700Bold',
+    fontSize: 18,
+    marginTop: 4
   }
 });

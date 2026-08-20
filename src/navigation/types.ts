@@ -36,6 +36,7 @@ export type RootStackParamList = {
   } | undefined;
   PaymentSuccess: {
     returnDestination?: keyof RootStackParamList;
+    priceBreakup?: import('../services/subscriptionService').PriceBreakup;
   } | undefined;
   Search: undefined;
   Notifications: undefined;

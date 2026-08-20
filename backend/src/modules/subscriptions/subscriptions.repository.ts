@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { pool } from '../../db/pool.js';
 import { EntitlementCode, PaymentOrderStatus, SubscriptionPlanDto, SubscriptionStatus } from './subscriptions.types.js';
+import { calculateGstForPlan } from './gst.js';
 
 type Queryable = Pick<PoolClient, 'query'>;
 
@@ -27,6 +28,7 @@ const mapPlan = (row: Record<string, unknown>): SubscriptionPlanDto => ({
   durationDays: Number(row.duration_days),
   durationMonths: Number(row.duration_months),
   priceMinor: Number(row.price_minor),
+  ...calculateGstForPlan(String(row.code), Number(row.price_minor)),
   currency: String(row.currency),
   isActive: Boolean(row.is_active),
   isFeatured: Boolean(row.is_featured),
@@ -46,6 +48,13 @@ export type PaymentOrderRecord = {
   provider: string;
   providerOrderId: string | null;
   amountMinor: number;
+  baseAmountMinor: number;
+  cgstRatePercent: number;
+  cgstAmountMinor: number;
+  sgstRatePercent: number;
+  sgstAmountMinor: number;
+  totalTaxMinor: number;
+  totalAmountMinor: number;
   currency: string;
   status: PaymentOrderStatus;
   source: string | null;
@@ -63,6 +72,13 @@ const mapPaymentOrder = (row: Record<string, unknown>): PaymentOrderRecord => ({
   provider: String(row.provider),
   providerOrderId: row.provider_order_id == null ? null : String(row.provider_order_id),
   amountMinor: Number(row.amount_minor),
+  baseAmountMinor: Number(row.base_amount_minor ?? row.amount_minor),
+  cgstRatePercent: Number(row.cgst_rate_percent ?? 0),
+  cgstAmountMinor: Number(row.cgst_amount_minor ?? 0),
+  sgstRatePercent: Number(row.sgst_rate_percent ?? 0),
+  sgstAmountMinor: Number(row.sgst_amount_minor ?? 0),
+  totalTaxMinor: Number(row.total_tax_minor ?? 0),
+  totalAmountMinor: Number(row.total_amount_minor ?? row.amount_minor),
   currency: String(row.currency),
   status: String(row.status) as PaymentOrderStatus,
   source: row.source == null ? null : String(row.source),
@@ -203,6 +219,13 @@ export const createOrReusePaymentOrder = async (input: {
         subscription_plan_id,
         provider,
         amount_minor,
+        base_amount_minor,
+        cgst_rate_percent,
+        cgst_amount_minor,
+        sgst_rate_percent,
+        sgst_amount_minor,
+        total_tax_minor,
+        total_amount_minor,
         currency,
         status,
         source,
@@ -211,7 +234,7 @@ export const createOrReusePaymentOrder = async (input: {
         idempotency_key,
         created_at,
         updated_at
-      ) values ($1, $2, $3, 'RAZORPAY', $4, $5, 'CREATED', $6, $7, $8, $9, now(), now())
+      ) values ($1, $2, $3, 'RAZORPAY', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'CREATED', $14, $15, $16, $17, now(), now())
       on conflict (user_id, idempotency_key) do update
       set updated_at = payment_orders.updated_at
       returning *
@@ -220,7 +243,14 @@ export const createOrReusePaymentOrder = async (input: {
       crypto.randomUUID(),
       input.userId,
       input.plan.id,
+      input.plan.totalAmountMinor,
       input.plan.priceMinor,
+      input.plan.cgstRatePercent,
+      input.plan.cgstAmountMinor,
+      input.plan.sgstRatePercent,
+      input.plan.sgstAmountMinor,
+      input.plan.totalTaxMinor,
+      input.plan.totalAmountMinor,
       input.plan.currency,
       input.source,
       input.requiredEntitlement,
@@ -352,10 +382,17 @@ export const activateSubscriptionFromPayment = async (input: {
           provider_payment_id,
           payment_order_id,
           amount_paid_minor,
+          base_amount_minor,
+          cgst_rate_percent,
+          cgst_amount_minor,
+          sgst_rate_percent,
+          sgst_amount_minor,
+          total_tax_minor,
+          total_amount_minor,
           currency,
           created_at,
           updated_at
-        ) values ($1, $2, $3, 'ACTIVE', $4, $5, 'RAZORPAY', $6, $7, $8, $9, $10, now(), now())
+        ) values ($1, $2, $3, 'ACTIVE', $4, $5, 'RAZORPAY', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now(), now())
         on conflict (payment_provider, provider_payment_id) where provider_payment_id is not null do nothing
       `,
       [
@@ -368,6 +405,13 @@ export const activateSubscriptionFromPayment = async (input: {
         input.providerPaymentId,
         lockedOrder.id,
         lockedOrder.amountMinor,
+        lockedOrder.baseAmountMinor,
+        lockedOrder.cgstRatePercent,
+        lockedOrder.cgstAmountMinor,
+        lockedOrder.sgstRatePercent,
+        lockedOrder.sgstAmountMinor,
+        lockedOrder.totalTaxMinor,
+        lockedOrder.totalAmountMinor,
         lockedOrder.currency
       ]
     );
@@ -383,6 +427,13 @@ export const activateSubscriptionFromPayment = async (input: {
           provider_order_id,
           provider_payment_id,
           amount_minor,
+          base_amount_minor,
+          cgst_rate_percent,
+          cgst_amount_minor,
+          sgst_rate_percent,
+          sgst_amount_minor,
+          total_tax_minor,
+          total_amount_minor,
           currency,
           status,
           payment_method,
@@ -390,7 +441,7 @@ export const activateSubscriptionFromPayment = async (input: {
           captured_at,
           created_at,
           updated_at
-        ) values ($1, $2, $3, $4, 'RAZORPAY', $5, $6, $7, $8, $9, $10, now(), now(), now(), now())
+        ) values ($1, $2, $3, $4, 'RAZORPAY', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now(), now(), now(), now())
         on conflict (provider, provider_payment_id) where provider_payment_id is not null do nothing
       `,
       [
@@ -401,6 +452,13 @@ export const activateSubscriptionFromPayment = async (input: {
         lockedOrder.providerOrderId,
         input.providerPaymentId,
         lockedOrder.amountMinor,
+        lockedOrder.baseAmountMinor,
+        lockedOrder.cgstRatePercent,
+        lockedOrder.cgstAmountMinor,
+        lockedOrder.sgstRatePercent,
+        lockedOrder.sgstAmountMinor,
+        lockedOrder.totalTaxMinor,
+        lockedOrder.totalAmountMinor,
         lockedOrder.currency,
         input.paymentStatus,
         input.paymentMethod ?? null
@@ -495,6 +553,13 @@ export const listPaymentHistoryForUser = async (userId: string) => {
       select
         transactions.created_at,
         transactions.amount_minor,
+        transactions.base_amount_minor,
+        transactions.cgst_rate_percent,
+        transactions.cgst_amount_minor,
+        transactions.sgst_rate_percent,
+        transactions.sgst_amount_minor,
+        transactions.total_tax_minor,
+        transactions.total_amount_minor,
         transactions.currency,
         transactions.status,
         transactions.provider_payment_id,
@@ -512,6 +577,15 @@ export const listPaymentHistoryForUser = async (userId: string) => {
     dateISO: new Date(String(row.created_at)).toISOString(),
     planName: String(row.plan_name),
     amountMinor: Number(row.amount_minor),
+    priceBreakup: {
+      baseAmountMinor: Number(row.base_amount_minor ?? row.amount_minor),
+      cgstRatePercent: Number(row.cgst_rate_percent ?? 0),
+      cgstAmountMinor: Number(row.cgst_amount_minor ?? 0),
+      sgstRatePercent: Number(row.sgst_rate_percent ?? 0),
+      sgstAmountMinor: Number(row.sgst_amount_minor ?? 0),
+      totalTaxMinor: Number(row.total_tax_minor ?? 0),
+      totalAmountMinor: Number(row.total_amount_minor ?? row.amount_minor)
+    },
     currency: String(row.currency),
     status: String(row.status),
     paymentReference: row.provider_payment_id == null ? null : String(row.provider_payment_id)

@@ -150,6 +150,15 @@ export const createCheckout = async (
           id: plan.id,
           code: plan.code,
           name: plan.name
+        },
+        priceBreakup: {
+          baseAmountMinor: order.baseAmountMinor,
+          cgstRatePercent: order.cgstRatePercent,
+          cgstAmountMinor: order.cgstAmountMinor,
+          sgstRatePercent: order.sgstRatePercent,
+          sgstAmountMinor: order.sgstAmountMinor,
+          totalTaxMinor: order.totalTaxMinor,
+          totalAmountMinor: order.totalAmountMinor
         }
       }
     };
@@ -157,7 +166,7 @@ export const createCheckout = async (
 
   try {
     const providerOrder = await getRazorpayClient().createOrder({
-      amount: plan.priceMinor,
+      amount: plan.totalAmountMinor,
       currency: plan.currency,
       receipt: order.id,
       notes: {
@@ -192,7 +201,7 @@ export const createCheckout = async (
       checkoutId: updatedOrder.id,
       provider: 'RAZORPAY',
       planCode: plan.code,
-      amountMinor: plan.priceMinor,
+      amountMinor: plan.totalAmountMinor,
       currency: plan.currency
     });
     return {
@@ -222,6 +231,15 @@ export const createCheckout = async (
           id: plan.id,
           code: plan.code,
           name: plan.name
+        },
+        priceBreakup: {
+          baseAmountMinor: updatedOrder.baseAmountMinor,
+          cgstRatePercent: updatedOrder.cgstRatePercent,
+          cgstAmountMinor: updatedOrder.cgstAmountMinor,
+          sgstRatePercent: updatedOrder.sgstRatePercent,
+          sgstAmountMinor: updatedOrder.sgstAmountMinor,
+          totalTaxMinor: updatedOrder.totalTaxMinor,
+          totalAmountMinor: updatedOrder.totalAmountMinor
         }
       }
     };
@@ -277,7 +295,16 @@ export const verifyRazorpayPayment = async (
   return {
     verified: true,
     subscription,
-    current: await getCurrentSubscription(account)
+    current: await getCurrentSubscription(account),
+    priceBreakup: {
+      baseAmountMinor: order.baseAmountMinor,
+      cgstRatePercent: order.cgstRatePercent,
+      cgstAmountMinor: order.cgstAmountMinor,
+      sgstRatePercent: order.sgstRatePercent,
+      sgstAmountMinor: order.sgstAmountMinor,
+      totalTaxMinor: order.totalTaxMinor,
+      totalAmountMinor: order.totalAmountMinor
+    }
   };
 };
 

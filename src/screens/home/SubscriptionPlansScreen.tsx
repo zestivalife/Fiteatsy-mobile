@@ -18,6 +18,7 @@ import {
   PremiumSource,
   SubscriptionPlan,
   createSubscriptionCheckout,
+  formatMinorPrice,
   formatPlanDuration,
   formatPlanPrice,
   getCurrentSubscription,
@@ -125,6 +126,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
   const [activeEntitlements, setActiveEntitlements] = useState<EntitlementCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadPlans = useCallback(async () => {
@@ -207,8 +209,8 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
         }
       }) as RazorpaySuccess;
 
-      await verifyRazorpayPayment(result);
-      navigateAfterActivation();
+      const verification = await verifyRazorpayPayment(result);
+      navigation.replace('PaymentSuccess', { returnDestination, priceBreakup: verification.priceBreakup });
     } catch (error) {
       const message =
         error instanceof ApiClientError
@@ -221,6 +223,8 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
       setCheckoutPlanId(null);
     }
   };
+
+  const selectPlanForCheckout = (plan: SubscriptionPlan) => setSelectedPlan(plan);
 
   const entitledForRequiredFeature = requiredEntitlement ? activeEntitlements.includes(requiredEntitlement) : false;
   const recommendedPlan = recommendation.primary;
@@ -269,8 +273,9 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
             <Text style={styles.badge}>{recommendedPlan.badge ?? 'Recommended for you'}</Text>
             <Text style={styles.confidence}>{recommendation.confidenceLabel}</Text>
           </View>
-          <Text style={styles.planName}>{recommendedPlan.name}</Text>
-          <Text style={styles.planReason}>{recommendation.reason}</Text>
+            <Text style={styles.planName}>{recommendedPlan.name}</Text>
+            <Text style={styles.planReason}>{recommendation.reason}</Text>
+            <Text style={styles.taxNote}>Base price + applicable GST at checkout</Text>
           <View style={styles.planMetaRow}>
             <Text style={styles.planMeta}>{formatPlanDuration(recommendedPlan.durationDays)}</Text>
             <Text style={styles.planPrice}>{formatPlanPrice(recommendedPlan)}</Text>
@@ -287,7 +292,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
           <View style={styles.recommendationActions}>
             <PrimaryButton
               title={checkoutPlanId === recommendedPlan.id ? 'Opening secure checkout...' : 'Subscribe & Continue'}
-              onPress={() => { void startCheckout(recommendedPlan); }}
+              onPress={() => selectPlanForCheckout(recommendedPlan)}
               disabled={Boolean(checkoutPlanId)}
               style={styles.chooseButton}
             />
@@ -303,10 +308,10 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
           <Text style={[styles.secondaryLabel, { color: palette.textSecondary }]}>Also worth considering</Text>
           <Text style={[styles.secondaryName, { color: palette.textPrimary }]}>{recommendation.secondary.name}</Text>
           <Text style={[styles.secondaryCopy, { color: palette.textSecondary }]}>
-            {formatPlanDuration(recommendation.secondary.durationDays)} · {formatPlanPrice(recommendation.secondary)}
+            {formatPlanDuration(recommendation.secondary.durationDays)} · {formatPlanPrice(recommendation.secondary)} + applicable GST
           </Text>
           <Pressable
-            onPress={() => { void startCheckout(recommendation.secondary as SubscriptionPlan); }}
+            onPress={() => selectPlanForCheckout(recommendation.secondary as SubscriptionPlan)}
             disabled={Boolean(checkoutPlanId)}
             style={styles.secondaryAction}
             accessibilityRole="button"
@@ -329,7 +334,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
           {plans.map((plan) => (
             <Pressable
               key={plan.id}
-              onPress={() => { void startCheckout(plan); }}
+              onPress={() => selectPlanForCheckout(plan)}
               disabled={Boolean(checkoutPlanId)}
               style={[styles.catalogCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}
               accessibilityRole="button"
@@ -341,6 +346,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
               <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>
                 {formatPlanDuration(plan.durationDays)}{planDailyCostLabel(plan) ? ` · ${planDailyCostLabel(plan)}` : ''}
               </Text>
+              <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>Base price + applicable GST at checkout</Text>
               {plan.badge ? <Text style={styles.catalogValue}>{plan.badge}</Text> : null}
               <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>
                 Unlocks {plan.entitlements.slice(0, 3).map((item) => item.replace(/_/g, ' ')).join(', ')}
@@ -363,6 +369,23 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
               </View>
             ))}
             <PrimaryButton title="Close" onPress={() => setWhyVisible(false)} style={styles.closeButton} />
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={Boolean(selectedPlan)} transparent animationType="slide" onRequestClose={() => setSelectedPlan(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.sheet, { backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0D0F0D' }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={[styles.sheetTitle, { color: palette.textPrimary }]}>Confirm payment</Text>
+            <Text style={[styles.sheetBody, { color: palette.textSecondary }]}>{selectedPlan?.name}</Text>
+            {selectedPlan ? <>
+              <View style={styles.taxRow}><Text style={[styles.taxLabel, { color: palette.textSecondary }]}>Plan price</Text><Text style={[styles.taxValue, { color: palette.textPrimary }]}>{formatMinorPrice(selectedPlan.priceMinor, selectedPlan.currency)}</Text></View>
+              <View style={styles.taxRow}><Text style={[styles.taxLabel, { color: palette.textSecondary }]}>CGST @ 9%</Text><Text style={[styles.taxValue, { color: palette.textPrimary }]}>{formatMinorPrice(selectedPlan.cgstAmountMinor ?? 0, selectedPlan.currency)}</Text></View>
+              <View style={styles.taxRow}><Text style={[styles.taxLabel, { color: palette.textSecondary }]}>SGST @ 9%</Text><Text style={[styles.taxValue, { color: palette.textPrimary }]}>{formatMinorPrice(selectedPlan.sgstAmountMinor ?? 0, selectedPlan.currency)}</Text></View>
+              <View style={styles.totalRow}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalValue}>{formatMinorPrice(selectedPlan.totalAmountMinor ?? selectedPlan.priceMinor, selectedPlan.currency)}</Text></View>
+              <PrimaryButton title={`Pay ${formatMinorPrice(selectedPlan.totalAmountMinor ?? selectedPlan.priceMinor, selectedPlan.currency)}`} onPress={() => { const plan = selectedPlan; setSelectedPlan(null); void startCheckout(plan); }} disabled={Boolean(checkoutPlanId)} />
+            </> : null}
+            <Pressable onPress={() => setSelectedPlan(null)} style={styles.closeButton} accessibilityRole="button"><Text style={styles.whyText}>Cancel</Text></Pressable>
           </View>
         </View>
       </Modal>
@@ -738,5 +761,36 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     marginTop: spacing.sm
+  },
+  taxRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6
+  },
+  taxLabel: {
+    fontFamily: 'Exo_400Regular',
+    fontSize: 15
+  },
+  taxValue: {
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 15
+  },
+  totalRow: {
+    borderTopColor: '#39433A',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    paddingTop: 12
+  },
+  totalLabel: {
+    color: '#64D900',
+    fontFamily: 'Exo_700Bold',
+    fontSize: 18
+  },
+  totalValue: {
+    color: '#64D900',
+    fontFamily: 'Exo_700Bold',
+    fontSize: 20
   }
 });

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { pool } from '../../db/pool.js';
+import { calculateGstForPlan } from './gst.js';
 
 type Queryable = Pick<PoolClient, 'query'>;
 
@@ -29,6 +30,7 @@ const mapPlan = (row: Record<string, unknown>) => ({
   name: String(row.name),
   description: String(row.description),
   priceMinor: Number(row.price_minor),
+  ...calculateGstForPlan(String(row.code), Number(row.price_minor)),
   currency: String(row.currency),
   durationDays: Number(row.duration_days),
   durationMonths: Number(row.duration_months),

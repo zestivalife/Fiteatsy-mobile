@@ -39,6 +39,12 @@ export type SubscriptionPlanDto = {
   durationDays: number;
   durationMonths: number;
   priceMinor: number;
+  cgstRatePercent: number;
+  cgstAmountMinor: number;
+  sgstRatePercent: number;
+  sgstAmountMinor: number;
+  totalTaxMinor: number;
+  totalAmountMinor: number;
   currency: string;
   isActive: boolean;
   isFeatured: boolean;
