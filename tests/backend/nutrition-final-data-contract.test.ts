@@ -48,6 +48,7 @@ test('water has a dedicated millilitre contract and never uses meal validation',
 
 test('daily client projection exposes canonical date and reconciled meal states', () => {
   const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const routes = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.routes.ts', import.meta.url), 'utf8');
   const client = readFileSync(new URL('../../src/services/nutritionExperienceService.ts', import.meta.url), 'utf8');
   const screen = readFileSync(new URL('../../src/screens/home/NutritionExperienceScreen.tsx', import.meta.url), 'utf8');
 
@@ -61,6 +62,8 @@ test('daily client projection exposes canonical date and reconciled meal states'
   assert.match(screen, /selectedDate.*isoDay\(new Date\(\)\)/s);
   assert.match(screen, /getFullYear\(\)[\s\S]*getMonth\(\)[\s\S]*getDate\(\)/);
   assert.doesNotMatch(screen, /new Date\(data\.selectedDate\)(?!T00:00:00)/);
+  assert.match(routes, /NUTRITION_MEAL_PLAN_SHAPE_INVALID/);
+  assert.match(routes, /NUTRITION_EVENT_TIME_INVALID/);
 });
 
 test('Phase 2 views consume one backend projection without local nutrition heuristics', () => {

@@ -516,9 +516,26 @@ platformNutritionRouter.get('/nutrition-plan/today', async (req, res) => {
 
 platformNutritionRouter.get('/nutrition-experience', async (req, res) => {
   const account = getAuthenticatedAccount(req);
-  const payload = await getClientNutritionExperience({ accountId: account.accountId, clientId: account.client.id }, typeof req.query.date === 'string' ? req.query.date : undefined);
-  if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Your nutrition plan is being prepared.' });
-  return res.status(200).json(payload);
+  try {
+    const payload = await getClientNutritionExperience({ accountId: account.accountId, clientId: account.client.id }, typeof req.query.date === 'string' ? req.query.date : undefined);
+    if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Your nutrition plan is being prepared.' });
+    return res.status(200).json(payload);
+  } catch (error) {
+    if (error instanceof NutritionPlanWorkflowError) return handleNutritionRouteError(res, error);
+    const message = error instanceof Error ? error.message : '';
+    const errorCode = message.includes('supplementsAndClinicalNotes')
+      ? 'NUTRITION_GUIDANCE_SHAPE_INVALID'
+      : /mealPlan|options|Cannot convert undefined or null to object/.test(message)
+        ? 'NUTRITION_MEAL_PLAN_SHAPE_INVALID'
+        : /eventTimeISO|Invalid time value|localeCompare/.test(message)
+          ? 'NUTRITION_EVENT_TIME_INVALID'
+          : 'NUTRITION_PROJECTION_FAILED';
+    console.error('[NutritionProjection] failed', { errorCode, error });
+    return res.status(500).json({
+      error: errorCode,
+      message: `Nutrition projection failed (${errorCode}).`,
+    });
+  }
 });
 
 platformNutritionRouter.get('/nutrition-experience/pattern', async (req, res) => {
