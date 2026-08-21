@@ -2262,8 +2262,8 @@ export const getClientNutritionPattern = async (owner: ClientOwnershipContext, e
   const outOfPlanCount = dailyAdherence.reduce((sum, day) => sum + day.outOfPlan, 0);
   const skippedCount = dailyAdherence.reduce((sum, day) => sum + day.skipped, 0);
   const resolvedCount = approvedCount + outOfPlanCount + skippedCount;
-  const whatWorked = approvedCount ? [`${approvedCount} consultant-approved meal${approvedCount === 1 ? '' : 's'} were logged in this period.`] : [];
-  const harderThisWeek = [...(outOfPlanCount ? [`${outOfPlanCount} meal${outOfPlanCount === 1 ? '' : 's'} were logged out of plan.`] : []), ...(skippedCount ? [`${skippedCount} planned meal${skippedCount === 1 ? ' was' : 's were'} skipped.`] : [])];
+  const whatWorked = approvedCount ? [`${approvedCount} consultant-approved meal${approvedCount === 1 ? ' was' : 's were'} logged in this period.`] : [];
+  const harderThisWeek = [...(outOfPlanCount ? [`${outOfPlanCount} meal${outOfPlanCount === 1 ? ' was' : 's were'} logged out of plan.`] : []), ...(skippedCount ? [`${skippedCount} planned meal${skippedCount === 1 ? ' was' : 's were'} skipped.`] : [])];
   const nextFocus = outOfPlanCount ? ['Use the highest-ranked remaining approved option when the next meal is pending.'] : skippedCount ? ['Use a remaining approved option when a planned meal is difficult to complete.'] : approvedCount ? ['Continue the approved choices that supported adherence this week.'] : [];
   return {
     periodDays: 7, startDate: days[0], endDate: days[6], dailyAdherence,
