@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
@@ -21,15 +20,12 @@ import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-inactive.svg';
 import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-selected.svg';
 import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-inactive.svg';
 import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
-import { MainTabParamList, RootStackParamList } from '../../navigation/types';
+import { RootStackParamList } from '../../navigation/types';
 import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/recoveryIntelligenceEngine';
 import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
 import { getMySubscription } from '../../services/subscriptionService';
-import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
 import type { DailyCheckIn, Medication, MedicationLogStatus } from '../../types';
-import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
-import { resolveClientFirstName } from '../../utils/clientIdentity';
 import {
   buildPss10StressContext,
   formatPss10Change,
@@ -58,10 +54,7 @@ const font = {
   bold: 'Exo_700Bold'
 } as const;
 
-type Nav = CompositeNavigationProp<
-  BottomTabNavigationProp<MainTabParamList, 'Journey'>,
-  NativeStackNavigationProp<RootStackParamList>
->;
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 type MetricKey = 'recovery' | 'calm' | 'activity' | 'nutrition' | 'mind' | 'sleep';
 type SvgAsset = React.FC<SvgProps>;
 const HOME_RECOVERY_UI_FIXTURE: Record<MetricKey, number> = {
@@ -89,6 +82,12 @@ type MedicationTimelineEntry = {
   medication: Medication;
   scheduledForISO: string;
   status: MedicationLogStatus;
+};
+
+const firstName = (name?: string | null) => {
+  const trimmed = name?.trim();
+  if (!trimmed) return 'there';
+  return trimmed.split(/\s+/)[0];
 };
 
 const trendTone = (value: number) => {
@@ -124,7 +123,7 @@ const arcGradientForMetric = (key: MetricKey) => {
 };
 
 const scoreForHomeUi = (key: MetricKey, score: number | null) => (
-  ENABLE_HOME_RECOVERY_UI_FIXTURE && key !== 'nutrition' ? HOME_RECOVERY_UI_FIXTURE[key] : score
+  ENABLE_HOME_RECOVERY_UI_FIXTURE ? HOME_RECOVERY_UI_FIXTURE[key] : score
 );
 
 const driverScore = (drivers: RecoveryDriver[], key: RecoveryDriver['key'], requireSignal: boolean) => {
@@ -166,10 +165,10 @@ export const HomeScreen = () => {
     checkIns,
     wearableSyncData,
     authSession,
+    publishedNutritionPlan,
     getMedicationTimelineForDate
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
-  const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
   );
@@ -244,27 +243,19 @@ export const HomeScreen = () => {
     }
   }, [hasAuthSession, sessionToken]);
 
-  const refreshDailyNutrition = useCallback(async () => {
-    if (!hasAuthSession) {
-      setDailyNutrition(null);
-      return;
-    }
-    try {
-      setDailyNutrition(await getNutritionExperience(nutritionDate()));
-    } catch {
-      setDailyNutrition(null);
-    }
-  }, [hasAuthSession]);
-
   useFocusEffect(
     useCallback(() => {
       void refreshPss10Context();
-      void refreshDailyNutrition();
-    }, [refreshDailyNutrition, refreshPss10Context])
+    }, [refreshPss10Context])
   );
-  useEffect(() => subscribeToNutritionDay(() => { void refreshDailyNutrition(); }), [refreshDailyNutrition]);
 
-  const nutritionScore = normalizeScore(dailyNutrition?.nutritionScore ?? null);
+  const nutritionProtein = publishedNutritionPlan?.version.contentSummary.protein ?? null;
+  const nutritionCalories = publishedNutritionPlan?.version.contentSummary.calories ?? null;
+  const nutritionScore = normalizeScore(
+    nutritionProtein != null && nutritionCalories != null
+      ? Math.min(100, Math.round((nutritionProtein / 120) * 55 + (nutritionCalories / 2200) * 45))
+      : wellness.nourishmentScore
+  );
   const metrics: RecoveryMetric[] = [
     {
       key: 'calm',
@@ -334,7 +325,7 @@ export const HomeScreen = () => {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.referenceFrame}>
             <HomeHeader
-              name={resolveClientFirstName(authSession?.user.name)}
+              name={firstName(onboarding?.name)}
               onSearch={() => navigation.navigate('Search')}
               onAdd={() => navigation.navigate('Leadership')}
               onNotifications={() => navigation.navigate('Notifications')}
@@ -631,7 +622,7 @@ const StressCard = ({
         <Text style={styles.cardTitle}>Stress Recovery</Text>
         <Ionicons name="headset-outline" size={20} color="#F4F7F4" />
       </View>
-      <Text style={styles.stressLabel}>Stress Test</Text>
+      <Text style={styles.stressLabel}>Perceived Stress</Text>
       <View style={styles.stressValueRow}>
         <Text style={styles.stressValue}>{stateText}</Text>
         {pss10Context.available && changeText ? <Text style={styles.stressTrend}>{changeText}</Text> : null}
