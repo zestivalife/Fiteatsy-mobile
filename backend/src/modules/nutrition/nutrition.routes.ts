@@ -523,7 +523,7 @@ platformNutritionRouter.get('/nutrition-experience', async (req, res) => {
 
 platformNutritionRouter.get('/nutrition-experience/pattern', async (req, res) => {
   const account = getAuthenticatedAccount(req);
-  const payload = await getClientNutritionPattern({ accountId: account.accountId, clientId: account.client.id });
+  const payload = await getClientNutritionPattern({ accountId: account.accountId, clientId: account.client.id }, typeof req.query.endDate === 'string' ? req.query.endDate : undefined);
   if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Your nutrition plan is being prepared.' });
   return res.status(200).json(payload);
 });

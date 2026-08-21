@@ -2231,32 +2231,48 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
 };
 
 export const getClientNutritionExperience = (owner: ClientOwnershipContext, selectedDateISO?: string) => buildNutritionProjection(owner, 1, selectedDateISO);
-export const getClientNutritionPattern = async (owner: ClientOwnershipContext) => {
-  const current = await buildNutritionProjection(owner, 7);
-  if (!current) return null;
+export const getClientNutritionPattern = async (owner: ClientOwnershipContext, endDateISO?: string) => {
+  const published = await getLatestPublishedDietPlanByClientId(owner);
+  if (!published) return null;
   const careCase = await getCareCaseByClientId(owner.clientId);
   const events = careCase ? await listHealthEvents(careCase.id) : [];
-  const start = Date.now() - 7 * 86400000;
-  const mealEvents = events.filter((event) => event.type === 'meal_logged' && new Date(event.eventTimeISO).getTime() >= start);
-  const followed = new Set<string>();
-  const outOfPlan = new Set<string>();
-  const skipped = new Set<string>();
-  for (const event of mealEvents) {
+  const endDate = endDateISO ?? new Date().toISOString().slice(0, 10);
+  if (!isCanonicalNutritionDate(endDate)) throw new NutritionPlanWorkflowError('INVALID_NUTRITION_DATE', 'Nutrition date must use YYYY-MM-DD.', 400);
+  const days = Array.from({ length: 7 }, (_, index) => nutritionDateKey(new Date(new Date(`${endDate}T12:00:00.000Z`).getTime() - ((6 - index) * 86400000))));
+  const daySet = new Set(days);
+  const latest = new Map<string, { state: NutritionConsumptionState; payload: Record<string, unknown> }>();
+  const waterByDay = new Map<string, number>();
+  for (const event of events) {
     const payload = parseNutritionEvent(event);
-    if (!payload || typeof payload.mealKey !== 'string') continue;
-    const day = event.eventTimeISO.slice(0, 10);
-    const key = `${day}:${payload.mealKey}`;
-    if (payload.state === 'CONSUMED_APPROVED') followed.add(key);
-    if (payload.state === 'CONSUMED_OUT_OF_PLAN') outOfPlan.add(key);
-    if (payload.state === 'SKIPPED') skipped.add(key);
+    const day = nutritionDateKey(event.eventTimeISO);
+    if (!payload || !daySet.has(day) || payload.planId !== published.plan.id || payload.versionId !== published.version.id) continue;
+    if (event.type === 'water_logged') waterByDay.set(day, (waterByDay.get(day) ?? 0) + Number(payload.waterMl ?? Number(payload.litres ?? 0) * 1000));
+    if (event.type === 'meal_logged' && typeof payload.mealKey === 'string') latest.set(`${day}:${payload.mealKey}`, { state: (payload.state as NutritionConsumptionState) ?? 'CONSUMED_APPROVED', payload });
   }
-  const proteinTarget = current.version.content.dailyTargets.protein;
+  const targets = resolveDailyNutritionTargets(published.version.content);
+  const dailyAdherence = days.map((date) => {
+    const rows = [...latest.entries()].filter(([key]) => key.startsWith(`${date}:`)).map(([, value]) => value);
+    const approved = rows.filter((row) => row.state === 'CONSUMED_APPROVED').length;
+    const outOfPlan = rows.filter((row) => row.state === 'CONSUMED_OUT_OF_PLAN').length;
+    const skipped = rows.filter((row) => row.state === 'SKIPPED').length;
+    const totals = rows.filter((row) => row.state === 'CONSUMED_APPROVED' || row.state === 'CONSUMED_OUT_OF_PLAN').reduce((sum, row) => ({ protein: sum.protein + Number(row.payload.proteinGrams ?? 0), fibre: sum.fibre + Number(row.payload.fibreGrams ?? 0) }), { protein: 0, fibre: 0 });
+    return { date, approved, outOfPlan, skipped, pending: Math.max(Object.keys(published.version.content.mealPlan).length - rows.length, 0), adherencePercent: rows.length ? Math.round((approved / rows.length) * 100) : null, proteinMet: targets.protein == null ? null : totals.protein >= targets.protein, fibreMet: targets.fibre == null ? null : totals.fibre >= targets.fibre, waterMet: targets.hydration == null ? null : (waterByDay.get(date) ?? 0) >= targets.hydration * 1000 };
+  });
+  const approvedCount = dailyAdherence.reduce((sum, day) => sum + day.approved, 0);
+  const outOfPlanCount = dailyAdherence.reduce((sum, day) => sum + day.outOfPlan, 0);
+  const skippedCount = dailyAdherence.reduce((sum, day) => sum + day.skipped, 0);
+  const resolvedCount = approvedCount + outOfPlanCount + skippedCount;
+  const whatWorked = approvedCount ? [`${approvedCount} consultant-approved meal${approvedCount === 1 ? '' : 's'} were logged in this period.`] : [];
+  const harderThisWeek = [...(outOfPlanCount ? [`${outOfPlanCount} meal${outOfPlanCount === 1 ? '' : 's'} were logged out of plan.`] : []), ...(skippedCount ? [`${skippedCount} planned meal${skippedCount === 1 ? ' was' : 's were'} skipped.`] : [])];
+  const nextFocus = outOfPlanCount ? ['Use the highest-ranked remaining approved option when the next meal is pending.'] : skippedCount ? ['Use a remaining approved option when a planned meal is difficult to complete.'] : approvedCount ? ['Continue the approved choices that supported adherence this week.'] : [];
   return {
-    periodDays: 7, planAdherencePercent: followed.size ? Math.round((followed.size / Math.max(1, followed.size + outOfPlan.size + skipped.size)) * 100) : null,
-    outOfPlanMeals: outOfPlan.size, skippedMeals: skipped.size,
-    waterTargetDays: current.water.targetLitres == null ? null : current.water.litres >= current.water.targetLitres ? 1 : 0,
-    targetRangeDays: { protein: proteinTarget == null ? null : current.totals.protein >= proteinTarget ? 1 : 0, fibre: null, water: current.water.targetLitres == null ? null : current.water.litres >= current.water.targetLitres ? 1 : 0 },
-    insights: current.mealsFollowed > 0 ? ['Your approved meal consistency is building a useful baseline.'] : [],
+    periodDays: 7, startDate: days[0], endDate: days[6], dailyAdherence,
+    planAdherencePercent: resolvedCount ? Math.round((approvedCount / resolvedCount) * 100) : null,
+    outOfPlanMeals: outOfPlanCount, skippedMeals: skippedCount,
+    waterTargetDays: targets.hydration == null ? null : dailyAdherence.filter((day) => day.waterMet).length,
+    targetRangeDays: { protein: targets.protein == null ? null : dailyAdherence.filter((day) => day.proteinMet).length, fibre: targets.fibre == null ? null : dailyAdherence.filter((day) => day.fibreMet).length, water: targets.hydration == null ? null : dailyAdherence.filter((day) => day.waterMet).length },
+    whatWorked, harderThisWeek, nextFocus, eatingPattern: resolvedCount ? [`${approvedCount} of ${resolvedCount} resolved meal heads followed the published plan.`] : [],
+    insights: [...whatWorked, ...harderThisWeek, ...nextFocus],
   };
 };
 
