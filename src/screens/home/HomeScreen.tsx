@@ -26,7 +26,9 @@ import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/r
 import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
 import { getMySubscription } from '../../services/subscriptionService';
+import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
 import type { DailyCheckIn, Medication, MedicationLogStatus } from '../../types';
+import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import {
   buildPss10StressContext,
   formatPss10Change,
@@ -127,7 +129,7 @@ const arcGradientForMetric = (key: MetricKey) => {
 };
 
 const scoreForHomeUi = (key: MetricKey, score: number | null) => (
-  ENABLE_HOME_RECOVERY_UI_FIXTURE ? HOME_RECOVERY_UI_FIXTURE[key] : score
+  ENABLE_HOME_RECOVERY_UI_FIXTURE && key !== 'nutrition' ? HOME_RECOVERY_UI_FIXTURE[key] : score
 );
 
 const driverScore = (drivers: RecoveryDriver[], key: RecoveryDriver['key'], requireSignal: boolean) => {
@@ -169,10 +171,10 @@ export const HomeScreen = () => {
     checkIns,
     wearableSyncData,
     authSession,
-    publishedNutritionPlan,
     getMedicationTimelineForDate
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
+  const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
   );
@@ -247,19 +249,27 @@ export const HomeScreen = () => {
     }
   }, [hasAuthSession, sessionToken]);
 
+  const refreshDailyNutrition = useCallback(async () => {
+    if (!hasAuthSession) {
+      setDailyNutrition(null);
+      return;
+    }
+    try {
+      setDailyNutrition(await getNutritionExperience(nutritionDate()));
+    } catch {
+      setDailyNutrition(null);
+    }
+  }, [hasAuthSession]);
+
   useFocusEffect(
     useCallback(() => {
       void refreshPss10Context();
-    }, [refreshPss10Context])
+      void refreshDailyNutrition();
+    }, [refreshDailyNutrition, refreshPss10Context])
   );
+  useEffect(() => subscribeToNutritionDay(() => { void refreshDailyNutrition(); }), [refreshDailyNutrition]);
 
-  const nutritionProtein = publishedNutritionPlan?.version.contentSummary.protein ?? null;
-  const nutritionCalories = publishedNutritionPlan?.version.contentSummary.calories ?? null;
-  const nutritionScore = normalizeScore(
-    nutritionProtein != null && nutritionCalories != null
-      ? Math.min(100, Math.round((nutritionProtein / 120) * 55 + (nutritionCalories / 2200) * 45))
-      : wellness.nourishmentScore
-  );
+  const nutritionScore = normalizeScore(dailyNutrition?.nutritionScore ?? null);
   const metrics: RecoveryMetric[] = [
     {
       key: 'calm',

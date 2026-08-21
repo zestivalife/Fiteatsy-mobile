@@ -1,4 +1,5 @@
 import { apiFetch, ApiClientError } from './apiClient';
+import { nutritionDate } from '../utils/nutritionDate';
 
 const TRANSIENT_NUTRITION_STATUSES = new Set([502, 503, 504]);
 
@@ -90,12 +91,13 @@ export type NutritionExperience = {
   plannedVsActual: { calories: { planned: number | null; actual: number }; mealsFollowed: { planned: number; actual: number }; outOfPlan: number; skipped: number };
   mealStates: Array<{ mealHeadId: string; mealHeadName: string; scheduledTime: string; status: NutritionMeal['state']; loggedEventId: string | null; loggedOptionId: string | null; loggedFood: string | null; timestamp: string | null }>;
   adherence: { percent: number; label: string };
+  nutritionScore: number;
   selectedDate: string;
   consultantNote: string | null;
 };
 
 export const getNutritionExperience = async (date?: string) => {
-  const canonicalDate = date ?? new Date().toISOString().slice(0, 10);
+  const canonicalDate = date ?? nutritionDate();
   const response = await nutritionFetch<NutritionExperience>(`/v1/platform/nutrition-experience?date=${encodeURIComponent(canonicalDate)}`);
   return { ...response, selectedDate: response.selectedDate || canonicalDate };
 };

@@ -2132,7 +2132,19 @@ const nutritionMealLabels: Record<string, string> = {
 };
 
 const canonicalNutritionDay = /^\d{4}-\d{2}-\d{2}$/;
-const nutritionDateKey = (value: string | Date) => new Date(value).toISOString().slice(0, 10);
+export const NUTRITION_TIME_ZONE = 'Asia/Kolkata';
+const nutritionDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: NUTRITION_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+export const nutritionDateKey = (value: string | Date) => {
+  const date = value instanceof Date ? value : new Date(value);
+  const parts = nutritionDateFormatter.formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+};
 export const isCanonicalNutritionDate = (value: string) => {
   if (!canonicalNutritionDay.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -2157,8 +2169,15 @@ export const resolveDailyNutritionTargets = (content: NutritionPlanContent) => {
 };
 
 export const isFutureNutritionDate = (selectedDate: string, now = new Date()) => {
-  const latestClientLocalDate = nutritionDateKey(new Date(now.getTime() + 86400000));
-  return selectedDate > latestClientLocalDate;
+  return selectedDate > nutritionDateKey(now);
+};
+
+const eventNutritionDate = (event: Awaited<ReturnType<typeof listHealthEvents>>[number]) => {
+  const payload = parseNutritionEvent(event);
+  const persistedDate = typeof payload?.nutritionDate === 'string' ? payload.nutritionDate : null;
+  return persistedDate && isCanonicalNutritionDate(persistedDate)
+    ? persistedDate
+    : nutritionDateKey(event.eventTimeISO);
 };
 
 const parseNutritionEvent = (event: Awaited<ReturnType<typeof listHealthEvents>>[number]) => {
@@ -2182,12 +2201,16 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
   const careCase = await getCareCaseByClientId(owner.clientId);
   if (!published || !careCase) return null;
   const events = await listHealthEvents(careCase.id);
-  const selectedDate = selectedDateISO ?? new Date().toISOString().slice(0, 10);
+  const selectedDate = selectedDateISO ?? nutritionDateKey(new Date());
   if (!isCanonicalNutritionDate(selectedDate)) throw new NutritionPlanWorkflowError('INVALID_NUTRITION_DATE', 'Nutrition date must use YYYY-MM-DD.', 400);
   if (isFutureNutritionDate(selectedDate)) throw new NutritionPlanWorkflowError('FUTURE_DATE_NOT_ALLOWED', 'Future Nutrition history is not available.', 400);
-  const end = new Date(`${selectedDate}T23:59:59.999Z`).getTime();
-  const start = rangeDays === 1 ? new Date(`${selectedDate}T00:00:00.000Z`).getTime() : end - ((rangeDays - 1) * 86400000);
-  const relevant = events.filter((event) => { const time = new Date(event.eventTimeISO).getTime(); return time >= start && time <= end; });
+  const selectedDayIndex = Math.floor(new Date(`${selectedDate}T12:00:00.000Z`).getTime() / 86400000);
+  const firstDayIndex = selectedDayIndex - (rangeDays - 1);
+  const relevant = events.filter((event) => {
+    const date = eventNutritionDate(event);
+    const dayIndex = Math.floor(new Date(`${date}T12:00:00.000Z`).getTime() / 86400000);
+    return dayIndex >= firstDayIndex && dayIndex <= selectedDayIndex;
+  });
   const mealEvents = relevant.filter((event) => {
     if (event.type !== 'meal_logged') return false;
     const payload = parseNutritionEvent(event);
@@ -2243,6 +2266,7 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
       : adherencePercent > 0
         ? 'Building consistency'
         : 'No meals logged yet';
+  const nutritionScore = Math.min(100, Math.round((totals.protein / 120) * 55 + (totals.calories / 2200) * 45));
   const latestEventTimestamp = relevant.reduce<string | null>((latest, event) => (
     latest == null || event.eventTimeISO > latest ? event.eventTimeISO : latest
   ), null);
@@ -2259,6 +2283,7 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
     mealSummary: { totalMealHeads: meals.length, followedMeals: consumedApprovedMeals, consumedApprovedMeals, outOfPlanMeals, skippedMeals, pendingMeals },
     mealStates,
     adherence: { percent: adherencePercent, label: adherenceLabel },
+    nutritionScore,
     plannedVsActual: { calories: { planned: targets.calories, actual: totals.calories }, mealsFollowed: { planned: meals.length, actual: consumedApprovedMeals }, outOfPlan: outOfPlanMeals, skipped: skippedMeals },
     mealCount: meals.length, mealsFollowed: consumedApprovedMeals,
     outOfPlanCount: outOfPlanMeals,
@@ -2274,7 +2299,7 @@ export const getClientNutritionPattern = async (owner: ClientOwnershipContext, e
   if (!published) return null;
   const careCase = await getCareCaseByClientId(owner.clientId);
   const events = careCase ? await listHealthEvents(careCase.id) : [];
-  const endDate = endDateISO ?? new Date().toISOString().slice(0, 10);
+  const endDate = endDateISO ?? nutritionDateKey(new Date());
   if (!isCanonicalNutritionDate(endDate)) throw new NutritionPlanWorkflowError('INVALID_NUTRITION_DATE', 'Nutrition date must use YYYY-MM-DD.', 400);
   const days = Array.from({ length: 7 }, (_, index) => nutritionDateKey(new Date(new Date(`${endDate}T12:00:00.000Z`).getTime() - ((6 - index) * 86400000))));
   const daySet = new Set(days);
@@ -2282,7 +2307,7 @@ export const getClientNutritionPattern = async (owner: ClientOwnershipContext, e
   const waterByDay = new Map<string, number>();
   for (const event of events) {
     const payload = parseNutritionEvent(event);
-    const day = nutritionDateKey(event.eventTimeISO);
+    const day = eventNutritionDate(event);
     if (!payload || !daySet.has(day) || payload.planId !== published.plan.id || payload.versionId !== published.version.id) continue;
     if (event.type === 'water_logged') waterByDay.set(day, (waterByDay.get(day) ?? 0) + Number(payload.waterMl ?? Number(payload.litres ?? 0) * 1000));
     if (event.type === 'meal_logged' && typeof payload.mealKey === 'string') latest.set(`${day}:${payload.mealKey}`, { state: (payload.state as NutritionConsumptionState) ?? 'CONSUMED_APPROVED', payload });
@@ -2359,6 +2384,7 @@ export const logClientNutritionEvent = async (owner: ClientOwnershipContext, inp
       fatGrams: selectedOption?.fatGrams ?? input.fatGrams ?? null,
       fibreGrams: selectedOption?.fibreGrams ?? input.fibreGrams ?? null,
       litres: input.litres ?? null,
+      nutritionDate: nutritionDateKey(eventTimeISO),
     },
   });
   return buildNutritionProjection(owner, 1, nutritionDateKey(eventTimeISO));
@@ -2381,7 +2407,7 @@ export const logClientNutritionWater = async (owner: ClientOwnershipContext, inp
     summary: `${input.waterMl} ml water logged`,
     replayKey: `${careCase.id}:water_logged:${input.versionId}:${eventTimeISO}`,
     eventTimeISO,
-    payload: { planId: input.planId, versionId: input.versionId, waterMl: input.waterMl },
+    payload: { planId: input.planId, versionId: input.versionId, waterMl: input.waterMl, nutritionDate: nutritionDateKey(eventTimeISO) },
   });
   return buildNutritionProjection(owner, 1, nutritionDateKey(eventTimeISO));
 };

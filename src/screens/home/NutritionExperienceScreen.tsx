@@ -8,11 +8,12 @@ import { Screen } from '../../components/Screen';
 import { radius, spacing, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
 import { getNutritionExperience, getNutritionPattern, logNutritionEvent, logWater, NutritionExperience, NutritionMeal } from '../../services/nutritionExperienceService';
+import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 
 const C = { bg: '#07070B', card: '#111117', raised: '#181820', line: '#272733', text: '#F3F2FA', muted: '#898899', blue: '#43C4FA', green: '#4BE38A', yellow: '#FFC229', purple: '#A985FF' };
 const fmt = (value: number | null) => value == null ? '—' : Math.round(value).toLocaleString('en-IN');
 const ratio = (value: number, target: number | null) => target && target > 0 ? Math.max(0, Math.min(1, value / target)) : 0;
-const day = () => new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+const day = () => new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata' });
 const isoDay = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -28,14 +29,25 @@ export const NutritionExperienceScreen = () => {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [selected, setSelected] = React.useState<NutritionMeal | null>(null);
-  const [selectedDate, setSelectedDate] = React.useState(() => isoDay(new Date()));
+  const [selectedDate, setSelectedDate] = React.useState(() => nutritionDate());
+  const viewingToday = React.useRef(true);
   const [showCalendar, setShowCalendar] = React.useState(false);
   const [draftDate, setDraftDate] = React.useState(() => new Date());
   const [showWater, setShowWater] = React.useState(false);
   const [waterAmount, setWaterAmount] = React.useState(.25);
   const [waterError, setWaterError] = React.useState<string | null>(null);
   const refresh = React.useCallback(async () => { setError(null); try { setData(await getNutritionExperience(selectedDate)); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load Nutrition.'); } }, [selectedDate]);
-  useFocusEffect(React.useCallback(() => { void refresh(); }, [refresh]));
+  useFocusEffect(React.useCallback(() => {
+    const today = nutritionDate();
+    if (viewingToday.current && selectedDate !== today) setSelectedDate(today);
+    else void refresh();
+  }, [refresh, selectedDate]));
+  React.useEffect(() => subscribeToNutritionDay((today) => {
+    if (viewingToday.current) {
+      setSelectedDate(today);
+      setPattern(null);
+    }
+  }), []);
 
   const updateMeal = async (meal: NutritionMeal, state: 'CONSUMED_APPROVED' | 'SKIPPED', option = meal.options[0]) => {
     if (!data) return;
@@ -48,7 +60,7 @@ export const NutritionExperienceScreen = () => {
   if (!data && !error) return <Screen contentStyle={styles.center}><ActivityIndicator color={C.blue} /></Screen>;
   if (!data) return <Screen contentStyle={styles.screen}><Text style={styles.title}>Nutrition</Text><View style={styles.card}><Text style={styles.body}>{error}</Text><Pressable onPress={() => void refresh()}><Text style={styles.blue}>Try again</Text></Pressable></View></Screen>;
   const pending = data.meals.filter(meal => meal.state === 'PENDING').length;
-  const isToday = selectedDate === isoDay(new Date());
+  const isToday = selectedDate === nutritionDate();
   const selectedLabel = isToday ? `Today, ${day()}` : new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   const onDateChange = (_event: DateTimePickerEvent, value?: Date) => { if (value) setDraftDate(value); };
   const saveWater = async () => {
@@ -61,7 +73,7 @@ export const NutritionExperienceScreen = () => {
   return <Screen scroll contentStyle={styles.screen}>
     <View style={styles.topRow}><View style={styles.tabs}><Tab label="Today's Plan" active={tab === 'today'} onPress={() => setTab('today')} /><Tab label="My Pattern" active={tab === 'pattern'} onPress={async () => { setTab('pattern'); if (!pattern) setPattern(await getNutritionPattern(selectedDate)); }} /></View><Pressable accessibilityRole="button" accessibilityLabel="Select Nutrition date" onPress={() => { setDraftDate(new Date(`${selectedDate}T12:00:00`)); setShowCalendar(true); }} style={styles.calendar}><Ionicons name="calendar-outline" size={20} color={C.text} /></Pressable></View>
     <Text style={styles.date}>{selectedLabel}</Text>
-    <Modal visible={showCalendar} transparent animationType="slide" onRequestClose={() => setShowCalendar(false)}><Pressable style={styles.backdrop} onPress={() => setShowCalendar(false)}><Pressable style={styles.pickerSheet} onPress={() => undefined}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Pressable onPress={() => setShowCalendar(false)}><Text style={styles.sheetCancel}>Cancel</Text></Pressable><Text style={styles.sheetTitle}>Select date</Text><Pressable onPress={() => { setSelectedDate(isoDay(draftDate)); setPattern(null); setShowCalendar(false); }}><Text style={styles.sheetDone}>Done</Text></Pressable></View><DateTimePicker value={draftDate} mode="date" display="inline" maximumDate={new Date()} onChange={onDateChange} themeVariant="dark" /></Pressable></Pressable></Modal>
+    <Modal visible={showCalendar} transparent animationType="slide" onRequestClose={() => setShowCalendar(false)}><Pressable style={styles.backdrop} onPress={() => setShowCalendar(false)}><Pressable style={styles.pickerSheet} onPress={() => undefined}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Pressable onPress={() => setShowCalendar(false)}><Text style={styles.sheetCancel}>Cancel</Text></Pressable><Text style={styles.sheetTitle}>Select date</Text><Pressable onPress={() => { const nextDate = isoDay(draftDate); viewingToday.current = nextDate === nutritionDate(); setSelectedDate(nextDate); setPattern(null); setShowCalendar(false); }}><Text style={styles.sheetDone}>Done</Text></Pressable></View><DateTimePicker value={draftDate} mode="date" display="inline" maximumDate={new Date()} onChange={onDateChange} themeVariant="dark" /></Pressable></Pressable></Modal>
     {tab === 'pattern' ? <Pattern pattern={pattern} /> : <>
       {data.consultantNote ? <View style={styles.consultant}><View style={styles.info}><Ionicons name="information-circle-outline" size={25} color={C.blue} /></View><View style={styles.flex}><Text style={styles.consultantLabel}>FROM YOUR CONSULTANT</Text><Text style={styles.consultantText}>{data.consultantNote}</Text></View></View> : null}
       <View style={styles.planStrip}><View style={styles.pill}><Text style={styles.pillText}>Active plan</Text></View><Text style={styles.muted}>·</Text><Text numberOfLines={1} style={[styles.muted, styles.flex]}>{data.version.content.nutritionSnapshot.programmeName}</Text><Text style={styles.muted}>v{data.version.versionNumber}</Text></View>

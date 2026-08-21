@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { NutritionPlanContent } from '../../backend/src/modules/platform/platform.types.js';
-import { isCanonicalNutritionDate, isFutureNutritionDate, resolveDailyNutritionTargets } from '../../backend/src/modules/nutrition/nutrition.service.js';
+import { isCanonicalNutritionDate, isFutureNutritionDate, nutritionDateKey, resolveDailyNutritionTargets } from '../../backend/src/modules/nutrition/nutrition.service.js';
 
 test('Nutrition date contract accepts real YYYY-MM-DD values only', () => {
   assert.equal(isCanonicalNutritionDate('2026-08-21'), true);
@@ -25,6 +25,14 @@ test('client-local today is not rejected during the positive timezone UTC bounda
   const beforeUtcMidnight = new Date('2026-08-21T19:26:00.000Z');
   assert.equal(isFutureNutritionDate('2026-08-22', beforeUtcMidnight), false);
   assert.equal(isFutureNutritionDate('2026-08-23', beforeUtcMidnight), true);
+});
+
+test('Nutrition business date rolls over exactly at midnight Asia/Kolkata', () => {
+  assert.equal(nutritionDateKey(new Date('2026-08-21T18:29:59.999Z')), '2026-08-21');
+  assert.equal(nutritionDateKey(new Date('2026-08-21T18:30:00.000Z')), '2026-08-22');
+  assert.equal(nutritionDateKey(new Date('2026-08-21T18:31:00.000Z')), '2026-08-22');
+  assert.equal(nutritionDateKey(new Date('2026-08-21T19:45:00.000Z')), '2026-08-22');
+  assert.equal(nutritionDateKey(new Date('2026-08-21T23:59:00.000Z')), '2026-08-22');
 });
 
 test('water has a dedicated millilitre contract and never uses meal validation', () => {
@@ -54,8 +62,8 @@ test('daily client projection exposes canonical date and reconciled meal states'
   assert.match(service, /mealStates/);
   assert.match(service, /adherence: \{ percent: adherencePercent, label: adherenceLabel \}/);
   assert.match(client, /nutrition-experience\?date=/);
-  assert.match(screen, /selectedDate.*isoDay\(new Date\(\)\)/s);
-  assert.match(screen, /getFullYear\(\)[\s\S]*getMonth\(\)[\s\S]*getDate\(\)/);
+  assert.match(screen, /selectedDate.*nutritionDate\(\)/s);
+  assert.match(screen, /subscribeToNutritionDay/);
   assert.doesNotMatch(screen, /new Date\(data\.selectedDate\)(?!T00:00:00)/);
   assert.match(routes, /NUTRITION_MEAL_PLAN_SHAPE_INVALID/);
   assert.match(routes, /NUTRITION_EVENT_TIME_INVALID/);
@@ -92,4 +100,18 @@ test('actual events stay scoped to the published plan version and preserve out-o
   assert.match(service, /selectedOption\?\.approxKcal \?\? input\.calories \?\? null/);
   assert.match(service, /selectedOption\?\.proteinGrams \?\? input\.proteinGrams \?\? null/);
   assert.match(service, /buildNutritionProjection\(owner, 1, nutritionDateKey\(eventTimeISO\)\)/);
+  assert.match(service, /nutritionDate: nutritionDateKey\(eventTimeISO\)/);
+});
+
+test('Home and Consultant consume the same date-scoped backend projection', () => {
+  const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const home = readFileSync(new URL('../../src/screens/home/HomeScreen.tsx', import.meta.url), 'utf8');
+  const dateUtility = readFileSync(new URL('../../src/utils/nutritionDate.ts', import.meta.url), 'utf8');
+
+  assert.match(service, /nutritionScore,/);
+  assert.match(service, /nutritionMonitoring: dailyMonitoring/);
+  assert.match(home, /getNutritionExperience\(nutritionDate\(\)\)/);
+  assert.match(home, /dailyNutrition\?\.nutritionScore/);
+  assert.match(dateUtility, /Asia\/Kolkata/);
+  assert.match(dateUtility, /AppState\.addEventListener/);
 });
