@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { NutritionPlanContent } from '../../backend/src/modules/platform/platform.types.js';
-import { isCanonicalNutritionDate, resolveDailyNutritionTargets } from '../../backend/src/modules/nutrition/nutrition.service.js';
+import { isCanonicalNutritionDate, resolveDailyNutritionTargets, resolveNutritionConsultantNote } from '../../backend/src/modules/nutrition/nutrition.service.js';
 
 test('Nutrition date contract accepts real YYYY-MM-DD values only', () => {
   assert.equal(isCanonicalNutritionDate('2026-08-21'), true);
@@ -19,6 +19,17 @@ test('legacy published plans deterministically resolve all macro targets', () =>
   assert.deepEqual(resolveDailyNutritionTargets(content), {
     calories: 1800, protein: 120, carbohydrates: 203, fat: 60, fibre: 25, hydration: 2.5, movement: 'Walk',
   });
+});
+
+test('legacy published plans without clinical notes still produce consultant guidance safely', () => {
+  const content = {
+    nutritionSnapshot: { personalisedPlanFocus: 'Focus on protein and hydration.' },
+    dailyTargets: { calories: 1800, protein: 120, hydration: 2.5 },
+    mealPlan: {},
+  } as unknown as NutritionPlanContent;
+
+  assert.equal(resolveNutritionConsultantNote(content), 'Focus on protein and hydration.');
+  assert.doesNotThrow(() => resolveDailyNutritionTargets(content));
 });
 
 test('water has a dedicated millilitre contract and never uses meal validation', () => {

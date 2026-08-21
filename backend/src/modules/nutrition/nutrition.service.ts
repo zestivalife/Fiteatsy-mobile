@@ -2140,20 +2140,31 @@ export const isCanonicalNutritionDate = (value: string) => {
 };
 
 export const resolveDailyNutritionTargets = (content: NutritionPlanContent) => {
-  const options = (Object.values(content.mealPlan) as Array<NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]>).map(section => section.options[0]).filter(Boolean);
+  const mealPlan = content.mealPlan ?? {} as NutritionPlanContent['mealPlan'];
+  const options = (Object.values(mealPlan) as Array<NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]>).map(section => section?.options?.[0]).filter(Boolean);
   const sum = (field: 'approxKcal' | 'proteinGrams' | 'carbsGrams' | 'fatGrams' | 'fibreGrams') => {
     const values = options.map(option => option?.[field]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     return values.length ? Math.round(values.reduce((total, value) => total + value, 0)) : null;
   };
-  const calories = content.dailyTargets.calories ?? sum('approxKcal');
+  const dailyTargets = content.dailyTargets ?? {} as NutritionPlanContent['dailyTargets'];
+  const calories = dailyTargets.calories ?? sum('approxKcal');
   return {
-    ...content.dailyTargets,
+    ...dailyTargets,
     calories,
-    protein: content.dailyTargets.protein ?? sum('proteinGrams'),
-    carbohydrates: content.dailyTargets.carbohydrates ?? sum('carbsGrams') ?? (calories == null ? null : Math.round((calories * .45) / 4)),
-    fat: content.dailyTargets.fat ?? sum('fatGrams') ?? (calories == null ? null : Math.round((calories * .3) / 9)),
-    fibre: content.dailyTargets.fibre ?? sum('fibreGrams') ?? (calories == null ? null : Math.max(25, Math.round((calories / 1000) * 14))),
+    protein: dailyTargets.protein ?? sum('proteinGrams'),
+    carbohydrates: dailyTargets.carbohydrates ?? sum('carbsGrams') ?? (calories == null ? null : Math.round((calories * .45) / 4)),
+    fat: dailyTargets.fat ?? sum('fatGrams') ?? (calories == null ? null : Math.round((calories * .3) / 9)),
+    fibre: dailyTargets.fibre ?? sum('fibreGrams') ?? (calories == null ? null : Math.max(25, Math.round((calories / 1000) * 14))),
   };
+};
+
+export const resolveNutritionConsultantNote = (content: NutritionPlanContent) => {
+  const notes = Array.isArray(content.supplementsAndClinicalNotes)
+    ? content.supplementsAndClinicalNotes
+    : [];
+  return notes.map((item) => item?.note).find((note) => typeof note === 'string' && note.trim().length > 0)
+    ?? content.nutritionSnapshot?.personalisedPlanFocus?.trim()
+    ?? null;
 };
 
 const parseNutritionEvent = (event: Awaited<ReturnType<typeof listHealthEvents>>[number]) => {
@@ -2212,11 +2223,12 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
     fat: targets.fat == null ? null : Math.max(0, targets.fat - totals.fat),
     fibre: targets.fibre == null ? null : Math.max(0, targets.fibre - totals.fibre),
   };
-  const meals = (Object.entries(published.version.content.mealPlan) as Array<[keyof NutritionPlanContent['mealPlan'], NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]]>).map(([key, section]) => {
-    const ranking = section.options.map((option) => ({ option, rank: scoreApprovedOption(option, remaining) })).sort((a, b) => b.rank.score - a.rank.score);
+  const mealPlan = published.version.content.mealPlan ?? {} as NutritionPlanContent['mealPlan'];
+  const meals = (Object.entries(mealPlan) as Array<[keyof NutritionPlanContent['mealPlan'], NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]]>).map(([key, section]) => {
+    const ranking = (section?.options ?? []).map((option) => ({ option, rank: scoreApprovedOption(option, remaining) })).sort((a, b) => b.rank.score - a.rank.score);
     const current = latestByMeal.get(key);
     return {
-      key, label: nutritionMealLabels[key], window: section.window, options: ranking.map(({ option, rank }) => ({ ...option, rankingReasons: rank.reasons })),
+      key, label: nutritionMealLabels[key] ?? key, window: section?.window ?? '', options: ranking.map(({ option, rank }) => ({ ...option, rankingReasons: rank.reasons })),
       state: current?.state ?? 'PENDING', consumedAtISO: current?.eventTimeISO ?? null,
       consumed: current?.payload ?? null,
     };
@@ -2260,7 +2272,7 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
     outOfPlanCount: outOfPlanMeals,
     skippedCount: skippedMeals,
     pendingCount: pendingMeals,
-    consultantNote: published.version.content.supplementsAndClinicalNotes.map((item) => item.note).find(Boolean) ?? null,
+    consultantNote: resolveNutritionConsultantNote(published.version.content),
   };
 };
 
