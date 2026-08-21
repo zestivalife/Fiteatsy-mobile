@@ -288,7 +288,7 @@ export const getLatestPublishedDietPlanByClientId = async (owner: ClientOwnershi
         and cc.deleted_at is null
         and dp.deleted_at is null
         and dp.status = 'active'
-        and dp.plan_status = 'published'
+        and dp.latest_published_version_id is not null
       order by dp.published_at desc nulls last, dp.updated_at desc
       limit 1
     `,
@@ -589,6 +589,81 @@ export const updateDietPlanLifecycle = async (input: {
     plan: mapDietPlan(updatedPlan.rows[0]),
     version: updatedVersion.rowCount ? mapDietPlanVersion(updatedVersion.rows[0]) : null,
   };
+};
+
+export const publishApprovedDietPlanVersion = async (input: {
+  dietPlanId: string;
+  versionId: string;
+  publishedBy: string;
+  sourceSnapshot: NutritionPlanSourceSnapshot;
+}) => {
+  const client = await pool.connect();
+  const timestamp = nowIso();
+  try {
+    await client.query('begin');
+    const versionResult = await client.query(
+      `
+        update diet_plan_versions
+        set lifecycle_status = 'published',
+            updated_at = $3,
+            version = version + 1
+        where id = $1
+          and diet_plan_id = $2
+          and lifecycle_status in ('approved', 'published')
+          and deleted_at is null
+        returning *
+      `,
+      [input.versionId, input.dietPlanId, timestamp],
+    );
+    if (versionResult.rowCount === 0) {
+      await client.query('rollback');
+      return null;
+    }
+
+    const planResult = await client.query(
+      `
+        update diet_plans
+        set latest_published_version_id = $2,
+            plan_status = 'published',
+            approved_by = coalesce(approved_by, $3),
+            approved_at = coalesce(approved_at, $4),
+            published_at = case when latest_published_version_id = $2 then published_at else $4 end,
+            reviewed_by = $3,
+            reviewed_at = $4,
+            source_snapshot = $5::jsonb,
+            updated_at = $4,
+            version = version + 1
+        where id = $1
+          and deleted_at is null
+        returning *
+      `,
+      [input.dietPlanId, input.versionId, input.publishedBy, timestamp, JSON.stringify(input.sourceSnapshot)],
+    );
+    if (planResult.rowCount === 0) {
+      await client.query('rollback');
+      return null;
+    }
+
+    await client.query(
+      `insert into diet_plan_review_events (id, diet_plan_id, diet_plan_version_id, actor_user_id, event_type, comment)
+       select $1, $2, $3, $4, 'published', null
+       where not exists (
+         select 1 from diet_plan_review_events
+         where diet_plan_id = $2 and diet_plan_version_id = $3 and event_type = 'published'
+       )`,
+      [crypto.randomUUID(), input.dietPlanId, input.versionId, input.publishedBy],
+    );
+    await client.query('commit');
+    return {
+      plan: mapDietPlan(planResult.rows[0]),
+      version: mapDietPlanVersion(versionResult.rows[0]),
+    };
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 

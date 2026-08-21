@@ -11,6 +11,10 @@ import {
   getConsultantLatestDietPlan,
   getConsultantNutritionIntelligence,
   getPublishedDietPlanForClient,
+  getDietPlanDeliveryStatusForClient,
+  getClientNutritionExperience,
+  getClientNutritionPattern,
+  logClientNutritionEvent,
   NutritionPlanWorkflowError,
   publishConsultantDietPlan,
   requestConsultantDietPlanChanges,
@@ -18,9 +22,6 @@ import {
   updateConsultantDietPlanDraft,
   exportConsultantDietPlanDocument,
   logNutritionMealConsumption,
-  getClientNutritionExperience,
-  getClientNutritionPattern,
-  logClientNutritionEvent,
 } from './nutrition.service.js';
 import { getFoodPreferenceProfile, listVerifiedFoodCatalogue, updateFoodPreferenceProfile } from './food-preferences.service.js';
 
@@ -159,6 +160,10 @@ const updateDraftSchema = z.object({
 
 const reviewCommentSchema = z.object({
   comment: z.string().trim().min(1).max(2000),
+});
+
+const publishDietPlanSchema = z.object({
+  approvedVersionId: z.string().trim().min(1),
 });
 
 const markMealConsumedSchema = z.object({
@@ -385,10 +390,12 @@ consultantNutritionRouter.post('/clients/:clientId/diet-plans/:dietPlanId/approv
 });
 
 consultantNutritionRouter.post('/clients/:clientId/diet-plans/:dietPlanId/publish', async (req, res) => {
+  const parsed = publishDietPlanSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: 'APPROVED_VERSION_REQUIRED', details: parsed.error.flatten() });
   const account = getAuthenticatedAccount(req);
   let payload;
   try {
-    payload = await publishConsultantDietPlan(req.params.clientId, account, req.params.dietPlanId);
+    payload = await publishConsultantDietPlan(req.params.clientId, account, req.params.dietPlanId, parsed.data.approvedVersionId);
   } catch (error) {
     return handleNutritionRouteError(res, error);
   }
@@ -462,6 +469,14 @@ platformNutritionRouter.get('/nutrition-plan', async (req, res) => {
     ...payload,
     today: buildTodayNutritionView(payload.version.content),
   });
+});
+
+platformNutritionRouter.get('/nutrition-plan/status', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  return res.status(200).json(await getDietPlanDeliveryStatusForClient({
+    accountId: account.accountId,
+    clientId: account.client.id,
+  }));
 });
 
 platformNutritionRouter.get('/nutrition-plan/today', async (req, res) => {

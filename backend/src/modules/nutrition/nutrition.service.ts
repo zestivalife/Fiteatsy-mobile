@@ -34,6 +34,7 @@ import {
   updateDietPlanVersionContent,
   updateDietPlanVersionExportPaths,
   listDietPlanReviewQueue,
+  publishApprovedDietPlanVersion,
 } from './nutrition.store.js';
 import { generateDietPlanDocument } from './nutrition.document.js';
 import { buildRecommendationSets, calculateMealNutritionTotals, classifyMealMatch, deriveMealTargets } from './meal-engine.js';
@@ -63,6 +64,10 @@ const isConsultantRole = (account: AuthenticatedAccount) =>
 
 export const canApproveOrPublishDietPlan = (account: AuthenticatedAccount) =>
   ['senior_consultant', 'admin', 'superuser', 'platform_owner'].includes(account.user.role?.toLowerCase() ?? '');
+
+export const canPublishAssignedDietPlan = (account: AuthenticatedAccount, assignedConsultantId: string | null | undefined) =>
+  canApproveOrPublishDietPlan(account) ||
+  (isConsultantRole(account) && assignedConsultantId != null && assignedConsultantId === account.accountId);
 
 const unique = (values: Array<string | null | undefined>) =>
   Array.from(new Set(values.map((value) => (value ?? '').trim()).filter(Boolean)));
@@ -1335,6 +1340,46 @@ export const assertLifecycleTransition = (
   }
 };
 
+export const assertPublishVersionEligibility = (input: {
+  dietPlanId: string;
+  requestedVersionId: string;
+  requestedVersionDietPlanId: string;
+  requestedVersionLifecycle: DietPlanVersionRecord['lifecycleStatus'];
+  latestPublishedVersionId: string | null;
+}) => {
+  if (input.requestedVersionDietPlanId !== input.dietPlanId) {
+    throw new NutritionPlanWorkflowError('DIET_PLAN_VERSION_MISMATCH', 'The approved version does not belong to this diet plan.', 409);
+  }
+  if (
+    input.requestedVersionLifecycle === 'published' &&
+    input.latestPublishedVersionId === input.requestedVersionId
+  ) {
+    return 'already_published' as const;
+  }
+  if (input.requestedVersionLifecycle !== 'approved') {
+    throw new NutritionPlanWorkflowError('DIET_PLAN_VERSION_NOT_APPROVED', 'Only the exact Senior-Consultant-approved version can be published.', 409);
+  }
+  return 'publish' as const;
+};
+
+export const classifyDietPlanDeliveryLifecycle = (input: {
+  planStatus: string;
+  currentLifecycle: string | null;
+  latestPublishedVersionId: string | null;
+  publishedVersionId: string | null;
+  publishedLifecycle: string | null;
+}) => {
+  if (
+    input.latestPublishedVersionId != null &&
+    input.publishedVersionId === input.latestPublishedVersionId &&
+    input.publishedLifecycle === 'published'
+  ) return 'ACTIVE_PUBLISHED' as const;
+  const lifecycle = input.currentLifecycle ?? input.planStatus;
+  if (lifecycle === 'approved' || input.planStatus === 'approved') return 'APPROVED_NOT_PUBLISHED' as const;
+  if (lifecycle === 'submitted_for_review' || lifecycle === 'changes_requested') return 'PENDING_APPROVAL' as const;
+  return 'PREPARING' as const;
+};
+
 const buildMacroTargets = (tdee: number | null) => {
   if (tdee == null) return null;
   const caloriesKcal = Math.round(tdee);
@@ -1790,22 +1835,32 @@ export const publishConsultantDietPlan = async (
   publicClientId: string,
   account: AuthenticatedAccount,
   dietPlanId: string,
+  approvedVersionId: string,
 ) => {
   if (!isConsultantRole(account)) return null;
-  if (!canApproveOrPublishDietPlan(account)) {
+  const workspace = await getWorkspaceContext(publicClientId);
+  if (!workspace || !workspace.careCase) return null;
+  if (!canPublishAssignedDietPlan(account, workspace.careCase.assignedConsultantId)) {
     throw new NutritionPlanWorkflowError(
       'ROLE_NOT_ALLOWED',
-      'Only Senior Consultants can publish nutrition plans.',
+      'Only the assigned Consultant or an authorised Senior Consultant can publish this nutrition plan.',
       403,
     );
   }
-  const workspace = await getWorkspaceContext(publicClientId);
-  if (!workspace || !workspace.careCase) return null;
   const plan = await getDietPlanById(dietPlanId);
-  if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
-  const currentVersion = await getCurrentDietPlanVersion(plan.id);
-  if (!currentVersion) return null;
-  assertLifecycleTransition(currentVersion.lifecycleStatus, 'published');
+  if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
+  const approvedVersion = await getDietPlanVersionById(approvedVersionId);
+  if (!approvedVersion) return null;
+  const publishAction = assertPublishVersionEligibility({
+    dietPlanId: plan.id,
+    requestedVersionId: approvedVersion.id,
+    requestedVersionDietPlanId: approvedVersion.dietPlanId,
+    requestedVersionLifecycle: approvedVersion.lifecycleStatus,
+    latestPublishedVersionId: plan.latestPublishedVersionId,
+  });
+  if (publishAction === 'already_published') {
+    return { plan, version: approvedVersion };
+  }
   const sourceSnapshot = buildSourceSnapshot({
     bmi: workspace.metrics.bmi.status === 'AVAILABLE' ? workspace.metrics.bmi.value : null,
     weightKg: workspace.context.calculationInput.weightKg,
@@ -1825,13 +1880,10 @@ export const publishConsultantDietPlan = async (
     },
     stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
   });
-  const result = await updateDietPlanLifecycle({
+  const result = await publishApprovedDietPlanVersion({
     dietPlanId: plan.id,
-    consultantId: account.accountId,
-    currentVersionId: plan.currentVersionId,
-    lifecycle: 'published',
-    approvedBy: account.accountId,
-    reviewEventType: 'published',
+    versionId: approvedVersion.id,
+    publishedBy: account.accountId,
     sourceSnapshot,
   });
   await transitionCareCaseStageBestEffort(
@@ -1955,6 +2007,80 @@ export const getPublishedDietPlanForClient = async (owner: ClientOwnershipContex
   };
 };
 
+export const getDietPlanDeliveryStatusForClient = async (owner: ClientOwnershipContext) => {
+  const careCase = await getCareCaseByClientId(owner.clientId);
+  if (!careCase) return { status: 'NO_PLAN' as const, plan: null };
+
+  const plan = await getDietPlanByCareCaseId(careCase.id);
+  if (!plan) return { status: 'NO_PLAN' as const, plan: null };
+
+  const version = plan.currentVersionId ? await getCurrentDietPlanVersion(plan.id) : null;
+  const publishedVersion = plan.latestPublishedVersionId
+    ? await getDietPlanVersionById(plan.latestPublishedVersionId)
+    : null;
+  const lifecycleStatus = version?.lifecycleStatus ?? plan.planStatus;
+  const deliveryLifecycle = classifyDietPlanDeliveryLifecycle({
+    planStatus: plan.planStatus,
+    currentLifecycle: version?.lifecycleStatus ?? null,
+    latestPublishedVersionId: plan.latestPublishedVersionId,
+    publishedVersionId: publishedVersion?.id ?? null,
+    publishedLifecycle: publishedVersion?.lifecycleStatus ?? null,
+  });
+
+  if (deliveryLifecycle === 'ACTIVE_PUBLISHED' && publishedVersion) {
+    return {
+      status: 'ACTIVE_PUBLISHED' as const,
+      plan: {
+        id: plan.id,
+        versionId: publishedVersion.id,
+        planStatus: plan.planStatus,
+        lifecycleStatus: publishedVersion.lifecycleStatus,
+        approvedAtISO: plan.approvedAtISO,
+        publishedAtISO: plan.publishedAtISO,
+      },
+    };
+  }
+
+  if (deliveryLifecycle === 'APPROVED_NOT_PUBLISHED') {
+    return {
+      status: 'APPROVED_NOT_PUBLISHED' as const,
+      plan: {
+        id: plan.id,
+        versionId: version?.id ?? null,
+        planStatus: plan.planStatus,
+        lifecycleStatus,
+        approvedAtISO: plan.approvedAtISO,
+        publishedAtISO: plan.publishedAtISO,
+      },
+    };
+  }
+
+  if (deliveryLifecycle === 'PENDING_APPROVAL') {
+    return {
+      status: 'PENDING_APPROVAL' as const,
+      plan: {
+        id: plan.id,
+        versionId: version?.id ?? null,
+        planStatus: plan.planStatus,
+        lifecycleStatus,
+        approvedAtISO: plan.approvedAtISO,
+        publishedAtISO: plan.publishedAtISO,
+      },
+    };
+  }
+
+  return {
+    status: 'PREPARING' as const,
+    plan: {
+      id: plan.id,
+      versionId: version?.id ?? null,
+      planStatus: plan.planStatus,
+      lifecycleStatus,
+      approvedAtISO: plan.approvedAtISO,
+      publishedAtISO: plan.publishedAtISO,
+    },
+  };
+};
 type NutritionConsumptionState = 'PENDING' | 'CONSUMED_APPROVED' | 'CONSUMED_OUT_OF_PLAN' | 'SKIPPED';
 type NutritionReasonCode = 'HIGHER_PROTEIN' | 'HIGHER_FIBRE' | 'LOWER_FAT' | 'CALORIE_FIT' | 'BALANCED_OPTION';
 
