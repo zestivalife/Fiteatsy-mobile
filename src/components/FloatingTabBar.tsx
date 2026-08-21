@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { getThemeColors, typography } from '../design/tokens';
+import { getThemeColors, radius, spacing, typography } from '../design/tokens';
 import { MainTabParamList } from '../navigation/types';
 import { useAppContext } from '../state/AppContext';
 
@@ -27,7 +27,7 @@ const labelMap: Record<keyof MainTabParamList, string> = {
   Cycle: 'Cycle'
 };
 
-export const FloatingTabBar = ({ state, navigation }: BottomTabBarProps) => {
+export const FloatingTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
   const insets = useSafeAreaInsets();
   const { themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
@@ -35,63 +35,49 @@ export const FloatingTabBar = ({ state, navigation }: BottomTabBarProps) => {
 
   return (
     <View pointerEvents="box-none" style={styles.container}>
-      <BlurView intensity={42} tint={isLight ? 'light' : 'dark'} style={[styles.blurShell, { borderColor: palette.strokeStrong }]}>
+      <BlurView
+        intensity={52}
+        tint={isLight ? 'light' : 'dark'}
+        style={[styles.blurShell, { borderColor: isLight ? '#C7D2DF' : '#000000' }]}
+      >
         <LinearGradient
-          colors={isLight ? ['rgba(255,255,255,0.96)', 'rgba(247,250,244,0.96)'] : ['rgba(18,19,18,0.92)', 'rgba(6,8,7,0.94)']}
+          colors={isLight ? ['rgba(255,255,255,0.78)', '#EFF4FA', '#E5EDF6'] : ['rgba(0,0,0,0.29)', '#323232', '#151515']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.bar, { paddingBottom: Math.max(8, insets.bottom) }]}
+          style={[styles.bar, { paddingBottom: Math.max(2, Math.round(insets.bottom * 0.45)) }]}
         >
           {state.routes.map((route, index) => {
             const isFocused = state.index === index;
-            const routeName = route.name as keyof MainTabParamList;
             const onPress = () => {
               const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
               if (!isFocused && !event.defaultPrevented) {
                 navigation.navigate(route.name);
               }
             };
+            const onLongPress = () => navigation.emit({ type: 'tabLongPress', target: route.key });
+            const label = descriptors[route.key].options.tabBarLabel ?? descriptors[route.key].options.title ?? route.name;
 
             return (
               <Pressable
                 key={route.key}
                 accessibilityRole="button"
                 accessibilityState={isFocused ? { selected: true } : {}}
-                accessibilityLabel={labelMap[routeName]}
+                accessibilityLabel={labelMap[route.name as keyof MainTabParamList]}
                 onPress={onPress}
-                style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+                onLongPress={onLongPress}
+                style={({ pressed }) => [styles.item, isFocused && styles.itemActive, pressed && styles.itemPressed]}
               >
-                <View
-                  style={[
-                    styles.itemInner,
-                    isFocused
-                      ? {
-                          backgroundColor: '#5FC100',
-                          borderColor: '#5FC100'
-                        }
-                      : {
-                          backgroundColor: 'transparent',
-                          borderColor: 'transparent'
-                        }
-                  ]}
-                >
+                <View style={[styles.itemInner, isFocused && styles.itemInnerActive]}>
                   <Ionicons
-                    name={iconMap[routeName]}
+                    name={iconMap[route.name as keyof MainTabParamList]}
                     size={20}
-                    color={isFocused ? '#FFFFFF' : palette.textMuted}
+                    color={isFocused ? (isLight ? '#000000' : palette.white) : palette.textMuted}
                   />
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.label,
-                      {
-                        color: isFocused ? '#FFFFFF' : palette.textMuted,
-                        fontFamily: isFocused ? 'Exo_700Bold' : 'Exo_500Medium'
-                      }
-                    ]}
-                  >
-                    {labelMap[routeName]}
-                  </Text>
+                  {isFocused ? (
+                    <Text numberOfLines={1} style={[styles.label, { color: isLight ? '#000000' : palette.white }, styles.labelActive]}>
+                      {String(label)}
+                    </Text>
+                  ) : null}
                 </View>
               </Pressable>
             );
@@ -105,44 +91,57 @@ export const FloatingTabBar = ({ state, navigation }: BottomTabBarProps) => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 14
+    left: spacing.sm,
+    right: spacing.sm,
+    bottom: 0,
+    backgroundColor: 'transparent'
   },
   blurShell: {
     overflow: 'hidden',
-    borderRadius: 28,
-    borderWidth: 1
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 14
   },
   bar: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingTop: 7,
-    minHeight: 68
+    paddingHorizontal: spacing.xs,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
+    minHeight: 74
   },
   item: {
     flex: 1,
-    alignItems: 'center'
-  },
-  itemInner: {
-    width: '100%',
-    minHeight: 55,
-    borderRadius: 25,
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 8,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4
+    minHeight: 44,
+    paddingVertical: 6
+  },
+  itemActive: {
+    backgroundColor: '#60AF00',
+    flex: 1.55
+  },
+  itemInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0
+  },
+  itemInnerActive: {
+    gap: 6
   },
   itemPressed: {
     transform: [{ scale: 0.97 }]
   },
   label: {
     ...typography.caption,
-    fontSize: 10,
-    lineHeight: 12,
-    textAlign: 'center'
+    fontSize: 12
+  },
+  labelActive: {
+    fontFamily: 'Poppins_700Bold'
   }
 });

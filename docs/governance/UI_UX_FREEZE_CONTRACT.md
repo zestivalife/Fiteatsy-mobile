@@ -28,3 +28,12 @@ Every UI-affecting change must record:
 - confirmation that unrelated frozen screens remain unchanged.
 
 If an unrelated frozen screen changes, the change must be reverted before acceptance.
+
+## Footer navigation baseline
+
+THE CURRENT OVERSIZED FLOATING FOOTER SHOWN IN THE 22 AUG 2026 01:28 SIMULATOR SCREENSHOT IS A KNOWN LEGACY/REGRESSED COMPONENT AND MUST NOT BE USED AS A UI FREEZE BASELINE.
+
+- Canonical component: `src/components/FloatingTabBar.tsx`
+- Accepted navigation source SHA: `94791be461c39ba41c6791955bdbf6d59bfc24a6`
+- Frozen behaviour: compact floating shell, safe-area-aware bottom padding, icon-only inactive tabs, and a compact horizontal icon-and-label selected state.
+- Current required routes: Home, Tracker, Nutrition, Reports, Sessions, Cycle.
