@@ -1726,7 +1726,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: palette.textDark
   },
   heroCard: {
@@ -1767,7 +1767,7 @@ const styles = StyleSheet.create({
   heroToggleText: {
     fontSize: 12,
     color: '#000000',
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -1785,7 +1785,7 @@ const styles = StyleSheet.create({
     fontSize: 56,
     marginTop: 4,
     lineHeight: 62,
-    fontFamily: 'Poppins_400Regular'
+    fontFamily: 'Exo_400Regular'
   },
   heroSub: {
     fontSize: 13,
@@ -1830,12 +1830,12 @@ const styles = StyleSheet.create({
   categoryName: {
     flex: 1,
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: palette.textMid
   },
   categoryScoreBadge: {
     fontSize: 16,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   miniTrack: {
     height: 7,
@@ -1849,13 +1849,13 @@ const styles = StyleSheet.create({
   categoryScore: {
     marginTop: 4,
     fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: palette.textDark
   },
   categoryCaption: {
     marginTop: 5,
     fontSize: 11,
-    fontFamily: 'Poppins_500Medium',
+    fontFamily: 'Exo_500Medium',
     color: colors.textMuted
   },
   categoryCaptionDark: {
@@ -1876,7 +1876,7 @@ const styles = StyleSheet.create({
   seeAll: {
     fontSize: 12,
     color: palette.teal,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   nuetraCard: {
     borderRadius: 16,
@@ -1897,11 +1897,11 @@ const styles = StyleSheet.create({
   nuetraBadgeText: {
     color: colors.white,
     fontSize: 11,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   nuetraTitle: {
     fontSize: 17,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: '#000000',
     marginBottom: 6
   },
@@ -1914,7 +1914,7 @@ const styles = StyleSheet.create({
   askNuetra: {
     color: '#000000',
     fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   shimmerBlock: {
     position: 'relative',
@@ -1944,7 +1944,7 @@ const styles = StyleSheet.create({
   },
   detailTitle: {
     fontSize: 16,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: palette.textDark,
     marginBottom: 10
   },
@@ -1968,12 +1968,12 @@ const styles = StyleSheet.create({
   parameterName: {
     color: palette.textDark,
     fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   parameterValue: {
     color: palette.coral,
     fontSize: 14,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   parameterRange: {
     marginTop: 3,
@@ -2002,7 +2002,7 @@ const styles = StyleSheet.create({
   },
   actionPriority: {
     fontSize: 11,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: palette.teal,
     backgroundColor: palette.tealLight,
     paddingHorizontal: 7,
@@ -2011,7 +2011,7 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: palette.textDark,
     flex: 1
   },
@@ -2024,7 +2024,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     color: palette.coral,
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   crossRow: {
     borderRadius: 12,
@@ -2066,7 +2066,7 @@ const styles = StyleSheet.create({
   trendChartName: {
     flex: 1,
     fontSize: 13,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: palette.textDark
   },
   trendChartNameDark: {
@@ -2077,7 +2077,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     fontSize: 11,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   trendChartBadgeGood: {
     color: palette.teal,
@@ -2127,7 +2127,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: palette.textDark
   },
   countChip: {
@@ -2139,7 +2139,7 @@ const styles = StyleSheet.create({
   countChipText: {
     color: palette.teal,
     fontSize: 12,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   historyActions: {
     flexDirection: 'row',
@@ -2156,7 +2156,7 @@ const styles = StyleSheet.create({
   deleteAllChipText: {
     color: palette.coral,
     fontSize: 12,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   disabledChip: {
     opacity: 0.45
@@ -2183,7 +2183,7 @@ const styles = StyleSheet.create({
   deleteText: {
     color: colors.white,
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   reportRow: {
     flexDirection: 'row',
@@ -2206,7 +2206,7 @@ const styles = StyleSheet.create({
   reportAvatarText: {
     color: colors.white,
     fontSize: 12,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   reportMiddle: {
     flex: 1,
@@ -2214,7 +2214,7 @@ const styles = StyleSheet.create({
   },
   reportLab: {
     fontSize: 15,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: palette.textDark
   },
   reportDate: {
@@ -2225,7 +2225,7 @@ const styles = StyleSheet.create({
   reportMeta: {
     fontSize: 12,
     marginTop: 2,
-    fontFamily: 'Poppins_500Medium'
+    fontFamily: 'Exo_500Medium'
   },
   metaBad: {
     color: palette.coral
@@ -2247,11 +2247,11 @@ const styles = StyleSheet.create({
   },
   scoreBadgeText: {
     fontSize: 17,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   trend: {
     fontSize: 16,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   trendUp: {
     color: '#60AF00'
@@ -2305,7 +2305,7 @@ const styles = StyleSheet.create({
   confirmTitle: {
     fontSize: 20,
     color: palette.textDark,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     marginBottom: 8
   },
   confirmTitleDark: {
@@ -2323,7 +2323,7 @@ const styles = StyleSheet.create({
   confirmLabel: {
     fontSize: 12,
     color: palette.textDark,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     marginBottom: 6
   },
   confirmInput: {
@@ -2334,7 +2334,7 @@ const styles = StyleSheet.create({
     color: palette.textDark,
     paddingHorizontal: 12,
     fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     marginBottom: 16
   },
   confirmInputDark: {
@@ -2361,7 +2361,7 @@ const styles = StyleSheet.create({
   confirmSecondaryText: {
     color: palette.textDark,
     fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   confirmSecondaryTextDark: {
     color: colors.white
@@ -2377,7 +2377,7 @@ const styles = StyleSheet.create({
   confirmDangerText: {
     color: colors.white,
     fontSize: 14,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   sheetDismissZone: {
     flex: 1
@@ -2411,7 +2411,7 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 17,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: '#000000'
   },
   sheetSubtitle: {
@@ -2445,7 +2445,7 @@ const styles = StyleSheet.create({
   uploadMethodTitle: {
     marginTop: 6,
     fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: '#000000',
     textAlign: 'center'
   },
@@ -2472,7 +2472,7 @@ const styles = StyleSheet.create({
   },
   uploadStatusTitle: {
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: colors.textPrimary
   },
   uploadStatusText: {
@@ -2504,7 +2504,7 @@ const styles = StyleSheet.create({
   },
   retryBtnText: {
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: colors.danger
   },
   fieldWrap: {
@@ -2548,7 +2548,7 @@ const styles = StyleSheet.create({
   },
   pickerDoneText: {
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: colors.textPrimary
   },
   inputText: {
@@ -2567,7 +2567,7 @@ const styles = StyleSheet.create({
   readonlyChipText: {
     color: colors.textPrimary,
     fontSize: 12,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   privacyRow: {
     marginTop: 4,
@@ -2594,7 +2594,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: colors.white,
     fontSize: 15,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   processingScreen: {
     flex: 1,
@@ -2617,7 +2617,7 @@ const styles = StyleSheet.create({
   },
   processingTitle: {
     fontSize: 20,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: palette.textDark,
     marginBottom: 6,
     textAlign: 'center'
@@ -2626,7 +2626,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     fontSize: 12,
     color: palette.textLight,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     letterSpacing: 0.3
   },
   processingSteps: {
@@ -2663,7 +2663,7 @@ const styles = StyleSheet.create({
   },
   stepTextActive: {
     color: palette.textDark,
-    fontFamily: 'Poppins_600SemiBold'
+    fontFamily: 'Exo_600SemiBold'
   },
   findingCard: {
     width: '100%',
@@ -2677,7 +2677,7 @@ const styles = StyleSheet.create({
   },
   findingTitle: {
     fontSize: 12,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: palette.textDark,
     marginBottom: 4
   },
@@ -2715,7 +2715,7 @@ const styles = StyleSheet.create({
   },
   processingCancelText: {
     fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: colors.textPrimary
   },
   reviewBackdrop: {
@@ -2735,7 +2735,7 @@ const styles = StyleSheet.create({
   },
   reviewTitle: {
     fontSize: 18,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: colors.textPrimary
   },
   reviewSubtitle: {
@@ -2751,13 +2751,13 @@ const styles = StyleSheet.create({
   reviewGood: {
     flex: 1,
     fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: colors.success
   },
   reviewBad: {
     flex: 1,
     fontSize: 13,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: colors.danger
   },
   reviewList: {
@@ -2776,7 +2776,7 @@ const styles = StyleSheet.create({
   reviewSectionTitle: {
     marginBottom: 5,
     fontSize: 12,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: colors.textPrimary
   },
   reviewAllGood: {
@@ -2807,7 +2807,7 @@ const styles = StyleSheet.create({
   },
   reviewSecondaryText: {
     fontSize: 14,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     color: colors.textSecondary
   },
   reviewPrimaryBtn: {
@@ -2820,7 +2820,7 @@ const styles = StyleSheet.create({
   },
   reviewPrimaryText: {
     fontSize: 14,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: colors.white
   },
   screenContentDark: {
@@ -2904,7 +2904,7 @@ const styles = StyleSheet.create({
   },
   profilePromptTitle: {
     fontSize: 14,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: '#111827'
   },
   profilePromptTrack: {
@@ -3003,7 +3003,7 @@ const styles = StyleSheet.create({
   sortChipText: {
     color: '#475569',
     fontSize: 12,
-    fontFamily: 'Poppins_500Medium'
+    fontFamily: 'Exo_500Medium'
   },
   sortChipTextActive: {
     color: '#2E6B00'
