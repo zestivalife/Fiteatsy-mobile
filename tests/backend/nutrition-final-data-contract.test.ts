@@ -41,12 +41,40 @@ test('daily client projection exposes canonical date and reconciled meal states'
   const screen = readFileSync(new URL('../../src/screens/home/NutritionExperienceScreen.tsx', import.meta.url), 'utf8');
 
   assert.match(service, /selectedDate/);
-  assert.match(service, /mealsFollowed: meals\.filter\(\(meal\) => meal\.state !== 'PENDING'\)\.length/);
-  assert.match(service, /pendingCount: meals\.filter\(\(meal\) => meal\.state === 'PENDING'\)\.length/);
+  assert.match(service, /followedMeals: consumedApprovedMeals/);
+  assert.match(service, /outOfPlanMeals, skippedMeals, pendingMeals/);
+  assert.match(service, /plannedVsActual:/);
+  assert.match(service, /mealStates/);
+  assert.match(service, /adherence: \{ percent: adherencePercent, label: adherenceLabel \}/);
   assert.match(client, /nutrition-experience\?date=/);
   assert.match(screen, /selectedDate.*isoDay\(new Date\(\)\)/s);
   assert.match(screen, /getFullYear\(\)[\s\S]*getMonth\(\)[\s\S]*getDate\(\)/);
   assert.doesNotMatch(screen, /new Date\(data\.selectedDate\)(?!T00:00:00)/);
+});
+
+test('Phase 2 views consume one backend projection without local nutrition heuristics', () => {
+  const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const screen = readFileSync(new URL('../../src/screens/home/NutritionExperienceScreen.tsx', import.meta.url), 'utf8');
+
+  assert.match(service, /dailyNutrition:/);
+  assert.match(service, /mealSummary:/);
+  assert.match(service, /mealStates,/);
+  assert.match(service, /plannedVsActual:/);
+  assert.match(screen, /data\.plannedVsActual/);
+  assert.match(screen, /data\.mealStates/);
+  assert.match(screen, /data\.adherence\.label/);
+  assert.doesNotMatch(screen, /percent >= 80/);
+});
+
+test('weekly pattern and Consultant monitoring reuse canonical backend intelligence', () => {
+  const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+
+  assert.match(service, /dailyAdherence = days\.map/);
+  assert.match(service, /targetRangeDays:/);
+  assert.match(service, /whatWorked, harderThisWeek, nextFocus, eatingPattern/);
+  assert.match(service, /buildNutritionProjection\(monitoringOwner\)/);
+  assert.match(service, /getClientNutritionPattern\(monitoringOwner\)/);
+  assert.match(service, /nutritionMonitoring: dailyMonitoring \? \{ daily: dailyMonitoring, pattern: patternMonitoring \}/);
 });
 
 test('actual events stay scoped to the published plan version and preserve out-of-plan nutrition', () => {

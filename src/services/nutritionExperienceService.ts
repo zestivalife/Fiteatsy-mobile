@@ -62,6 +62,9 @@ export type NutritionExperience = {
   outOfPlanCount: number;
   skippedCount: number;
   pendingCount: number;
+  plannedVsActual: { calories: { planned: number | null; actual: number }; mealsFollowed: { planned: number; actual: number }; outOfPlan: number; skipped: number };
+  mealStates: Array<{ mealHeadId: string; mealHeadName: string; scheduledTime: string; status: NutritionMeal['state']; loggedEventId: string | null; loggedOptionId: string | null; loggedFood: string | null; timestamp: string | null }>;
+  adherence: { percent: number; label: string };
   selectedDate: string;
   consultantNote: string | null;
 };
@@ -80,6 +83,13 @@ export const getNutritionPattern = (endDate?: string) =>
     skippedMeals: number;
     waterTargetDays: number | null;
     targetRangeDays: { protein: number | null; fibre: number | null; water: number | null };
+    startDate: string;
+    endDate: string;
+    dailyAdherence: Array<{ date: string; adherencePercent: number | null }>;
+    whatWorked: string[];
+    harderThisWeek: string[];
+    nextFocus: string[];
+    eatingPattern: string[];
     insights: string[];
   }>(`/v1/platform/nutrition-experience/pattern${endDate ? `?endDate=${encodeURIComponent(endDate)}` : ''}`);
 

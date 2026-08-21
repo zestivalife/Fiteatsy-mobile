@@ -1520,6 +1520,12 @@ export const getConsultantNutritionIntelligence = async (publicClientId: string,
     stressAssessment,
   });
 
+  const monitoringOwner = { accountId: context.accountId, clientId: context.internalClientId };
+  const [dailyMonitoring, patternMonitoring] = await Promise.all([
+    buildNutritionProjection(monitoringOwner),
+    getClientNutritionPattern(monitoringOwner),
+  ]);
+
   return {
     clientId: publicClientId,
     nutritionSnapshot: {
@@ -1540,6 +1546,7 @@ export const getConsultantNutritionIntelligence = async (publicClientId: string,
       wearableConnected: workspace.wearableSummary.connected,
     },
     intelligence,
+    nutritionMonitoring: dailyMonitoring ? { daily: dailyMonitoring, pattern: patternMonitoring } : null,
     sourceMetadata: {
       sourceProduct: 'Fiteatsy',
       generatedAtISO: new Date().toISOString(),
@@ -2182,11 +2189,11 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
     const payload = parseNutritionEvent(event);
     return payload?.planId === published.plan.id && payload?.versionId === published.version.id;
   });
-  const latestByMeal = new Map<string, { state: NutritionConsumptionState; payload: Record<string, unknown>; eventTimeISO: string }>();
+  const latestByMeal = new Map<string, { state: NutritionConsumptionState; payload: Record<string, unknown>; eventTimeISO: string; eventId: string }>();
   for (const event of mealEvents.sort((a, b) => a.eventTimeISO.localeCompare(b.eventTimeISO))) {
     const payload = parseNutritionEvent(event);
     if (!payload || typeof payload.mealKey !== 'string') continue;
-    latestByMeal.set(payload.mealKey, { state: (payload.state as NutritionConsumptionState) ?? 'CONSUMED_APPROVED', payload, eventTimeISO: event.eventTimeISO });
+    latestByMeal.set(payload.mealKey, { state: (payload.state as NutritionConsumptionState) ?? 'CONSUMED_APPROVED', payload, eventTimeISO: event.eventTimeISO, eventId: event.id });
   }
   const targets = resolveDailyNutritionTargets(published.version.content);
   const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 };
@@ -2220,12 +2227,39 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
     return payload?.planId === published.plan.id && payload?.versionId === published.version.id;
   }).reduce((sum, event) => { const payload = parseNutritionEvent(event); return sum + Number(payload?.waterMl ?? Number(payload?.litres ?? 0) * 1000); }, 0);
   const targetWater = targets.hydration;
+  const consumedApprovedMeals = meals.filter((meal) => meal.state === 'CONSUMED_APPROVED').length;
+  const outOfPlanMeals = meals.filter((meal) => meal.state === 'CONSUMED_OUT_OF_PLAN').length;
+  const skippedMeals = meals.filter((meal) => meal.state === 'SKIPPED').length;
+  const pendingMeals = meals.filter((meal) => meal.state === 'PENDING').length;
+  const adherencePercent = meals.length === 0 ? 0 : Math.round((consumedApprovedMeals / meals.length) * 100);
+  const adherenceLabel = adherencePercent >= 80
+    ? 'Strong consistency'
+    : adherencePercent >= 50
+      ? 'Good consistency'
+      : adherencePercent > 0
+        ? 'Building consistency'
+        : 'No meals logged yet';
+  const latestEventTimestamp = relevant.reduce<string | null>((latest, event) => (
+    latest == null || event.eventTimeISO > latest ? event.eventTimeISO : latest
+  ), null);
+  const mealStates = meals.map((meal) => ({
+    mealHeadId: meal.key, mealHeadName: meal.label, scheduledTime: meal.window, status: meal.state,
+    loggedEventId: latestByMeal.get(meal.key)?.eventId ?? null,
+    loggedOptionId: typeof meal.consumed?.optionId === 'string' ? meal.consumed.optionId : null,
+    loggedFood: typeof meal.consumed?.mealName === 'string' ? meal.consumed.mealName : null,
+    timestamp: meal.consumedAtISO,
+  }));
   return {
     selectedDate, plan: published.plan, version: { ...published.version, content: { ...published.version.content, dailyTargets: targets } }, meals, totals, remaining, water: { litres: waterMl / 1000, targetLitres: targetWater, dailyWaterMl: waterMl, hydrationTargetMl: targetWater == null ? null : Math.round(targetWater * 1000), remainingHydrationMl: targetWater == null ? null : Math.max(Math.round(targetWater * 1000) - waterMl, 0) },
-    mealCount: meals.length, mealsFollowed: meals.filter((meal) => meal.state !== 'PENDING').length,
-    outOfPlanCount: meals.filter((meal) => meal.state === 'CONSUMED_OUT_OF_PLAN').length,
-    skippedCount: meals.filter((meal) => meal.state === 'SKIPPED').length,
-    pendingCount: meals.filter((meal) => meal.state === 'PENDING').length,
+    dailyNutrition: { date: selectedDate, planId: published.plan.id, planVersionId: published.version.id, targetCalories: targets.calories, consumedCalories: totals.calories, targetProtein: targets.protein, consumedProtein: totals.protein, targetCarbs: targets.carbohydrates, consumedCarbs: totals.carbs, targetFat: targets.fat, consumedFat: totals.fat, targetFibre: targets.fibre, consumedFibre: totals.fibre, hydrationTargetMl: targetWater == null ? null : Math.round(targetWater * 1000), hydrationConsumedMl: waterMl, latestEventTimestamp },
+    mealSummary: { totalMealHeads: meals.length, followedMeals: consumedApprovedMeals, consumedApprovedMeals, outOfPlanMeals, skippedMeals, pendingMeals },
+    mealStates,
+    adherence: { percent: adherencePercent, label: adherenceLabel },
+    plannedVsActual: { calories: { planned: targets.calories, actual: totals.calories }, mealsFollowed: { planned: meals.length, actual: consumedApprovedMeals }, outOfPlan: outOfPlanMeals, skipped: skippedMeals },
+    mealCount: meals.length, mealsFollowed: consumedApprovedMeals,
+    outOfPlanCount: outOfPlanMeals,
+    skippedCount: skippedMeals,
+    pendingCount: pendingMeals,
     consultantNote: published.version.content.supplementsAndClinicalNotes.map((item) => item.note).find(Boolean) ?? null,
   };
 };
@@ -2250,24 +2284,26 @@ export const getClientNutritionPattern = async (owner: ClientOwnershipContext, e
     if (event.type === 'meal_logged' && typeof payload.mealKey === 'string') latest.set(`${day}:${payload.mealKey}`, { state: (payload.state as NutritionConsumptionState) ?? 'CONSUMED_APPROVED', payload });
   }
   const targets = resolveDailyNutritionTargets(published.version.content);
+  const totalMealHeads = Object.keys(published.version.content.mealPlan).length;
   const dailyAdherence = days.map((date) => {
     const rows = [...latest.entries()].filter(([key]) => key.startsWith(`${date}:`)).map(([, value]) => value);
     const approved = rows.filter((row) => row.state === 'CONSUMED_APPROVED').length;
     const outOfPlan = rows.filter((row) => row.state === 'CONSUMED_OUT_OF_PLAN').length;
     const skipped = rows.filter((row) => row.state === 'SKIPPED').length;
     const totals = rows.filter((row) => row.state === 'CONSUMED_APPROVED' || row.state === 'CONSUMED_OUT_OF_PLAN').reduce((sum, row) => ({ protein: sum.protein + Number(row.payload.proteinGrams ?? 0), fibre: sum.fibre + Number(row.payload.fibreGrams ?? 0) }), { protein: 0, fibre: 0 });
-    return { date, approved, outOfPlan, skipped, pending: Math.max(Object.keys(published.version.content.mealPlan).length - rows.length, 0), adherencePercent: rows.length ? Math.round((approved / rows.length) * 100) : null, proteinMet: targets.protein == null ? null : totals.protein >= targets.protein, fibreMet: targets.fibre == null ? null : totals.fibre >= targets.fibre, waterMet: targets.hydration == null ? null : (waterByDay.get(date) ?? 0) >= targets.hydration * 1000 };
+    return { date, approved, outOfPlan, skipped, pending: Math.max(totalMealHeads - rows.length, 0), adherencePercent: totalMealHeads ? Math.round((approved / totalMealHeads) * 100) : null, proteinMet: targets.protein == null ? null : totals.protein >= targets.protein, fibreMet: targets.fibre == null ? null : totals.fibre >= targets.fibre, waterMet: targets.hydration == null ? null : (waterByDay.get(date) ?? 0) >= targets.hydration * 1000 };
   });
   const approvedCount = dailyAdherence.reduce((sum, day) => sum + day.approved, 0);
   const outOfPlanCount = dailyAdherence.reduce((sum, day) => sum + day.outOfPlan, 0);
   const skippedCount = dailyAdherence.reduce((sum, day) => sum + day.skipped, 0);
+  const plannedMealHeadCount = totalMealHeads * days.length;
   const resolvedCount = approvedCount + outOfPlanCount + skippedCount;
   const whatWorked = approvedCount ? [`${approvedCount} consultant-approved meal${approvedCount === 1 ? ' was' : 's were'} logged in this period.`] : [];
   const harderThisWeek = [...(outOfPlanCount ? [`${outOfPlanCount} meal${outOfPlanCount === 1 ? ' was' : 's were'} logged out of plan.`] : []), ...(skippedCount ? [`${skippedCount} planned meal${skippedCount === 1 ? ' was' : 's were'} skipped.`] : [])];
   const nextFocus = outOfPlanCount ? ['Use the highest-ranked remaining approved option when the next meal is pending.'] : skippedCount ? ['Use a remaining approved option when a planned meal is difficult to complete.'] : approvedCount ? ['Continue the approved choices that supported adherence this week.'] : [];
   return {
     periodDays: 7, startDate: days[0], endDate: days[6], dailyAdherence,
-    planAdherencePercent: resolvedCount ? Math.round((approvedCount / resolvedCount) * 100) : null,
+    planAdherencePercent: plannedMealHeadCount ? Math.round((approvedCount / plannedMealHeadCount) * 100) : null,
     outOfPlanMeals: outOfPlanCount, skippedMeals: skippedCount,
     waterTargetDays: targets.hydration == null ? null : dailyAdherence.filter((day) => day.waterMet).length,
     targetRangeDays: { protein: targets.protein == null ? null : dailyAdherence.filter((day) => day.proteinMet).length, fibre: targets.fibre == null ? null : dailyAdherence.filter((day) => day.fibreMet).length, water: targets.hydration == null ? null : dailyAdherence.filter((day) => day.waterMet).length },
