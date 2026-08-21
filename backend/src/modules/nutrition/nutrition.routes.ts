@@ -6,6 +6,7 @@ import type { NutritionPlanContent } from '../platform/platform.types.js';
 import { canAccessConsultantClientApi } from '../consultants/consultants.service.js';
 import {
   approveConsultantDietPlan,
+  canAccessConsultantNutritionClient,
   generateConsultantDietPlanDraft,
   getSeniorConsultantDietPlanReviewQueue,
   getConsultantLatestDietPlan,
@@ -265,30 +266,39 @@ const handleNutritionRouteError = (res: Response, error: unknown) => {
 };
 
 consultantNutritionRouter.get('/clients/:clientId/nutrition-intelligence', async (req, res) => {
-  const payload = await getConsultantNutritionIntelligence(req.params.clientId);
+  const account = getAuthenticatedAccount(req);
+  const payload = await getConsultantNutritionIntelligence(req.params.clientId, account);
   if (!payload) {
-    return res.status(404).json({
-      error: 'CLIENT_NOT_FOUND',
-      message: 'Nutrition intelligence is not available for this client.',
+    return res.status(403).json({
+      error: 'CLIENT_ASSIGNMENT_REQUIRED',
+      message: 'An active client assignment is required to access nutrition intelligence.',
     });
   }
   return res.status(200).json(payload);
 });
 
 consultantNutritionRouter.get('/clients/:clientId/food-preferences', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  if (!await canAccessConsultantNutritionClient(req.params.clientId, account, { allowSeniorAuthority: true })) {
+    return res.status(403).json({ error: 'CLIENT_ASSIGNMENT_REQUIRED', message: 'An active client assignment is required to access food preferences.' });
+  }
   const payload = await getFoodPreferenceProfile(req.params.clientId);
   if (!payload) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'Client was not found.' });
   return res.status(200).json(payload);
 });
 
 consultantNutritionRouter.put('/clients/:clientId/food-preferences', async (req, res) => {
-  const payload = await updateFoodPreferenceProfile(req.params.clientId, getAuthenticatedAccount(req).accountId, 'consultant', req.body ?? {});
+  const account = getAuthenticatedAccount(req);
+  if (!await canAccessConsultantNutritionClient(req.params.clientId, account)) {
+    return res.status(403).json({ error: 'CLIENT_ASSIGNMENT_REQUIRED', message: 'An active client assignment is required to update food preferences.' });
+  }
+  const payload = await updateFoodPreferenceProfile(req.params.clientId, account.accountId, 'consultant', req.body ?? {});
   if (!payload) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'Client was not found.' });
   return res.status(200).json(payload);
 });
 
 consultantNutritionRouter.get('/clients/:clientId/diet-plans/latest', async (req, res) => {
-  const payload = await getConsultantLatestDietPlan(req.params.clientId);
+  const payload = await getConsultantLatestDietPlan(req.params.clientId, getAuthenticatedAccount(req));
   if (!payload) {
     return res.status(404).json({
       error: 'DIET_PLAN_NOT_FOUND',

@@ -23,10 +23,9 @@ test('only Senior Consultant and platform authority roles can approve or publish
 
 test('publication allows the assigned Consultant but denies wrong or unassigned Consultants', () => {
   const assigned = account('consultant');
-  assert.equal(canPublishAssignedDietPlan(assigned, assigned.accountId), true);
-  assert.equal(canPublishAssignedDietPlan(assigned, 'another-consultant'), false);
-  assert.equal(canPublishAssignedDietPlan(assigned, null), false);
-  assert.equal(canPublishAssignedDietPlan(account('senior_consultant'), null), true);
+  assert.equal(canPublishAssignedDietPlan(assigned, true), true);
+  assert.equal(canPublishAssignedDietPlan(assigned, false), false);
+  assert.equal(canPublishAssignedDietPlan(account('senior_consultant'), false), true);
 });
 
 test('only the exact approved version is publishable and repeat publication is idempotent', () => {

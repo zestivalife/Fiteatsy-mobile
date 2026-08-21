@@ -818,8 +818,8 @@ export const getConsultantClientWorkspace = async (
     lastSyncedAt
   });
   const [nutritionIntelligencePayload, latestDietPlan] = await Promise.all([
-    getConsultantNutritionIntelligence(publicClientId),
-    getConsultantLatestDietPlan(publicClientId),
+    getConsultantNutritionIntelligence(publicClientId, account),
+    getConsultantLatestDietPlan(publicClientId, account),
   ]);
 
   return {

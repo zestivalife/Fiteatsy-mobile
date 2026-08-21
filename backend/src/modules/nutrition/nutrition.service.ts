@@ -62,12 +62,15 @@ const CONSULTANT_DIET_WORKFLOW_ROLES = ['consultant', 'provider', 'dietician', '
 const isConsultantRole = (account: AuthenticatedAccount) =>
   CONSULTANT_DIET_WORKFLOW_ROLES.includes(account.user.role?.toLowerCase() ?? '');
 
+const professionalTypeForNutritionAccount = (account: AuthenticatedAccount) =>
+  account.user.role?.toLowerCase() === 'practitioner' ? 'PRACTITIONER' : 'CONSULTANT';
+
 export const canApproveOrPublishDietPlan = (account: AuthenticatedAccount) =>
   ['senior_consultant', 'admin', 'superuser', 'platform_owner'].includes(account.user.role?.toLowerCase() ?? '');
 
-export const canPublishAssignedDietPlan = (account: AuthenticatedAccount, assignedConsultantId: string | null | undefined) =>
+export const canPublishAssignedDietPlan = (account: AuthenticatedAccount, hasActiveCanonicalAssignment: boolean) =>
   canApproveOrPublishDietPlan(account) ||
-  (isConsultantRole(account) && assignedConsultantId != null && assignedConsultantId === account.accountId);
+  (isConsultantRole(account) && hasActiveCanonicalAssignment);
 
 const unique = (values: Array<string | null | undefined>) =>
   Array.from(new Set(values.map((value) => (value ?? '').trim()).filter(Boolean)));
@@ -1318,6 +1321,21 @@ const contentSummaryFromContent = (content: NutritionPlanContent): DietPlanVersi
   ]),
 });
 
+export const canAccessConsultantNutritionClient = async (
+  publicClientId: string,
+  account: AuthenticatedAccount,
+  options: { allowSeniorAuthority?: boolean } = {},
+) => {
+  if (!isConsultantRole(account)) return false;
+  const useSeniorAuthority = options.allowSeniorAuthority === true && canApproveOrPublishDietPlan(account);
+  const context = await getRegisteredConsultantClientProfileContext(
+    publicClientId,
+    useSeniorAuthority ? undefined : account.accountId,
+    professionalTypeForNutritionAccount(account),
+  );
+  return context != null;
+};
+
 export const assertLifecycleTransition = (
   currentLifecycle: DietPlanVersionRecord['lifecycleStatus'] | null,
   nextLifecycle: DietPlanVersionRecord['lifecycleStatus'],
@@ -1391,8 +1409,18 @@ const buildMacroTargets = (tdee: number | null) => {
   };
 };
 
-const getWorkspaceContext = async (publicClientId: string) => {
-  const context = await getRegisteredConsultantClientProfileContext(publicClientId);
+const getWorkspaceContext = async (
+  publicClientId: string,
+  account: AuthenticatedAccount,
+  options: { allowSeniorAuthority?: boolean } = {},
+) => {
+  if (!isConsultantRole(account)) return null;
+  const useSeniorAuthority = options.allowSeniorAuthority === true && canApproveOrPublishDietPlan(account);
+  const context = await getRegisteredConsultantClientProfileContext(
+    publicClientId,
+    useSeniorAuthority ? undefined : account.accountId,
+    professionalTypeForNutritionAccount(account),
+  );
   if (!context) return null;
   const [healthProfile, nutritionProfile, careCase, reports, biomarkers, wearableSummary, timeline, healthScores] = await Promise.all([
     getHealthProfileByClientId(context.internalClientId),
@@ -1418,6 +1446,10 @@ const getWorkspaceContext = async (publicClientId: string) => {
 
   return {
     context,
+    access: {
+      source: useSeniorAuthority ? 'senior_consultant_authority' as const : 'cap003_professional_assignment' as const,
+      assignedToRequestor: !useSeniorAuthority,
+    },
     healthProfile,
     nutritionProfile,
     careCase,
@@ -1436,8 +1468,8 @@ const getWorkspaceContext = async (publicClientId: string) => {
   };
 };
 
-export const getConsultantNutritionIntelligence = async (publicClientId: string) => {
-  const workspace = await getWorkspaceContext(publicClientId);
+export const getConsultantNutritionIntelligence = async (publicClientId: string, account: AuthenticatedAccount) => {
+  const workspace = await getWorkspaceContext(publicClientId, account, { allowSeniorAuthority: true });
   if (!workspace) return null;
   const { context, healthProfile, reports, biomarkers, metrics, macroTargets, hydrationTargetLiters } = workspace;
   const conditions = unique([
@@ -1530,10 +1562,10 @@ export const generateConsultantDietPlanDraft = async (
   },
 ) => {
   if (!isConsultantRole(account)) return null;
-  const workspace = await getWorkspaceContext(publicClientId);
+  const workspace = await getWorkspaceContext(publicClientId, account);
   if (!workspace || !workspace.careCase) return null;
 
-  const intelligencePayload = await getConsultantNutritionIntelligence(publicClientId);
+  const intelligencePayload = await getConsultantNutritionIntelligence(publicClientId, account);
   if (!intelligencePayload) return null;
 
   const { context, healthProfile, careCase, metrics, macroTargets, hydrationTargetLiters, biomarkers } = workspace;
@@ -1649,7 +1681,7 @@ export const updateConsultantDietPlanDraft = async (
   },
 ) => {
   if (!isConsultantRole(account)) return null;
-  const workspace = await getWorkspaceContext(publicClientId);
+  const workspace = await getWorkspaceContext(publicClientId, account);
   if (!workspace) return null;
   const plan = await getDietPlanById(dietPlanId);
   if (!plan || plan.careCaseId !== workspace.careCase?.id) return null;
@@ -1727,7 +1759,7 @@ export const submitConsultantDietPlanForReview = async (
   dietPlanId: string,
 ) => {
   if (!isConsultantRole(account) || account.user.role?.toLowerCase() === 'senior_consultant') return null;
-  const workspace = await getWorkspaceContext(publicClientId);
+  const workspace = await getWorkspaceContext(publicClientId, account);
   if (!workspace?.careCase) return null;
   const plan = await getDietPlanById(dietPlanId);
   if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
@@ -1753,7 +1785,7 @@ export const requestConsultantDietPlanChanges = async (
   if (!canApproveOrPublishDietPlan(account)) {
     throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can request changes.', 403);
   }
-  const workspace = await getWorkspaceContext(publicClientId);
+  const workspace = await getWorkspaceContext(publicClientId, account, { allowSeniorAuthority: true });
   if (!workspace?.careCase) return null;
   const plan = await getDietPlanById(dietPlanId);
   if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
@@ -1791,7 +1823,7 @@ export const approveConsultantDietPlan = async (
       403,
     );
   }
-  const workspace = await getWorkspaceContext(publicClientId);
+  const workspace = await getWorkspaceContext(publicClientId, account, { allowSeniorAuthority: true });
   if (!workspace) return null;
   const plan = await getDietPlanById(dietPlanId);
   if (!plan || plan.careCaseId !== workspace.careCase?.id || !plan.currentVersionId) return null;
@@ -1838,9 +1870,9 @@ export const publishConsultantDietPlan = async (
   approvedVersionId: string,
 ) => {
   if (!isConsultantRole(account)) return null;
-  const workspace = await getWorkspaceContext(publicClientId);
+  const workspace = await getWorkspaceContext(publicClientId, account, { allowSeniorAuthority: true });
   if (!workspace || !workspace.careCase) return null;
-  if (!canPublishAssignedDietPlan(account, workspace.careCase.assignedConsultantId)) {
+  if (!canPublishAssignedDietPlan(account, workspace.access.source === 'cap003_professional_assignment')) {
     throw new NutritionPlanWorkflowError(
       'ROLE_NOT_ALLOWED',
       'Only the assigned Consultant or an authorised Senior Consultant can publish this nutrition plan.',
@@ -1894,8 +1926,8 @@ export const publishConsultantDietPlan = async (
   return result;
 };
 
-export const getConsultantLatestDietPlan = async (publicClientId: string) => {
-  const workspace = await getWorkspaceContext(publicClientId);
+export const getConsultantLatestDietPlan = async (publicClientId: string, account: AuthenticatedAccount) => {
+  const workspace = await getWorkspaceContext(publicClientId, account, { allowSeniorAuthority: true });
   if (!workspace || !workspace.careCase) return null;
   const plan = await getDietPlanByCareCaseId(workspace.careCase.id);
   if (!plan) return null;
@@ -1910,7 +1942,7 @@ export const exportConsultantDietPlanDocument = async (
   dietPlanId: string,
 ) => {
   if (!isConsultantRole(account)) return null;
-  const workspace = await getWorkspaceContext(publicClientId);
+  const workspace = await getWorkspaceContext(publicClientId, account, { allowSeniorAuthority: true });
   if (!workspace || !workspace.careCase) return null;
   const plan = await getDietPlanById(dietPlanId);
   if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
