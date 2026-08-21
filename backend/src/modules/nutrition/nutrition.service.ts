@@ -1164,6 +1164,9 @@ const buildDraftContent = (input: {
     dailyTargets: {
       calories: input.calorieTarget,
       protein: input.proteinTargetGrams,
+      carbohydrates: input.calorieTarget == null ? null : Math.round((input.calorieTarget * .45) / 4),
+      fat: input.calorieTarget == null ? null : Math.round((input.calorieTarget * .3) / 9),
+      fibre: input.calorieTarget == null ? null : Math.max(25, Math.round((input.calorieTarget / 1000) * 14)),
       hydration: input.hydrationTargetLiters,
       movement: '20-30 min walk or consultant-approved movement block',
     },
@@ -2121,6 +2124,31 @@ const nutritionMealLabels: Record<string, string> = {
   lunch: 'Lunch', eveningSnack: 'Evening Snack', dinner: 'Dinner', bedtimeNutrition: 'Bedtime',
 };
 
+const canonicalNutritionDay = /^\d{4}-\d{2}-\d{2}$/;
+const nutritionDateKey = (value: string | Date) => new Date(value).toISOString().slice(0, 10);
+export const isCanonicalNutritionDate = (value: string) => {
+  if (!canonicalNutritionDay.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && nutritionDateKey(parsed) === value;
+};
+
+export const resolveDailyNutritionTargets = (content: NutritionPlanContent) => {
+  const options = (Object.values(content.mealPlan) as Array<NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]>).map(section => section.options[0]).filter(Boolean);
+  const sum = (field: 'approxKcal' | 'proteinGrams' | 'carbsGrams' | 'fatGrams' | 'fibreGrams') => {
+    const values = options.map(option => option?.[field]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    return values.length ? Math.round(values.reduce((total, value) => total + value, 0)) : null;
+  };
+  const calories = content.dailyTargets.calories ?? sum('approxKcal');
+  return {
+    ...content.dailyTargets,
+    calories,
+    protein: content.dailyTargets.protein ?? sum('proteinGrams'),
+    carbohydrates: content.dailyTargets.carbohydrates ?? sum('carbsGrams') ?? (calories == null ? null : Math.round((calories * .45) / 4)),
+    fat: content.dailyTargets.fat ?? sum('fatGrams') ?? (calories == null ? null : Math.round((calories * .3) / 9)),
+    fibre: content.dailyTargets.fibre ?? sum('fibreGrams') ?? (calories == null ? null : Math.max(25, Math.round((calories / 1000) * 14))),
+  };
+};
+
 const parseNutritionEvent = (event: Awaited<ReturnType<typeof listHealthEvents>>[number]) => {
   if (event.type !== 'meal_logged' && event.type !== 'water_logged') return null;
   return event.payload as Record<string, unknown>;
@@ -2137,13 +2165,18 @@ const scoreApprovedOption = (option: NutritionPlanContent['mealPlan'][keyof Nutr
   return { score, reasons };
 };
 
-const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays = 1) => {
+const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays = 1, selectedDateISO?: string) => {
   const published = await getLatestPublishedDietPlanByClientId(owner);
   const careCase = await getCareCaseByClientId(owner.clientId);
   if (!published || !careCase) return null;
   const events = await listHealthEvents(careCase.id);
-  const since = Date.now() - rangeDays * 86400000;
-  const relevant = events.filter((event) => new Date(event.eventTimeISO).getTime() >= since);
+  const selectedDate = selectedDateISO ?? new Date().toISOString().slice(0, 10);
+  if (!isCanonicalNutritionDate(selectedDate)) throw new NutritionPlanWorkflowError('INVALID_NUTRITION_DATE', 'Nutrition date must use YYYY-MM-DD.', 400);
+  const today = new Date().toISOString().slice(0, 10);
+  if (selectedDate > today) throw new NutritionPlanWorkflowError('FUTURE_DATE_NOT_ALLOWED', 'Future Nutrition history is not available.', 400);
+  const end = new Date(`${selectedDate}T23:59:59.999Z`).getTime();
+  const start = rangeDays === 1 ? new Date(`${selectedDate}T00:00:00.000Z`).getTime() : end - ((rangeDays - 1) * 86400000);
+  const relevant = events.filter((event) => { const time = new Date(event.eventTimeISO).getTime(); return time >= start && time <= end; });
   const mealEvents = relevant.filter((event) => event.type === 'meal_logged');
   const latestByMeal = new Map<string, { state: NutritionConsumptionState; payload: Record<string, unknown>; eventTimeISO: string }>();
   for (const event of mealEvents.sort((a, b) => a.eventTimeISO.localeCompare(b.eventTimeISO))) {
@@ -2151,7 +2184,7 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
     if (!payload || typeof payload.mealKey !== 'string') continue;
     latestByMeal.set(payload.mealKey, { state: (payload.state as NutritionConsumptionState) ?? 'CONSUMED_APPROVED', payload, eventTimeISO: event.eventTimeISO });
   }
-  const targets = published.version.content.dailyTargets;
+  const targets = resolveDailyNutritionTargets(published.version.content);
   const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 };
   for (const item of latestByMeal.values()) {
     if (item.state !== 'CONSUMED_APPROVED' && item.state !== 'CONSUMED_OUT_OF_PLAN') continue;
@@ -2164,9 +2197,9 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
   const remaining = {
     calories: targets.calories == null ? null : Math.max(0, targets.calories - totals.calories),
     protein: targets.protein == null ? null : Math.max(0, targets.protein - totals.protein),
-    carbs: null as number | null,
-    fat: null as number | null,
-    fibre: null as number | null,
+    carbs: targets.carbohydrates == null ? null : Math.max(0, targets.carbohydrates - totals.carbs),
+    fat: targets.fat == null ? null : Math.max(0, targets.fat - totals.fat),
+    fibre: targets.fibre == null ? null : Math.max(0, targets.fibre - totals.fibre),
   };
   const meals = (Object.entries(published.version.content.mealPlan) as Array<[keyof NutritionPlanContent['mealPlan'], NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]]>).map(([key, section]) => {
     const ranking = section.options.map((option) => ({ option, rank: scoreApprovedOption(option, remaining) })).sort((a, b) => b.rank.score - a.rank.score);
@@ -2177,18 +2210,19 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
       consumed: current?.payload ?? null,
     };
   });
-  const water = relevant.filter((event) => event.type === 'water_logged').reduce((sum, event) => sum + Number(parseNutritionEvent(event)?.litres ?? 0), 0);
+  const waterMl = relevant.filter((event) => event.type === 'water_logged').reduce((sum, event) => { const payload = parseNutritionEvent(event); return sum + Number(payload?.waterMl ?? Number(payload?.litres ?? 0) * 1000); }, 0);
   const targetWater = targets.hydration;
   return {
-    plan: published.plan, version: published.version, meals, totals, remaining, water: { litres: water, targetLitres: targetWater },
-    mealCount: meals.length, mealsFollowed: meals.filter((meal) => meal.state === 'CONSUMED_APPROVED').length,
+    selectedDate, plan: published.plan, version: { ...published.version, content: { ...published.version.content, dailyTargets: targets } }, meals, totals, remaining, water: { litres: waterMl / 1000, targetLitres: targetWater, dailyWaterMl: waterMl, hydrationTargetMl: targetWater == null ? null : Math.round(targetWater * 1000), remainingHydrationMl: targetWater == null ? null : Math.max(Math.round(targetWater * 1000) - waterMl, 0) },
+    mealCount: meals.length, mealsFollowed: meals.filter((meal) => meal.state !== 'PENDING').length,
     outOfPlanCount: meals.filter((meal) => meal.state === 'CONSUMED_OUT_OF_PLAN').length,
     skippedCount: meals.filter((meal) => meal.state === 'SKIPPED').length,
+    pendingCount: meals.filter((meal) => meal.state === 'PENDING').length,
     consultantNote: published.version.content.supplementsAndClinicalNotes.map((item) => item.note).find(Boolean) ?? null,
   };
 };
 
-export const getClientNutritionExperience = (owner: ClientOwnershipContext) => buildNutritionProjection(owner);
+export const getClientNutritionExperience = (owner: ClientOwnershipContext, selectedDateISO?: string) => buildNutritionProjection(owner, 1, selectedDateISO);
 export const getClientNutritionPattern = async (owner: ClientOwnershipContext) => {
   const current = await buildNutritionProjection(owner, 7);
   if (!current) return null;
@@ -2264,4 +2298,26 @@ export const logClientNutritionEvent = async (owner: ClientOwnershipContext, inp
     },
   });
   return buildNutritionProjection(owner);
+};
+
+export const logClientNutritionWater = async (owner: ClientOwnershipContext, input: {
+  planId: string; versionId: string; waterMl: number; consumedAtISO?: string | null;
+}) => {
+  const published = await getLatestPublishedDietPlanByClientId(owner);
+  if (!published || published.plan.id !== input.planId || published.version.id !== input.versionId) {
+    throw new NutritionPlanWorkflowError('DIET_PLAN_VERSION_MISMATCH', 'This nutrition plan is no longer current.', 409);
+  }
+  const careCase = await getCareCaseByClientId(owner.clientId);
+  if (!careCase) throw new NutritionPlanWorkflowError('CARE_CASE_NOT_FOUND', 'Care case not found for this client.', 404);
+  const eventTimeISO = input.consumedAtISO ?? new Date().toISOString();
+  await addHealthEvent({
+    careCaseId: careCase.id,
+    userId: owner.accountId,
+    type: 'water_logged',
+    summary: `${input.waterMl} ml water logged`,
+    replayKey: `${careCase.id}:water_logged:${input.versionId}:${eventTimeISO}`,
+    eventTimeISO,
+    payload: { planId: input.planId, versionId: input.versionId, waterMl: input.waterMl },
+  });
+  return buildNutritionProjection(owner, 1, nutritionDateKey(eventTimeISO));
 };

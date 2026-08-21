@@ -326,6 +326,9 @@ export type NutritionPlanContent = {
   dailyTargets: {
     calories: number | null;
     protein: number | null;
+    carbohydrates?: number | null;
+    fat?: number | null;
+    fibre?: number | null;
     hydration: number | null;
     movement: string;
   };

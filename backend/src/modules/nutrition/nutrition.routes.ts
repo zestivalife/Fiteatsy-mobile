@@ -16,6 +16,7 @@ import {
   getClientNutritionExperience,
   getClientNutritionPattern,
   logClientNutritionEvent,
+  logClientNutritionWater,
   NutritionPlanWorkflowError,
   publishConsultantDietPlan,
   requestConsultantDietPlanChanges,
@@ -130,6 +131,9 @@ const nutritionPlanContentSchema: z.ZodType<NutritionPlanContent> = z.object({
   dailyTargets: z.object({
     calories: z.number().nullable(),
     protein: z.number().nullable(),
+    carbohydrates: z.number().nullable().optional(),
+    fat: z.number().nullable().optional(),
+    fibre: z.number().nullable().optional(),
     hydration: z.number().nullable(),
     movement: z.string(),
   }),
@@ -186,7 +190,7 @@ const nutritionEventSchema = z.object({
   consumedAtISO: z.string().datetime().nullable().optional(),
 });
 
-const waterEventSchema = z.object({ planId: z.string().trim().min(1), versionId: z.string().trim().min(1), litres: z.number().positive().max(5), consumedAtISO: z.string().datetime().nullable().optional() });
+const waterEventSchema = z.object({ planId: z.string().trim().min(1), versionId: z.string().trim().min(1), waterMl: z.number().int().positive().max(5000), consumedAtISO: z.string().datetime().nullable().optional() });
 
 const mealSectionOrder = [
   'earlyMorning',
@@ -512,7 +516,7 @@ platformNutritionRouter.get('/nutrition-plan/today', async (req, res) => {
 
 platformNutritionRouter.get('/nutrition-experience', async (req, res) => {
   const account = getAuthenticatedAccount(req);
-  const payload = await getClientNutritionExperience({ accountId: account.accountId, clientId: account.client.id });
+  const payload = await getClientNutritionExperience({ accountId: account.accountId, clientId: account.client.id }, typeof req.query.date === 'string' ? req.query.date : undefined);
   if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Your nutrition plan is being prepared.' });
   return res.status(200).json(payload);
 });
@@ -538,7 +542,7 @@ platformNutritionRouter.post('/nutrition-experience/water', async (req, res) => 
   if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   const account = getAuthenticatedAccount(req);
   try {
-    return res.status(201).json(await logClientNutritionEvent({ accountId: account.accountId, clientId: account.client.id }, { ...parsed.data, mealKey: 'water', state: 'CONSUMED_APPROVED', litres: parsed.data.litres }));
+    return res.status(201).json(await logClientNutritionWater({ accountId: account.accountId, clientId: account.client.id }, parsed.data));
   } catch (error) { return handleNutritionRouteError(res, error); }
 });
 
