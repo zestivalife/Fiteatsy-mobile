@@ -1,9 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
@@ -21,18 +21,22 @@ import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-inactive.svg';
 import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-selected.svg';
 import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-inactive.svg';
 import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
-import { RootStackParamList } from '../../navigation/types';
+import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/recoveryIntelligenceEngine';
-import { listAnalyzedReports, type ReportDto } from '../../services/reportUploadService';
+import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
 import { getMySubscription } from '../../services/subscriptionService';
 import type { DailyCheckIn, Medication, MedicationLogStatus } from '../../types';
-import { getIdentityScopedStorageKey } from '../../utils/identityScopedStorage';
+import {
+  buildPss10StressContext,
+  formatPss10Change,
+  formatPss10LastChecked,
+  type Pss10StressContext
+} from '../../utils/pss10StressContext';
 
-const REPORT_HISTORY_STORAGE_KEY = 'fiteatsy.reportHistory';
 const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const STAR_CENTER_X = 183;
-const STAR_CENTER_Y = 178;
+const STAR_CENTER_Y = 196;
 const DONUT_ASSET_SIZE = 276;
 const DONUT_ASSET_VISUAL_CENTER = 126;
 const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
@@ -51,7 +55,10 @@ const font = {
   bold: 'Exo_700Bold'
 } as const;
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Home'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 type MetricKey = 'recovery' | 'calm' | 'activity' | 'nutrition' | 'mind' | 'sleep';
 type SvgAsset = React.FC<SvgProps>;
 const HOME_RECOVERY_UI_FIXTURE: Record<MetricKey, number> = {
@@ -75,33 +82,10 @@ type RecoveryMetric = {
   activeIconType?: 'svg' | 'image';
 };
 
-type HealthProfileReportSummary = {
-  id: string;
-  labName: string;
-  date: string;
-  abnormal: number;
-  score: number;
-  uploadedAtISO?: string;
-};
-
 type MedicationTimelineEntry = {
   medication: Medication;
   scheduledForISO: string;
   status: MedicationLogStatus;
-};
-
-const toHealthProfileReportSummary = (report: ReportDto): HealthProfileReportSummary | null => {
-  const analysis = report.analysis;
-  if (!analysis) return null;
-  const parameters = Array.isArray(analysis.parameters) ? analysis.parameters : [];
-  return {
-    id: report.id,
-    labName: analysis.labName || report.labName || 'Blood Report',
-    date: analysis.reportDate || report.reportDate || 'Date unavailable',
-    abnormal: parameters.filter((parameter) => parameter.status !== 'normal').length,
-    score: Number(analysis.score ?? 0),
-    uploadedAtISO: report.createdAtISO
-  };
 };
 
 const firstName = (name?: string | null) => {
@@ -189,10 +173,17 @@ export const HomeScreen = () => {
     getMedicationTimelineForDate
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
+  const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
+    buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
+  );
+  const sessionToken = authSession?.sessionToken;
+  const hasAuthSession = Boolean(authSession);
+
   const openAssist = useCallback(async () => {
     try {
       const subscription = await getMySubscription();
       const hasAssist = subscription.entitlements.AI_ASSIST?.value === true;
+
       if (['PENDING', 'PAYMENT_PENDING', 'PROCESSING'].includes(subscription.status)) {
         navigation.navigate('SubscriptionPaymentPlaceholder', {
           status: subscription.status as 'PENDING' | 'PAYMENT_PENDING' | 'PROCESSING',
@@ -200,14 +191,17 @@ export const HomeScreen = () => {
         });
         return;
       }
+
       if (subscription.status === 'PAYMENT_FAILED') {
         navigation.navigate('SubscriptionPaymentPlaceholder', { status: 'PAYMENT_FAILED', returnDestination: 'AssistHub' });
         return;
       }
+
       if (hasAssist && ['ACTIVE', 'EXPIRING_SOON', 'CANCELLED'].includes(subscription.status)) {
         navigation.navigate('AssistHub');
         return;
       }
+
       navigation.navigate('SubscriptionPlans', {
         source: 'assist',
         requiredEntitlement: 'AI_ASSIST',
@@ -217,21 +211,6 @@ export const HomeScreen = () => {
       Alert.alert('Subscription unavailable', 'We could not check Assist access right now. Please try again.');
     }
   }, [navigation]);
-  const [reportHistory, setReportHistory] = useState<HealthProfileReportSummary[]>([]);
-
-  const reportHistoryStorageKey = useMemo(
-    () =>
-      getIdentityScopedStorageKey(
-        REPORT_HISTORY_STORAGE_KEY,
-        authSession
-          ? {
-              userId: authSession.accountId,
-              clientId: authSession.client.fiteatsyClientId
-            }
-          : null
-      ),
-    [authSession]
-  );
 
   const recoveryIntel = useMemo(
     () =>
@@ -245,32 +224,34 @@ export const HomeScreen = () => {
     [wellness, checkIns, wearableSyncData]
   );
 
-  useEffect(() => {
-    let alive = true;
+  const refreshPss10Context = useCallback(async () => {
+    if (!hasAuthSession || !sessionToken) {
+      setPss10Context(buildPss10StressContext({ latestResult: null, previousResult: null, draft: null }));
+      return;
+    }
 
-    const loadReportHistory = async () => {
-      if (!reportHistoryStorageKey) {
-        if (alive) setReportHistory([]);
-        return;
-      }
+    try {
+      const [latestResponse, draftResponse] = await Promise.all([
+        getLatestAssessmentResult(sessionToken),
+        getDraftAssessmentSession(sessionToken)
+      ]);
+      setPss10Context(
+        buildPss10StressContext({
+          latestResult: latestResponse.result,
+          previousResult: latestResponse.previousResult,
+          draft: draftResponse.session
+        })
+      );
+    } catch {
+      // Keep the last known completed result when a focus refresh is unavailable.
+    }
+  }, [hasAuthSession, sessionToken]);
 
-      try {
-        const reportDtos = await listAnalyzedReports();
-        const reports = reportDtos.map(toHealthProfileReportSummary).filter(Boolean) as HealthProfileReportSummary[];
-        if (!alive) return;
-        setReportHistory(reports);
-        await AsyncStorage.setItem(reportHistoryStorageKey, JSON.stringify(reports));
-      } catch {
-        if (alive) setReportHistory([]);
-      }
-    };
-
-    void loadReportHistory();
-
-    return () => {
-      alive = false;
-    };
-  }, [reportHistoryStorageKey]);
+  useFocusEffect(
+    useCallback(() => {
+      void refreshPss10Context();
+    }, [refreshPss10Context])
+  );
 
   const nutritionProtein = publishedNutritionPlan?.version.contentSummary.protein ?? null;
   const nutritionCalories = publishedNutritionPlan?.version.contentSummary.calories ?? null;
@@ -357,15 +338,6 @@ export const HomeScreen = () => {
 
             <RecoveryTrend values={trendValues} hasData={hasTrendData} />
 
-            <View style={styles.actionRow}>
-              <ActionPill
-                label="Assist"
-                Icon={AssistIcon}
-                onPress={() => { void openAssist(); }}
-              />
-              <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable', { autoSync: true })} />
-            </View>
-
             <RecoveryPanel
               metrics={displayMetrics}
               selectedMetric={selectedMetric}
@@ -376,9 +348,24 @@ export const HomeScreen = () => {
               onSelectMetric={setSelectedMetric}
             />
 
+            <View style={styles.actionRow}>
+              <ActionPill
+                label="Assist"
+                Icon={AssistIcon}
+                onPress={() => { void openAssist(); }}
+              />
+              <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable', { autoSync: true })} />
+              <ActionPill label="Health Reports" Icon={ReportsActionIcon} onPress={() => navigation.navigate('Reports')} />
+              <ActionPill label="Cycle" Icon={CycleActionIcon} onPress={() => navigation.navigate('Cycle')} />
+            </View>
+
             <View style={styles.summaryRow}>
               <MedicationCard timeline={todayMedicationTimeline} onPress={() => navigation.navigate('MedicationCalendar')} />
-              <StressCard score={normalizeScore(recoveryIntel.stressRecoveryScore)} onPress={() => navigation.navigate('BreathingSession')} />
+              <StressCard
+                pss10Context={pss10Context}
+                onBreathingPress={() => navigation.navigate('BreathingSession')}
+                onAssessmentPress={() => navigation.navigate('Pss10Assessment', pss10Context.available ? { mode: 'history' } : undefined)}
+              />
             </View>
           </View>
         </ScrollView>
@@ -444,6 +431,14 @@ const RecoveryTrend = ({ values, hasData }: { values: number[]; hasData: boolean
   </View>
 );
 
+const ReportsActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
+  <Ionicons name="document-text-outline" size={Math.min(Number(width), Number(height))} color="#FFFFFF" />
+);
+
+const CycleActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
+  <Ionicons name="calendar-outline" size={Math.min(Number(width), Number(height))} color="#FFFFFF" />
+);
+
 const ActionPill = ({ label, Icon, onPress }: { label: string; Icon: SvgAsset; onPress: () => void }) => (
   <Pressable onPress={onPress} style={styles.actionPill} accessibilityRole="button">
     <Icon width={18} height={18} />
@@ -487,7 +482,9 @@ const RecoveryPanel = ({
   return (
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
-        <RecoveryStarAsset width={406} height={492} style={styles.starAsset} pointerEvents="none" />
+        <View style={styles.starShadow} pointerEvents="none">
+          <RecoveryStarAsset width={406} height={492} pointerEvents="none" />
+        </View>
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
         {selectedScore != null ? (
           <Svg
@@ -606,42 +603,81 @@ const MedicationCard = ({ timeline, onPress }: { timeline: MedicationTimelineEnt
   );
 };
 
-const StressCard = ({ score, onPress }: { score: number | null; onPress: () => void }) => (
-  <Pressable onPress={onPress} style={styles.infoCard} accessibilityRole="button" accessibilityLabel="Open stress recovery breathing">
-    <View style={styles.cardTitleRow}>
-      <Text style={styles.cardTitle}>Stress Recovery</Text>
-      <Ionicons name="headset-outline" size={20} color="#F4F7F4" />
+const StressCard = ({
+  pss10Context,
+  onBreathingPress,
+  onAssessmentPress
+}: {
+  pss10Context: Pss10StressContext;
+  onBreathingPress: () => void;
+  onAssessmentPress: () => void;
+}) => {
+  const changeText = formatPss10Change(pss10Context.change);
+  const lastCheckedText = formatPss10LastChecked(pss10Context.completedAtISO);
+  const actionText = pss10Context.available ? 'View Stress Test' : pss10Context.hasDraft ? 'Continue Stress Test' : 'Take Stress Test';
+  const stateText = pss10Context.available ? `${pss10Context.score} / ${pss10Context.maxScore}` : 'Not assessed yet';
+  const supportText = pss10Context.available
+    ? (lastCheckedText ?? 'Complete a quick stress check to establish your baseline.')
+    : 'Complete a quick stress check to establish your baseline.';
+
+  return (
+    <View style={[styles.infoCard, styles.stressInfoCard]}>
+      <View style={styles.cardTitleRow}>
+        <Text style={styles.cardTitle}>Stress Recovery</Text>
+        <Ionicons name="headset-outline" size={20} color="#F4F7F4" />
+      </View>
+      <Text style={styles.stressLabel}>Perceived Stress</Text>
+      <View style={styles.stressValueRow}>
+        <Text style={styles.stressValue}>{stateText}</Text>
+        {pss10Context.available && changeText ? <Text style={styles.stressTrend}>{changeText}</Text> : null}
+      </View>
+      <Text style={styles.stressSupportText} numberOfLines={2}>{supportText}</Text>
+      {pss10Context.hasDraft && !pss10Context.available ? (
+        <Text style={styles.stressDraftText} numberOfLines={1}>{pss10Context.draftAnsweredCount} responses saved.</Text>
+      ) : null}
+      <View style={styles.stressActionRow}>
+        <Pressable
+          style={styles.stressPrimaryAction}
+          onPress={onAssessmentPress}
+          accessibilityRole="button"
+          accessibilityLabel={actionText}
+        >
+          <Text style={styles.stressPrimaryActionText}>{actionText}</Text>
+          <Ionicons name="arrow-forward" size={12} color="#C9C7FF" />
+        </Pressable>
+        <Pressable
+          style={styles.stressSecondaryAction}
+          onPress={onBreathingPress}
+          accessibilityRole="button"
+          accessibilityLabel="Breathe"
+        >
+          <Text style={styles.stressSecondaryActionText}>Breathe</Text>
+        </Pressable>
+      </View>
     </View>
-    <Text style={styles.stressScore}>{score == null ? '--/100' : `${score}/100`}</Text>
-    <Text style={styles.stressCaption}>Adjusted by breathing minutes</Text>
-    <View style={styles.stressBars}>
-      <View style={[styles.stressBar, styles.stressBarActive]} />
-      <View style={styles.stressBar} />
-      <View style={styles.stressBar} />
-    </View>
-  </Pressable>
-);
+  );
+};
 
 const nodePositions = StyleSheet.create({
   top: {
-    top: 23,
-    left: 135
+    top: 24,
+    left: 131
   },
   left: {
-    top: 115,
-    left: 9
+    top: 125,
+    left: 1
   },
   right: {
-    top: 115,
-    right: 9
+    top: 125,
+    right: 1
   },
   bottomLeft: {
     left: 52,
-    bottom: 16
+    bottom: 17
   },
   bottomRight: {
     right: 52,
-    bottom: 16
+    bottom: 17
   }
 });
 
@@ -662,10 +698,10 @@ const styles = StyleSheet.create({
     maxWidth: 390,
     alignSelf: 'center',
     paddingHorizontal: 12,
-    paddingTop: 8
+    paddingTop: 0
   },
   header: {
-    height: 51,
+    height: 43,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between'
@@ -761,17 +797,18 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     height: 36,
-    marginTop: 18,
+    marginTop: -1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    gap: 8
   },
   actionPill: {
     height: 30,
-    minWidth: 75,
     borderRadius: 16,
     backgroundColor: '#050505',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
+    flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -784,8 +821,8 @@ const styles = StyleSheet.create({
     lineHeight: 15
   },
   recoveryPanel: {
-    height: 347,
-    marginTop: -2,
+    height: 371,
+    marginTop: 0,
     position: 'relative',
     alignItems: 'center',
     overflow: 'visible'
@@ -796,12 +833,19 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: '100%',
-    transform: [{ translateY: -46 }]
+    transform: [{ translateY: -18 }]
   },
-  starAsset: {
+  starShadow: {
     position: 'absolute',
-    top: -68,
-    left: -20
+    top: -48,
+    left: -20,
+    width: 406,
+    height: 492,
+    shadowColor: '#000000',
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    shadowOffset: { width: 10, height: -8 },
+    elevation: 8
   },
   progressDonutAsset: {
     position: 'absolute',
@@ -887,13 +931,13 @@ const styles = StyleSheet.create({
     height: 58
   },
   summaryRow: {
-    marginTop: -6,
+    marginTop: 11,
     flexDirection: 'row',
     gap: 10
   },
   infoCard: {
     flex: 1,
-    height: 131,
+    minHeight: 131,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#202423',
@@ -960,6 +1004,81 @@ const styles = StyleSheet.create({
     fontFamily: font.regular,
     fontSize: 12,
     lineHeight: 14
+  },
+  stressInfoCard: {
+    minHeight: 131
+  },
+  stressLabel: {
+    marginTop: 18,
+    color: '#9B98C7',
+    fontFamily: font.medium,
+    fontSize: 11,
+    lineHeight: 13
+  },
+  stressValueRow: {
+    marginTop: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8
+  },
+  stressValue: {
+    color: '#FFFFFF',
+    fontFamily: font.bold,
+    fontSize: 18,
+    lineHeight: 22
+  },
+  stressTrend: {
+    color: '#C9C7FF',
+    fontFamily: font.semiBold,
+    fontSize: 11,
+    lineHeight: 13
+  },
+  stressSupportText: {
+    marginTop: 7,
+    color: '#777C79',
+    fontFamily: font.regular,
+    fontSize: 11,
+    lineHeight: 14
+  },
+  stressDraftText: {
+    marginTop: 4,
+    color: '#A5A7B1',
+    fontFamily: font.medium,
+    fontSize: 10,
+    lineHeight: 12
+  },
+  stressActionRow: {
+    marginTop: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8
+  },
+  stressPrimaryAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5
+  },
+  stressPrimaryActionText: {
+    color: '#C9C7FF',
+    fontFamily: font.bold,
+    fontSize: 11,
+    lineHeight: 13
+  },
+  stressSecondaryAction: {
+    minHeight: 24,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: '#1A1B20',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  stressSecondaryActionText: {
+    color: '#F4F7F4',
+    fontFamily: font.medium,
+    fontSize: 10,
+    lineHeight: 12
   },
   stressBars: {
     marginTop: 10,
