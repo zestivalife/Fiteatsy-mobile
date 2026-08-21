@@ -1155,6 +1155,9 @@ const buildDraftContent = (input: {
     dailyTargets: {
       calories: input.calorieTarget,
       protein: input.proteinTargetGrams,
+      carbohydrates: input.calorieTarget == null ? null : Math.round((input.calorieTarget * 0.45) / 4),
+      fat: input.calorieTarget == null ? null : Math.round((input.calorieTarget * 0.3) / 9),
+      fibre: input.calorieTarget == null ? null : Math.max(25, Math.round((input.calorieTarget / 1000) * 14)),
       hydration: input.hydrationTargetLiters,
       movement: '20-30 min walk or consultant-approved movement block',
     },
@@ -1937,4 +1940,199 @@ export const getPublishedDietPlanForClient = async (owner: ClientOwnershipContex
       content: sanitizePublishedNutritionPlanContent(payload.version.content),
     },
   };
+};
+
+export const getDietPlanDeliveryStatusForClient = async (owner: ClientOwnershipContext) => {
+  const careCase = await getCareCaseByClientId(owner.clientId);
+  if (!careCase) return { status: 'NO_PLAN' as const, plan: null };
+
+  const plan = await getDietPlanByCareCaseId(careCase.id);
+  if (!plan) return { status: 'NO_PLAN' as const, plan: null };
+
+  const version = plan.currentVersionId ? await getCurrentDietPlanVersion(plan.id) : null;
+  const lifecycleStatus = version?.lifecycleStatus ?? plan.planStatus;
+  const isPublished =
+    plan.planStatus === 'published' &&
+    plan.latestPublishedVersionId != null &&
+    version?.id === plan.latestPublishedVersionId &&
+    version.lifecycleStatus === 'published';
+
+  if (isPublished) {
+    return {
+      status: 'ACTIVE_PUBLISHED' as const,
+      plan: {
+        id: plan.id,
+        versionId: version.id,
+        planStatus: plan.planStatus,
+        lifecycleStatus: version.lifecycleStatus,
+        approvedAtISO: plan.approvedAtISO,
+        publishedAtISO: plan.publishedAtISO,
+      },
+    };
+  }
+
+  if (lifecycleStatus === 'approved' || plan.planStatus === 'approved') {
+    return {
+      status: 'APPROVED_NOT_PUBLISHED' as const,
+      plan: {
+        id: plan.id,
+        versionId: version?.id ?? null,
+        planStatus: plan.planStatus,
+        lifecycleStatus,
+        approvedAtISO: plan.approvedAtISO,
+        publishedAtISO: plan.publishedAtISO,
+      },
+    };
+  }
+
+  if (lifecycleStatus === 'submitted_for_review' || lifecycleStatus === 'changes_requested') {
+    return {
+      status: 'PENDING_APPROVAL' as const,
+      plan: {
+        id: plan.id,
+        versionId: version?.id ?? null,
+        planStatus: plan.planStatus,
+        lifecycleStatus,
+        approvedAtISO: plan.approvedAtISO,
+        publishedAtISO: plan.publishedAtISO,
+      },
+    };
+  }
+
+  return {
+    status: 'PREPARING' as const,
+    plan: {
+      id: plan.id,
+      versionId: version?.id ?? null,
+      planStatus: plan.planStatus,
+      lifecycleStatus,
+      approvedAtISO: plan.approvedAtISO,
+      publishedAtISO: plan.publishedAtISO,
+    },
+  };
+};
+
+const nutritionMealOrder = [
+  'earlyMorning', 'breakfast', 'midMorningSnack', 'lunch', 'eveningSnack', 'dinner', 'bedtimeNutrition',
+] as const;
+
+const nutritionMealLabels: Record<(typeof nutritionMealOrder)[number], string> = {
+  earlyMorning: 'Early Morning', breakfast: 'Breakfast', midMorningSnack: 'Mid Morning Snack',
+  lunch: 'Lunch', eveningSnack: 'Evening Snack', dinner: 'Dinner', bedtimeNutrition: 'Bedtime Nourishment',
+};
+
+const canonicalDayPattern = /^\d{4}-\d{2}-\d{2}$/;
+const dateKey = (value: string | Date) => new Date(value).toISOString().slice(0, 10);
+export const isCanonicalNutritionDate = (value: string) => {
+  if (!canonicalDayPattern.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && dateKey(parsed) === value;
+};
+
+export const resolveNutritionMealState = (payload?: Record<string, unknown>) =>
+  String(payload ? (payload.state ?? 'CONSUMED_APPROVED') : 'PENDING') as 'PENDING' | 'CONSUMED_APPROVED' | 'CONSUMED_OUT_OF_PLAN' | 'SKIPPED';
+
+export const resolveDailyTargets = (content: NutritionPlanContent) => {
+  const selectedOptions = nutritionMealOrder.map(key => content.mealPlan?.[key]?.options?.[0]).filter(Boolean);
+  const sumField = (field: 'approxKcal' | 'proteinGrams' | 'carbsGrams' | 'fatGrams' | 'fibreGrams') => {
+    const values = selectedOptions.map(option => option?.[field]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0)) : null;
+  };
+  const calories = content.dailyTargets.calories ?? sumField('approxKcal');
+  const protein = content.dailyTargets.protein ?? sumField('proteinGrams');
+  return {
+    ...content.dailyTargets,
+    calories,
+    protein,
+    carbohydrates: content.dailyTargets.carbohydrates ?? sumField('carbsGrams') ?? (calories == null ? null : Math.round((calories * 0.45) / 4)),
+    fat: content.dailyTargets.fat ?? sumField('fatGrams') ?? (calories == null ? null : Math.round((calories * 0.3) / 9)),
+    fibre: content.dailyTargets.fibre ?? sumField('fibreGrams') ?? (calories == null ? null : Math.max(25, Math.round((calories / 1000) * 14))),
+  };
+};
+
+const eventNumber = (payload: Record<string, unknown>, key: string) => {
+  const value = payload[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+};
+
+export const getClientNutritionExperience = async (owner: ClientOwnershipContext, selectedDateISO?: string) => {
+  const published = await getLatestPublishedDietPlanByClientId(owner);
+  if (!published) throw new NutritionPlanWorkflowError('DIET_PLAN_NOT_FOUND', 'A published nutrition plan is required.', 404);
+  const content = sanitizePublishedNutritionPlanContent(published.version.content);
+  const careCase = await getCareCaseByClientId(owner.clientId);
+  if (!careCase) throw new NutritionPlanWorkflowError('CARE_CASE_NOT_FOUND', 'Care case not found.', 404);
+  const selectedDate = selectedDateISO ?? new Date().toISOString().slice(0, 10);
+  if (!isCanonicalNutritionDate(selectedDate)) {
+    throw new NutritionPlanWorkflowError('INVALID_NUTRITION_DATE', 'Nutrition date must use YYYY-MM-DD.', 400);
+  }
+  if (selectedDate > new Date().toISOString().slice(0, 10)) {
+    throw new NutritionPlanWorkflowError('FUTURE_DATE_NOT_ALLOWED', 'Future Nutrition history is not available.', 400);
+  }
+  const events = (await listHealthEvents(careCase.id)).filter(event => dateKey(event.eventTimeISO) === selectedDate);
+  const mealEvents = events.filter(event => event.type === 'meal_logged' && event.payload.versionId === published.version.id);
+  const latestByMeal = new Map<string, (typeof mealEvents)[number]>();
+  mealEvents.forEach(event => { const key = String(event.payload.mealKey ?? ''); if (key && !latestByMeal.has(key)) latestByMeal.set(key, event); });
+  const meals = nutritionMealOrder.map(key => {
+    const section = content.mealPlan[key];
+    const event = latestByMeal.get(key);
+    const state = resolveNutritionMealState(event?.payload);
+    return { key, label: nutritionMealLabels[key], window: section.window, options: section.options, state, consumedAtISO: event?.eventTimeISO ?? null, consumed: event?.payload ?? null };
+  });
+  const consumedEvents = [...latestByMeal.values()].filter(event => ['CONSUMED_APPROVED', 'CONSUMED_OUT_OF_PLAN'].includes(String(event.payload.state ?? 'CONSUMED_APPROVED')));
+  const totals = consumedEvents.reduce((sum, event) => ({
+    calories: sum.calories + eventNumber(event.payload, 'calories'), protein: sum.protein + eventNumber(event.payload, 'proteinGrams'),
+    carbs: sum.carbs + eventNumber(event.payload, 'carbsGrams'), fat: sum.fat + eventNumber(event.payload, 'fatGrams'), fibre: sum.fibre + eventNumber(event.payload, 'fibreGrams'),
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 });
+  const targets = resolveDailyTargets(content);
+  const remaining = {
+    calories: targets.calories == null ? null : Math.max(targets.calories - totals.calories, 0),
+    protein: targets.protein == null ? null : Math.max(targets.protein - totals.protein, 0),
+    carbs: targets.carbohydrates == null ? null : Math.max(targets.carbohydrates - totals.carbs, 0),
+    fat: targets.fat == null ? null : Math.max(targets.fat - totals.fat, 0),
+    fibre: targets.fibre == null ? null : Math.max(targets.fibre - totals.fibre, 0),
+  };
+  const waterMl = events.filter(event => event.type === 'water_logged' && event.payload.versionId === published.version.id).reduce((sum, event) => sum + (eventNumber(event.payload, 'waterMl') || eventNumber(event.payload, 'litres') * 1000), 0);
+  const completed = meals.filter(meal => meal.state !== 'PENDING').length;
+  return {
+    selectedDate, plan: published.plan, version: { ...published.version, content: { ...content, dailyTargets: targets } },
+    meals, totals, remaining, water: { litres: waterMl / 1000, targetLitres: targets.hydration, dailyWaterMl: waterMl, hydrationTargetMl: targets.hydration == null ? null : Math.round(targets.hydration * 1000), remainingHydrationMl: targets.hydration == null ? null : Math.max(Math.round(targets.hydration * 1000) - waterMl, 0) }, mealCount: meals.length,
+    mealsFollowed: completed, consumedCount: meals.filter(meal => meal.state === 'CONSUMED_APPROVED').length,
+    outOfPlanCount: meals.filter(meal => meal.state === 'CONSUMED_OUT_OF_PLAN').length,
+    skippedCount: meals.filter(meal => meal.state === 'SKIPPED').length,
+    pendingCount: meals.filter(meal => meal.state === 'PENDING').length,
+    consultantNote: content.nutritionSnapshot.personalisedPlanFocus?.trim() || null,
+  };
+};
+
+export const logClientNutritionEvent = async (owner: ClientOwnershipContext, input: Record<string, unknown>) => {
+  const published = await getLatestPublishedDietPlanByClientId(owner);
+  if (!published || input.planId !== published.plan.id || input.versionId !== published.version.id) throw new NutritionPlanWorkflowError('DIET_PLAN_VERSION_MISMATCH', 'Only the active published plan can be updated.', 409);
+  const careCase = await getCareCaseByClientId(owner.clientId);
+  if (!careCase) throw new NutritionPlanWorkflowError('CARE_CASE_NOT_FOUND', 'Care case not found.', 404);
+  const eventTimeISO = typeof input.consumedAtISO === 'string' ? input.consumedAtISO : new Date().toISOString();
+  await addHealthEvent({ careCaseId: careCase.id, userId: owner.accountId, type: 'meal_logged', summary: `${String(input.mealKey)} nutrition updated`, payload: input, replayKey: `${careCase.id}:nutrition:${String(input.versionId)}:${String(input.mealKey)}:${eventTimeISO}`, eventTimeISO });
+  return getClientNutritionExperience(owner, dateKey(eventTimeISO));
+};
+
+export const logClientNutritionWater = async (owner: ClientOwnershipContext, input: { planId: string; versionId: string; waterMl: number; consumedAtISO?: string | null }) => {
+  const published = await getLatestPublishedDietPlanByClientId(owner);
+  if (!published || input.planId !== published.plan.id || input.versionId !== published.version.id) throw new NutritionPlanWorkflowError('DIET_PLAN_VERSION_MISMATCH', 'Only the active published plan can be updated.', 409);
+  const careCase = await getCareCaseByClientId(owner.clientId);
+  if (!careCase) throw new NutritionPlanWorkflowError('CARE_CASE_NOT_FOUND', 'Care case not found.', 404);
+  const eventTimeISO = input.consumedAtISO ?? new Date().toISOString();
+  await addHealthEvent({ careCaseId: careCase.id, userId: owner.accountId, type: 'water_logged', summary: `${input.waterMl} ml water logged`, payload: input, replayKey: `${careCase.id}:water:${input.versionId}:${eventTimeISO}`, eventTimeISO });
+  return getClientNutritionExperience(owner, dateKey(eventTimeISO));
+};
+
+export const getClientNutritionPattern = async (owner: ClientOwnershipContext, endDateISO?: string) => {
+  const careCase = await getCareCaseByClientId(owner.clientId);
+  if (!careCase) throw new NutritionPlanWorkflowError('CARE_CASE_NOT_FOUND', 'Care case not found.', 404);
+  const end = new Date(`${endDateISO ?? new Date().toISOString().slice(0, 10)}T23:59:59.999Z`);
+  const start = new Date(end); start.setUTCDate(start.getUTCDate() - 6);
+  const events = (await listHealthEvents(careCase.id)).filter(event => new Date(event.eventTimeISO) >= start && new Date(event.eventTimeISO) <= end);
+  const meals = events.filter(event => event.type === 'meal_logged');
+  const consumed = meals.filter(event => String(event.payload.state) === 'CONSUMED_APPROVED').length;
+  const outOfPlanMeals = meals.filter(event => String(event.payload.state) === 'CONSUMED_OUT_OF_PLAN').length;
+  const skippedMeals = meals.filter(event => String(event.payload.state) === 'SKIPPED').length;
+  return { periodDays: 7, planAdherencePercent: meals.length ? Math.round((consumed / meals.length) * 100) : null, outOfPlanMeals, skippedMeals, waterTargetDays: null, targetRangeDays: { protein: null, fibre: null, water: null }, insights: meals.length ? [`${consumed} consultant-approved meals were logged in this period.`] : ['No meal events were logged in this period.'] };
 };
