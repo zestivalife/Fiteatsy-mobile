@@ -1,4 +1,29 @@
-import { apiFetch } from './apiClient';
+import { apiFetch, ApiClientError } from './apiClient';
+
+const TRANSIENT_NUTRITION_STATUSES = new Set([502, 503, 504]);
+
+const nutritionFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  try {
+    return await apiFetch<T>(path, init);
+  } catch (error) {
+    const retryable = error instanceof ApiClientError
+      && error.status != null
+      && TRANSIENT_NUTRITION_STATUSES.has(error.status);
+
+    if (__DEV__) {
+      console.warn('[NutritionRuntime] request failed', {
+        path,
+        method: init?.method ?? 'GET',
+        code: error instanceof ApiClientError ? error.code : 'UNKNOWN',
+        status: error instanceof ApiClientError ? error.status : undefined,
+        retryable
+      });
+    }
+
+    if (!retryable) throw error;
+    return apiFetch<T>(path, init);
+  }
+};
 
 export type NutritionOption = {
   id?: string;
@@ -71,12 +96,12 @@ export type NutritionExperience = {
 
 export const getNutritionExperience = async (date?: string) => {
   const canonicalDate = date ?? new Date().toISOString().slice(0, 10);
-  const response = await apiFetch<NutritionExperience>(`/v1/platform/nutrition-experience?date=${encodeURIComponent(canonicalDate)}`);
+  const response = await nutritionFetch<NutritionExperience>(`/v1/platform/nutrition-experience?date=${encodeURIComponent(canonicalDate)}`);
   return { ...response, selectedDate: response.selectedDate || canonicalDate };
 };
 
 export const getNutritionPattern = (endDate?: string) =>
-  apiFetch<{
+  nutritionFetch<{
     periodDays: number;
     planAdherencePercent: number | null;
     outOfPlanMeals: number;
