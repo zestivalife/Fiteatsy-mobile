@@ -58,7 +58,7 @@ const font = {
 } as const;
 
 type Nav = CompositeNavigationProp<
-  BottomTabNavigationProp<MainTabParamList, 'Home'>,
+  BottomTabNavigationProp<MainTabParamList, 'Journey'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 type MetricKey = 'recovery' | 'calm' | 'activity' | 'nutrition' | 'mind' | 'sleep';

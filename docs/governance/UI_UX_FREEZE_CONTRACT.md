@@ -31,9 +31,11 @@ If an unrelated frozen screen changes, the change must be reverted before accept
 
 ## Footer navigation baseline
 
-THE CURRENT OVERSIZED FLOATING FOOTER SHOWN IN THE 22 AUG 2026 01:28 SIMULATOR SCREENSHOT IS A KNOWN LEGACY/REGRESSED COMPONENT AND MUST NOT BE USED AS A UI FREEZE BASELINE.
+`PRIMARY_BOTTOM_NAVIGATION_REFERENCE` = attached 20 Aug 2026 16:46:06 (4:46) iPhone simulator screenshot.
 
-- Canonical component: `src/components/FloatingTabBar.tsx`
-- Accepted navigation source SHA: `94791be461c39ba41c6791955bdbf6d59bfc24a6`
-- Frozen behaviour: compact floating shell, safe-area-aware bottom padding, icon-only inactive tabs, and a compact horizontal icon-and-label selected state.
-- Current required routes: Home, Tracker, Nutrition, Reports, Sessions, Cycle.
+- This reference governs FOOTER NAVIGATION ONLY. It must never be interpreted as permission to restore or modify the Home screen, Recovery Core, cards, typography, colours, layouts, or any other screen content shown in that screenshot.
+- Canonical component: `src/components/FloatingTabBar.tsx`.
+- Frozen primary structure: Journey | Tracker | Nutrition | Care | Profile.
+- Frozen treatment: flat black edge-to-edge footer, five evenly distributed icon-above-label destinations, white active state, muted-grey inactive state, compact vertical footprint, and iOS safe-area handling.
+- Home, Tracker, Nutrition, Reports, Sessions, Cycle in a six-item floating capsule is LEGACY / REJECTED / DO NOT RESTORE.
+- Reports, Sessions, and Cycle remain feature routes and must not be promoted into the primary footer.

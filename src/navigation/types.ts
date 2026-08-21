@@ -41,6 +41,9 @@ export type RootStackParamList = {
   Search: undefined;
   Notifications: undefined;
   Profile: undefined;
+  Reports: undefined;
+  Sessions: undefined;
+  Cycle: undefined;
   ConnectedMetrics: undefined;
   HealthSyncDebug: undefined;
   ReportsChat: { reportName: string; reportId: string; reportParameters: ReportParameter[] };
@@ -76,10 +79,9 @@ export type RootStackParamList = {
 };
 
 export type MainTabParamList = {
-  Home: undefined;
+  Journey: undefined;
   Tracker: undefined;
   Nutrition: undefined;
-  Reports: undefined;
-  Sessions: undefined;
-  Cycle: undefined;
+  Care: undefined;
+  Profile: undefined;
 };

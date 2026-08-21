@@ -57,6 +57,7 @@ import { useAppContext } from '../state/AppContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+const CareTabScreen = ConsultantBookingScreen as React.ComponentType<any>;
 
 const MainTabs = () => {
   return (
@@ -72,12 +73,11 @@ const MainTabs = () => {
         }
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Journey" component={HomeScreen} />
       <Tab.Screen name="Tracker" component={TrackerScreen} />
       <Tab.Screen name="Nutrition" component={NutritionExperienceScreen} />
-      <Tab.Screen name="Reports" component={ReportsScreen} />
-      <Tab.Screen name="Sessions" component={SessionsScreen} />
-      <Tab.Screen name="Cycle" component={CycleScreen} />
+      <Tab.Screen name="Care" component={CareTabScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };
@@ -142,6 +142,9 @@ export const AppNavigation = () => {
         <Stack.Screen name="ConnectedMetrics" component={ConnectedMetricsScreen} />
         {__DEV__ ? <Stack.Screen name="HealthSyncDebug" component={HealthSyncDebugScreen} /> : null}
         <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
+        <Stack.Screen name="Reports" component={ReportsScreen} />
+        <Stack.Screen name="Sessions" component={SessionsScreen} />
+        <Stack.Screen name="Cycle" component={CycleScreen} />
         <Stack.Screen name="NutritionPlan" component={NutritionPlanScreen} />
         <Stack.Screen name="NutritionExperience" component={NutritionExperienceScreen} />
         <Stack.Screen name="MedicationForm" component={MedicationFormScreen} />
