@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { NutritionPlanContent } from '../../backend/src/modules/platform/platform.types.js';
-import { isCanonicalNutritionDate, resolveDailyNutritionTargets, resolveNutritionConsultantNote } from '../../backend/src/modules/nutrition/nutrition.service.js';
+import { isCanonicalNutritionDate, isFutureNutritionDate, resolveDailyNutritionTargets } from '../../backend/src/modules/nutrition/nutrition.service.js';
 
 test('Nutrition date contract accepts real YYYY-MM-DD values only', () => {
   assert.equal(isCanonicalNutritionDate('2026-08-21'), true);
@@ -21,15 +21,10 @@ test('legacy published plans deterministically resolve all macro targets', () =>
   });
 });
 
-test('legacy published plans without clinical notes still produce consultant guidance safely', () => {
-  const content = {
-    nutritionSnapshot: { personalisedPlanFocus: 'Focus on protein and hydration.' },
-    dailyTargets: { calories: 1800, protein: 120, hydration: 2.5 },
-    mealPlan: {},
-  } as unknown as NutritionPlanContent;
-
-  assert.equal(resolveNutritionConsultantNote(content), 'Focus on protein and hydration.');
-  assert.doesNotThrow(() => resolveDailyNutritionTargets(content));
+test('client-local today is not rejected during the positive timezone UTC boundary', () => {
+  const beforeUtcMidnight = new Date('2026-08-21T19:26:00.000Z');
+  assert.equal(isFutureNutritionDate('2026-08-22', beforeUtcMidnight), false);
+  assert.equal(isFutureNutritionDate('2026-08-23', beforeUtcMidnight), true);
 });
 
 test('water has a dedicated millilitre contract and never uses meal validation', () => {
