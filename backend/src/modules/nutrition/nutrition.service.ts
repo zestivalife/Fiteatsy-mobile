@@ -2177,7 +2177,11 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
   const end = new Date(`${selectedDate}T23:59:59.999Z`).getTime();
   const start = rangeDays === 1 ? new Date(`${selectedDate}T00:00:00.000Z`).getTime() : end - ((rangeDays - 1) * 86400000);
   const relevant = events.filter((event) => { const time = new Date(event.eventTimeISO).getTime(); return time >= start && time <= end; });
-  const mealEvents = relevant.filter((event) => event.type === 'meal_logged');
+  const mealEvents = relevant.filter((event) => {
+    if (event.type !== 'meal_logged') return false;
+    const payload = parseNutritionEvent(event);
+    return payload?.planId === published.plan.id && payload?.versionId === published.version.id;
+  });
   const latestByMeal = new Map<string, { state: NutritionConsumptionState; payload: Record<string, unknown>; eventTimeISO: string }>();
   for (const event of mealEvents.sort((a, b) => a.eventTimeISO.localeCompare(b.eventTimeISO))) {
     const payload = parseNutritionEvent(event);
@@ -2210,7 +2214,11 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
       consumed: current?.payload ?? null,
     };
   });
-  const waterMl = relevant.filter((event) => event.type === 'water_logged').reduce((sum, event) => { const payload = parseNutritionEvent(event); return sum + Number(payload?.waterMl ?? Number(payload?.litres ?? 0) * 1000); }, 0);
+  const waterMl = relevant.filter((event) => {
+    if (event.type !== 'water_logged') return false;
+    const payload = parseNutritionEvent(event);
+    return payload?.planId === published.plan.id && payload?.versionId === published.version.id;
+  }).reduce((sum, event) => { const payload = parseNutritionEvent(event); return sum + Number(payload?.waterMl ?? Number(payload?.litres ?? 0) * 1000); }, 0);
   const targetWater = targets.hydration;
   return {
     selectedDate, plan: published.plan, version: { ...published.version, content: { ...published.version.content, dailyTargets: targets } }, meals, totals, remaining, water: { litres: waterMl / 1000, targetLitres: targetWater, dailyWaterMl: waterMl, hydrationTargetMl: targetWater == null ? null : Math.round(targetWater * 1000), remainingHydrationMl: targetWater == null ? null : Math.max(Math.round(targetWater * 1000) - waterMl, 0) },
@@ -2289,15 +2297,15 @@ export const logClientNutritionEvent = async (owner: ClientOwnershipContext, inp
       state: input.state,
       optionId: selectedOption?.id ?? input.optionId ?? null,
       mealName: selectedOption?.meal ?? input.mealName ?? null,
-      calories: selectedOption?.approxKcal ?? null,
-      proteinGrams: selectedOption?.proteinGrams ?? null,
-      carbsGrams: selectedOption?.carbsGrams ?? null,
-      fatGrams: selectedOption?.fatGrams ?? null,
-      fibreGrams: selectedOption?.fibreGrams ?? null,
+      calories: selectedOption?.approxKcal ?? input.calories ?? null,
+      proteinGrams: selectedOption?.proteinGrams ?? input.proteinGrams ?? null,
+      carbsGrams: selectedOption?.carbsGrams ?? input.carbsGrams ?? null,
+      fatGrams: selectedOption?.fatGrams ?? input.fatGrams ?? null,
+      fibreGrams: selectedOption?.fibreGrams ?? input.fibreGrams ?? null,
       litres: input.litres ?? null,
     },
   });
-  return buildNutritionProjection(owner);
+  return buildNutritionProjection(owner, 1, nutritionDateKey(eventTimeISO));
 };
 
 export const logClientNutritionWater = async (owner: ClientOwnershipContext, input: {

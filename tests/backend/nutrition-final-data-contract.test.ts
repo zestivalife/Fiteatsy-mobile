@@ -48,3 +48,11 @@ test('daily client projection exposes canonical date and reconciled meal states'
   assert.match(screen, /getFullYear\(\)[\s\S]*getMonth\(\)[\s\S]*getDate\(\)/);
   assert.doesNotMatch(screen, /new Date\(data\.selectedDate\)(?!T00:00:00)/);
 });
+
+test('actual events stay scoped to the published plan version and preserve out-of-plan nutrition', () => {
+  const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  assert.match(service, /payload\?\.planId === published\.plan\.id && payload\?\.versionId === published\.version\.id/);
+  assert.match(service, /selectedOption\?\.approxKcal \?\? input\.calories \?\? null/);
+  assert.match(service, /selectedOption\?\.proteinGrams \?\? input\.proteinGrams \?\? null/);
+  assert.match(service, /buildNutritionProjection\(owner, 1, nutritionDateKey\(eventTimeISO\)\)/);
+});
