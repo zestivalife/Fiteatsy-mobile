@@ -22,6 +22,7 @@ import type {
   NutritionPlanContent,
   NutritionPlanSourceSnapshot,
 } from '../platform/platform.types.js';
+import { NUTRITION_MEAL_SEQUENCE } from '../platform/platform.types.js';
 import { transitionCareCaseStage } from '../platform/platform.lifecycle.js';
 import { addHealthEvent } from '../platform/platform.store.js';
 import {
@@ -1279,7 +1280,8 @@ const enrichMealPlanWithLibraryMatches = async (input: {
   preferredCuisines?: string[];
 }) => {
   const nextMealPlanEntries = await Promise.all(
-    Object.entries(input.content.mealPlan).map(async ([mealKey, section]) => {
+    NUTRITION_MEAL_SEQUENCE.map(async (mealKey) => {
+      const section = input.content.mealPlan[mealKey];
       const verifiedMatches = await listMealLibrarySlotsForTarget({
         mealKey,
         target: section.target,
@@ -1930,14 +1932,16 @@ export const generateConsultantOptionalGuidance = async (
     caloriesTarget: version.content.dailyTargets.calories,
     proteinTargetGrams: version.content.dailyTargets.protein,
   }).lunch;
-  const planOptions = Object.entries(version.content.mealPlan).flatMap(([mealKey, section]) =>
-    section.options.map((slot) => ({ slot, mealKey, timeWindow: section.window })),
-  );
-  const verifiedDraftCandidates = Object.entries(version.content.mealPlan).flatMap(([mealKey, section]) =>
-    [...section.options, ...(section.availableOptions ?? [])]
+  const planOptions = NUTRITION_MEAL_SEQUENCE.flatMap((mealKey) => {
+    const section = version.content.mealPlan[mealKey];
+    return section.options.map((slot) => ({ slot, mealKey, timeWindow: section.window }));
+  });
+  const verifiedDraftCandidates = NUTRITION_MEAL_SEQUENCE.flatMap((mealKey) => {
+    const section = version.content.mealPlan[mealKey];
+    return [...section.options, ...(section.availableOptions ?? [])]
       .filter(guidanceNutritionComplete)
-      .map((slot) => ({ slot, mealKey, timeWindow: section.window })),
-  );
+      .map((slot) => ({ slot, mealKey, timeWindow: section.window }));
+  });
   const planOptionIds = new Set(planOptions.flatMap(({ slot }) => slot.id ? [slot.id] : []));
   const mealTagsForSlot = (slot: NutritionMealSlot) => planOptions.filter((entry) => entry.slot.id === slot.id).map((entry) => entry.mealKey);
   const catalogueInput = {
@@ -1989,7 +1993,7 @@ export const generateConsultantOptionalGuidance = async (
     return [key, candidates.map((slot, index) => guidanceItemFromSlot({ slot, category: 'craving', displayOrder: index + 1, planOptionIds, cravingTags: [key], mealTags: mealTagsForSlot(slot) }))];
   })) as OptionalNutritionGuidance['cravings'];
   const now = new Date().toISOString();
-  const optionalGuidance: OptionalNutritionGuidance = {
+  const generatedGuidance: OptionalNutritionGuidance = {
     schemaVersion: 1, generatedBy: account.accountId, generatedAtISO: now, updatedBy: account.accountId, updatedAtISO: now,
     reviewedBy: null, reviewedAtISO: null,
     whatCanIEatNow: whatSlots.map((slot, index) => {
@@ -1998,6 +2002,24 @@ export const generateConsultantOptionalGuidance = async (
     }),
     eatingOut, cravings,
   };
+  const mergeGuidanceItems = (existing: NutritionGuidanceItem[] | undefined, generated: NutritionGuidanceItem[], maximum: number) =>
+    Array.from(new Map([...generated, ...(existing ?? [])].map((item) => [item.id || `${item.name}:${item.servingLabel}`, item])).values())
+      .slice(0, maximum)
+      .map((item, index) => ({ ...item, displayOrder: index + 1 }));
+  const existingGuidance = version.content.optionalGuidance;
+  const optionalGuidance: OptionalNutritionGuidance = existingGuidance ? {
+    ...generatedGuidance,
+    generatedAtISO: existingGuidance.generatedAtISO,
+    whatCanIEatNow: mergeGuidanceItems(existingGuidance.whatCanIEatNow, generatedGuidance.whatCanIEatNow, OPTIONAL_GUIDANCE_WHAT_COUNT),
+    eatingOut: Object.fromEntries(Object.keys(cuisineDefinitions).map((key) => [
+      key,
+      mergeGuidanceItems(existingGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']], generatedGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']], OPTIONAL_GUIDANCE_CUISINE_COUNT),
+    ])) as OptionalNutritionGuidance['eatingOut'],
+    cravings: Object.fromEntries(Object.keys(cravingDefinitions).map((key) => [
+      key,
+      mergeGuidanceItems(existingGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], generatedGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], OPTIONAL_GUIDANCE_CRAVING_COUNT),
+    ])) as OptionalNutritionGuidance['cravings'],
+  } : generatedGuidance;
   return updateConsultantDietPlanDraft(publicClientId, account, dietPlanId, {
     content: { ...version.content, optionalGuidance },
     reviewNotes: version.reviewNotes,
@@ -2017,7 +2039,7 @@ export const searchConsultantOptionalGuidanceCandidates = async (
   const version = plan?.currentVersionId ? await getCurrentDietPlanVersion(plan.id) : null;
   if (!plan || !version || plan.careCaseId !== workspace.careCase.id) return null;
   const preferences = await resolveFoodPreferencesFilter(publicClientId);
-  const planEntries = Object.entries(version.content.mealPlan).flatMap(([mealKey, section]) => section.options.map((item) => ({ mealKey, item })));
+  const planEntries = NUTRITION_MEAL_SEQUENCE.flatMap((mealKey) => version.content.mealPlan[mealKey].options.map((item) => ({ mealKey, item })));
   const planOptionIds = new Set(planEntries.flatMap(({ item }) => item.id ? [item.id] : []));
   const contextKey = lower(input.context);
   const cuisine = input.category === 'eating_out' ? resolveCuisineLabel(contextKey) : 'general';
@@ -2429,9 +2451,7 @@ export const getDietPlanDeliveryStatusForClient = async (owner: ClientOwnershipC
 type NutritionConsumptionState = 'PENDING' | 'CONSUMED_APPROVED' | 'CONSUMED_OUT_OF_PLAN' | 'SKIPPED';
 type NutritionReasonCode = 'HIGHER_PROTEIN' | 'HIGHER_FIBRE' | 'LOWER_FAT' | 'CALORIE_FIT' | 'BALANCED_OPTION';
 
-const nutritionMealOrder = [
-  'earlyMorning', 'breakfast', 'midMorningSnack', 'lunch', 'eveningSnack', 'dinner', 'bedtimeNutrition',
-] as const;
+const nutritionMealOrder = NUTRITION_MEAL_SEQUENCE;
 
 const nutritionMealLabels: Record<string, string> = {
   earlyMorning: 'Early Morning', breakfast: 'Breakfast', midMorningSnack: 'Mid-Morning',
@@ -2459,7 +2479,7 @@ export const isCanonicalNutritionDate = (value: string) => {
 };
 
 export const resolveDailyNutritionTargets = (content: NutritionPlanContent) => {
-  const options = (Object.values(content.mealPlan) as Array<NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]>).map(section => section.options[0]).filter(Boolean);
+  const options = NUTRITION_MEAL_SEQUENCE.map((key) => content.mealPlan[key].options[0]).filter(Boolean);
   const sum = (field: 'approxKcal' | 'proteinGrams' | 'carbsGrams' | 'fatGrams' | 'fibreGrams') => {
     const values = options.map(option => option?.[field]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     return values.length ? Math.round(values.reduce((total, value) => total + value, 0)) : null;
@@ -2573,7 +2593,8 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
     fat: targets.fat == null ? null : Math.max(0, targets.fat - totals.fat),
     fibre: targets.fibre == null ? null : Math.max(0, targets.fibre - totals.fibre),
   };
-  const meals = (Object.entries(published.version.content.mealPlan) as Array<[keyof NutritionPlanContent['mealPlan'], NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]]>).map(([key, section]) => {
+  const meals = NUTRITION_MEAL_SEQUENCE.map((key) => {
+    const section = published.version.content.mealPlan[key];
     const ranking = section.options.map((option) => ({ option, rank: scoreApprovedOption(option, remaining) })).sort((a, b) => b.rank.score - a.rank.score);
     const current = latestByMeal.get(key);
     return {

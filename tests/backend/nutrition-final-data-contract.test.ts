@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import type { NutritionPlanContent } from '../../backend/src/modules/platform/platform.types.js';
+import { NUTRITION_MEAL_ORDER, NUTRITION_MEAL_SEQUENCE, type NutritionPlanContent } from '../../backend/src/modules/platform/platform.types.js';
 import { assertCurrentNutritionBusinessDate, classifyEatingOutRecommendation, isCanonicalNutritionDate, isFutureNutritionDate, nutritionDateKey, resolveDailyNutritionTargets, scoreNutritionRecommendation } from '../../backend/src/modules/nutrition/nutrition.service.js';
 
 test('Nutrition date contract accepts real YYYY-MM-DD values only', () => {
@@ -19,6 +19,11 @@ test('legacy published plans deterministically resolve all macro targets', () =>
   assert.deepEqual(resolveDailyNutritionTargets(content), {
     calories: 1800, protein: 120, carbohydrates: 203, fat: 60, fibre: 25, hydration: 2.5, movement: 'Walk',
   });
+});
+
+test('all backend nutrition projections use the canonical clinical meal sequence', () => {
+  assert.deepEqual(NUTRITION_MEAL_SEQUENCE, ['earlyMorning', 'breakfast', 'midMorningSnack', 'lunch', 'eveningSnack', 'dinner', 'bedtimeNutrition']);
+  assert.deepEqual(NUTRITION_MEAL_ORDER, { earlyMorning: 10, breakfast: 20, midMorningSnack: 30, lunch: 40, eveningSnack: 50, dinner: 60, bedtimeNutrition: 70 });
 });
 
 test('client-local today is not rejected during the positive timezone UTC boundary', () => {
