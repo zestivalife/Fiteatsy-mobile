@@ -27,6 +27,14 @@ const androidManifest = fs.readFileSync(
   path.join(process.cwd(), 'android/app/src/main/AndroidManifest.xml'),
   'utf8'
 );
+const appNavigation = fs.readFileSync(
+  path.join(process.cwd(), 'src/navigation/AppNavigation.tsx'),
+  'utf8'
+);
+const podfileLock = fs.readFileSync(
+  path.join(process.cwd(), 'ios/Podfile.lock'),
+  'utf8'
+);
 
 describe('premium app-level video intro contract', () => {
   it('uses the approved remote video and supplied SVG with the required presentation', () => {
@@ -80,5 +88,12 @@ describe('premium app-level video intro contract', () => {
     expect(androidManifest).toContain(
       '{&quot;expo-channel-name&quot;:&quot;production&quot;}'
     );
+  });
+
+  it('keeps the canonical splash first and backed by the native video module', () => {
+    expect(appNavigation).toContain('initialRouteName="Splash"');
+    expect(appNavigation.match(/<Stack\.Screen name="Splash"/g)).toHaveLength(1);
+    expect(podfileLock).toContain('ExpoVideo (3.0.16)');
+    expect(appConfig.expo.runtimeVersion).toBe('1.0.0-native-20260823-video');
   });
 });
