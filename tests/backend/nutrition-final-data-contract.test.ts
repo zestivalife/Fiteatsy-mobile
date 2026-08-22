@@ -83,16 +83,17 @@ test('Eating Out approval requires stable membership in the active published mea
   assert.equal(classifyEatingOutRecommendation(undefined, activePublishedOptionIds), 'general');
 });
 
-test('Eating Out general guidance is labelled truthfully and logs outside the plan', () => {
+test('reviewed optional guidance is labelled truthfully and logs outside the plan', () => {
   const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
   const screen = readFileSync(new URL('../../src/screens/home/NutritionExperienceScreen.tsx', import.meta.url), 'utf8');
   const eatingOutStart = service.indexOf('export const getNutritionEatingOutSuggestions');
   const eatingOutEnd = service.indexOf('export const getNutritionCravingSuggestions', eatingOutStart);
   const eatingOut = service.slice(eatingOutStart, eatingOutEnd);
 
-  assert.match(eatingOut, /activePublishedOptionIds/);
-  assert.match(eatingOut, /classifyEatingOutRecommendation\(option\.id, activePublishedOptionIds\)/);
-  assert.match(screen, /mode === 'eating-out' \? 'General guidance' : 'Outside plan'/);
+  assert.match(eatingOut, /experience\.version\.content\.optionalGuidance/);
+  assert.match(eatingOut, /guidance\.eatingOut\[cuisineKey\]/);
+  assert.doesNotMatch(eatingOut, /listMealLibrarySlotsForTarget/);
+  assert.match(screen, /Reviewed guidance/);
   assert.match(screen, /state: isApproved \? 'CONSUMED_APPROVED' : 'CONSUMED_OUT_OF_PLAN'/);
   assert.match(service, /outOfPlanMeals = meals\.filter\(\(meal\) => meal\.state === 'CONSUMED_OUT_OF_PLAN'\)/);
   assert.match(service, /nutritionMonitoring: dailyMonitoring/);
@@ -189,21 +190,35 @@ test('recommendation score reacts to remaining macro context', () => {
   assert.ok(scoreNutritionRecommendation(highProtein as never, remaining) > scoreNutritionRecommendation(highFat as never, remaining));
 });
 
-test('contextual recommendation flows use distinct verified pools and no generic craving fallback', () => {
+test('client contextual recommendation flows consume only versioned reviewed pools', () => {
   const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
-  const store = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.library.store.ts', import.meta.url), 'utf8');
   const eatingOutStart = service.indexOf('export const getNutritionEatingOutSuggestions');
   const cravingStart = service.indexOf('export const getNutritionCravingSuggestions', eatingOutStart);
   const eatingOut = service.slice(eatingOutStart, cravingStart);
   const craving = service.slice(cravingStart);
 
-  assert.match(store, /\(\$1 = '' or meal_key = \$1\)/);
-  assert.match(eatingOut, /filterByTextMatch\(option, \[requestedCuisine\]\)/);
-  assert.match(eatingOut, /preferredCuisines: requestedCuisine === 'general' \? \[\] : \[requestedCuisine\]/);
-  assert.match(eatingOut, /mealKey: ''/);
-  assert.match(craving, /mealKey: ''/);
-  assert.match(craving, /filterByTextMatch\(option, cravings\)/);
-  assert.doesNotMatch(craving, /slice\(0,\s*8\)/);
+  assert.match(eatingOut, /optionalGuidance/);
+  assert.match(eatingOut, /guidance\.eatingOut\[cuisineKey\]/);
+  assert.match(craving, /guidance\.cravings\[cravingKey\]/);
+  assert.doesNotMatch(eatingOut, /listMealLibrarySlotsForTarget/);
+  assert.doesNotMatch(craving, /listMealLibrarySlotsForTarget/);
+  assert.match(service, /item\.enabled && item\.clinicallyReviewed/);
+  assert.match(service, /guidanceStatus: 'available' \| 'preparing'/);
+});
+
+test('optional guidance is governed by the complete Diet Plan version lifecycle', () => {
+  const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const routes = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.routes.ts', import.meta.url), 'utf8');
+  const types = readFileSync(new URL('../../backend/src/modules/platform/platform.types.ts', import.meta.url), 'utf8');
+
+  assert.match(types, /optionalGuidance\?: OptionalNutritionGuidance/);
+  assert.match(service, /assertOptionalGuidanceComplete\(version\.content\)/);
+  assert.match(service, /assertOptionalGuidanceComplete\(approvedVersion\.content, true\)/);
+  assert.match(service, /clinicallyReviewed: true/);
+  assert.match(routes, /optional-guidance\/generate/);
+  assert.match(service, /listMealLibrarySlotsForTarget/);
+  assert.match(service, /OPTIONAL_GUIDANCE_INCOMPLETE/);
+  assert.match(service, /OPTIONAL_GUIDANCE_UNRESOLVED/);
 });
 
 test('quick actions are independent and selection changes bypass stale React state', () => {

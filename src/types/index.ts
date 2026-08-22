@@ -630,6 +630,41 @@ export type NutritionPlanContent = {
   weeklySuccessGuide: string[];
   smartSubstitutions: NutritionSubstitution[];
   supplementsAndClinicalNotes: NutritionClinicalNote[];
+  optionalGuidance?: {
+    schemaVersion: 1;
+    generatedBy: string;
+    generatedAtISO: string;
+    updatedBy: string;
+    updatedAtISO: string;
+    reviewedBy: string | null;
+    reviewedAtISO: string | null;
+    whatCanIEatNow: NutritionGuidanceItem[];
+    eatingOut: Record<'northIndian' | 'southIndian' | 'chinese' | 'continental' | 'fastFood', NutritionGuidanceItem[]>;
+    cravings: Record<'sweet' | 'salty' | 'crunchy' | 'spicy', NutritionGuidanceItem[]>;
+  };
+};
+
+export type NutritionGuidanceItem = {
+  id: string;
+  foodId: string | null;
+  name: string;
+  servingLabel: string;
+  quantity: number | null;
+  unit: string | null;
+  nutrition: { calories: number; protein: number; carbs: number; fat: number; fibre: number };
+  category: 'what_can_i_eat_now' | 'eating_out' | 'craving';
+  cuisineTags: string[];
+  cravingTags: string[];
+  mealTags: string[];
+  timeWindowTags: string[];
+  dietaryTags: string[];
+  restrictionTags: string[];
+  reason: string;
+  planMembership: boolean;
+  clinicallyReviewed: boolean;
+  displayOrder: number;
+  enabled: boolean;
+  source: 'published_plan' | 'verified_catalogue';
 };
 
 export type PublishedNutritionPlan = {

@@ -8,6 +8,7 @@ import {
   approveConsultantDietPlan,
   canAccessConsultantNutritionClient,
   generateConsultantDietPlanDraft,
+  generateConsultantOptionalGuidance,
   getSeniorConsultantDietPlanReviewQueue,
   getConsultantLatestDietPlan,
   getConsultantNutritionIntelligence,
@@ -23,6 +24,7 @@ import {
   NutritionPlanWorkflowError,
   publishConsultantDietPlan,
   requestConsultantDietPlanChanges,
+  searchConsultantOptionalGuidanceCandidates,
   submitConsultantDietPlanForReview,
   updateConsultantDietPlanDraft,
   exportConsultantDietPlanDocument,
@@ -117,6 +119,24 @@ const supplementSchema = z.object({
   note: z.string(),
 });
 
+const guidanceItemSchema = z.object({
+  id: z.string().min(1), foodId: z.string().min(1).nullable(), name: z.string().min(1), servingLabel: z.string().min(1),
+  quantity: z.number().nullable(), unit: z.string().nullable(),
+  nutrition: z.object({ calories: z.number(), protein: z.number(), carbs: z.number(), fat: z.number(), fibre: z.number() }),
+  category: z.enum(['what_can_i_eat_now', 'eating_out', 'craving']),
+  cuisineTags: z.array(z.string()), cravingTags: z.array(z.string()), mealTags: z.array(z.string()), timeWindowTags: z.array(z.string()),
+  dietaryTags: z.array(z.string()), restrictionTags: z.array(z.string()), reason: z.string().min(1),
+  planMembership: z.boolean(), clinicallyReviewed: z.boolean(), displayOrder: z.number().int().min(1), enabled: z.boolean(),
+  source: z.enum(['published_plan', 'verified_catalogue']),
+});
+
+const optionalGuidanceSchema = z.object({
+  schemaVersion: z.literal(1), generatedBy: z.string(), generatedAtISO: z.string().datetime(), updatedBy: z.string(), updatedAtISO: z.string().datetime(),
+  reviewedBy: z.string().nullable(), reviewedAtISO: z.string().datetime().nullable(), whatCanIEatNow: z.array(guidanceItemSchema),
+  eatingOut: z.object({ northIndian: z.array(guidanceItemSchema), southIndian: z.array(guidanceItemSchema), chinese: z.array(guidanceItemSchema), continental: z.array(guidanceItemSchema), fastFood: z.array(guidanceItemSchema) }),
+  cravings: z.object({ sweet: z.array(guidanceItemSchema), salty: z.array(guidanceItemSchema), crunchy: z.array(guidanceItemSchema), spicy: z.array(guidanceItemSchema) }),
+});
+
 const nutritionPlanContentSchema: z.ZodType<NutritionPlanContent> = z.object({
   nutritionSnapshot: z.object({
     client: z.string(),
@@ -153,6 +173,7 @@ const nutritionPlanContentSchema: z.ZodType<NutritionPlanContent> = z.object({
   weeklySuccessGuide: z.array(z.string()),
   smartSubstitutions: z.array(substitutionSchema),
   supplementsAndClinicalNotes: z.array(supplementSchema),
+  optionalGuidance: optionalGuidanceSchema.optional(),
 });
 
 const generateDraftSchema = z.object({
@@ -359,6 +380,28 @@ consultantNutritionRouter.post('/clients/:clientId/diet-plans/draft', async (req
     });
   }
   return res.status(201).json(payload);
+});
+
+consultantNutritionRouter.post('/clients/:clientId/diet-plans/:dietPlanId/optional-guidance/generate', async (req, res) => {
+  try {
+    const payload = await generateConsultantOptionalGuidance(req.params.clientId, getAuthenticatedAccount(req), req.params.dietPlanId);
+    if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Unable to generate guidance for this plan.' });
+    return res.status(200).json(payload);
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
+});
+
+consultantNutritionRouter.get('/clients/:clientId/diet-plans/:dietPlanId/optional-guidance/candidates', async (req, res) => {
+  const parsed = z.object({ query: z.string().trim().optional(), category: z.enum(['what_can_i_eat_now', 'eating_out', 'craving']), context: z.string().trim().optional() }).safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const payload = await searchConsultantOptionalGuidanceCandidates(req.params.clientId, getAuthenticatedAccount(req), req.params.dietPlanId, parsed.data);
+    if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Unable to search guidance for this plan.' });
+    return res.status(200).json(payload);
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
 });
 
 consultantNutritionRouter.patch('/clients/:clientId/diet-plans/:dietPlanId', async (req, res) => {

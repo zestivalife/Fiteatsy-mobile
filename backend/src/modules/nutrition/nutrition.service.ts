@@ -17,6 +17,8 @@ import type {
   NutritionIntelligence,
   NutritionMealSection,
   NutritionMealSlot,
+  NutritionGuidanceItem,
+  OptionalNutritionGuidance,
   NutritionPlanContent,
   NutritionPlanSourceSnapshot,
 } from '../platform/platform.types.js';
@@ -44,6 +46,9 @@ import { getFoodPreferenceProfile } from './food-preferences.service.js';
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
 const AVAILABLE_LIBRARY_MATCH_LIMIT = 18;
+const OPTIONAL_GUIDANCE_WHAT_COUNT = 12;
+const OPTIONAL_GUIDANCE_CUISINE_COUNT = 5;
+const OPTIONAL_GUIDANCE_CRAVING_COUNT = 3;
 
 export class NutritionPlanWorkflowError extends Error {
   statusCode: number;
@@ -109,7 +114,7 @@ const dedupeMealOptions = (options: NutritionMealSection['options'] | undefined)
 
 type NutritionMealPlanKey = keyof NutritionPlanContent['mealPlan'];
 type NutritionRecommendationMode = 'approved' | 'outside_plan' | 'general';
-type NutritionRecommendationSource = 'published_plan' | 'verified_library' | 'meal_library';
+type NutritionRecommendationSource = 'published_plan' | 'published_reviewed_guidance';
 
 type NutritionRecommendationItem = {
   id?: string;
@@ -138,6 +143,7 @@ export const classifyEatingOutRecommendation = (
 
 type NutritionRecommendationResponse = {
   recommendations: NutritionRecommendationItem[];
+  guidanceStatus: 'available' | 'preparing';
   selectedDate: string;
   mealKey: string;
   mealLabel: string;
@@ -1771,7 +1777,17 @@ export const updateConsultantDietPlanDraft = async (
     stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
   });
 
-  const normalizedContent = normalizeNutritionPlanContent(input.content);
+  const draftGuidance = input.content.optionalGuidance ? {
+    ...input.content.optionalGuidance,
+    updatedBy: account.accountId,
+    updatedAtISO: new Date().toISOString(),
+    reviewedBy: null,
+    reviewedAtISO: null,
+    whatCanIEatNow: input.content.optionalGuidance.whatCanIEatNow.map((item) => ({ ...item, clinicallyReviewed: false })),
+    eatingOut: Object.fromEntries(Object.entries(input.content.optionalGuidance.eatingOut).map(([key, items]) => [key, items.map((item) => ({ ...item, clinicallyReviewed: false }))])) as OptionalNutritionGuidance['eatingOut'],
+    cravings: Object.fromEntries(Object.entries(input.content.optionalGuidance.cravings).map(([key, items]) => [key, items.map((item) => ({ ...item, clinicallyReviewed: false }))])) as OptionalNutritionGuidance['cravings'],
+  } : undefined;
+  const normalizedContent = normalizeNutritionPlanContent({ ...input.content, optionalGuidance: draftGuidance });
   const saved = currentVersion.lifecycleStatus === 'changes_requested'
     ? await createDietPlanDraftVersion({
       dietPlanId: plan.id,
@@ -1811,6 +1827,198 @@ export const updateConsultantDietPlanDraft = async (
   };
 };
 
+const guidanceNutritionComplete = (slot: NutritionMealSlot) =>
+  [slot.approxKcal, slot.proteinGrams, slot.carbsGrams, slot.fatGrams, slot.fibreGrams]
+    .every((value) => typeof value === 'number' && Number.isFinite(value));
+
+const guidanceItemFromSlot = (input: {
+  slot: NutritionMealSlot;
+  category: NutritionGuidanceItem['category'];
+  displayOrder: number;
+  planOptionIds: Set<string>;
+  cuisineTags?: string[];
+  cravingTags?: string[];
+  mealTags?: string[];
+  timeWindowTags?: string[];
+}): NutritionGuidanceItem => {
+  const firstComponent = input.slot.components?.[0];
+  return {
+    id: input.slot.id ?? `${input.category}:${input.slot.meal}:${input.displayOrder}`,
+    foodId: firstComponent?.foodId ?? input.slot.id ?? null,
+    name: input.slot.meal,
+    servingLabel: input.slot.portion,
+    quantity: firstComponent?.quantity ?? null,
+    unit: firstComponent?.quantityUnit ?? null,
+    nutrition: {
+      calories: input.slot.approxKcal as number,
+      protein: input.slot.proteinGrams as number,
+      carbs: input.slot.carbsGrams as number,
+      fat: input.slot.fatGrams as number,
+      fibre: input.slot.fibreGrams as number,
+    },
+    category: input.category,
+    cuisineTags: input.cuisineTags ?? input.slot.cuisineTags ?? [],
+    cravingTags: input.cravingTags ?? [],
+    mealTags: input.mealTags ?? [],
+    timeWindowTags: input.timeWindowTags ?? [],
+    dietaryTags: input.slot.dietaryTags ?? [],
+    restrictionTags: [],
+    reason: input.slot.recommendationReason ?? '',
+    planMembership: input.slot.id != null && input.planOptionIds.has(input.slot.id),
+    clinicallyReviewed: false,
+    displayOrder: input.displayOrder,
+    enabled: true,
+    source: input.slot.id != null && input.planOptionIds.has(input.slot.id) ? 'published_plan' : 'verified_catalogue',
+  };
+};
+
+const assertOptionalGuidanceComplete = (content: NutritionPlanContent, requireReviewed = false) => {
+  const guidance = content.optionalGuidance;
+  if (!guidance) {
+    throw new NutritionPlanWorkflowError('OPTIONAL_GUIDANCE_REQUIRED', 'Generate and review Optional Nutrition Guidance before submitting this version.', 409);
+  }
+  const requiredCounts = [
+    [guidance.whatCanIEatNow, 10, 'What can I eat now'],
+    ...Object.entries(guidance.eatingOut).map(([key, items]) => [items, OPTIONAL_GUIDANCE_CUISINE_COUNT, `Eating Out ${key}`] as const),
+    ...Object.entries(guidance.cravings).map(([key, items]) => [items, OPTIONAL_GUIDANCE_CRAVING_COUNT, `Craving ${key}`] as const),
+  ] as Array<readonly [NutritionGuidanceItem[], number, string]>;
+  for (const [items, count, label] of requiredCounts) {
+    const enabled = items.filter((item) => item.enabled);
+    if (enabled.length < count) {
+      throw new NutritionPlanWorkflowError('OPTIONAL_GUIDANCE_INCOMPLETE', `${label} requires at least ${count} enabled verified options.`, 409);
+    }
+    for (const item of enabled) {
+      if (!item.foodId || !item.name || !item.servingLabel || !item.reason || Object.values(item.nutrition).some((value) => !Number.isFinite(value))) {
+        throw new NutritionPlanWorkflowError('OPTIONAL_GUIDANCE_UNRESOLVED', `${label} contains an unresolved nutrition option.`, 409);
+      }
+      if (requireReviewed && !item.clinicallyReviewed) {
+        throw new NutritionPlanWorkflowError('OPTIONAL_GUIDANCE_NOT_REVIEWED', `${label} contains guidance that has not been reviewed.`, 409);
+      }
+    }
+  }
+  return guidance;
+};
+
+export const generateConsultantOptionalGuidance = async (
+  publicClientId: string,
+  account: AuthenticatedAccount,
+  dietPlanId: string,
+) => {
+  if (!isConsultantRole(account) || account.user.role?.toLowerCase() === 'senior_consultant') return null;
+  const workspace = await getWorkspaceContext(publicClientId, account);
+  if (!workspace?.careCase) return null;
+  const plan = await getDietPlanById(dietPlanId);
+  if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
+  const version = await getCurrentDietPlanVersion(plan.id);
+  if (!version || !['draft', 'changes_requested'].includes(version.lifecycleStatus)) {
+    throw new NutritionPlanWorkflowError('DIET_PLAN_NOT_EDITABLE', 'Optional guidance can only be generated for an editable version.', 409);
+  }
+  const preferences = await resolveFoodPreferencesFilter(publicClientId);
+  const target = deriveMealTargets({
+    caloriesTarget: version.content.dailyTargets.calories,
+    proteinTargetGrams: version.content.dailyTargets.protein,
+  }).lunch;
+  const planOptions = Object.entries(version.content.mealPlan).flatMap(([mealKey, section]) =>
+    section.options.map((slot) => ({ slot, mealKey, timeWindow: section.window })),
+  );
+  const planOptionIds = new Set(planOptions.flatMap(({ slot }) => slot.id ? [slot.id] : []));
+  const mealTagsForSlot = (slot: NutritionMealSlot) => planOptions.filter((entry) => entry.slot.id === slot.id).map((entry) => entry.mealKey);
+  const catalogueInput = {
+    mealKey: '', target, consultantId: account.accountId,
+    dietPreference: preferences.dietPreference,
+    allergyTags: preferences.allergyTags,
+    avoidedFoods: preferences.avoidedFoods,
+    avoidedFoodIds: preferences.avoidedFoodIds,
+    likedFoodIds: preferences.likedFoodIds,
+  };
+  const broadCatalogue = (await listMealLibrarySlotsForTarget({ ...catalogueInput, limit: 160 })).filter(guidanceNutritionComplete);
+  const uniqueSlots = (slots: NutritionMealSlot[]) => Array.from(new Map(slots.map((slot) => [slot.id ?? slot.meal, slot])).values());
+  const whatSlots = uniqueSlots([
+    ...planOptions.map(({ slot }) => slot).filter(guidanceNutritionComplete),
+    ...broadCatalogue,
+  ]).slice(0, OPTIONAL_GUIDANCE_WHAT_COUNT);
+
+  const cuisineDefinitions = {
+    northIndian: 'north indian', southIndian: 'south indian', chinese: 'chinese', continental: 'continental', fastFood: 'fast food',
+  } as const;
+  const usedCuisineIds = new Set<string>();
+  const eatingOutEntries: Array<[string, NutritionGuidanceItem[]]> = [];
+  for (const [key, cuisine] of Object.entries(cuisineDefinitions)) {
+    const candidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, preferredCuisines: [cuisine], limit: 40 }))
+      .filter(guidanceNutritionComplete)
+      .filter((slot) => !usedCuisineIds.has(slot.id ?? slot.meal))
+      .slice(0, OPTIONAL_GUIDANCE_CUISINE_COUNT);
+    candidates.forEach((slot) => usedCuisineIds.add(slot.id ?? slot.meal));
+    eatingOutEntries.push([key, candidates.map((slot, index) => guidanceItemFromSlot({ slot, category: 'eating_out', displayOrder: index + 1, planOptionIds, cuisineTags: [cuisine], mealTags: mealTagsForSlot(slot) }))]);
+  }
+  const eatingOut = Object.fromEntries(eatingOutEntries) as OptionalNutritionGuidance['eatingOut'];
+
+  const cravingDefinitions = {
+    sweet: resolveCravingKeywords('sweet'), salty: resolveCravingKeywords('salty'), crunchy: resolveCravingKeywords('crunchy'), spicy: resolveCravingKeywords('spicy'),
+  } as const;
+  const usedCravingIds = new Set<string>();
+  const cravings = Object.fromEntries(Object.entries(cravingDefinitions).map(([key, keywords]) => {
+    const candidates = broadCatalogue
+      .filter((slot) => filterByTextMatch(slot, [...keywords]))
+      .filter((slot) => !usedCravingIds.has(slot.id ?? slot.meal))
+      .slice(0, OPTIONAL_GUIDANCE_CRAVING_COUNT);
+    candidates.forEach((slot) => usedCravingIds.add(slot.id ?? slot.meal));
+    return [key, candidates.map((slot, index) => guidanceItemFromSlot({ slot, category: 'craving', displayOrder: index + 1, planOptionIds, cravingTags: [key], mealTags: mealTagsForSlot(slot) }))];
+  })) as OptionalNutritionGuidance['cravings'];
+  const now = new Date().toISOString();
+  const optionalGuidance: OptionalNutritionGuidance = {
+    schemaVersion: 1, generatedBy: account.accountId, generatedAtISO: now, updatedBy: account.accountId, updatedAtISO: now,
+    reviewedBy: null, reviewedAtISO: null,
+    whatCanIEatNow: whatSlots.map((slot, index) => {
+      const planContext = planOptions.find((entry) => entry.slot.id === slot.id);
+      return guidanceItemFromSlot({ slot, category: 'what_can_i_eat_now', displayOrder: index + 1, planOptionIds, mealTags: planContext ? [planContext.mealKey] : [], timeWindowTags: planContext ? [planContext.timeWindow] : [] });
+    }),
+    eatingOut, cravings,
+  };
+  assertOptionalGuidanceComplete({ ...version.content, optionalGuidance });
+  return updateConsultantDietPlanDraft(publicClientId, account, dietPlanId, {
+    content: { ...version.content, optionalGuidance },
+    reviewNotes: version.reviewNotes,
+  });
+};
+
+export const searchConsultantOptionalGuidanceCandidates = async (
+  publicClientId: string,
+  account: AuthenticatedAccount,
+  dietPlanId: string,
+  input: { query?: string; category: NutritionGuidanceItem['category']; context?: string },
+) => {
+  if (!isConsultantRole(account)) return null;
+  const workspace = await getWorkspaceContext(publicClientId, account, { allowSeniorAuthority: true });
+  if (!workspace?.careCase) return null;
+  const plan = await getDietPlanById(dietPlanId);
+  const version = plan?.currentVersionId ? await getCurrentDietPlanVersion(plan.id) : null;
+  if (!plan || !version || plan.careCaseId !== workspace.careCase.id) return null;
+  const preferences = await resolveFoodPreferencesFilter(publicClientId);
+  const planEntries = Object.entries(version.content.mealPlan).flatMap(([mealKey, section]) => section.options.map((item) => ({ mealKey, item })));
+  const planOptionIds = new Set(planEntries.flatMap(({ item }) => item.id ? [item.id] : []));
+  const contextKey = lower(input.context);
+  const cuisine = input.category === 'eating_out' ? resolveCuisineLabel(contextKey) : 'general';
+  const candidates = (await listMealLibrarySlotsForTarget({
+    mealKey: '', target: undefined, consultantId: account.accountId,
+    dietPreference: preferences.dietPreference, allergyTags: preferences.allergyTags,
+    avoidedFoods: preferences.avoidedFoods, avoidedFoodIds: preferences.avoidedFoodIds, likedFoodIds: preferences.likedFoodIds,
+    preferredCuisines: cuisine === 'general' ? [] : [cuisine], limit: 120,
+  }))
+    .filter(guidanceNutritionComplete)
+    .filter((slot) => !input.query || filterByTextMatch(slot, [lower(input.query)]))
+    .filter((slot) => input.category !== 'craving' || filterByTextMatch(slot, resolveCravingKeywords(contextKey)))
+    .slice(0, 30);
+  return {
+    candidates: candidates.map((slot, index) => guidanceItemFromSlot({
+      slot, category: input.category, displayOrder: index + 1, planOptionIds,
+      cuisineTags: cuisine === 'general' ? undefined : [cuisine],
+      cravingTags: input.category === 'craving' && contextKey ? [contextKey] : undefined,
+      mealTags: planEntries.filter(({ item }) => item.id === slot.id).map(({ mealKey }) => mealKey),
+    })),
+  };
+};
+
 export const submitConsultantDietPlanForReview = async (
   publicClientId: string,
   account: AuthenticatedAccount,
@@ -1823,6 +2031,7 @@ export const submitConsultantDietPlanForReview = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
   const version = await getCurrentDietPlanVersion(plan.id);
   if (!version) return null;
+  assertOptionalGuidanceComplete(version.content);
   assertLifecycleTransition(version.lifecycleStatus, 'submitted_for_review');
   return updateDietPlanLifecycle({
     dietPlanId: plan.id,
@@ -1890,6 +2099,7 @@ export const approveConsultantDietPlan = async (
   }
   const currentVersion = await getCurrentDietPlanVersion(plan.id);
   if (!currentVersion) return null;
+  const guidance = assertOptionalGuidanceComplete(currentVersion.content);
   assertLifecycleTransition(currentVersion.lifecycleStatus, 'approved');
   const sourceSnapshot = buildSourceSnapshot({
     bmi: workspace.metrics.bmi.status === 'AVAILABLE' ? workspace.metrics.bmi.value : null,
@@ -1909,6 +2119,27 @@ export const approveConsultantDietPlan = async (
       stressResilience: workspace.scoreByType.get('stress_resilience') ?? workspace.scoreByType.get('calm') ?? null,
     },
     stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
+  });
+  const reviewedAtISO = new Date().toISOString();
+  const reviewedGuidance: OptionalNutritionGuidance = {
+    ...guidance,
+    reviewedBy: account.accountId,
+    reviewedAtISO,
+    updatedBy: account.accountId,
+    updatedAtISO: reviewedAtISO,
+    whatCanIEatNow: guidance.whatCanIEatNow.map((item) => ({ ...item, clinicallyReviewed: true })),
+    eatingOut: Object.fromEntries(Object.entries(guidance.eatingOut).map(([key, items]) => [key, items.map((item) => ({ ...item, clinicallyReviewed: true }))])) as OptionalNutritionGuidance['eatingOut'],
+    cravings: Object.fromEntries(Object.entries(guidance.cravings).map(([key, items]) => [key, items.map((item) => ({ ...item, clinicallyReviewed: true }))])) as OptionalNutritionGuidance['cravings'],
+  };
+  const approvedContent = { ...currentVersion.content, optionalGuidance: reviewedGuidance };
+  await updateDietPlanVersionContent({
+    dietPlanId: plan.id,
+    versionId: currentVersion.id,
+    content: approvedContent,
+    contentSummary: contentSummaryFromContent(approvedContent),
+    sourceSnapshot,
+    lifecycleStatus: currentVersion.lifecycleStatus,
+    reviewNotes: currentVersion.reviewNotes,
   });
   return updateDietPlanLifecycle({
     dietPlanId: plan.id,
@@ -1941,6 +2172,7 @@ export const publishConsultantDietPlan = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
   const approvedVersion = await getDietPlanVersionById(approvedVersionId);
   if (!approvedVersion) return null;
+  assertOptionalGuidanceComplete(approvedVersion.content, true);
   const publishAction = assertPublishVersionEligibility({
     dietPlanId: plan.id,
     requestedVersionId: approvedVersion.id,
@@ -2590,6 +2822,47 @@ const toRecommendationItem = (input: {
   slot: input.option.slot,
 });
 
+const reviewedGuidanceToRecommendation = (item: NutritionGuidanceItem): ReturnType<typeof toRecommendationItem> => ({
+  id: item.id,
+  mealName: item.name,
+  portion: item.servingLabel,
+  approxKcal: item.nutrition.calories,
+  proteinGrams: item.nutrition.protein,
+  carbsGrams: item.nutrition.carbs,
+  fatGrams: item.nutrition.fat,
+  fibreGrams: item.nutrition.fibre,
+  cuisineTags: item.cuisineTags,
+  matchClassification: undefined,
+  sourceType: item.planMembership ? 'published_plan' : 'published_reviewed_guidance',
+  sourceLabel: item.planMembership ? 'Approved plan' : 'Reviewed guidance',
+  recommendationMode: item.planMembership ? 'approved' : 'general',
+  nutritionRationale: item.reason,
+  rankingScore: 0,
+  slot: item.displayOrder,
+});
+
+const guidanceItemToMealSlot = (item: NutritionGuidanceItem): NutritionMealSlot => ({
+  id: item.id,
+  slot: item.displayOrder,
+  meal: item.name,
+  portion: item.servingLabel,
+  prepNote: item.reason,
+  approxKcal: item.nutrition.calories,
+  proteinGrams: item.nutrition.protein,
+  carbsGrams: item.nutrition.carbs,
+  fatGrams: item.nutrition.fat,
+  fibreGrams: item.nutrition.fibre,
+  cuisineTags: item.cuisineTags,
+  dietaryTags: item.dietaryTags,
+});
+
+const rankReviewedGuidance = (
+  items: NutritionGuidanceItem[],
+  remaining: ReturnType<typeof buildRecipeContext>['remaining'],
+) => sortRecommendations(items
+  .filter((item) => item.enabled && item.clinicallyReviewed)
+  .map((item) => ({ item: reviewedGuidanceToRecommendation(item), score: scoreNutritionRecommendation(guidanceItemToMealSlot(item), remaining) })), remaining);
+
 const mapTextList = (value?: string[]) => (value ?? []).map((item) => lower(item));
 
 const filterByTextMatch = (option: NutritionMealSlot, keywords: string[]) => {
@@ -2636,8 +2909,10 @@ const sortRecommendations = (
 const buildRecommendationResponse = (
   context: ReturnType<typeof buildRecipeContext>,
   recommendations: NutritionRecommendationItem[],
+  guidanceStatus: NutritionRecommendationResponse['guidanceStatus'] = 'available',
 ): NutritionRecommendationResponse => ({
   recommendations,
+  guidanceStatus,
   selectedDate: context.selectedDate,
   mealKey: context.meal.key,
   mealLabel: context.meal.label,
@@ -2666,47 +2941,10 @@ export const getNutritionWhatCanIEatNow = async (
   const sectionKey = mealKey && nutritionMealOrder.includes(mealKey as (typeof nutritionMealOrder)[number])
     ? mealKey
     : context.meal.key;
-  const activePreferences = await resolveFoodPreferencesFilter(owner.clientId);
-  const sectionForMeal = experience.version.content.mealPlan[sectionKey as NutritionMealPlanKey];
-
-  const approved = sectionForMeal.options.map((option) => ({
-    item: toRecommendationItem({
-      option,
-      mealKey: sectionKey,
-      mealLabel: context.meal.label,
-      mode: 'approved',
-      sourceType: 'published_plan',
-      sourceLabel: 'Approved plan',
-    }),
-    score: scoreNutritionRecommendation(option, context.remaining),
-  }));
-
-  const outside = (await listMealLibrarySlotsForTarget({
-    mealKey: '',
-    target: deriveMealTargets({
-      caloriesTarget: experience.version.content.dailyTargets.calories,
-      proteinTargetGrams: experience.version.content.dailyTargets.protein,
-    })[sectionKey],
-    consultantId: null,
-    dietPreference: activePreferences.dietPreference,
-    allergyTags: activePreferences.allergyTags,
-    avoidedFoods: activePreferences.avoidedFoods,
-    avoidedFoodIds: activePreferences.avoidedFoodIds,
-    likedFoodIds: activePreferences.likedFoodIds,
-    limit: 18,
-  })).map((option) => ({
-    item: toRecommendationItem({
-      option,
-      mealKey: sectionKey,
-      mealLabel: context.meal.label,
-      mode: 'outside_plan',
-      sourceType: 'meal_library',
-      sourceLabel: 'Verified food library',
-    }),
-    score: scoreNutritionRecommendation(option, context.remaining),
-  }));
-
-  return buildRecommendationResponse(context, sortRecommendations([...approved, ...outside], context.remaining));
+  const guidance = experience.version.content.optionalGuidance;
+  if (!guidance) return buildRecommendationResponse(context, [], 'preparing');
+  const eligible = guidance.whatCanIEatNow.filter((item) => !item.mealTags.length || item.mealTags.includes(sectionKey));
+  return buildRecommendationResponse(context, rankReviewedGuidance(eligible, context.remaining));
 };
 
 export const getNutritionEatingOutSuggestions = async (
@@ -2716,66 +2954,12 @@ export const getNutritionEatingOutSuggestions = async (
   const experience = await getClientNutritionExperience(owner, input.selectedDate);
   if (!experience) throw new NutritionPlanWorkflowError('DIET_PLAN_NOT_FOUND', 'A published nutrition plan is required.', 404);
   const context = buildRecipeContext(experience);
-  const activePreferences = await resolveFoodPreferencesFilter(owner.clientId);
   const requestedCuisine = resolveCuisineLabel(input.cuisine ?? '');
-  const sectionKey =
-    input.mealKey && nutritionMealOrder.includes(input.mealKey as (typeof nutritionMealOrder)[number])
-      ? input.mealKey
-      : context.meal.key;
-  const section = experience.version.content.mealPlan[sectionKey as NutritionMealPlanKey];
-  const activePublishedOptionIds = new Set(
-    section.options.flatMap((option) => option.id ? [option.id] : []),
-  );
-
-  const approved = section.options
-    .filter((option) => requestedCuisine === 'general' || filterByTextMatch(option, [requestedCuisine]))
-    .map((option) => ({
-    item: toRecommendationItem({
-      option,
-      mealKey: sectionKey,
-      mealLabel: context.meal.label,
-      mode: 'approved',
-      sourceType: 'published_plan',
-      sourceLabel: 'Approved plan',
-    }),
-    score: scoreNutritionRecommendation(option, context.remaining),
-    }));
-
-  const generalGuidance = (await listMealLibrarySlotsForTarget({
-    mealKey: '',
-    target: deriveMealTargets({
-      caloriesTarget: experience.version.content.dailyTargets.calories,
-      proteinTargetGrams: experience.version.content.dailyTargets.protein,
-    })[sectionKey],
-    consultantId: null,
-    dietPreference: activePreferences.dietPreference,
-    allergyTags: activePreferences.allergyTags,
-    avoidedFoods: activePreferences.avoidedFoods,
-    avoidedFoodIds: activePreferences.avoidedFoodIds,
-    likedFoodIds: activePreferences.likedFoodIds,
-    preferredCuisines: requestedCuisine === 'general' ? [] : [requestedCuisine],
-    limit: 18,
-  })).map((option) => ({
-    item: toRecommendationItem({
-      option,
-      mealKey: sectionKey,
-      mealLabel: context.meal.label,
-      mode: classifyEatingOutRecommendation(option.id, activePublishedOptionIds),
-      sourceType: 'meal_library',
-      sourceLabel: `${requestedCuisine} options`,
-    }),
-    score: scoreNutritionRecommendation(option, context.remaining),
-  }));
-
-  const catalogueOptionIds = new Set(
-    generalGuidance.flatMap(({ item }) => item.id ? [item.id] : []),
-  );
-  const additionalApproved = approved.filter(({ item }) => !item.id || !catalogueOptionIds.has(item.id));
-
-  return buildRecommendationResponse(
-    context,
-    sortRecommendations(generalGuidance, context.remaining).concat(additionalApproved.length ? sortRecommendations(additionalApproved, context.remaining).slice(0, 4) : []),
-  );
+  const guidance = experience.version.content.optionalGuidance;
+  if (!guidance) return buildRecommendationResponse(context, [], 'preparing');
+  const cuisineKey = ({ 'north indian': 'northIndian', 'south indian': 'southIndian', chinese: 'chinese', continental: 'continental', 'fast food': 'fastFood' } as const)[requestedCuisine as Exclude<typeof requestedCuisine, 'general'>];
+  const items = cuisineKey ? guidance.eatingOut[cuisineKey].filter((item) => !item.mealTags.length || item.mealTags.includes(context.meal.key)) : [];
+  return buildRecommendationResponse(context, rankReviewedGuidance(items, context.remaining));
 };
 
 export const getNutritionCravingSuggestions = async (
@@ -2785,58 +2969,9 @@ export const getNutritionCravingSuggestions = async (
   const experience = await getClientNutritionExperience(owner, input.selectedDate);
   if (!experience) throw new NutritionPlanWorkflowError('DIET_PLAN_NOT_FOUND', 'A published nutrition plan is required.', 404);
   const context = buildRecipeContext(experience);
-  const cravings = resolveCravingKeywords(input.craving);
-  const activePreferences = await resolveFoodPreferencesFilter(owner.clientId);
-  const sectionKey =
-    input.mealKey && nutritionMealOrder.includes(input.mealKey as (typeof nutritionMealOrder)[number])
-      ? input.mealKey
-      : context.meal.key;
-  const section = experience.version.content.mealPlan[sectionKey as NutritionMealPlanKey];
-
-  const approved = section.options
-    .filter((option) => filterByTextMatch(option, cravings))
-    .map((option) => ({
-      item: toRecommendationItem({
-        option,
-        mealKey: sectionKey,
-        mealLabel: context.meal.label,
-        mode: 'approved',
-        sourceType: 'published_plan',
-        sourceLabel: 'Approved plan',
-      }),
-      score: scoreNutritionRecommendation(option, context.remaining),
-    }));
-
-  const libraryOptions = await listMealLibrarySlotsForTarget({
-    mealKey: '',
-    target: deriveMealTargets({
-      caloriesTarget: experience.version.content.dailyTargets.calories,
-      proteinTargetGrams: experience.version.content.dailyTargets.protein,
-    })[sectionKey],
-    consultantId: null,
-    dietPreference: activePreferences.dietPreference,
-    allergyTags: activePreferences.allergyTags,
-    avoidedFoods: activePreferences.avoidedFoods,
-    avoidedFoodIds: activePreferences.avoidedFoodIds,
-    likedFoodIds: activePreferences.likedFoodIds,
-    limit: 120,
-  });
-
-  const outside = libraryOptions
-    .filter((option) => filterByTextMatch(option, cravings))
-    .slice(0, 20)
-    .map((option) => ({
-      item: toRecommendationItem({
-        option,
-        mealKey: sectionKey,
-        mealLabel: context.meal.label,
-        mode: 'outside_plan',
-        sourceType: 'meal_library',
-        sourceLabel: 'General guidance',
-      }),
-      score: scoreNutritionRecommendation(option, context.remaining),
-    }));
-
-  const merged = [...approved, ...outside];
-  return buildRecommendationResponse(context, sortRecommendations(merged, context.remaining));
+  const guidance = experience.version.content.optionalGuidance;
+  if (!guidance) return buildRecommendationResponse(context, [], 'preparing');
+  const cravingKey = lower(input.craving) as keyof OptionalNutritionGuidance['cravings'];
+  const items = (guidance.cravings[cravingKey] ?? []).filter((item) => !item.mealTags.length || item.mealTags.includes(context.meal.key));
+  return buildRecommendationResponse(context, rankReviewedGuidance(items, context.remaining));
 };

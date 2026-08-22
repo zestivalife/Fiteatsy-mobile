@@ -158,7 +158,7 @@ export type NutritionRecommendationItem = {
   fibreGrams: number | null;
   cuisineTags: string[];
   matchClassification?: 'best_match' | 'good_match' | 'acceptable' | 'outside_target';
-  sourceType: 'published_plan' | 'verified_library' | 'meal_library';
+  sourceType: 'published_plan' | 'published_reviewed_guidance';
   sourceLabel: string;
   recommendationMode: NutritionRecommendationMode;
   nutritionRationale: string | null;
@@ -168,6 +168,7 @@ export type NutritionRecommendationItem = {
 
 export type NutritionRecommendationResponse = {
   recommendations: NutritionRecommendationItem[];
+  guidanceStatus: 'available' | 'preparing';
   selectedDate: string;
   mealKey: string;
   mealLabel: string;
