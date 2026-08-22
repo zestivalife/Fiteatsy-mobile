@@ -162,6 +162,7 @@ export type NutritionRecommendationItem = {
   sourceLabel: string;
   recommendationMode: NutritionRecommendationMode;
   nutritionRationale: string | null;
+  rankingScore: number;
   slot: number;
 };
 

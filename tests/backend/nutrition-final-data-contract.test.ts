@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { NutritionPlanContent } from '../../backend/src/modules/platform/platform.types.js';
-import { assertCurrentNutritionBusinessDate, classifyEatingOutRecommendation, isCanonicalNutritionDate, isFutureNutritionDate, nutritionDateKey, resolveDailyNutritionTargets } from '../../backend/src/modules/nutrition/nutrition.service.js';
+import { assertCurrentNutritionBusinessDate, classifyEatingOutRecommendation, isCanonicalNutritionDate, isFutureNutritionDate, nutritionDateKey, resolveDailyNutritionTargets, scoreNutritionRecommendation } from '../../backend/src/modules/nutrition/nutrition.service.js';
 
 test('Nutrition date contract accepts real YYYY-MM-DD values only', () => {
   assert.equal(isCanonicalNutritionDate('2026-08-21'), true);
@@ -92,7 +92,7 @@ test('Eating Out general guidance is labelled truthfully and logs outside the pl
 
   assert.match(eatingOut, /activePublishedOptionIds/);
   assert.match(eatingOut, /classifyEatingOutRecommendation\(option\.id, activePublishedOptionIds\)/);
-  assert.match(screen, /mode === 'eating-out' \? 'General guidance' : 'Out of plan'/);
+  assert.match(screen, /mode === 'eating-out' \? 'General guidance' : 'Outside plan'/);
   assert.match(screen, /state: isApproved \? 'CONSUMED_APPROVED' : 'CONSUMED_OUT_OF_PLAN'/);
   assert.match(service, /outOfPlanMeals = meals\.filter\(\(meal\) => meal\.state === 'CONSUMED_OUT_OF_PLAN'\)/);
   assert.match(service, /nutritionMonitoring: dailyMonitoring/);
@@ -177,4 +177,49 @@ test('Home and Consultant consume the same date-scoped backend projection', () =
   assert.match(home, /dailyNutrition\?\.nutritionScore/);
   assert.match(dateUtility, /Asia\/Kolkata/);
   assert.match(dateUtility, /AppState\.addEventListener/);
+});
+
+test('recommendation score reacts to remaining macro context', () => {
+  const highProtein = { approxKcal: 300, proteinGrams: 30, carbsGrams: 25, fatGrams: 5, fibreGrams: 6 };
+  const lowProtein = { approxKcal: 300, proteinGrams: 5, carbsGrams: 25, fatGrams: 5, fibreGrams: 2 };
+  const highFat = { approxKcal: 300, proteinGrams: 30, carbsGrams: 25, fatGrams: 30, fibreGrams: 6 };
+  const remaining = { calories: 300, protein: 30, carbs: 25, fat: 8, fibre: 6 };
+
+  assert.ok(scoreNutritionRecommendation(highProtein as never, remaining) > scoreNutritionRecommendation(lowProtein as never, remaining));
+  assert.ok(scoreNutritionRecommendation(highProtein as never, remaining) > scoreNutritionRecommendation(highFat as never, remaining));
+});
+
+test('contextual recommendation flows use distinct verified pools and no generic craving fallback', () => {
+  const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const store = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.library.store.ts', import.meta.url), 'utf8');
+  const eatingOutStart = service.indexOf('export const getNutritionEatingOutSuggestions');
+  const cravingStart = service.indexOf('export const getNutritionCravingSuggestions', eatingOutStart);
+  const eatingOut = service.slice(eatingOutStart, cravingStart);
+  const craving = service.slice(cravingStart);
+
+  assert.match(store, /\(\$1 = '' or meal_key = \$1\)/);
+  assert.match(eatingOut, /filterByTextMatch\(option, \[requestedCuisine\]\)/);
+  assert.match(eatingOut, /preferredCuisines: requestedCuisine === 'general' \? \[\] : \[requestedCuisine\]/);
+  assert.match(eatingOut, /mealKey: ''/);
+  assert.match(craving, /mealKey: ''/);
+  assert.match(craving, /filterByTextMatch\(option, cravings\)/);
+  assert.doesNotMatch(craving, /slice\(0,\s*8\)/);
+});
+
+test('quick actions are independent and selection changes bypass stale React state', () => {
+  const screen = readFileSync(new URL('../../src/screens/home/NutritionExperienceScreen.tsx', import.meta.url), 'utf8');
+  const quickStart = screen.indexOf('const QuickActions');
+  const balanceStart = screen.indexOf('const Balance', quickStart);
+  const balanceEnd = screen.indexOf('const RecommendationModal', balanceStart);
+
+  assert.ok(quickStart > -1 && balanceStart > quickStart);
+  assert.match(screen.slice(quickStart, balanceStart), /What can I eat now\?/);
+  assert.match(screen.slice(quickStart, balanceStart), /Eating Out/);
+  assert.match(screen.slice(quickStart, balanceStart), /Craving something\?/);
+  assert.doesNotMatch(screen.slice(balanceStart, balanceEnd), /Eating Out|Craving/);
+  assert.match(screen, /loadRecommendations\('eating-out',[\s\S]*\{ cuisine \}\)/);
+  assert.match(screen, /loadRecommendations\('craving',[\s\S]*\{ craving: type \}\)/);
+  assert.match(screen, /nutritionRationale/);
+  assert.match(screen, /rankingScore/);
+  assert.match(readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8'), /currentISTMinutes/);
 });

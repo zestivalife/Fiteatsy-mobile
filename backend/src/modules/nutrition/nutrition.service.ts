@@ -126,6 +126,7 @@ type NutritionRecommendationItem = {
   sourceLabel: string;
   recommendationMode: NutritionRecommendationMode;
   nutritionRationale: string | null;
+  rankingScore: number;
   slot: number;
 };
 
@@ -2493,8 +2494,29 @@ export const logClientNutritionWater = async (owner: ClientOwnershipContext, inp
   return buildNutritionProjection(owner, 1, nutritionDateKey(eventTimeISO));
 };
 
+const mealWindowMinutes = (window: string) => {
+  const match = window.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
+  if (!match) return null;
+  const hour = Number(match[1]) % 12 + (match[3].toUpperCase() === 'PM' ? 12 : 0);
+  return hour * 60 + Number(match[2] ?? 0);
+};
+
+const currentISTMinutes = (now = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: NUTRITION_TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
+  return Number(parts.find((part) => part.type === 'hour')?.value ?? 0) * 60 + Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
+};
+
 const buildRecipeContext = (experience: NonNullable<Awaited<ReturnType<typeof getClientNutritionExperience>>>) => {
-  const meal = experience.meals.find((item) => item.state === 'PENDING')
+  const pendingMeals = experience.meals.filter((item) => item.state === 'PENDING');
+  const nowMinutes = currentISTMinutes();
+  const timedPendingMeals = pendingMeals
+    .map((item) => ({ item, minutes: mealWindowMinutes(item.window) }))
+    .filter((entry): entry is { item: (typeof pendingMeals)[number]; minutes: number } => entry.minutes != null)
+    .sort((left, right) => left.minutes - right.minutes);
+  const timedMeal = timedPendingMeals.find((entry) => entry.minutes >= nowMinutes - 60)?.item
+    ?? timedPendingMeals[timedPendingMeals.length - 1]?.item;
+  const meal = timedMeal
+    ?? pendingMeals[0]
     ?? experience.meals.find((item) => item.state === 'SKIPPED')
     ?? experience.meals[0];
   if (!meal) {
@@ -2524,7 +2546,7 @@ const buildRecipeContext = (experience: NonNullable<Awaited<ReturnType<typeof ge
   };
 };
 
-const scoreByRemaining = (
+export const scoreNutritionRecommendation = (
   option: NutritionMealSlot,
   remaining: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fibre: number | null },
 ) => {
@@ -2564,6 +2586,7 @@ const toRecommendationItem = (input: {
   sourceLabel: input.sourceLabel,
   recommendationMode: input.mode,
   nutritionRationale: input.option.recommendationReason ?? null,
+  rankingScore: 0,
   slot: input.option.slot,
 });
 
@@ -2587,10 +2610,28 @@ const resolveFoodPreferencesFilter = async (clientId: string) => {
   };
 };
 
-const sortRecommendations = (items: Array<{ item: ReturnType<typeof toRecommendationItem>; score: number }>) =>
+const recommendationReason = (
+  item: ReturnType<typeof toRecommendationItem>,
+  remaining: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fibre: number | null },
+) => {
+  if ((remaining.protein ?? 0) >= 20 && (item.proteinGrams ?? 0) >= 20) return 'High protein fit';
+  if ((remaining.fibre ?? 0) >= 5 && (item.fibreGrams ?? 0) >= 5) return 'Helps close fibre gap';
+  if (remaining.fat != null && remaining.fat <= 10 && (item.fatGrams ?? Number.POSITIVE_INFINITY) <= remaining.fat) return 'Lower-fat fit';
+  if (remaining.calories != null && remaining.calories <= 400 && (item.approxKcal ?? Number.POSITIVE_INFINITY) <= remaining.calories) return 'Light option for this time';
+  return 'Balanced against today’s remaining targets';
+};
+
+const sortRecommendations = (
+  items: Array<{ item: ReturnType<typeof toRecommendationItem>; score: number }>,
+  remaining: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fibre: number | null },
+) =>
   items
     .sort((left, right) => right.score - left.score)
-    .map(({ item }) => item);
+    .map(({ item, score }) => ({
+      ...item,
+      rankingScore: Math.round(score * 10) / 10,
+      nutritionRationale: recommendationReason(item, remaining),
+    }));
 
 const buildRecommendationResponse = (
   context: ReturnType<typeof buildRecipeContext>,
@@ -2637,11 +2678,11 @@ export const getNutritionWhatCanIEatNow = async (
       sourceType: 'published_plan',
       sourceLabel: 'Approved plan',
     }),
-    score: scoreByRemaining(option, context.remaining),
+    score: scoreNutritionRecommendation(option, context.remaining),
   }));
 
   const outside = (await listMealLibrarySlotsForTarget({
-    mealKey: sectionKey,
+    mealKey: '',
     target: deriveMealTargets({
       caloriesTarget: experience.version.content.dailyTargets.calories,
       proteinTargetGrams: experience.version.content.dailyTargets.protein,
@@ -2662,10 +2703,10 @@ export const getNutritionWhatCanIEatNow = async (
       sourceType: 'meal_library',
       sourceLabel: 'Verified food library',
     }),
-    score: scoreByRemaining(option, context.remaining),
+    score: scoreNutritionRecommendation(option, context.remaining),
   }));
 
-  return buildRecommendationResponse(context, sortRecommendations([...approved, ...outside]));
+  return buildRecommendationResponse(context, sortRecommendations([...approved, ...outside], context.remaining));
 };
 
 export const getNutritionEatingOutSuggestions = async (
@@ -2686,7 +2727,9 @@ export const getNutritionEatingOutSuggestions = async (
     section.options.flatMap((option) => option.id ? [option.id] : []),
   );
 
-  const approved = section.options.map((option) => ({
+  const approved = section.options
+    .filter((option) => requestedCuisine === 'general' || filterByTextMatch(option, [requestedCuisine]))
+    .map((option) => ({
     item: toRecommendationItem({
       option,
       mealKey: sectionKey,
@@ -2695,11 +2738,11 @@ export const getNutritionEatingOutSuggestions = async (
       sourceType: 'published_plan',
       sourceLabel: 'Approved plan',
     }),
-    score: scoreByRemaining(option, context.remaining),
-  }));
+    score: scoreNutritionRecommendation(option, context.remaining),
+    }));
 
   const generalGuidance = (await listMealLibrarySlotsForTarget({
-    mealKey: sectionKey,
+    mealKey: '',
     target: deriveMealTargets({
       caloriesTarget: experience.version.content.dailyTargets.calories,
       proteinTargetGrams: experience.version.content.dailyTargets.protein,
@@ -2721,7 +2764,7 @@ export const getNutritionEatingOutSuggestions = async (
       sourceType: 'meal_library',
       sourceLabel: `${requestedCuisine} options`,
     }),
-    score: scoreByRemaining(option, context.remaining),
+    score: scoreNutritionRecommendation(option, context.remaining),
   }));
 
   const catalogueOptionIds = new Set(
@@ -2731,7 +2774,7 @@ export const getNutritionEatingOutSuggestions = async (
 
   return buildRecommendationResponse(
     context,
-    sortRecommendations(generalGuidance).concat(additionalApproved.length ? sortRecommendations(additionalApproved).slice(0, 4) : []),
+    sortRecommendations(generalGuidance, context.remaining).concat(additionalApproved.length ? sortRecommendations(additionalApproved, context.remaining).slice(0, 4) : []),
   );
 };
 
@@ -2761,11 +2804,11 @@ export const getNutritionCravingSuggestions = async (
         sourceType: 'published_plan',
         sourceLabel: 'Approved plan',
       }),
-      score: scoreByRemaining(option, context.remaining),
+      score: scoreNutritionRecommendation(option, context.remaining),
     }));
 
   const libraryOptions = await listMealLibrarySlotsForTarget({
-    mealKey: sectionKey,
+    mealKey: '',
     target: deriveMealTargets({
       caloriesTarget: experience.version.content.dailyTargets.calories,
       proteinTargetGrams: experience.version.content.dailyTargets.protein,
@@ -2776,11 +2819,12 @@ export const getNutritionCravingSuggestions = async (
     avoidedFoods: activePreferences.avoidedFoods,
     avoidedFoodIds: activePreferences.avoidedFoodIds,
     likedFoodIds: activePreferences.likedFoodIds,
-    limit: 20,
+    limit: 120,
   });
 
   const outside = libraryOptions
     .filter((option) => filterByTextMatch(option, cravings))
+    .slice(0, 20)
     .map((option) => ({
       item: toRecommendationItem({
         option,
@@ -2790,22 +2834,9 @@ export const getNutritionCravingSuggestions = async (
         sourceType: 'meal_library',
         sourceLabel: 'General guidance',
       }),
-      score: scoreByRemaining(option, context.remaining),
+      score: scoreNutritionRecommendation(option, context.remaining),
     }));
 
   const merged = [...approved, ...outside];
-  if (merged.length) return buildRecommendationResponse(context, sortRecommendations(merged));
-
-  const fallback = libraryOptions.slice(0, 8).map((option) => ({
-    item: toRecommendationItem({
-      option,
-      mealKey: sectionKey,
-      mealLabel: context.meal.label,
-      mode: 'outside_plan',
-      sourceType: 'meal_library',
-      sourceLabel: 'General guidance',
-    }),
-    score: scoreByRemaining(option, context.remaining),
-  }));
-  return buildRecommendationResponse(context, sortRecommendations(fallback));
+  return buildRecommendationResponse(context, sortRecommendations(merged, context.remaining));
 };

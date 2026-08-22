@@ -227,7 +227,7 @@ export const listFoodPortionMasterRecords = async (foodIds?: string[]) => {
 };
 
 export const listEligibleMealVariantRecords = async (input: {
-  mealKey: string;
+  mealKey?: string;
   consultantId?: string | null;
   dietPreference?: string | null;
   allergyTags?: string[];
@@ -237,7 +237,9 @@ export const listEligibleMealVariantRecords = async (input: {
   preferredCuisines?: string[];
   limit?: number;
 }) => {
-  const params: unknown[] = [input.mealKey, input.consultantId ?? null, input.limit ?? 12];
+  const resultLimit = input.limit ?? 12;
+  const candidateLimit = input.preferredCuisines?.length ? Math.max(resultLimit, 120) : resultLimit;
+  const params: unknown[] = [input.mealKey ?? '', input.consultantId ?? null, candidateLimit];
   const variantsResult = await pool.query<MealVariantRow>(
     `
       select
@@ -261,7 +263,7 @@ export const listEligibleMealVariantRecords = async (input: {
       where deleted_at is null
         and status = 'active'
         and verification_status = 'verified'
-        and meal_key = $1
+        and ($1 = '' or meal_key = $1)
         and (
           owner_scope in ('system', 'organisation')
           or (owner_scope = 'consultant' and consultant_id = $2)
@@ -389,11 +391,12 @@ export const listEligibleMealVariantRecords = async (input: {
       const leftMatches = left.components.filter((component) => component.foodId != null && likedIds.has(component.foodId)).length;
       const rightMatches = right.components.filter((component) => component.foodId != null && likedIds.has(component.foodId)).length;
       return rightMatches - leftMatches;
-    });
+    })
+    .slice(0, resultLimit);
 };
 
 export const listMealLibrarySlotsForTarget = async (input: {
-  mealKey: string;
+  mealKey?: string;
   target: NutritionMealTarget | undefined;
   consultantId?: string | null;
   dietPreference?: string | null;
