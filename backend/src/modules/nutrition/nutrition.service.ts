@@ -129,6 +129,12 @@ type NutritionRecommendationItem = {
   slot: number;
 };
 
+export const classifyEatingOutRecommendation = (
+  optionId: string | undefined,
+  activePublishedOptionIds: ReadonlySet<string>,
+): NutritionRecommendationMode =>
+  optionId && activePublishedOptionIds.has(optionId) ? 'approved' : 'general';
+
 type NutritionRecommendationResponse = {
   recommendations: NutritionRecommendationItem[];
   selectedDate: string;
@@ -2676,6 +2682,9 @@ export const getNutritionEatingOutSuggestions = async (
       ? input.mealKey
       : context.meal.key;
   const section = experience.version.content.mealPlan[sectionKey as NutritionMealPlanKey];
+  const activePublishedOptionIds = new Set(
+    section.options.flatMap((option) => option.id ? [option.id] : []),
+  );
 
   const approved = section.options.map((option) => ({
     item: toRecommendationItem({
@@ -2689,7 +2698,7 @@ export const getNutritionEatingOutSuggestions = async (
     score: scoreByRemaining(option, context.remaining),
   }));
 
-  const outside = (await listMealLibrarySlotsForTarget({
+  const generalGuidance = (await listMealLibrarySlotsForTarget({
     mealKey: sectionKey,
     target: deriveMealTargets({
       caloriesTarget: experience.version.content.dailyTargets.calories,
@@ -2708,16 +2717,21 @@ export const getNutritionEatingOutSuggestions = async (
       option,
       mealKey: sectionKey,
       mealLabel: context.meal.label,
-      mode: 'outside_plan',
+      mode: classifyEatingOutRecommendation(option.id, activePublishedOptionIds),
       sourceType: 'meal_library',
       sourceLabel: `${requestedCuisine} options`,
     }),
     score: scoreByRemaining(option, context.remaining),
   }));
 
+  const catalogueOptionIds = new Set(
+    generalGuidance.flatMap(({ item }) => item.id ? [item.id] : []),
+  );
+  const additionalApproved = approved.filter(({ item }) => !item.id || !catalogueOptionIds.has(item.id));
+
   return buildRecommendationResponse(
     context,
-    sortRecommendations([...outside]).concat(approved.length ? sortRecommendations([...approved]).slice(0, 4) : []),
+    sortRecommendations(generalGuidance).concat(additionalApproved.length ? sortRecommendations(additionalApproved).slice(0, 4) : []),
   );
 };
 

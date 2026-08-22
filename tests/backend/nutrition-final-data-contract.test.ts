@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { NutritionPlanContent } from '../../backend/src/modules/platform/platform.types.js';
-import { assertCurrentNutritionBusinessDate, isCanonicalNutritionDate, isFutureNutritionDate, nutritionDateKey, resolveDailyNutritionTargets } from '../../backend/src/modules/nutrition/nutrition.service.js';
+import { assertCurrentNutritionBusinessDate, classifyEatingOutRecommendation, isCanonicalNutritionDate, isFutureNutritionDate, nutritionDateKey, resolveDailyNutritionTargets } from '../../backend/src/modules/nutrition/nutrition.service.js';
 
 test('Nutrition date contract accepts real YYYY-MM-DD values only', () => {
   assert.equal(isCanonicalNutritionDate('2026-08-21'), true);
@@ -72,6 +72,30 @@ test('all client Nutrition event writers use the canonical current-day guard', (
     assert.notEqual(start, -1, `${writerNames[index]} must exist`);
     assert.match(service.slice(start, next), /assertCurrentNutritionBusinessDate\((?:consumedAtISO|eventTimeISO)\)/);
   }
+});
+
+test('Eating Out approval requires stable membership in the active published meal options', () => {
+  const activePublishedOptionIds = new Set(['current-option']);
+  assert.equal(classifyEatingOutRecommendation('current-option', activePublishedOptionIds), 'approved');
+  assert.equal(classifyEatingOutRecommendation('old-version-option', activePublishedOptionIds), 'general');
+  assert.equal(classifyEatingOutRecommendation('draft-option', activePublishedOptionIds), 'general');
+  assert.equal(classifyEatingOutRecommendation('other-client-option', activePublishedOptionIds), 'general');
+  assert.equal(classifyEatingOutRecommendation(undefined, activePublishedOptionIds), 'general');
+});
+
+test('Eating Out general guidance is labelled truthfully and logs outside the plan', () => {
+  const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const screen = readFileSync(new URL('../../src/screens/home/NutritionExperienceScreen.tsx', import.meta.url), 'utf8');
+  const eatingOutStart = service.indexOf('export const getNutritionEatingOutSuggestions');
+  const eatingOutEnd = service.indexOf('export const getNutritionCravingSuggestions', eatingOutStart);
+  const eatingOut = service.slice(eatingOutStart, eatingOutEnd);
+
+  assert.match(eatingOut, /activePublishedOptionIds/);
+  assert.match(eatingOut, /classifyEatingOutRecommendation\(option\.id, activePublishedOptionIds\)/);
+  assert.match(screen, /mode === 'eating-out' \? 'General guidance' : 'Out of plan'/);
+  assert.match(screen, /state: isApproved \? 'CONSUMED_APPROVED' : 'CONSUMED_OUT_OF_PLAN'/);
+  assert.match(service, /outOfPlanMeals = meals\.filter\(\(meal\) => meal\.state === 'CONSUMED_OUT_OF_PLAN'\)/);
+  assert.match(service, /nutritionMonitoring: dailyMonitoring/);
 });
 
 test('water has a dedicated millilitre contract and never uses meal validation', () => {
