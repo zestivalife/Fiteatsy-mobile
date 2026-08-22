@@ -221,6 +221,26 @@ test('optional guidance is governed by the complete Diet Plan version lifecycle'
   assert.match(service, /OPTIONAL_GUIDANCE_UNRESOLVED/);
 });
 
+test('optional guidance completeness is enforced only at review lifecycle boundaries', () => {
+  const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const saveStart = service.indexOf('export const updateConsultantDietPlanDraft');
+  const saveEnd = service.indexOf('const guidanceNutritionComplete', saveStart);
+  const generateStart = service.indexOf('export const generateConsultantOptionalGuidance');
+  const searchStart = service.indexOf('export const searchConsultantOptionalGuidanceCandidates', generateStart);
+  const submitStart = service.indexOf('export const submitConsultantDietPlanForReview', searchStart);
+  const changesStart = service.indexOf('export const requestConsultantDietPlanChanges', submitStart);
+  const approveStart = service.indexOf('export const approveConsultantDietPlan');
+  const publishStart = service.indexOf('export const publishConsultantDietPlan');
+
+  assert.doesNotMatch(service.slice(saveStart, saveEnd), /assertOptionalGuidanceComplete/);
+  assert.doesNotMatch(service.slice(generateStart, searchStart), /assertOptionalGuidanceComplete/);
+  assert.match(service.slice(submitStart, changesStart), /assertOptionalGuidanceComplete\(version\.content\)/);
+  assert.match(service.slice(approveStart, publishStart), /assertOptionalGuidanceComplete\(currentVersion\.content\)/);
+  assert.match(service.slice(publishStart), /assertOptionalGuidanceComplete\(approvedVersion\.content, true\)/);
+  assert.match(service, /Complete Optional Guidance before submitting:/);
+  assert.match(service, /countIssues\.join\('\\n- '\)/);
+});
+
 test('quick actions are independent and selection changes bypass stale React state', () => {
   const screen = readFileSync(new URL('../../src/screens/home/NutritionExperienceScreen.tsx', import.meta.url), 'utf8');
   const quickStart = screen.indexOf('const QuickActions');

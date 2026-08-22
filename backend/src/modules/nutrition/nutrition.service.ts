@@ -1882,10 +1882,11 @@ const assertOptionalGuidanceComplete = (content: NutritionPlanContent, requireRe
     ...Object.entries(guidance.eatingOut).map(([key, items]) => [items, OPTIONAL_GUIDANCE_CUISINE_COUNT, `Eating Out ${key}`] as const),
     ...Object.entries(guidance.cravings).map(([key, items]) => [items, OPTIONAL_GUIDANCE_CRAVING_COUNT, `Craving ${key}`] as const),
   ] as Array<readonly [NutritionGuidanceItem[], number, string]>;
+  const countIssues: string[] = [];
   for (const [items, count, label] of requiredCounts) {
     const enabled = items.filter((item) => item.enabled);
     if (enabled.length < count) {
-      throw new NutritionPlanWorkflowError('OPTIONAL_GUIDANCE_INCOMPLETE', `${label} requires at least ${count} enabled verified options.`, 409);
+      countIssues.push(`${label}: ${enabled.length}/${count}`);
     }
     for (const item of enabled) {
       if (!item.foodId || !item.name || !item.servingLabel || !item.reason || Object.values(item.nutrition).some((value) => !Number.isFinite(value))) {
@@ -1895,6 +1896,13 @@ const assertOptionalGuidanceComplete = (content: NutritionPlanContent, requireRe
         throw new NutritionPlanWorkflowError('OPTIONAL_GUIDANCE_NOT_REVIEWED', `${label} contains guidance that has not been reviewed.`, 409);
       }
     }
+  }
+  if (countIssues.length) {
+    throw new NutritionPlanWorkflowError(
+      'OPTIONAL_GUIDANCE_INCOMPLETE',
+      `Complete Optional Guidance before submitting:\n- ${countIssues.join('\n- ')}`,
+      409,
+    );
   }
   return guidance;
 };
@@ -1931,7 +1939,7 @@ export const generateConsultantOptionalGuidance = async (
     avoidedFoodIds: preferences.avoidedFoodIds,
     likedFoodIds: preferences.likedFoodIds,
   };
-  const broadCatalogue = (await listMealLibrarySlotsForTarget({ ...catalogueInput, limit: 160 })).filter(guidanceNutritionComplete);
+  const broadCatalogue = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, limit: 160 })).filter(guidanceNutritionComplete);
   const uniqueSlots = (slots: NutritionMealSlot[]) => Array.from(new Map(slots.map((slot) => [slot.id ?? slot.meal, slot])).values());
   const whatSlots = uniqueSlots([
     ...planOptions.map(({ slot }) => slot).filter(guidanceNutritionComplete),
@@ -1944,7 +1952,7 @@ export const generateConsultantOptionalGuidance = async (
   const usedCuisineIds = new Set<string>();
   const eatingOutEntries: Array<[string, NutritionGuidanceItem[]]> = [];
   for (const [key, cuisine] of Object.entries(cuisineDefinitions)) {
-    const candidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, preferredCuisines: [cuisine], limit: 40 }))
+    const candidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, preferredCuisines: [cuisine], limit: 40 }))
       .filter(guidanceNutritionComplete)
       .filter((slot) => !usedCuisineIds.has(slot.id ?? slot.meal))
       .slice(0, OPTIONAL_GUIDANCE_CUISINE_COUNT);
@@ -1975,7 +1983,6 @@ export const generateConsultantOptionalGuidance = async (
     }),
     eatingOut, cravings,
   };
-  assertOptionalGuidanceComplete({ ...version.content, optionalGuidance });
   return updateConsultantDietPlanDraft(publicClientId, account, dietPlanId, {
     content: { ...version.content, optionalGuidance },
     reviewNotes: version.reviewNotes,
