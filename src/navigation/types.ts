@@ -6,9 +6,15 @@ export type RootStackParamList = {
   OnboardingBasics: undefined;
   OnboardingCalendar: undefined;
   OnboardingNotifications: undefined;
-  OnboardingAssessment: undefined;
+  OnboardingAssessment: {
+    startPhase?: 'lifestyle' | 'recovery';
+    lifestyle?: { heightCm: number; weightKg: number; activityLevel: string; sleepHours: number; sleepQuality: string };
+  } | undefined;
   OnboardingReady: undefined;
-  FoodPreferences: { mode?: 'onboarding' | 'profile' } | undefined;
+  FoodPreferences: {
+    mode?: 'onboarding' | 'profile';
+    lifestyle?: { heightCm: number; weightKg: number; activityLevel: string; sleepHours: number; sleepQuality: string };
+  } | undefined;
   SignIn: undefined;
   SignUp: undefined;
   ChangePin: { force?: boolean } | undefined;

@@ -15,6 +15,7 @@ import {
   type FoodCatalogueItem,
   type FoodPreferenceProfile
 } from '../../services/foodPreferenceService';
+import { OnboardingFoodPreferencesFlow } from './OnboardingFoodPreferencesFlow';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FoodPreferences'>;
 type Choice = { label: string; value: string };
@@ -89,7 +90,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       const response = await saveFoodPreferences(profile);
       setProfile(response.profile);
       setSavedAt(response.updatedAtISO);
-      if (mode === 'onboarding') navigation.navigate('OnboardingAssessment');
+      if (mode === 'onboarding') navigation.navigate('OnboardingAssessment', { startPhase: 'recovery', lifestyle: route.params?.lifestyle });
       else navigation.goBack();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Unable to save food preferences. Please try again.');
@@ -102,10 +103,26 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
     return <Screen><View style={styles.center}><Text style={[styles.body, { color: palette.textSecondary }]}>Loading your food preferences...</Text></View></Screen>;
   }
 
+  if (mode === 'onboarding') {
+    return <OnboardingFoodPreferencesFlow
+      profile={profile}
+      update={update}
+      foodQuery={foodQuery}
+      setFoodQuery={setFoodQuery}
+      foodItems={foodItems}
+      foodLoading={foodLoading}
+      foodError={foodError}
+      saving={saving}
+      error={error}
+      onSave={save}
+      onExit={() => navigation.goBack()}
+    />;
+  }
+
   return (
     <Screen scroll>
-      <Text style={[styles.eyebrow, { color: palette.blue }]}>{mode === 'onboarding' ? 'LIFESTYLE · NUTRITION' : 'FOOD PREFERENCES'}</Text>
-      <Text style={[styles.title, { color: palette.textPrimary }]}>{mode === 'onboarding' ? 'Make meals feel like yours' : 'Food Preferences'}</Text>
+      <Text style={[styles.eyebrow, { color: palette.blue }]}>FOOD PREFERENCES</Text>
+      <Text style={[styles.title, { color: palette.textPrimary }]}>Food Preferences</Text>
       <Text style={[styles.body, { color: palette.textSecondary }]}>Your choices help your consultant personalise recommendations. Clinical restrictions remain managed separately.</Text>
 
       <Card>

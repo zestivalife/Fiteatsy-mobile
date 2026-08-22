@@ -18,8 +18,9 @@ export type OnboardingPhase = 'BASICS' | 'LIFESTYLE' | 'RECOVERY' | 'CONNECT' | 
 
 const phaseIndex: Record<OnboardingPhase, number> = { BASICS: 0, LIFESTYLE: 1, RECOVERY: 2, CONNECT: 3, READY: 4 };
 
-export const OnboardingShell = ({ phase, step, total, onBack, children, action, direction = 'forward', scroll = true }: {
+export const OnboardingShell = ({ phase, phaseLabel, step, total, onBack, children, action, direction = 'forward', scroll = true }: {
   phase: OnboardingPhase;
+  phaseLabel?: string;
   step: number;
   total: number;
   onBack?: () => void;
@@ -67,7 +68,7 @@ export const OnboardingShell = ({ phase, step, total, onBack, children, action, 
           ) : <View style={styles.backSpacer} />}
           <View style={styles.progressColumn}>
             <View style={styles.phaseRow}>
-              <Text style={styles.phase}>{phase}</Text>
+              <Text style={[styles.phase, phaseLabel && styles.phaseQualifier]}>{phaseLabel ?? phase}</Text>
               <Text style={styles.counter}>{step} of {total}</Text>
             </View>
             <View style={styles.segments}>
@@ -134,6 +135,7 @@ const styles = StyleSheet.create({
   progressColumn: { flex: 1, gap: spacing.xs },
   phaseRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   phase: { ...typography.label, fontSize: 12, lineHeight: 17, color: colors.success },
+  phaseQualifier: { color: colors.blue },
   counter: { ...typography.caption, fontSize: 12, lineHeight: 17, color: colors.textSecondary },
   segments: { flexDirection: 'row', gap: 4 },
   track: { flex: 1, height: 3, borderRadius: 2, overflow: 'hidden', backgroundColor: '#262832' },

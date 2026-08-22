@@ -34,15 +34,17 @@ const moods: Array<{ label: string; value: AssessmentMood; emoji: string; copy: 
 ];
 const stressCopy: Record<number, string> = { 1: 'Feeling calm and settled', 2: 'Light pressure, comfortably manageable', 3: 'Some tension, still manageable', 4: 'Noticeable tension affecting wellbeing', 5: 'Feeling overwhelmed and needing support' };
 
-export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
+export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
   const { onboarding, setOnboarding, setAssessment, submitCheckIn, setMood } = useAppContext();
-  const [step, setStep] = useState(1);
+  const recoveryStart = route.params?.startPhase === 'recovery';
+  const lifestyleSeed = route.params?.lifestyle;
+  const [step, setStep] = useState(recoveryStart ? 5 : 1);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
-  const [heightCm, setHeightCm] = useState(onboarding?.heightCm ?? 170);
-  const [weightKg, setWeightKg] = useState(onboarding?.currentWeightKg ?? 68);
+  const [heightCm, setHeightCm] = useState(lifestyleSeed?.heightCm ?? onboarding?.heightCm ?? 170);
+  const [weightKg, setWeightKg] = useState(lifestyleSeed?.weightKg ?? onboarding?.currentWeightKg ?? 68);
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
-  const [activity, setActivity] = useState<Activity>((onboarding?.activityLevel as Activity) ?? 'Lightly active');
-  const [sleep, setSleep] = useState(sleepOptions.find((item) => item.hours === onboarding?.sleepHours) ?? sleepOptions[3]);
+  const [activity, setActivity] = useState<Activity>((lifestyleSeed?.activityLevel as Activity) ?? (onboarding?.activityLevel as Activity) ?? 'Lightly active');
+  const [sleep, setSleep] = useState(sleepOptions.find((item) => item.hours === lifestyleSeed?.sleepHours) ?? sleepOptions.find((item) => item.hours === onboarding?.sleepHours) ?? sleepOptions[3]);
   const [moodChoice, setMoodChoice] = useState(moods.find((item) => item.value === 'Neutral') ?? moods[2]);
   const [stress, setStress] = useState<1 | 2 | 3 | 4 | 5>(3);
   const [distress, setDistress] = useState<AssessmentPhysicalDistress>('No');
@@ -58,10 +60,19 @@ export const OnboardingAssessmentScreen = ({ navigation }: Props) => {
     setter(value);
   };
   const back = () => {
+    if (recoveryStart && step === 5) { navigation.goBack(); return; }
     if (step > 1) { setDirection('back'); setStep((value) => value - 1); return; }
     navigation.goBack();
   };
   const next = () => {
+    if (step < 4) { setDirection('forward'); setStep((value) => value + 1); return; }
+    if (step === 4) {
+      navigation.navigate('FoodPreferences', {
+        mode: 'onboarding',
+        lifestyle: { heightCm, weightKg, activityLevel: activity, sleepHours: sleep.hours, sleepQuality: sleep.quality }
+      });
+      return;
+    }
     if (step < total) { setDirection('forward'); setStep((value) => value + 1); return; }
     const completedAtISO = new Date().toISOString();
     if (onboarding) setOnboarding({ ...onboarding, heightCm, currentWeightKg: weightKg, activityLevel: activity, sleepHours: sleep.hours, sleepQualityLabel: sleep.quality, stressLevelLabel: `${stress}` });

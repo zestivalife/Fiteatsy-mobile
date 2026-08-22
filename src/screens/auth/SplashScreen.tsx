@@ -134,7 +134,7 @@ export const SplashScreen = ({ navigation }: Props) => {
       }
 
       if (onboardingStatus === 'IN_PROGRESS' && onboardingResumeStep === 'assessment') {
-        navigation.replace('OnboardingAssessment');
+        navigation.replace('OnboardingAssessment', { startPhase: 'lifestyle' });
         return;
       }
 

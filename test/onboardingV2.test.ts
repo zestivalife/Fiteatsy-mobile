@@ -20,6 +20,24 @@ describe('Onboarding V2 contract', () => {
     expect(assessment).toContain('setAssessment({');
     expect(assessment).toContain('heightCm, currentWeightKg: weightKg');
     expect(assessment).toContain('void submitCheckIn');
+    expect(assessment).toContain("navigation.navigate('FoodPreferences'");
+    expect(basics).toContain("navigation.navigate('OnboardingAssessment'");
+  });
+
+  it('captures nutrition preferences in the lifestyle phase through the canonical API', () => {
+    const screen = read('src/screens/onboarding/FoodPreferencesScreen.tsx');
+    const flow = read('src/screens/onboarding/OnboardingFoodPreferencesFlow.tsx');
+    expect(screen).toContain('saveFoodPreferences(profile)');
+    expect(screen).toContain('OnboardingFoodPreferencesFlow');
+    expect(screen).toContain("startPhase: 'recovery'");
+    expect(flow).toContain('phase="LIFESTYLE"');
+    expect(flow).toContain('total={4}');
+    expect(flow).toContain("update('dietType'");
+    expect(flow).toContain("update('cuisines'");
+    expect(flow).toContain("update('staplePreference'");
+    expect(flow).toContain("update('dairyPreference'");
+    expect(flow).toContain("update('proteins'");
+    expect(flow).toContain('verified foods selected');
   });
 
   it('keeps platform connectivity and consultant readiness truthful', () => {
