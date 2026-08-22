@@ -4,6 +4,10 @@ import { enqueueSyncItem, getPendingSyncItems, getHealthProfileSyncDiagnostics, 
 import { type StorageIdentity } from '../utils/identityScopedStorage';
 
 export type PlatformHealthProfile = {
+  id: string;
+  userId: string;
+  createdAtISO: string;
+  updatedAtISO: string;
   dateOfBirthISO: string | null;
   calculatedAge: number | null;
   gender: OnboardingProfile['gender'] | null;

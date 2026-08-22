@@ -31,6 +31,7 @@ export type AuthSessionResponse = {
     name: string;
     email: string;
     mobileNumber: string;
+    createdAtISO?: string;
   };
   client?: {
     fiteatsyClientId: string;
@@ -51,6 +52,7 @@ export type CurrentAuthSession = {
     name: string;
     email: string;
     mobileNumber: string;
+    createdAtISO?: string;
   };
 };
 
@@ -275,7 +277,8 @@ export const buildSessionFromAuthResponse = (session: AuthSessionResponse): Curr
       id: session.user.id,
       name: session.user.name,
       email: session.user.email,
-      mobileNumber: session.user.mobileNumber
+      mobileNumber: session.user.mobileNumber,
+      createdAtISO: session.user.createdAtISO
     }
   };
 };

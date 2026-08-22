@@ -157,7 +157,8 @@ authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
       id: account.user.id,
       name: account.user.name,
       email: account.user.email,
-      mobileNumber: account.user.mobileNumber
+      mobileNumber: account.user.mobileNumber,
+      createdAtISO: account.user.createdAtISO
     }
   });
 });

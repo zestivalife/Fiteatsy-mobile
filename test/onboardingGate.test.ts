@@ -4,6 +4,7 @@ import { deriveOnboardingGate } from '../src/utils/onboardingGate';
 import type { PlatformHealthProfile } from '../src/services/platformHealthProfileService';
 
 const profile = (overrides: Partial<PlatformHealthProfile> = {}): PlatformHealthProfile => ({
+  id: 'profile-test', userId: 'user-test', createdAtISO: '2026-01-01T00:00:00.000Z', updatedAtISO: '2026-01-01T00:00:00.000Z',
   dateOfBirthISO: '1996-01-01T00:00:00.000Z', calculatedAge: 30, gender: 'Prefer not to say', heightCm: 170, currentWeightKg: 68,
   goalWeightKg: null, waistCm: null, hipCm: null, neckCm: null, bodyFatPct: null, occupation: null, workingHoursLabel: null,
   shiftType: null, activityLevel: null, workMode: null, travelFrequency: null, dietType: null, regionalCuisine: null,

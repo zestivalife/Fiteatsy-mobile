@@ -39,13 +39,21 @@ export const ProfileScreen = ({ navigation }: Props) => {
     assessment,
     healthProfileSyncDiagnostics,
     retryPendingHealthProfileSync,
-    authSession
+    authSession,
+    canonicalProfile,
+    clientBootstrap
   } = useAppContext();
   const connectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? null;
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
   const consultant = getConsultantProfile(onboarding);
-  const healthProfile = buildHealthProfileCompletion(onboarding, assessment, 0);
+  const localCompletion = buildHealthProfileCompletion(onboarding, assessment, 0);
+  const healthProfile = canonicalProfile ? {
+    completionPercent: canonicalProfile.nutrition.completionPercent,
+    readinessPercent: canonicalProfile.nutrition.readinessScore,
+    isAiReady: canonicalProfile.nutrition.aiReady,
+    missingItems: canonicalProfile.nutrition.missingFields
+  } : clientBootstrap.profile.status === 'NO_DATA' ? localCompletion : null;
   const clientName = resolveClientName(authSession?.user.name);
 
 
@@ -84,9 +92,9 @@ export const ProfileScreen = ({ navigation }: Props) => {
 
       <Card>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Health Profile Completion</Text>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Completion</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfile.completionPercent}%</Text></View>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Nutrition Profile Readiness</Text><Text style={[styles.value, { color: healthProfile.isAiReady ? '#59BE08' : '#F0B44C' }]}>{healthProfile.readinessPercent}%</Text></View>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Missing</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfile.missingItems.slice(0, 3).join(', ') || 'Nothing important missing'}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Completion</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfile ? `${healthProfile.completionPercent}%` : clientBootstrap.profile.status === 'ERROR' ? 'Unavailable' : 'Loading'}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Nutrition Profile Readiness</Text><Text style={[styles.value, { color: healthProfile?.isAiReady ? '#59BE08' : '#F0B44C' }]}>{healthProfile ? `${healthProfile.readinessPercent}%` : clientBootstrap.profile.status === 'ERROR' ? 'Unavailable' : 'Loading'}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Missing</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfile ? healthProfile.missingItems.slice(0, 3).join(', ') || 'Nothing important missing' : clientBootstrap.profile.status === 'ERROR' ? 'Could not load profile' : 'Loading profile'}</Text></View>
       </Card>
 
       <Card>
@@ -114,7 +122,7 @@ export const ProfileScreen = ({ navigation }: Props) => {
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Primary Conditions</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.primaryConditions?.join(', ') || 'Not set'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Primary Goal</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.primaryGoal ?? 'Not set'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Secondary Goals</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.secondaryGoals?.join(', ') || 'None'}</Text></View>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Member Since</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDate(onboarding?.createdAtISO)}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Member Since</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDate(authSession?.user.createdAtISO)}</Text></View>
       </Card>
 
       <Card>

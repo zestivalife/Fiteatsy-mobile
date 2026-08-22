@@ -1,4 +1,4 @@
-export const resolveClientName = (canonicalName?: string | null, fallback = 'Member') => {
+export const resolveClientName = (canonicalName?: string | null, fallback = 'Name unavailable') => {
   const normalized = canonicalName?.trim();
   return normalized || fallback;
 };

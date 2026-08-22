@@ -33,28 +33,34 @@ const isFoodPreferenceProfileComplete = (profile: FoodPreferenceProfile | null) 
 
 export const NutritionHubScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { themeMode, publishedNutritionPlan, refreshPublishedNutritionPlan } = useAppContext();
+  const { themeMode, publishedNutritionPlan, refreshPublishedNutritionPlan, clientBootstrap } = useAppContext();
   const palette = getThemeColors(themeMode);
   const [profile, setProfile] = React.useState<FoodPreferenceProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [deliveryStatus, setDeliveryStatus] = React.useState<NutritionPlanDeliveryStatus['status']>('NO_PLAN');
+  const [deliveryResolved, setDeliveryResolved] = React.useState(false);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const response = await getFoodPreferences();
-      setProfile(response.profile);
-      const status = await getNutritionPlanDeliveryStatus();
-      setDeliveryStatus(status.status);
-      await refreshPublishedNutritionPlan();
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to load your nutrition profile right now.');
-    } finally {
-      setLoading(false);
+    const [preferencesResult, deliveryResult] = await Promise.allSettled([
+      getFoodPreferences(),
+      getNutritionPlanDeliveryStatus()
+    ]);
+    if (preferencesResult.status === 'fulfilled') setProfile(preferencesResult.value.profile);
+    if (deliveryResult.status === 'fulfilled') {
+      setDeliveryStatus(deliveryResult.value.status);
+      setDeliveryResolved(true);
+    } else {
+      setDeliveryResolved(false);
     }
-  }, [refreshPublishedNutritionPlan]);
+    await refreshPublishedNutritionPlan();
+    if (deliveryResult.status === 'rejected' && !publishedNutritionPlan) {
+      setError(deliveryResult.reason instanceof Error ? deliveryResult.reason.message : 'Unable to load your nutrition plan right now.');
+    }
+    setLoading(false);
+  }, [publishedNutritionPlan, refreshPublishedNutritionPlan]);
 
   useFocusEffect(React.useCallback(() => {
     void refresh();
@@ -62,9 +68,9 @@ export const NutritionHubScreen = () => {
 
   const preferencesComplete = isFoodPreferenceProfileComplete(profile);
   const hasPlan = Boolean(publishedNutritionPlan);
-  const hasLifecyclePlan = deliveryStatus !== 'NO_PLAN';
+  const hasLifecyclePlan = deliveryResolved && deliveryStatus !== 'NO_PLAN';
 
-  if (hasPlan || deliveryStatus === 'ACTIVE_PUBLISHED') {
+  if (hasPlan || (deliveryResolved && deliveryStatus === 'ACTIVE_PUBLISHED')) {
     return <NutritionExperienceScreen />;
   }
 
@@ -81,7 +87,7 @@ export const NutritionHubScreen = () => {
         </View>
       ) : null}
 
-      {!loading && !error && !preferencesComplete && !hasLifecyclePlan && !hasPlan ? (
+      {!loading && !error && clientBootstrap.nutrition.status !== 'ERROR' && !preferencesComplete && !hasLifecyclePlan && !hasPlan ? (
         <Card style={[styles.card, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
           <View style={[styles.iconCircle, { backgroundColor: palette.cardMuted }]}><Ionicons name="nutrition-outline" size={26} color={palette.blue} /></View>
           <Text style={[styles.cardTitle, { color: palette.textPrimary }]}>Personalise your nutrition</Text>
@@ -125,7 +131,7 @@ export const NutritionHubScreen = () => {
         </Card>
       ) : null}
 
-      {!loading && !error && preferencesComplete && !hasLifecyclePlan && !hasPlan ? (
+      {!loading && !error && clientBootstrap.nutrition.status !== 'ERROR' && preferencesComplete && !hasLifecyclePlan && !hasPlan ? (
         <Card style={[styles.card, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
           <View style={[styles.iconCircle, { backgroundColor: palette.cardMuted }]}><Ionicons name="time-outline" size={26} color={palette.blue} /></View>
           <Text style={[styles.cardTitle, { color: palette.textPrimary }]}>Your preferences are saved</Text>

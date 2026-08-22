@@ -16,8 +16,10 @@ export type NutritionPlanDeliveryStatus = {
 export const getNutritionPlanDeliveryStatus = () =>
   apiFetch<NutritionPlanDeliveryStatus>('/v1/platform/nutrition-plan/status');
 
-export const getPublishedNutritionPlan = () =>
-  apiFetch<PublishedNutritionPlan>('/v1/platform/nutrition-plan');
+export const getPublishedNutritionPlan = (sessionToken?: string) =>
+  apiFetch<PublishedNutritionPlan>('/v1/platform/nutrition-plan', sessionToken ? {
+    headers: { Authorization: `Bearer ${sessionToken}` }
+  } : undefined);
 
 export const getTodayNutritionPlan = () =>
   apiFetch<PublishedNutritionPlan['today'] & {
