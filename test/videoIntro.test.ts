@@ -41,6 +41,8 @@ describe('premium app-level video intro contract', () => {
   it('enforces the timeout, fallback, cleanup, and reduced-motion contracts', () => {
     expect(source).toContain('SPLASH_MAX_DURATION_MS = 10_000');
     expect(source).toContain("player.addListener('statusChange'");
+    expect(source).not.toContain("player.addListener('playToEnd'");
+    expect(source).not.toMatch(/status !== 'error'[\s\S]{0,240}requestExit\(\)/);
     expect(source).toContain('AccessibilityInfo.isReduceMotionEnabled()');
     expect(source).toContain('clearTimeout(maximumDurationTimer)');
     expect(source).toContain('player.pause()');

@@ -131,17 +131,14 @@ export const SplashScreen = ({ navigation }: Props) => {
     });
 
     const maximumDurationTimer = setTimeout(() => requestExit(true), SPLASH_MAX_DURATION_MS);
-    const endedSubscription = player.addListener('playToEnd', () => requestExit());
     const statusSubscription = player.addListener('statusChange', ({ status, error }) => {
       if (status !== 'error') return;
       console.warn('[VideoIntro] playback failed; continuing with branded fallback', error?.message ?? 'unknown_error');
-      requestExit();
     });
 
     return () => {
       mounted = false;
       clearTimeout(maximumDurationTimer);
-      endedSubscription.remove();
       statusSubscription.remove();
       logoOpacity.stopAnimation();
       logoTranslateY.stopAnimation();
