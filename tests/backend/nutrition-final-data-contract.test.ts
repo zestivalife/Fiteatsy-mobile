@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { NutritionPlanContent } from '../../backend/src/modules/platform/platform.types.js';
-import { isCanonicalNutritionDate, isFutureNutritionDate, nutritionDateKey, resolveDailyNutritionTargets } from '../../backend/src/modules/nutrition/nutrition.service.js';
+import { assertCurrentNutritionBusinessDate, isCanonicalNutritionDate, isFutureNutritionDate, nutritionDateKey, resolveDailyNutritionTargets } from '../../backend/src/modules/nutrition/nutrition.service.js';
 
 test('Nutrition date contract accepts real YYYY-MM-DD values only', () => {
   assert.equal(isCanonicalNutritionDate('2026-08-21'), true);
@@ -33,6 +33,45 @@ test('Nutrition business date rolls over exactly at midnight Asia/Kolkata', () =
   assert.equal(nutritionDateKey(new Date('2026-08-21T18:31:00.000Z')), '2026-08-22');
   assert.equal(nutritionDateKey(new Date('2026-08-21T19:45:00.000Z')), '2026-08-22');
   assert.equal(nutritionDateKey(new Date('2026-08-21T23:59:00.000Z')), '2026-08-22');
+});
+
+test('Nutrition writes accept only the current Asia/Kolkata business date', () => {
+  const serverNow = new Date('2026-08-22T05:00:00.000Z'); // 10:30 IST
+  const allowed = [
+    '2026-08-22T00:00:00+05:30',
+    '2026-08-22T10:30:00+05:30',
+    '2026-08-22T23:59:59+05:30',
+    '2026-08-21T18:30:00.000Z', // midnight IST expressed in UTC
+  ];
+  for (const timestamp of allowed) {
+    assert.doesNotThrow(() => assertCurrentNutritionBusinessDate(timestamp, serverNow));
+  }
+
+  for (const timestamp of ['2026-08-21T23:59:59+05:30', '2026-08-23T00:00:00+05:30']) {
+    assert.throws(
+      () => assertCurrentNutritionBusinessDate(timestamp, serverNow),
+      (error: unknown) => {
+        assert.equal((error as { code?: string }).code, 'NUTRITION_DATE_NOT_CURRENT');
+        assert.equal((error as { statusCode?: number }).statusCode, 400);
+        assert.equal((error as Error).message, 'Nutrition entries can only be logged for the current day.');
+        return true;
+      },
+    );
+  }
+});
+
+test('all client Nutrition event writers use the canonical current-day guard', () => {
+  const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const writerNames = ['logNutritionMealConsumption', 'logClientNutritionEvent', 'logClientNutritionWater'];
+
+  for (let index = 0; index < writerNames.length; index += 1) {
+    const start = service.indexOf(`export const ${writerNames[index]}`);
+    const next = index + 1 < writerNames.length
+      ? service.indexOf(`export const ${writerNames[index + 1]}`, start)
+      : service.indexOf('const buildRecipeContext', start);
+    assert.notEqual(start, -1, `${writerNames[index]} must exist`);
+    assert.match(service.slice(start, next), /assertCurrentNutritionBusinessDate\((?:consumedAtISO|eventTimeISO)\)/);
+  }
 });
 
 test('water has a dedicated millilitre contract and never uses meal validation', () => {

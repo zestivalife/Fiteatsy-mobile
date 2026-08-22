@@ -2052,6 +2052,7 @@ export const logNutritionMealConsumption = async (
   }
 
   const consumedAtISO = input.consumedAtISO ?? new Date().toISOString();
+  assertCurrentNutritionBusinessDate(consumedAtISO);
   await addHealthEvent({
     careCaseId: careCase.id,
     userId: owner.accountId,
@@ -2215,6 +2216,16 @@ export const resolveDailyNutritionTargets = (content: NutritionPlanContent) => {
 
 export const isFutureNutritionDate = (selectedDate: string, now = new Date()) => {
   return selectedDate > nutritionDateKey(now);
+};
+
+export const assertCurrentNutritionBusinessDate = (eventTimeISO: string, now = new Date()) => {
+  if (nutritionDateKey(eventTimeISO) !== nutritionDateKey(now)) {
+    throw new NutritionPlanWorkflowError(
+      'NUTRITION_DATE_NOT_CURRENT',
+      'Nutrition entries can only be logged for the current day.',
+      400,
+    );
+  }
 };
 
 const resolveCravingKeywords = (craving: string) => {
@@ -2426,6 +2437,7 @@ export const logClientNutritionEvent = async (owner: ClientOwnershipContext, inp
   }
   const eventType = input.litres != null ? 'water_logged' : 'meal_logged';
   const eventTimeISO = input.consumedAtISO ?? new Date().toISOString();
+  assertCurrentNutritionBusinessDate(eventTimeISO);
   await addHealthEvent({
     careCaseId: careCase.id,
     userId: owner.accountId,
@@ -2462,6 +2474,7 @@ export const logClientNutritionWater = async (owner: ClientOwnershipContext, inp
   const careCase = await getCareCaseByClientId(owner.clientId);
   if (!careCase) throw new NutritionPlanWorkflowError('CARE_CASE_NOT_FOUND', 'Care case not found for this client.', 404);
   const eventTimeISO = input.consumedAtISO ?? new Date().toISOString();
+  assertCurrentNutritionBusinessDate(eventTimeISO);
   await addHealthEvent({
     careCaseId: careCase.id,
     userId: owner.accountId,
