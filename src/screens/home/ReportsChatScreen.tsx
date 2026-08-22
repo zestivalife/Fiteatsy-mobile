@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.blueDark,
     color: colors.white,
     fontSize: 12,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     marginBottom: spacing.xxs
   },
   bubbleText: {

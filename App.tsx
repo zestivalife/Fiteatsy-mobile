@@ -6,12 +6,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useFonts } from 'expo-font';
 import {
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold
-} from '@expo-google-fonts/poppins';
-import {
   Exo_400Regular,
   Exo_500Medium,
   Exo_600SemiBold,
@@ -30,7 +24,7 @@ const Root = () => {
   useEffect(() => {
     const GlobalText = Text as typeof Text & { defaultProps?: { style?: unknown } };
     GlobalText.defaultProps = GlobalText.defaultProps ?? {};
-    GlobalText.defaultProps.style = [{ fontFamily: 'Poppins_400Regular', color: palette.textPrimary }, GlobalText.defaultProps.style];
+    GlobalText.defaultProps.style = [{ fontFamily: 'Exo_400Regular', color: palette.textPrimary }, GlobalText.defaultProps.style];
   }, [palette.textPrimary]);
 
   return (
@@ -43,10 +37,6 @@ const Root = () => {
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
     Exo_400Regular,
     Exo_500Medium,
     Exo_600SemiBold,
@@ -62,11 +52,11 @@ export default function App() {
   if (!hasConfiguredGlobalFont) {
     const GlobalText = Text as typeof Text & { defaultProps?: { style?: unknown } };
     GlobalText.defaultProps = GlobalText.defaultProps ?? {};
-    GlobalText.defaultProps.style = [{ fontFamily: 'Poppins_400Regular' }, GlobalText.defaultProps.style];
+    GlobalText.defaultProps.style = [{ fontFamily: 'Exo_400Regular' }, GlobalText.defaultProps.style];
 
     const GlobalTextInput = TextInput as typeof TextInput & { defaultProps?: { style?: unknown } };
     GlobalTextInput.defaultProps = GlobalTextInput.defaultProps ?? {};
-    GlobalTextInput.defaultProps.style = [{ fontFamily: 'Poppins_400Regular' }, GlobalTextInput.defaultProps.style];
+    GlobalTextInput.defaultProps.style = [{ fontFamily: 'Exo_400Regular' }, GlobalTextInput.defaultProps.style];
     hasConfiguredGlobalFont = true;
   }
 

@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: colors.white,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   timerWrap: {
     marginTop: 24,

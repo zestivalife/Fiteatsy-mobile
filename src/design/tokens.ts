@@ -81,33 +81,46 @@ export const radius = {
 } as const;
 
 export const typography: Record<string, TextStyle> = {
+  display: { fontFamily: 'Exo_700Bold', fontSize: 30, lineHeight: 36 },
+  screenTitle: { fontFamily: 'Exo_700Bold', fontSize: 28, lineHeight: 34 },
+  screenSubtitle: { fontFamily: 'Exo_400Regular', fontSize: 14, lineHeight: 20 },
+  sectionTitle: { fontFamily: 'Exo_600SemiBold', fontSize: 20, lineHeight: 26 },
+  cardTitle: { fontFamily: 'Exo_700Bold', fontSize: 16, lineHeight: 20 },
+  bodySmall: { fontFamily: 'Exo_400Regular', fontSize: 14, lineHeight: 20 },
+  label: { fontFamily: 'Exo_500Medium', fontSize: 13, lineHeight: 18 },
+  button: { fontFamily: 'Exo_700Bold', fontSize: 15, lineHeight: 19 },
+  tab: { fontFamily: 'Exo_600SemiBold', fontSize: 14, lineHeight: 18 },
+  badge: { fontFamily: 'Exo_700Bold', fontSize: 11, lineHeight: 14 },
+  metric: { fontFamily: 'Exo_700Bold', fontSize: 28, lineHeight: 34 },
+  metricSmall: { fontFamily: 'Exo_600SemiBold', fontSize: 18, lineHeight: 22 },
+  navigationLabel: { fontFamily: 'Exo_500Medium', fontSize: 12, lineHeight: 15 },
   titleXL: {
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     fontSize: 30,
     lineHeight: 36
   },
   title: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     fontSize: 24,
     lineHeight: 30
   },
   section: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     fontSize: 20,
     lineHeight: 26
   },
   body: {
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: 'Exo_400Regular',
     fontSize: 16,
     lineHeight: 24
   },
   bodyStrong: {
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     fontSize: 16,
     lineHeight: 24
   },
   caption: {
-    fontFamily: 'Poppins_400Regular',
+    fontFamily: 'Exo_400Regular',
     fontSize: 13,
     lineHeight: 18
   }

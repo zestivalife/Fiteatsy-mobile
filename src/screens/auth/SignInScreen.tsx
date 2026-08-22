@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   },
   kicker: {
     ...typography.caption,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     letterSpacing: 0.8,
     textTransform: 'uppercase'
   },

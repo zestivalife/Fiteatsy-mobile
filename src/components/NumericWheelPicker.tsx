@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   itemTextActive: {
     fontSize: 40,
     lineHeight: 46,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   unitText: {
     ...typography.bodyStrong,

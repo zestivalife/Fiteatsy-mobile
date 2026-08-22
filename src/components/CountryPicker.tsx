@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   },
   closeText: {
     ...typography.caption,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   searchInput: {
     borderRadius: radius.sm,
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   selectedMark: {
     ...typography.caption,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   emptyText: {
     ...typography.caption,

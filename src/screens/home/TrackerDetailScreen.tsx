@@ -371,12 +371,12 @@ const styles = StyleSheet.create({
     ...typography.title,
     fontSize: 14,
     lineHeight: 18,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   subtitle: {
     ...typography.body,
     fontSize: 12,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: colors.textSecondary,
     marginTop: 2
   },
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     ...typography.title,
     fontSize: 14,
     lineHeight: 18,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   scoreMeta: {
     ...typography.caption,
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     ...typography.section,
     fontSize: 14,
     lineHeight: 18,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   ringScoreLabel: {
     ...typography.caption,
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...typography.bodyStrong,
     fontSize: 14,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     marginBottom: 8
   },
   trendLegendRow: {
@@ -513,13 +513,13 @@ const styles = StyleSheet.create({
   compareValue: {
     ...typography.bodyStrong,
     fontSize: 14,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: colors.textPrimary
   },
   compareLabel: {
     ...typography.caption,
     fontSize: 12,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: colors.textSecondary
   },
   summaryCard: {
@@ -554,13 +554,13 @@ const styles = StyleSheet.create({
   factorName: {
     ...typography.body,
     fontSize: 12,
-    fontFamily: 'Poppins_700Bold',
+    fontFamily: 'Exo_700Bold',
     color: colors.textPrimary
   },
   factorImpact: {
     ...typography.bodyStrong,
     fontSize: 14,
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   factorTrack: {
     height: 8,

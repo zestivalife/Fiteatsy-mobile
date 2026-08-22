@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   },
   highlight: {
     color: '#60AF00',
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   targetText: {
     ...typography.caption,

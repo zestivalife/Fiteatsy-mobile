@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...typography.caption,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     textTransform: 'uppercase',
     letterSpacing: 1.1,
   },
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   },
   sectionFocus: {
     ...typography.caption,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
     flexShrink: 1,
     textAlign: 'right',
   },
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   },
   consumeButtonText: {
     ...typography.caption,
-    fontFamily: 'Poppins_600SemiBold',
+    fontFamily: 'Exo_600SemiBold',
   },
   inlineMessage: {
     borderWidth: 1,

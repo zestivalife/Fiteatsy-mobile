@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
   radioDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: '#C9CFD4' },
   radioDotActive: { borderColor: BRAND_GREEN, backgroundColor: BRAND_GREEN },
   optionLabel: { ...typography.body, fontSize: 14 },
-  optionLabelActive: { color: colors.textPrimary, fontFamily: 'Poppins_700Bold' },
+  optionLabelActive: { color: colors.textPrimary, fontFamily: 'Exo_700Bold' },
   unitRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   unitChip: {
     borderRadius: radius.pill,
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
   },
   unitChipActive: { backgroundColor: BRAND_GREEN, borderColor: BRAND_GREEN },
   unitChipText: { ...typography.body, fontSize: 14 },
-  unitChipTextActive: { color: '#FFFFFF', fontFamily: 'Poppins_700Bold' },
+  unitChipTextActive: { color: '#FFFFFF', fontFamily: 'Exo_700Bold' },
   measurementCard: {
     borderWidth: 1,
     borderColor: colors.stroke,
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
   },
   sleepRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center' },
   sleepLabel: { ...typography.body, fontSize: 16, width: 88, color: colors.textSecondary },
-  sleepLabelActive: { color: colors.textPrimary, fontFamily: 'Poppins_700Bold' },
+  sleepLabelActive: { color: colors.textPrimary, fontFamily: 'Exo_700Bold' },
   sleepDotTrack: { width: 24, alignItems: 'center', justifyContent: 'center' },
   sleepDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#939393' },
   sleepDotActive: { backgroundColor: BRAND_GREEN },

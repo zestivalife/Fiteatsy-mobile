@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     ...typography.caption
   },
   genderChipTextActive: {
-    fontFamily: 'Poppins_700Bold'
+    fontFamily: 'Exo_700Bold'
   },
   consultantHeader: {
     flexDirection: 'row',
