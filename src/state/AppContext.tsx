@@ -522,7 +522,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
         try {
           await processPendingHealthProfileSync(toSessionStorageIdentity(sessionForStorage));
-          const remoteBundle = await getPlatformHealthProfile();
+          const remoteBundle = await getPlatformHealthProfile(sessionForStorage.sessionToken);
           const gate = deriveOnboardingGate(remoteBundle.profile);
           setOnboardingStatus(gate.status);
           setOnboardingResumeStep(gate.resumeStep);
