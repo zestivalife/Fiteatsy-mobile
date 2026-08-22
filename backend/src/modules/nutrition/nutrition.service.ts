@@ -1875,7 +1875,11 @@ const guidanceItemFromSlot = (input: {
 const assertOptionalGuidanceComplete = (content: NutritionPlanContent, requireReviewed = false) => {
   const guidance = content.optionalGuidance;
   if (!guidance) {
-    throw new NutritionPlanWorkflowError('OPTIONAL_GUIDANCE_REQUIRED', 'Generate and review Optional Nutrition Guidance before submitting this version.', 409);
+    throw new NutritionPlanWorkflowError(
+      'OPTIONAL_GUIDANCE_INCOMPLETE',
+      'Complete Optional Guidance before submitting:\n- What can I eat now: 0/10\n- Eating Out northIndian: 0/5\n- Eating Out southIndian: 0/5\n- Eating Out chinese: 0/5\n- Eating Out continental: 0/5\n- Eating Out fastFood: 0/5\n- Craving sweet: 0/3\n- Craving salty: 0/3\n- Craving crunchy: 0/3\n- Craving spicy: 0/3',
+      409,
+    );
   }
   const requiredCounts = [
     [guidance.whatCanIEatNow, 10, 'What can I eat now'],
