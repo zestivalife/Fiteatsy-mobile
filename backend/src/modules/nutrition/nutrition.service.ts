@@ -1581,6 +1581,7 @@ export const getConsultantNutritionIntelligence = async (publicClientId: string,
     buildNutritionProjection(monitoringOwner),
     getClientNutritionPattern(monitoringOwner),
   ]);
+  const canonicalDailyNutrition = dailyMonitoring?.dailyNutrition ?? null;
 
   return {
     clientId: publicClientId,
@@ -1588,9 +1589,17 @@ export const getConsultantNutritionIntelligence = async (publicClientId: string,
       goal: context.profile.onboarding.goal,
       bmi: metrics.bmi.status === 'AVAILABLE' ? metrics.bmi.value : null,
       currentWeightKg: context.calculationInput.weightKg,
-      caloriesTarget: macroTargets?.caloriesKcal ?? null,
-      proteinTargetGrams: macroTargets?.proteinGrams ?? null,
-      hydrationTargetLiters,
+      caloriesTarget: canonicalDailyNutrition?.targetCalories ?? macroTargets?.caloriesKcal ?? null,
+      proteinTargetGrams: canonicalDailyNutrition?.targetProtein ?? macroTargets?.proteinGrams ?? null,
+      carbohydrateTargetGrams: canonicalDailyNutrition?.targetCarbs ?? macroTargets?.carbohydrateGrams ?? null,
+      fatTargetGrams: canonicalDailyNutrition?.targetFat ?? macroTargets?.fatGrams ?? null,
+      fibreTargetGrams: canonicalDailyNutrition?.targetFibre ?? null,
+      hydrationTargetLiters: canonicalDailyNutrition?.hydrationTargetMl != null ? canonicalDailyNutrition.hydrationTargetMl / 1000 : hydrationTargetLiters,
+      hydrationConsumedTodayLiters: canonicalDailyNutrition ? canonicalDailyNutrition.hydrationConsumedMl / 1000 : null,
+      hydrationRemainingTodayLiters: canonicalDailyNutrition?.hydrationTargetMl != null
+        ? Math.max(canonicalDailyNutrition.hydrationTargetMl - canonicalDailyNutrition.hydrationConsumedMl, 0) / 1000
+        : null,
+      hydrationTargetSource: canonicalDailyNutrition ? 'active_published_diet_plan' : 'profile_weight_formula',
       activityLevel: healthProfile?.activityLevel ?? context.profile.onboarding.activityLevel,
       dietPreference: healthProfile?.dietType ?? context.profile.onboarding.dietPreference,
       reportsCount: reports.length,

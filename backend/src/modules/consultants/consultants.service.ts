@@ -821,6 +821,17 @@ export const getConsultantClientWorkspace = async (
     getConsultantNutritionIntelligence(publicClientId, account),
     getConsultantLatestDietPlan(publicClientId, account),
   ]);
+  const canonicalDailyNutrition = nutritionIntelligencePayload?.nutritionMonitoring?.daily?.dailyNutrition ?? null;
+  const canonicalMacroTargets = canonicalDailyNutrition ? {
+    caloriesKcal: canonicalDailyNutrition.targetCalories,
+    proteinGrams: canonicalDailyNutrition.targetProtein,
+    carbohydrateGrams: canonicalDailyNutrition.targetCarbs,
+    fatGrams: canonicalDailyNutrition.targetFat,
+    fibreGrams: canonicalDailyNutrition.targetFibre,
+  } : macroTargets;
+  const canonicalHydrationTargetLiters = canonicalDailyNutrition?.hydrationTargetMl != null
+    ? canonicalDailyNutrition.hydrationTargetMl / 1000
+    : (context.calculationInput.weightKg ? Number(Math.max(2, context.calculationInput.weightKg * 0.035).toFixed(1)) : null);
 
   return {
     contract: {
@@ -889,13 +900,18 @@ export const getConsultantClientWorkspace = async (
       completionPercent: nutritionProfile?.completionPercent ?? completeness.profileCompletionScore,
       aiReady: nutritionProfile?.aiReady ?? false,
       missingFields: completeness.missingFields,
-      calorieTarget: macroTargets?.caloriesKcal ?? null,
-      macroTargets,
-      hydrationTargetLiters: context.calculationInput.weightKg ? Number(Math.max(2, context.calculationInput.weightKg * 0.035).toFixed(1)) : null,
+      calorieTarget: canonicalMacroTargets?.caloriesKcal ?? null,
+      macroTargets: canonicalMacroTargets,
+      hydrationTargetLiters: canonicalHydrationTargetLiters,
+      hydrationConsumedTodayLiters: canonicalDailyNutrition ? canonicalDailyNutrition.hydrationConsumedMl / 1000 : null,
+      hydrationRemainingTodayLiters: canonicalDailyNutrition?.hydrationTargetMl != null
+        ? Math.max(canonicalDailyNutrition.hydrationTargetMl - canonicalDailyNutrition.hydrationConsumedMl, 0) / 1000
+        : null,
+      hydrationTargetSource: canonicalDailyNutrition ? 'active_published_diet_plan' : 'profile_weight_formula',
       unavailableReasons: {
         calorieTarget: tdee == null ? unavailableReason(healthMetrics, 'tdee') : null,
         macroTargets: macroTargets == null ? unavailableReason(healthMetrics, 'tdee') : null,
-        hydrationTargetLiters: context.calculationInput.weightKg ? null : 'Weight is required.'
+        hydrationTargetLiters: canonicalHydrationTargetLiters != null ? null : 'No published Diet Plan target or profile weight is available.'
       }
     },
     foodPreferences: foodPreferences

@@ -185,6 +185,17 @@ test('Home and Consultant consume the same date-scoped backend projection', () =
   assert.match(dateUtility, /AppState\.addEventListener/);
 });
 
+test('Consultant hydration target and daily water actuals come from the published Nutrition projection', () => {
+  const nutritionService = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const consultantService = readFileSync(new URL('../../backend/src/modules/consultants/consultants.service.ts', import.meta.url), 'utf8');
+  assert.match(nutritionService, /payload\?\.planId === published\.plan\.id && payload\?\.versionId === published\.version\.id/);
+  assert.match(nutritionService, /hydrationTargetMl: targetWater == null \? null : Math\.round\(targetWater \* 1000\)/);
+  assert.match(nutritionService, /remainingHydrationMl: targetWater == null \? null : Math\.max\(Math\.round\(targetWater \* 1000\) - waterMl, 0\)/);
+  assert.match(consultantService, /hydrationTargetSource: canonicalDailyNutrition \? 'active_published_diet_plan' : 'profile_weight_formula'/);
+  assert.match(consultantService, /hydrationConsumedTodayLiters: canonicalDailyNutrition/);
+  assert.match(consultantService, /hydrationRemainingTodayLiters: canonicalDailyNutrition\?\.hydrationTargetMl/);
+});
+
 test('recommendation score reacts to remaining macro context', () => {
   const highProtein = { approxKcal: 300, proteinGrams: 30, carbsGrams: 25, fatGrams: 5, fibreGrams: 6 };
   const lowProtein = { approxKcal: 300, proteinGrams: 5, carbsGrams: 25, fatGrams: 5, fibreGrams: 2 };
