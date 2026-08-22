@@ -21,7 +21,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 export const SPLASH_MAX_DURATION_MS = 10_000;
 const EXIT_FADE_DURATION = 320;
 const LOGO_ANIMATION_DURATION = 640;
-const VIDEO_URL = 'https://zestiva.life/assets/Fiteatsy.mp4';
+const SPLASH_VIDEO_URL = 'https://zestiva.life/assets/Fiteatsy.mp4';
 
 export const SplashScreen = ({ navigation }: Props) => {
   const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep, authSession } = useAppContext();
@@ -34,7 +34,7 @@ export const SplashScreen = ({ navigation }: Props) => {
   const logoTranslateY = useRef(new Animated.Value(8)).current;
   const logoScale = useRef(new Animated.Value(0.97)).current;
 
-  const player = useVideoPlayer({ uri: VIDEO_URL }, (videoPlayer) => {
+  const player = useVideoPlayer({ uri: SPLASH_VIDEO_URL }, (videoPlayer) => {
     videoPlayer.loop = false;
     videoPlayer.muted = true;
     videoPlayer.allowsExternalPlayback = false;
