@@ -15,6 +15,9 @@ import {
   getDietPlanDeliveryStatusForClient,
   getClientNutritionExperience,
   getClientNutritionPattern,
+  getNutritionWhatCanIEatNow,
+  getNutritionEatingOutSuggestions,
+  getNutritionCravingSuggestions,
   logClientNutritionEvent,
   logClientNutritionWater,
   NutritionPlanWorkflowError,
@@ -191,6 +194,23 @@ const nutritionEventSchema = z.object({
 });
 
 const waterEventSchema = z.object({ planId: z.string().trim().min(1), versionId: z.string().trim().min(1), waterMl: z.number().int().positive().max(5000), consumedAtISO: z.string().datetime().nullable().optional() });
+
+const nutritionRecommendationQuerySchema = z.object({
+  mealKey: z.string().trim().min(1).optional(),
+  date: z.string().trim().optional(),
+});
+
+const nutritionCravingQuerySchema = z.object({
+  mealKey: z.string().trim().min(1).optional(),
+  date: z.string().trim().optional(),
+  craving: z.string().trim().min(1),
+});
+
+const nutritionCuisineQuerySchema = z.object({
+  mealKey: z.string().trim().min(1).optional(),
+  date: z.string().trim().optional(),
+  cuisine: z.string().trim().min(1),
+});
 
 const mealSectionOrder = [
   'earlyMorning',
@@ -543,6 +563,60 @@ platformNutritionRouter.get('/nutrition-experience/pattern', async (req, res) =>
   const payload = await getClientNutritionPattern({ accountId: account.accountId, clientId: account.client.id }, typeof req.query.endDate === 'string' ? req.query.endDate : undefined);
   if (!payload) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'Your nutrition plan is being prepared.' });
   return res.status(200).json(payload);
+});
+
+platformNutritionRouter.get('/nutrition-experience/recommendations/what-can-i-eat-now', async (req, res) => {
+  const parsed = nutritionRecommendationQuerySchema.safeParse({
+    mealKey: req.query.mealKey,
+    date: req.query.date,
+  });
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  const account = getAuthenticatedAccount(req);
+  try {
+    return res.status(200).json(await getNutritionWhatCanIEatNow(
+      { accountId: account.accountId, clientId: account.client.id },
+      parsed.data.date,
+      parsed.data.mealKey,
+    ));
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
+});
+
+platformNutritionRouter.get('/nutrition-experience/recommendations/eating-out', async (req, res) => {
+  const parsed = nutritionCuisineQuerySchema.safeParse({
+    mealKey: req.query.mealKey,
+    date: req.query.date,
+    cuisine: req.query.cuisine,
+  });
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  const account = getAuthenticatedAccount(req);
+  try {
+    return res.status(200).json(await getNutritionEatingOutSuggestions(
+      { accountId: account.accountId, clientId: account.client.id },
+      { mealKey: parsed.data.mealKey, selectedDate: parsed.data.date, cuisine: parsed.data.cuisine },
+    ));
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
+});
+
+platformNutritionRouter.get('/nutrition-experience/recommendations/craving', async (req, res) => {
+  const parsed = nutritionCravingQuerySchema.safeParse({
+    mealKey: req.query.mealKey,
+    date: req.query.date,
+    craving: req.query.craving,
+  });
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  const account = getAuthenticatedAccount(req);
+  try {
+    return res.status(200).json(await getNutritionCravingSuggestions(
+      { accountId: account.accountId, clientId: account.client.id },
+      { mealKey: parsed.data.mealKey, selectedDate: parsed.data.date, craving: parsed.data.craving },
+    ));
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
 });
 
 platformNutritionRouter.post('/nutrition-experience/event', async (req, res) => {

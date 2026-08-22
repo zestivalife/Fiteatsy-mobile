@@ -107,6 +107,47 @@ const dedupeMealOptions = (options: NutritionMealSection['options'] | undefined)
   });
 };
 
+type NutritionMealPlanKey = keyof NutritionPlanContent['mealPlan'];
+type NutritionRecommendationMode = 'approved' | 'outside_plan' | 'general';
+type NutritionRecommendationSource = 'published_plan' | 'verified_library' | 'meal_library';
+
+type NutritionRecommendationItem = {
+  id?: string;
+  mealName: string;
+  portion: string;
+  approxKcal: number | null;
+  proteinGrams: number | null;
+  carbsGrams: number | null;
+  fatGrams: number | null;
+  fibreGrams: number | null;
+  cuisineTags: string[];
+  matchClassification?: NutritionMealSlot['matchClassification'];
+  sourceType: NutritionRecommendationSource;
+  sourceLabel: string;
+  recommendationMode: NutritionRecommendationMode;
+  nutritionRationale: string | null;
+  slot: number;
+};
+
+type NutritionRecommendationResponse = {
+  recommendations: NutritionRecommendationItem[];
+  selectedDate: string;
+  mealKey: string;
+  mealLabel: string;
+  mealWindow: string;
+  context: {
+    planId: string;
+    versionId: string;
+    consumedCal: number;
+    consumedProtein: number;
+    remainingCal: number | null;
+    remainingProtein: number | null;
+    remainingCarbs: number | null;
+    remainingFat: number | null;
+    remainingFibre: number | null;
+  };
+};
+
 const normalizeMealSection = (section: NutritionMealSection): NutritionMealSection => {
   const selectedOptions = normalizeMealOptions(section.options);
   const availableOptions = dedupeMealOptions([
@@ -2126,6 +2167,10 @@ export const getDietPlanDeliveryStatusForClient = async (owner: ClientOwnershipC
 type NutritionConsumptionState = 'PENDING' | 'CONSUMED_APPROVED' | 'CONSUMED_OUT_OF_PLAN' | 'SKIPPED';
 type NutritionReasonCode = 'HIGHER_PROTEIN' | 'HIGHER_FIBRE' | 'LOWER_FAT' | 'CALORIE_FIT' | 'BALANCED_OPTION';
 
+const nutritionMealOrder = [
+  'earlyMorning', 'breakfast', 'midMorningSnack', 'lunch', 'eveningSnack', 'dinner', 'bedtimeNutrition',
+] as const;
+
 const nutritionMealLabels: Record<string, string> = {
   earlyMorning: 'Early Morning', breakfast: 'Breakfast', midMorningSnack: 'Mid-Morning',
   lunch: 'Lunch', eveningSnack: 'Evening Snack', dinner: 'Dinner', bedtimeNutrition: 'Bedtime',
@@ -2170,6 +2215,23 @@ export const resolveDailyNutritionTargets = (content: NutritionPlanContent) => {
 
 export const isFutureNutritionDate = (selectedDate: string, now = new Date()) => {
   return selectedDate > nutritionDateKey(now);
+};
+
+const resolveCravingKeywords = (craving: string) => {
+  const key = lower(craving).trim();
+  if (!key) return [] as string[];
+  if (['sweet', 'savoury', 'sugar', 'sweetness'].includes(key)) return ['sweet', 'dessert', 'kheer', 'halwa', 'cake'];
+  if (key === 'salty') return ['salty', 'namkeen', 'roasted', 'chat', 'papad', 'bhujia', 'chips'];
+  if (key === 'crunchy') return ['crunchy', 'crunch', 'roasted', 'nuts', 'seed', 'munch'];
+  if (key === 'spicy') return ['spicy', 'spice', 'masala', 'chili', 'curry', 'chhonk', 'tadka'];
+  return [key];
+};
+
+const resolveCuisineLabel = (cuisine: string) => {
+  const candidate = lower(cuisine).trim();
+  const allowed = ['north indian', 'south indian', 'chinese', 'continental', 'fast food'];
+  const match = allowed.find((item) => candidate.includes(item) || item.includes(candidate));
+  return match ?? 'general';
 };
 
 const eventNutritionDate = (event: Awaited<ReturnType<typeof listHealthEvents>>[number]) => {
@@ -2410,4 +2472,313 @@ export const logClientNutritionWater = async (owner: ClientOwnershipContext, inp
     payload: { planId: input.planId, versionId: input.versionId, waterMl: input.waterMl, nutritionDate: nutritionDateKey(eventTimeISO) },
   });
   return buildNutritionProjection(owner, 1, nutritionDateKey(eventTimeISO));
+};
+
+const buildRecipeContext = (experience: NonNullable<Awaited<ReturnType<typeof getClientNutritionExperience>>>) => {
+  const meal = experience.meals.find((item) => item.state === 'PENDING')
+    ?? experience.meals.find((item) => item.state === 'SKIPPED')
+    ?? experience.meals[0];
+  if (!meal) {
+    throw new NutritionPlanWorkflowError('MEAL_CONTEXT_NOT_FOUND', 'No meal context was found for recommendations.', 404);
+  }
+  const section = experience.version.content.mealPlan[meal.key as NutritionMealPlanKey];
+  return {
+    selectedDate: experience.selectedDate,
+    planId: experience.plan.id,
+    versionId: experience.version.id,
+    consumedTotals: {
+      calories: Number(experience.totals.calories ?? 0),
+      protein: Number(experience.totals.protein ?? 0),
+      carbs: Number(experience.totals.carbs ?? 0),
+      fat: Number(experience.totals.fat ?? 0),
+      fibre: Number(experience.totals.fibre ?? 0),
+    },
+    remaining: {
+      calories: experience.remaining.calories,
+      protein: experience.remaining.protein,
+      carbs: experience.remaining.carbs,
+      fat: experience.remaining.fat,
+      fibre: experience.remaining.fibre,
+    },
+    meal,
+    section,
+  };
+};
+
+const scoreByRemaining = (
+  option: NutritionMealSlot,
+  remaining: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; fibre: number | null },
+) => {
+  const calTarget = remaining.calories == null ? 1200 : Math.max(remaining.calories, 0);
+  const proteinTarget = remaining.protein == null ? 40 : Math.max(remaining.protein, 0);
+  const carbTarget = remaining.carbs == null ? 180 : Math.max(remaining.carbs, 0);
+  const fatTarget = remaining.fat == null ? 60 : Math.max(remaining.fat, 0);
+  const fibreTarget = remaining.fibre == null ? 20 : Math.max(remaining.fibre, 0);
+  const scoreCal = option.approxKcal == null ? 0 : 100 - Math.abs((option.approxKcal - calTarget) / Math.max(calTarget, 1)) * 100;
+  const scoreProtein = option.proteinGrams == null ? 0 : 100 - Math.abs((option.proteinGrams - proteinTarget) / Math.max(proteinTarget, 1)) * 100;
+  const scoreCarb = option.carbsGrams == null ? 0 : 100 - Math.abs((option.carbsGrams - carbTarget) / Math.max(carbTarget, 1)) * 100;
+  const scoreFibre = option.fibreGrams == null ? 0 : 100 - Math.abs((option.fibreGrams - fibreTarget) / Math.max(fibreTarget, 1)) * 100;
+  const fatPenalty = option.fatGrams == null ? 0 : option.fatGrams > fatTarget ? ((option.fatGrams - fatTarget) / Math.max(fatTarget, 1)) * 100 : 0;
+  const clamp = (value: number) => Math.max(0, Math.min(100, value));
+  return clamp(scoreCal * 0.34 + scoreProtein * 0.35 + scoreCarb * 0.15 + scoreFibre * 0.1 - fatPenalty * 0.1);
+};
+
+const toRecommendationItem = (input: {
+  option: NutritionMealSlot;
+  mealKey: string;
+  mealLabel: string;
+  mode: NutritionRecommendationMode;
+  sourceType: NutritionRecommendationSource;
+  sourceLabel: string;
+}) => ({
+  id: input.option.id,
+  mealName: input.option.meal,
+  portion: input.option.portion,
+  approxKcal: input.option.approxKcal,
+  proteinGrams: input.option.proteinGrams,
+  carbsGrams: input.option.carbsGrams ?? null,
+  fatGrams: input.option.fatGrams ?? null,
+  fibreGrams: input.option.fibreGrams ?? null,
+  cuisineTags: input.option.cuisineTags ?? [],
+  matchClassification: input.option.matchClassification,
+  sourceType: input.sourceType,
+  sourceLabel: input.sourceLabel,
+  recommendationMode: input.mode,
+  nutritionRationale: input.option.recommendationReason ?? null,
+  slot: input.option.slot,
+});
+
+const mapTextList = (value?: string[]) => (value ?? []).map((item) => lower(item));
+
+const filterByTextMatch = (option: NutritionMealSlot, keywords: string[]) => {
+  const target = mapTextList([option.meal, option.portion, option.prepNote ?? '', ...(option.cuisineTags ?? []), ...(option.dietaryTags ?? []), option.recommendationReason ?? '']);
+  if (!keywords.length) return true;
+  return keywords.some((keyword) => target.some((value) => value.includes(keyword)));
+};
+
+const resolveFoodPreferencesFilter = async (clientId: string) => {
+  const profilePayload = await getFoodPreferenceProfile(clientId);
+  const profile = profilePayload?.profile ?? null;
+  return {
+    dietPreference: profile?.dietType ?? null,
+    allergyTags: profile?.restrictions ?? [],
+    avoidedFoods: profile?.foodsAvoided ?? [],
+    avoidedFoodIds: profile?.avoidedFoodIds ?? [],
+    likedFoodIds: profile?.likedFoodIds ?? [],
+  };
+};
+
+const sortRecommendations = (items: Array<{ item: ReturnType<typeof toRecommendationItem>; score: number }>) =>
+  items
+    .sort((left, right) => right.score - left.score)
+    .map(({ item }) => item);
+
+const buildRecommendationResponse = (
+  context: ReturnType<typeof buildRecipeContext>,
+  recommendations: NutritionRecommendationItem[],
+): NutritionRecommendationResponse => ({
+  recommendations,
+  selectedDate: context.selectedDate,
+  mealKey: context.meal.key,
+  mealLabel: context.meal.label,
+  mealWindow: context.meal.window,
+  context: {
+    planId: context.planId,
+    versionId: context.versionId,
+    consumedCal: context.consumedTotals.calories,
+    consumedProtein: context.consumedTotals.protein,
+    remainingCal: context.remaining.calories,
+    remainingProtein: context.remaining.protein,
+    remainingCarbs: context.remaining.carbs,
+    remainingFat: context.remaining.fat,
+    remainingFibre: context.remaining.fibre,
+  },
+});
+
+export const getNutritionWhatCanIEatNow = async (
+  owner: ClientOwnershipContext,
+  selectedDateISO?: string,
+  mealKey?: string,
+) => {
+  const experience = await getClientNutritionExperience(owner, selectedDateISO);
+  if (!experience) throw new NutritionPlanWorkflowError('DIET_PLAN_NOT_FOUND', 'A published nutrition plan is required.', 404);
+  const context = buildRecipeContext(experience);
+  const sectionKey = mealKey && nutritionMealOrder.includes(mealKey as (typeof nutritionMealOrder)[number])
+    ? mealKey
+    : context.meal.key;
+  const activePreferences = await resolveFoodPreferencesFilter(owner.clientId);
+  const sectionForMeal = experience.version.content.mealPlan[sectionKey as NutritionMealPlanKey];
+
+  const approved = sectionForMeal.options.map((option) => ({
+    item: toRecommendationItem({
+      option,
+      mealKey: sectionKey,
+      mealLabel: context.meal.label,
+      mode: 'approved',
+      sourceType: 'published_plan',
+      sourceLabel: 'Approved plan',
+    }),
+    score: scoreByRemaining(option, context.remaining),
+  }));
+
+  const outside = (await listMealLibrarySlotsForTarget({
+    mealKey: sectionKey,
+    target: deriveMealTargets({
+      caloriesTarget: experience.version.content.dailyTargets.calories,
+      proteinTargetGrams: experience.version.content.dailyTargets.protein,
+    })[sectionKey],
+    consultantId: null,
+    dietPreference: activePreferences.dietPreference,
+    allergyTags: activePreferences.allergyTags,
+    avoidedFoods: activePreferences.avoidedFoods,
+    avoidedFoodIds: activePreferences.avoidedFoodIds,
+    likedFoodIds: activePreferences.likedFoodIds,
+    limit: 18,
+  })).map((option) => ({
+    item: toRecommendationItem({
+      option,
+      mealKey: sectionKey,
+      mealLabel: context.meal.label,
+      mode: 'outside_plan',
+      sourceType: 'meal_library',
+      sourceLabel: 'Verified food library',
+    }),
+    score: scoreByRemaining(option, context.remaining),
+  }));
+
+  return buildRecommendationResponse(context, sortRecommendations([...approved, ...outside]));
+};
+
+export const getNutritionEatingOutSuggestions = async (
+  owner: ClientOwnershipContext,
+  input: { selectedDate?: string; mealKey?: string; cuisine?: string },
+) => {
+  const experience = await getClientNutritionExperience(owner, input.selectedDate);
+  if (!experience) throw new NutritionPlanWorkflowError('DIET_PLAN_NOT_FOUND', 'A published nutrition plan is required.', 404);
+  const context = buildRecipeContext(experience);
+  const activePreferences = await resolveFoodPreferencesFilter(owner.clientId);
+  const requestedCuisine = resolveCuisineLabel(input.cuisine ?? '');
+  const sectionKey =
+    input.mealKey && nutritionMealOrder.includes(input.mealKey as (typeof nutritionMealOrder)[number])
+      ? input.mealKey
+      : context.meal.key;
+  const section = experience.version.content.mealPlan[sectionKey as NutritionMealPlanKey];
+
+  const approved = section.options.map((option) => ({
+    item: toRecommendationItem({
+      option,
+      mealKey: sectionKey,
+      mealLabel: context.meal.label,
+      mode: 'approved',
+      sourceType: 'published_plan',
+      sourceLabel: 'Approved plan',
+    }),
+    score: scoreByRemaining(option, context.remaining),
+  }));
+
+  const outside = (await listMealLibrarySlotsForTarget({
+    mealKey: sectionKey,
+    target: deriveMealTargets({
+      caloriesTarget: experience.version.content.dailyTargets.calories,
+      proteinTargetGrams: experience.version.content.dailyTargets.protein,
+    })[sectionKey],
+    consultantId: null,
+    dietPreference: activePreferences.dietPreference,
+    allergyTags: activePreferences.allergyTags,
+    avoidedFoods: activePreferences.avoidedFoods,
+    avoidedFoodIds: activePreferences.avoidedFoodIds,
+    likedFoodIds: activePreferences.likedFoodIds,
+    preferredCuisines: requestedCuisine === 'general' ? [] : [requestedCuisine],
+    limit: 18,
+  })).map((option) => ({
+    item: toRecommendationItem({
+      option,
+      mealKey: sectionKey,
+      mealLabel: context.meal.label,
+      mode: 'outside_plan',
+      sourceType: 'meal_library',
+      sourceLabel: `${requestedCuisine} options`,
+    }),
+    score: scoreByRemaining(option, context.remaining),
+  }));
+
+  return buildRecommendationResponse(
+    context,
+    sortRecommendations([...outside]).concat(approved.length ? sortRecommendations([...approved]).slice(0, 4) : []),
+  );
+};
+
+export const getNutritionCravingSuggestions = async (
+  owner: ClientOwnershipContext,
+  input: { selectedDate?: string; mealKey?: string; craving: string },
+) => {
+  const experience = await getClientNutritionExperience(owner, input.selectedDate);
+  if (!experience) throw new NutritionPlanWorkflowError('DIET_PLAN_NOT_FOUND', 'A published nutrition plan is required.', 404);
+  const context = buildRecipeContext(experience);
+  const cravings = resolveCravingKeywords(input.craving);
+  const activePreferences = await resolveFoodPreferencesFilter(owner.clientId);
+  const sectionKey =
+    input.mealKey && nutritionMealOrder.includes(input.mealKey as (typeof nutritionMealOrder)[number])
+      ? input.mealKey
+      : context.meal.key;
+  const section = experience.version.content.mealPlan[sectionKey as NutritionMealPlanKey];
+
+  const approved = section.options
+    .filter((option) => filterByTextMatch(option, cravings))
+    .map((option) => ({
+      item: toRecommendationItem({
+        option,
+        mealKey: sectionKey,
+        mealLabel: context.meal.label,
+        mode: 'approved',
+        sourceType: 'published_plan',
+        sourceLabel: 'Approved plan',
+      }),
+      score: scoreByRemaining(option, context.remaining),
+    }));
+
+  const libraryOptions = await listMealLibrarySlotsForTarget({
+    mealKey: sectionKey,
+    target: deriveMealTargets({
+      caloriesTarget: experience.version.content.dailyTargets.calories,
+      proteinTargetGrams: experience.version.content.dailyTargets.protein,
+    })[sectionKey],
+    consultantId: null,
+    dietPreference: activePreferences.dietPreference,
+    allergyTags: activePreferences.allergyTags,
+    avoidedFoods: activePreferences.avoidedFoods,
+    avoidedFoodIds: activePreferences.avoidedFoodIds,
+    likedFoodIds: activePreferences.likedFoodIds,
+    limit: 20,
+  });
+
+  const outside = libraryOptions
+    .filter((option) => filterByTextMatch(option, cravings))
+    .map((option) => ({
+      item: toRecommendationItem({
+        option,
+        mealKey: sectionKey,
+        mealLabel: context.meal.label,
+        mode: 'outside_plan',
+        sourceType: 'meal_library',
+        sourceLabel: 'General guidance',
+      }),
+      score: scoreByRemaining(option, context.remaining),
+    }));
+
+  const merged = [...approved, ...outside];
+  if (merged.length) return buildRecommendationResponse(context, sortRecommendations(merged));
+
+  const fallback = libraryOptions.slice(0, 8).map((option) => ({
+    item: toRecommendationItem({
+      option,
+      mealKey: sectionKey,
+      mealLabel: context.meal.label,
+      mode: 'outside_plan',
+      sourceType: 'meal_library',
+      sourceLabel: 'General guidance',
+    }),
+    score: scoreByRemaining(option, context.remaining),
+  }));
+  return buildRecommendationResponse(context, sortRecommendations(fallback));
 };

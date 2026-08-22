@@ -132,6 +132,7 @@ export const logNutritionEvent = (payload: {
   carbsGrams?: number | null;
   fatGrams?: number | null;
   fibreGrams?: number | null;
+  consumedAtISO?: string | null;
 }) =>
   apiFetch<NutritionExperience>('/v1/platform/nutrition-experience/event', {
     method: 'POST',
@@ -143,3 +144,62 @@ export const logWater = (payload: { planId: string; versionId: string; waterMl: 
     method: 'POST',
     body: JSON.stringify(payload),
   });
+
+export type NutritionRecommendationMode = 'approved' | 'outside_plan' | 'general';
+
+export type NutritionRecommendationItem = {
+  id?: string;
+  mealName: string;
+  portion: string;
+  approxKcal: number | null;
+  proteinGrams: number | null;
+  carbsGrams: number | null;
+  fatGrams: number | null;
+  fibreGrams: number | null;
+  cuisineTags: string[];
+  matchClassification?: 'best_match' | 'good_match' | 'acceptable' | 'outside_target';
+  sourceType: 'published_plan' | 'verified_library' | 'meal_library';
+  sourceLabel: string;
+  recommendationMode: NutritionRecommendationMode;
+  nutritionRationale: string | null;
+  slot: number;
+};
+
+export type NutritionRecommendationResponse = {
+  recommendations: NutritionRecommendationItem[];
+  selectedDate: string;
+  mealKey: string;
+  mealLabel: string;
+  mealWindow: string;
+  context: {
+    planId: string;
+    versionId: string;
+    consumedCal: number;
+    consumedProtein: number;
+    remainingCal: number | null;
+    remainingProtein: number | null;
+    remainingCarbs: number | null;
+    remainingFat: number | null;
+    remainingFibre: number | null;
+  };
+};
+
+export const getWhatCanIEatNow = (mealKey?: string, date?: string) =>
+  nutritionFetch<NutritionRecommendationResponse>(`/v1/platform/nutrition-experience/recommendations/what-can-i-eat-now?${new URLSearchParams({
+    ...(mealKey ? { mealKey } : {}),
+    ...(date ? { date } : {}),
+  } as Record<string, string>).toString()}`);
+
+export const getEatingOutSuggestions = (params: { mealKey?: string; date?: string; cuisine: string }) =>
+  nutritionFetch<NutritionRecommendationResponse>(`/v1/platform/nutrition-experience/recommendations/eating-out?${new URLSearchParams({
+    ...(params.mealKey ? { mealKey: params.mealKey } : {}),
+    ...(params.date ? { date: params.date } : {}),
+    cuisine: params.cuisine,
+  } as Record<string, string>).toString()}`);
+
+export const getCravingSuggestions = (params: { mealKey?: string; date?: string; craving: string }) =>
+  nutritionFetch<NutritionRecommendationResponse>(`/v1/platform/nutrition-experience/recommendations/craving?${new URLSearchParams({
+    ...(params.mealKey ? { mealKey: params.mealKey } : {}),
+    ...(params.date ? { date: params.date } : {}),
+    craving: params.craving,
+  } as Record<string, string>).toString()}`);

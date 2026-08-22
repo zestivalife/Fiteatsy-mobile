@@ -1,6 +1,21 @@
 import { apiFetch } from './apiClient';
 import { NutritionMealConsumptionResult, PublishedNutritionPlan } from '../types';
 
+export type NutritionPlanDeliveryStatus = {
+  status: 'NO_PLAN' | 'PREPARING' | 'PENDING_APPROVAL' | 'APPROVED_NOT_PUBLISHED' | 'ACTIVE_PUBLISHED';
+  plan: {
+    id: string;
+    versionId: string | null;
+    planStatus: string;
+    lifecycleStatus: string;
+    approvedAtISO: string | null;
+    publishedAtISO: string | null;
+  } | null;
+};
+
+export const getNutritionPlanDeliveryStatus = () =>
+  apiFetch<NutritionPlanDeliveryStatus>('/v1/platform/nutrition-plan/status');
+
 export const getPublishedNutritionPlan = () =>
   apiFetch<PublishedNutritionPlan>('/v1/platform/nutrition-plan');
 
