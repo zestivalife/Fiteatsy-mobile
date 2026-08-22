@@ -3,7 +3,7 @@
     "name": "Fiteatsy",
     "slug": "fiteatsy-health-app",
     "version": "1.0.0",
-    "runtimeVersion": "1.0.0-native-20260818",
+    "runtimeVersion": "1.0.0-native-20260823-video",
     "orientation": "portrait",
     "icon": "./src/assets/icon.png",
     "userInterfaceStyle": "dark",
