@@ -13,6 +13,7 @@ import { RootStackParamList } from '../../navigation/types';
 import type { Medication, MedicationLogStatus } from '../../types';
 import { useAppContext } from '../../state/AppContext';
 import { resolveMedicationSlotForOccurrence } from '../../services/medicationUtils';
+import { resolveClientFirstName } from '../../utils/clientIdentity';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type MedicationTimelineEntry = {
@@ -215,7 +216,7 @@ export const MedicationCalendarScreen = () => {
     }
   };
 
-  const firstName = authSession?.user.name?.split(' ')[0] || 'there';
+  const firstName = resolveClientFirstName(authSession?.user.name);
 
   const medicationTimeLabel = (medication: Medication) =>
     medication.schedule.timeSlots

@@ -40,6 +40,7 @@ import {
 } from '../../services/nuetraService';
 import { useAppContext } from '../../state/AppContext';
 import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
+import { resolveClientName } from '../../utils/clientIdentity';
 import {
   BiomarkerHistoryItem,
   deleteAllAnalyzedReports,
@@ -317,6 +318,7 @@ const SwipeableReportCard = ({
 export const ReportsScreen = () => {
   const navigation = useNavigation<Nav>();
   const { wellness, onboarding, checkIns, themeMode, authSession } = useAppContext();
+  const clientName = resolveClientName(authSession?.user.name);
   const isLight = themeMode === 'light';
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [biomarkerHistory, setBiomarkerHistory] = useState<BiomarkerHistoryItem[]>([]);
@@ -769,7 +771,7 @@ export const ReportsScreen = () => {
       setSummaryLoading(true);
 
       try {
-        const summaryPromise = generateNuetraSummary(latestReport.id, onboarding?.name);
+        const summaryPromise = generateNuetraSummary(latestReport.id, clientName);
 
         const insightPairsPromise = Promise.all(
           abnormalParameters.map(async (parameter) => {
@@ -793,13 +795,13 @@ export const ReportsScreen = () => {
           return;
         }
 
-        setNuetraSummary(summary || buildSpecificFallbackSummary(latestReport.parametersData, onboarding?.name));
+        setNuetraSummary(summary || buildSpecificFallbackSummary(latestReport.parametersData, clientName));
         setParameterInsights(Object.fromEntries(insightPairs));
         setActionPlan(actions);
         setCrossInsights(cross);
       } catch {
         if (!cancelled) {
-          setNuetraSummary(buildSpecificFallbackSummary(latestReport.parametersData, onboarding?.name));
+          setNuetraSummary(buildSpecificFallbackSummary(latestReport.parametersData, clientName));
           setParameterInsights(
             Object.fromEntries(
               abnormalParameters.map((parameter) => [
@@ -830,7 +832,7 @@ export const ReportsScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [abnormalParameters, checkIns, latestReport, onboarding?.name]);
+  }, [abnormalParameters, checkIns, clientName, latestReport]);
 
   useEffect(() => {
     if (!showProcessing || processingIntent !== 'upload') {

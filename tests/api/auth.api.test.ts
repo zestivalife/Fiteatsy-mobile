@@ -94,6 +94,7 @@ test('POST /v1/auth/signup/verify-otp issues a persisted session and GET /v1/aut
   });
   assert.equal(me.response.status, 200);
   assert.equal(me.body.accountId, verified.body.user.id);
+  assert.equal(me.body.user.name, 'Asha Sharma');
   assert.equal(me.body.user.email, 'asha@example.com');
   assert.match(me.body.client.fiteatsyClientId, /^fc_[a-f0-9]{32}$/i);
   assert.equal(me.body.client.status, 'active');

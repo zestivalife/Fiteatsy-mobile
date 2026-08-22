@@ -29,6 +29,7 @@ import { getMySubscription } from '../../services/subscriptionService';
 import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
 import type { DailyCheckIn, Medication, MedicationLogStatus } from '../../types';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
+import { resolveClientFirstName } from '../../utils/clientIdentity';
 import {
   buildPss10StressContext,
   formatPss10Change,
@@ -88,12 +89,6 @@ type MedicationTimelineEntry = {
   medication: Medication;
   scheduledForISO: string;
   status: MedicationLogStatus;
-};
-
-const firstName = (name?: string | null) => {
-  const trimmed = name?.trim();
-  if (!trimmed) return 'there';
-  return trimmed.split(/\s+/)[0];
 };
 
 const trendTone = (value: number) => {
@@ -339,7 +334,7 @@ export const HomeScreen = () => {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.referenceFrame}>
             <HomeHeader
-              name={firstName(onboarding?.name)}
+              name={resolveClientFirstName(authSession?.user.name)}
               onSearch={() => navigation.navigate('Search')}
               onAdd={() => navigation.navigate('Leadership')}
               onNotifications={() => navigation.navigate('Notifications')}

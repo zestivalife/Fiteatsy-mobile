@@ -11,6 +11,7 @@ import { AssessmentGender } from '../../types';
 import { useAppContext } from '../../state/AppContext';
 import { formatConsultantAvailability, formatDobLabel, getConsultantProfile } from '../../utils/healthProfile';
 import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
+import { resolveClientName } from '../../utils/clientIdentity';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
@@ -37,13 +38,15 @@ export const ProfileScreen = ({ navigation }: Props) => {
     nudges,
     assessment,
     healthProfileSyncDiagnostics,
-    retryPendingHealthProfileSync
+    retryPendingHealthProfileSync,
+    authSession
   } = useAppContext();
   const connectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? null;
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
   const consultant = getConsultantProfile(onboarding);
   const healthProfile = buildHealthProfileCompletion(onboarding, assessment, 0);
+  const clientName = resolveClientName(authSession?.user.name);
 
 
   useFocusEffect(
@@ -106,7 +109,7 @@ export const ProfileScreen = ({ navigation }: Props) => {
 
       <Card>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Member Profile</Text>
-        <Text style={[styles.valuePrimary, { color: palette.textPrimary }]}>{onboarding?.name ?? 'Member'}</Text>
+        <Text style={[styles.valuePrimary, { color: palette.textPrimary }]}>{clientName}</Text>
         <Text style={[styles.valueSecondary, { color: palette.textSecondary }]}>{onboarding?.careTrack ?? 'Foundational Recovery Care'}</Text>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Primary Conditions</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.primaryConditions?.join(', ') || 'Not set'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Primary Goal</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.primaryGoal ?? 'Not set'}</Text></View>
