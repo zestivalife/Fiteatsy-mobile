@@ -68,7 +68,8 @@
       ],
       "expo-document-picker",
       "@react-native-community/datetimepicker",
-      "react-native-health-connect"
+      "react-native-health-connect",
+      "expo-video"
     ]
   }
 }
