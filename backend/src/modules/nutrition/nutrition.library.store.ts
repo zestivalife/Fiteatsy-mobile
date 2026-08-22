@@ -235,6 +235,7 @@ export const listEligibleMealVariantRecords = async (input: {
   avoidedFoodIds?: string[];
   likedFoodIds?: string[];
   preferredCuisines?: string[];
+  includeOutsideTarget?: boolean;
   limit?: number;
 }) => {
   const resultLimit = input.limit ?? 12;
@@ -405,6 +406,7 @@ export const listMealLibrarySlotsForTarget = async (input: {
   avoidedFoodIds?: string[];
   likedFoodIds?: string[];
   preferredCuisines?: string[];
+  includeOutsideTarget?: boolean;
   limit?: number;
 }) => {
   const variants = await listEligibleMealVariantRecords(input);
@@ -421,7 +423,7 @@ export const listMealLibrarySlotsForTarget = async (input: {
         fibreGrams: slot.fibreGrams ?? totals.fibreGrams,
       } satisfies NutritionMealSlot;
     })
-    .filter((slot) => slot.matchClassification !== 'outside_target' || variants.length <= 3)
+    .filter((slot) => input.includeOutsideTarget || slot.matchClassification !== 'outside_target' || variants.length <= 3)
     .slice(0, input.limit ?? 6);
 
   return slots;

@@ -1943,7 +1943,7 @@ export const generateConsultantOptionalGuidance = async (
     avoidedFoodIds: preferences.avoidedFoodIds,
     likedFoodIds: preferences.likedFoodIds,
   };
-  const broadCatalogue = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, limit: 160 })).filter(guidanceNutritionComplete);
+  const broadCatalogue = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, includeOutsideTarget: true, limit: 160 })).filter(guidanceNutritionComplete);
   const uniqueSlots = (slots: NutritionMealSlot[]) => Array.from(new Map(slots.map((slot) => [slot.id ?? slot.meal, slot])).values());
   const whatSlots = uniqueSlots([
     ...planOptions.map(({ slot }) => slot).filter(guidanceNutritionComplete),
@@ -1956,7 +1956,7 @@ export const generateConsultantOptionalGuidance = async (
   const usedCuisineIds = new Set<string>();
   const eatingOutEntries: Array<[string, NutritionGuidanceItem[]]> = [];
   for (const [key, cuisine] of Object.entries(cuisineDefinitions)) {
-    const candidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, preferredCuisines: [cuisine], limit: 40 }))
+    const candidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, includeOutsideTarget: true, preferredCuisines: [cuisine], limit: 40 }))
       .filter(guidanceNutritionComplete)
       .filter((slot) => !usedCuisineIds.has(slot.id ?? slot.meal))
       .slice(0, OPTIONAL_GUIDANCE_CUISINE_COUNT);
@@ -2014,7 +2014,7 @@ export const searchConsultantOptionalGuidanceCandidates = async (
     mealKey: '', target: undefined, consultantId: account.accountId,
     dietPreference: preferences.dietPreference, allergyTags: preferences.allergyTags,
     avoidedFoods: preferences.avoidedFoods, avoidedFoodIds: preferences.avoidedFoodIds, likedFoodIds: preferences.likedFoodIds,
-    preferredCuisines: cuisine === 'general' ? [] : [cuisine], limit: 120,
+    preferredCuisines: cuisine === 'general' ? [] : [cuisine], includeOutsideTarget: true, limit: 120,
   }))
     .filter(guidanceNutritionComplete)
     .filter((slot) => !input.query || filterByTextMatch(slot, [lower(input.query)]))

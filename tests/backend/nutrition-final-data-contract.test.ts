@@ -234,6 +234,7 @@ test('optional guidance completeness is enforced only at review lifecycle bounda
 
   assert.doesNotMatch(service.slice(saveStart, saveEnd), /assertOptionalGuidanceComplete/);
   assert.doesNotMatch(service.slice(generateStart, searchStart), /assertOptionalGuidanceComplete/);
+  assert.match(service.slice(generateStart, searchStart), /includeOutsideTarget: true/);
   assert.match(service.slice(submitStart, changesStart), /assertOptionalGuidanceComplete\(version\.content\)/);
   assert.match(service.slice(approveStart, publishStart), /assertOptionalGuidanceComplete\(currentVersion\.content\)/);
   assert.match(service.slice(publishStart), /assertOptionalGuidanceComplete\(approvedVersion\.content, true\)/);
