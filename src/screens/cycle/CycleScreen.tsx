@@ -5,6 +5,8 @@ import { useNavigation } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { AppBackButton } from '../../components/AppBackButton';
+import { PageHeader } from '../../components/PageHeader';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { Screen } from '../../components/Screen';
 import { RootStackParamList } from '../../navigation/types';
 import { CycleEnergy, CycleFlowIntensity, CycleMood, CycleSymptom } from '../../types';
@@ -114,8 +116,7 @@ export const CycleScreen = () => {
 
   return (
     <Screen scroll>
-      <AppBackButton onPress={() => navigation.goBack()} />
-      <Text style={[styles.title, { color: darkGraySurfaceText }]}>Cycle</Text>
+      <PageHeader title="Cycle" onBack={() => navigation.goBack()} />
       {!isWomenOnlyEnabled ? (
         <View style={[styles.noticeCard, { backgroundColor: isLight ? '#FFF4F4' : colors.cardMuted }]}>
           <Text style={[styles.noticeTitle, { color: darkGraySurfaceText }]}>Cycle tracking is for women only in this build</Text>
@@ -134,16 +135,13 @@ export const CycleScreen = () => {
         </View>
       </View>
 
-      <Pressable style={[styles.logButton, !isLight && styles.logButtonDark, !isWomenOnlyEnabled && styles.logButtonDisabled]} onPress={() => isWomenOnlyEnabled && setLogOpen(true)}>
-        <Ionicons name="add-circle-outline" size={18} color={darkGraySurfaceText} />
-        <Text style={[styles.logButtonText, { color: darkGraySurfaceText }]}>Log Today</Text>
-      </Pressable>
+      <PrimaryButton title="Log Today" onPress={() => setLogOpen(true)} disabled={!isWomenOnlyEnabled} style={styles.logButton} />
 
       <View style={styles.quickRow}>
         <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleCalendar')}><Text style={[styles.quickTitle, { color: darkGraySurfaceText }]}>Calendar</Text><Text style={[styles.quickBody, { color: darkGraySurfaceText }]}>View logs and predictions</Text></Pressable>
         <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleInsights')}><Text style={[styles.quickTitle, { color: darkGraySurfaceText }]}>Insights</Text><Text style={[styles.quickBody, { color: darkGraySurfaceText }]}>Patterns and consistency</Text></Pressable>
       </View>
-      <Pressable style={[styles.quickCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleNotifications')}><Text style={[styles.quickTitle, { color: darkGraySurfaceText }]}>Reminders</Text><Text style={[styles.quickBody, { color: darkGraySurfaceText }]}>Manage cycle notification timing</Text></Pressable>
+      <Pressable style={[styles.quickCard, styles.quickCardStandalone, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]} onPress={() => navigation.navigate('CycleNotifications')}><Text style={[styles.quickTitle, { color: darkGraySurfaceText }]}>Reminders</Text><Text style={[styles.quickBody, { color: darkGraySurfaceText }]}>Manage cycle notification timing</Text></Pressable>
 
       <Modal visible={logOpen} transparent animationType="slide" onRequestClose={() => setLogOpen(false)}>
         <View style={[styles.sheetOverlay, { backgroundColor: isLight ? 'rgba(15,23,42,0.40)' : colors.overlay }]}>
@@ -231,9 +229,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary
   },
   title: {
-    ...typography.bodyStrong,
-    fontSize: 14,
-    lineHeight: 20,
+    ...typography.screenTitle,
     marginBottom: spacing.sm
   },
   noticeCard: {
@@ -307,15 +303,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary
   },
   logButton: {
-    minHeight: 48,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.blue,
-    backgroundColor: colors.blueSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
+    backgroundColor: colors.blue,
     marginBottom: spacing.sm
   },
   logButtonDark: {
@@ -342,13 +330,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.stroke,
     backgroundColor: colors.card,
-    padding: spacing.md
+    padding: spacing.md,
+    minHeight: 96
   },
   quickTitle: {
     ...typography.bodyStrong,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 6
+  },
+  quickCardStandalone: {
+    flex: 0
   },
   quickBody: {
     ...typography.body,

@@ -13,7 +13,7 @@ type Props = {
   iconOnly?: boolean;
 };
 
-export const AppBackButton = ({ onPress, fallbackRoute, label = 'Back', style, iconOnly = false }: Props) => {
+export const AppBackButton = ({ onPress, fallbackRoute, label = 'Back', style, iconOnly = true }: Props) => {
   const navigation = useNavigation<any>();
   const { themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);

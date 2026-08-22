@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AppBackButton } from '../../components/AppBackButton';
+import { PageHeader } from '../../components/PageHeader';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Screen } from '../../components/Screen';
@@ -64,7 +65,7 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
 
   return (
     <Screen scroll contentStyle={styles.screen}>
-      <AppBackButton onPress={() => navigation.goBack()} />
+      <PageHeader title="Consultant Booking" onBack={() => navigation.goBack()} />
 
       <View style={[styles.hero, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#101311' }]}>
         <Text style={styles.eyebrow}>Consultant booking</Text>
@@ -153,26 +154,27 @@ const styles = StyleSheet.create({
   },
   hero: {
     borderWidth: 1,
-    borderRadius: 26,
-    padding: spacing.lg,
-    gap: 10
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm
   },
   eyebrow: {
     color: '#5FC100',
-    fontFamily: 'Exo_700Bold',
+    fontFamily: 'Exo_500Medium',
     fontSize: 12,
+    lineHeight: 17,
     letterSpacing: 1.2,
     textTransform: 'uppercase'
   },
   title: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 30,
-    lineHeight: 36
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22
   },
   body: {
     fontFamily: 'Exo_400Regular',
-    fontSize: 15,
-    lineHeight: 22
+    fontSize: 14,
+    lineHeight: 20
   },
   card: {
     borderWidth: 1,
@@ -203,13 +205,14 @@ const styles = StyleSheet.create({
     gap: 4
   },
   consultantName: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 19
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 14,
+    lineHeight: 20
   },
   consultantDetail: {
     fontFamily: 'Exo_400Regular',
-    fontSize: 13,
-    lineHeight: 18
+    fontSize: 12,
+    lineHeight: 17
   },
   pendingBox: {
     borderRadius: 16,
@@ -229,8 +232,9 @@ const styles = StyleSheet.create({
     lineHeight: 18
   },
   sectionTitle: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 18
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22
   },
   windowGrid: {
     flexDirection: 'row',
@@ -245,7 +249,8 @@ const styles = StyleSheet.create({
   },
   windowText: {
     fontFamily: 'Exo_600SemiBold',
-    fontSize: 13
+    fontSize: 14,
+    lineHeight: 18
   },
   successText: {
     color: colors.success,
@@ -272,12 +277,13 @@ const styles = StyleSheet.create({
     gap: 4
   },
   planButtonTitle: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 16
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 14,
+    lineHeight: 20
   },
   planButtonBody: {
     fontFamily: 'Exo_400Regular',
-    fontSize: 13,
-    lineHeight: 18
+    fontSize: 12,
+    lineHeight: 17
   }
 });

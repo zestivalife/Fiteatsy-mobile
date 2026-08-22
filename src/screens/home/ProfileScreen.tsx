@@ -270,13 +270,12 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   title: {
-    ...typography.section,
-    fontSize: 22
+    ...typography.screenTitle
   },
   closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.cardMuted,
     borderWidth: 1,
     borderColor: colors.stroke,
@@ -284,13 +283,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   sectionTitle: {
-    ...typography.bodyStrong,
-    fontSize: 14,
+    ...typography.cardTitle,
     marginBottom: 10
   },
   valuePrimary: {
-    ...typography.bodyStrong,
-    fontSize: 18
+    ...typography.bodyMedium
   },
   valueSecondary: {
     ...typography.body,
@@ -312,8 +309,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   label: {
-    ...typography.body,
-    fontSize: 14,
+    ...typography.label,
     color: colors.textSecondary
   },
   value: {

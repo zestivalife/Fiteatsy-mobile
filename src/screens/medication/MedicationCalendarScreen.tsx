@@ -4,6 +4,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppBackButton } from '../../components/AppBackButton';
+import { PageHeader } from '../../components/PageHeader';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { SegmentedTabs } from '../../components/SegmentedTabs';
 import { Screen } from '../../components/Screen';
 import { radius, spacing } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
@@ -225,17 +228,11 @@ export const MedicationCalendarScreen = () => {
       .join(', ');
 
   const renderTabs = () => (
-    <View style={styles.tabRow}>
-      {([
-        ['today', 'Today'],
-        ['medications', 'My Medications'],
-        ['history', 'History']
-      ] as Array<[MedicationTab, string]>).map(([key, label]) => (
-        <Pressable key={key} style={[styles.topTab, activeTab === key && styles.topTabActive]} onPress={() => setActiveTab(key)} accessibilityRole="button">
-          <Text style={[styles.topTabText, activeTab === key && styles.topTabTextActive]}>{label}</Text>
-        </Pressable>
-      ))}
-    </View>
+    <SegmentedTabs
+      tabs={[{ key: 'today', label: 'Today' }, { key: 'medications', label: 'My Medications' }, { key: 'history', label: 'History' }]}
+      value={activeTab}
+      onChange={setActiveTab}
+    />
   );
 
   const renderProgressSegments = () => {
@@ -285,13 +282,12 @@ export const MedicationCalendarScreen = () => {
             <Text style={styles.nextMeta}>· {mealRelationLabel[resolveMedicationSlotForOccurrence(nextDose.medication, nextDose.scheduledForISO)?.mealRelation] ?? 'Scheduled dose'}</Text>
             <Text style={styles.nextMeta}>🔔 Reminder ON</Text>
           </View>
-          <Pressable
-            style={styles.takeNowButton}
+          <PrimaryButton
+            title="Take now"
             onPress={() => recordMedicationStatus(nextDose, 'taken')}
-            accessibilityRole="button"
-          >
-            <Text style={styles.takeNowText}>{savingLogId?.endsWith('-taken') ? 'Saving...' : 'Take now'}</Text>
-          </Pressable>
+            loading={savingLogId?.endsWith('-taken') === true}
+            style={styles.takeNowButton}
+          />
           <View style={styles.secondaryActions}>
             <Pressable style={styles.secondaryActionButton} onPress={() => setSheet({ type: 'snooze', entry: nextDose, minutes: 15 })}>
               <Text style={styles.secondaryActionText}>Snooze</Text>
@@ -378,13 +374,7 @@ export const MedicationCalendarScreen = () => {
 
   const renderHistory = () => (
     <>
-      <View style={styles.subTabRow}>
-        {(['7', '30'] as const).map((key) => (
-          <Pressable key={key} style={[styles.subTab, historyRange === key && styles.subTabActive]} onPress={() => setHistoryRange(key)}>
-            <Text style={[styles.subTabText, historyRange === key && styles.subTabTextActive]}>{key} Days</Text>
-          </Pressable>
-        ))}
-      </View>
+      <SegmentedTabs tabs={[{ key: '7', label: '7 Days' }, { key: '30', label: '30 Days' }]} value={historyRange} onChange={setHistoryRange} />
       <View style={styles.adherenceCard}>
         <Text style={styles.scheduleTitle}>{historyRange}-DAY ADHERENCE</Text>
         <View style={styles.adherenceRow}>
@@ -476,14 +466,12 @@ export const MedicationCalendarScreen = () => {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerRow}>
-          <AppBackButton onPress={() => navigation.goBack()} iconOnly />
-          <Pressable style={styles.notificationButton} onPress={() => navigation.navigate('MedicationNotifications')}>
-            <Ionicons name="notifications-outline" size={23} color={medicationTheme.secondary} />
-          </Pressable>
-        </View>
+        <PageHeader
+          title="Medication Tracker"
+          onBack={() => navigation.goBack()}
+          action={<Pressable style={styles.notificationButton} onPress={() => navigation.navigate('MedicationNotifications')} accessibilityLabel="Medication notifications"><Ionicons name="notifications-outline" size={22} color={medicationTheme.secondary} /></Pressable>}
+        />
         <Text style={styles.greeting}>Good {new Date().getHours() < 17 ? 'morning' : 'evening'}, {firstName}</Text>
-        <Text style={styles.title}>Medication Tracker</Text>
         <Text style={styles.date}>{formatDate(today)}</Text>
         {renderTabs()}
         {activeTab === 'today' ? renderToday() : activeTab === 'medications' ? renderMedications() : renderHistory()}
@@ -641,11 +629,10 @@ const styles = StyleSheet.create({
     color: medicationTheme.due
   },
   takeNowButton: {
-    minHeight: 56,
-    borderRadius: 20,
+    minHeight: 44,
+    borderRadius: radius.pill,
     backgroundColor: medicationTheme.active,
-    alignItems: 'center',
-    justifyContent: 'center'
+    alignItems: 'center'
   },
   takeNowText: {
     ...typography.bodyStrong,

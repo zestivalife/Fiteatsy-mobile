@@ -28,4 +28,24 @@ describe('Foundation V1 interaction contracts', () => {
     expect(tabs).toContain('accessibilityState={{ selected: active }}');
     expect(header).toContain('typography.screenTitle');
   });
+
+  it('keeps high-risk production screens converged on shared Foundation primitives', () => {
+    const contracts = [
+      ['src/screens/cycle/CycleScreen.tsx', ['PageHeader', 'PrimaryButton']],
+      ['src/screens/assessments/Pss10AssessmentScreen.tsx', ['PageHeader', 'PrimaryButton']],
+      ['src/screens/sync/SyncWearableScreen.tsx', ['PageHeader', 'PrimaryButton']],
+      ['src/screens/home/SubscriptionPlansScreen.tsx', ['PageHeader', 'PrimaryButton']],
+      ['src/screens/home/ConsultantBookingScreen.tsx', ['PageHeader', 'PrimaryButton']],
+      ['src/screens/medication/MedicationCalendarScreen.tsx', ['PageHeader', 'PrimaryButton', 'SegmentedTabs']],
+      ['src/screens/home/NutritionExperienceScreen.tsx', ['SegmentedTabs']]
+    ] as const;
+    contracts.forEach(([file, primitives]) => {
+      const source = read(file);
+      primitives.forEach((primitive) => expect(source).toContain(`<${primitive}`));
+    });
+  });
+
+  it('defaults the shared Back Button to the compact icon-only treatment', () => {
+    expect(read('src/components/AppBackButton.tsx')).toContain('iconOnly = true');
+  });
 });

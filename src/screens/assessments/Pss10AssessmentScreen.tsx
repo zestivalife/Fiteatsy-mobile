@@ -3,6 +3,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AppBackButton } from '../../components/AppBackButton';
+import { PageHeader } from '../../components/PageHeader';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { Screen } from '../../components/Screen';
 import { RootStackParamList } from '../../navigation/types';
 import {
@@ -184,14 +186,11 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
   }
 
   const renderHeader = (title: string, subtitle?: string) => (
-    <View style={styles.header}>
-      <AppBackButton iconOnly onPress={goBackWithinFlow} />
-      <View style={styles.headerTextWrap}>
-        <Text style={styles.eyebrow}>MIND / STRESS</Text>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-      </View>
-    </View>
+    <>
+      <PageHeader title={title} onBack={goBackWithinFlow} />
+      <Text style={styles.eyebrow}>MIND / STRESS</Text>
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+    </>
   );
 
   const renderIntro = () => (
@@ -221,9 +220,7 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
           </Pressable>
         </View>
       ) : (
-        <Pressable style={styles.primaryButton} onPress={() => beginAssessment(false)} disabled={submitting} accessibilityRole="button">
-          <Text style={styles.primaryButtonText}>Start Assessment</Text>
-        </Pressable>
+        <PrimaryButton title="Start Assessment" onPress={() => beginAssessment(false)} disabled={submitting} style={styles.primaryButton} />
       )}
       {latestResult ? (
         <Pressable style={styles.secondaryButton} onPress={() => setView('history')} accessibilityRole="button">
@@ -408,8 +405,7 @@ const styles = StyleSheet.create({
     color: MIND_ACCENT
   },
   title: {
-    ...typography.title,
-    fontFamily: 'Exo_700Bold',
+    ...typography.screenTitle,
     color: TEXT
   },
   subtitle: {
@@ -421,8 +417,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
-    padding: 20,
-    gap: 14
+    padding: 16,
+    gap: 12
   },
   heroIcon: {
     width: 48,
@@ -435,8 +431,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(141,124,255,0.34)'
   },
   heroTitle: {
-    ...typography.titleXL,
-    fontFamily: 'Exo_700Bold',
+    ...typography.sectionTitle,
     color: TEXT
   },
   heroCopy: {
@@ -482,16 +477,16 @@ const styles = StyleSheet.create({
     color: MUTED
   },
   primaryButton: {
-    minHeight: 52,
-    borderRadius: 16,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.md,
     backgroundColor: MIND_ACCENT,
-    paddingHorizontal: spacing.md
+    borderRadius: 999
   },
   secondaryButton: {
-    minHeight: 52,
-    borderRadius: 16,
+    minHeight: 44,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -500,7 +495,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md
   },
   primaryButtonText: {
-    ...typography.bodyStrong,
+    ...typography.button,
     color: TEXT
   },
   secondaryButtonText: {
@@ -577,8 +572,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     flex: 0.38,
-    minHeight: 52,
-    borderRadius: 16,
+    minHeight: 44,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: BORDER,
     alignItems: 'center',
@@ -591,8 +586,8 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     flex: 0.62,
-    minHeight: 52,
-    borderRadius: 16,
+    minHeight: 44,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: MIND_ACCENT

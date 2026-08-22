@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { AppBackButton } from '../../components/AppBackButton';
+import { PageHeader } from '../../components/PageHeader';
 import { Screen } from '../../components/Screen';
 import { ApiClientError } from '../../services/apiClient';
 import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
@@ -232,7 +233,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
 
   return (
     <Screen scroll contentStyle={styles.screen}>
-      <AppBackButton onPress={() => navigation.goBack()} />
+      <PageHeader title="Subscriptions" onBack={() => navigation.goBack()} />
 
       <View style={[styles.hero, { backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0E120F', borderColor: palette.stroke }]}>
         <Text style={styles.eyebrow}>Fiteatsy subscriptions</Text>
@@ -441,26 +442,27 @@ const styles = StyleSheet.create({
   },
   hero: {
     borderWidth: 1,
-    borderRadius: 28,
+    borderRadius: radius.lg,
     gap: 10,
-    padding: spacing.lg
+    padding: spacing.md
   },
   eyebrow: {
     color: '#64D900',
-    fontFamily: 'Exo_700Bold',
+    fontFamily: 'Exo_500Medium',
     fontSize: 12,
+    lineHeight: 17,
     letterSpacing: 1.2,
     textTransform: 'uppercase'
   },
   title: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 29,
-    lineHeight: 35
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22
   },
   body: {
     fontFamily: 'Exo_400Regular',
-    fontSize: 15,
-    lineHeight: 22
+    fontSize: 14,
+    lineHeight: 20
   },
   entitlementPill: {
     alignItems: 'center',
@@ -515,9 +517,9 @@ const styles = StyleSheet.create({
   },
   recommendationCard: {
     borderWidth: 1,
-    borderRadius: 30,
-    gap: spacing.md,
-    padding: spacing.lg
+    borderRadius: radius.lg,
+    gap: spacing.sm,
+    padding: spacing.md
   },
   badgeRow: {
     flexDirection: 'row',
@@ -528,8 +530,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#64D900',
     borderRadius: radius.pill,
     color: '#092104',
-    fontFamily: 'Exo_700Bold',
-    fontSize: 12,
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 11,
+    lineHeight: 14,
     paddingHorizontal: 12,
     paddingVertical: 7
   },
@@ -537,22 +540,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#22301E',
     borderRadius: radius.pill,
     color: '#C9F6B7',
-    fontFamily: 'Exo_700Bold',
-    fontSize: 12,
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 11,
+    lineHeight: 14,
     paddingHorizontal: 12,
     paddingVertical: 7
   },
   planName: {
     color: '#FFFFFF',
-    fontFamily: 'Exo_700Bold',
-    fontSize: 26,
-    lineHeight: 31
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22
   },
   planReason: {
     color: '#D7E6D0',
     fontFamily: 'Exo_400Regular',
-    fontSize: 15,
-    lineHeight: 22
+    fontSize: 14,
+    lineHeight: 20
   },
   planMetaRow: {
     alignItems: 'center',
@@ -634,8 +638,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg
   },
   sectionTitle: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 21
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22
   },
   choiceGroup: {
     gap: 10

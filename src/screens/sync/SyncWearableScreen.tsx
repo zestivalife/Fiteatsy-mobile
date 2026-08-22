@@ -5,6 +5,7 @@ import { SdkAvailabilityStatus, getSdkStatus } from 'react-native-health-connect
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { PageHeader } from '../../components/PageHeader';
 import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
@@ -481,6 +482,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
   return (
     <Screen scroll contentStyle={styles.screenContent}>
       <View style={styles.container}>
+        <PageHeader title="Health Connect" onBack={() => navigation.goBack()} />
         <View style={[styles.heroCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
           <View style={[styles.heroIcon, { backgroundColor: isLight ? '#EAF8F5' : '#143532' }]}>
             <Ionicons name={stageIcon[stage]} size={26} color={isLight ? '#087B6C' : '#66FCF1'} />
@@ -587,7 +589,7 @@ const styles = StyleSheet.create({
   heroCard: {
     borderWidth: 1,
     borderRadius: radius.lg,
-    padding: spacing.lg,
+    padding: spacing.md,
     gap: spacing.sm
   },
   heroIcon: {
@@ -604,8 +606,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1
   },
   title: {
-    ...typography.title,
-    fontSize: 24
+    ...typography.sectionTitle
   },
   subTitle: {
     ...typography.body,
