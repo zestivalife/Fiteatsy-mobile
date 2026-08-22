@@ -19,6 +19,14 @@ const androidLaunchBackground = fs.readFileSync(
   ),
   'utf8'
 );
+const iosUpdatesConfig = fs.readFileSync(
+  path.join(process.cwd(), 'ios/Fiteatsy/Supporting/Expo.plist'),
+  'utf8'
+);
+const androidManifest = fs.readFileSync(
+  path.join(process.cwd(), 'android/app/src/main/AndroidManifest.xml'),
+  'utf8'
+);
 
 describe('premium app-level video intro contract', () => {
   it('uses the approved remote video and supplied SVG with the required presentation', () => {
@@ -31,7 +39,7 @@ describe('premium app-level video intro contract', () => {
   });
 
   it('enforces the timeout, fallback, cleanup, and reduced-motion contracts', () => {
-    expect(source).toContain('MAX_SPLASH_DURATION = 10_000');
+    expect(source).toContain('SPLASH_MAX_DURATION_MS = 10_000');
     expect(source).toContain("player.addListener('statusChange'");
     expect(source).toContain('AccessibilityInfo.isReduceMotionEnabled()');
     expect(source).toContain('clearTimeout(maximumDurationTimer)');
@@ -58,5 +66,17 @@ describe('premium app-level video intro contract', () => {
     });
     expect(iosLaunchScreen).not.toContain('SplashScreenLegacy');
     expect(androidLaunchBackground).not.toContain('splashscreen_logo');
+  });
+
+  it('pins native production builds to the production OTA channel', () => {
+    expect(iosUpdatesConfig).toContain('<key>EXUpdatesRequestHeaders</key>');
+    expect(iosUpdatesConfig).toContain('<key>expo-channel-name</key>');
+    expect(iosUpdatesConfig).toContain('<string>production</string>');
+    expect(androidManifest).toContain(
+      'expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY'
+    );
+    expect(androidManifest).toContain(
+      '{&quot;expo-channel-name&quot;:&quot;production&quot;}'
+    );
   });
 });

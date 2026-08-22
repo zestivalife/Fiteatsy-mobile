@@ -18,7 +18,7 @@ import { getOnboardingRuntimeProgress } from '../../services/onboardingRuntimePr
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
-export const MAX_SPLASH_DURATION = 10_000;
+export const SPLASH_MAX_DURATION_MS = 10_000;
 const EXIT_FADE_DURATION = 320;
 const LOGO_ANIMATION_DURATION = 640;
 const VIDEO_URL = 'https://zestiva.life/assets/Fiteatsy.mp4';
@@ -130,7 +130,7 @@ export const SplashScreen = ({ navigation }: Props) => {
       ]).start();
     });
 
-    const maximumDurationTimer = setTimeout(() => requestExit(true), MAX_SPLASH_DURATION);
+    const maximumDurationTimer = setTimeout(() => requestExit(true), SPLASH_MAX_DURATION_MS);
     const endedSubscription = player.addListener('playToEnd', () => requestExit());
     const statusSubscription = player.addListener('statusChange', ({ status, error }) => {
       if (status !== 'error') return;

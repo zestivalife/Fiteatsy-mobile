@@ -10,6 +10,11 @@
     <integer>0</integer>
     <key>EXUpdatesRuntimeVersion</key>
     <string>1.0.0-native-20260818</string>
+    <key>EXUpdatesRequestHeaders</key>
+    <dict>
+      <key>expo-channel-name</key>
+      <string>production</string>
+    </dict>
     <key>EXUpdatesURL</key>
     <string>https://u.expo.dev/70254234-571c-4351-87d9-33e8f851dde1</string>
   </dict>

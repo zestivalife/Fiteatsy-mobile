@@ -39,3 +39,16 @@ If an unrelated frozen screen changes, the change must be reverted before accept
 - Frozen treatment: flat black edge-to-edge footer, five evenly distributed icon-above-label destinations, white active state, muted-grey inactive state, compact vertical footprint, and iOS safe-area handling.
 - Home, Tracker, Nutrition, Reports, Sessions, Cycle in a six-item floating capsule is LEGACY / REJECTED / DO NOT RESTORE.
 - Reports, Sessions, and Cycle remain feature routes and must not be promoted into the primary footer.
+
+## Cold-launch splash baseline
+
+- Canonical app-level owner: `src/screens/auth/SplashScreen.tsx`. No second startup, intro, loading, or legacy splash may compete with it.
+- Canonical sequence: true process cold launch → remote `https://zestiva.life/assets/Fiteatsy.mp4` video → 70% black overlay → `src/assets/brand/fiteatsy-logo.svg` → existing Auth, Onboarding V2 resume point, or Main destination.
+- The native launch surface is an unbranded black bridge only. It must not display `src/assets/splash.png`, a legacy logo, progress copy, or download state.
+- `SPLASH_MAX_DURATION_MS` is fixed at `10000`. Playback failure must retain the dark latest-logo fallback and the timeout must always release the user.
+- The splash appears once per true process launch. It must not replay on tab navigation or ordinary background/foreground transitions.
+- Production native builds must carry the `expo-channel-name: production` Expo Updates request header on iOS and Android. Missing or mismatched channel metadata is a release blocker because it can launch a stale embedded bundle.
+
+## Change-impact gate
+
+Before any future implementation, record the authorised surface, direct dependencies, shared consumers, persistence/API/cache effects, test boundary, runtime target, and rollback boundary. The smallest viable diff is mandatory. No new feature authorises adjacent redesign, refactoring, fallback replacement, navigation changes, or restoration from historical source.
