@@ -47,29 +47,29 @@ const medicationTheme = {
 
 const typography = {
   hero: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 34,
-    lineHeight: 42
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22
   },
   section: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 24,
-    lineHeight: 30
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22
   },
   bodyStrong: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 17,
-    lineHeight: 24
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 14,
+    lineHeight: 20
   },
   body: {
-    fontFamily: 'Exo_500Medium',
-    fontSize: 16,
-    lineHeight: 23
+    fontFamily: 'Exo_400Regular',
+    fontSize: 14,
+    lineHeight: 20
   },
   caption: {
-    fontFamily: 'Exo_600SemiBold',
-    fontSize: 13,
-    lineHeight: 18
+    fontFamily: 'Exo_500Medium',
+    fontSize: 12,
+    lineHeight: 17
   }
 };
 

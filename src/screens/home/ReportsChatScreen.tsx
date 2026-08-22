@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
+import { AppBackButton } from '../../components/AppBackButton';
 import { colors, gradients, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { generateNuetraChat, NuetraChatMessage, ReportParameter } from '../../services/nuetraService';
@@ -108,9 +109,7 @@ export const ReportsChatScreen = () => {
   return (
     <Screen contentStyle={[styles.container, isLight && styles.containerLight]}>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Go back" style={[styles.headerBtn, isLight && styles.headerBtnLight]} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={18} color={headerIconColor} />
-        </Pressable>
+        <AppBackButton onPress={() => navigation.goBack()} iconOnly style={[styles.headerBtn, isLight && styles.headerBtnLight]} />
         <Text style={[styles.title, isLight && styles.titleLight]}>Ask Fiteatsy</Text>
         <View style={[styles.headerGhost, isLight && styles.headerBtnLight]} />
       </View>

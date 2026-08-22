@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { RootStackParamList } from '../../navigation/types';
 import {
@@ -184,9 +185,7 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
 
   const renderHeader = (title: string, subtitle?: string) => (
     <View style={styles.header}>
-      <Pressable style={styles.iconButton} onPress={goBackWithinFlow} accessibilityRole="button" accessibilityLabel="Go back">
-        <Ionicons name="chevron-back" size={22} color={TEXT} />
-      </Pressable>
+      <AppBackButton iconOnly onPress={goBackWithinFlow} />
       <View style={styles.headerTextWrap}>
         <Text style={styles.eyebrow}>MIND / STRESS</Text>
         <Text style={styles.title}>{title}</Text>

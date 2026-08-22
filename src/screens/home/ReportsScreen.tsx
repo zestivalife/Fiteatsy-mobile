@@ -25,6 +25,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Card } from '../../components/Card';
 import { colors } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
@@ -1050,9 +1051,7 @@ export const ReportsScreen = () => {
   return (
     <Screen scroll contentStyle={[styles.screenContent, !isLight && styles.screenContentDark]}>
       <View style={styles.header}>
-        <Pressable style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]}>
-          <Ionicons name="chevron-back" size={18} color={palette.textDark} />
-        </Pressable>
+        <AppBackButton onPress={() => navigation.goBack()} iconOnly style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]} />
         <Text style={[styles.headerTitle, !isLight && styles.headerTitleDark]}>My Health</Text>
         <Pressable style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]} onPress={() => setShowUploadSheet(true)}>
           <Ionicons name="cloud-upload-outline" size={18} color={isLight ? palette.teal : sectionHighlight} />

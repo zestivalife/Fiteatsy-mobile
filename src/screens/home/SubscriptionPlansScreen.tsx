@@ -3,9 +3,10 @@ import { ActivityIndicator, Modal, NativeModules, Pressable, StyleSheet, Text, V
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { ApiClientError } from '../../services/apiClient';
-import { colors, getThemeColors, radius, spacing } from '../../design/tokens';
+import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import {
   DurationPreference,
@@ -231,10 +232,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
 
   return (
     <Screen scroll contentStyle={styles.screen}>
-      <Pressable onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
-        <Ionicons name="chevron-back" size={22} color={palette.textPrimary} />
-        <Text style={[styles.backText, { color: palette.textPrimary }]}>Back</Text>
-      </Pressable>
+      <AppBackButton onPress={() => navigation.goBack()} />
 
       <View style={[styles.hero, { backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0E120F', borderColor: palette.stroke }]}>
         <Text style={styles.eyebrow}>Fiteatsy subscriptions</Text>
@@ -792,5 +790,9 @@ const styles = StyleSheet.create({
     color: '#64D900',
     fontFamily: 'Exo_700Bold',
     fontSize: 20
+  },
+  taxNote: {
+    ...typography.subtext,
+    color: '#8F9690'
   }
 });

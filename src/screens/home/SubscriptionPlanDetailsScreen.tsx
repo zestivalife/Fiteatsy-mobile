@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
+import { AppBackButton } from '../../components/AppBackButton';
 import { getThemeColors } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { formatPlanDuration, formatPlanPrice, getSubscriptionPlan, SubscriptionPlan } from '../../services/subscriptionService';
@@ -14,7 +15,7 @@ export const SubscriptionPlanDetailsScreen = ({ navigation, route }: Props) => {
   const [plan, setPlan] = useState<SubscriptionPlan | null>(null); const [loading, setLoading] = useState(true);
   useEffect(() => { void getSubscriptionPlan(route.params.planId).then((result) => setPlan(result.plan)).finally(() => setLoading(false)); }, [route.params.planId]);
   return <Screen scroll contentStyle={styles.screen}>
-    <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" style={styles.back}><Ionicons name="chevron-back" size={22} color={palette.textPrimary} /><Text style={[styles.backText, { color: palette.textPrimary }]}>Plans</Text></Pressable>
+    <AppBackButton onPress={() => navigation.goBack()} label="Plans" />
     {loading ? <ActivityIndicator color="#B59CFF" /> : plan ? <>
       {plan.recommended ? <Text style={styles.badge}>RECOMMENDED</Text> : null}
       <Text style={[styles.title, { color: palette.textPrimary }]}>{plan.name}</Text>

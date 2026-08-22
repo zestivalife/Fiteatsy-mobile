@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { AppBackButton } from '../../components/AppBackButton';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { getThemeColors } from '../../design/tokens';
@@ -36,9 +37,7 @@ export const PlansScreen = ({ navigation }: Props) => {
   return (
     <Screen scroll contentStyle={styles.screen}>
       <View style={styles.headerRow}>
-        <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back" style={styles.iconButton}>
-          <Ionicons name="chevron-back" size={22} color={palette.textPrimary} />
-        </Pressable>
+        <AppBackButton iconOnly onPress={() => navigation.goBack()} />
         <View style={styles.headerCopy}>
           <Text style={[styles.eyebrow, { color: '#B59CFF' }]}>FITEATSY PLANS</Text>
           <Text style={[styles.title, { color: palette.textPrimary }]}>Choose your wellness plan</Text>

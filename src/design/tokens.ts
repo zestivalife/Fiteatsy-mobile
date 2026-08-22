@@ -81,18 +81,20 @@ export const radius = {
 } as const;
 
 export const typography: Record<string, TextStyle> = {
-  display: { fontFamily: 'Exo_700Bold', fontSize: 30, lineHeight: 36 },
-  screenTitle: { fontFamily: 'Exo_700Bold', fontSize: 28, lineHeight: 34 },
+  display: { fontFamily: 'Exo_700Bold', fontSize: 24, lineHeight: 30 },
+  screenTitle: { fontFamily: 'Exo_600SemiBold', fontSize: 16, lineHeight: 22 },
   screenSubtitle: { fontFamily: 'Exo_400Regular', fontSize: 14, lineHeight: 20 },
-  sectionTitle: { fontFamily: 'Exo_600SemiBold', fontSize: 20, lineHeight: 26 },
-  cardTitle: { fontFamily: 'Exo_700Bold', fontSize: 16, lineHeight: 20 },
+  sectionTitle: { fontFamily: 'Exo_600SemiBold', fontSize: 16, lineHeight: 22 },
+  cardTitle: { fontFamily: 'Exo_600SemiBold', fontSize: 14, lineHeight: 20 },
+  bodyMedium: { fontFamily: 'Exo_500Medium', fontSize: 14, lineHeight: 20 },
   bodySmall: { fontFamily: 'Exo_400Regular', fontSize: 14, lineHeight: 20 },
-  label: { fontFamily: 'Exo_500Medium', fontSize: 13, lineHeight: 18 },
-  button: { fontFamily: 'Exo_700Bold', fontSize: 15, lineHeight: 19 },
+  subtext: { fontFamily: 'Exo_400Regular', fontSize: 12, lineHeight: 17 },
+  label: { fontFamily: 'Exo_500Medium', fontSize: 12, lineHeight: 17 },
+  button: { fontFamily: 'Exo_600SemiBold', fontSize: 16, lineHeight: 20 },
   tab: { fontFamily: 'Exo_600SemiBold', fontSize: 14, lineHeight: 18 },
-  badge: { fontFamily: 'Exo_700Bold', fontSize: 11, lineHeight: 14 },
-  metric: { fontFamily: 'Exo_700Bold', fontSize: 28, lineHeight: 34 },
-  metricSmall: { fontFamily: 'Exo_600SemiBold', fontSize: 18, lineHeight: 22 },
+  badge: { fontFamily: 'Exo_600SemiBold', fontSize: 11, lineHeight: 14 },
+  metric: { fontFamily: 'Exo_700Bold', fontSize: 24, lineHeight: 30 },
+  metricSmall: { fontFamily: 'Exo_600SemiBold', fontSize: 16, lineHeight: 22 },
   navigationLabel: { fontFamily: 'Exo_500Medium', fontSize: 12, lineHeight: 15 },
   titleXL: {
     fontFamily: 'Exo_700Bold',
@@ -111,18 +113,18 @@ export const typography: Record<string, TextStyle> = {
   },
   body: {
     fontFamily: 'Exo_400Regular',
-    fontSize: 16,
-    lineHeight: 24
+    fontSize: 14,
+    lineHeight: 20
   },
   bodyStrong: {
     fontFamily: 'Exo_600SemiBold',
-    fontSize: 16,
-    lineHeight: 24
+    fontSize: 14,
+    lineHeight: 20
   },
   caption: {
     fontFamily: 'Exo_400Regular',
-    fontSize: 13,
-    lineHeight: 18
+    fontSize: 12,
+    lineHeight: 17
   }
 };
 

@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
+import { AppBackButton } from '../../components/AppBackButton';
 import { getThemeColors } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { FoundationSubscription, getMySubscription } from '../../services/subscriptionService';
@@ -37,10 +38,7 @@ export const AssistHubScreen = ({ navigation }: Props) => {
 
   return (
     <Screen scroll contentStyle={styles.screen}>
-      <Pressable onPress={() => navigation.goBack()} style={styles.back} accessibilityRole="button">
-        <Ionicons name="chevron-back" size={22} color={palette.textPrimary} />
-        <Text style={[styles.backText, { color: palette.textPrimary }]}>Home</Text>
-      </Pressable>
+      <AppBackButton onPress={() => navigation.goBack()} label="Home" />
       <Text style={[styles.title, { color: palette.textPrimary }]}>Assist</Text>
       {loading ? <ActivityIndicator color={palette.blue} /> : data ? <>
         <View style={[styles.hero, { backgroundColor: palette.card, borderColor: palette.stroke }]}>

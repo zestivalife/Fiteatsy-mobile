@@ -1,25 +1,28 @@
 import React from 'react';
-import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
 import { colors, radius, typography } from '../design/tokens';
 
 type Props = {
   title: string;
   onPress: () => void;
   disabled?: boolean;
+  loading?: boolean;
+  variant?: 'primary' | 'secondary';
   style?: StyleProp<ViewStyle>;
 };
 
-export const PrimaryButton = ({ title, onPress, disabled = false, style }: Props) => {
+export const PrimaryButton = ({ title, onPress, disabled = false, loading = false, variant = 'primary', style }: Props) => {
+  const unavailable = disabled || loading;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: unavailable, busy: loading }}
       onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, disabled && styles.buttonDisabled, style]}
+      disabled={unavailable}
+      style={({ pressed }) => [styles.button, variant === 'secondary' && styles.secondary, pressed && styles.buttonPressed, unavailable && styles.buttonDisabled, style]}
     >
-      <Text style={styles.label}>{title}</Text>
+      {loading ? <ActivityIndicator color={variant === 'primary' ? colors.white : colors.blue} /> : <Text style={[styles.label, variant === 'secondary' && styles.secondaryLabel]}>{title}</Text>}
     </Pressable>
   );
 };
@@ -28,10 +31,14 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.blue,
     borderRadius: radius.pill,
-    height: 52,
+    width: '100%',
+    minHeight: 44,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center'
   },
+  secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.blue },
   buttonPressed: {
     opacity: 0.9
   },
@@ -39,8 +46,8 @@ const styles = StyleSheet.create({
     opacity: 0.5
   },
   label: {
-    ...typography.bodyStrong,
+    ...typography.button,
     color: colors.white,
-    fontSize: 15
-  }
+  },
+  secondaryLabel: { color: colors.blue }
 });

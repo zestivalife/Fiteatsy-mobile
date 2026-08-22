@@ -36,10 +36,10 @@ const styles = StyleSheet.create({
     gap: 6
   },
   label: {
-    ...typography.bodyStrong,
-    fontSize: 14
+    ...typography.label
   },
   input: {
+    ...typography.bodySmall,
     minHeight: 44,
     borderRadius: radius.sm,
     borderWidth: 1,

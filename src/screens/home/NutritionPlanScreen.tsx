@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
+import { AppBackButton } from '../../components/AppBackButton';
 import { getThemeColors, spacing, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
@@ -33,9 +34,7 @@ export const NutritionPlanScreen = () => {
     return (
       <Screen contentStyle={styles.screen}>
         <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]}>
-            <Ionicons name="chevron-back" size={18} color={palette.textPrimary} />
-          </Pressable>
+          <AppBackButton onPress={() => navigation.goBack()} iconOnly />
           <Text style={[styles.headerTitle, { color: palette.textPrimary }]}>Nutrition Plan</Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -52,9 +51,7 @@ export const NutritionPlanScreen = () => {
   return (
     <Screen contentStyle={styles.screen}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]}>
-          <Ionicons name="chevron-back" size={18} color={palette.textPrimary} />
-        </Pressable>
+        <AppBackButton onPress={() => navigation.goBack()} iconOnly />
         <Text style={[styles.headerTitle, { color: palette.textPrimary }]}>Your Nutrition Plan</Text>
         <View style={styles.headerSpacer} />
       </View>

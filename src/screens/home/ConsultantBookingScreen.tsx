@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { AppBackButton } from '../../components/AppBackButton';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Screen } from '../../components/Screen';
@@ -63,10 +64,7 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
 
   return (
     <Screen scroll contentStyle={styles.screen}>
-      <Pressable onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
-        <Ionicons name="chevron-back" size={22} color={palette.textPrimary} />
-        <Text style={[styles.backText, { color: palette.textPrimary }]}>Back</Text>
-      </Pressable>
+      <AppBackButton onPress={() => navigation.goBack()} />
 
       <View style={[styles.hero, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#101311' }]}>
         <Text style={styles.eyebrow}>Consultant booking</Text>
