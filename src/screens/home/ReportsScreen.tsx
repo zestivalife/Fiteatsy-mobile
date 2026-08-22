@@ -222,17 +222,8 @@ const buildTrendLabel = (current: BiomarkerHistoryItem, prior: BiomarkerHistoryI
   return delta < 0 ? 'Improved' : 'Needs monitoring';
 };
 
-const buildSpecificFallbackSummary = (parameters: ReportParameter[], userName?: string) => {
-  const abnormal = parameters.filter((parameter) => parameter.status !== 'normal');
-  const first = abnormal[0];
-  const second = abnormal[1] ?? abnormal[0];
-
-  if (!first) {
-    return `${userName ?? 'You'} have all tracked markers in range today. Keep your routine steady and repeat this test cycle on your next scheduled check.`;
-  }
-
-  return `${userName ?? 'You'} are doing well on several core markers, and that is a strong base. ${first.name} is ${first.value} ${first.unit}, and ${second.name} is ${second.value} ${second.unit}, so these need focused correction this week. You can improve fast by tightening sleep, hydration, and meal consistency around work hours. Take one action now: book a clinician review and follow one weekly nutrition plan.`;
-};
+const buildSpecificFallbackSummary = (_parameters: ReportParameter[], _userName?: string) =>
+  'Clinical report guidance is temporarily unavailable. Verified report values remain visible and unchanged; retry when the guidance service is available.';
 
 const shimmerLoop = (value: Animated.Value) => {
   value.setValue(0);

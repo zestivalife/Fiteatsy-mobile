@@ -136,7 +136,7 @@ const sessionCatalog: SessionConfig[] = [
 
 export const SessionsScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { authSession, setWellness, themeMode } = useAppContext();
+  const { authSession, themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
   const darkGraySurfaceText = isLight ? '#000000' : '#FFFFFF';
@@ -283,22 +283,6 @@ export const SessionsScreen = () => {
     };
 
     setLastResult(result);
-    setWellness((previous) => {
-      const breathingGain = session.mode === 'breathing' ? 4 : 1;
-      const focusGain = session.mode === 'focus' ? 6 : 2;
-      const stressDrop = session.mode === 'breathing' ? 3 : 1;
-      const calmBoost = session.mode === 'emotion' ? 2 : 1;
-      const nextStress = Math.max(10, previous.stressScore - stressDrop);
-      return {
-        ...previous,
-        breathingMinutes: previous.breathingMinutes + breathingGain,
-        focusMinutes: previous.focusMinutes + focusGain,
-        stressScore: nextStress,
-        moodScore: Math.min(100, previous.moodScore + calmBoost),
-        wellnessScore: Math.min(100, previous.wellnessScore + result.recoveryContribution)
-      };
-    });
-
     if (session.key === 'breathing_sync') {
       navigation.navigate('BreathingSession');
     } else if (session.key === 'focus_light') {
@@ -329,14 +313,6 @@ export const SessionsScreen = () => {
   const finalizeInteractiveResult = async (result: SessionResult, message: string, payload: SessionStoragePayload) => {
     setLastResult(result);
     setStatusMessage(message);
-    setWellness((previous) => ({
-      ...previous,
-      breathingMinutes: previous.breathingMinutes + Math.max(1, Math.round(result.calmImpact / 3)),
-      focusMinutes: previous.focusMinutes + Math.max(1, Math.round(result.focusImpact / 2)),
-      stressScore: Math.max(10, previous.stressScore - Math.max(1, Math.round(result.stressRecoveryImpact / 2))),
-      moodScore: Math.min(100, previous.moodScore + Math.max(1, Math.round(result.calmImpact / 4))),
-      wellnessScore: Math.min(100, previous.wellnessScore + result.recoveryContribution)
-    }));
     await persistSessionPayload(payload);
     setActiveExperience(null);
   };

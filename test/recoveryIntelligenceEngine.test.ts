@@ -74,7 +74,7 @@ describe('recoveryIntelligenceEngine', () => {
     expect(output.recoveryScore as number).toBeGreaterThanOrEqual(0);
     expect(output.recoveryScore as number).toBeLessThanOrEqual(100);
     expect(output.recoveryDrivers.length).toBeGreaterThanOrEqual(6);
-    expect(output.trendValues7d).toHaveLength(7);
+    expect(output.trendValues7d).toEqual([80, 73, 67]);
     expect(output.highestImpactActions.length).toBeGreaterThan(0);
     expect(output.whyChanged.length).toBeGreaterThan(0);
   });

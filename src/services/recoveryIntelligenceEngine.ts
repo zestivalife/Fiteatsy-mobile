@@ -114,33 +114,9 @@ const smoothScore = (previous: number, nextRaw: number, maxDelta = 8) => {
   return round(clamp(previous * 0.72 + bounded * 0.28, 0, 100));
 };
 
-const buildTrend = (stableScore: number, checkIns: DailyCheckIn[]) => {
+const buildTrend = (checkIns: DailyCheckIn[]) => {
   const recent = lastNDays(checkIns, 7).reverse();
-  if (recent.length === 0) {
-    return [stableScore - 7, stableScore - 5, stableScore - 4, stableScore - 2, stableScore - 1, stableScore, stableScore].map((v) =>
-      round(clamp(v, 0, 100))
-    );
-  }
-
-  const samples = recent.map((entry, index) => {
-    const moodAdj = (entry.mood - 3) * 2.6;
-    const energyAdj = (entry.energy - 3) * 2.2;
-    const sleepAdj = (entry.sleepQuality - 3) * 2.4;
-    const recencyAdj = -((recent.length - 1 - index) * 0.9);
-    return round(clamp(stableScore + moodAdj + energyAdj + sleepAdj + recencyAdj, 0, 100));
-  });
-
-  const padded = samples.length >= 7 ? samples.slice(-7) : [...Array(7 - samples.length).fill(samples[0] ?? stableScore), ...samples];
-  const smoothed: number[] = [];
-  for (let i = 0; i < padded.length; i += 1) {
-    if (i === 0) {
-      smoothed.push(padded[i]);
-      continue;
-    }
-    const prev = smoothed[i - 1];
-    smoothed.push(round(clamp(prev * 0.7 + padded[i] * 0.3, 0, 100)));
-  }
-  return smoothed;
+  return recent.map((entry) => round(clamp(((entry.mood + entry.energy + entry.sleepQuality) / 15) * 100, 0, 100)));
 };
 
 const contextualInsight = (direction: RecoveryDirection, topDriver: string, blocker: string) => {
@@ -350,7 +326,7 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
     contextualInsights,
     whyChanged,
     blockers,
-    trendValues7d: buildTrend(recoveryScore ?? previousRecovery, input.checkIns),
+    trendValues7d: buildTrend(input.checkIns),
     debug: {
       rawRecoveryScore,
       smoothedRecoveryScore: recoveryScore,

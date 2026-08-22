@@ -59,32 +59,6 @@ const TypingDots = ({ color }: { color: string }) => {
   );
 };
 
-const generateOfflineNuetraReply = (question: string, parameters: ReportParameter[]) => {
-  const lowerQuestion = question.toLowerCase();
-  const vitaminD = parameters.find((parameter) => parameter.name.toLowerCase().includes('vitamin d'));
-  const hba1c = parameters.find((parameter) => parameter.name.toLowerCase().includes('hba1c'));
-  const ldl = parameters.find((parameter) => parameter.name.toLowerCase().includes('ldl'));
-  const primary = parameters.find((parameter) => parameter.status !== 'normal') ?? parameters[0];
-
-  if (vitaminD && lowerQuestion.includes('vitamin d')) {
-    return `Your Vitamin D is ${vitaminD.value} ${vitaminD.unit}, below the ${vitaminD.referenceRange} range. Low sunlight exposure and indoor routines often cause this. Start a consistent sunlight + nutrition routine this week and review supplement need with your clinician.`;
-  }
-
-  if (hba1c && (lowerQuestion.includes('diabet') || lowerQuestion.includes('sugar'))) {
-    return `Your HbA1c is ${hba1c.value}${hba1c.unit}, compared with ${hba1c.referenceRange}. This indicates early glucose stress, not a diagnosis by itself. This week, prioritize post-meal walks and reduce refined sugar load.`;
-  }
-
-  if (ldl && lowerQuestion.includes('cholesterol')) {
-    return `Your LDL is ${ldl.value} ${ldl.unit}, higher than ${ldl.referenceRange}. This can improve with food quality and movement consistency. Start with a 7-day plan focused on fiber, hydration, and daily steps.`;
-  }
-
-  if (primary) {
-    return `I can still help while backend reconnects. Your ${primary.name} is ${primary.value} ${primary.unit} against ${primary.referenceRange}. Let us take one focused action this week and track change in your next report.`;
-  }
-
-  return 'I can still help while backend reconnects. Ask me about any parameter and I will explain it simply using your current report values.';
-};
-
 export const ReportsChatScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<ReportsChatRoute>();
@@ -117,8 +91,10 @@ export const ReportsChatScreen = () => {
       const response = await generateNuetraChat(content, nextMessages, route.params.reportId);
       setMessages((prev) => [...prev, { role: 'assistant', content: response }]);
     } catch {
-      const fallback = generateOfflineNuetraReply(content, route.params.reportParameters);
-      setMessages((prev) => [...prev, { role: 'assistant', content: fallback }]);
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: 'Report guidance is temporarily unavailable. Your verified report values remain unchanged; please retry when the clinical guidance service is available.'
+      }]);
     } finally {
       setLoading(false);
     }

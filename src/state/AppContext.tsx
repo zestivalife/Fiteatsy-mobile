@@ -83,6 +83,7 @@ import {
 } from '../services/platformHealthProfileService';
 import { getPublishedNutritionPlan } from '../services/nutritionPlanService';
 import { getHealthScoreSummary, submitPssAssessment } from '../services/healthIntelligenceService';
+import { syncMedicationSnapshot } from '../services/medicationSyncService';
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
 import { wellnessFromHealthScores } from '../services/healthSyncManager';
 import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/identityScopedStorage';
@@ -776,6 +777,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setUserStorageItem(STORAGE_KEYS.medicationLogs, JSON.stringify(next));
   }, [setUserStorageItem]);
 
+  const syncMedicationStateToBackend = useCallback((nextMedications: Medication[], nextLogs: MedicationLog[]) => {
+    if (!userId || !authSession?.sessionToken) return;
+    void syncMedicationSnapshot(nextMedications, nextLogs).catch((error) => {
+      console.warn('[MedicationSync] Snapshot sync failed', {
+        message: error instanceof Error ? error.message : String(error)
+      });
+    });
+  }, [authSession?.sessionToken, userId]);
+
   const persistCycleLogs = useCallback((next: CycleLog[]) => {
     setUserStorageItem(STORAGE_KEYS.cycleLogs, JSON.stringify(next));
   }, [setUserStorageItem]);
@@ -1150,6 +1160,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setMedications((previous) => {
         const next = [withNotifications, ...previous];
         persistMedications(next);
+        syncMedicationStateToBackend(next, medicationLogs);
         return next;
       });
       if (userId) {
@@ -1169,7 +1180,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
     },
-    [clientId, medicationPermissionGranted, onboarding, persistMedications, userId]
+    [clientId, medicationLogs, medicationPermissionGranted, onboarding, persistMedications, syncMedicationStateToBackend, userId]
   );
 
   const updateMedication = useCallback<AppContextValue['updateMedication']>(
@@ -1193,10 +1204,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setMedications((previous) => {
         const next = previous.map((item) => (item.id === medicationId ? hydrated : item));
         persistMedications(next);
+        syncMedicationStateToBackend(next, medicationLogs);
         return next;
       });
     },
-    [medicationPermissionGranted, medications, persistMedications]
+    [medicationLogs, medicationPermissionGranted, medications, persistMedications, syncMedicationStateToBackend]
   );
 
   const pauseMedication = useCallback<AppContextValue['pauseMedication']>(
@@ -1218,6 +1230,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setMedications((previous) => {
         const next = previous.filter((item) => item.id !== medicationId);
         persistMedications(next);
+        syncMedicationStateToBackend(next, medicationLogs.filter((item) => item.medicationId !== medicationId));
         return next;
       });
       setMedicationLogs((previous) => {
@@ -1226,7 +1239,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return next;
       });
     },
-    [medications, persistMedicationLogs, persistMedications]
+    [medicationLogs, medications, persistMedicationLogs, persistMedications, syncMedicationStateToBackend]
   );
 
   const markMedicationAction = useCallback<AppContextValue['markMedicationAction']>(
@@ -1254,6 +1267,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const withoutSame = previous.filter((item) => !(item.medicationId === medicationId && item.scheduledForISO === scheduledForISO));
         const next = [log, ...withoutSame].slice(0, 2000);
         persistMedicationLogs(next);
+        syncMedicationStateToBackend(medications, next);
         return next;
       });
       const eventTypeByStatus: Record<Extract<MedicationLogStatus, 'taken' | 'snoozed' | 'skipped'>, 'medication_taken' | 'medication_snoozed' | 'medication_skipped'> = {
@@ -1278,7 +1292,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
     },
-    [clientId, medications, onboarding, persistMedicationLogs, userId]
+    [clientId, medications, onboarding, persistMedicationLogs, syncMedicationStateToBackend, userId]
   );
 
   useEffect(() => {
