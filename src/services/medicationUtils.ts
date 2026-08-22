@@ -7,10 +7,21 @@ import {
 } from '../types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const IST_OFFSET_MS = 330 * 60 * 1000;
+export const MEDICATION_TIME_ZONE = 'Asia/Kolkata';
+
+export const getMedicationBusinessDateKey = (value: string | Date) => {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+};
+
+export const medicationBusinessDateFromKey = (key: string) => new Date(`${key}T00:00:00.000+05:30`);
+
+export const medicationScheduledDate = (businessDateKey: string, time24h: string) =>
+  new Date(`${businessDateKey}T${/^\d{2}:\d{2}$/.test(time24h) ? time24h : '00:00'}:00.000+05:30`);
 
 export const toISODateOnly = (value: string | Date) => {
-  const d = typeof value === 'string' ? new Date(value) : value;
-  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
+  return medicationBusinessDateFromKey(getMedicationBusinessDateKey(value)).toISOString();
 };
 
 export const parseTimeToParts = (time24h: string) => {
@@ -19,9 +30,9 @@ export const parseTimeToParts = (time24h: string) => {
 };
 
 export const resolveMedicationSlotForOccurrence = (medication: Medication, scheduledForISO: string) => {
-  const scheduled = new Date(scheduledForISO);
-  const hours = scheduled.getHours();
-  const minutes = scheduled.getMinutes();
+  const scheduled = new Date(new Date(scheduledForISO).getTime() + IST_OFFSET_MS);
+  const hours = scheduled.getUTCHours();
+  const minutes = scheduled.getUTCMinutes();
   return (
     medication.schedule.timeSlots.find((slot) => {
       const parts = parseTimeToParts(slot.time24h);
@@ -30,8 +41,10 @@ export const resolveMedicationSlotForOccurrence = (medication: Medication, sched
   );
 };
 
-const matchesFrequency = (rule: MedicationFrequencyRule, day: Date, start: Date) => {
-  const diffDays = Math.floor((toStartOfDay(day).getTime() - toStartOfDay(start).getTime()) / DAY_MS);
+const matchesFrequency = (rule: MedicationFrequencyRule, dayKey: string, startKey: string) => {
+  const day = new Date(`${dayKey}T00:00:00.000Z`);
+  const start = new Date(`${startKey}T00:00:00.000Z`);
+  const diffDays = Math.floor((day.getTime() - start.getTime()) / DAY_MS);
   if (diffDays < 0) return false;
 
   switch (rule.preset) {
@@ -40,15 +53,15 @@ const matchesFrequency = (rule: MedicationFrequencyRule, day: Date, start: Date)
     case 'alternate_days':
       return diffDays % 2 === 0;
     case 'specific_weekdays':
-      return (rule.weekdays ?? []).includes(day.getDay());
+      return (rule.weekdays ?? []).includes(day.getUTCDay());
     case 'every_x_days': {
       const interval = Math.max(1, rule.intervalDays ?? 1);
       return diffDays % interval === 0;
     }
     case 'weekly':
-      return (rule.weekdays ?? [start.getDay()]).includes(day.getDay());
+      return (rule.weekdays ?? [start.getUTCDay()]).includes(day.getUTCDay());
     case 'monthly':
-      return (rule.monthlyDays ?? [start.getDate()]).includes(day.getDate());
+      return (rule.monthlyDays ?? [start.getUTCDate()]).includes(day.getUTCDate());
     case 'custom':
       return true;
     default:
@@ -56,24 +69,23 @@ const matchesFrequency = (rule: MedicationFrequencyRule, day: Date, start: Date)
   }
 };
 
-export const toStartOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+export const toStartOfDay = (d: Date) => medicationBusinessDateFromKey(getMedicationBusinessDateKey(d));
 
 export const getMedicationOccurrencesForDate = (medication: Medication, day: Date) => {
   if (medication.status !== 'active') return [];
 
-  const start = new Date(medication.schedule.duration.startDateISO);
-  const end = medication.schedule.duration.endDateISO ? new Date(medication.schedule.duration.endDateISO) : null;
-
-  const dayStart = toStartOfDay(day);
-  if (dayStart < toStartOfDay(start)) return [];
-  if (end && dayStart > toStartOfDay(end)) return [];
-  if (!matchesFrequency(medication.schedule.frequency, dayStart, start)) return [];
+  const dayKey = getMedicationBusinessDateKey(day);
+  const startKey = getMedicationBusinessDateKey(medication.schedule.duration.startDateISO);
+  const endKey = medication.schedule.duration.endDateISO ? getMedicationBusinessDateKey(medication.schedule.duration.endDateISO) : null;
+  if (dayKey < startKey) return [];
+  if (endKey && dayKey > endKey) return [];
+  if (!matchesFrequency(medication.schedule.frequency, dayKey, startKey)) return [];
 
   return medication.schedule.timeSlots.map((slot) => {
     const { hours, minutes } = parseTimeToParts(slot.time24h);
     return {
       slot,
-      scheduledFor: new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes, 0, 0)
+      scheduledFor: medicationScheduledDate(dayKey, `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`)
     };
   });
 };

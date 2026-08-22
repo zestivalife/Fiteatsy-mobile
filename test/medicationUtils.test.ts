@@ -1,6 +1,7 @@
 import { Medication, MedicationLog } from '../src/types';
 import {
   getMedicationOccurrencesForDate,
+  getMedicationBusinessDateKey,
   getMedicationStatusForOccurrence,
   resolveMedicationSlotForOccurrence
 } from '../src/services/medicationUtils';
@@ -27,6 +28,15 @@ const baseMedication = (overrides?: Partial<Medication>): Medication => ({
 });
 
 describe('medicationUtils', () => {
+  it.each([
+    ['2026-08-21T18:29:59.000Z', '2026-08-21'],
+    ['2026-08-21T18:30:00.000Z', '2026-08-22'],
+    ['2026-08-21T18:30:01.000Z', '2026-08-22'],
+    ['2026-08-21T19:45:00.000Z', '2026-08-22']
+  ])('resolves %s to the canonical IST Medication day %s', (instant, expected) => {
+    expect(getMedicationBusinessDateKey(instant)).toBe(expected);
+  });
+
   it('supports alternate day schedule correctly', () => {
     const med = baseMedication({
       schedule: {

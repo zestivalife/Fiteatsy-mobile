@@ -41,7 +41,10 @@ export const MEDICATION_EXCEPTION_RULES = {
   }
 } as const;
 
-const startOfUtcDay = (date: Date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+export const MEDICATION_TIME_ZONE = 'Asia/Kolkata';
+const IST_OFFSET_MS = 330 * 60 * 1000;
+const businessDateKey = (date: Date) => new Date(date.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+const startOfMedicationDay = (date: Date) => new Date(`${businessDateKey(date)}T00:00:00.000+05:30`);
 
 const addDays = (date: Date, days: number) => {
   const next = new Date(date);
@@ -49,18 +52,18 @@ const addDays = (date: Date, days: number) => {
   return next;
 };
 
-const toDayKey = (date: Date) => startOfUtcDay(date).toISOString().slice(0, 10);
+const toDayKey = (date: Date) => businessDateKey(date);
 
 const parseTimeSlot = (day: Date, time24h: string) => {
   const [hourRaw, minuteRaw] = time24h.split(':');
   const hour = Number(hourRaw);
   const minute = Number(minuteRaw);
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-  return new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), hour, minute, 0, 0));
+  return new Date(`${toDayKey(day)}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00.000+05:30`);
 };
 
 const daysBetween = (start: Date, day: Date) =>
-  Math.floor((startOfUtcDay(day).getTime() - startOfUtcDay(start).getTime()) / 86_400_000);
+  Math.floor((new Date(`${toDayKey(day)}T00:00:00.000Z`).getTime() - new Date(`${toDayKey(start)}T00:00:00.000Z`).getTime()) / 86_400_000);
 
 const matchesFrequency = (medication: ClientMedicationRecord, day: Date) => {
   const start = new Date(medication.schedule.duration.startDateISO);
@@ -72,21 +75,22 @@ const matchesFrequency = (medication: ClientMedicationRecord, day: Date) => {
   if (rule.preset === 'alternate_days') return difference % 2 === 0;
   if (rule.preset === 'every_x_days') return difference % Math.max(1, rule.intervalDays ?? 1) === 0;
   if (rule.preset === 'weekly' || rule.preset === 'specific_weekdays') {
-    return (rule.weekdays ?? []).includes(day.getUTCDay());
+    return (rule.weekdays ?? []).includes(new Date(`${toDayKey(day)}T00:00:00.000Z`).getUTCDay());
   }
   if (rule.preset === 'monthly') {
-    return (rule.monthlyDays ?? []).includes(day.getUTCDate());
+    return (rule.monthlyDays ?? []).includes(Number(toDayKey(day).slice(8, 10)));
   }
   return true;
 };
 
 const getMedicationOccurrencesForDate = (medication: ClientMedicationRecord, day: Date): MedicationOccurrence[] => {
   if (medication.status !== 'active') return [];
-  const dayStart = startOfUtcDay(day);
-  const start = startOfUtcDay(new Date(medication.schedule.duration.startDateISO));
-  const end = medication.schedule.duration.endDateISO ? startOfUtcDay(new Date(medication.schedule.duration.endDateISO)) : null;
-  if (dayStart < start) return [];
-  if (end && dayStart > end) return [];
+  const dayStart = startOfMedicationDay(day);
+  const dayKey = toDayKey(dayStart);
+  const startKey = toDayKey(new Date(medication.schedule.duration.startDateISO));
+  const endKey = medication.schedule.duration.endDateISO ? toDayKey(new Date(medication.schedule.duration.endDateISO)) : null;
+  if (dayKey < startKey) return [];
+  if (endKey && dayKey > endKey) return [];
   if (!matchesFrequency(medication, dayStart)) return [];
 
   return medication.schedule.timeSlots.flatMap((slot) => {
@@ -101,7 +105,7 @@ const formatTime = (iso: string) =>
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-    timeZone: 'UTC'
+    timeZone: MEDICATION_TIME_ZONE
   }).format(new Date(iso));
 
 const mealRelationLabels: Record<string, string> = {
@@ -150,7 +154,7 @@ const summarizeAdherence = (occurrences: MedicationOccurrence[], logs: ClientMed
 };
 
 const buildOccurrencesForRange = (medications: ClientMedicationRecord[], daysBack: number, now = new Date()) => {
-  const today = startOfUtcDay(now);
+  const today = startOfMedicationDay(now);
   const days = Array.from({ length: daysBack }, (_item, index) => addDays(today, -index));
   return days.flatMap((day) => medications.flatMap((medication) => getMedicationOccurrencesForDate(medication, day)));
 };
@@ -161,7 +165,7 @@ const buildOccurrencesForWindow = (
   lengthDays: number,
   now = new Date()
 ) => {
-  const today = startOfUtcDay(now);
+  const today = startOfMedicationDay(now);
   const days = Array.from({ length: lengthDays }, (_item, index) => addDays(today, startDayOffset + index));
   return days.flatMap((day) => medications.flatMap((medication) => getMedicationOccurrencesForDate(medication, day)));
 };
@@ -204,8 +208,8 @@ export const detectMedicationExceptionInputs = async (
   owner: MedicationOwner,
   now = new Date()
 ): Promise<MedicationExceptionInput[]> => {
-  const from = addDays(startOfUtcDay(now), -30).toISOString();
-  const to = addDays(startOfUtcDay(now), 2).toISOString();
+  const from = addDays(startOfMedicationDay(now), -30).toISOString();
+  const to = addDays(startOfMedicationDay(now), 2).toISOString();
   const [medications, logs] = await Promise.all([
     listMedicationsForOwner(owner),
     listMedicationLogsForOwner(owner, from, to)
@@ -369,8 +373,8 @@ export const syncClientMedicationSnapshot = async (
 };
 
 export const getMedicationMonitoringForOwner = async (owner: MedicationOwner, now = new Date()) => {
-  const from = addDays(startOfUtcDay(now), -30).toISOString();
-  const to = addDays(startOfUtcDay(now), 2).toISOString();
+  const from = addDays(startOfMedicationDay(now), -30).toISOString();
+  const to = addDays(startOfMedicationDay(now), 2).toISOString();
   const [medications, logs] = await Promise.all([
     listMedicationsForOwner(owner),
     listMedicationLogsForOwner(owner, from, to)
