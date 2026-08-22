@@ -636,7 +636,7 @@ const StressCard = ({
         <Text style={styles.cardTitle}>Stress Recovery</Text>
         <Ionicons name="headset-outline" size={20} color="#F4F7F4" />
       </View>
-      <Text style={styles.stressLabel}>Perceived Stress</Text>
+      <Text style={styles.stressLabel}>Stress Test</Text>
       <View style={styles.stressValueRow}>
         <Text style={styles.stressValue}>{stateText}</Text>
         {pss10Context.available && changeText ? <Text style={styles.stressTrend}>{changeText}</Text> : null}

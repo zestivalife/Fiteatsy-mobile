@@ -1754,7 +1754,7 @@ export const TrackerScreen = () => {
         style={[styles.pssEntryCard, !isLight && styles.pssEntryCardDark]}
         onPress={() => navigation.navigate('Pss10Assessment')}
         accessibilityRole="button"
-        accessibilityLabel="Open perceived stress assessment"
+        accessibilityLabel="Open Stress Test"
       >
         <View style={styles.pssEntryIcon}>
           <Ionicons name="sparkles-outline" size={22} color={MIND_ACCENT} />

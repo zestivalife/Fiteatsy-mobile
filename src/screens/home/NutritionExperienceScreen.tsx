@@ -34,6 +34,15 @@ const isoDay = (date: Date) => {
   return `${year}-${month}-${dayOfMonth}`;
 };
 
+const NUTRITION_LOAD_TIMEOUT_MS = 20_000;
+const withNutritionTimeout = <T,>(request: Promise<T>): Promise<T> => new Promise((resolve, reject) => {
+  const timeout = setTimeout(
+    () => reject(new Error("Nutrition couldn't be loaded. Please try again.")),
+    NUTRITION_LOAD_TIMEOUT_MS,
+  );
+  request.then(resolve, reject).finally(() => clearTimeout(timeout));
+});
+
 type RecommendationMode = 'what-can-eat-now' | 'eating-out' | 'craving' | null;
 type PendingRecommendationEvent = {
   item: NutritionRecommendationItem;
@@ -62,7 +71,7 @@ export const NutritionExperienceScreen = () => {
   const [showWater, setShowWater] = React.useState(false);
   const [waterAmount, setWaterAmount] = React.useState(.25);
   const [waterError, setWaterError] = React.useState<string | null>(null);
-  const refresh = React.useCallback(async () => { setError(null); try { setData(await getNutritionExperience(selectedDate)); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load Nutrition.'); } }, [selectedDate]);
+  const refresh = React.useCallback(async () => { setError(null); try { setData(await withNutritionTimeout(getNutritionExperience(selectedDate))); } catch (e) { setError(e instanceof Error ? e.message : "Nutrition couldn't be loaded. Please try again."); } }, [selectedDate]);
   useFocusEffect(React.useCallback(() => {
     const today = nutritionDate();
     if (viewingToday.current && selectedDate !== today) setSelectedDate(today);
@@ -151,7 +160,7 @@ export const NutritionExperienceScreen = () => {
   };
 
   if (!data && !error) return <Screen contentStyle={styles.center}><ActivityIndicator color={C.blue} /></Screen>;
-  if (!data) return <Screen contentStyle={styles.screen}><Text style={styles.title}>Nutrition</Text><View style={styles.card}><Text style={styles.body}>{error}</Text><Pressable onPress={() => void refresh()}><Text style={styles.blue}>Try again</Text></Pressable></View></Screen>;
+  if (!data) return <Screen contentStyle={styles.screen}><Text style={styles.title}>Nutrition</Text><View style={styles.card}><Text style={styles.section}>Nutrition couldn't be loaded</Text><Text style={styles.body}>{error}</Text><Pressable accessibilityRole="button" onPress={() => void refresh()}><Text style={styles.blue}>Try again</Text></Pressable></View></Screen>;
   const pending = data.meals.filter(meal => meal.state === 'PENDING').length;
   const hasRecommendationContext = data.meals.length > 0;
   const isToday = selectedDate === nutritionDate();

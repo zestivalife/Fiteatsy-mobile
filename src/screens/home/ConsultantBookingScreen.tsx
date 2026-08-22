@@ -140,7 +140,8 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
 
 const styles = StyleSheet.create({
   screen: {
-    gap: spacing.md
+    gap: spacing.md,
+    paddingBottom: 136
   },
   backButton: {
     alignSelf: 'flex-start',

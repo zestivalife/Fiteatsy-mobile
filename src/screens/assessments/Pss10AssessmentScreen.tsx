@@ -38,6 +38,8 @@ const MUTED = '#A5A7B1';
 const formatDate = (iso: string) =>
   new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(iso));
 
+const userFacingInterpretation = (label: string) => label.replace(/perceived stress/gi, 'stress');
+
 const buildResponseMap = (responses: AssessmentResponse[]) =>
   responses.reduce<ResponseMap>((acc, response) => {
     acc[response.itemId] = response.selectedValue;
@@ -89,7 +91,7 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
       setPreviousResult(latestResultResponse.previousResult);
       setHistory(historyResponse.items);
     } catch {
-      setError('Assessment data could not be loaded. Check your connection and try again.');
+      setError('Stress Test data could not be loaded. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -185,6 +187,19 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
     );
   }
 
+  if (error && !definition) {
+    return (
+      <Screen scroll contentStyle={styles.content}>
+        <PageHeader title="Stress Test" onBack={() => navigation.goBack()} />
+        <View style={styles.heroPanel}>
+          <Text style={styles.panelTitle}>Stress Test unavailable</Text>
+          <Text style={styles.heroCopy}>{error}</Text>
+          <PrimaryButton title="Try again" onPress={() => void loadAssessment()} style={styles.primaryButton} />
+        </View>
+      </Screen>
+    );
+  }
+
   const renderHeader = (title: string, subtitle?: string) => (
     <>
       <PageHeader title={title} onBack={goBackWithinFlow} />
@@ -195,12 +210,12 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
 
   const renderIntro = () => (
     <>
-      {renderHeader('Perceived Stress Check', definition?.subtitle ?? 'Thinking about the last 30 days, select how often each of the following applied to you.')}
+      {renderHeader('Stress Test', definition?.subtitle ?? 'Thinking about the last 30 days, select how often each of the following applied to you.')}
       <View style={styles.heroPanel}>
         <View style={styles.heroIcon}>
           <Ionicons name="sparkles-outline" size={24} color={MIND_ACCENT} />
         </View>
-        <Text style={styles.heroTitle}>PSS-10</Text>
+        <Text style={styles.heroTitle}>Stress Test</Text>
         <Text style={styles.heroCopy}>This self-reported assessment is not a diagnosis. Results are stored as a score and trend only.</Text>
         <View style={styles.metaRow}>
           <View style={styles.metaPill}><Text style={styles.metaText}>10 questions</Text></View>
@@ -213,14 +228,14 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
           <Text style={styles.panelTitle}>Assessment in progress</Text>
           <Text style={styles.panelCopy}>{answeredCount} of {definition?.itemCount ?? 10} responses saved.</Text>
           <Pressable style={styles.primaryButton} onPress={() => beginAssessment(true)} disabled={submitting} accessibilityRole="button">
-            <Text style={styles.primaryButtonText}>Continue Assessment</Text>
+            <Text style={styles.primaryButtonText}>Continue Stress Test</Text>
           </Pressable>
           <Pressable style={styles.secondaryButton} onPress={() => beginAssessment(false)} disabled={submitting} accessibilityRole="button">
             <Text style={styles.secondaryButtonText}>Start Again</Text>
           </Pressable>
         </View>
       ) : (
-        <PrimaryButton title="Start Assessment" onPress={() => beginAssessment(false)} disabled={submitting} style={styles.primaryButton} />
+        <PrimaryButton title="Start Stress Test" onPress={() => beginAssessment(false)} disabled={submitting} style={styles.primaryButton} />
       )}
       {latestResult ? (
         <Pressable style={styles.secondaryButton} onPress={() => setView('history')} accessibilityRole="button">
@@ -234,7 +249,7 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
     if (!definition || !currentItem) return null;
     return (
       <>
-        {renderHeader('PSS-10', `Question ${questionIndex + 1} of ${definition.itemCount}`)}
+        {renderHeader('Stress Test', `Question ${questionIndex + 1} of ${definition.itemCount}`)}
         <View accessible accessibilityLabel={`Question ${questionIndex + 1} of ${definition.itemCount}`} style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
         </View>
@@ -272,7 +287,7 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
             accessibilityRole="button"
             accessibilityState={{ disabled: selectedValue == null || submitting }}
           >
-            <Text style={styles.primaryButtonText}>{questionIndex === definition.itemCount - 1 ? 'Complete Assessment' : 'Continue'}</Text>
+            <Text style={styles.primaryButtonText}>{questionIndex === definition.itemCount - 1 ? 'Complete Stress Test' : 'Continue'}</Text>
           </Pressable>
         </View>
       </>
@@ -281,16 +296,16 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
 
   const renderResult = () => (
     <>
-      {renderHeader('Perceived Stress', latestResult ? `Completed ${formatDate(latestResult.completedAtISO)}` : undefined)}
+      {renderHeader('Stress Test', latestResult ? `Completed ${formatDate(latestResult.completedAtISO)}` : undefined)}
       {latestResult ? (
-        <View style={styles.resultPanel} accessibilityLabel={`Perceived stress score ${latestResult.rawScore} out of ${latestResult.maxScore}`}>
+        <View style={styles.resultPanel} accessibilityLabel={`Stress Test score ${latestResult.rawScore} out of ${latestResult.maxScore}`}>
           <View style={styles.scoreArc}>
             <Text style={styles.scoreValue}>{latestResult.rawScore}</Text>
             <Text style={styles.scoreMax}>/ {latestResult.maxScore}</Text>
           </View>
-          <Text style={styles.resultCopy}>Higher scores represent greater perceived stress.</Text>
-          <Text style={styles.interpretation}>{latestResult.interpretationLabel}</Text>
-          <Text style={styles.resultCopy}>This score reflects your self-reported perceived stress over the last 30 days and is not a diagnosis.</Text>
+          <Text style={styles.resultCopy}>Higher scores represent greater reported stress.</Text>
+          <Text style={styles.interpretation}>{userFacingInterpretation(latestResult.interpretationLabel)}</Text>
+          <Text style={styles.resultCopy}>This score reflects your self-reported stress over the last 30 days and is not a diagnosis.</Text>
           <View style={styles.resultGrid}>
             <View style={styles.resultMini}>
               <Text style={styles.resultLabel}>Previous</Text>
@@ -316,9 +331,9 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
 
   const renderHistory = () => (
     <>
-      {renderHeader('Stress Assessment History', 'Completed assessments are listed by completion date.')}
+      {renderHeader('Stress Test History', 'Completed tests are listed by completion date.')}
       {history.length === 0 ? (
-        <Text style={styles.emptyText}>No completed PSS-10 assessments yet.</Text>
+        <Text style={styles.emptyText}>No completed Stress Tests yet.</Text>
       ) : (
         <>
           <View style={styles.trendPanel}>
@@ -340,7 +355,7 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
                 <Text style={styles.historyDate}>{formatDate(item.completedAtISO)}</Text>
                 <View style={styles.historyValue}>
                   <Text style={styles.historyScore}>{item.rawScore} / {item.maxScore}</Text>
-                  <Text style={styles.historyInterpretation}>{item.interpretationLabel}</Text>
+                  <Text style={styles.historyInterpretation}>{userFacingInterpretation(item.interpretationLabel)}</Text>
                 </View>
               </View>
             ))}
