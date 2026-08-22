@@ -83,15 +83,17 @@ const Intro = () => <View style={styles.intro}>
   <Text style={styles.introTitle}>Let's personalise your{`\n`}recovery journey</Text>
   <Text style={styles.introBody}>Answer a few questions and Fiteatsy will build a health profile tailored to you.</Text>
   <View style={styles.list}>
-    <ChoiceCard icon="locate-outline" label="Better recommendations" selected={false} onPress={() => undefined} />
-    <ChoiceCard icon="pulse-outline" label="Safer health targets" selected={false} onPress={() => undefined} accent={colors.blue} />
-    <ChoiceCard icon="person-outline" label="More relevant consultant support" selected={false} onPress={() => undefined} accent="#A78BFA" />
+    <Benefit icon="locate-outline" label="Better recommendations" accent={colors.success} />
+    <Benefit icon="pulse-outline" label="Safer health targets" accent={colors.blue} />
+    <Benefit icon="person-outline" label="More relevant consultant support" accent="#A78BFA" />
   </View>
   <Text style={styles.support}>Takes about 4 minutes · Your data stays private</Text>
 </View>;
 
+const Benefit = ({ icon, label, accent }: { icon: keyof typeof Ionicons.glyphMap; label: string; accent: string }) => <View style={styles.benefit}><View style={[styles.benefitIcon, { backgroundColor: `${accent}18` }]}><Ionicons name={icon} size={20} color={accent} /></View><Text style={styles.benefitText}>{label}</Text></View>;
+
 const styles = StyleSheet.create({
-  list: { gap: spacing.sm },
+  list: { gap: spacing.sm, width: '100%' },
   label: { ...typography.label, fontSize: 12, lineHeight: 17, color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.md },
   field: { minHeight: 52, borderWidth: 1, borderColor: colors.success, borderRadius: radius.lg, backgroundColor: colors.cardMuted, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   fieldText: { ...typography.bodyStrong, fontSize: 14, color: colors.textPrimary },
@@ -99,5 +101,8 @@ const styles = StyleSheet.create({
   heroIcon: { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#42DDB5', marginBottom: spacing.xl },
   introTitle: { ...typography.sectionTitle, fontSize: 20, lineHeight: 26, textAlign: 'center', color: colors.textPrimary },
   introBody: { ...typography.body, fontSize: 14, lineHeight: 20, textAlign: 'center', color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.xl, maxWidth: 360 },
-  support: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: spacing.xl }
+  support: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: spacing.xl },
+  benefit: { width: '100%', minHeight: 60, borderWidth: 1, borderColor: colors.stroke, borderRadius: radius.lg, backgroundColor: colors.cardMuted, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  benefitIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  benefitText: { ...typography.bodyStrong, fontSize: 14, lineHeight: 20, color: colors.textPrimary }
 });
