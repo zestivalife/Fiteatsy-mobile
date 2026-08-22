@@ -1,380 +1,103 @@
 import React, { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Screen } from '../../components/Screen';
-import { PrimaryButton } from '../../components/PrimaryButton';
-import { colors, getThemeColors, typography } from '../../design/tokens';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { ChoiceCard, OnboardingAction, OnboardingShell, QuestionHeader } from '../../components/onboarding/OnboardingShell';
+import { colors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
-import {
-  AssessmentGender,
-  HealthCondition,
-  HealthGoal,
-  OnboardingProfile
-} from '../../types';
+import { AssessmentGender, HealthCondition, HealthGoal, OnboardingProfile } from '../../types';
 import { useAppContext } from '../../state/AppContext';
-import { calculateAgeFromDob, createPendingConsultant, formatConsultantAvailability, normalizeOnboardingProfile } from '../../utils/healthProfile';
+import { normalizeOnboardingProfile } from '../../utils/healthProfile';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingBasics'>;
-
 const goals: HealthGoal[] = ['Better Energy', 'Better Sleep', 'Weight Loss', 'Sugar Control', 'Hormone Balance'];
 const genders: AssessmentGender[] = ['Male', 'Female', 'Prefer not to say'];
-const conditions: HealthCondition[] = [
-  'Diabetes',
-  'Prediabetes',
-  'Hypertension',
-  'PCOS',
-  'Thyroid',
-  'Obesity',
-  'High Cholesterol',
-  'Gut Health'
-];
+const conditions: HealthCondition[] = ['Diabetes', 'Prediabetes', 'Hypertension', 'PCOS', 'Thyroid', 'Obesity', 'High Cholesterol', 'Gut Health'];
 
-const formatDob = (date: Date): string =>
-  date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  });
+const baseProfile = (): OnboardingProfile => ({
+  name: '', dateOfBirthISO: new Date(1996, 0, 1).toISOString(), calculatedAge: 28, age: 28,
+  gender: 'Prefer not to say', wellnessGoal: 'Better Energy', ageBracket: '25-34', primaryConditions: [],
+  symptomTags: ['Fatigue'], healthGoals: ['Better Energy'], primaryGoal: 'Better Energy', secondaryGoals: [],
+  wearablePreference: 'later', careTrack: 'Foundational Recovery Care', assignedConsultantId: null,
+  assignedConsultant: null, calendarProvider: 'None', calendarPermissionGranted: false,
+  notificationPermissionGranted: false, createdAtISO: new Date().toISOString()
+});
 
-const deriveCareTrack = (selectedConditions: HealthCondition[], goal: HealthGoal | null) => {
-  if (selectedConditions.some((item) => ['Diabetes', 'Prediabetes'].includes(item)) || goal === 'Sugar Control') {
-    return 'Blood Sugar Recovery Care';
-  }
-  if (selectedConditions.some((item) => ['PCOS', 'Thyroid'].includes(item)) || goal === 'Hormone Balance') {
-    return 'Hormone Balance Care';
-  }
-  if (selectedConditions.includes('Gut Health')) {
-    return 'Digestive & Metabolic Care';
-  }
+const deriveCareTrack = (items: HealthCondition[], goal: HealthGoal | null) => {
+  if (items.some((item) => item === 'Diabetes' || item === 'Prediabetes') || goal === 'Sugar Control') return 'Blood Sugar Recovery Care';
+  if (items.some((item) => item === 'PCOS' || item === 'Thyroid') || goal === 'Hormone Balance') return 'Hormone Balance Care';
+  if (items.includes('Gut Health')) return 'Digestive & Metabolic Care';
   return 'Foundational Recovery Care';
 };
 
-const baseProfile = (): OnboardingProfile => ({
-  name: '',
-  dateOfBirthISO: new Date(1996, 0, 1).toISOString(),
-  calculatedAge: 28,
-  age: 28,
-  gender: 'Prefer not to say',
-  wellnessGoal: 'Better Energy',
-  ageBracket: '25-34',
-  primaryConditions: [],
-  symptomTags: ['Fatigue'],
-  healthGoals: ['Better Energy'],
-  primaryGoal: 'Better Energy',
-  secondaryGoals: [],
-  wearablePreference: 'later',
-  careTrack: 'Foundational Recovery Care',
-  assignedConsultantId: null,
-  assignedConsultant: null,
-  calendarProvider: 'None',
-  calendarPermissionGranted: false,
-  notificationPermissionGranted: false,
-  createdAtISO: new Date().toISOString()
-});
-
 export const OnboardingBasicsScreen = ({ navigation }: Props) => {
-  const { onboarding, setOnboarding, setWearableSetupCompleted, themeMode } = useAppContext();
-  const isLight = themeMode === 'light';
-  const themeColors = getThemeColors(themeMode);
-  const darkTextStrong = isLight ? '#000000' : '#FFFFFF';
-  const darkTextSoft = isLight ? '#334155' : '#FFFFFF';
-  const selectedLightBg = isLight ? themeColors.blueDark : undefined;
+  const { onboarding, setOnboarding, setWearableSetupCompleted } = useAppContext();
   const seed = useMemo(() => onboarding ?? baseProfile(), [onboarding]);
-
-  const initialDob = seed.dateOfBirthISO ? new Date(seed.dateOfBirthISO) : new Date(1996, 0, 1);
-  const [dob, setDob] = useState(initialDob);
+  const [step, setStep] = useState(1);
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward');
+  const [dob, setDob] = useState(seed.dateOfBirthISO ? new Date(seed.dateOfBirthISO) : new Date(1996, 0, 1));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [gender, setGender] = useState<AssessmentGender>(seed.gender ?? 'Prefer not to say');
   const [selectedGoals, setSelectedGoals] = useState<HealthGoal[]>(seed.healthGoals ?? []);
-  const [primaryConditions, setPrimaryConditions] = useState<HealthCondition[]>(seed.primaryConditions ?? []);
+  const [selectedConditions, setSelectedConditions] = useState<HealthCondition[]>(seed.primaryConditions ?? []);
 
-  const age = calculateAgeFromDob(dob);
-  const careTrack = deriveCareTrack(primaryConditions, selectedGoals[0] ?? null);
-  const assignmentPreview = createPendingConsultant(careTrack, seed.createdAtISO);
-
-  const onDobChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (event.type === 'set' && selectedDate) {
-      setDob(selectedDate);
-    }
+  const goBack = () => {
+    if (step > 1) { setDirection('back'); setStep((value) => value - 1); return; }
+    if (navigation.canGoBack()) navigation.goBack();
   };
-
-  const persistAndContinue = (mode: 'continue' | 'skip') => {
-    const finalGoals = mode === 'skip' ? [] : selectedGoals;
-    const finalGoal = finalGoals[0] ?? null;
-    const finalConditions = mode === 'skip' ? [] : primaryConditions;
-    const finalTrack = deriveCareTrack(finalConditions, finalGoal);
+  const next = () => {
+    if (step < 4) { setDirection('forward'); setStep((value) => value + 1); return; }
+    const primaryGoal = selectedGoals[0] ?? null;
     setOnboarding(normalizeOnboardingProfile({
-      ...seed,
-      name: seed.name.trim() || 'Member',
-      dateOfBirthISO: dob.toISOString(),
-      gender,
-      primaryConditions: finalConditions,
-      healthGoals: finalGoals,
-      primaryGoal: finalGoal ?? undefined,
-      secondaryGoals: finalGoal ? finalGoals.filter((goal) => goal !== finalGoal) : [],
-      wearablePreference: 'later',
-      careTrack: finalTrack,
-      assignedConsultantId: seed.assignedConsultantId ?? null,
-      assignedConsultant: seed.assignedConsultant ?? null,
-      createdAtISO: seed.createdAtISO || new Date().toISOString()
+      ...seed, name: seed.name.trim() || 'Member', dateOfBirthISO: dob.toISOString(), gender,
+      primaryConditions: selectedConditions, healthGoals: selectedGoals, primaryGoal: primaryGoal ?? undefined,
+      secondaryGoals: primaryGoal ? selectedGoals.slice(1) : [], wellnessGoal: primaryGoal ?? seed.wellnessGoal,
+      careTrack: deriveCareTrack(selectedConditions, primaryGoal), createdAtISO: seed.createdAtISO || new Date().toISOString()
     }));
     setWearableSetupCompleted(false);
-    navigation.navigate('OnboardingCalendar');
+    navigation.navigate('FoodPreferences', { mode: 'onboarding' });
+  };
+  const onDob = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event.type === 'set' && date) setDob(date);
   };
 
   return (
-    <Screen>
-      <View style={styles.body}>
-        <Text style={[styles.kicker, { color: themeColors.blue }]}>Quick Setup</Text>
-        <Text style={[styles.title, { color: darkTextStrong }]}>Tell us just what we need</Text>
-        <Text style={[styles.subtitle, { color: darkTextSoft }]}>This takes less than a minute. You can update everything later.</Text>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <Text style={[styles.label, { color: darkTextStrong }]}>Date of birth</Text>
-          <Pressable style={[styles.dateField, { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted }]} onPress={() => setShowDatePicker(true)}>
-            <View style={styles.dateFieldLeft}>
-              <Ionicons name="calendar-outline" size={16} color={darkTextSoft} />
-              <Text style={[styles.dateFieldText, { color: darkTextStrong }]}>{formatDob(dob)}</Text>
-            </View>
-            <Text style={styles.dateAgeText}>{age} yrs</Text>
-          </Pressable>
-          {showDatePicker ? (
-            <DateTimePicker
-              value={dob}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              maximumDate={new Date()}
-              onChange={onDobChange}
-            />
-          ) : null}
-
-          <Text style={[styles.label, { color: darkTextStrong }]}>Gender</Text>
-          <View style={styles.options}>
-            {genders.map((item) => {
-              const active = gender === item;
-              return (
-                <Pressable
-                  key={item}
-                  style={[
-                    styles.option,
-                    { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted },
-                    active && styles.optionActive,
-                    active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
-                  ]}
-                  onPress={() => setGender(item)}
-                >
-                  <Text style={[styles.optionText, { color: darkTextStrong }, active && styles.optionTextActive]}>{item}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Text style={[styles.label, { color: darkTextStrong }]}>Wellness goals</Text>
-          <Text style={[styles.helper, { color: darkTextSoft }]}>Choose one or more. Your first selected goal becomes primary.</Text>
-          <View style={styles.options}>
-            {goals.map((item) => {
-              const active = selectedGoals.includes(item);
-              return (
-                <Pressable
-                  key={item}
-                  style={[
-                    styles.option,
-                    { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted },
-                    active && styles.optionActive,
-                    active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
-                  ]}
-                  onPress={() => {
-                    setSelectedGoals((current) => {
-                      if (current.includes(item)) {
-                        return current.filter((goal) => goal !== item);
-                      }
-                      return [...current, item];
-                    });
-                  }}
-                >
-                  <Text style={[styles.optionText, { color: darkTextStrong }, active && styles.optionTextActive]}>{item}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text style={[styles.helper, { color: darkTextSoft }]}>
-            {selectedGoals.length > 0 ? `Primary: ${selectedGoals[0]}${selectedGoals.length > 1 ? ` • Secondary: ${selectedGoals.slice(1).join(', ')}` : ''}` : 'You can skip goals for now.'}
-          </Text>
-
-          <Text style={[styles.label, { color: darkTextStrong }]}>Existing conditions (optional)</Text>
-          <Text style={[styles.helper, { color: darkTextSoft }]}>Select if relevant, or leave blank</Text>
-          <View style={styles.options}>
-            {conditions.map((item) => {
-              const active = primaryConditions.includes(item);
-              return (
-                <Pressable
-                  key={item}
-                  style={[
-                    styles.option,
-                    { borderColor: themeColors.stroke, backgroundColor: isLight ? '#FFFFFF' : themeColors.cardMuted },
-                    active && styles.optionActive,
-                    active && isLight && { backgroundColor: selectedLightBg, borderColor: selectedLightBg }
-                  ]}
-                  onPress={() => {
-                    setPrimaryConditions((current) => {
-                      const exists = current.includes(item);
-                      if (exists) {
-                        return current.filter((x) => x !== item);
-                      }
-                      return [...current, item];
-                    });
-                  }}
-                >
-                  <Text style={[styles.optionText, { color: darkTextStrong }, active && styles.optionTextActive]}>{item}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <LinearGradient colors={isLight ? ['#FFFFFF', '#EEF2F7'] : [colors.cardMuted, colors.cardMuted]} style={[styles.matchCard, { borderColor: themeColors.stroke }]}>
-            <Text style={[styles.matchEyebrow, { color: themeColors.blue }]}>Consultant assignment</Text>
-            <Text style={[styles.matchTrack, { color: darkTextStrong }]}>{careTrack}</Text>
-            <Text style={[styles.matchDietitian, { color: darkTextStrong }]}>Assigned after program activation</Text>
-            <Text style={[styles.matchSpecialty, { color: darkTextSoft }]}>{assignmentPreview.specialization} • {formatConsultantAvailability(assignmentPreview.availability)}</Text>
-            <Text style={[styles.matchSpecialty, { color: darkTextSoft }]}>Your consultant syncs automatically from the backend once your care case is created and assigned.</Text>
-          </LinearGradient>
-        </ScrollView>
-      </View>
-
-      <View style={styles.footer}>
-        <PrimaryButton title="Continue" onPress={() => persistAndContinue('continue')} />
-        <Pressable style={styles.skipBtn} onPress={() => persistAndContinue('skip')}>
-          <Text style={[styles.skipText, { color: darkTextSoft }]}>Skip for now</Text>
-        </Pressable>
-      </View>
-    </Screen>
+    <OnboardingShell key={step} phase="BASICS" step={step} total={4} onBack={step === 1 ? undefined : goBack} direction={direction} action={<OnboardingAction title={step === 1 ? 'Start setup' : 'Continue'} onPress={next} />}>
+      {step === 1 ? <Intro /> : null}
+      {step === 2 ? <View><QuestionHeader title="Basic profile" description="Used to calculate your personal health baselines and safe targets." />
+        <Text style={styles.label}>DATE OF BIRTH</Text>
+        <Pressable accessibilityRole="button" style={styles.field} onPress={() => setShowDatePicker(true)}><Text style={styles.fieldText}>{dob.toLocaleDateString('en-GB')}</Text><Ionicons name="calendar-outline" size={20} color={colors.textPrimary} /></Pressable>
+        {showDatePicker ? <DateTimePicker value={dob} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} maximumDate={new Date()} onChange={onDob} /> : null}
+        <Text style={styles.label}>GENDER</Text><View style={styles.list}>{genders.map((item) => <ChoiceCard key={item} label={item} selected={gender === item} onPress={() => setGender(item)} />)}</View>
+      </View> : null}
+      {step === 3 ? <View><QuestionHeader title="What are your wellness goals?" description="Select all that apply. Your first choice becomes your primary focus." /><View style={styles.list}>{goals.map((item) => <ChoiceCard key={item} label={item === 'Weight Loss' ? 'Weight Management' : item} description={selectedGoals[0] === item ? 'Primary' : undefined} selected={selectedGoals.includes(item)} accent="#FFBE25" onPress={() => setSelectedGoals((current) => current.includes(item) ? current.filter((goal) => goal !== item) : [...current, item])} />)}</View></View> : null}
+      {step === 4 ? <View><QuestionHeader title="Existing health conditions" description="Helps us keep recommendations safe and relevant for you." /><View style={styles.list}>{conditions.map((item) => <ChoiceCard key={item} label={item} selected={selectedConditions.includes(item)} onPress={() => setSelectedConditions((current) => current.includes(item) ? current.filter((condition) => condition !== item) : [...current, item])} />)}</View></View> : null}
+    </OnboardingShell>
   );
 };
 
+const Intro = () => <View style={styles.intro}>
+  <View style={styles.heroIcon}><Ionicons name="person-circle-outline" size={38} color="#06100B" /></View>
+  <Text style={styles.introTitle}>Let's personalise your{`\n`}recovery journey</Text>
+  <Text style={styles.introBody}>Answer a few questions and Fiteatsy will build a health profile tailored to you.</Text>
+  <View style={styles.list}>
+    <ChoiceCard icon="locate-outline" label="Better recommendations" selected={false} onPress={() => undefined} />
+    <ChoiceCard icon="pulse-outline" label="Safer health targets" selected={false} onPress={() => undefined} accent={colors.blue} />
+    <ChoiceCard icon="person-outline" label="More relevant consultant support" selected={false} onPress={() => undefined} accent="#A78BFA" />
+  </View>
+  <Text style={styles.support}>Takes about 4 minutes · Your data stays private</Text>
+</View>;
+
 const styles = StyleSheet.create({
-  body: {
-    flex: 1
-  },
-  scrollContent: {
-    paddingBottom: 16,
-    gap: 12
-  },
-  footer: {
-    paddingTop: 12
-  },
-  kicker: {
-    ...typography.caption,
-    color: colors.blue,
-    marginBottom: 8
-  },
-  title: {
-    ...typography.title,
-    fontSize: 28,
-    lineHeight: 34
-  },
-  subtitle: {
-    ...typography.body,
-    marginTop: 8,
-    marginBottom: 20
-  },
-  label: {
-    ...typography.bodyStrong,
-    fontSize: 14
-  },
-  helper: {
-    ...typography.caption,
-    marginTop: -6,
-    marginBottom: 2
-  },
-  options: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8
-  },
-  option: {
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    borderRadius: 999,
-    backgroundColor: colors.cardMuted,
-    paddingHorizontal: 12,
-    paddingVertical: 9
-  },
-  optionActive: {
-    borderColor: colors.blue,
-    backgroundColor: 'rgba(96,175,0,0.24)'
-  },
-  optionText: {
-    ...typography.caption,
-    color: colors.textSecondary
-  },
-  optionTextActive: {
-    color: colors.textPrimary
-  },
-  matchCard: {
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    borderRadius: 16,
-    backgroundColor: colors.cardMuted,
-    padding: 14,
-    marginTop: 4
-  },
-  matchEyebrow: {
-    ...typography.caption,
-    color: colors.blue
-  },
-  dateField: {
-    minHeight: 46,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    backgroundColor: colors.cardMuted,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  dateFieldLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  dateFieldText: {
-    ...typography.body,
-    fontSize: 14,
-    color: colors.textPrimary
-  },
-  dateAgeText: {
-    ...typography.caption,
-    color: colors.blue
-  },
-  matchTrack: {
-    ...typography.bodyStrong,
-    marginTop: 6,
-    fontSize: 16
-  },
-  matchDietitian: {
-    ...typography.bodyStrong,
-    marginTop: 10
-  },
-  matchSpecialty: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 3
-  },
-  skipBtn: {
-    marginTop: 12,
-    alignSelf: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8
-  },
-  skipText: {
-    ...typography.caption,
-    color: colors.textSecondary
-  }
+  list: { gap: spacing.sm },
+  label: { ...typography.label, fontSize: 12, lineHeight: 17, color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.md },
+  field: { minHeight: 52, borderWidth: 1, borderColor: colors.success, borderRadius: radius.lg, backgroundColor: colors.cardMuted, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  fieldText: { ...typography.bodyStrong, fontSize: 14, color: colors.textPrimary },
+  intro: { alignItems: 'center', paddingTop: spacing.xl },
+  heroIcon: { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#42DDB5', marginBottom: spacing.xl },
+  introTitle: { ...typography.sectionTitle, fontSize: 20, lineHeight: 26, textAlign: 'center', color: colors.textPrimary },
+  introBody: { ...typography.body, fontSize: 14, lineHeight: 20, textAlign: 'center', color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.xl, maxWidth: 360 },
+  support: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: spacing.xl }
 });

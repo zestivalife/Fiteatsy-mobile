@@ -104,7 +104,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
 
   return (
     <Screen scroll>
-      <Text style={[styles.eyebrow, { color: palette.blue }]}>FOOD PREFERENCES</Text>
+      <Text style={[styles.eyebrow, { color: palette.blue }]}>{mode === 'onboarding' ? 'LIFESTYLE · NUTRITION' : 'FOOD PREFERENCES'}</Text>
       <Text style={[styles.title, { color: palette.textPrimary }]}>{mode === 'onboarding' ? 'Make meals feel like yours' : 'Food Preferences'}</Text>
       <Text style={[styles.body, { color: palette.textSecondary }]}>Your choices help your consultant personalise recommendations. Clinical restrictions remain managed separately.</Text>
 
@@ -201,10 +201,10 @@ const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery,
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   eyebrow: { ...typography.caption, marginBottom: 8 },
-  title: { ...typography.title, fontSize: 28, marginBottom: 8 },
+  title: { ...typography.sectionTitle, fontSize: 20, lineHeight: 26, marginBottom: 8 },
   body: { ...typography.body, lineHeight: 22 },
   helper: { ...typography.caption, lineHeight: 18, marginBottom: 12 },
-  sectionTitle: { ...typography.bodyStrong, fontSize: 17, marginBottom: 6 },
+  sectionTitle: { ...typography.bodyStrong, fontSize: 14, lineHeight: 20, marginBottom: 6 },
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   choice: { minHeight: 44, paddingHorizontal: 14, borderWidth: 1, borderRadius: radius.sm, justifyContent: 'center' },
   choiceText: { ...typography.caption },

@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { PageHeader } from '../../components/PageHeader';
+import { OnboardingAction, OnboardingShell, QuestionHeader } from '../../components/onboarding/OnboardingShell';
 import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
@@ -186,6 +187,7 @@ const formatSyncTime = (iso?: string | null) => {
 export const SyncWearableScreen = ({ navigation, route }: Props) => {
   const {
     themeMode,
+    wearableSetupCompleted,
     setWearableSetupCompleted,
     setSelectedDeviceId,
     onboarding,
@@ -228,7 +230,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
       });
     }
     setWearableSetupCompleted(true);
-    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+    navigation.navigate('OnboardingCalendar');
   }, [connectionState, navigation, onboarding, setOnboarding, setWearableSetupCompleted]);
 
   const finishOnboardingFlow = useCallback(() => {
@@ -438,7 +440,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
       });
     }
     setWearableSetupCompleted(true);
-    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+    navigation.navigate('OnboardingCalendar');
   };
 
   const metrics = lastResult?.payload.dataQuality.connectedMetrics;
@@ -478,6 +480,29 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
     }
     void runRecoveryConnection();
   };
+
+  if (!wearableSetupCompleted) {
+    return (
+      <OnboardingShell
+        phase="CONNECT"
+        step={1}
+        total={3}
+        onBack={() => navigation.goBack()}
+        action={<View><OnboardingAction title={primaryTitle === 'Continue' ? 'Connect Health Data' : primaryTitle} onPress={handlePrimary} disabled={isRunning} /><OnboardingAction title="I'll do this later" secondary onPress={skipForNow} /></View>}
+      >
+        <QuestionHeader title="Connect your health data" description="Fiteatsy can automatically understand your activity, sleep, heart and recovery patterns." />
+        <View style={styles.onboardingDomains}>
+          {domainRows.map((domain) => {
+            const label = summarizeDomain(domain, metrics, isRunning);
+            const isSynced = label === 'Synced';
+            return <View key={domain.key} style={[styles.onboardingDomain, isSynced && styles.onboardingDomainSynced]}><View style={styles.domainLeft}><Ionicons name={domain.icon} size={20} color={isSynced ? colors.success : palette.textSecondary} /><Text style={[styles.domainTitle, { color: palette.textPrimary }]}>{domain.key}</Text></View><Text style={[styles.domainStatus, { color: isSynced ? colors.success : palette.textSecondary }]}>{label}</Text></View>;
+          })}
+        </View>
+        <View style={styles.platformTruth}><Text style={[styles.supportText, { color: palette.textSecondary }]}>{Platform.OS === 'android' ? 'Android Health Connect · read-only access' : 'Apple Health is not available in this build · continue without connecting'}</Text></View>
+        {error ? <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text> : null}
+      </OnboardingShell>
+    );
+  }
 
   return (
     <Screen scroll contentStyle={styles.screenContent}>
@@ -693,5 +718,9 @@ const styles = StyleSheet.create({
   },
   skipInlineText: {
     ...typography.caption
-  }
+  },
+  onboardingDomains: { gap: spacing.sm },
+  onboardingDomain: { minHeight: 64, borderWidth: 1, borderColor: colors.stroke, borderRadius: radius.lg, backgroundColor: colors.cardMuted, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  onboardingDomainSynced: { borderColor: colors.success, backgroundColor: 'rgba(73,223,134,0.08)' },
+  platformTruth: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.blue, borderRadius: radius.lg, padding: spacing.md, backgroundColor: 'rgba(53,215,210,0.06)' }
 });

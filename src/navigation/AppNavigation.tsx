@@ -9,6 +9,7 @@ import { OnboardingBasicsScreen } from '../screens/onboarding/OnboardingBasicsSc
 import { OnboardingCalendarScreen } from '../screens/onboarding/OnboardingCalendarScreen';
 import { OnboardingNotificationsScreen } from '../screens/onboarding/OnboardingNotificationsScreen';
 import { OnboardingAssessmentScreen } from '../screens/onboarding/OnboardingAssessmentScreen';
+import { OnboardingReadyScreen } from '../screens/onboarding/OnboardingReadyScreen';
 import { FoodPreferencesScreen } from '../screens/onboarding/FoodPreferencesScreen';
 import { SignInScreen } from '../screens/auth/SignInScreen';
 import { SignUpScreen } from '../screens/auth/SignUpScreen';
@@ -114,6 +115,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="OnboardingCalendar" component={OnboardingCalendarScreen} />
         <Stack.Screen name="OnboardingNotifications" component={OnboardingNotificationsScreen} />
         <Stack.Screen name="OnboardingAssessment" component={OnboardingAssessmentScreen} />
+        <Stack.Screen name="OnboardingReady" component={OnboardingReadyScreen} />
         <Stack.Screen name="FoodPreferences" component={FoodPreferencesScreen} />
         <Stack.Screen name="SignIn" component={SignInScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />

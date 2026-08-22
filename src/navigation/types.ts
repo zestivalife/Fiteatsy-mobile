@@ -7,6 +7,7 @@ export type RootStackParamList = {
   OnboardingCalendar: undefined;
   OnboardingNotifications: undefined;
   OnboardingAssessment: undefined;
+  OnboardingReady: undefined;
   FoodPreferences: { mode?: 'onboarding' | 'profile' } | undefined;
   SignIn: undefined;
   SignUp: undefined;
