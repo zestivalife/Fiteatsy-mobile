@@ -1933,6 +1933,11 @@ export const generateConsultantOptionalGuidance = async (
   const planOptions = Object.entries(version.content.mealPlan).flatMap(([mealKey, section]) =>
     section.options.map((slot) => ({ slot, mealKey, timeWindow: section.window })),
   );
+  const verifiedDraftCandidates = Object.entries(version.content.mealPlan).flatMap(([mealKey, section]) =>
+    [...section.options, ...(section.availableOptions ?? [])]
+      .filter(guidanceNutritionComplete)
+      .map((slot) => ({ slot, mealKey, timeWindow: section.window })),
+  );
   const planOptionIds = new Set(planOptions.flatMap(({ slot }) => slot.id ? [slot.id] : []));
   const mealTagsForSlot = (slot: NutritionMealSlot) => planOptions.filter((entry) => entry.slot.id === slot.id).map((entry) => entry.mealKey);
   const catalogueInput = {
@@ -1943,8 +1948,9 @@ export const generateConsultantOptionalGuidance = async (
     avoidedFoodIds: preferences.avoidedFoodIds,
     likedFoodIds: preferences.likedFoodIds,
   };
-  const broadCatalogue = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, includeOutsideTarget: true, limit: 160 })).filter(guidanceNutritionComplete);
+  const databaseCatalogue = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, includeOutsideTarget: true, limit: 160 })).filter(guidanceNutritionComplete);
   const uniqueSlots = (slots: NutritionMealSlot[]) => Array.from(new Map(slots.map((slot) => [slot.id ?? slot.meal, slot])).values());
+  const broadCatalogue = uniqueSlots([...databaseCatalogue, ...verifiedDraftCandidates.map(({ slot }) => slot)]);
   const whatSlots = uniqueSlots([
     ...planOptions.map(({ slot }) => slot).filter(guidanceNutritionComplete),
     ...broadCatalogue,
@@ -1956,8 +1962,13 @@ export const generateConsultantOptionalGuidance = async (
   const usedCuisineIds = new Set<string>();
   const eatingOutEntries: Array<[string, NutritionGuidanceItem[]]> = [];
   for (const [key, cuisine] of Object.entries(cuisineDefinitions)) {
-    const candidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, includeOutsideTarget: true, preferredCuisines: [cuisine], limit: 40 }))
-      .filter(guidanceNutritionComplete)
+    const databaseCandidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, includeOutsideTarget: true, preferredCuisines: [cuisine], limit: 40 }))
+      .filter(guidanceNutritionComplete);
+    const cuisineKey = cuisine.replace(/[^a-z]/g, '');
+    const candidates = uniqueSlots([
+      ...databaseCandidates,
+      ...broadCatalogue.filter((slot) => (slot.cuisineTags ?? []).some((tag) => lower(tag).replace(/[^a-z]/g, '') === cuisineKey)),
+    ])
       .filter((slot) => !usedCuisineIds.has(slot.id ?? slot.meal))
       .slice(0, OPTIONAL_GUIDANCE_CUISINE_COUNT);
     candidates.forEach((slot) => usedCuisineIds.add(slot.id ?? slot.meal));
