@@ -9,6 +9,9 @@ describe('Onboarding V2 contract', () => {
     expect(shell).toContain("'BASICS' | 'LIFESTYLE' | 'RECOVERY' | 'CONNECT' | 'READY'");
     expect(shell).toContain('isReduceMotionEnabled');
     expect(shell).toContain('accessibilityLabel="Go back"');
+    expect(shell).toContain("content: { flex: 1, width: '100%', paddingHorizontal: spacing.md }");
+    expect(shell).toContain('paddingHorizontal: spacing.md');
+    expect(shell).not.toContain('paddingHorizontal: spacing.lg');
   });
 
   it('preserves canonical profile and assessment writes', () => {
@@ -29,7 +32,10 @@ describe('Onboarding V2 contract', () => {
     const flow = read('src/screens/onboarding/OnboardingFoodPreferencesFlow.tsx');
     expect(screen).toContain('saveFoodPreferences(profile)');
     expect(screen).toContain('OnboardingFoodPreferencesFlow');
-    expect(screen).toContain("startPhase: 'recovery'");
+    expect(screen).toContain("navigation.push('OnboardingAssessment', { startPhase: 'recovery'");
+    expect(screen).toContain("phase: 'recovery', step: 1");
+    expect(flow).toContain('initialStep');
+    expect(flow).toContain('onProgress(step, profile)');
     expect(flow).toContain('phase="LIFESTYLE"');
     expect(flow).toContain('total={4}');
     expect(flow).toContain("update('dietType'");
@@ -38,6 +44,19 @@ describe('Onboarding V2 contract', () => {
     expect(flow).toContain("update('dairyPreference'");
     expect(flow).toContain("update('proteins'");
     expect(flow).toContain('verified foods selected');
+  });
+
+  it('resumes the client-scoped canonical onboarding phase and step', () => {
+    const progress = read('src/services/onboardingRuntimeProgress.ts');
+    const splash = read('src/screens/auth/SplashScreen.tsx');
+    const assessment = read('src/screens/onboarding/OnboardingAssessmentScreen.tsx');
+    const ready = read('src/screens/onboarding/OnboardingReadyScreen.tsx');
+    expect(progress).toContain('fiteatsy.onboarding.runtime.v2:${clientId}');
+    expect(splash).toContain("progress?.phase === 'food'");
+    expect(splash).toContain("progress?.phase === 'recovery'");
+    expect(splash).toContain("progress?.phase === 'connect'");
+    expect(assessment).toContain("phase: step <= 4 ? 'lifestyle' : 'recovery'");
+    expect(ready).toContain('clearOnboardingRuntimeProgress');
   });
 
   it('keeps platform connectivity and consultant readiness truthful', () => {

@@ -6,11 +6,12 @@ import { OnboardingAction, OnboardingShell } from '../../components/onboarding/O
 import { colors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
+import { clearOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingReady'>;
 
 export const OnboardingReadyScreen = ({ navigation }: Props) => {
-  const { onboarding, assessment, wearableSetupCompleted, setWearableSetupCompleted } = useAppContext();
+  const { onboarding, assessment, wearableSetupCompleted, setWearableSetupCompleted, authSession } = useAppContext();
   const reveal = useRef(new Animated.Value(0)).current;
   useEffect(() => { Animated.timing(reveal, { toValue: 1, duration: 500, useNativeDriver: true }).start(); }, [reveal]);
   const healthReady = Boolean(onboarding?.dateOfBirthISO && onboarding?.gender);
@@ -18,7 +19,7 @@ export const OnboardingReadyScreen = ({ navigation }: Props) => {
   const nutritionReady = Boolean(onboarding?.primaryGoal || onboarding?.healthGoals.length);
   const healthConnected = onboarding?.wearablePreference === 'sync';
   const consultantReady = Boolean(onboarding?.assignedConsultantId);
-  const enter = () => { setWearableSetupCompleted(true); navigation.reset({ index: 0, routes: [{ name: 'Main' }] }); };
+  const enter = () => { void clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId); setWearableSetupCompleted(true); navigation.reset({ index: 0, routes: [{ name: 'Main' }] }); };
 
   return <OnboardingShell phase="READY" step={1} total={1} onBack={() => navigation.goBack()} scroll action={<View><OnboardingAction title="Enter Fiteatsy" onPress={enter} /><OnboardingAction title="Review my answers" secondary onPress={() => navigation.navigate('OnboardingBasics')} /></View>}>
     <Animated.View style={[styles.hero, { opacity: reveal, transform: [{ scale: reveal.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>

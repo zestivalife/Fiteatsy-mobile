@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { OnboardingAction, OnboardingShell, QuestionHeader } from '../../components/onboarding/OnboardingShell';
 import { colors, radius, spacing, typography } from '../../design/tokens';
@@ -33,6 +33,8 @@ export const OnboardingFoodPreferencesFlow = ({
   foodError,
   saving,
   error,
+  initialStep,
+  onProgress,
   onSave,
   onExit
 }: {
@@ -45,10 +47,12 @@ export const OnboardingFoodPreferencesFlow = ({
   foodError: string | null;
   saving: boolean;
   error: string | null;
+  initialStep: number;
+  onProgress: (step: number, profile: FoodPreferenceProfile) => void;
   onSave: () => void;
   onExit: () => void;
 }) => {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(initialStep);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [foodMode, setFoodMode] = useState<FoodMode>('dislikedFoodIds');
   const foodLabels = useMemo(() => new Map(foodItems.map((item) => [item.id, item.displayName])), [foodItems]);
@@ -56,6 +60,9 @@ export const OnboardingFoodPreferencesFlow = ({
   const stapleLabel = staples.find((choice) => choice.value === profile.staplePreference)?.label ?? 'No preference';
   const dairyLabel = dairy.find((choice) => choice.value === profile.dairyPreference)?.label ?? 'Not selected';
   const selectedFoodIds = foodMode === 'dislikedFoodIds' ? profile.dislikedFoodIds : profile.avoidedFoodIds;
+
+  useEffect(() => setStep(initialStep), [initialStep]);
+  useEffect(() => onProgress(step, profile), [onProgress, profile, step]);
 
   const go = (next: number) => {
     setDirection(next >= step ? 'forward' : 'back');

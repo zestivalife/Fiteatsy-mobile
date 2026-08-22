@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,6 +7,7 @@ import { colors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { AssessmentMood, AssessmentPhysicalDistress, AssessmentSleepQuality } from '../../types';
 import { useAppContext } from '../../state/AppContext';
+import { setOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingAssessment'>;
 type Activity = 'Mostly seated' | 'Lightly active' | 'Moderately active' | 'Very active' | 'Athlete / intense training';
@@ -35,7 +36,7 @@ const moods: Array<{ label: string; value: AssessmentMood; emoji: string; copy: 
 const stressCopy: Record<number, string> = { 1: 'Feeling calm and settled', 2: 'Light pressure, comfortably manageable', 3: 'Some tension, still manageable', 4: 'Noticeable tension affecting wellbeing', 5: 'Feeling overwhelmed and needing support' };
 
 export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
-  const { onboarding, setOnboarding, setAssessment, submitCheckIn, setMood } = useAppContext();
+  const { onboarding, setOnboarding, setAssessment, submitCheckIn, setMood, authSession } = useAppContext();
   const recoveryStart = route.params?.startPhase === 'recovery';
   const lifestyleSeed = route.params?.lifestyle;
   const [step, setStep] = useState(recoveryStart ? 5 : 1);
@@ -53,6 +54,17 @@ export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
   const phase = step <= 4 ? 'LIFESTYLE' : 'RECOVERY';
   const phaseStep = step <= 4 ? step : step - 4;
   const valueOpacity = useRef(new Animated.Value(1)).current;
+  const completionStarted = useRef(false);
+  const lifestyle = { heightCm, weightKg, activityLevel: activity, sleepHours: sleep.hours, sleepQuality: sleep.quality };
+
+  useEffect(() => {
+    if (completionStarted.current) return;
+    void setOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId, {
+      phase: step <= 4 ? 'lifestyle' : 'recovery',
+      step: phaseStep,
+      lifestyle
+    });
+  }, [activity, authSession?.client.fiteatsyClientId, heightCm, phaseStep, sleep.hours, sleep.quality, step, weightKg]);
 
   const changeMetric = (setter: React.Dispatch<React.SetStateAction<number>>, current: number, next: number, min: number, max: number) => {
     const value = Math.max(min, Math.min(max, next));
@@ -69,11 +81,12 @@ export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
     if (step === 4) {
       navigation.navigate('FoodPreferences', {
         mode: 'onboarding',
-        lifestyle: { heightCm, weightKg, activityLevel: activity, sleepHours: sleep.hours, sleepQuality: sleep.quality }
+        lifestyle
       });
       return;
     }
     if (step < total) { setDirection('forward'); setStep((value) => value + 1); return; }
+    completionStarted.current = true;
     const completedAtISO = new Date().toISOString();
     if (onboarding) setOnboarding({ ...onboarding, heightCm, currentWeightKg: weightKg, activityLevel: activity, sleepHours: sleep.hours, sleepQualityLabel: sleep.quality, stressLevelLabel: `${stress}` });
     setAssessment({ completedAtISO, goal: 'Reduce Stress', gender: onboarding?.gender, age: onboarding?.calculatedAge ?? onboarding?.age, heightCm, weightKg, mood: moodChoice.value, soughtHelpBefore: support, physicalDistress: distress, sleepQuality: sleep.quality, stressLevel: stress, voiceReflection: '' });
@@ -81,6 +94,7 @@ export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
     const sleepScore = sleep.quality === 'Excellent' ? 5 : sleep.quality === 'Good' ? 4 : sleep.quality === 'Fair' ? 3 : sleep.quality === 'Poor' ? 2 : 1;
     void submitCheckIn({ mood: moodScore as 1 | 2 | 3 | 4 | 5, energy: Math.max(1, 6 - stress) as 1 | 2 | 3 | 4 | 5, sleepQuality: sleepScore as 1 | 2 | 3 | 4 | 5, stressLevel: stress });
     setMood(moodScore >= 4 ? '🙂' : moodScore === 3 ? '😐' : '☹️');
+    void setOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId, { phase: 'connect', step: 1, lifestyle });
     navigation.navigate('SyncWearable');
   };
 

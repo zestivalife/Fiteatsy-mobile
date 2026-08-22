@@ -7,6 +7,7 @@ import Svg, { Path } from 'react-native-svg';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import { colors } from '../../design/tokens';
+import { getOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
@@ -29,7 +30,7 @@ const FiteatsyWordmark = ({ width }: { width: number }) => {
 };
 
 export const SplashScreen = ({ navigation }: Props) => {
-  const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep } = useAppContext();
+  const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep, authSession } = useAppContext();
   const { width } = useWindowDimensions();
 
   const introOpacity = useRef(new Animated.Value(0)).current;
@@ -116,7 +117,7 @@ export const SplashScreen = ({ navigation }: Props) => {
 
     startAnimations();
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       if (navigated.current) {
         return;
       }
@@ -125,6 +126,20 @@ export const SplashScreen = ({ navigation }: Props) => {
 
       if (!isAuthenticated) {
         navigation.replace('SignIn');
+        return;
+      }
+
+      const progress = await getOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
+      if (onboardingStatus !== 'COMPLETED' && progress?.phase === 'food') {
+        navigation.replace('FoodPreferences', { mode: 'onboarding', lifestyle: progress.lifestyle });
+        return;
+      }
+      if (onboardingStatus !== 'COMPLETED' && progress?.phase === 'recovery') {
+        navigation.replace('OnboardingAssessment', { startPhase: 'recovery', lifestyle: progress.lifestyle });
+        return;
+      }
+      if (progress?.phase === 'connect') {
+        navigation.replace('SyncWearable');
         return;
       }
 
@@ -149,7 +164,7 @@ export const SplashScreen = ({ navigation }: Props) => {
       sweepX.stopAnimation();
       bgShift.stopAnimation();
     };
-  }, [bootstrapped, introOpacity, introScale, isAuthenticated, navigation, onboardingStatus, onboardingResumeStep, glowOpacity, sweepX, bgShift]);
+  }, [authSession?.client.fiteatsyClientId, bootstrapped, introOpacity, introScale, isAuthenticated, navigation, onboardingStatus, onboardingResumeStep, glowOpacity, sweepX, bgShift]);
 
   const logoWidth = Math.min(width * 0.78, 420);
 

@@ -128,7 +128,7 @@ export const QuestionHeader = ({ title, description }: { title: string; descript
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bgPrimary },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.lg },
   back: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardMuted },
   backSpacer: { width: 44, height: 44 },
   pressed: { opacity: 0.72 },
@@ -141,9 +141,9 @@ const styles = StyleSheet.create({
   track: { flex: 1, height: 3, borderRadius: 2, overflow: 'hidden', backgroundColor: '#262832' },
   fill: { height: 3, borderRadius: 2, backgroundColor: colors.success },
   currentFill: { backgroundColor: colors.blue },
-  scroll: { flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  content: { flex: 1, paddingHorizontal: spacing.lg },
-  action: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.stroke, paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.bgPrimary },
+  scroll: { flexGrow: 1, paddingBottom: spacing.xl },
+  content: { flex: 1, width: '100%', paddingHorizontal: spacing.md },
+  action: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.stroke, paddingHorizontal: spacing.md, paddingTop: spacing.md, backgroundColor: colors.bgPrimary },
   actionButton: { minHeight: 52, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: '#49DF86' },
   secondaryButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.stroke, marginTop: spacing.sm },
   disabled: { opacity: 0.45 },

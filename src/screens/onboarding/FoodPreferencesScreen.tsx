@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
@@ -16,6 +16,7 @@ import {
   type FoodPreferenceProfile
 } from '../../services/foodPreferenceService';
 import { OnboardingFoodPreferencesFlow } from './OnboardingFoodPreferencesFlow';
+import { getOnboardingRuntimeProgress, setOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FoodPreferences'>;
 type Choice = { label: string; value: string };
@@ -39,7 +40,7 @@ const practicality: Choice[] = ['Home-cooked', 'Office-friendly', 'Quick prepara
 const toggle = (values: string[], value: string) => values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 
 export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
-  const { themeMode, onboarding } = useAppContext();
+  const { themeMode, onboarding, authSession } = useAppContext();
   const palette = getThemeColors(themeMode);
   const mode = route.params?.mode ?? 'profile';
   const [profile, setProfile] = useState<FoodPreferenceProfile>(emptyFoodPreferenceProfile());
@@ -52,16 +53,24 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const [foodItems, setFoodItems] = useState<FoodCatalogueItem[]>([]);
   const [foodLoading, setFoodLoading] = useState(false);
   const [foodError, setFoodError] = useState<string | null>(null);
+  const [initialOnboardingStep, setInitialOnboardingStep] = useState(1);
+  const clientId = authSession?.client.fiteatsyClientId;
+  const completionStarted = useRef(false);
 
   useEffect(() => {
-    getFoodPreferences()
-      .then((response) => {
-        setProfile({ ...emptyFoodPreferenceProfile(), ...response.profile, likedFoodIds: response.profile.likedFoodIds ?? [], dislikedFoodIds: response.profile.dislikedFoodIds ?? [], avoidedFoodIds: response.profile.avoidedFoodIds ?? [] });
+    Promise.all([
+      getFoodPreferences(),
+      mode === 'onboarding' ? getOnboardingRuntimeProgress(clientId) : Promise.resolve(null)
+    ])
+      .then(([response, progress]) => {
+        const source = progress?.phase === 'food' && progress.foodDraft ? progress.foodDraft : response.profile;
+        setProfile({ ...emptyFoodPreferenceProfile(), ...source, likedFoodIds: source.likedFoodIds ?? [], dislikedFoodIds: source.dislikedFoodIds ?? [], avoidedFoodIds: source.avoidedFoodIds ?? [] });
+        if (progress?.phase === 'food') setInitialOnboardingStep(Math.max(1, Math.min(4, progress.step)));
         setSavedAt(response.updatedAtISO);
       })
       .catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'Unable to load food preferences.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [clientId, mode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -79,20 +88,29 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const selectedDietLabel = useMemo(() => diets.find((item) => item.value === profile.dietType)?.label ?? 'Not selected', [profile.dietType]);
 
   const update = <K extends keyof FoodPreferenceProfile>(key: K, value: FoodPreferenceProfile[K]) => setProfile((current) => ({ ...current, [key]: value }));
+  const persistOnboardingProgress = useCallback((step: number, foodDraft: FoodPreferenceProfile) => {
+    if (completionStarted.current) return;
+    void setOnboardingRuntimeProgress(clientId, { phase: 'food', step, lifestyle: route.params?.lifestyle, foodDraft });
+  }, [clientId, route.params?.lifestyle]);
   const save = async () => {
     if (!profile.dietType) {
       setError('Choose the diet that best describes you.');
       return;
     }
+    completionStarted.current = mode === 'onboarding';
     setSaving(true);
     setError(null);
     try {
       const response = await saveFoodPreferences(profile);
       setProfile(response.profile);
       setSavedAt(response.updatedAtISO);
-      if (mode === 'onboarding') navigation.navigate('OnboardingAssessment', { startPhase: 'recovery', lifestyle: route.params?.lifestyle });
+      if (mode === 'onboarding') {
+        await setOnboardingRuntimeProgress(clientId, { phase: 'recovery', step: 1, lifestyle: route.params?.lifestyle, foodDraft: response.profile });
+        navigation.push('OnboardingAssessment', { startPhase: 'recovery', lifestyle: route.params?.lifestyle });
+      }
       else navigation.goBack();
     } catch (requestError) {
+      completionStarted.current = false;
       setError(requestError instanceof Error ? requestError.message : 'Unable to save food preferences. Please try again.');
     } finally {
       setSaving(false);
@@ -106,6 +124,8 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   if (mode === 'onboarding') {
     return <OnboardingFoodPreferencesFlow
       profile={profile}
+      initialStep={initialOnboardingStep}
+      onProgress={persistOnboardingProgress}
       update={update}
       foodQuery={foodQuery}
       setFoodQuery={setFoodQuery}
