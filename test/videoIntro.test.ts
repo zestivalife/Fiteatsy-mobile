@@ -5,6 +5,20 @@ const source = fs.readFileSync(
   path.join(process.cwd(), 'src/screens/auth/SplashScreen.tsx'),
   'utf8'
 );
+const appConfig = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), 'app.json'), 'utf8')
+);
+const iosLaunchScreen = fs.readFileSync(
+  path.join(process.cwd(), 'ios/Fiteatsy/SplashScreen.storyboard'),
+  'utf8'
+);
+const androidLaunchBackground = fs.readFileSync(
+  path.join(
+    process.cwd(),
+    'android/app/src/main/res/drawable/ic_launcher_background.xml'
+  ),
+  'utf8'
+);
 
 describe('premium app-level video intro contract', () => {
   it('uses the approved remote video and supplied SVG with the required presentation', () => {
@@ -35,5 +49,14 @@ describe('premium app-level video intro contract', () => {
     ]) {
       expect(source).toContain(`navigation.replace('${route}'`);
     }
+  });
+
+  it('keeps the native bootstrap unbranded and black before video playback', () => {
+    expect(appConfig.expo.splash).toEqual({
+      resizeMode: 'contain',
+      backgroundColor: '#000000'
+    });
+    expect(iosLaunchScreen).not.toContain('SplashScreenLegacy');
+    expect(androidLaunchBackground).not.toContain('splashscreen_logo');
   });
 });
