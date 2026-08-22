@@ -47,8 +47,16 @@ export const SplashScreen = ({ navigation }: Props) => {
     setExitRequested(true);
   }, []);
 
+  const pauseVideo = useCallback(() => {
+    try {
+      player.pause();
+    } catch {
+      // The native player may already be released during a development reload.
+    }
+  }, [player]);
+
   const transitionTo = useCallback((navigate: () => void) => {
-    player.pause();
+    pauseVideo();
     Animated.timing(screenOpacity, {
       toValue: 0,
       duration: EXIT_FADE_DURATION,
@@ -57,7 +65,7 @@ export const SplashScreen = ({ navigation }: Props) => {
     }).start(({ finished }) => {
       if (finished) navigate();
     });
-  }, [player, screenOpacity]);
+  }, [pauseVideo, screenOpacity]);
 
   const resolveAndNavigate = useCallback(async () => {
     if (!isAuthenticated) {
@@ -139,9 +147,9 @@ export const SplashScreen = ({ navigation }: Props) => {
       logoTranslateY.stopAnimation();
       logoScale.stopAnimation();
       screenOpacity.stopAnimation();
-      player.pause();
+      pauseVideo();
     };
-  }, [logoOpacity, logoScale, logoTranslateY, player, requestExit, screenOpacity]);
+  }, [logoOpacity, logoScale, logoTranslateY, pauseVideo, player, requestExit, screenOpacity]);
 
   useEffect(() => {
     if (!exitRequested || navigated.current || (!bootstrapped && !forceExit)) return;
@@ -162,7 +170,7 @@ export const SplashScreen = ({ navigation }: Props) => {
         style={StyleSheet.absoluteFill}
         contentFit="cover"
         nativeControls={false}
-        allowsFullscreen={false}
+        fullscreenOptions={{ enable: false }}
         allowsPictureInPicture={false}
         showsTimecodes={false}
         surfaceType={Platform.OS === 'android' ? 'textureView' : undefined}
