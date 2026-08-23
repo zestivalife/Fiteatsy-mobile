@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
@@ -20,12 +21,19 @@ import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-inactive.svg';
 import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-selected.svg';
 import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-inactive.svg';
 import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
-import { RootStackParamList } from '../../navigation/types';
-import { buildRecoveryIntelligence, type RecoveryDriver } from '../../services/recoveryIntelligenceEngine';
+import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
 import { getMySubscription } from '../../services/subscriptionService';
-import type { DailyCheckIn, Medication, MedicationLogStatus } from '../../types';
+import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
+import {
+  getHealthScoreHistory,
+  getHealthScoreSummary,
+  type HealthScoreSummary
+} from '../../services/healthIntelligenceService';
+import type { Medication, MedicationLogStatus } from '../../types';
+import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
+import { resolveClientFirstName } from '../../utils/clientIdentity';
 import {
   buildPss10StressContext,
   formatPss10Change,
@@ -44,7 +52,6 @@ const SCORE_ARC_SIZE = 209;
 const SCORE_ARC_RADIUS = 69;
 const SCORE_ARC_STROKE_WIDTH = 20;
 const SCORE_ARC_CIRCUMFERENCE = 2 * Math.PI * SCORE_ARC_RADIUS;
-const ENABLE_HOME_RECOVERY_UI_FIXTURE = true;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const font = {
@@ -54,18 +61,12 @@ const font = {
   bold: 'Exo_700Bold'
 } as const;
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Journey'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 type MetricKey = 'recovery' | 'calm' | 'activity' | 'nutrition' | 'mind' | 'sleep';
 type SvgAsset = React.FC<SvgProps>;
-const HOME_RECOVERY_UI_FIXTURE: Record<MetricKey, number> = {
-  recovery: 64,
-  calm: 72,
-  activity: 48,
-  nutrition: 83,
-  mind: 59,
-  sleep: 36
-};
-
 type RecoveryMetric = {
   key: Exclude<MetricKey, 'recovery'>;
   label: string;
@@ -82,12 +83,6 @@ type MedicationTimelineEntry = {
   medication: Medication;
   scheduledForISO: string;
   status: MedicationLogStatus;
-};
-
-const firstName = (name?: string | null) => {
-  const trimmed = name?.trim();
-  if (!trimmed) return 'there';
-  return trimmed.split(/\s+/)[0];
 };
 
 const trendTone = (value: number) => {
@@ -122,53 +117,21 @@ const arcGradientForMetric = (key: MetricKey) => {
   }
 };
 
-const scoreForHomeUi = (key: MetricKey, score: number | null) => (
-  ENABLE_HOME_RECOVERY_UI_FIXTURE ? HOME_RECOVERY_UI_FIXTURE[key] : score
-);
-
-const driverScore = (drivers: RecoveryDriver[], key: RecoveryDriver['key'], requireSignal: boolean) => {
-  if (!requireSignal) return null;
-  return drivers.find((driver) => driver.key === key && driver.weight > 0)?.score ?? null;
-};
-
 const normalizeScore = (value: number | null | undefined) => {
   if (value == null || !Number.isFinite(value)) return null;
   return Math.max(0, Math.min(100, Math.round(value)));
 };
 
-const averageScores = (scores: Array<number | null>) => {
-  const available = scores.filter((score): score is number => score != null);
-  if (available.length === 0) return null;
-  return Math.round(available.reduce((sum, score) => sum + score, 0) / available.length);
-};
-
-const buildDomainTrend = (scores: Array<number | null>, checkIns: DailyCheckIn[]) => {
-  const todayScore = averageScores(scores);
-  if (todayScore == null) return [];
-
-  const recentCheckIns = [...checkIns]
-    .sort((a, b) => (+new Date(a.dateISO)) - (+new Date(b.dateISO)))
-    .slice(-6);
-
-  const historical = recentCheckIns.map((entry) =>
-    normalizeScore(((entry.mood / 5) * 34) + ((entry.energy / 5) * 33) + ((entry.sleepQuality / 5) * 33)) ?? todayScore
-  );
-
-  return [...historical, todayScore].slice(-7);
-};
-
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
   const {
-    onboarding,
-    wellness,
-    checkIns,
-    wearableSyncData,
     authSession,
-    publishedNutritionPlan,
     getMedicationTimelineForDate
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
+  const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
+  const [healthSummary, setHealthSummary] = useState<HealthScoreSummary | null>(null);
+  const [recoveryTrend, setRecoveryTrend] = useState<number[]>([]);
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
   );
@@ -208,18 +171,6 @@ export const HomeScreen = () => {
     }
   }, [navigation]);
 
-  const recoveryIntel = useMemo(
-    () =>
-      buildRecoveryIntelligence({
-        wellness,
-        checkIns,
-        medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
-        hasWearable: wearableSyncData.length > 0,
-        wearableSyncData
-      }),
-    [wellness, checkIns, wearableSyncData]
-  );
-
   const refreshPss10Context = useCallback(async () => {
     if (!hasAuthSession || !sessionToken) {
       setPss10Context(buildPss10StressContext({ latestResult: null, previousResult: null, draft: null }));
@@ -243,24 +194,65 @@ export const HomeScreen = () => {
     }
   }, [hasAuthSession, sessionToken]);
 
+  const refreshDailyNutrition = useCallback(async () => {
+    if (!hasAuthSession) {
+      setDailyNutrition(null);
+      return;
+    }
+    try {
+      setDailyNutrition(await getNutritionExperience(nutritionDate()));
+    } catch {
+      setDailyNutrition(null);
+    }
+  }, [hasAuthSession]);
+
+  const refreshHealthScores = useCallback(async () => {
+    if (!hasAuthSession) {
+      setHealthSummary(null);
+      setRecoveryTrend([]);
+      return;
+    }
+    try {
+      const [summary, history] = await Promise.all([
+        getHealthScoreSummary(),
+        getHealthScoreHistory('recovery')
+      ]);
+      setHealthSummary(summary);
+      setRecoveryTrend(
+        history.items
+          .filter((item) => item.scoreStatus === 'calculated' && item.scoreValue != null)
+          .sort((a, b) => (+new Date(a.calculatedAtISO)) - (+new Date(b.calculatedAtISO)))
+          .slice(-7)
+          .map((item) => normalizeScore(item.scoreValue))
+          .filter((score): score is number => score != null)
+      );
+    } catch {
+      setHealthSummary(null);
+      setRecoveryTrend([]);
+    }
+  }, [hasAuthSession]);
+
   useFocusEffect(
     useCallback(() => {
       void refreshPss10Context();
-    }, [refreshPss10Context])
+      void refreshDailyNutrition();
+      void refreshHealthScores();
+    }, [refreshDailyNutrition, refreshHealthScores, refreshPss10Context])
+  );
+  useEffect(
+    () => subscribeToNutritionDay(() => {
+      void refreshDailyNutrition();
+      void refreshHealthScores();
+    }),
+    [refreshDailyNutrition, refreshHealthScores]
   );
 
-  const nutritionProtein = publishedNutritionPlan?.version.contentSummary.protein ?? null;
-  const nutritionCalories = publishedNutritionPlan?.version.contentSummary.calories ?? null;
-  const nutritionScore = normalizeScore(
-    nutritionProtein != null && nutritionCalories != null
-      ? Math.min(100, Math.round((nutritionProtein / 120) * 55 + (nutritionCalories / 2200) * 45))
-      : wellness.nourishmentScore
-  );
+  const nutritionScore = normalizeScore(dailyNutrition?.nutritionScore ?? null);
   const metrics: RecoveryMetric[] = [
     {
       key: 'calm',
       label: 'Calm',
-      score: normalizeScore(recoveryIntel.calmScore),
+      score: normalizeScore(healthSummary?.stressResilienceScore ?? healthSummary?.calmScore),
       color: '#FF1717',
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
@@ -269,7 +261,7 @@ export const HomeScreen = () => {
     {
       key: 'activity',
       label: 'Activity',
-      score: normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'activity', recoveryIntel.signalCoverage.steps || recoveryIntel.signalCoverage.workouts)),
+      score: normalizeScore(healthSummary?.activePerformanceScore ?? healthSummary?.activityScore),
       color: '#F27A1A',
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
@@ -287,9 +279,7 @@ export const HomeScreen = () => {
     {
       key: 'mind',
       label: 'Mind',
-      score: checkIns.length > 0
-        ? normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'emotional_checkins', true))
-        : null,
+      score: normalizeScore(healthSummary?.stressResilienceScore),
       color: '#763CEF',
       position: 'bottomLeft',
       DefaultIcon: MindDefaultIcon,
@@ -298,20 +288,17 @@ export const HomeScreen = () => {
     {
       key: 'sleep',
       label: 'Sleep',
-      score: normalizeScore(driverScore(recoveryIntel.recoveryDrivers, 'sleep', recoveryIntel.signalCoverage.sleep)),
+      score: normalizeScore(healthSummary?.energyBalanceScore ?? healthSummary?.sleepScore),
       color: '#0F80FF',
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
       ActiveIcon: SleepActiveIcon
     }
   ];
-  const displayMetrics = metrics.map((metric) => ({
-    ...metric,
-    score: scoreForHomeUi(metric.key, metric.score)
-  }));
-  const trendValues = buildDomainTrend(displayMetrics.map((metric) => metric.score), checkIns);
+  const displayMetrics = metrics;
+  const trendValues = recoveryTrend;
   const hasTrendData = trendValues.length > 0;
-  const recoveryCoreScore = scoreForHomeUi('recovery', averageScores(displayMetrics.map((metric) => metric.score)));
+  const recoveryCoreScore = normalizeScore(healthSummary?.recoveryScore);
 
   const selected = selectedMetric === 'recovery'
     ? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D' }
@@ -325,7 +312,7 @@ export const HomeScreen = () => {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.referenceFrame}>
             <HomeHeader
-              name={firstName(onboarding?.name)}
+              name={resolveClientFirstName(authSession?.user.name)}
               onSearch={() => navigation.navigate('Search')}
               onAdd={() => navigation.navigate('Leadership')}
               onNotifications={() => navigation.navigate('Notifications')}
@@ -622,7 +609,7 @@ const StressCard = ({
         <Text style={styles.cardTitle}>Stress Recovery</Text>
         <Ionicons name="headset-outline" size={20} color="#F4F7F4" />
       </View>
-      <Text style={styles.stressLabel}>Perceived Stress</Text>
+      <Text style={styles.stressLabel}>Stress Test</Text>
       <View style={styles.stressValueRow}>
         <Text style={styles.stressValue}>{stateText}</Text>
         {pss10Context.available && changeText ? <Text style={styles.stressTrend}>{changeText}</Text> : null}
