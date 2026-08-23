@@ -499,7 +499,14 @@ const buildParsedParameter = (
 });
 
 const parseDelimitedReportRows = (text: string): ParsedParameter[] => {
-  const rawLines = normalizePdfTextForParsing(text).split('\n');
+  // Preserve PDF table delimiters for the primary row parser. Running the
+  // text through normalizePdfTextForParsing first collapses tabs to spaces,
+  // which makes the tab-delimited branch unreachable and forces real reports
+  // through the lower-confidence fallback scan.
+  const rawLines = text
+    .split('\n')
+    .map((line) => collapseStandaloneRepeatedLetters(line).trim())
+    .filter(Boolean);
   const out: ParsedParameter[] = [];
 
   for (let index = 0; index < rawLines.length; index += 1) {
@@ -589,7 +596,7 @@ const parseGroupedTableParameters = (lines: string[]): ParsedParameter[] => {
 const parseParameters = (text: string): ParsedParameter[] => {
   const normalizedText = normalizePdfTextForParsing(text);
   const lines = normalizedText.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
-  const out: ParsedParameter[] = [...parseDelimitedReportRows(normalizedText), ...parseGroupedTableParameters(lines)];
+  const out: ParsedParameter[] = [...parseDelimitedReportRows(text), ...parseGroupedTableParameters(lines)];
   const linePattern =
     /^([A-Za-z][A-Za-z0-9 .(),/+%-]{2,70})\s+(-?\d+(?:\.\d+)?)\s*([A-Za-z0-9/%µμ^./-]+)?\s+(<?\s*-?\d+(?:\.\d+)?\s*(?:-|–)\s*-?\d+(?:\.\d+)?|<\s*-?\d+(?:\.\d+)?|>\s*-?\d+(?:\.\d+)?)/;
 

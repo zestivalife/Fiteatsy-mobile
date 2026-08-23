@@ -29,7 +29,7 @@ test('public report responses hide rejected biomarker values while preserving pa
 });
 
 test('public report responses keep needs-review biomarkers visible but hide invalid real-PDF fragments', async () => {
-  const buffer = readFileSync('fixtures/real-reports/pdf_case_b.pdf');
+  const buffer = readFileSync(new URL('../../fixtures/real-reports/pdf_case_b.pdf', import.meta.url));
   const analysis = await analyzeReportBuffer(buffer, 'application/pdf');
   const publicAnalysis = sanitizeReportAnalysisForPublic(analysis);
 
