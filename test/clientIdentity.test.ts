@@ -7,7 +7,7 @@ describe('canonical authenticated client identity', () => {
   });
 
   it.each([null, undefined, '', '   '])('uses the approved fallback only for a missing name: %p', (name) => {
-    expect(resolveClientName(name)).toBe('Member');
+    expect(resolveClientName(name)).toBe('Name unavailable');
     expect(resolveClientFirstName(name)).toBe('there');
   });
 
