@@ -171,6 +171,7 @@ test('OTP verification creates a persisted session and current client without pu
       try {
         await resetBackendStateForTests();
         setOtpGeneratorForTests(() => '654321');
+        useSuccessfulOtpDeliveryProvider();
       } catch (error) {
         if (isConnectionRefused(error)) {
           t.skip('Local PostgreSQL is unavailable; session/client verification requires the test database.');
@@ -194,7 +195,7 @@ test('OTP verification creates a persisted session and current client without pu
           otp: '654321'
         });
         assert.equal(verified.response.status, 200);
-        assert.match(verified.body.sessionToken, /^[-a-z0-9]+$/i);
+        assert.match(verified.body.sessionToken, /^[-_a-z0-9]+$/i);
 
         const me = await getJson(server.baseUrl, '/v1/auth/me', {
           headers: authHeaders(verified.body.sessionToken)

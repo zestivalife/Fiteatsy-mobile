@@ -1189,12 +1189,6 @@ export const TrackerScreen = () => {
   const contentAnim = useRef(new Animated.Value(1)).current;
 
   const days = useMemo<DayData[]>(() => {
-    const latestSync = wearableSyncData[0];
-    const baseHeart = latestSync?.metrics.heartRateAvg ?? wellness.heartRateAvg;
-    const baseSteps = Math.max(1600, Math.round((latestSync?.metrics.movementMinutes ?? wellness.movementMinutes) * 210));
-    const baseCal = Math.round(1000 + (latestSync?.metrics.focusMinutes ?? wellness.focusMinutes) * 18);
-    const baseDistance = Number((Math.max(2.2, wellness.movementMinutes / 8)).toFixed(1));
-
     const base = new Date();
     const weekStart = new Date(base);
     weekStart.setHours(0, 0, 0, 0);
@@ -1203,39 +1197,31 @@ export const TrackerScreen = () => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(weekStart);
       d.setDate(weekStart.getDate() + i);
-      const stressNoise = ((i + 3) % 5) - 2;
-      const moodEnergy = checkIns.length > 0 ? checkIns[Math.max(0, checkIns.length - 1)] : null;
-      const moodFactor = moodEnergy ? (moodEnergy.mood + moodEnergy.energy + moodEnergy.sleepQuality) / 3 : 3;
-
-      const steps = Math.max(1200, baseSteps + (i - 3) * 210 + stressNoise * 55 + Math.round(moodFactor * 45));
-      const calories = Math.max(850, baseCal + (i - 3) * 64 + stressNoise * 18);
-      const distanceKm = Number(Math.max(1.8, baseDistance + (i - 3) * 0.28 + stressNoise * 0.04).toFixed(1));
-      const heartRate = Math.max(58, Math.min(122, baseHeart + stressNoise * 2 + (i % 2 === 0 ? 1 : -1)));
-
-      const activityEnergy = [38, 52, 31, 58, 78, 56, 24].map((v, idx) => Math.max(16, v + stressNoise * 2 + (idx === i ? 6 : 0)));
-      const cardioRecovery = [62, 66, 61, 70, 79, 74, 68].map((v, idx) => Math.max(40, v + Math.round(moodFactor) - 3 + (idx === i ? 4 : 0)));
-      const sleepScoreBars = [58, 66, 51, 72, 81, 69, 63].map((v, idx) => Math.max(35, v + (idx === i ? 5 : 0) - stressNoise));
-      const stressLoad = [61, 58, 64, 56, 51, 49, 53].map((v, idx) => Math.max(28, v + stressNoise + (idx === i ? -4 : 0)));
-      const focusTrend = [48, 52, 50, 58, 61, 63, 66].map((v, idx) => Math.max(25, v + Math.round(moodFactor) - 3 + (idx === i ? 3 : 0)));
-      const wellnessTrend = [57, 60, 59, 64, 67, 70, 72].map((v, idx) => Math.max(30, v + Math.round(moodFactor) - 3 + (idx === i ? 2 : 0)));
+      const dayKey = toDayKey(d.toISOString());
+      const sync = wearableSyncData.find((item) => toDayKey(item.syncedAtISO) === dayKey);
+      const calories = sync?.metrics.caloriesKcal ?? 0;
+      const heartRate = sync?.metrics.heartRateAvg ?? 0;
+      const activityEnergy = sync ? [sync.metrics.movementMinutes] : [];
+      const stressLoad = sync?.metrics.stressScore == null ? [] : [sync.metrics.stressScore];
+      const focusTrend = sync ? [sync.metrics.focusMinutes] : [];
 
       return {
-        key: toDayKey(d.toISOString()),
+        key: dayKey,
         dayLabel: dayShort[d.getDay()],
         dateNum: d.getDate(),
         calories,
-        distanceKm,
-        steps,
+        distanceKm: 0,
+        steps: 0,
         heartRate,
         activityEnergy,
-        cardioRecovery,
-        sleepScoreBars,
+        cardioRecovery: [],
+        sleepScoreBars: [],
         stressLoad,
         focusTrend,
-        wellnessTrend
+        wellnessTrend: []
       };
     });
-  }, [checkIns, wearableSyncData, wellness.focusMinutes, wellness.heartRateAvg, wellness.movementMinutes]);
+  }, [wearableSyncData]);
 
   const selected = days[selectedDay] ?? days[days.length - 1];
   const yesterday = days[Math.max(0, selectedDay - 1)] ?? selected;
@@ -1768,7 +1754,7 @@ export const TrackerScreen = () => {
         style={[styles.pssEntryCard, !isLight && styles.pssEntryCardDark]}
         onPress={() => navigation.navigate('Pss10Assessment')}
         accessibilityRole="button"
-        accessibilityLabel="Open perceived stress assessment"
+        accessibilityLabel="Open Stress Test"
       >
         <View style={styles.pssEntryIcon}>
           <Ionicons name="sparkles-outline" size={22} color={MIND_ACCENT} />

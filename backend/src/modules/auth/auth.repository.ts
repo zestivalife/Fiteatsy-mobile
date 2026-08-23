@@ -439,7 +439,14 @@ const findUserCandidates = async (
       select *
       from users
       where deleted_at is null
-        and (email_normalized = $1 or mobile_number_normalized = $2)
+        and (
+          email_normalized = $1
+          or case
+            when length(regexp_replace(coalesce(mobile_number_normalized, ''), '[^0-9]', '', 'g')) = 10
+              then concat('91', regexp_replace(mobile_number_normalized, '[^0-9]', '', 'g'))
+            else regexp_replace(coalesce(mobile_number_normalized, ''), '[^0-9]', '', 'g')
+          end = $2
+        )
       order by created_at asc
       ${lockClause}
     `,
@@ -619,7 +626,11 @@ export const normalizeUserMobileNumber = async (userId: string, mobileNumber: st
           from users existing
           where existing.id <> users.id
             and existing.deleted_at is null
-            and existing.mobile_number_normalized = $2
+            and case
+              when length(regexp_replace(coalesce(existing.mobile_number_normalized, ''), '[^0-9]', '', 'g')) = 10
+                then concat('91', regexp_replace(existing.mobile_number_normalized, '[^0-9]', '', 'g'))
+              else regexp_replace(coalesce(existing.mobile_number_normalized, ''), '[^0-9]', '', 'g')
+            end = $2
         )
     `,
     [userId, normalizeMobileNumber(mobileNumber), now().toISOString()]

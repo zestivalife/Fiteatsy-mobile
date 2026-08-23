@@ -12,7 +12,7 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "test": "jest",
-    "test:canonical-data-contract": "cd backend && node --import tsx --test ../test/canonicalClientDataContract.test.ts ../test/onboardingGate.test.ts"
+    "test:canonical-data-contract": "jest --runInBand test/canonicalClientDataContract.test.ts && cd backend && node --import tsx --test ../test/onboardingGate.test.ts"
   },
   "dependencies": {
     "@expo-google-fonts/exo": "^0.4.1",

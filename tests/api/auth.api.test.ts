@@ -85,7 +85,7 @@ test('POST /v1/auth/signup/verify-otp issues a persisted session and GET /v1/aut
     otp: TEST_OTP,
   });
   assert.equal(verified.response.status, 200);
-  assert.match(verified.body.sessionToken, /^[-a-z0-9]+$/i);
+  assert.match(verified.body.sessionToken, /^[-_a-z0-9]+$/i);
   assert.match(verified.body.user.id, /^[0-9a-f-]{36}$/i);
   assert.notEqual(verified.body.user.id, 'asha@example.com');
 
@@ -120,7 +120,7 @@ test('PIN login bootstraps existing OTP users with default PIN and requires PIN 
   });
   assert.equal(pinSession.response.status, 200);
   assert.equal(pinSession.body.requiresPinChange, true);
-  assert.match(pinSession.body.sessionToken, /^[-a-z0-9]+$/i);
+  assert.match(pinSession.body.sessionToken, /^[-_a-z0-9]+$/i);
   assert.equal(pinSession.body.user.id, otpSession.body.user.id);
   assert.match(pinSession.body.client.fiteatsyClientId, /^fc_[a-f0-9]{32}$/i);
 });

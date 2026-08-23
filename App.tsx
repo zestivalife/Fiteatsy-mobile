@@ -45,11 +45,10 @@ export default function App() {
     ...MaterialCommunityIcons.font
   });
 
-  if (!fontsLoaded) {
-    return null;
-  }
-
-  if (!hasConfiguredGlobalFont) {
+  // The branded video splash must mount immediately on a cold launch. Font
+  // loading is allowed to finish behind it instead of extending the native
+  // black bridge with an otherwise blank React tree.
+  if (fontsLoaded && !hasConfiguredGlobalFont) {
     const GlobalText = Text as typeof Text & { defaultProps?: { style?: unknown } };
     GlobalText.defaultProps = GlobalText.defaultProps ?? {};
     GlobalText.defaultProps.style = [{ fontFamily: 'Exo_400Regular' }, GlobalText.defaultProps.style];

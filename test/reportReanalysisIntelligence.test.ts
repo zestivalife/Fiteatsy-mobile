@@ -36,7 +36,9 @@ describe('report re-analysis intelligence layer', () => {
     expect(metadataMigration).toContain('add column if not exists file_size bigint');
     expect(store).toContain('saveReportFile');
     expect(store).toContain('getReportFile');
-    expect(store).toContain("analysis_attempts = coalesce(health_reports.analysis_attempts, '[]'::jsonb) || jsonb_build_array");
+    expect(store).toContain('analysis_attempts = (');
+    expect(store).toContain("jsonb_array_elements(coalesce(health_reports.analysis_attempts, '[]'::jsonb))");
+    expect(store).toContain(') || jsonb_build_array(');
     expect(store).toContain('compareAnalysisQuality');
     expect(store).toContain("'selected', $10::boolean");
   });

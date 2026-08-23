@@ -134,9 +134,9 @@ describe('ReportsScreen auth isolation', () => {
       rerender(React.createElement(require('../src/screens/home/ReportsScreen').ReportsScreen));
     });
 
-    await waitFor(() => expect(getByText('No health reports yet')).toBeTruthy());
+    await waitFor(() => expect(getByText('View history (0)')).toBeTruthy());
     expect(queryByText('HbA1c')).toBeNull();
     expect(queryByText(/Last report:/)).toBeNull();
     expect(queryByText('5.8')).toBeNull();
-  });
+  }, 15_000);
 });

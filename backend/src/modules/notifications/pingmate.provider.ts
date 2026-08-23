@@ -86,6 +86,12 @@ export class PingMateProvider implements WhatsappProvider {
       ? configuredBaseUrl
       : `${configuredBaseUrl}/messages/send`;
     const normalizedRecipient = normalizeCanonicalPhoneNumber(input.mobileNumber);
+    if (!/^[0-9]+$/.test(normalizedRecipient)) {
+      throw new OtpDeliveryError('OTP recipient must use the canonical digits-only phone format.', {
+        provider: PINGMATE_PROVIDER_NAME,
+        latencyMs: Date.now() - startedAt
+      });
+    }
     const requestPayload = {
       to: normalizedRecipient,
       message: {

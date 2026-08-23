@@ -1,13 +1,19 @@
-import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AppState, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppBackButton } from '../../components/AppBackButton';
+import { PageHeader } from '../../components/PageHeader';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { SegmentedTabs } from '../../components/SegmentedTabs';
 import { Screen } from '../../components/Screen';
 import { radius, spacing } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import type { Medication, MedicationLogStatus } from '../../types';
 import { useAppContext } from '../../state/AppContext';
+import { resolveMedicationSlotForOccurrence } from '../../services/medicationUtils';
+import { resolveClientFirstName } from '../../utils/clientIdentity';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type MedicationTimelineEntry = {
@@ -15,6 +21,7 @@ type MedicationTimelineEntry = {
   scheduledForISO: string;
   status: MedicationLogStatus;
 };
+type Daypart = 'MORNING' | 'AFTERNOON' | 'EVENING' | 'NIGHT';
 type MedicationTab = 'today' | 'medications' | 'history';
 type SheetState =
   | { type: 'snooze'; entry: MedicationTimelineEntry; minutes: 5 | 10 | 15 | 30 }
@@ -33,6 +40,7 @@ const medicationTheme = {
   borderStrong: '#3A4046',
   cta: '#171A1D',
   ctaBorder: '#42484F',
+  active: '#67E638',
   taken: '#44D07F',
   due: '#F5B544',
   snoozed: '#B879FF',
@@ -43,29 +51,29 @@ const medicationTheme = {
 
 const typography = {
   hero: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 44,
-    lineHeight: 52
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22
   },
   section: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 24,
-    lineHeight: 30
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 16,
+    lineHeight: 22
   },
   bodyStrong: {
-    fontFamily: 'Exo_700Bold',
-    fontSize: 17,
-    lineHeight: 24
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 14,
+    lineHeight: 20
   },
   body: {
-    fontFamily: 'Exo_500Medium',
-    fontSize: 16,
-    lineHeight: 23
+    fontFamily: 'Exo_400Regular',
+    fontSize: 14,
+    lineHeight: 20
   },
   caption: {
-    fontFamily: 'Exo_600SemiBold',
-    fontSize: 13,
-    lineHeight: 18
+    fontFamily: 'Exo_500Medium',
+    fontSize: 12,
+    lineHeight: 17
   }
 };
 
@@ -85,9 +93,17 @@ const statusLabel: Record<MedicationLogStatus, string> = {
   upcoming: 'Upcoming'
 };
 
+const visibleStatus = (entry: MedicationTimelineEntry, now: Date) => {
+  if (entry.status !== 'upcoming') return { label: statusLabel[entry.status], color: statusColor[entry.status] };
+  const minutesUntil = (new Date(entry.scheduledForISO).getTime() - now.getTime()) / 60_000;
+  return minutesUntil <= 30 && minutesUntil >= -120
+    ? { label: 'Due now', color: medicationTheme.due }
+    : { label: 'Pending', color: medicationTheme.upcoming };
+};
+
 const mealRelationLabel: Record<string, string> = {
   before_meal: 'Before food',
-  after_meal: 'After dinner',
+  after_meal: 'After food',
   with_meal: 'With food',
   empty_stomach: 'Empty stomach'
 };
@@ -104,17 +120,30 @@ const getDayOffset = (offset: number) => {
 };
 
 const normalize = (value: string) => value.replace(/_/g, ' ').toLowerCase();
+const daypartFor = (value: string): Daypart => {
+  const hour = new Date(value).getHours();
+  if (hour < 12) return 'MORNING';
+  if (hour < 17) return 'AFTERNOON';
+  if (hour < 21) return 'EVENING';
+  return 'NIGHT';
+};
 
 export const MedicationCalendarScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { authSession, medications, getMedicationTimelineForDate, markMedicationAction } = useAppContext();
+  const { authSession, medications, medicationLogs, getMedicationTimelineForDate, markMedicationAction } = useAppContext();
   const [activeTab, setActiveTab] = useState<MedicationTab>('today');
   const [medicationFilter, setMedicationFilter] = useState<'active' | 'completed'>('active');
   const [historyRange, setHistoryRange] = useState<'7' | '30'>('7');
   const [savingLogId, setSavingLogId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<SheetState>(null);
 
-  const today = useMemo(() => new Date(), []);
+  const [today, setToday] = useState(() => new Date());
+  useEffect(() => {
+    const refresh = () => setToday(new Date());
+    const subscription = AppState.addEventListener('change', (state) => state === 'active' && refresh());
+    const timer = setInterval(refresh, 60_000);
+    return () => { subscription.remove(); clearInterval(timer); };
+  }, []);
   const todayTimeline = useMemo(
     () => getMedicationTimelineForDate(today.toISOString()).sort((a, b) => new Date(a.scheduledForISO).getTime() - new Date(b.scheduledForISO).getTime()),
     [getMedicationTimelineForDate, today]
@@ -132,6 +161,19 @@ export const MedicationCalendarScreen = () => {
     () => todayTimeline.find((entry) => entry.status === 'upcoming' || entry.status === 'snoozed') ?? todayTimeline.find((entry) => entry.status === 'missed') ?? null,
     [todayTimeline]
   );
+
+  const groupedTimeline = useMemo(() => {
+    const groups = new Map<Daypart, MedicationTimelineEntry[]>();
+    todayTimeline.forEach((entry) => groups.set(daypartFor(entry.scheduledForISO), [...(groups.get(daypartFor(entry.scheduledForISO)) ?? []), entry]));
+    return (['MORNING', 'AFTERNOON', 'EVENING', 'NIGHT'] as Daypart[]).flatMap((label) => {
+      const entries = groups.get(label) ?? [];
+      return entries.length ? [{ label, entries }] : [];
+    });
+  }, [todayTimeline]);
+
+  const actionTimeFor = (entry: MedicationTimelineEntry) => medicationLogs.find(
+    (log) => log.medicationId === entry.medication.id && log.scheduledForISO === entry.scheduledForISO
+  )?.actionedAtISO ?? null;
 
   const visibleMedications = useMemo(
     () => medications.filter((item) => (medicationFilter === 'active' ? item.status === 'active' : item.status !== 'active')),
@@ -174,7 +216,7 @@ export const MedicationCalendarScreen = () => {
     }
   };
 
-  const firstName = authSession?.user.name?.split(' ')[0] || 'there';
+  const firstName = resolveClientFirstName(authSession?.user.name);
 
   const medicationTimeLabel = (medication: Medication) =>
     medication.schedule.timeSlots
@@ -187,32 +229,22 @@ export const MedicationCalendarScreen = () => {
       .join(', ');
 
   const renderTabs = () => (
-    <View style={styles.tabRow}>
-      {([
-        ['today', 'Today'],
-        ['medications', 'My Medications'],
-        ['history', 'History']
-      ] as Array<[MedicationTab, string]>).map(([key, label]) => (
-        <Pressable key={key} style={[styles.topTab, activeTab === key && styles.topTabActive]} onPress={() => setActiveTab(key)} accessibilityRole="button">
-          <Text style={[styles.topTabText, activeTab === key && styles.topTabTextActive]}>{label}</Text>
-        </Pressable>
-      ))}
-    </View>
+    <SegmentedTabs
+      tabs={[{ key: 'today', label: 'Today' }, { key: 'medications', label: 'My Medications' }, { key: 'history', label: 'History' }]}
+      value={activeTab}
+      onChange={setActiveTab}
+    />
   );
 
   const renderProgressSegments = () => {
-    const sequence = todayTimeline.length > 0 ? todayTimeline : Array.from({ length: 5 }).map(() => null);
     return (
       <View style={styles.progressSegments}>
-        {sequence.slice(0, 5).map((entry, index) => (
+        {todayTimeline.map((entry) => (
           <View
-            key={entry ? `${entry.medication.id}-${entry.scheduledForISO}` : `empty-${index}`}
+            key={`${entry.medication.id}-${entry.scheduledForISO}`}
             style={[
               styles.progressSegment,
-              {
-                backgroundColor: entry ? statusColor[entry.status] : medicationTheme.surfaceRaised,
-                opacity: entry ? 1 : 0.42
-              }
+              { backgroundColor: statusColor[entry.status] }
             ]}
           />
         ))}
@@ -244,20 +276,19 @@ export const MedicationCalendarScreen = () => {
               <Text style={styles.nextMedicine}>{nextDose.medication.name}</Text>
               <Text style={styles.nextMeta}>{nextDose.medication.dosage}</Text>
             </View>
-            <View style={styles.pillIconBox}><Text style={styles.pillIcon}>⌁</Text></View>
+            <View style={styles.pillIconBox}><Ionicons name="medical-outline" size={32} color={medicationTheme.due} /></View>
           </View>
           <View style={styles.nextMetaRow}>
             <Text style={styles.dueTime}>◷ {formatTime(nextDose.scheduledForISO)}</Text>
-            <Text style={styles.nextMeta}>· {mealRelationLabel[nextDose.medication.schedule.timeSlots[0]?.mealRelation] ?? 'Scheduled dose'}</Text>
+            <Text style={styles.nextMeta}>· {mealRelationLabel[resolveMedicationSlotForOccurrence(nextDose.medication, nextDose.scheduledForISO)?.mealRelation] ?? 'Scheduled dose'}</Text>
             <Text style={styles.nextMeta}>🔔 Reminder ON</Text>
           </View>
-          <Pressable
-            style={styles.takeNowButton}
+          <PrimaryButton
+            title="Take now"
             onPress={() => recordMedicationStatus(nextDose, 'taken')}
-            accessibilityRole="button"
-          >
-            <Text style={styles.takeNowText}>{savingLogId?.endsWith('-taken') ? 'Saving...' : 'Take now'}</Text>
-          </Pressable>
+            loading={savingLogId?.endsWith('-taken') === true}
+            style={styles.takeNowButton}
+          />
           <View style={styles.secondaryActions}>
             <Pressable style={styles.secondaryActionButton} onPress={() => setSheet({ type: 'snooze', entry: nextDose, minutes: 15 })}>
               <Text style={styles.secondaryActionText}>Snooze</Text>
@@ -277,26 +308,33 @@ export const MedicationCalendarScreen = () => {
         </View>
       )}
 
-      <Text style={styles.scheduleTitle}>TODAY'S SCHEDULE</Text>
-      {todayTimeline.length === 0 ? null : (
-        <View style={styles.scheduleStack}>
-          {todayTimeline.map((entry) => (
+      {todayTimeline.length > 0 ? <Text style={styles.scheduleTitle}>TODAY'S SCHEDULE</Text> : null}
+      {groupedTimeline.map((group) => (
+        <View key={group.label} style={styles.scheduleGroup}>
+          <Text style={styles.daypartLabel}>{group.label}</Text>
+          <View style={styles.scheduleStack}>
+          {group.entries.map((entry) => {
+            const actionedAt = actionTimeFor(entry);
+            const displayStatus = visibleStatus(entry, today);
+            return (
             <View key={`${entry.medication.id}-${entry.scheduledForISO}`} style={styles.scheduleItem}>
               <View style={styles.scheduleTimeBlock}>
                 <Text style={styles.scheduleTime}>{formatTime(entry.scheduledForISO)}</Text>
-                <View style={[styles.statusDot, { backgroundColor: statusColor[entry.status] }]} />
+                {actionedAt ? <Text style={styles.actionTime}>{formatTime(actionedAt)}</Text> : null}
               </View>
+              <View style={[styles.statusDot, { backgroundColor: displayStatus.color }]} />
               <View style={styles.scheduleInfo}>
                 <Text style={styles.scheduleName}>{entry.medication.name}</Text>
-                <Text style={styles.scheduleMeta}>{entry.medication.dosage} · {mealRelationLabel[entry.medication.schedule.timeSlots[0]?.mealRelation] ?? 'Scheduled'}</Text>
+                <Text style={styles.scheduleMeta}>{entry.medication.dosage} · {mealRelationLabel[resolveMedicationSlotForOccurrence(entry.medication, entry.scheduledForISO)?.mealRelation] ?? 'Scheduled'}</Text>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: `${statusColor[entry.status]}24` }]}>
-                <Text style={[styles.statusBadgeText, { color: statusColor[entry.status] }]}>{statusLabel[entry.status]}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: `${displayStatus.color}24` }]}>
+                <Text style={[styles.statusBadgeText, { color: displayStatus.color }]}>{displayStatus.label}</Text>
               </View>
             </View>
-          ))}
+          )})}
+          </View>
         </View>
-      )}
+      ))}
     </>
   );
 
@@ -337,13 +375,7 @@ export const MedicationCalendarScreen = () => {
 
   const renderHistory = () => (
     <>
-      <View style={styles.subTabRow}>
-        {(['7', '30'] as const).map((key) => (
-          <Pressable key={key} style={[styles.subTab, historyRange === key && styles.subTabActive]} onPress={() => setHistoryRange(key)}>
-            <Text style={[styles.subTabText, historyRange === key && styles.subTabTextActive]}>{key} Days</Text>
-          </Pressable>
-        ))}
-      </View>
+      <SegmentedTabs tabs={[{ key: '7', label: '7 Days' }, { key: '30', label: '30 Days' }]} value={historyRange} onChange={setHistoryRange} />
       <View style={styles.adherenceCard}>
         <Text style={styles.scheduleTitle}>{historyRange}-DAY ADHERENCE</Text>
         <View style={styles.adherenceRow}>
@@ -351,7 +383,7 @@ export const MedicationCalendarScreen = () => {
           <Text style={styles.adherenceMeta}>{historyStats.taken} of {historyStats.scheduled} scheduled doses taken</Text>
         </View>
         <View style={styles.historyBars}>
-          {historyDays.slice(0, 7).reverse().map((day) => {
+          {historyDays.slice().reverse().map((day) => {
             const dayStatus: MedicationLogStatus =
               day.missed > 0 ? 'missed' : day.skipped > 0 ? 'snoozed' : day.taken > 0 ? 'taken' : 'upcoming';
             return (
@@ -371,7 +403,7 @@ export const MedicationCalendarScreen = () => {
       <Text style={styles.scheduleTitle}>DOSE LOG</Text>
       {historyDays.slice(0, 5).map((day) => (
         <View key={day.date.toISOString()} style={styles.historyDaySection}>
-          <Text style={styles.historyDate}>{toDateOnly(day.date).getTime() === toDateOnly(today).getTime() ? 'Today' : formatShortDate(day.date)}</Text>
+          <Text style={styles.historyDate}>{toDateOnly(day.date).getTime() === toDateOnly(today).getTime() ? 'Today' : toDateOnly(day.date).getTime() === toDateOnly(getDayOffset(-1)).getTime() ? 'Yesterday' : formatShortDate(day.date)}</Text>
           {day.timeline.length === 0 ? (
             <Text style={styles.emptyText}>No scheduled doses.</Text>
           ) : (
@@ -435,14 +467,12 @@ export const MedicationCalendarScreen = () => {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerRow}>
-          <AppBackButton onPress={() => navigation.goBack()} iconOnly />
-          <Pressable style={styles.notificationButton} onPress={() => navigation.navigate('MedicationNotifications')}>
-            <Text style={styles.notificationText}>⌁</Text>
-          </Pressable>
-        </View>
+        <PageHeader
+          title="Medication Tracker"
+          onBack={() => navigation.goBack()}
+          action={<Pressable style={styles.notificationButton} onPress={() => navigation.navigate('MedicationNotifications')} accessibilityLabel="Medication notifications"><Ionicons name="notifications-outline" size={22} color={medicationTheme.secondary} /></Pressable>}
+        />
         <Text style={styles.greeting}>Good {new Date().getHours() < 17 ? 'morning' : 'evening'}, {firstName}</Text>
-        <Text style={styles.title}>Medication Tracker</Text>
         <Text style={styles.date}>{formatDate(today)}</Text>
         {renderTabs()}
         {activeTab === 'today' ? renderToday() : activeTab === 'medications' ? renderMedications() : renderHistory()}
@@ -455,7 +485,7 @@ export const MedicationCalendarScreen = () => {
 const styles = StyleSheet.create({
   content: {
     paddingBottom: spacing.xxl * 2,
-    gap: 16
+    gap: 14
   },
   headerRow: {
     flexDirection: 'row',
@@ -463,9 +493,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between'
   },
   notificationButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: medicationTheme.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center'
@@ -480,35 +510,38 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.hero,
-    color: medicationTheme.text
+    color: medicationTheme.text,
+    marginTop: 2
   },
   date: {
     ...typography.body,
     color: medicationTheme.muted,
-    marginTop: -10
+    marginTop: -8
   },
   tabRow: {
     flexDirection: 'row',
-    gap: 8
+    gap: 8,
+    marginTop: 4
   },
   topTab: {
+    flexShrink: 1,
     borderRadius: radius.pill,
     backgroundColor: medicationTheme.surface,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
     borderWidth: 1,
     borderColor: 'transparent'
   },
   topTabActive: {
-    backgroundColor: medicationTheme.surfaceRaised,
-    borderColor: medicationTheme.borderStrong
+    backgroundColor: medicationTheme.active,
+    borderColor: medicationTheme.active
   },
   topTabText: {
     ...typography.bodyStrong,
     color: medicationTheme.muted
   },
   topTabTextActive: {
-    color: medicationTheme.text
+    color: '#071006'
   },
   progressCard: {
     borderWidth: 1,
@@ -597,17 +630,14 @@ const styles = StyleSheet.create({
     color: medicationTheme.due
   },
   takeNowButton: {
-    minHeight: 56,
-    borderRadius: 20,
-    backgroundColor: 'rgba(245, 181, 68, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 181, 68, 0.42)',
-    alignItems: 'center',
-    justifyContent: 'center'
+    minHeight: 44,
+    borderRadius: radius.pill,
+    backgroundColor: medicationTheme.active,
+    alignItems: 'center'
   },
   takeNowText: {
     ...typography.bodyStrong,
-    color: medicationTheme.text
+    color: '#071006'
   },
   secondaryActions: {
     flexDirection: 'row',
@@ -633,6 +663,14 @@ const styles = StyleSheet.create({
   scheduleStack: {
     gap: 12
   },
+  scheduleGroup: {
+    gap: 8
+  },
+  daypartLabel: {
+    ...typography.caption,
+    color: medicationTheme.muted,
+    letterSpacing: 2
+  },
   scheduleItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -644,14 +682,16 @@ const styles = StyleSheet.create({
     gap: 14
   },
   scheduleTimeBlock: {
-    width: 74,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
+    width: 68,
+    alignItems: 'flex-end'
   },
   scheduleTime: {
     ...typography.bodyStrong,
     color: medicationTheme.text
+  },
+  actionTime: {
+    ...typography.caption,
+    color: medicationTheme.muted
   },
   statusDot: {
     width: 8,
@@ -689,7 +729,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   subTabActive: {
-    backgroundColor: medicationTheme.surfaceRaised,
+    backgroundColor: medicationTheme.active,
     borderWidth: 1,
     borderColor: medicationTheme.borderStrong
   },
@@ -698,7 +738,7 @@ const styles = StyleSheet.create({
     color: medicationTheme.muted
   },
   subTabTextActive: {
-    color: medicationTheme.text
+    color: '#071006'
   },
   addButton: {
     marginLeft: 'auto',
