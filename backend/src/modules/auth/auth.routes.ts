@@ -158,6 +158,8 @@ authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
       name: account.user.name,
       email: account.user.email,
       mobileNumber: account.user.mobileNumber,
+      role: account.user.role,
+      accountPurpose: account.user.accountPurpose,
       createdAtISO: account.user.createdAtISO
     }
   });

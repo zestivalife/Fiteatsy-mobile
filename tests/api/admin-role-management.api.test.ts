@@ -180,6 +180,28 @@ test('consultant cannot assign roles', async () => {
   assert.equal(statusDenied.body.error, 'ROLE_NOT_ALLOWED');
 });
 
+test('QA_TEST admin cannot mutate production roles and reports only QA provisioning permission', async () => {
+  const admin = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Restricted QA Admin', email: `restricted-qa-admin-${Date.now()}@example.com`
+  });
+  const target = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Production Role Target', email: `production-role-target-${Date.now()}@example.com`
+  });
+  await pool.query("update users set role = 'admin', account_purpose = 'QA_TEST' where id = $1", [admin.current.body.accountId]);
+
+  const denied = await postJson(server.baseUrl, `/v1/admin/users/${target.current.body.accountId}/role`, {
+    role: 'admin', reason: 'Must remain production-safe'
+  }, { headers: authHeaders(admin.token) });
+  assert.equal(denied.response.status, 403);
+  assert.equal(denied.body.error, 'QA_ADMIN_SCOPE_RESTRICTED');
+  const persisted = await pool.query('select role from users where id = $1', [target.current.body.accountId]);
+  assert.equal(persisted.rows[0].role, null);
+
+  const status = await getJson(server.baseUrl, '/v1/admin/status', { headers: authHeaders(admin.token) });
+  assert.equal(status.response.status, 200);
+  assert.deepEqual(status.body.permissions, ['qa_provisioning']);
+});
+
 test('normal user cannot assign roles and cannot access consultant client API', async () => {
   const user = await createAuthenticatedSession(server.baseUrl, {
     name: 'QA Normal User',

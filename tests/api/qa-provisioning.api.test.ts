@@ -30,11 +30,18 @@ test('admin provisions QA client and consultant, issues governed sessions, and r
   assert.equal(client.body.user.accountPurpose, 'QA_TEST');
   assert.equal(consultant.body.user.role, 'consultant');
 
+  const arbitraryAdmin = await postJson(server.baseUrl, '/v1/admin/qa-identities', {
+    name: 'Forbidden Generic Admin', email: `forbidden-admin-${suffix}@example.com`, mobileNumber: '+919876543298', role: 'admin', reason: 'Must remain delegated-only'
+  }, { headers: authHeaders(admin.token) });
+  assert.equal(arbitraryAdmin.response.status, 400);
+
   const clientSession = await postJson(server.baseUrl, `/v1/admin/qa-identities/${client.body.user.id}/session`, { reason: 'Food preference acceptance' }, { headers: authHeaders(admin.token) });
   assert.equal(clientSession.response.status, 201);
   const me = await getJson(server.baseUrl, '/v1/auth/me', { headers: authHeaders(clientSession.body.token) });
   assert.equal(me.response.status, 200);
   assert.equal(me.body.user.id, client.body.user.id);
+  assert.equal(me.body.user.role, 'user');
+  assert.equal(me.body.user.accountPurpose, 'QA_TEST');
 
   const assignment = await postJson(server.baseUrl, '/v1/admin/client-assignments', {
     consultantUserId: consultant.body.user.id, clientUserId: client.body.user.id, reason: 'Food preference acceptance'
@@ -128,6 +135,8 @@ test('QA onboarding reset denies production identities and unauthenticated calle
   assert.equal(denied.response.status, 404);
   const unauthenticated = await postJson(server.baseUrl, `/v1/admin/qa-identities/${production.current.body.accountId}/onboarding/reset`, { reason: 'Must be denied' });
   assert.equal(unauthenticated.response.status, 401);
+  const sessionDenied = await postJson(server.baseUrl, `/v1/admin/qa-identities/${production.current.body.accountId}/session`, { reason: 'Production sessions are forbidden' }, { headers: authHeaders(admin.token) });
+  assert.equal(sessionDenied.response.status, 404);
 });
 
 test('admin provisions a QA senior consultant with canonical role and governed session', async () => {

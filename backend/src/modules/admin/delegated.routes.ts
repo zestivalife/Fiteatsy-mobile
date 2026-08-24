@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { requireDelegatedAuthority } from '../auth/delegated-authority.middleware.js';
 import { executeDelegatedIdempotently } from './delegated-operation-idempotency.js';
 import { createAuthSession } from '../auth/auth.repository.js';
-import { createQaAssignment, deactivateQaIdentity, getQaIdentity, issueQaSessionAudit, provisionQaIdentity, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
+import { createQaAssignment, deactivateQaIdentity, getQaIdentity, issueQaSessionAudit, provisionQaIdentity, recordQaIdentityReuse, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
 
 export const delegatedRouter = Router();
 
@@ -14,6 +14,7 @@ const identitySchema = z.object({
   mobileNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/),
   reason: z.string().trim().min(3).max(240),
 });
+const qaAdminIdentitySchema = identitySchema.strict();
 const assignmentSchema = z.object({ consultantUserId: z.string().trim().min(1), clientUserId: z.string().trim().min(1), reason: z.string().trim().min(3).max(240) });
 const reasonSchema = z.object({ reason: z.string().trim().min(3).max(240) });
 
@@ -54,6 +55,26 @@ delegatedRouter.post('/qa-senior-consultants', requireDelegatedAuthority('fiteat
     const result = await executeDelegatedIdempotently({ operation: 'qa_senior_consultant_provision', key: req.header('idempotency-key') || '', execute: () => provisionQaIdentity({ ...parsed.data, reason: correlationReason(req, parsed.data.reason), role: 'senior_consultant', actorUserId: actorId(req) }) });
     return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
   } catch (error) { return respondError(res, error, 'QA_SENIOR_CONSULTANT_PROVISIONING_FAILED'); }
+});
+
+delegatedRouter.post('/qa-admins', requireDelegatedAuthority('fiteatsy.qa.admin.create', 'qa_provisioning', 'platform_owner'), async (req, res) => {
+  const idempotencyKey = req.header('idempotency-key')?.trim();
+  if (!idempotencyKey) return res.status(400).json({ error: 'IDEMPOTENCY_KEY_REQUIRED', message: 'A non-empty idempotency key is required.' });
+  const parsed = qaAdminIdentitySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const reason = correlationReason(req, parsed.data.reason);
+    const delegatedActorId = actorId(req);
+    const result = await executeDelegatedIdempotently({
+      operation: 'qa_admin_provision',
+      key: idempotencyKey,
+      execute: () => provisionQaIdentity({ ...parsed.data, reason, role: 'admin', actorUserId: null, actorReference: delegatedActorId })
+    });
+    if (result.replayed) {
+      await recordQaIdentityReuse({ actorUserId: null, actorReference: delegatedActorId, targetUserId: result.value.user.id, role: 'admin', reason });
+    }
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+  } catch (error) { return respondError(res, error, 'QA_ADMIN_PROVISIONING_FAILED'); }
 });
 
 delegatedRouter.post('/client-assignments', requireDelegatedAuthority('fiteatsy.client.assign', 'client_assignment'), async (req, res) => {

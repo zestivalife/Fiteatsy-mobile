@@ -5,7 +5,7 @@ import { createOrUpdateHealthProfile, createCareCaseIfMissing } from '../platfor
 import type { ClientOwnershipContext } from '../platform/platform.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 
-type QaRole = 'user' | 'consultant' | 'senior_consultant';
+type QaRole = 'user' | 'consultant' | 'senior_consultant' | 'admin';
 
 const mapUser = (row: Record<string, unknown>) => ({
   id: String(row.id),
@@ -19,7 +19,8 @@ const mapUser = (row: Record<string, unknown>) => ({
 });
 
 const audit = async (input: {
-  actorUserId: string;
+  actorUserId: string | null;
+  actorReference?: string;
   targetUserId?: string | null;
   assignmentId?: string | null;
   action: string;
@@ -33,12 +34,31 @@ const audit = async (input: {
       (id, actor_user_id, target_user_id, assignment_id, action, account_purpose, role, reason, metadata)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
     [crypto.randomUUID(), input.actorUserId, input.targetUserId ?? null, input.assignmentId ?? null,
-      input.action, input.accountPurpose ?? null, input.role ?? null, input.reason, JSON.stringify(input.metadata ?? {})]
+      input.action, input.accountPurpose ?? null, input.role ?? null, input.reason,
+      JSON.stringify({ ...(input.metadata ?? {}), ...(input.actorReference ? { delegatedActorReference: input.actorReference } : {}) })]
   );
 };
 
+export const recordQaIdentityReuse = async (input: {
+  actorUserId: string | null;
+  actorReference?: string;
+  targetUserId: string;
+  role: QaRole;
+  reason: string;
+}) => audit({
+  actorUserId: input.actorUserId,
+  actorReference: input.actorReference,
+  targetUserId: input.targetUserId,
+  action: 'QAIdentityReused',
+  accountPurpose: 'QA_TEST',
+  role: input.role,
+  reason: input.reason,
+  metadata: { idempotentReplay: true }
+});
+
 export const provisionQaIdentity = async (input: {
-  actorUserId: string;
+  actorUserId: string | null;
+  actorReference?: string;
   name: string;
   email: string;
   mobileNumber: string;
@@ -57,14 +77,14 @@ export const provisionQaIdentity = async (input: {
     );
     const user = mapUser(inserted.rows[0]);
     await client.query('commit');
-    await audit({ actorUserId: input.actorUserId, targetUserId: user.id, action: 'QAIdentityCreated', accountPurpose: 'QA_TEST', role: input.role, reason: input.reason });
+    await audit({ actorUserId: input.actorUserId, actorReference: input.actorReference, targetUserId: user.id, action: 'QAIdentityCreated', accountPurpose: 'QA_TEST', role: input.role, reason: input.reason });
 
     const clientRecord = input.role === 'user' ? await createOrResolveClientForAccount(user.id) : null;
     if (clientRecord) {
       const owner: ClientOwnershipContext = { accountId: user.id, clientId: clientRecord.id };
       const profile = await createOrUpdateHealthProfile(owner, {});
       await createCareCaseIfMissing(owner, profile.id, 'new_client');
-      await audit({ actorUserId: input.actorUserId, targetUserId: user.id, action: 'QAProfileProvisioned', accountPurpose: 'QA_TEST', role: input.role, reason: input.reason, metadata: { clientId: clientRecord.fiteatsyClientId } });
+      await audit({ actorUserId: input.actorUserId, actorReference: input.actorReference, targetUserId: user.id, action: 'QAProfileProvisioned', accountPurpose: 'QA_TEST', role: input.role, reason: input.reason, metadata: { clientId: clientRecord.fiteatsyClientId } });
     }
     return { user, client: clientRecord };
   } catch (error) {

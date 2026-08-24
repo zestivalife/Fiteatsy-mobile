@@ -13,6 +13,9 @@ const INITIAL_ADMIN_BOOTSTRAP_REASON = 'initial_admin_bootstrap';
 
 export const canManageRoles = (account: AuthenticatedAccount) => account.user.role?.toLowerCase() === 'admin';
 
+const isQaAdmin = (account: AuthenticatedAccount) =>
+  canManageRoles(account) && account.user.accountPurpose.toUpperCase() === 'QA_TEST';
+
 export const getAdminStatus = async (account: AuthenticatedAccount) => {
   if (!canManageRoles(account)) {
     return {
@@ -26,7 +29,7 @@ export const getAdminStatus = async (account: AuthenticatedAccount) => {
   return {
     ok: true as const,
     role: 'admin',
-    permissions: ['role_management'],
+    permissions: isQaAdmin(account) ? ['qa_provisioning'] : ['role_management'],
     bootstrapConfigured: Boolean(env.initialAdminPhone),
     activeAdmins: await countActiveAdmins(),
     bootstrapAuditRecorded: (await countRoleAuditEventsByReason(INITIAL_ADMIN_BOOTSTRAP_REASON)) > 0
@@ -45,6 +48,15 @@ export const assignRoleAsAdmin = async (
       status: 403,
       error: 'ROLE_NOT_ALLOWED',
       message: 'An admin account is required to manage user roles.'
+    };
+  }
+
+  if (isQaAdmin(actor)) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: 'QA_ADMIN_SCOPE_RESTRICTED',
+      message: 'QA_TEST administrators cannot manage production user roles.'
     };
   }
 
