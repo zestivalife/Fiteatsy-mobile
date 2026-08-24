@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { assignRoleAsAdmin, getAdminStatus } from './admin.service.js';
-import { assignQaClient, deactivateQa, getQaAssignmentsForAdmin, getQaIdentityForAdmin, issueQaSession, provisionQa, revokeQaClientAssignment } from './qa-provisioning.service.js';
+import { assignQaClient, deactivateQa, getQaAssignmentsForAdmin, getQaIdentityForAdmin, issueQaSession, provisionQa, resetQaClientOnboarding, revokeQaClientAssignment } from './qa-provisioning.service.js';
 
 export const adminRouter = Router();
 
@@ -18,7 +18,7 @@ const qaIdentitySchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().email().max(180),
   mobileNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/),
-  role: z.enum(['user', 'consultant']),
+  role: z.enum(['user', 'consultant', 'senior_consultant']),
   reason: z.string().trim().min(3).max(240)
 });
 
@@ -124,6 +124,19 @@ adminRouter.post('/qa-identities/:userId/deactivate', async (req, res) => {
   } catch (error) {
     const typed = error as Error & { status?: number; code?: string };
     return res.status(typed.status ?? 500).json({ error: typed.code ?? 'QA_DEACTIVATION_FAILED', message: typed.message });
+  }
+});
+
+adminRouter.post('/qa-identities/:userId/onboarding/reset', async (req, res) => {
+  const parsed = qaRevokeSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const result = await resetQaClientOnboarding(getAuthenticatedAccount(req), req.params.userId, parsed.data.reason);
+    if (!result) return res.status(404).json({ error: 'QA_CLIENT_NOT_FOUND' });
+    return res.status(200).json(result);
+  } catch (error) {
+    const typed = error as Error & { status?: number; code?: string };
+    return res.status(typed.status ?? 500).json({ error: typed.code ?? 'QA_ONBOARDING_RESET_FAILED', message: typed.message });
   }
 });
 

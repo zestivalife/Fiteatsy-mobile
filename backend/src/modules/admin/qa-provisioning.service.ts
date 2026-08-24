@@ -2,13 +2,13 @@ import { createAuthSession } from '../auth/auth.repository.js';
 import { getAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { canManageRoles } from './admin.service.js';
 import { assignUserRole } from './admin.repository.js';
-import { createQaAssignment, deactivateQaIdentity, getQaIdentity, issueQaSessionAudit, listQaAssignments, provisionQaIdentity, revokeQaAssignment } from './qa-provisioning.repository.js';
+import { createQaAssignment, deactivateQaIdentity, getQaIdentity, issueQaSessionAudit, listQaAssignments, provisionQaIdentity, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
 
 const assertAdmin = (account: ReturnType<typeof getAuthenticatedAccount>) => {
   if (!canManageRoles(account)) throw Object.assign(new Error('An admin account is required.'), { status: 403, code: 'ROLE_NOT_ALLOWED' });
 };
 
-export const provisionQa = async (account: ReturnType<typeof getAuthenticatedAccount>, input: { name: string; email: string; mobileNumber: string; role: 'user' | 'consultant'; reason: string }) => {
+export const provisionQa = async (account: ReturnType<typeof getAuthenticatedAccount>, input: { name: string; email: string; mobileNumber: string; role: 'user' | 'consultant' | 'senior_consultant'; reason: string }) => {
   assertAdmin(account);
   return provisionQaIdentity({ ...input, actorUserId: account.user.id });
 };
@@ -52,4 +52,9 @@ export const getQaAssignmentsForAdmin = async (account: ReturnType<typeof getAut
 export const deactivateQa = async (account: ReturnType<typeof getAuthenticatedAccount>, userId: string, reason: string) => {
   assertAdmin(account);
   return deactivateQaIdentity({ actorUserId: account.user.id, userId, reason });
+};
+
+export const resetQaClientOnboarding = async (account: ReturnType<typeof getAuthenticatedAccount>, userId: string, reason: string) => {
+  assertAdmin(account);
+  return resetQaOnboarding({ actorUserId: account.user.id, userId, reason });
 };

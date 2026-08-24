@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { requireDelegatedAuthority } from '../auth/delegated-authority.middleware.js';
 import { executeDelegatedIdempotently } from './delegated-operation-idempotency.js';
 import { createAuthSession } from '../auth/auth.repository.js';
-import { createQaAssignment, deactivateQaIdentity, getQaIdentity, issueQaSessionAudit, provisionQaIdentity, revokeQaAssignment } from './qa-provisioning.repository.js';
+import { createQaAssignment, deactivateQaIdentity, getQaIdentity, issueQaSessionAudit, provisionQaIdentity, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
 
 export const delegatedRouter = Router();
 
@@ -45,6 +45,15 @@ delegatedRouter.post('/qa-consultants', requireDelegatedAuthority('fiteatsy.qa.i
     const result = await executeDelegatedIdempotently({ operation: 'qa_consultant_provision', key: req.header('idempotency-key') || '', execute: () => provisionQaIdentity({ ...parsed.data, reason: correlationReason(req, parsed.data.reason), role: 'consultant', actorUserId: actorId(req) }) });
     return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
   } catch (error) { return respondError(res, error, 'QA_CONSULTANT_PROVISIONING_FAILED'); }
+});
+
+delegatedRouter.post('/qa-senior-consultants', requireDelegatedAuthority('fiteatsy.qa.identity.create', 'qa_provisioning'), async (req, res) => {
+  const parsed = identitySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const result = await executeDelegatedIdempotently({ operation: 'qa_senior_consultant_provision', key: req.header('idempotency-key') || '', execute: () => provisionQaIdentity({ ...parsed.data, reason: correlationReason(req, parsed.data.reason), role: 'senior_consultant', actorUserId: actorId(req) }) });
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+  } catch (error) { return respondError(res, error, 'QA_SENIOR_CONSULTANT_PROVISIONING_FAILED'); }
 });
 
 delegatedRouter.post('/client-assignments', requireDelegatedAuthority('fiteatsy.client.assign', 'client_assignment'), async (req, res) => {
@@ -89,4 +98,14 @@ delegatedRouter.post('/qa-identities/:userId/session', requireDelegatedAuthority
     await issueQaSessionAudit(actorId(req), userId, correlationReason(req, parsed.data.reason));
     return res.status(201).json({ userId, session: session.session, handoff: 'server_governed', token: undefined });
   } catch (error) { return respondError(res, error, 'QA_SESSION_FAILED'); }
+});
+
+delegatedRouter.post('/qa-identities/:userId/onboarding/reset', requireDelegatedAuthority('fiteatsy.qa.onboarding.reset', 'qa_provisioning'), async (req, res) => {
+  const parsed = reasonSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const result = await resetQaOnboarding({ actorUserId: actorId(req), userId: String(req.params.userId), reason: correlationReason(req, parsed.data.reason) });
+    if (!result) return res.status(404).json({ error: 'QA_CLIENT_NOT_FOUND', message: 'Active QA client was not found.' });
+    return res.status(200).json(result);
+  } catch (error) { return respondError(res, error, 'QA_ONBOARDING_RESET_FAILED'); }
 });

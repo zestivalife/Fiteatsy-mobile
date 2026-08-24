@@ -3,8 +3,9 @@ import { pool } from '../../db/pool.js';
 import { createOrResolveClientForAccount } from '../client/client.repository.js';
 import { createOrUpdateHealthProfile, createCareCaseIfMissing } from '../platform/platform.store.js';
 import type { ClientOwnershipContext } from '../platform/platform.types.js';
+import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 
-type QaRole = 'user' | 'consultant';
+type QaRole = 'user' | 'consultant' | 'senior_consultant';
 
 const mapUser = (row: Record<string, unknown>) => ({
   id: String(row.id),
@@ -52,7 +53,7 @@ export const provisionQaIdentity = async (input: {
         (id, name, email_normalized, mobile_number_normalized, email_verified_at, mobile_verified_at, role, status, account_purpose, version, created_at, updated_at)
        values ($1, $2, lower(trim($3)), $4, now(), now(), $5, 'active', 'QA_TEST', 1, now(), now())
        returning id, name, email_normalized, mobile_number_normalized, role, status, account_purpose, created_at`,
-      [crypto.randomUUID(), input.name.trim(), input.email.trim(), input.mobileNumber.trim(), input.role]
+      [crypto.randomUUID(), input.name.trim(), input.email.trim(), normalizeCanonicalPhoneNumber(input.mobileNumber), input.role]
     );
     const user = mapUser(inserted.rows[0]);
     await client.query('commit');
@@ -118,6 +119,94 @@ export const issueQaSessionAudit = async (actorUserId: string, targetUserId: str
   await audit({ actorUserId, targetUserId, action: 'QASessionIssued', accountPurpose: 'QA_TEST', reason });
 };
 
+export const resetQaOnboarding = async (input: { actorUserId: string; userId: string; reason: string }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const target = await client.query(
+      `select u.id, hp.id as health_profile_id
+         from users u
+         join health_profiles hp on hp.user_id = u.id and hp.deleted_at is null and hp.status = 'active'
+        where u.id = $1 and u.account_purpose = 'QA_TEST' and lower(u.role) = 'user'
+          and u.deleted_at is null and u.status = 'active'
+        for update of u, hp`,
+      [input.userId]
+    );
+    if (!target.rowCount) {
+      await client.query('rollback');
+      return null;
+    }
+
+    const healthProfileId = String(target.rows[0].health_profile_id);
+    await client.query(
+      `update health_profiles
+          set date_of_birth_iso = null, calculated_age = null, gender = null,
+              height_cm = null, current_weight_kg = null, goal_weight_kg = null,
+              waist_cm = null, hip_cm = null, neck_cm = null, body_fat_pct = null,
+              occupation = null, working_hours_label = null, shift_type = null,
+              activity_level = null, work_mode = null, travel_frequency = null,
+              diet_type = null, regional_cuisine = null, preferred_cuisines = '[]'::jsonb,
+              foods_liked = '[]'::jsonb, foods_disliked = '[]'::jsonb,
+              food_allergies = '[]'::jsonb, food_intolerances = '[]'::jsonb,
+              current_supplements = '[]'::jsonb, current_medicines = '[]'::jsonb,
+              wake_time = null, breakfast_time = null, lunch_time = null,
+              dinner_time = null, sleep_time = null, meals_per_day = null,
+              water_intake_liters = null, sleep_hours = null, sleep_goal_hours = null,
+              sleep_quality_label = null, outside_food_frequency = null,
+              cooking_at_home = null, who_cooks = null, smoking_status = null,
+              alcohol_frequency = null, exercise_frequency = null, stress_level_label = null,
+              primary_conditions = '[]'::jsonb, previous_conditions = '[]'::jsonb,
+              family_history_conditions = '[]'::jsonb, wellness_goals = '[]'::jsonb,
+              medical_notes = null, pregnancy_status = null, breastfeeding_status = null,
+              pcos_status = null, thyroid_status = null, diabetes_status = null,
+              hypertension_status = null, cholesterol_status = null,
+              heart_condition_status = null, previous_surgeries = '[]'::jsonb,
+              food_preference_profile = '{}'::jsonb,
+              food_preference_updated_by = null, food_preference_updated_at = null,
+              updated_at = now(), version = version + 1
+        where id = $1`,
+      [healthProfileId]
+    );
+    await client.query(
+      `update nutrition_profiles
+          set completion_percent = 0, readiness_score = 0, ai_ready = false,
+              missing_fields = '[]'::jsonb, section_scores = '[]'::jsonb,
+              updated_at = now(), version = version + 1
+        where health_profile_id = $1 and deleted_at is null and status = 'active'`,
+      [healthProfileId]
+    );
+    await client.query(
+      `update recovery_programs
+          set current_phase = 'health_profile_pending', updated_at = now(), version = version + 1
+        where health_profile_id = $1 and deleted_at is null and status = 'active'`,
+      [healthProfileId]
+    );
+    await client.query(
+      `update care_cases
+          set previous_stage = current_stage, current_stage = 'health_profile_pending',
+              last_transition_at = now(), updated_at = now(), version = version + 1
+        where health_profile_id = $1 and deleted_at is null and status = 'active'`,
+      [healthProfileId]
+    );
+    await client.query('commit');
+    await audit({
+      actorUserId: input.actorUserId,
+      targetUserId: input.userId,
+      action: 'QAOnboardingReset',
+      accountPurpose: 'QA_TEST',
+      role: 'user',
+      reason: input.reason,
+      metadata: { healthProfileId }
+    });
+    return { userId: input.userId, healthProfileId, onboardingStatus: 'INCOMPLETE' as const };
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 export const createQaAssignment = async (input: { actorUserId: string; consultantUserId: string; clientUserId: string; reason: string }) => {
   const result = await pool.query(
     `insert into consultant_client_assignments
@@ -135,7 +224,7 @@ export const createQaAssignment = async (input: { actorUserId: string; consultan
   if (!result.rowCount) return null;
   const assignment = result.rows[0];
   await pool.query(
-    `update health_profiles hp set assigned_consultant_id = $1, updated_at = now(), version = version + 1
+    `update health_profiles hp set assigned_consultant_id = $1, updated_at = now(), version = hp.version + 1
        from fiteatsy_clients c where c.account_user_id = hp.user_id and hp.user_id = $2 and hp.deleted_at is null`,
     [input.consultantUserId, input.clientUserId]
   );
