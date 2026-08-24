@@ -1,0 +1,53 @@
+{
+  "migrationIdentity": "full-filename",
+  "historicalLedgerOnly": {
+    "0018_health_calculations.sql": "Renamed historically before immutability governance; superseded byte-for-byte by 0019_health_calculations.sql."
+  },
+  "allowedDuplicatePrefixes": {
+    "0035": [
+      "0035_professional_names.sql",
+      "0035_subscription_plan_catalog_correction.sql"
+    ]
+  },
+  "appliedSha256": {
+    "0001_phase1b_persistence_foundation.sql": "e5f3e15d71eef8c8a6632800b25ba4bc5b67101bc3998192a77187c28aa7239a",
+    "0002_m3a_client_identity_foundation.sql": "727478cbc343c102051d926488e771f1fa1859da5e5baa41cf6a8127a6ab1ff1",
+    "0003_m3b1_ownership_schema_foundation.sql": "6011d9098ab0e136aafa50d2a2ccc6f676319d4b87a9f02b399ceda4dc1dfb16",
+    "0004_phase1_foundation_hardening.sql": "43749018fd84ba4da8a7bc71c4124f893e962ab6b43871669e2b194d4aa1f744",
+    "0005_intelligence_pipeline_activation.sql": "44151cdb29c9d5a5e612386d410995076319d696b1c01d0e91c71e5a3de63647",
+    "0006_report_intelligence_data_integrity.sql": "3fbc6e6d64c9024c24c2f7cbc6cdf246944575eb1e83517bbe66e99fe824d610",
+    "0007_health_sync_score_dimensions.sql": "c039990fa31745a7dbca1faf659efe550e67107a1e3703d606474e2ca5a746ef",
+    "0008_medical_report_intelligence_governance.sql": "802fa24a67bb9763916178b1dafd7a482da6bfc82deea01e5acf427106605107",
+    "0009_medical_report_quality_state_machine.sql": "c6d4d20620cdc1e8d39522518ffc82429ca8f857991eedcd68eb6a95599dc479",
+    "0010_medical_report_partial_validation.sql": "db16ba519efb8fbb640f76daf2170eb1fd8fa433ae864cd4897b3b75c2a4307c",
+    "0011_report_soft_delete_governance.sql": "a85899089867bbb19999dfaf6e2dba5560bf18f7e291aac590c374c5534fcd0d",
+    "0012_report_reanalysis_intelligence.sql": "3ee1615335276cd8c8b3bccfec1c328283c0eab4ffd05cc7c9a39eeace713f0c",
+    "0013_report_file_storage_metadata.sql": "af6f76da3cbd3bee308dbcd80595cdb89ef393122e7ca811d34dec0a4cc679cb",
+    "0014_temporary_pin_login_fallback.sql": "b5427288221af1cec327eebe5a49b86b22f635c8cdd98f5c8651c8d55ab5101d",
+    "0015_backfill_legacy_mobile_pin_lookup.sql": "4fc3d1fe59dd6aa11c56b505f33e36132ecab0112412109da75fdc568fb59c56",
+    "0016_report_retryable_hash_index.sql": "c214a0990bea5f1a8eab657a125420af176c047fe0c55eb59eeb2e3f2ee0d54d",
+    "0017_document_intelligence_audit.sql": "e673e6c7db418081f79b34e05dc705eda1b7c77b420bb29ae72d481aa93d31f8",
+    "0018_admin_role_management_foundation.sql": "7951078b2a6be77f0a801666a8f01da7c71403b26e065c3c59fe1bc47dcbed4b",
+    "0019_health_calculations.sql": "516fcee649db34f3491918d028e781fa8e3eb98477578af8078261d423bdaf57",
+    "0020_progressive_health_profile_collection.sql": "3b204d5826367a5fed836f351998ba4051546bbcd41b8b0af3cd589b86072ddf",
+    "0021_health_profile_completion_experience.sql": "d6e2aea0cf80033025b01df83eda3769dc76a600acc5cb23fee89c6c946b338c",
+    "0022_nutrition_plan_launch.sql": "0c5dd417cfd349943d169654632214c31ec7263066ec5da8b381b608f48c613a",
+    "0023_wellness_intelligence_upgrade.sql": "c039990fa31745a7dbca1faf659efe550e67107a1e3703d606474e2ca5a746ef",
+    "0024_intelligent_meal_plan_engine.sql": "5e5100b180c2fed80685b7e075181c3feb09613f31342fc745a14d6079029e39",
+    "0025_subscription_payment_entitlements.sql": "dc1d2adac5b78c2a6b7d1082fe392fd817cf5a83c6c08a46c8a0d84b788d71e0",
+    "0026_client_medication_monitoring.sql": "b2e65bcf2f4a0d87de00a49a1da5dc514b7c33cbcdd8c58ce791969a7ffe93e7",
+    "0027_medication_exception_intelligence.sql": "26fd09267ff6ef1f2c7901726c0e84777008bc152179f5b80227a4046facba34",
+    "0028_assessment_engine_pss10.sql": "9bc509d80ba58a0334d3e07642caaf6c0a43b1528cb4669bf7228afa77f04bbc",
+    "0029_pss10_content_update.sql": "3c1d92c96764f46654c384f70688123ff10b3f81512765a28cea5b3a418d1642",
+    "0030_subscription_foundation.sql": "ec02b10342046a73c9af183426ea8349812a110a43b0de6598ae6e1ed5fbfef1",
+    "0031_food_preference_profile.sql": "89dc1284f89e6cab086a15d6c8fae235a0e459df06625118bab5399313db0844",
+    "0032_qa_provisioning_and_assignments.sql": "0eacb532e6b24c28bdd3be68e4a1e06693fdbfe15008650f0a73da59231d641f",
+    "0033_cap003_professional_assignments.sql": "b4c4061ab9a44e66d39284f7c0282825bfd16021b8a4b15c57407c8813c92b66",
+    "0034_simple_consultant_approval_workflow.sql": "881eb968ca86eb5840bb1f2436d135b16df0bb1d19c83d49462ab5a1a8c7861a",
+    "0035_professional_names.sql": "dba350165071da071728e19c52e41a1ec4c1aa4df8ebaf911bfbed9477d5a11d",
+    "0035_subscription_plan_catalog_correction.sql": "55adf38be514f1b9708ecd88eb8e1212e1c00746f6b5594937aaf25766a1e942",
+    "0036_professional_identity_snapshot_backfill.sql": "f7ff4f50903b541237f91289969d461464a980982ad5d84d0d9d2e64a36c6118",
+    "0037_subscription_gst_snapshot.sql": "343b4bafd32f5f0c3c56c2fad2ef3edd95a78e07c1f228ce64ed49beda7c467d",
+    "0038_canonical_operational_phone_identity.sql": "b699b8af3c5be9ebc020b17d62bac4ccf659190fc2d576926ca84ac51bca9bd1"
+  }
+}

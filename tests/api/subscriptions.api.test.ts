@@ -102,7 +102,7 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
       },
       { headers: authHeaders(session.token) }
     );
-    assert.equal(checkout.response.status, 201);
+    assert.equal(checkout.response.status, 201, JSON.stringify(checkout.body));
     assert.equal(checkout.body.alreadyEntitled, false);
     assert.equal(checkout.body.checkout.provider, 'razorpay');
     assert.equal(checkout.body.checkout.keyId, 'rzp_test_key');
@@ -145,7 +145,7 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
     assert.equal(current.response.status, 200);
     assert.equal(current.body.hasActiveSubscription, true);
     assert.equal(current.body.subscription.planCode, 'LIFESTYLE_MODIFICATION_CONSULT');
-    assert.equal(current.body.entitlements.includes('APPOINTMENT_BOOKING'), true);
+    assert.equal(current.body.entitlements.includes('EXPERT_CONSULTATION'), true);
 
     const repeatedVerify = await postJson(
       server.baseUrl,

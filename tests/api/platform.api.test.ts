@@ -18,17 +18,21 @@ test.beforeEach(async () => {
   await resetTestState();
 });
 
-test('platform endpoints return 404 before health profile exists', async () => {
+test('platform endpoints return the canonical placeholder created during verified signup', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const profile = await getJson(server.baseUrl, '/v1/platform/health-profile?userId=no-profile', {
     headers: authHeaders(session.token)
   });
-  assert.equal(profile.response.status, 404);
+  assert.equal(profile.response.status, 200);
+  assert.equal(profile.body.profile.userId, session.current.body.accountId);
+  assert.equal(profile.body.profile.version, 1);
 
   const careCase = await getJson(server.baseUrl, '/v1/platform/care-cases/current?userId=no-profile', {
     headers: authHeaders(session.token)
   });
-  assert.equal(careCase.response.status, 404);
+  assert.equal(careCase.response.status, 200);
+  assert.equal(careCase.body.userId, session.current.body.accountId);
+  assert.equal(careCase.body.currentStage, 'new_client');
 });
 
 test('PATCH /v1/platform/health-profile creates bundle and GET endpoints return 200', async () => {

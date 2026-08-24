@@ -234,7 +234,7 @@ export const createOrReusePaymentOrder = async (input: {
         idempotency_key,
         created_at,
         updated_at
-      ) values ($1, $2, $3, 'RAZORPAY', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'CREATED', $14, $15, $16, $17, now(), now())
+      ) values ($1, $2, $3, 'RAZORPAY', $4, $5, $6, $7, $8, $9, $10, $11, $12, 'CREATED', $13, $14, $15, $16, now(), now())
       on conflict (user_id, idempotency_key) do update
       set updated_at = payment_orders.updated_at
       returning *

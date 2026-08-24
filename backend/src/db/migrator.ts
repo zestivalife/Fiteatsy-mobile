@@ -7,6 +7,15 @@ import { closePool, getPool } from './pool.js';
 const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
 const MIGRATION_LOCK_NAMESPACE = 20260730;
 const MIGRATION_LOCK_KEY = 11;
+const LEGACY_PROFESSIONAL_SNAPSHOT_FILE = '0036_professional_identity_snapshot_backfill.sql';
+const LEGACY_PROFESSIONAL_SNAPSHOT_USER_IDS = [
+  '0e65d616-b96e-4fc5-8d36-a2f33cd81c89',
+  '3bc788d8-795d-4ecb-bded-e120b33ed554',
+  '3b641ceb-8eab-4e70-bffe-efd746347cee',
+  '8fa26de5-21fc-43e1-ba8b-86c898f6c91b',
+  '14848d83-8a39-4674-90f9-13909e0bd728',
+  '78fc83c9-2d55-4815-8918-baf00fff7abb'
+] as const;
 
 let migrationPromise: Promise<void> | null = null;
 
@@ -41,6 +50,22 @@ const rollbackQuietly = async (client: PoolClient) => {
   } catch {}
 };
 
+const shouldSkipLegacySnapshotOnFreshReplay = async (
+  client: PoolClient,
+  file: string,
+  startedWithEmptyLedger: boolean
+) => {
+  if (!startedWithEmptyLedger || file !== LEGACY_PROFESSIONAL_SNAPSHOT_FILE) return false;
+
+  const result = await client.query<{ matching_count: number }>(
+    `select count(*)::int as matching_count
+       from users
+      where id = any($1::text[])`,
+    [LEGACY_PROFESSIONAL_SNAPSHOT_USER_IDS]
+  );
+  return Number(result.rows[0]?.matching_count ?? 0) === 0;
+};
+
 const applyMigrations = async () => {
   const pool = getPool();
   const client = await pool.connect();
@@ -51,6 +76,7 @@ const applyMigrations = async () => {
     await ensureSchemaMigrationsTable(client);
     const applied = await client.query<{ version: string }>('select version from schema_migrations');
     const appliedVersions = new Set(applied.rows.map((row) => row.version));
+    const startedWithEmptyLedger = appliedVersions.size === 0;
 
     const files = await readMigrationFiles();
     for (const file of files) {
@@ -59,7 +85,12 @@ const applyMigrations = async () => {
       await client.query('begin');
       try {
         await ensureSchemaMigrationsTable(client);
-        await client.query(sql);
+        const skipLegacySnapshot = await shouldSkipLegacySnapshotOnFreshReplay(
+          client,
+          file,
+          startedWithEmptyLedger
+        );
+        if (!skipLegacySnapshot) await client.query(sql);
         await client.query('insert into schema_migrations (version) values ($1)', [file]);
         await client.query('commit');
         appliedVersions.add(file);

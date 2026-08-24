@@ -374,7 +374,14 @@ test('consultant medication monitoring uses client tracker data and enforces ass
   });
   const consultant = await createConsultantSession();
   const otherConsultant = await createConsultantSession();
-  const baseDate = '2026-08-19';
+  const baseDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+  const morningScheduledForISO = new Date(`${baseDate}T08:00:00.000+05:30`).toISOString();
+  const eveningScheduledForISO = new Date(`${baseDate}T20:00:00.000+05:30`).toISOString();
   const medicationId = 'med-test-metformin';
   const medication = {
     id: medicationId,
@@ -409,7 +416,7 @@ test('consultant medication monitoring uses client tracker data and enforces ass
         {
           id: 'log-metformin-morning',
           medicationId,
-          scheduledForISO: `${baseDate}T08:00:00.000Z`,
+          scheduledForISO: morningScheduledForISO,
           status: 'taken',
           actionedAtISO: `${baseDate}T08:04:00.000Z`,
           snoozedUntilISO: null,
@@ -418,7 +425,7 @@ test('consultant medication monitoring uses client tracker data and enforces ass
         {
           id: 'log-metformin-evening',
           medicationId,
-          scheduledForISO: `${baseDate}T20:00:00.000Z`,
+          scheduledForISO: eveningScheduledForISO,
           status: 'snoozed',
           actionedAtISO: `${baseDate}T19:58:00.000Z`,
           snoozedUntilISO: `${baseDate}T20:15:00.000Z`,
@@ -477,8 +484,8 @@ test('consultant medication monitoring uses client tracker data and enforces ass
     `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/medications`,
     { headers: authHeaders(otherConsultant.token) }
   );
-  assert.equal(denied.response.status, 403);
-  assert.equal(denied.body.error, 'CLIENT_MEDICATION_ACCESS_DENIED');
+  assert.equal(denied.response.status, 404);
+  assert.equal(denied.body.error, 'CLIENT_NOT_FOUND');
 });
 
 const isoDay = (offsetDays: number) => {

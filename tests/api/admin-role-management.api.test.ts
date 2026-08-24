@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pool } from '../../backend/src/db/pool.js';
 import { bootstrapInitialAdminFromEnvironment } from '../../backend/src/modules/admin/admin.service.js';
+import { createProfessionalAssignment } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson, postJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
@@ -227,6 +228,16 @@ test('consultant can access client list after admin role assignment', async () =
     { headers: authHeaders(admin.token) }
   );
   assert.equal(assigned.response.status, 200);
+
+  const clientAssignment = await createProfessionalAssignment({
+    actorUserId: admin.current.body.accountId,
+    clientUserId: client.current.body.accountId,
+    professionalUserId: consultant.current.body.accountId,
+    professionalType: 'CONSULTANT',
+    relationshipType: 'CLIENT_CARE',
+    reason: 'Test consultant client-list access through canonical assignment'
+  });
+  assert.notEqual(clientAssignment, null);
 
   const list = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(consultant.token)
