@@ -26,6 +26,12 @@ const actorId = (req: Request) => {
 
 const respondError = (res: Response, error: unknown, fallback: string) => {
   const typed = error as Error & { status?: number; code?: string };
+  console.error('[delegated-operation-error]', JSON.stringify({
+    operation: fallback,
+    errorName: typed.name || 'Error',
+    errorCode: typed.code || null,
+    status: typed.status || 500
+  }));
   return res.status(typed.status ?? 500).json({ error: typed.code ?? fallback, message: typed.status ? typed.message : 'Fiteatsy operation could not be completed.' });
 };
 const correlationReason = (req: Request, reason: string) => `${reason} [correlation:${req.header('x-correlation-id') || 'unavailable'}]`;
