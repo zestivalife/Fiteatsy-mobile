@@ -94,6 +94,6 @@ describe('premium app-level video intro contract', () => {
     expect(appNavigation).toContain('initialRouteName="Splash"');
     expect(appNavigation.match(/<Stack\.Screen name="Splash"/g)).toHaveLength(1);
     expect(podfileLock).toContain('ExpoVideo (3.0.16)');
-    expect(appConfig.expo.runtimeVersion).toBe('1.0.0-native-20260823-video');
+    expect(appConfig.expo.runtimeVersion).toBe('1.0.0-native-20260825-health-connect-d2');
   });
 });

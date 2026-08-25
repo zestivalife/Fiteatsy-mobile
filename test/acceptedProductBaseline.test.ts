@@ -50,7 +50,7 @@ describe('FITEATSY accepted product baseline regression contracts', () => {
     expect(splash).toContain('https://zestiva.life/assets/Fiteatsy.mp4');
     expect(splash).toMatch(/rgba\(0,\s*0,\s*0,\s*0\.70?\)/);
     expect(splash).toContain('SPLASH_MAX_DURATION_MS = 10_000');
-    expect(config.expo.runtimeVersion).toBe('1.0.0-native-20260823-video');
+    expect(config.expo.runtimeVersion).toBe('1.0.0-native-20260825-health-connect-d2');
   });
 
   it('FITEATSY_NUTRITION_CONTRACT exposes only the canonical published lifecycle', () => {
