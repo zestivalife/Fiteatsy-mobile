@@ -1,10 +1,12 @@
 import Constants from 'expo-constants';
 
 export type ApiClientErrorCode =
+  | 'TIMEOUT'
   | 'NETWORK_ERROR'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
   | 'NOT_FOUND'
+  | 'CONFLICT'
   | 'VALIDATION_ERROR'
   | 'SERVER_ERROR';
 
@@ -74,19 +76,38 @@ const toErrorCode = (status: number): ApiClientErrorCode => {
   if (status === 401) return 'UNAUTHORIZED';
   if (status === 403) return 'FORBIDDEN';
   if (status === 404) return 'NOT_FOUND';
+  if (status === 409) return 'CONFLICT';
   if (status === 422 || status === 400) return 'VALIDATION_ERROR';
   return 'SERVER_ERROR';
 };
 
-export const apiFetch = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+export const API_REQUEST_TIMEOUT_MS = 15_000;
+
+type ApiRequestInit = RequestInit & { timeoutMs?: number };
+
+export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Promise<T> => {
+  const controller = new AbortController();
+  const callerSignal = init.signal;
+  const abortFromCaller = () => controller.abort();
+  callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+  const timeoutMs = init.timeoutMs ?? API_REQUEST_TIMEOUT_MS;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   try {
+    const { timeoutMs: _timeoutMs, ...requestInit } = init;
     response = await fetch(`${apiBaseUrl}${path}`, {
-      ...init,
+      ...requestInit,
+      signal: controller.signal,
       headers: buildHeaders(init.headers)
     });
-  } catch {
+  } catch (error) {
+    if (controller.signal.aborted && !callerSignal?.aborted) {
+      throw new ApiClientError('TIMEOUT', 'The platform request timed out. Please try again.');
+    }
     throw new ApiClientError('NETWORK_ERROR', 'Unable to reach the platform backend.');
+  } finally {
+    clearTimeout(timeout);
+    callerSignal?.removeEventListener('abort', abortFromCaller);
   }
 
   if (!response.ok) {

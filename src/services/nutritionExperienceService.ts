@@ -7,7 +7,8 @@ const nutritionFetch = async <T>(path: string, init?: RequestInit): Promise<T> =
   try {
     return await apiFetch<T>(path, init);
   } catch (error) {
-    const retryable = error instanceof ApiClientError
+    const retryable = (init?.method == null || init.method === 'GET')
+      && error instanceof ApiClientError
       && error.status != null
       && TRANSIENT_NUTRITION_STATUSES.has(error.status);
 
@@ -99,6 +100,9 @@ export type NutritionExperience = {
 export const getNutritionExperience = async (date?: string) => {
   const canonicalDate = date ?? nutritionDate();
   const response = await nutritionFetch<NutritionExperience>(`/v1/platform/nutrition-experience?date=${encodeURIComponent(canonicalDate)}`);
+  if (!response?.plan?.id || !response?.version?.id || !Array.isArray(response.meals) || !response.version.content?.nutritionSnapshot) {
+    throw new ApiClientError('VALIDATION_ERROR', 'The published nutrition plan response is malformed.');
+  }
   return { ...response, selectedDate: response.selectedDate || canonicalDate };
 };
 

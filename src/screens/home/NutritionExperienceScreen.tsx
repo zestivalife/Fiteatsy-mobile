@@ -22,6 +22,7 @@ import {
   NutritionMeal,
 } from '../../services/nutritionExperienceService';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
+import { classifyNutritionLoadError, NutritionLoadState } from '../../services/nutritionLoadState';
 
 const C = { bg: '#07070B', card: '#111117', raised: '#181820', line: '#272733', text: '#F3F2FA', muted: '#898899', blue: '#43C4FA', green: '#4BE38A', yellow: '#FFC229', purple: '#A985FF' };
 const fmt = (value: number | null) => value == null ? '—' : Math.round(value).toLocaleString('en-IN');
@@ -56,6 +57,7 @@ export const NutritionExperienceScreen = () => {
   const [tab, setTab] = React.useState<'today' | 'pattern'>('today');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [loadState, setLoadState] = React.useState<NutritionLoadState>('LOADING');
   const [selected, setSelected] = React.useState<NutritionMeal | null>(null);
   const [recommendationMode, setRecommendationMode] = React.useState<RecommendationMode>(null);
   const [recommendations, setRecommendations] = React.useState<NutritionRecommendationResponse | null>(null);
@@ -71,7 +73,17 @@ export const NutritionExperienceScreen = () => {
   const [showWater, setShowWater] = React.useState(false);
   const [waterAmount, setWaterAmount] = React.useState(.25);
   const [waterError, setWaterError] = React.useState<string | null>(null);
-  const refresh = React.useCallback(async () => { setError(null); try { setData(await withNutritionTimeout(getNutritionExperience(selectedDate))); } catch (e) { setError(e instanceof Error ? e.message : "Nutrition couldn't be loaded. Please try again."); } }, [selectedDate]);
+  const refresh = React.useCallback(async () => {
+    setError(null);
+    setLoadState('LOADING');
+    try {
+      setData(await withNutritionTimeout(getNutritionExperience(selectedDate)));
+      setLoadState('READY');
+    } catch (e) {
+      setLoadState(classifyNutritionLoadError(e));
+      setError(e instanceof Error ? e.message : "Nutrition couldn't be loaded. Please try again.");
+    }
+  }, [selectedDate]);
   useFocusEffect(React.useCallback(() => {
     const today = nutritionDate();
     if (viewingToday.current && selectedDate !== today) setSelectedDate(today);
@@ -160,7 +172,7 @@ export const NutritionExperienceScreen = () => {
   };
 
   if (!data && !error) return <Screen contentStyle={styles.center}><ActivityIndicator color={C.blue} /></Screen>;
-  if (!data) return <Screen contentStyle={styles.screen}><Text style={styles.title}>Nutrition</Text><View style={styles.card}><Text style={styles.section}>Nutrition couldn't be loaded</Text><Text style={styles.body}>{error}</Text><Pressable accessibilityRole="button" onPress={() => void refresh()}><Text style={styles.blue}>Try again</Text></Pressable></View></Screen>;
+  if (!data) return <Screen contentStyle={styles.screen}><Text style={styles.title}>Nutrition</Text><View style={styles.card}><Text style={styles.section}>Nutrition couldn't be loaded</Text><Text style={styles.body}>{error}</Text><Text style={styles.muted}>{loadState.replaceAll('_', ' ')}</Text><Pressable accessibilityRole="button" onPress={() => void refresh()}><Text style={styles.blue}>Try again</Text></Pressable></View></Screen>;
   const pending = data.meals.filter(meal => meal.state === 'PENDING').length;
   const hasRecommendationContext = data.meals.length > 0;
   const isToday = selectedDate === nutritionDate();
