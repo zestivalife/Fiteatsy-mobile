@@ -10,6 +10,11 @@ import {
 } from './auth.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from './auth.middleware.js';
 import { revokeAuthSession } from './auth.repository.js';
+import {
+  assertQaHandoffExchangeRate,
+  exchangeQaAdminSessionHandoff,
+  QA_ADMIN_HANDOFF_PURPOSE
+} from './qa-session-handoff.js';
 
 const signupRequestSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -40,6 +45,12 @@ const changePinSchema = z.object({
   path: ['confirmNewPin']
 });
 
+const qaSessionHandoffExchangeSchema = z.object({
+  code: z.string().trim().min(40).max(120),
+  targetUserId: z.string().uuid(),
+  purpose: z.literal(QA_ADMIN_HANDOFF_PURPOSE)
+}).strict();
+
 const toHttpStatus = (code: OtpDomainError['code']): number => {
   if (code === 'OTP_NOT_FOUND') return 404;
   if (code === 'OTP_EXPIRED') return 410;
@@ -60,6 +71,30 @@ const validationErrorResponse = (error: z.ZodError) => ({
 });
 
 export const authRouter = Router();
+
+authRouter.post('/qa-session-handoff/exchange', async (req, res) => {
+  const parsed = qaSessionHandoffExchangeSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(validationErrorResponse(parsed.error));
+  try {
+    await assertQaHandoffExchangeRate(req.ip || 'unknown');
+    const result = await exchangeQaAdminSessionHandoff({
+      ...parsed.data,
+      userAgent: req.header('user-agent') ?? null,
+      ipAddress: req.ip || null
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.status(200).json(result);
+  } catch (error) {
+    const typed = error as Error & { status?: number; code?: string; retryAfterSec?: number };
+    if (typed.retryAfterSec) res.setHeader('Retry-After', String(typed.retryAfterSec));
+    return res.status(typed.status ?? 401).json({
+      error: typed.code ?? 'QA_HANDOFF_DENIED',
+      message: typed.status === 429 ? typed.message : 'The QA session handoff is invalid.',
+      retryAfterSec: typed.retryAfterSec
+    });
+  }
+});
 
 authRouter.post('/login/pin', async (req, res) => {
   const parsed = pinLoginSchema.safeParse(req.body);

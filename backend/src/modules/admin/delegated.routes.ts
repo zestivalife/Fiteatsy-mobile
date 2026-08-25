@@ -3,8 +3,8 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { requireDelegatedAuthority } from '../auth/delegated-authority.middleware.js';
 import { executeDelegatedIdempotently } from './delegated-operation-idempotency.js';
-import { createAuthSession } from '../auth/auth.repository.js';
-import { createQaAssignment, deactivateQaIdentity, getQaIdentity, issueQaSessionAudit, provisionQaIdentity, recordQaIdentityReuse, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
+import { issueQaAdminSessionHandoff } from '../auth/qa-session-handoff.js';
+import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, recordQaIdentityReuse, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
 
 export const delegatedRouter = Router();
 
@@ -117,11 +117,14 @@ delegatedRouter.post('/qa-identities/:userId/session', requireDelegatedAuthority
   if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   try {
     const userId = String(req.params.userId);
-    const identity = await getQaIdentity(userId);
-    if (!identity || identity.status.toLowerCase() !== 'active') return res.status(404).json({ error: 'QA_IDENTITY_NOT_FOUND', message: 'Active QA identity was not found.' });
-    const session = await createAuthSession(userId, { userAgent: 'zestiva-owner-console-delegated', ipAddress: null });
-    await issueQaSessionAudit(actorId(req), userId, correlationReason(req, parsed.data.reason));
-    return res.status(201).json({ userId, session: session.session, handoff: 'server_governed', token: undefined });
+    const handoff = await issueQaAdminSessionHandoff({
+      actorReference: actorId(req),
+      targetUserId: userId,
+      reason: correlationReason(req, parsed.data.reason)
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.status(201).json({ userId, handoff: 'one_time_exchange', exchange: handoff });
   } catch (error) { return respondError(res, error, 'QA_SESSION_FAILED'); }
 });
 

@@ -5,12 +5,14 @@ import { resetReportsStoreForTests } from '../modules/reports/reports.store.js';
 import { resetWearablesStateForTests } from '../modules/wearables/wearables.service.js';
 import { resetWhatsappProviderForTests } from '../modules/notifications/notification.service.js';
 import { pool } from '../db/pool.js';
+import { resetQaHandoffRateLimitForTests } from '../modules/auth/qa-session-handoff.js';
 
 export const resetBackendStateForTests = async () => {
   resetMigrationStateForTests();
   await migrateDatabase();
   resetOtpChallengesForTests();
   resetWhatsappProviderForTests();
+  resetQaHandoffRateLimitForTests();
   await pool.query('truncate table auth_sessions, fiteatsy_clients, users restart identity cascade');
   await resetPlatformStoreForTests();
   await resetReportsStoreForTests();

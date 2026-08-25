@@ -550,11 +550,19 @@ export const createAuthSession = async (
   userId: string,
   metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
 ) => {
+  return createAuthSessionWithClient(pool, userId, metadata);
+};
+
+export const createAuthSessionWithClient = async (
+  client: Queryable,
+  userId: string,
+  metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
+) => {
   const token = crypto.randomBytes(32).toString('base64url');
   const sessionId = crypto.randomUUID();
   const createdAt = now();
   const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_MS);
-  const inserted = await pool.query(
+  const inserted = await client.query(
     `
       insert into auth_sessions (
         id,
