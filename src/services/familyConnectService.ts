@@ -9,6 +9,7 @@ import {
   WellnessSnapshot,
   DailyCheckIn
 } from '../types';
+import { todayKey, toDayKey } from '../utils/date';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -42,8 +43,8 @@ export const relationshipLabel = (value: FamilyRelationshipType) => {
 
 export const buildSupportiveMedicationLabel = (medications: Medication[], logs: MedicationLog[]) => {
   if (medications.length === 0) return 'No medication plan shared';
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const todayLogs = logs.filter((item) => item.scheduledForISO.slice(0, 10) === todayKey);
+  const currentDayKey = todayKey();
+  const todayLogs = logs.filter((item) => toDayKey(item.scheduledForISO) === currentDayKey);
   if (todayLogs.some((l) => l.status === 'taken')) return 'Medication reminders completed today';
   if (todayLogs.some((l) => l.status === 'snoozed')) return 'Medication reminder snoozed';
   if (todayLogs.some((l) => l.status === 'missed')) return 'Medication support may be helpful';
@@ -51,8 +52,8 @@ export const buildSupportiveMedicationLabel = (medications: Medication[], logs: 
 };
 
 export const buildWellnessActivityLabel = (wellness: WellnessSnapshot, checkIns: DailyCheckIn[]) => {
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const todayCheckIn = checkIns.find((item) => item.dateISO.slice(0, 10) === todayKey);
+  const currentDayKey = todayKey();
+  const todayCheckIn = checkIns.find((item) => toDayKey(item.dateISO) === currentDayKey);
   if (todayCheckIn) return 'Wellness check-in shared recently';
   if (wellness.movementMinutes >= 20) return 'Wellness activity detected';
   if (wellness.movementMinutes >= 8) return 'Steady wellness activity';

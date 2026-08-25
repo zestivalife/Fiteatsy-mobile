@@ -41,6 +41,7 @@ import {
 import { useAppContext } from '../../state/AppContext';
 import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
 import { resolveClientName } from '../../utils/clientIdentity';
+import { BUSINESS_TIME_ZONE, toDayKey } from '../../utils/date';
 import {
   BiomarkerHistoryItem,
   deleteAllAnalyzedReports,
@@ -335,8 +336,18 @@ export const ReportsScreen = () => {
   const [processingIntent, setProcessingIntent] = useState<'upload' | 'reanalysis' | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  const [reportDate, setReportDate] = useState('15 Mar 2026');
-  const [reportDateValue, setReportDateValue] = useState<Date>(new Date('2026-03-15T00:00:00.000Z'));
+  const initialReportDate = useMemo(() => new Date(), []);
+  const [reportDate, setReportDate] = useState(() =>
+    initialReportDate.toLocaleDateString('en-GB', {
+      timeZone: BUSINESS_TIME_ZONE,
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    })
+  );
+  const [reportDateValue, setReportDateValue] = useState<Date>(() =>
+    new Date(`${toDayKey(initialReportDate)}T00:00:00.000+05:30`)
+  );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [labName, setLabName] = useState('');
   const [uploadType, setUploadType] = useState<'camera' | 'gallery' | 'pdf' | null>(null);

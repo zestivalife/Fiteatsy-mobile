@@ -79,7 +79,12 @@ const validateParameter = (parameter: ParsedParameter) => {
 const testDateFromAnalysis = (analysis: ReportAnalysisResult) => {
   const parsed = new Date(analysis.reportDate);
   if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
 };
 
 export const persistReportIntelligence = async (

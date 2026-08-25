@@ -3,6 +3,14 @@ import { PDFParse } from 'pdf-parse';
 import { env } from '../../config/env.js';
 import { buildExtractionGovernance, canonicalBiomarkerName, classifyDocument, CORE_BIOMARKERS } from './report-governance.js';
 
+const currentBusinessDateLabel = () =>
+  new Date().toLocaleDateString('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+
 export type ParsedParameter = {
   rawName?: string;
   name: string;
@@ -1240,7 +1248,7 @@ export const analyzeReportBuffer = async (buffer: Buffer, mimeType: string): Pro
   const reportDate =
     aiDate ??
     findDate(text) ??
-    new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    currentBusinessDateLabel();
   const labName = aiLab ?? findLabName(text) ?? 'Uploaded Lab Report';
   return buildReportAnalysisResult({
     text,
@@ -1283,7 +1291,7 @@ export const analyzeReportBufferAdvanced = async (
   const reportDate =
     advanced.reportDate ??
     findDate(text) ??
-    new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    currentBusinessDateLabel();
   const labName = advanced.labName ?? findLabName(text) ?? 'Uploaded Lab Report';
   const extractionConfidence = advanced.parameters.length === 0
     ? 0
