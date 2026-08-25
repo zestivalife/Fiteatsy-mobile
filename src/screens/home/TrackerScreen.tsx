@@ -1201,9 +1201,9 @@ export const TrackerScreen = () => {
       const sync = wearableSyncData.find((item) => toDayKey(item.syncedAtISO) === dayKey);
       const calories = sync?.metrics.caloriesKcal ?? 0;
       const heartRate = sync?.metrics.heartRateAvg ?? 0;
-      const activityEnergy = sync ? [sync.metrics.movementMinutes] : [];
+      const activityEnergy = sync?.metrics.movementMinutes == null ? [] : [sync.metrics.movementMinutes];
       const stressLoad = sync?.metrics.stressScore == null ? [] : [sync.metrics.stressScore];
-      const focusTrend = sync ? [sync.metrics.focusMinutes] : [];
+      const focusTrend = sync?.metrics.focusMinutes == null ? [] : [sync.metrics.focusMinutes];
 
       return {
         key: dayKey,

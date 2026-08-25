@@ -396,13 +396,13 @@ export const ReportsScreen = () => {
     }
     return next;
   }, [reports, sortMode]);
-  const overallScore = latestReport?.score ?? wellness.wellnessScore;
+  const overallScore = latestReport?.score ?? (wellness.availability === 'available' ? wellness.wellnessScore : null);
   const totalParams = latestReport?.parameters ?? 0;
-  const healthScoreLabel = isReportBackedScore ? 'Report-backed Health Score' : 'Estimated Wellness Score';
+  const healthScoreLabel = isReportBackedScore ? 'Report-backed Health Score' : 'Wellness score unavailable';
   const healthScoreDescription = isReportBackedScore
     ? `out of 100 · ${totalParams} lab parameters analysed`
-    : 'estimated from wellness activity · upload a publishable lab report for a report-backed score';
-  const sectionHighlight = overallScore >= 80 ? colors.success : overallScore >= 60 ? colors.warning : colors.danger;
+    : 'sync current wellness data or upload a publishable lab report';
+  const sectionHighlight = overallScore == null ? colors.textMuted : overallScore >= 80 ? colors.success : overallScore >= 60 ? colors.warning : colors.danger;
   const profileCompletion = useMemo(
     () => buildHealthProfileCompletion(onboarding, null, reports.length),
     [onboarding, reports.length]
@@ -1088,12 +1088,12 @@ export const ReportsScreen = () => {
             style={[
               styles.heroScore,
               {
-                color: scoreColor(overallScore),
+                color: overallScore == null ? colors.textMuted : scoreColor(overallScore),
                 transform: [{ scale: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] }) }]
               }
             ]}
           >
-            {overallScore}
+            {overallScore ?? '—'}
           </Animated.Text>
           <Text style={[styles.heroSub, !isLight && styles.heroSubDark]}>{healthScoreDescription}</Text>
 

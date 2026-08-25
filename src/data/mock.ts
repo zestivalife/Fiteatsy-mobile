@@ -63,6 +63,9 @@ export const initialWellness: WellnessSnapshot = {
   recoveryScore: 0,
   nourishmentScore: 0,
   wellnessScore: 0,
-  hrvStatus: 'Normal',
-  stressScore: 0
+  hrvStatus: 'Unavailable',
+  stressScore: 0,
+  availability: 'not_synced',
+  lastUpdatedISO: null,
+  source: null
 };

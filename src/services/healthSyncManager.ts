@@ -53,6 +53,9 @@ const deriveObservations = (payload: WearableSyncPayload): HealthObservationDraf
 const scoreOrExisting = (value: number | null | undefined, existing: number) =>
   typeof value === 'number' && Number.isFinite(value) ? value : existing;
 
+const positiveOrExisting = (value: number | null | undefined, existing: number) =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : existing;
+
 export const wellnessFromHealthScores = (
   previous: WellnessSnapshot,
   payload: Pick<WearableSyncPayload, 'metrics'> | null,
@@ -61,12 +64,12 @@ export const wellnessFromHealthScores = (
   const metrics = payload?.metrics;
   const next = recalculateWellness({
     ...previous,
-    heartRateAvg: metrics && metrics.heartRateAvg > 0 ? metrics.heartRateAvg : previous.heartRateAvg,
-    sleepHours: metrics && metrics.sleepHours > 0 ? metrics.sleepHours : previous.sleepHours,
-    movementMinutes: metrics && metrics.movementMinutes > 0 ? metrics.movementMinutes : previous.movementMinutes,
-    focusMinutes: metrics && metrics.focusMinutes > 0 ? metrics.focusMinutes : previous.focusMinutes,
-    breathingMinutes: metrics && metrics.breathingMinutes > 0 ? metrics.breathingMinutes : previous.breathingMinutes,
-    hydrationLiters: metrics && metrics.hydrationLiters > 0 ? metrics.hydrationLiters : previous.hydrationLiters,
+    heartRateAvg: positiveOrExisting(metrics?.heartRateAvg, previous.heartRateAvg),
+    sleepHours: positiveOrExisting(metrics?.sleepHours, previous.sleepHours),
+    movementMinutes: positiveOrExisting(metrics?.movementMinutes, previous.movementMinutes),
+    focusMinutes: positiveOrExisting(metrics?.focusMinutes, previous.focusMinutes),
+    breathingMinutes: positiveOrExisting(metrics?.breathingMinutes, previous.breathingMinutes),
+    hydrationLiters: positiveOrExisting(metrics?.hydrationLiters, previous.hydrationLiters),
     recoveryScore: scoreOrExisting(scores.recoveryScore, previous.recoveryScore),
     nourishmentScore: scoreOrExisting(scores.nourishmentScore ?? scores.nutritionScore, previous.nourishmentScore),
     wellnessScore: scoreOrExisting(scores.physicalWellnessIndex ?? scores.overallScore, previous.wellnessScore),

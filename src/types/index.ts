@@ -2,7 +2,7 @@ export type WearableBrand = 'Apple' | 'Samsung' | 'Xiaomi' | 'Amazfit' | 'GoBOLT
 
 export type MoodSelection = '😂' | '😀' | '🙂' | '😐' | '☹️' | '😔';
 
-export type HrvStatus = 'High' | 'Normal' | 'Low';
+export type HrvStatus = 'High' | 'Normal' | 'Low' | 'Unavailable';
 export type CoreChallenge = 'Stress' | 'Sleep' | 'Energy' | 'Focus';
 export type CalendarProvider = 'Google' | 'Outlook' | 'None';
 export type BurnoutRiskFlag = 'none' | 'watch' | 'alert';
@@ -263,12 +263,12 @@ export type WearableSyncPayload = {
   syncedAtISO: string;
   source: 'api' | 'mock';
   metrics: {
-    heartRateAvg: number;
-    sleepHours: number;
-    hydrationLiters: number;
-    focusMinutes: number;
-    breathingMinutes: number;
-    movementMinutes: number;
+    heartRateAvg: number | null;
+    sleepHours: number | null;
+    hydrationLiters: number | null;
+    focusMinutes: number | null;
+    breathingMinutes: number | null;
+    movementMinutes: number | null;
     hrvMs?: number | null;
     caloriesKcal?: number | null;
     workoutMinutes?: number | null;
@@ -333,6 +333,9 @@ export type WellnessSnapshot = {
   wellnessScore: number;
   hrvStatus: HrvStatus;
   stressScore: number;
+  availability: 'available' | 'not_synced' | 'unavailable';
+  lastUpdatedISO: string | null;
+  source: string | null;
 };
 
 export type MedicationType = 'tablet' | 'capsule' | 'syrup' | 'injection' | 'drops' | 'powder';

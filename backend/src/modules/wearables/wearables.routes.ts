@@ -3,12 +3,10 @@ import { z } from 'zod';
 import {
   buildLiveSyncPayload,
   connectHealthApp,
-  getConnections,
   getHealthApps,
-  ingestHealthRecords
 } from './wearables.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
-import { ingestHealthObservations } from '../health/health-observations.repository.js';
+import { ingestHealthObservations, listHealthObservations } from '../health/health-observations.repository.js';
 
 const wearableSyncSchema = z.object({
   deviceId: z.string().min(1),
@@ -95,11 +93,13 @@ wearablesRouter.post('/connect-app', (req, res) => {
   }
 });
 
-wearablesRouter.get('/connections/:userId', (req, res) => {
-  const userId = getAuthenticatedAccount(req).accountId;
+wearablesRouter.get('/connections/:userId', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  const observations = await listHealthObservations({ accountId: account.accountId, clientId: account.client.id }, { limit: 500, offset: 0 });
+  const providers = [...new Set(observations.map((item) => item.sourceProvider))];
   return res.status(200).json({
-    userId,
-    connections: getConnections(userId)
+    userId: account.accountId,
+    connections: providers.map((provider) => ({ provider, status: 'connected', authority: 'health_observations' }))
   });
 });
 
@@ -129,10 +129,6 @@ wearablesRouter.post('/records/ingest', async (req, res) => {
   }
 
   const account = getAuthenticatedAccount(req);
-  const result = ingestHealthRecords({
-    ...parse.data,
-    userId: account.accountId
-  });
   const durable = await ingestHealthObservations({
     accountId: account.accountId,
     clientId: account.client.id
@@ -146,7 +142,12 @@ wearablesRouter.post('/records/ingest', async (req, res) => {
     syncKey: `${parse.data.appId}:${record.type}:${record.recordedAtISO}`
   })));
   return res.status(200).json({
-    ...result,
+    connectionId: `canonical-${account.accountId}-${parse.data.platform}-${parse.data.appId}`,
+    ingestedCount: durable.accepted.length,
+    duplicateCount: durable.duplicate.length,
+    rejectedCount: durable.rejected.length,
+    totalStored: await listHealthObservations({ accountId: account.accountId, clientId: account.client.id }, { limit: 5000, offset: 0 }).then((items) => items.length),
+    latestRecordedAtISO: durable.accepted[0]?.measuredAtISO ?? null,
     durableObservations: {
       accepted: durable.accepted.length,
       duplicate: durable.duplicate.length,
@@ -155,7 +156,7 @@ wearablesRouter.post('/records/ingest', async (req, res) => {
   });
 });
 
-wearablesRouter.post('/sync/live', (req, res) => {
+wearablesRouter.post('/sync/live', async (req, res) => {
   const parse = liveSyncSchema.safeParse(req.body);
   if (!parse.success) {
     return res.status(400).json({
@@ -165,9 +166,17 @@ wearablesRouter.post('/sync/live', (req, res) => {
   }
 
   try {
+    const account = getAuthenticatedAccount(req);
+    const appId = parse.data.appId ?? 'health-connect';
+    const platform = parse.data.platform ?? (appId === 'apple-health' ? 'ios' : 'android');
+    const observations = await listHealthObservations({ accountId: account.accountId, clientId: account.client.id }, { limit: 5000, offset: 0 });
     const { connection, payload } = buildLiveSyncPayload({
-      ...parse.data,
-      userId: getAuthenticatedAccount(req).accountId
+      userId: account.accountId,
+      appId,
+      platform,
+      records: observations
+        .filter((item) => item.sourceProvider === appId)
+        .map((item) => ({ type: item.metricType as never, value: item.value, recordedAtISO: item.measuredAtISO }))
     });
     return res.status(200).json({
       connection,

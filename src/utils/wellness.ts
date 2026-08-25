@@ -98,6 +98,9 @@ export const applyMoodImpact = (snapshot: WellnessSnapshot, mood: MoodSelection 
 };
 
 export const wellnessTagsFromSnapshot = (snapshot: WellnessSnapshot): [string, string, string, string] => {
+  if (snapshot.availability !== 'available') {
+    return ['Nourishment unavailable', 'Recovery unavailable', 'Sleep not synced', 'HRV unavailable'];
+  }
   return [
     `${snapshot.nourishmentScore}% Nourishment`,
     `${snapshot.recoveryScore}% Recovery`,

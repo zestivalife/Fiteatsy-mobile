@@ -14,7 +14,10 @@ const baseWellness: WellnessSnapshot = {
   nourishmentScore: 68,
   wellnessScore: 69,
   hrvStatus: 'Normal',
-  stressScore: 36
+  stressScore: 36,
+  availability: 'available',
+  lastUpdatedISO: '2026-08-23T06:30:00.000Z',
+  source: 'test'
 };
 
 const makeCheckIn = (day: number, mood: 1 | 2 | 3 | 4 | 5, energy: 1 | 2 | 3 | 4 | 5, sleepQuality: 1 | 2 | 3 | 4 | 5): DailyCheckIn => ({

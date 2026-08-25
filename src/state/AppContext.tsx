@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as Notifications from 'expo-notifications';
-import { initialWellness } from '../data/mock';
+import { emptyWellness } from './emptyWellness';
 import {
   AssessmentProfile,
   DailyCheckIn,
@@ -289,7 +289,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus>('NOT_STARTED');
   const [onboardingResumeStep, setOnboardingResumeStep] = useState<OnboardingResumeStep>('basics');
   const [devices, setDevicesState] = useState<WearableDevice[]>([]);
-  const [wellness, setWellnessState] = useState<WellnessSnapshot>(initialWellness);
+  const [wellness, setWellnessState] = useState<WellnessSnapshot>(emptyWellness);
   const [mood, setMood] = useState<MoodSelection | null>(null);
   const [onboarding, setOnboardingState] = useState<OnboardingProfile | null>(null);
   const [assessment, setAssessmentState] = useState<AssessmentProfile | null>(null);
@@ -1672,7 +1672,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setCanonicalProfile(null);
     setClientBootstrap(createClientBootstrapState());
     setPublishedNutritionPlan(null);
-    setWellnessState(initialWellness);
+    setWellnessState(emptyWellness);
   }, [authSession, clearPersistedAuth, setSelectedDeviceId, setWearableSetupCompleted]);
 
 

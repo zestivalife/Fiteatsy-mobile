@@ -1,5 +1,5 @@
 import { WearableDevice, WearableSyncPayload, WellnessSnapshot } from '../types';
-import { initialWellness } from '../data/mock';
+import { emptyWellness } from '../state/emptyWellness';
 import { recalculateWellness } from '../utils/wellness';
 import { postJson } from './apiClient';
 
@@ -19,19 +19,23 @@ export const connectWearable = async (device: WearableDevice): Promise<WearableD
 const validateAndNormalizePayload = (payload: WearableSyncPayload): WearableSyncPayload => {
   const warnings: string[] = [];
 
+  const normalize = (value: number | null, min: number, max: number, decimals = 0) => {
+    if (value == null) return null;
+    if (!Number.isFinite(value)) throw new Error('Invalid wearable metric.');
+    const clamped = clamp(value, min, max);
+    return decimals === 0 ? Math.round(clamped) : Number(clamped.toFixed(decimals));
+  };
+
   const metrics = {
-    heartRateAvg: Math.round(clamp(payload.metrics.heartRateAvg, 45, 130)),
-    sleepHours: Number(clamp(payload.metrics.sleepHours, 3, 10).toFixed(1)),
-    hydrationLiters: Number(clamp(payload.metrics.hydrationLiters, 0, 7).toFixed(1)),
-    focusMinutes: Math.round(clamp(payload.metrics.focusMinutes, 0, 180)),
-    breathingMinutes: Math.round(clamp(payload.metrics.breathingMinutes, 0, 90)),
-    movementMinutes: Math.round(clamp(payload.metrics.movementMinutes, 0, 240))
+    heartRateAvg: normalize(payload.metrics.heartRateAvg, 45, 130),
+    sleepHours: normalize(payload.metrics.sleepHours, 3, 10, 1),
+    hydrationLiters: normalize(payload.metrics.hydrationLiters, 0, 7, 1),
+    focusMinutes: normalize(payload.metrics.focusMinutes, 0, 180),
+    breathingMinutes: normalize(payload.metrics.breathingMinutes, 0, 90),
+    movementMinutes: normalize(payload.metrics.movementMinutes, 0, 240)
   };
 
   (Object.keys(metrics) as Array<keyof typeof metrics>).forEach((key) => {
-    if (!Number.isFinite(payload.metrics[key])) {
-      throw new Error(`Invalid wearable metric: ${key}`);
-    }
     if (payload.metrics[key] !== metrics[key]) {
       warnings.push(`Adjusted ${key} to safe range.`);
     }
@@ -58,13 +62,16 @@ const payloadToWellness = (payload: WearableSyncPayload): WellnessSnapshot => {
   }
 
   return recalculateWellness({
-    ...initialWellness,
-    heartRateAvg: payload.metrics.heartRateAvg,
-    sleepHours: payload.metrics.sleepHours,
-    hydrationLiters: payload.metrics.hydrationLiters,
-    focusMinutes: payload.metrics.focusMinutes,
-    breathingMinutes: payload.metrics.breathingMinutes,
-    movementMinutes: payload.metrics.movementMinutes
+    ...emptyWellness,
+    heartRateAvg: payload.metrics.heartRateAvg ?? emptyWellness.heartRateAvg,
+    sleepHours: payload.metrics.sleepHours ?? emptyWellness.sleepHours,
+    hydrationLiters: payload.metrics.hydrationLiters ?? emptyWellness.hydrationLiters,
+    focusMinutes: payload.metrics.focusMinutes ?? emptyWellness.focusMinutes,
+    breathingMinutes: payload.metrics.breathingMinutes ?? emptyWellness.breathingMinutes,
+    movementMinutes: payload.metrics.movementMinutes ?? emptyWellness.movementMinutes,
+    availability: 'available',
+    lastUpdatedISO: payload.syncedAtISO,
+    source: payload.provider
   });
 };
 
