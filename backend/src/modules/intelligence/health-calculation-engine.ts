@@ -3,16 +3,18 @@ import { listHealthObservations } from '../health/health-observations.repository
 import { getHealthProfileByClientId } from '../platform/platform.store.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { HealthScoreInput, clearHealthScoresForOwner, createHealthScores } from './health-scores.repository.js';
+import { HEALTH_OBSERVATION_FRESHNESS_MS, isCurrentHealthObservation } from './health-freshness.js';
 
-const CALCULATION_VERSION = 'FIT-WELLNESS-200.v1';
+export const CALCULATION_VERSION = 'FIT-WELLNESS-200.v1';
+
 
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 const average = (values: number[]) => Math.round(values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length));
 const confidenceAverage = (values: number[]) =>
   Number((values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)).toFixed(4));
 
-const scoreFromReferenceRange = (value: number, referenceRange: string | null) => {
-  if (!referenceRange) return 70;
+const scoreFromReferenceRange = (value: number, referenceRange: string | null): number | null => {
+  if (!referenceRange) return null;
   const cleaned = referenceRange.replace(/\s/g, '');
   const between = cleaned.match(/(-?\d+(?:\.\d+)?)\s*[-–]\s*(-?\d+(?:\.\d+)?)/);
   if (between) {
@@ -27,10 +29,10 @@ const scoreFromReferenceRange = (value: number, referenceRange: string | null) =
   if (below) return value < Number(below[1]) ? 88 : 55;
   const above = cleaned.match(/^>(-?\d+(?:\.\d+)?)/);
   if (above) return value > Number(above[1]) ? 88 : 55;
-  return 70;
+  return null;
 };
 
-const scoreObservation = (metricType: string, value: number) => {
+const scoreObservation = (metricType: string, value: number): number | null => {
   switch (metricType) {
     case 'steps':
       return clamp(Math.round((value / 10000) * 100));
@@ -50,9 +52,11 @@ const scoreObservation = (metricType: string, value: number) => {
     case 'mindfulness_minutes':
       return clamp(Math.round((value / 15) * 100));
     default:
-      return 60;
+      return null;
   }
 };
+
+const scored = (values: Array<number | null>) => values.filter((value): value is number => value != null);
 
 const insufficient = (scoreType: HealthScoreInput['scoreType'], reason: string): HealthScoreInput => ({
   scoreType,
@@ -64,6 +68,7 @@ const insufficient = (scoreType: HealthScoreInput['scoreType'], reason: string):
 });
 
 export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
+  const evaluatedAtMs = Date.now();
   const [biomarkers, observations, profile] = await Promise.all([
     listBiomarkerHistory(owner, { limit: 200, offset: 0 }),
     listHealthObservations(owner, { limit: 200, offset: 0 }),
@@ -71,7 +76,9 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
   ]);
 
   const validatedBiomarkers = biomarkers.filter((item) => item.validationStatus === 'validated');
-  const recentObservations = observations.filter((item) => item.qualityStatus === 'accepted' || item.qualityStatus === 'estimated');
+  const eligibleObservations = observations.filter((item) => item.qualityStatus === 'accepted' || item.qualityStatus === 'estimated');
+  const recentObservations = eligibleObservations.filter((item) => isCurrentHealthObservation(item, evaluatedAtMs));
+  const staleObservations = eligibleObservations.filter((item) => !isCurrentHealthObservation(item, evaluatedAtMs));
 
   const nutritionBiomarkers = validatedBiomarkers.filter((item) =>
     /vitamin|b12|folate|ferritin|iron|albumin|protein|calcium|magnesium/i.test(`${item.biomarkerName} ${item.unit}`)
@@ -89,22 +96,29 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
   const hydrationObservations = recentObservations.filter((item) => item.metricType === 'hydration_ml');
   const stressObservations = recentObservations.filter((item) => ['stress_score', 'hrv_ms', 'resting_heart_rate', 'mindfulness_minutes', 'sleep_minutes'].includes(item.metricType));
 
-  const nourishmentInputs = [
+  const nourishmentInputs = scored([
     ...nutritionBiomarkers.map((item) => scoreFromReferenceRange(item.value, item.referenceRange)),
     ...hydrationObservations.map((item) => scoreObservation(item.metricType, item.value))
-  ];
-  const energyBalanceInputs = [
+  ]);
+  const energyBalanceInputs = scored([
     ...sleepObservations.map((item) => scoreObservation(item.metricType, item.value)),
     ...activityObservations.map((item) => scoreObservation(item.metricType, item.value)),
     ...hydrationObservations.map((item) => scoreObservation(item.metricType, item.value))
-  ];
-  const bodySupportInputs = [
+  ]);
+  const bodySupportInputs = scored([
     ...metabolicBiomarkers.map((item) => scoreFromReferenceRange(item.value, item.referenceRange)),
     ...inflammationBiomarkers.map((item) => scoreFromReferenceRange(item.value, item.referenceRange))
-  ];
-  const activePerformanceInputs = activityObservations.map((item) => scoreObservation(item.metricType, item.value));
-  const recoveryInputs = recoveryObservations.map((item) => scoreObservation(item.metricType, item.value));
-  const stressResilienceInputs = stressObservations.map((item) => scoreObservation(item.metricType, item.value));
+  ]);
+  const activePerformanceInputs = scored(activityObservations.map((item) => scoreObservation(item.metricType, item.value)));
+  const recoveryInputs = scored(recoveryObservations.map((item) => scoreObservation(item.metricType, item.value)));
+  const stressResilienceInputs = scored(stressObservations.map((item) => scoreObservation(item.metricType, item.value)));
+
+  const freshnessSummary = {
+    evaluatedAtISO: new Date(evaluatedAtMs).toISOString(),
+    policyMsByMetric: HEALTH_OBSERVATION_FRESHNESS_MS,
+    staleHealthObservationIds: staleObservations.map((item) => item.id),
+    biomarkerPolicy: 'validated_longitudinal_until_clinical_freshness_specification'
+  };
 
   const scores: HealthScoreInput[] = [];
   const pushCalculated = (
@@ -138,7 +152,8 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
     {
       biomarkerObservationIds: nutritionBiomarkers.map((item) => item.id),
       healthObservationIds: hydrationObservations.map((item) => item.id),
-      profileAvailable: Boolean(profile)
+      profileAvailable: Boolean(profile),
+      freshness: freshnessSummary
     },
     'No validated nourishment biomarkers or hydration observations are available.'
   );
@@ -150,21 +165,21 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
       ...activityObservations.map(() => 0.74),
       ...hydrationObservations.map(() => 0.72)
     ]),
-    { healthObservationIds: [...sleepObservations, ...activityObservations, ...hydrationObservations].map((item) => item.id) },
+    { healthObservationIds: [...sleepObservations, ...activityObservations, ...hydrationObservations].map((item) => item.id), freshness: freshnessSummary },
     'No sleep, movement, or hydration observations are available.'
   );
   pushCalculated(
     'body_support',
     bodySupportInputs,
     confidenceAverage([...metabolicBiomarkers, ...inflammationBiomarkers].map((item) => item.confidence)),
-    { biomarkerObservationIds: [...metabolicBiomarkers, ...inflammationBiomarkers].map((item) => item.id) },
+    { biomarkerObservationIds: [...metabolicBiomarkers, ...inflammationBiomarkers].map((item) => item.id), freshness: freshnessSummary },
     'No validated metabolic or body-support biomarkers are available.'
   );
   pushCalculated(
     'active_performance',
     activePerformanceInputs,
     0.74,
-    { healthObservationIds: activityObservations.map((item) => item.id) },
+    { healthObservationIds: activityObservations.map((item) => item.id), freshness: freshnessSummary },
     'No activity observations are available.'
   );
   pushCalculated(
@@ -173,7 +188,8 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
     0.74,
     {
       healthObservationIds: recoveryObservations.map((item) => item.id),
-      calculationRule: 'Recovery combines sleep, HRV, resting heart rate, movement load, and mindfulness recovery signals.'
+      calculationRule: 'Recovery combines sleep, HRV, resting heart rate, movement load, and mindfulness recovery signals.',
+      freshness: freshnessSummary
     },
     'No recovery observations are available.'
   );
@@ -183,7 +199,8 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
     0.72,
     {
       healthObservationIds: stressObservations.map((item) => item.id),
-      calculationRule: 'Stress resilience reflects stress score, HRV, resting heart rate, sleep, and mindfulness recovery behaviour.'
+      calculationRule: 'Stress resilience reflects stress score, HRV, resting heart rate, sleep, and mindfulness recovery behaviour.',
+      freshness: freshnessSummary
     },
     'No stress resilience observations are available.'
   );
