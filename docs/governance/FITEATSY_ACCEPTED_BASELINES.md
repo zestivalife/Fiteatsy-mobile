@@ -11,7 +11,10 @@ This manifest records source references and contract owners. An `Accepted SHA` i
 | Canonical client data | `e816e1c` | `FITEATSY_CANONICAL_CLIENT_DATA_CONTRACT` | Pending authenticated account-switch verification |
 | Nutrition | `bf69e45250e4ffdc47d94ada55d392334da9b31f` | `FITEATSY_NUTRITION_CONTRACT` | Pending ACTIVE_PUBLISHED device verification |
 | Phone identity | `bf69e45250e4ffdc47d94ada55d392334da9b31f` | `FITEATSY_PHONE_IDENTITY_CONTRACT` | Pending provider-backed OTP verification |
+| Consultant + Senior Consultant Phase C | Backend `c1610cbed6fcac1654ab42362f9be0714490a52c`; Consultant `d4dc8415bf3965e4ab1bd56157a0601341d73a95` | [`FITEATSY_PHASE_C_CONSULTANT_PLATFORM_FREEZE`](./FITEATSY_PHASE_C_CONSULTANT_PLATFORM_FREEZE.md) | Authenticated production E2E accepted; frozen |
 
 ## Ownership guard
 
 Canonical route owners are `SplashScreen`, the Onboarding V2 shell/screens, and `MedicationCalendarScreen`. Navigation must never remount known legacy splash, onboarding, or medication components. The permanent source guards live in `test/acceptedProductBaseline.test.ts` and the module-specific contract tests.
+
+The Consultant and Senior Consultant workflow, data projections, isolation rules, Diet Plan lifecycle, and Optional Guidance V2 contract are additionally frozen by the Phase C production milestone. The original golden recovery benchmark remains unchanged.
