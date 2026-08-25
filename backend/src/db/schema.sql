@@ -431,6 +431,7 @@ create table if not exists health_observations (
   source_record_id text,
   sync_key text not null,
   quality_status text not null default 'accepted',
+  source_metadata jsonb,
   created_at timestamptz not null default now(),
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
 );

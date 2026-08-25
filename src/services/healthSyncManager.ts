@@ -17,18 +17,25 @@ export type HealthSyncStatus = {
   fiteatsyClientId: string;
   overallStatus: HealthSyncConnectionState;
   lastSyncISO: string | null;
+  latestMeasurementISO: string | null;
   recordsSynced: number;
   appleHealth: {
     status: HealthSyncConnectionState;
     lastSyncISO: string | null;
+    latestMeasurementISO: string | null;
     recordsSynced: number;
   };
   healthConnect: {
     status: HealthSyncConnectionState;
     lastSyncISO: string | null;
+    latestMeasurementISO: string | null;
     recordsSynced: number;
   };
-  sources: Record<string, { recordsSynced: number; lastSyncISO: string | null }>;
+  sources: Record<string, {
+    recordsSynced: number;
+    lastSyncISO: string | null;
+    latestMeasurementISO: string | null;
+  }>;
 };
 
 export type HealthSyncResult = {

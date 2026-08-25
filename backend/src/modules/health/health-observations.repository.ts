@@ -11,6 +11,7 @@ export type HealthObservationInput = {
   sourceRecordId?: string | null;
   syncKey?: string | null;
   qualityStatus?: 'accepted' | 'estimated';
+  sourceMetadata?: Record<string, unknown> | null;
 };
 
 export type HealthObservationRecord = {
@@ -26,6 +27,7 @@ export type HealthObservationRecord = {
   syncKey: string;
   qualityStatus: string;
   createdAtISO: string;
+  sourceMetadata: Record<string, unknown> | null;
 };
 
 const rowToObservation = (row: Record<string, unknown>): HealthObservationRecord => ({
@@ -40,7 +42,8 @@ const rowToObservation = (row: Record<string, unknown>): HealthObservationRecord
   sourceRecordId: row.source_record_id == null ? null : String(row.source_record_id),
   syncKey: String(row.sync_key),
   qualityStatus: String(row.quality_status),
-  createdAtISO: new Date(String(row.created_at)).toISOString()
+  createdAtISO: new Date(String(row.created_at)).toISOString(),
+  sourceMetadata: row.source_metadata == null ? null : row.source_metadata as Record<string, unknown>
 });
 
 const buildSyncKey = (owner: ClientOwnershipContext, observation: HealthObservationInput) =>
@@ -71,9 +74,9 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
       `
         insert into health_observations (
           id, user_id, client_id, metric_type, value, unit, measured_at, source_provider,
-          source_record_id, sync_key, quality_status
+          source_record_id, sync_key, quality_status, source_metadata
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         on conflict (client_id, sync_key) do nothing
         returning *
       `,
@@ -88,7 +91,8 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
         observation.sourceProvider,
         observation.sourceRecordId ?? null,
         syncKey,
-        observation.qualityStatus ?? 'accepted'
+        observation.qualityStatus ?? 'accepted',
+        observation.sourceMetadata ?? null
       ]
     );
 

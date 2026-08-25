@@ -7,6 +7,52 @@ import { HEALTH_OBSERVATION_FRESHNESS_MS, isCurrentHealthObservation } from './h
 
 export const CALCULATION_VERSION = 'FIT-WELLNESS-200.v1';
 
+type ScoringObservation = Awaited<ReturnType<typeof listHealthObservations>>[number];
+
+const IST_OFFSET_MS = 330 * 60 * 1000;
+const ADDITIVE_DAILY_METRICS = new Set([
+  'steps',
+  'active_minutes',
+  'workout_minutes',
+  'sleep_minutes',
+  'hydration_ml',
+  'mindfulness_minutes'
+]);
+
+const istDayKey = (iso: string) => new Date(Date.parse(iso) + IST_OFFSET_MS).toISOString().slice(0, 10);
+
+export const normalizeAdditiveObservationsForScoring = (
+  observations: ScoringObservation[]
+): ScoringObservation[] => {
+  const passthrough = observations.filter((item) => !ADDITIVE_DAILY_METRICS.has(item.metricType));
+  const bySource = new Map<string, ScoringObservation>();
+
+  observations.filter((item) => ADDITIVE_DAILY_METRICS.has(item.metricType)).forEach((item) => {
+    const sourceApplication = typeof item.sourceMetadata?.sourceApplication === 'string'
+      ? item.sourceMetadata.sourceApplication
+      : item.sourceProvider;
+    const key = [item.metricType, istDayKey(item.measuredAtISO), sourceApplication].join('|');
+    const current = bySource.get(key);
+    bySource.set(key, current == null ? { ...item } : {
+      ...current,
+      value: current.value + item.value,
+      measuredAtISO: current.measuredAtISO > item.measuredAtISO ? current.measuredAtISO : item.measuredAtISO,
+      createdAtISO: current.createdAtISO > item.createdAtISO ? current.createdAtISO : item.createdAtISO
+    });
+  });
+
+  const preferredByDay = new Map<string, ScoringObservation>();
+  bySource.forEach((item) => {
+    const key = [item.metricType, istDayKey(item.measuredAtISO)].join('|');
+    const current = preferredByDay.get(key);
+    if (current == null || item.value > current.value || (
+      item.value === current.value && item.createdAtISO > current.createdAtISO
+    )) preferredByDay.set(key, item);
+  });
+
+  return [...passthrough, ...preferredByDay.values()];
+};
+
 
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 const average = (values: number[]) => Math.round(values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length));
@@ -77,7 +123,9 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
 
   const validatedBiomarkers = biomarkers.filter((item) => item.validationStatus === 'validated');
   const eligibleObservations = observations.filter((item) => item.qualityStatus === 'accepted' || item.qualityStatus === 'estimated');
-  const recentObservations = eligibleObservations.filter((item) => isCurrentHealthObservation(item, evaluatedAtMs));
+  const recentObservations = normalizeAdditiveObservationsForScoring(
+    eligibleObservations.filter((item) => isCurrentHealthObservation(item, evaluatedAtMs))
+  );
   const staleObservations = eligibleObservations.filter((item) => !isCurrentHealthObservation(item, evaluatedAtMs));
 
   const nutritionBiomarkers = validatedBiomarkers.filter((item) =>

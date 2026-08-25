@@ -66,6 +66,60 @@ test('POST /v1/health/observations:batch persists client-owned observations and 
   assert.equal(listed.body.items[0].userId, undefined);
 });
 
+test('health ingestion preserves Health Connect provenance and rejects unsafe observations atomically', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const measuredAtISO = new Date(Date.now() - 60_000).toISOString();
+  const valid = await postJson(server.baseUrl, '/v1/health/observations:batch', {
+    observations: [{
+      metricType: 'weight',
+      value: 71.4,
+      unit: 'kg',
+      measuredAtISO,
+      sourceProvider: 'health_connect',
+      sourceRecordId: 'hc-weight-record-1',
+      syncKey: 'health_connect:Weight:com.example.scale:hc-weight-record-1',
+      sourceMetadata: {
+        recordType: 'Weight',
+        sourceApplication: 'com.example.scale',
+        originalValue: 71.4,
+        originalUnit: 'kg',
+        device: { manufacturer: 'Synthetic QA', model: 'Scale', type: 3 },
+        recordingMethod: 2
+      }
+    }]
+  }, { headers: authHeaders(session.token) });
+  assert.equal(valid.response.status, 200);
+  assert.equal(valid.body.accepted, 1);
+  assert.equal(valid.body.items[0].sourceMetadata.sourceApplication, 'com.example.scale');
+  assert.equal(valid.body.items[0].sourceMetadata.device.model, 'Scale');
+
+  const syncStatus = await getJson(server.baseUrl, '/v1/health/sync/status', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(syncStatus.response.status, 200);
+  assert.equal(syncStatus.body.lastSyncISO, valid.body.items[0].createdAtISO);
+  assert.equal(syncStatus.body.latestMeasurementISO, valid.body.items[0].measuredAtISO);
+  assert.equal(syncStatus.body.healthConnect.lastSyncISO, valid.body.items[0].createdAtISO);
+  assert.equal(syncStatus.body.healthConnect.latestMeasurementISO, valid.body.items[0].measuredAtISO);
+
+  for (const observation of [
+    { metricType: 'unknown_metric', value: 1, unit: 'count', measuredAtISO },
+    { metricType: 'steps', value: 1, unit: 'kg', measuredAtISO },
+    { metricType: 'steps', value: 0, unit: 'count', measuredAtISO },
+    { metricType: 'steps', value: 1, unit: 'count', measuredAtISO: new Date(Date.now() + 60 * 60_000).toISOString() },
+    {
+      metricType: 'sleep_minutes', value: 30, unit: 'min', measuredAtISO,
+      sourceMetadata: { startAtISO: new Date(Date.now() - 60_000).toISOString(), endAtISO: new Date(Date.now() - 120_000).toISOString() }
+    }
+  ]) {
+    const response = await postJson(server.baseUrl, '/v1/health/observations:batch', {
+      observations: [{ sourceProvider: 'health_connect', ...observation }]
+    }, { headers: authHeaders(session.token) });
+    assert.equal(response.response.status, 400);
+    assert.equal(response.body.error, 'INVALID_HEALTH_OBSERVATION');
+  }
+});
+
 test('GET /v1/biomarkers and /v1/biomarkers/history return client-owned biomarker data', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const biomarker = await upsertBiomarker({

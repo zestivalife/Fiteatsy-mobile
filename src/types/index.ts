@@ -317,6 +317,20 @@ export type HealthObservationDraft = {
   sourceRecordId?: string;
   syncKey?: string;
   qualityStatus?: 'accepted' | 'estimated';
+  sourceMetadata?: {
+    recordType?: string;
+    sourceApplication?: string;
+    startAtISO?: string;
+    endAtISO?: string;
+    originalValue?: number;
+    originalUnit?: string;
+    device?: {
+      manufacturer?: string;
+      model?: string;
+      type?: number;
+    };
+    recordingMethod?: number;
+  };
 };
 
 export type WellnessSnapshot = {

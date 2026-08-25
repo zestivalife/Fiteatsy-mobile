@@ -31,6 +31,9 @@
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_HEART_RATE_VARIABILITY",
         "android.permission.health.READ_EXERCISE",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_WEIGHT",
+        "android.permission.health.READ_DISTANCE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO"
       ],
