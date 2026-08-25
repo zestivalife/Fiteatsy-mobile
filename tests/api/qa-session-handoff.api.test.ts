@@ -4,7 +4,7 @@ import test from 'node:test';
 import { pool } from '../../backend/src/db/pool.js';
 import { resetDelegatedIdempotencyForTests } from '../../backend/src/modules/admin/delegated-operation-idempotency.js';
 import { resetDelegatedAuthorityReplayStoreForTests } from '../../backend/src/modules/auth/delegated-authority.js';
-import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
+import { authHeaders } from '../helpers/auth.js';
 import { postJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
@@ -56,13 +56,6 @@ const provision = async (role: 'admin' | 'user' | 'consultant' | 'senior_consult
   return result;
 };
 
-const issue = (userId: string) => postJson(server.baseUrl, `/v1/internal/delegated/qa-identities/${userId}/session`, {
-  reason: 'Phase C governed QA Admin authentication'
-}, { headers: {
-  'x-zestiva-delegation': sign('fiteatsy.qa.session.issue', 'qa_session'),
-  'idempotency-key': crypto.randomUUID()
-} });
-
 const exchange = (issued: any, overrides: Record<string, unknown> = {}) => postJson(server.baseUrl, '/v1/auth/qa-session-handoff/exchange', {
   code: issued.body.exchange.code,
   targetUserId: issued.body.exchange.targetUserId,
@@ -72,8 +65,8 @@ const exchange = (issued: any, overrides: Record<string, unknown> = {}) => postJ
 
 test('fresh handoff exchanges once into the canonical QA Admin session and supports logout', async () => {
   const admin = await provision();
-  const issued = await issue(admin.body.user.id);
-  assert.equal(issued.response.status, 201, JSON.stringify(issued.body));
+  const issued = admin;
+  assert.ok([200, 201].includes(issued.response.status), JSON.stringify(issued.body));
   assert.equal(issued.body.token, undefined);
   assert.equal(issued.body.session, undefined);
   assert.equal(issued.body.handoff, 'one_time_exchange');
@@ -111,7 +104,7 @@ test('fresh handoff exchanges once into the canonical QA Admin session and suppo
 
 test('concurrent exchange allows exactly one canonical session', async () => {
   const admin = await provision();
-  const issued = await issue(admin.body.user.id);
+  const issued = admin;
   const results = await Promise.all([exchange(issued), exchange(issued)]);
   assert.deepEqual(results.map((result) => result.response.status).sort(), [200, 401]);
   const sessions = await pool.query('select count(*)::int as count from auth_sessions where user_id = $1', [admin.body.user.id]);
@@ -121,7 +114,7 @@ test('concurrent exchange allows exactly one canonical session', async () => {
 test('unknown, modified, cross-user and expired handoffs are denied', async () => {
   const admin = await provision();
   const other = await provision();
-  const issued = await issue(admin.body.user.id);
+  const issued = admin;
   const unknown = await exchange(issued, { code: crypto.randomBytes(32).toString('base64url') });
   assert.equal(unknown.response.status, 401);
   const modified = await exchange(issued, { code: `${issued.body.exchange.code.slice(0, -1)}x` });
@@ -139,28 +132,28 @@ test('unknown, modified, cross-user and expired handoffs are denied', async () =
   assert.equal(expired.body.error, 'QA_HANDOFF_EXPIRED');
 });
 
-test('handoff issuance denies every non-admin QA role and production Admin', async () => {
+test('handoff exchange denies every non-admin QA role and production Admin substitution', async () => {
   for (const role of ['user', 'consultant', 'senior_consultant'] as const) {
     const identity = await provision(role);
     assert.ok([200, 201].includes(identity.response.status), `${role}: ${JSON.stringify(identity.body)}`);
-    const denied = await issue(identity.body.user.id);
-    assert.equal(denied.response.status, 404, `${role}: ${JSON.stringify(denied.body)}`);
+    const denied = await exchange(identity);
+    assert.equal(denied.response.status, 401, `${role}: ${JSON.stringify(denied.body)}`);
   }
-  const production = await createAuthenticatedSession(server.baseUrl);
-  const productionUserId = production.current.body.user.id;
-  await pool.query(`update users set role = 'admin' where id = $1`, [productionUserId]);
-  const denied = await issue(productionUserId);
-  assert.equal(denied.response.status, 404, JSON.stringify(denied.body));
+  const production = await provision();
+  const productionUserId = production.body.user.id;
+  await pool.query(`update users set account_purpose = 'PRODUCTION_USER' where id = $1`, [productionUserId]);
+  const denied = await exchange(production);
+  assert.equal(denied.response.status, 401, JSON.stringify(denied.body));
 });
 
 test('inactive QA Admin and wrong purpose are denied', async () => {
   const admin = await provision();
   await pool.query(`update users set status = 'disabled' where id = $1`, [admin.body.user.id]);
-  const inactive = await issue(admin.body.user.id);
-  assert.equal(inactive.response.status, 404);
+  const inactive = await exchange(admin);
+  assert.equal(inactive.response.status, 401);
 
   await pool.query(`update users set status = 'active' where id = $1`, [admin.body.user.id]);
-  const issued = await issue(admin.body.user.id);
+  const issued = await provision();
   const wrongPurpose = await postJson(server.baseUrl, '/v1/auth/qa-session-handoff/exchange', {
     code: issued.body.exchange.code,
     targetUserId: admin.body.user.id,
@@ -170,9 +163,16 @@ test('inactive QA Admin and wrong purpose are denied', async () => {
 });
 
 test('issuing a replacement revokes the prior code and invalid attempts are rate limited', async () => {
-  const admin = await provision();
-  const first = await issue(admin.body.user.id);
-  const replacement = await issue(admin.body.user.id);
+  const first = await provision();
+  const replacement = await postJson(server.baseUrl, '/v1/internal/delegated/qa-admins', {
+    name: first.body.user.name,
+    email: first.body.user.email,
+    mobileNumber: first.body.user.mobileNumber,
+    reason: 'Phase C replacement handoff'
+  }, { headers: {
+    'x-zestiva-delegation': sign('fiteatsy.qa.admin.create', 'qa_provisioning'),
+    'idempotency-key': crypto.randomUUID()
+  } });
   const revoked = await exchange(first);
   assert.equal(revoked.response.status, 401);
   const valid = await exchange(replacement);
@@ -182,7 +182,7 @@ test('issuing a replacement revokes the prior code and invalid attempts are rate
   for (let index = 0; index < 11; index += 1) {
     last = await postJson(server.baseUrl, '/v1/auth/qa-session-handoff/exchange', {
       code: crypto.randomBytes(32).toString('base64url'),
-      targetUserId: admin.body.user.id,
+      targetUserId: first.body.user.id,
       purpose
     });
   }

@@ -80,7 +80,19 @@ delegatedRouter.post('/qa-admins', requireDelegatedAuthority('fiteatsy.qa.admin.
       await recordQaIdentityReuse({ actorUserId: null, actorReference: delegatedActorId, targetUserId: result.value.user.id, role: 'admin', reason });
     }
     const reused = result.replayed || result.value.identityReused;
-    return res.status(reused ? 200 : 201).json({ ...result.value, idempotentReplay: reused });
+    const exchange = await issueQaAdminSessionHandoff({
+      actorReference: delegatedActorId,
+      targetUserId: result.value.user.id,
+      reason
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.status(reused ? 200 : 201).json({
+      ...result.value,
+      idempotentReplay: reused,
+      handoff: 'one_time_exchange',
+      exchange
+    });
   } catch (error) { return respondError(res, error, 'QA_ADMIN_PROVISIONING_FAILED'); }
 });
 
@@ -113,22 +125,6 @@ delegatedRouter.post('/qa-identities/:userId/deactivate', requireDelegatedAuthor
     if (!result) return res.status(404).json({ error: 'QA_IDENTITY_NOT_FOUND', message: 'Active QA identity was not found.' });
     return res.status(200).json(result);
   } catch (error) { return respondError(res, error, 'QA_DEACTIVATION_FAILED'); }
-});
-
-delegatedRouter.post('/qa-identities/:userId/session', requireDelegatedAuthority('fiteatsy.qa.session.issue', 'qa_session'), async (req, res) => {
-  const parsed = reasonSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
-  try {
-    const userId = String(req.params.userId);
-    const handoff = await issueQaAdminSessionHandoff({
-      actorReference: actorId(req),
-      targetUserId: userId,
-      reason: correlationReason(req, parsed.data.reason)
-    });
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Referrer-Policy', 'no-referrer');
-    return res.status(201).json({ userId, handoff: 'one_time_exchange', exchange: handoff });
-  } catch (error) { return respondError(res, error, 'QA_SESSION_FAILED'); }
 });
 
 delegatedRouter.post('/qa-identities/:userId/onboarding/reset', requireDelegatedAuthority('fiteatsy.qa.onboarding.reset', 'qa_provisioning'), async (req, res) => {

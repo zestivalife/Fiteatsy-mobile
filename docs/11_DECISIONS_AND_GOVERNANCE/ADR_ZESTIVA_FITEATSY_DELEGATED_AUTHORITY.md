@@ -24,6 +24,8 @@ The Owner Console browser calls only `/api/v1/platform/fiteatsy/*` with its exis
 | Client assignment | `fiteatsy.client.assign` | `client_assignment` |
 | Assignment revoke | `fiteatsy.client.assignment.revoke` | `client_assignment` |
 | QA identity deactivation | `fiteatsy.qa.identity.deactivate` | `qa_provisioning` |
-| QA session issuance | `fiteatsy.qa.session.issue` | `qa_session` |
+| QA Admin provisioning with subordinate one-time handoff | `fiteatsy.qa.admin.create` | `qa_provisioning` |
+
+The subordinate handoff is bound to the exact `QA_TEST` Admin resolved by the provisioning operation. There is no delegated arbitrary-user session issuance route. The exchange endpoint relies on the short-lived, target-bound, purpose-bound, single-use handoff secret and independently revalidates the QA Admin boundary before creating the canonical session.
 
 The delegation token never reaches the browser. Correlation IDs and idempotency keys cross the gateway boundary; Fiteatsy stores completed operation responses in Redis and rejects an in-progress duplicate. Service failures are translated to stable owner-facing errors without returning token material or provider details. Fiteatsy audit events record the delegated actor and operation through the existing QA provisioning audit model.

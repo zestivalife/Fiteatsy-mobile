@@ -58,10 +58,15 @@ test('Owner delegation creates only a canonical QA_TEST admin and audits creatio
   assert.equal(created.body.user.role, 'admin');
   assert.equal(created.body.user.accountPurpose, 'QA_TEST');
   assert.equal(created.body.user.mobileNumber, '919762006688');
+  assert.equal(created.body.handoff, 'one_time_exchange');
+  assert.equal(created.body.exchange.targetUserId, created.body.user.id);
+  assert.equal(created.body.exchange.purpose, 'qa_admin_session_handoff');
+  assert.equal(created.body.token, undefined);
+  assert.equal(created.body.session, undefined);
 
   const persisted = await pool.query('select role, account_purpose, mobile_number_normalized from users where id = $1', [created.body.user.id]);
   assert.deepEqual(persisted.rows[0], { role: 'admin', account_purpose: 'QA_TEST', mobile_number_normalized: '919762006688' });
-  const audit = await pool.query('select actor_user_id, action, role, account_purpose, metadata from qa_provisioning_audit_events where target_user_id = $1', [created.body.user.id]);
+  const audit = await pool.query("select actor_user_id, action, role, account_purpose, metadata from qa_provisioning_audit_events where target_user_id = $1 and action = 'QAIdentityCreated'", [created.body.user.id]);
   assert.deepEqual(audit.rows[0], {
     actor_user_id: null,
     action: 'QAIdentityCreated',
@@ -86,7 +91,7 @@ test('identical idempotent requests reuse one QA admin and audit the replay', as
   assert.equal(second.body.user.id, first.body.user.id);
   const users = await pool.query('select count(*)::int as count from users where mobile_number_normalized = $1', ['919762006688']);
   assert.equal(users.rows[0].count, 1);
-  const audit = await pool.query('select action from qa_provisioning_audit_events where target_user_id = $1 order by created_at', [first.body.user.id]);
+  const audit = await pool.query("select action from qa_provisioning_audit_events where target_user_id = $1 and action in ('QAIdentityCreated', 'QAIdentityReused') order by created_at", [first.body.user.id]);
   assert.deepEqual(audit.rows.map((row) => row.action), ['QAIdentityCreated', 'QAIdentityReused']);
 });
 
@@ -105,7 +110,7 @@ test('identical canonical identity with a new idempotency key reuses one QA admi
   assert.equal(second.body.user.id, first.body.user.id);
   const users = await pool.query('select count(*)::int as count from users where email_normalized = $1 or mobile_number_normalized = $2', [body.email.toLowerCase(), '919762006688']);
   assert.equal(users.rows[0].count, 1);
-  const audit = await pool.query('select action from qa_provisioning_audit_events where target_user_id = $1 order by created_at', [first.body.user.id]);
+  const audit = await pool.query("select action from qa_provisioning_audit_events where target_user_id = $1 and action in ('QAIdentityCreated', 'QAIdentityReused') order by created_at", [first.body.user.id]);
   assert.deepEqual(audit.rows.map((row) => row.action), ['QAIdentityCreated', 'QAIdentityReused']);
 });
 
