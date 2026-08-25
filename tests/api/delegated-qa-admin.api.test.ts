@@ -90,6 +90,25 @@ test('identical idempotent requests reuse one QA admin and audit the replay', as
   assert.deepEqual(audit.rows.map((row) => row.action), ['QAIdentityCreated', 'QAIdentityReused']);
 });
 
+test('identical canonical identity with a new idempotency key reuses one QA admin', async () => {
+  const body = input();
+  const first = await postJson(server.baseUrl, '/v1/internal/delegated/qa-admins', body, {
+    headers: { 'x-zestiva-delegation': sign(), 'idempotency-key': crypto.randomUUID(), 'x-correlation-id': 'phase-c-create' }
+  });
+  const second = await postJson(server.baseUrl, '/v1/internal/delegated/qa-admins', body, {
+    headers: { 'x-zestiva-delegation': sign(), 'idempotency-key': crypto.randomUUID(), 'x-correlation-id': 'phase-c-reuse' }
+  });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body));
+  assert.equal(second.response.status, 200, JSON.stringify(second.body));
+  assert.equal(second.body.idempotentReplay, true);
+  assert.equal(second.body.identityReused, true);
+  assert.equal(second.body.user.id, first.body.user.id);
+  const users = await pool.query('select count(*)::int as count from users where email_normalized = $1 or mobile_number_normalized = $2', [body.email.toLowerCase(), '919762006688']);
+  assert.equal(users.rows[0].count, 1);
+  const audit = await pool.query('select action from qa_provisioning_audit_events where target_user_id = $1 order by created_at', [first.body.user.id]);
+  assert.deepEqual(audit.rows.map((row) => row.action), ['QAIdentityCreated', 'QAIdentityReused']);
+});
+
 test('QA admin endpoint denies missing, invalid, expired, wrong-purpose, and missing-permission delegation', async () => {
   const body = input();
   const attempts = [

@@ -26,12 +26,6 @@ const actorId = (req: Request) => {
 
 const respondError = (res: Response, error: unknown, fallback: string) => {
   const typed = error as Error & { status?: number; code?: string };
-  console.error('[delegated-operation-error]', JSON.stringify({
-    operation: fallback,
-    errorName: typed.name || 'Error',
-    errorCode: typed.code || null,
-    status: typed.status || 500
-  }));
   return res.status(typed.status ?? 500).json({ error: typed.code ?? fallback, message: typed.status ? typed.message : 'Fiteatsy operation could not be completed.' });
 };
 const correlationReason = (req: Request, reason: string) => `${reason} [correlation:${req.header('x-correlation-id') || 'unavailable'}]`;
@@ -41,7 +35,8 @@ delegatedRouter.post('/qa-clients', requireDelegatedAuthority('fiteatsy.qa.ident
   if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   try {
     const result = await executeDelegatedIdempotently({ operation: 'qa_client_provision', key: req.header('idempotency-key') || '', execute: () => provisionQaIdentity({ ...parsed.data, reason: correlationReason(req, parsed.data.reason), role: 'user', actorUserId: actorId(req) }) });
-    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+    const reused = result.replayed || result.value.identityReused;
+    return res.status(reused ? 200 : 201).json({ ...result.value, idempotentReplay: reused });
   } catch (error) { return respondError(res, error, 'QA_CLIENT_PROVISIONING_FAILED'); }
 });
 
@@ -50,7 +45,8 @@ delegatedRouter.post('/qa-consultants', requireDelegatedAuthority('fiteatsy.qa.i
   if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   try {
     const result = await executeDelegatedIdempotently({ operation: 'qa_consultant_provision', key: req.header('idempotency-key') || '', execute: () => provisionQaIdentity({ ...parsed.data, reason: correlationReason(req, parsed.data.reason), role: 'consultant', actorUserId: actorId(req) }) });
-    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+    const reused = result.replayed || result.value.identityReused;
+    return res.status(reused ? 200 : 201).json({ ...result.value, idempotentReplay: reused });
   } catch (error) { return respondError(res, error, 'QA_CONSULTANT_PROVISIONING_FAILED'); }
 });
 
@@ -59,7 +55,8 @@ delegatedRouter.post('/qa-senior-consultants', requireDelegatedAuthority('fiteat
   if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
   try {
     const result = await executeDelegatedIdempotently({ operation: 'qa_senior_consultant_provision', key: req.header('idempotency-key') || '', execute: () => provisionQaIdentity({ ...parsed.data, reason: correlationReason(req, parsed.data.reason), role: 'senior_consultant', actorUserId: actorId(req) }) });
-    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+    const reused = result.replayed || result.value.identityReused;
+    return res.status(reused ? 200 : 201).json({ ...result.value, idempotentReplay: reused });
   } catch (error) { return respondError(res, error, 'QA_SENIOR_CONSULTANT_PROVISIONING_FAILED'); }
 });
 
@@ -79,7 +76,8 @@ delegatedRouter.post('/qa-admins', requireDelegatedAuthority('fiteatsy.qa.admin.
     if (result.replayed) {
       await recordQaIdentityReuse({ actorUserId: null, actorReference: delegatedActorId, targetUserId: result.value.user.id, role: 'admin', reason });
     }
-    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+    const reused = result.replayed || result.value.identityReused;
+    return res.status(reused ? 200 : 201).json({ ...result.value, idempotentReplay: reused });
   } catch (error) { return respondError(res, error, 'QA_ADMIN_PROVISIONING_FAILED'); }
 });
 

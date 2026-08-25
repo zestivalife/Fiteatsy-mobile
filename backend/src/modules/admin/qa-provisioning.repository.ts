@@ -65,15 +65,53 @@ export const provisionQaIdentity = async (input: {
   role: QaRole;
   reason: string;
 }) => {
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const normalizedMobileNumber = normalizeCanonicalPhoneNumber(input.mobileNumber);
   const client = await pool.connect();
   try {
     await client.query('begin');
+    await client.query(
+      `select pg_advisory_xact_lock(hashtextextended($1, 0))`,
+      [`qa_identity:${normalizedEmail}:${normalizedMobileNumber}`]
+    );
+    const existing = await client.query(
+      `select id, name, email_normalized, mobile_number_normalized, role, status, account_purpose, created_at
+         from users
+        where deleted_at is null
+          and (email_normalized = $1 or mobile_number_normalized = $2)
+        for update`,
+      [normalizedEmail, normalizedMobileNumber]
+    );
+    if (existing.rowCount) {
+      const exact = existing.rows.length === 1
+        && String(existing.rows[0].email_normalized) === normalizedEmail
+        && String(existing.rows[0].mobile_number_normalized) === normalizedMobileNumber
+        && String(existing.rows[0].account_purpose) === 'QA_TEST'
+        && String(existing.rows[0].role).toLowerCase() === input.role;
+      if (!exact) {
+        throw Object.assign(new Error('Email or mobile number is already bound to a different identity.'), {
+          status: 409,
+          code: 'QA_IDENTITY_CONFLICT'
+        });
+      }
+      const user = mapUser(existing.rows[0]);
+      await client.query('commit');
+      await recordQaIdentityReuse({
+        actorUserId: input.actorUserId,
+        actorReference: input.actorReference,
+        targetUserId: user.id,
+        role: input.role,
+        reason: input.reason
+      });
+      const clientRecord = input.role === 'user' ? await createOrResolveClientForAccount(user.id) : null;
+      return { user, client: clientRecord, identityReused: true };
+    }
     const inserted = await client.query(
       `insert into users
         (id, name, email_normalized, mobile_number_normalized, email_verified_at, mobile_verified_at, role, status, account_purpose, version, created_at, updated_at)
        values ($1, $2, lower(trim($3)), $4, now(), now(), $5, 'active', 'QA_TEST', 1, now(), now())
        returning id, name, email_normalized, mobile_number_normalized, role, status, account_purpose, created_at`,
-      [crypto.randomUUID(), input.name.trim(), input.email.trim(), normalizeCanonicalPhoneNumber(input.mobileNumber), input.role]
+      [crypto.randomUUID(), input.name.trim(), normalizedEmail, normalizedMobileNumber, input.role]
     );
     const user = mapUser(inserted.rows[0]);
     await client.query('commit');
@@ -86,7 +124,7 @@ export const provisionQaIdentity = async (input: {
       await createCareCaseIfMissing(owner, profile.id, 'new_client');
       await audit({ actorUserId: input.actorUserId, actorReference: input.actorReference, targetUserId: user.id, action: 'QAProfileProvisioned', accountPurpose: 'QA_TEST', role: input.role, reason: input.reason, metadata: { clientId: clientRecord.fiteatsyClientId } });
     }
-    return { user, client: clientRecord };
+    return { user, client: clientRecord, identityReused: false };
   } catch (error) {
     await client.query('rollback');
     throw error;
