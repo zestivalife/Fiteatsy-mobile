@@ -41,15 +41,16 @@ import {
 } from './nutrition.store.js';
 import { generateDietPlanDocument } from './nutrition.document.js';
 import { buildRecommendationSets, calculateMealNutritionTotals, classifyMealMatch, deriveMealTargets } from './meal-engine.js';
-import { listMealLibrarySlotsForTarget } from './nutrition.library.store.js';
+import { listMealLibrarySlotsForTarget, listVerifiedFoodMasterRecords } from './nutrition.library.store.js';
 import { getFoodPreferenceProfile } from './food-preferences.service.js';
+import { OptionalGuidanceContractError, validateOptionalGuidanceV2 } from './optional-guidance-contract.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
 const AVAILABLE_LIBRARY_MATCH_LIMIT = 18;
-const OPTIONAL_GUIDANCE_WHAT_COUNT = 12;
-const OPTIONAL_GUIDANCE_CUISINE_COUNT = 5;
-const OPTIONAL_GUIDANCE_CRAVING_COUNT = 3;
+const OPTIONAL_GUIDANCE_WHAT_DISPLAY_LIMIT = 12;
+const OPTIONAL_GUIDANCE_CUISINE_DISPLAY_LIMIT = 5;
+const OPTIONAL_GUIDANCE_CRAVING_DISPLAY_LIMIT = 3;
 
 export class NutritionPlanWorkflowError extends Error {
   statusCode: number;
@@ -1883,43 +1884,27 @@ const guidanceItemFromSlot = (input: {
   };
 };
 
-const assertOptionalGuidanceComplete = (content: NutritionPlanContent, requireReviewed = false) => {
-  const guidance = content.optionalGuidance;
-  if (!guidance) {
-    throw new NutritionPlanWorkflowError(
-      'OPTIONAL_GUIDANCE_INCOMPLETE',
-      'Complete Optional Guidance before submitting:\n- What can I eat now: 0/10\n- Eating Out northIndian: 0/5\n- Eating Out southIndian: 0/5\n- Eating Out chinese: 0/5\n- Eating Out continental: 0/5\n- Eating Out fastFood: 0/5\n- Craving sweet: 0/3\n- Craving salty: 0/3\n- Craving crunchy: 0/3\n- Craving spicy: 0/3',
-      409,
-    );
-  }
-  const requiredCounts = [
-    [guidance.whatCanIEatNow, 10, 'What can I eat now'],
-    ...Object.entries(guidance.eatingOut).map(([key, items]) => [items, OPTIONAL_GUIDANCE_CUISINE_COUNT, `Eating Out ${key}`] as const),
-    ...Object.entries(guidance.cravings).map(([key, items]) => [items, OPTIONAL_GUIDANCE_CRAVING_COUNT, `Craving ${key}`] as const),
-  ] as Array<readonly [NutritionGuidanceItem[], number, string]>;
-  const countIssues: string[] = [];
-  for (const [items, count, label] of requiredCounts) {
-    const enabled = items.filter((item) => item.enabled);
-    if (enabled.length < count) {
-      countIssues.push(`${label}: ${enabled.length}/${count}`);
+const assertOptionalGuidanceValid = async (publicClientId: string, content: NutritionPlanContent, requireReviewed = false) => {
+  const preferences = await resolveFoodPreferencesFilter(publicClientId);
+  try {
+    return validateOptionalGuidanceV2({
+      content,
+      verifiedActiveFoods: await listVerifiedFoodMasterRecords(),
+      compatibility: {
+        dietPreference: preferences.dietPreference ?? content.nutritionSnapshot.dietPreference,
+        allergyTags: [...preferences.allergyTags, ...content.nutritionSnapshot.allergies],
+        medicalRestrictions: content.nutritionSnapshot.healthConditions,
+        avoidedFoods: preferences.avoidedFoods,
+        avoidedFoodIds: preferences.avoidedFoodIds,
+      },
+      requireReviewed,
+    });
+  } catch (error) {
+    if (error instanceof OptionalGuidanceContractError) {
+      throw new NutritionPlanWorkflowError(error.code, error.message, 409);
     }
-    for (const item of enabled) {
-      if (!item.foodId || !item.name || !item.servingLabel || !item.reason || Object.values(item.nutrition).some((value) => !Number.isFinite(value))) {
-        throw new NutritionPlanWorkflowError('OPTIONAL_GUIDANCE_UNRESOLVED', `${label} contains an unresolved nutrition option.`, 409);
-      }
-      if (requireReviewed && !item.clinicallyReviewed) {
-        throw new NutritionPlanWorkflowError('OPTIONAL_GUIDANCE_NOT_REVIEWED', `${label} contains guidance that has not been reviewed.`, 409);
-      }
-    }
+    throw error;
   }
-  if (countIssues.length) {
-    throw new NutritionPlanWorkflowError(
-      'OPTIONAL_GUIDANCE_INCOMPLETE',
-      `Complete Optional Guidance before submitting:\n- ${countIssues.join('\n- ')}`,
-      409,
-    );
-  }
-  return guidance;
 };
 
 export const generateConsultantOptionalGuidance = async (
@@ -1967,7 +1952,7 @@ export const generateConsultantOptionalGuidance = async (
   const whatSlots = uniqueSlots([
     ...planOptions.map(({ slot }) => slot).filter(guidanceNutritionComplete),
     ...broadCatalogue,
-  ]).slice(0, OPTIONAL_GUIDANCE_WHAT_COUNT);
+  ]).slice(0, OPTIONAL_GUIDANCE_WHAT_DISPLAY_LIMIT);
 
   const cuisineDefinitions = {
     northIndian: 'north indian', southIndian: 'south indian', chinese: 'chinese', continental: 'continental', fastFood: 'fast food',
@@ -1983,7 +1968,7 @@ export const generateConsultantOptionalGuidance = async (
       ...broadCatalogue.filter((slot) => (slot.cuisineTags ?? []).some((tag) => lower(tag).replace(/[^a-z]/g, '') === cuisineKey)),
     ])
       .filter((slot) => !usedCuisineIds.has(slot.id ?? slot.meal))
-      .slice(0, OPTIONAL_GUIDANCE_CUISINE_COUNT);
+      .slice(0, OPTIONAL_GUIDANCE_CUISINE_DISPLAY_LIMIT);
     candidates.forEach((slot) => usedCuisineIds.add(slot.id ?? slot.meal));
     eatingOutEntries.push([key, candidates.map((slot, index) => guidanceItemFromSlot({ slot, category: 'eating_out', displayOrder: index + 1, planOptionIds, cuisineTags: [cuisine], mealTags: mealTagsForSlot(slot) }))]);
   }
@@ -1997,7 +1982,7 @@ export const generateConsultantOptionalGuidance = async (
     const candidates = broadCatalogue
       .filter((slot) => filterByTextMatch(slot, [...keywords]))
       .filter((slot) => !usedCravingIds.has(slot.id ?? slot.meal))
-      .slice(0, OPTIONAL_GUIDANCE_CRAVING_COUNT);
+      .slice(0, OPTIONAL_GUIDANCE_CRAVING_DISPLAY_LIMIT);
     candidates.forEach((slot) => usedCravingIds.add(slot.id ?? slot.meal));
     return [key, candidates.map((slot, index) => guidanceItemFromSlot({ slot, category: 'craving', displayOrder: index + 1, planOptionIds, cravingTags: [key], mealTags: mealTagsForSlot(slot) }))];
   })) as OptionalNutritionGuidance['cravings'];
@@ -2019,14 +2004,14 @@ export const generateConsultantOptionalGuidance = async (
   const optionalGuidance: OptionalNutritionGuidance = existingGuidance ? {
     ...generatedGuidance,
     generatedAtISO: existingGuidance.generatedAtISO,
-    whatCanIEatNow: mergeGuidanceItems(existingGuidance.whatCanIEatNow, generatedGuidance.whatCanIEatNow, OPTIONAL_GUIDANCE_WHAT_COUNT),
+    whatCanIEatNow: mergeGuidanceItems(existingGuidance.whatCanIEatNow, generatedGuidance.whatCanIEatNow, OPTIONAL_GUIDANCE_WHAT_DISPLAY_LIMIT),
     eatingOut: Object.fromEntries(Object.keys(cuisineDefinitions).map((key) => [
       key,
-      mergeGuidanceItems(existingGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']], generatedGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']], OPTIONAL_GUIDANCE_CUISINE_COUNT),
+      mergeGuidanceItems(existingGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']], generatedGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']], OPTIONAL_GUIDANCE_CUISINE_DISPLAY_LIMIT),
     ])) as OptionalNutritionGuidance['eatingOut'],
     cravings: Object.fromEntries(Object.keys(cravingDefinitions).map((key) => [
       key,
-      mergeGuidanceItems(existingGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], generatedGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], OPTIONAL_GUIDANCE_CRAVING_COUNT),
+      mergeGuidanceItems(existingGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], generatedGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], OPTIONAL_GUIDANCE_CRAVING_DISPLAY_LIMIT),
     ])) as OptionalNutritionGuidance['cravings'],
   } : generatedGuidance;
   return updateConsultantDietPlanDraft(publicClientId, account, dietPlanId, {
@@ -2084,7 +2069,7 @@ export const submitConsultantDietPlanForReview = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
   const version = await getCurrentDietPlanVersion(plan.id);
   if (!version) return null;
-  assertOptionalGuidanceComplete(version.content);
+  await assertOptionalGuidanceValid(publicClientId, version.content);
   assertLifecycleTransition(version.lifecycleStatus, 'submitted_for_review');
   return updateDietPlanLifecycle({
     dietPlanId: plan.id,
@@ -2152,7 +2137,7 @@ export const approveConsultantDietPlan = async (
   }
   const currentVersion = await getCurrentDietPlanVersion(plan.id);
   if (!currentVersion) return null;
-  const guidance = assertOptionalGuidanceComplete(currentVersion.content);
+  const guidance = await assertOptionalGuidanceValid(publicClientId, currentVersion.content);
   assertLifecycleTransition(currentVersion.lifecycleStatus, 'approved');
   const sourceSnapshot = buildSourceSnapshot({
     bmi: workspace.metrics.bmi.status === 'AVAILABLE' ? workspace.metrics.bmi.value : null,
@@ -2174,7 +2159,7 @@ export const approveConsultantDietPlan = async (
     stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
   });
   const reviewedAtISO = new Date().toISOString();
-  const reviewedGuidance: OptionalNutritionGuidance = {
+  const reviewedGuidance: OptionalNutritionGuidance | undefined = guidance ? {
     ...guidance,
     reviewedBy: account.accountId,
     reviewedAtISO,
@@ -2183,7 +2168,7 @@ export const approveConsultantDietPlan = async (
     whatCanIEatNow: guidance.whatCanIEatNow.map((item) => ({ ...item, clinicallyReviewed: true })),
     eatingOut: Object.fromEntries(Object.entries(guidance.eatingOut).map(([key, items]) => [key, items.map((item) => ({ ...item, clinicallyReviewed: true }))])) as OptionalNutritionGuidance['eatingOut'],
     cravings: Object.fromEntries(Object.entries(guidance.cravings).map(([key, items]) => [key, items.map((item) => ({ ...item, clinicallyReviewed: true }))])) as OptionalNutritionGuidance['cravings'],
-  };
+  } : undefined;
   const approvedContent = { ...currentVersion.content, optionalGuidance: reviewedGuidance };
   await updateDietPlanVersionContent({
     dietPlanId: plan.id,
@@ -2225,7 +2210,7 @@ export const publishConsultantDietPlan = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
   const approvedVersion = await getDietPlanVersionById(approvedVersionId);
   if (!approvedVersion) return null;
-  assertOptionalGuidanceComplete(approvedVersion.content, true);
+  await assertOptionalGuidanceValid(publicClientId, approvedVersion.content, true);
   const publishAction = assertPublishVersionEligibility({
     dietPlanId: plan.id,
     requestedVersionId: approvedVersion.id,

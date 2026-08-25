@@ -222,19 +222,20 @@ test('client contextual recommendation flows consume only versioned reviewed poo
   assert.match(service, /guidanceStatus: 'available' \| 'preparing'/);
 });
 
-test('optional guidance is governed by the complete Diet Plan version lifecycle', () => {
+test('optional guidance V2 is governed by the Diet Plan lifecycle without category minimums', () => {
   const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const contract = readFileSync(new URL('../../backend/src/modules/nutrition/optional-guidance-contract.ts', import.meta.url), 'utf8');
   const routes = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.routes.ts', import.meta.url), 'utf8');
   const types = readFileSync(new URL('../../backend/src/modules/platform/platform.types.ts', import.meta.url), 'utf8');
 
   assert.match(types, /optionalGuidance\?: OptionalNutritionGuidance/);
-  assert.match(service, /assertOptionalGuidanceComplete\(version\.content\)/);
-  assert.match(service, /assertOptionalGuidanceComplete\(approvedVersion\.content, true\)/);
+  assert.match(service, /await assertOptionalGuidanceValid\(publicClientId, version\.content\)/);
+  assert.match(service, /await assertOptionalGuidanceValid\(publicClientId, approvedVersion\.content, true\)/);
   assert.match(service, /clinicallyReviewed: true/);
   assert.match(routes, /optional-guidance\/generate/);
   assert.match(service, /listMealLibrarySlotsForTarget/);
-  assert.match(service, /OPTIONAL_GUIDANCE_INCOMPLETE/);
-  assert.match(service, /OPTIONAL_GUIDANCE_UNRESOLVED/);
+  assert.match(contract, /OPTIONAL_GUIDANCE_UNRESOLVED/);
+  assert.doesNotMatch(service, /Complete Optional Guidance before submitting:/);
 });
 
 test('optional guidance completeness is enforced only at review lifecycle boundaries', () => {
@@ -248,14 +249,13 @@ test('optional guidance completeness is enforced only at review lifecycle bounda
   const approveStart = service.indexOf('export const approveConsultantDietPlan');
   const publishStart = service.indexOf('export const publishConsultantDietPlan');
 
-  assert.doesNotMatch(service.slice(saveStart, saveEnd), /assertOptionalGuidanceComplete/);
-  assert.doesNotMatch(service.slice(generateStart, searchStart), /assertOptionalGuidanceComplete/);
+  assert.doesNotMatch(service.slice(saveStart, saveEnd), /assertOptionalGuidanceValid/);
+  assert.doesNotMatch(service.slice(generateStart, searchStart), /assertOptionalGuidanceValid/);
   assert.match(service.slice(generateStart, searchStart), /includeOutsideTarget: true/);
-  assert.match(service.slice(submitStart, changesStart), /assertOptionalGuidanceComplete\(version\.content\)/);
-  assert.match(service.slice(approveStart, publishStart), /assertOptionalGuidanceComplete\(currentVersion\.content\)/);
-  assert.match(service.slice(publishStart), /assertOptionalGuidanceComplete\(approvedVersion\.content, true\)/);
-  assert.match(service, /Complete Optional Guidance before submitting:/);
-  assert.match(service, /countIssues\.join\('\\n- '\)/);
+  assert.match(service.slice(submitStart, changesStart), /await assertOptionalGuidanceValid\(publicClientId, version\.content\)/);
+  assert.match(service.slice(approveStart, publishStart), /await assertOptionalGuidanceValid\(publicClientId, currentVersion\.content\)/);
+  assert.match(service.slice(publishStart), /await assertOptionalGuidanceValid\(publicClientId, approvedVersion\.content, true\)/);
+  assert.doesNotMatch(service, /OPTIONAL_GUIDANCE_INCOMPLETE|countIssues/);
 });
 
 test('quick actions are independent and selection changes bypass stale React state', () => {
