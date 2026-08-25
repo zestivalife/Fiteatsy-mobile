@@ -145,3 +145,36 @@ test('QA admin endpoint rejects role and account-purpose overrides', async () =>
     assert.equal(denied.response.status, 400, JSON.stringify(denied.body));
   }
 });
+
+test('delegated QA identity provisioning records the external Owner as an audit reference', async () => {
+  const cases = [
+    { route: 'qa-clients', role: 'user', suffix: '1' },
+    { route: 'qa-consultants', role: 'consultant', suffix: '2' },
+    { route: 'qa-senior-consultants', role: 'senior_consultant', suffix: '3' }
+  ];
+
+  for (const item of cases) {
+    const created = await postJson(server.baseUrl, `/v1/internal/delegated/${item.route}`, {
+      name: `Phase C ${item.role}`,
+      email: `phase-c-${item.role}-${Date.now()}@example.com`,
+      mobileNumber: `+91976200668${item.suffix}`,
+      reason: 'Phase C governed identity provisioning'
+    }, {
+      headers: {
+        'x-zestiva-delegation': sign({ permissions: ['fiteatsy.qa.identity.create'] }),
+        'idempotency-key': crypto.randomUUID(),
+        'x-correlation-id': `phase-c-${item.role}`
+      }
+    });
+
+    assert.equal(created.response.status, 201, JSON.stringify(created.body));
+    assert.equal(created.body.user.role, item.role);
+    assert.equal(created.body.user.accountPurpose, 'QA_TEST');
+    const audit = await pool.query(
+      'select actor_user_id, metadata from qa_provisioning_audit_events where target_user_id = $1 and action = $2',
+      [created.body.user.id, 'QAIdentityCreated']
+    );
+    assert.equal(audit.rows[0].actor_user_id, null);
+    assert.deepEqual(audit.rows[0].metadata, { delegatedActorReference: 'owner-qa-operator' });
+  }
+});
