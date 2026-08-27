@@ -3,7 +3,7 @@
     "name": "Fiteatsy",
     "slug": "fiteatsy-health-app",
     "version": "1.0.0",
-    "runtimeVersion": "1.0.0-native-20260825-health-connect-d2",
+    "runtimeVersion": "1.0.0-native-20260827-healthkit-ios-v1",
     "orientation": "portrait",
     "icon": "./src/assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -15,7 +15,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.fiteatsy.health",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSHealthShareUsageDescription": "Allow Fiteatsy to read your activity, sleep, heart, recovery, weight, energy and distance data to calculate your health insights."
       }
     },
     "android": {
@@ -71,6 +72,14 @@
       "expo-document-picker",
       "@react-native-community/datetimepicker",
       "react-native-health-connect",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "background": false,
+          "NSHealthShareUsageDescription": "Allow Fiteatsy to read your activity, sleep, heart, recovery, weight, energy and distance data to calculate your health insights.",
+          "NSHealthUpdateUsageDescription": false
+        }
+      ],
       "expo-video"
     ]
   }

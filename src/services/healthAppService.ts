@@ -2,6 +2,7 @@ import { Linking, Platform } from 'react-native';
 import { WearableSyncPayload } from '../types';
 import { apiFetch, postJson } from './apiClient';
 import { syncFromHealthConnect } from './healthConnectService';
+import { syncFromHealthKit } from './healthKitService';
 
 export type HealthAppId = 'apple-health' | 'health-connect' | 'google-fit' | 'samsung-health' | 'fitbit';
 export type RecoveryConnectionState =
@@ -64,6 +65,10 @@ export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<Wearab
   // Android: source-of-truth sync must read directly from Health Connect.
   if (platform === 'android' && ['health-connect', 'google-fit', 'samsung-health'].includes(appId)) {
     return syncFromHealthConnect();
+  }
+
+  if (platform === 'ios' && appId === 'apple-health') {
+    return syncFromHealthKit();
   }
 
   throw new Error('apple_health_native_reader_not_available');
