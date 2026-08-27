@@ -28,6 +28,7 @@ import { documentHash } from './report-governance.js';
 import { sanitizeReportAnalysisForPublic } from './report-response.js';
 import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
 import { clearHealthScoresForOwner } from '../intelligence/health-scores.repository.js';
+import { buildReportComparison, sortAnalysableReports } from './report-comparison.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -275,6 +276,15 @@ reportsRouter.get('/', async (req, res) => {
   const items = await listReports(reportOwner(owner));
   const page = items.slice(offset, offset + limit).map(toReportDto);
   return res.status(200).json({ total: items.length, limit, offset, items: page });
+});
+
+reportsRouter.get('/comparison/current', async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const reports = sortAnalysableReports(await listReports(reportOwner(owner)));
+  if (reports.length < 2) {
+    return res.status(404).json({ error: 'REPORT_COMPARISON_NOT_AVAILABLE', message: 'Two analysed reports are required.' });
+  }
+  return res.status(200).json(buildReportComparison(reports[0], reports[1]));
 });
 
 reportsRouter.get('/:reportId', async (req, res) => {
@@ -542,38 +552,12 @@ reportsRouter.get('/:reportId/comparison', async (req, res) => {
   if (!ownsReport(previous, owner)) {
     return res.status(404).json({ error: 'PREVIOUS_REPORT_NOT_FOUND', message: 'Previous report not found.' });
   }
-  if (!current!.analysis || !previous!.analysis) {
-    return res.status(409).json({ error: 'ANALYSIS_NOT_READY', message: 'Both reports must have completed analysis.' });
+  try {
+    return res.status(200).json(buildReportComparison(current!, previous!));
+  } catch (error) {
+    const code = error instanceof Error ? error.message : 'REPORT_COMPARISON_INVALID';
+    return res.status(409).json({ error: code, message: 'These reports cannot be compared.' });
   }
-  if (current!.analysis.score == null || previous!.analysis.score == null) {
-    return res.status(409).json({ error: 'ANALYSIS_NOT_PUBLISHED', message: 'Both reports must pass the quality gate before comparison.' });
-  }
-
-  const currentAnalysis = sanitizeReportAnalysisForPublic(current!.analysis);
-  const previousAnalysis = sanitizeReportAnalysisForPublic(previous!.analysis);
-  const scoreDelta = currentAnalysis.score! - previousAnalysis.score!;
-  const currentAbnormal = currentAnalysis.parameters.filter((item) => item.status !== 'normal').length;
-  const previousAbnormal = previousAnalysis.parameters.filter((item) => item.status !== 'normal').length;
-  const abnormalDelta = currentAbnormal - previousAbnormal;
-
-  return res.status(200).json({
-    currentReportId: current!.id,
-    previousReportId: previous!.id,
-    scoreDelta,
-    abnormalDelta,
-    summary:
-      scoreDelta > 0
-        ? `Recovery trend is improving by ${scoreDelta} points compared with the previous report.`
-        : scoreDelta < 0
-          ? `Recovery score dropped by ${Math.abs(scoreDelta)} points; review adherence and follow-up recommendations.`
-          : 'Recovery score is unchanged; continue routine and monitor follow-up markers.',
-    details: {
-      currentScore: currentAnalysis.score,
-      previousScore: previousAnalysis.score,
-      currentAbnormal,
-      previousAbnormal
-    }
-  });
 });
 
 reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, res) => {
