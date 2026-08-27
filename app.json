@@ -71,7 +71,8 @@
       "expo-document-picker",
       "@react-native-community/datetimepicker",
       "react-native-health-connect",
-      "expo-video"
+      "expo-video",
+      "./plugins/withFrozenSplashBridge"
     ]
   }
 }
