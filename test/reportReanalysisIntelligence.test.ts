@@ -18,7 +18,12 @@ describe('report re-analysis intelligence layer', () => {
     expect(routes).not.toContain('REANALYZE_NOT_AVAILABLE');
     expect(routes).toContain('requiresAdvancedReanalysis');
     expect(routes).toContain('REANALYSIS_STAGE');
-    expect(routes.indexOf('const saved = await attachReportAnalysis')).toBeLessThan(routes.indexOf('persistReportIntelligence(input.owner, input.reportId, selectedAnalysis)'));
+    const attachIndex = routes.indexOf('const saved = await input.attach()');
+    const persistIndex = routes.indexOf('const intelligence = await input.persist(selectedAnalysis)');
+    const finalizeIndex = routes.indexOf('const completed = await input.finalize');
+    expect(attachIndex).toBeGreaterThanOrEqual(0);
+    expect(attachIndex).toBeLessThan(persistIndex);
+    expect(persistIndex).toBeLessThan(finalizeIndex);
     expect(service).toContain('document_intelligence_layout_recovery');
     expect(service).toContain('describeAiProviderError');
     expect(mobileService).toContain('export const reanalyzeReport');

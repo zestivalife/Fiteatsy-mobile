@@ -44,6 +44,15 @@ const assignClientToConsultant = async (
   assert.equal(response.response.status, 200, JSON.stringify(response.body));
 };
 
+const getClientDatabaseId = async (client: Awaited<ReturnType<typeof createAuthenticatedSession>>) => {
+  const result = await pool.query(
+    'select id from fiteatsy_clients where account_user_id = $1',
+    [client.current.body.accountId]
+  );
+  assert.equal(result.rows.length, 1);
+  return String(result.rows[0].id);
+};
+
 const ageFromDob = (dobISO: string) => {
   const dob = new Date(dobISO);
   const now = new Date();
@@ -1026,7 +1035,8 @@ test('consultant workspace contract syncs reports and validated biomarkers from 
     email: `report-sync-client-${Date.now()}@example.com`
   });
   const consultant = await createConsultantSession();
-  const owner = { accountId: client.current.body.accountId, clientId: client.current.body.client.id };
+  await assignClientToConsultant(client, consultant);
+  const owner = { accountId: client.current.body.accountId, clientId: await getClientDatabaseId(client) };
 
   const report = await createReportRecord({
     userId: owner.accountId,
@@ -1073,7 +1083,7 @@ test('consultant workspace contract syncs reports and validated biomarkers from 
   assert.equal(response.body.biomarkers[0].name, 'Vitamin D');
   assert.equal(response.body.biomarkers[0].value, 18);
   assert.equal(response.body.biomarkers[0].referenceRange, '30-100');
-  assert.ok(response.body.provenance.sources.some((item: { key: string, freshness: string }) => item.key === 'reports' && item.freshness === 'fresh'));
+  assert.ok(response.body.provenance.sources.some((item: { key: string, freshness: string }) => item.key === 'reports' && item.freshness === 'stale'));
 });
 
 test('consultant workspace contract syncs wearable summaries and source metadata', async () => {

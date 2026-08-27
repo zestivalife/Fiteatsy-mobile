@@ -417,7 +417,8 @@ export const updateReportStatus = async (reportId: string, status: ReportStatus,
 export const attachReportAnalysis = async (
   reportId: string,
   analysis: ReportAnalysisResult,
-  analysisMode: 'standard' | 'advanced_reanalysis' = 'standard'
+  analysisMode: 'standard' | 'advanced_reanalysis' = 'standard',
+  deferTerminalStatus = false
 ) => {
   const current = await pool.query(
     `
@@ -439,7 +440,7 @@ export const attachReportAnalysis = async (
         analysis = $2::jsonb,
         report_date = $3,
         lab_name = $4,
-        processing_status = $5,
+        processing_status = case when $20::boolean then processing_status else $5 end,
         error = $6,
         analysis_attempts = (
           case
@@ -502,10 +503,13 @@ export const attachReportAnalysis = async (
       analysis.qualityGate.extractionConfidence,
       JSON.stringify(analysis.extractionAttempts.map((attempt) => attempt.strategy)),
       JSON.stringify(analysis.qualityGate.reasons),
-      JSON.stringify(analysis)
+      JSON.stringify(analysis),
+      deferTerminalStatus
     ]
   );
-  return result.rows[0] ? rowToReport(result.rows[0]) : null;
+  return result.rows[0]
+    ? { ...rowToReport(result.rows[0]), selectedStatus }
+    : null;
 };
 
 export const getReport = async (reportId: string) => {

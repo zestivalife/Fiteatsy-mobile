@@ -115,6 +115,26 @@ const logReanalysisStage = (payload: {
   logReportRuntime('REANALYSIS_STAGE', payload);
 };
 
+type AttachedReportAnalysis = NonNullable<Awaited<ReturnType<typeof attachReportAnalysis>>>;
+type PersistedReportIntelligence = Awaited<ReturnType<typeof persistReportIntelligence>>;
+type FinalizedReport = Awaited<ReturnType<typeof updateReportStatus>>;
+
+export const finalizeReportAfterIntelligence = async (input: {
+  analysis: ReportAnalysisResult;
+  attach: () => Promise<AttachedReportAnalysis | null>;
+  persist: (analysis: ReportAnalysisResult) => Promise<PersistedReportIntelligence>;
+  finalize: (
+    status: AttachedReportAnalysis['selectedStatus'],
+    error?: string
+  ) => Promise<FinalizedReport>;
+}) => {
+  const saved = await input.attach();
+  const selectedAnalysis = saved?.analysis ?? input.analysis;
+  const intelligence = await input.persist(selectedAnalysis);
+  const completed = await input.finalize(saved?.selectedStatus ?? 'INSUFFICIENT_DATA', saved?.error);
+  return { saved, selectedAnalysis, intelligence, completed };
+};
+
 const analyzeAndPersistReport = async (input: {
   owner: ClientOwnershipContext;
   reportId: string;
@@ -161,9 +181,12 @@ const analyzeAndPersistReport = async (input: {
     status: 'VALIDATION_COMPLETED',
     validationConfidence: analysis.qualityGate.validationConfidence
   });
-  const saved = await attachReportAnalysis(input.reportId, analysis, input.analysisMode ?? 'standard');
-  const selectedAnalysis = saved?.analysis ?? analysis;
-  const intelligence = await persistReportIntelligence(input.owner, input.reportId, selectedAnalysis);
+  const { saved, selectedAnalysis, intelligence, completed } = await finalizeReportAfterIntelligence({
+    analysis,
+    attach: () => attachReportAnalysis(input.reportId, analysis, input.analysisMode ?? 'standard', true),
+    persist: (selected) => persistReportIntelligence(input.owner, input.reportId, selected),
+    finalize: (status, error) => updateReportStatus(input.reportId, status, error)
+  });
   logReportRuntime('processing:status', {
     reportId: input.reportId,
     status: 'SELECTED_ANALYSIS_PERSISTED',
@@ -179,7 +202,7 @@ const analyzeAndPersistReport = async (input: {
   });
   logReportRuntime('processing:completed', {
     reportId: input.reportId,
-    status: saved?.status,
+    status: completed?.status,
     observationCount: intelligence.observations.length,
     scoreCount: intelligence.scores.length,
     qualityGate: selectedAnalysis.qualityGate.status
@@ -191,7 +214,7 @@ const analyzeAndPersistReport = async (input: {
   const publicAnalysis = sanitizeReportAnalysisForPublic(selectedAnalysis);
   return {
     reportId: saved?.id,
-    status: saved?.status,
+    status: completed?.status,
     biomarkerObservations: intelligence.observations,
     healthScores: intelligence.scores.map((score) => ({
       scoreType: score.scoreType,

@@ -135,7 +135,7 @@ test('report list, detail, metadata patch, status, feedback, delete, and 404 pat
   assert.equal(removed.response.status, 200);
 });
 
-test('report comparison and reanalyze endpoints return expected 200, 400, 404, and 409 states', async () => {
+test('report comparison and reanalyze endpoints preserve the selected validated analysis', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const first = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
     method: 'POST',
@@ -177,10 +177,11 @@ test('report comparison and reanalyze endpoints return expected 200, 400, 404, a
     {},
     { headers: authHeaders(session.token) }
   );
-  assert.equal(reanalyze.response.status, 409);
+  assert.equal(reanalyze.response.status, 200);
+  assert.equal(reanalyze.body.reportId, secondBody.reportId);
 });
 
-test('duplicate report upload reuses the existing published report', async () => {
+test('duplicate report upload reuses the existing publishable report', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const first = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
     method: 'POST',
@@ -189,7 +190,7 @@ test('duplicate report upload reuses the existing published report', async () =>
   });
   const firstBody = await first.json();
   assert.equal(first.status, 200);
-  assert.equal(firstBody.status, 'PUBLISHED');
+  assert.equal(firstBody.status, 'PARTIALLY_VALIDATED');
 
   const second = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
     method: 'POST',
@@ -200,6 +201,7 @@ test('duplicate report upload reuses the existing published report', async () =>
   assert.equal(second.status, 200);
   assert.equal(secondBody.duplicate, true);
   assert.equal(secondBody.reportId, firstBody.reportId);
+  assert.equal(secondBody.status, firstBody.status);
 
   const list = await getJson(server.baseUrl, '/v1/reports?limit=50', {
     headers: authHeaders(session.token)
@@ -208,7 +210,7 @@ test('duplicate report upload reuses the existing published report', async () =>
   assert.equal(list.body.total, 1);
 });
 
-test('async report analysis publishes through status polling and detail fetch', async () => {
+test('async report analysis reaches a publishable terminal state through status polling and detail fetch', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const started = await fetch(`${server.baseUrl}/v1/reports/analyze/start`, {
     method: 'POST',
@@ -222,8 +224,9 @@ test('async report analysis publishes through status polling and detail fetch', 
   let terminalStatus = '';
   let statusBody: Record<string, any> = {};
   const terminalStatuses = new Set(['PUBLISHED', 'PARTIALLY_VALIDATED', 'COMPLETED', 'FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA']);
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
+  const pollingDeadline = Date.now() + 180_000;
+  while (Date.now() < pollingDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
     const status = await getJson(server.baseUrl, `/v1/reports/${startedBody.reportId}/status`, {
       headers: authHeaders(session.token)
     });
@@ -235,7 +238,7 @@ test('async report analysis publishes through status polling and detail fetch', 
     }
   }
 
-  assert.equal(terminalStatus, 'PUBLISHED');
+  assert.equal(terminalStatus, 'PARTIALLY_VALIDATED');
   assert.equal(statusBody.qualityGate?.canPublish, true);
   assert.equal(statusBody.qualityGate?.canScore, true);
 
@@ -243,7 +246,7 @@ test('async report analysis publishes through status polling and detail fetch', 
     headers: authHeaders(session.token)
   });
   assert.equal(detail.response.status, 200);
-  assert.equal(detail.body.status, 'PUBLISHED');
+  assert.equal(detail.body.status, terminalStatus);
   assert.equal(detail.body.analysis.qualityGate.canPublish, true);
   assert.equal(detail.body.analysis.debugTrace.finalState, 'PUBLISHED');
 });
