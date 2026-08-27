@@ -26,8 +26,28 @@ test('denies production environment and production database before reset SQL', (
   expectBlocked({ NODE_ENV: 'production', DATABASE_URL: productionUrl, ...marker });
 });
 
-test('denies test environment pointed at production even with marker', () => {
-  expectBlocked({ NODE_ENV: 'test', DATABASE_URL: productionUrl, ...marker });
+test('production-like Railway host is denied regardless of disposable designation, marker, or test environment', () => {
+  expectBlocked({
+    NODE_ENV: 'test', DATABASE_URL: productionUrl,
+    RAILWAY_PROJECT_NAME: 'fiteatsy-reports-v2-b12-envc', RAILWAY_ENVIRONMENT_NAME: 'test', ...marker
+  });
+  expectBlocked({
+    NODE_ENV: 'test', DATABASE_URL: productionUrl,
+    RAILWAY_PROJECT_NAME: 'disposable', ...marker
+  });
+  expectBlocked({
+    NODE_ENV: 'test', DATABASE_URL: productionUrl,
+    RAILWAY_PROJECT_NAME: 'qa'
+  });
+});
+
+test('production-like Railway host cannot be disguised by a safe database name', () => {
+  expectBlocked({
+    NODE_ENV: 'test',
+    DATABASE_URL: 'postgresql://user:secret@prod-db.proxy.rlwy.net:5432/fiteatsy_test',
+    RAILWAY_PROJECT_NAME: 'disposable',
+    ...marker
+  });
 });
 
 test('denies unknown, malformed, missing, and incomplete database targets', () => {
@@ -65,17 +85,25 @@ test('marker never overrides production designation, encoding, or hostname suffi
   expectBlocked({
     NODE_ENV: 'test', DATABASE_URL: 'postgresql://railway.internal.attacker.example/fiteatsy_test', ...marker
   });
+  expectBlocked({
+    NODE_ENV: 'test', DATABASE_URL: 'postgresql://production.proxy.rlwy.net:5432/railway',
+    RAILWAY_PROJECT_NAME: 'disposable', ...marker
+  });
 });
 
 test('direct reset helper invocation rejects an unsafe target before database access', async () => {
   const previous = {
     NODE_ENV: process.env.NODE_ENV,
     DATABASE_URL: process.env.DATABASE_URL,
-    FITEATSY_ALLOW_DESTRUCTIVE_TEST_RESET: process.env.FITEATSY_ALLOW_DESTRUCTIVE_TEST_RESET
+    FITEATSY_ALLOW_DESTRUCTIVE_TEST_RESET: process.env.FITEATSY_ALLOW_DESTRUCTIVE_TEST_RESET,
+    RAILWAY_PROJECT_NAME: process.env.RAILWAY_PROJECT_NAME,
+    RAILWAY_ENVIRONMENT_NAME: process.env.RAILWAY_ENVIRONMENT_NAME
   };
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_URL = productionUrl;
   process.env.FITEATSY_ALLOW_DESTRUCTIVE_TEST_RESET = 'true';
+  process.env.RAILWAY_PROJECT_NAME = 'fiteatsy-reports-v2-b12-envc';
+  process.env.RAILWAY_ENVIRONMENT_NAME = 'test';
   try {
     const { resetBackendStateForTests } = await import('../../backend/src/test-support/reset.js');
     await assert.rejects(

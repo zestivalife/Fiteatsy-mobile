@@ -158,6 +158,16 @@ test('local development does not issue fixed OTP 123456 or expose debug OTP', as
 });
 
 test('OTP verification creates a persisted session and current client without public debug OTP', async (t) => {
+  try {
+    await resetBackendStateForTests();
+  } catch (error) {
+    if (isConnectionRefused(error)) {
+      t.skip('Local PostgreSQL is unavailable; session/client verification requires the test database.');
+      return;
+    }
+    throw error;
+  }
+
   await withEnv(
     {
       NODE_ENV: 'development',
@@ -168,17 +178,8 @@ test('OTP verification creates a persisted session and current client without pu
       RAILWAY_ENVIRONMENT: undefined
     },
     async () => {
-      try {
-        await resetBackendStateForTests();
-        setOtpGeneratorForTests(() => '654321');
-        useSuccessfulOtpDeliveryProvider();
-      } catch (error) {
-        if (isConnectionRefused(error)) {
-          t.skip('Local PostgreSQL is unavailable; session/client verification requires the test database.');
-          return;
-        }
-        throw error;
-      }
+      setOtpGeneratorForTests(() => '654321');
+      useSuccessfulOtpDeliveryProvider();
 
       const server = await startAppServer(createApp());
       const requested = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
