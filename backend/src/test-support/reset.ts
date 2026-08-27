@@ -6,8 +6,10 @@ import { resetWearablesStateForTests } from '../modules/wearables/wearables.serv
 import { resetWhatsappProviderForTests } from '../modules/notifications/notification.service.js';
 import { pool } from '../db/pool.js';
 import { resetQaHandoffRateLimitForTests } from '../modules/auth/qa-session-handoff.js';
+import { assertDestructiveTestResetAllowed } from './destructive-reset-guard.js';
 
 export const resetBackendStateForTests = async () => {
+  assertDestructiveTestResetAllowed();
   resetMigrationStateForTests();
   await migrateDatabase();
   resetOtpChallengesForTests();
