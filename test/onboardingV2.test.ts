@@ -63,7 +63,7 @@ describe('Onboarding V2 contract', () => {
     const sync = read('src/screens/sync/SyncWearableScreen.tsx');
     const ready = read('src/screens/onboarding/OnboardingReadyScreen.tsx');
     expect(sync).toContain("Platform.OS === 'android'");
-    expect(sync).toContain('Apple Health is not available in this build');
+    expect(sync).toContain('Apple Health · read-only access');
     expect(ready).toContain("Boolean(onboarding?.assignedConsultantId)");
     expect(ready).toContain("consultantReady ? 'Ready' : 'Pending'");
   });

@@ -16,6 +16,7 @@ import {
   type RecoveryConnectionState
 } from '../../services/healthAppService';
 import { requestHealthConnectPermissionsOnly } from '../../services/healthConnectService';
+import { requestHealthKitPermissionsOnly } from '../../services/healthKitService';
 import { HealthSyncResult, runHealthSync } from '../../services/healthSyncManager';
 import { WearableSyncPayload } from '../../types';
 
@@ -96,7 +97,7 @@ const stageContent: Record<SyncStage, { title: string; body: string; eyebrow: st
   intro: {
     eyebrow: 'Health Intelligence',
     title: 'Unlock Your Health Intelligence',
-    body: 'Connect Health Connect to turn real activity, sleep, heart, and recovery signals into Fiteatsy scores.'
+    body: 'Connect your device health app to turn real activity, sleep, heart, and recovery signals into Fiteatsy scores.'
   },
   permission_explainer: {
     eyebrow: 'Secure permission',
@@ -105,7 +106,7 @@ const stageContent: Record<SyncStage, { title: string; body: string; eyebrow: st
   },
   requesting_permission: {
     eyebrow: 'Permission request',
-    title: 'Opening Health Connect',
+    title: 'Opening health access',
     body: 'Approve the health signals you want Fiteatsy to use. We will return here and prepare your first sync.'
   },
   connected_ready: {
@@ -131,7 +132,7 @@ const stageContent: Record<SyncStage, { title: string; body: string; eyebrow: st
   insufficient_data: {
     eyebrow: 'INSUFFICIENT_DATA',
     title: 'No recent health data found',
-    body: 'Permissions may be connected, but Health Connect did not return supported recent records yet.'
+    body: 'Health access may be connected, but the device health app did not return supported recent records yet.'
   },
   permission_denied: {
     eyebrow: 'Permission needed',
@@ -140,8 +141,8 @@ const stageContent: Record<SyncStage, { title: string; body: string; eyebrow: st
   },
   not_supported: {
     eyebrow: 'Platform unavailable',
-    title: 'Health Connect is not available here',
-    body: 'Health sync currently supports Android Health Connect. Apple Health support requires the native HealthKit reader.'
+    title: 'Health sync is not available here',
+    body: 'Health sync requires a supported Android Health Connect or iOS Apple Health native runtime.'
   },
   failed: {
     eyebrow: 'Sync failed',
@@ -238,45 +239,50 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
   }, [completeOnboardingFlow]);
 
   const requestHealthPermission = useCallback(async () => {
-    if (Platform.OS !== 'android') {
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
       setStage('not_supported');
-      setStatusTitle('Apple Health Reader Not Available');
-      setStatusBody('This build supports Android Health Connect. Apple Health needs the native HealthKit reader before syncing.');
-      setError('Supported now: Android Health Connect. Coming next: native Apple HealthKit reader.');
+      setError('Health sync is available on supported Android and iOS devices.');
       return;
     }
 
     setIsRunning(true);
     setError(null);
     setStage('requesting_permission');
-    setStatusTitle('Opening Health Connect');
+    setStatusTitle(Platform.OS === 'ios' ? 'Opening Apple Health' : 'Opening Health Connect');
     setStatusBody('Requesting read-only access for steps, sleep, heart rate, HRV, and exercise.');
     try {
-      const permission = await requestHealthConnectPermissionsOnly();
-      if (permission.grantedCount > 0) {
+      const permission = Platform.OS === 'ios'
+        ? await requestHealthKitPermissionsOnly()
+        : await requestHealthConnectPermissionsOnly();
+      const requestCompleted = 'authorizationRequestCompleted' in permission && permission.authorizationRequestCompleted;
+      if (permission.grantedCount > 0 || requestCompleted) {
         setConnectionState('calibrating');
         setStage('connected_ready');
         setStatusTitle('Health Data Connected');
-        setStatusBody(`${permission.grantedCount}/${permission.requestedCount} Health Connect permissions are ready. Start your first sync when you are ready.`);
+        setStatusBody('The health-access request completed. Start your first sync to confirm which supported signals are available.');
       } else {
         setConnectionState('permission_missing');
         setStage('permission_denied');
         setStatusTitle('Permission Needed');
-        setStatusBody('No supported Health Connect permissions were granted.');
+        setStatusBody('No supported health permissions were granted.');
         setError('Open Settings or try again to allow at least one supported signal.');
       }
     } catch (permissionError) {
-      const message = permissionError instanceof Error ? permissionError.message : 'health_connect_permission_failed';
-      if (message.includes('unavailable')) {
+      const message = permissionError instanceof Error ? permissionError.message : 'health_permission_failed';
+      if (message.includes('health_connect_unavailable')) {
         setStage('not_supported');
         setPendingInstall(true);
         setStatusTitle('Health Connect Needed');
         setStatusBody('Install or update Health Connect to continue recovery sync.');
+      } else if (message.includes('healthkit_unavailable')) {
+        setStage('not_supported');
+        setStatusTitle('Apple Health Not Available');
+        setStatusBody('Apple Health is not available on this device.');
       } else {
         setStage('permission_denied');
         setConnectionState('permission_missing');
         setStatusTitle('Permission Needed');
-        setStatusBody('Health Connect permission could not be completed.');
+        setStatusBody('Health permission could not be completed.');
       }
       setError(message);
     } finally {
@@ -290,18 +296,17 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
     }
     inFlightRef.current = true;
 
-    if (Platform.OS !== 'android') {
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
       inFlightRef.current = false;
       if (isMountedRef.current) {
         setStage('not_supported');
         setConnectionState(null);
-        setStatusTitle('Apple Health Reader Not Available');
-        setStatusBody('This build supports Android Health Connect. Apple Health needs the native HealthKit reader before syncing.');
-        setError('Supported now: Android Health Connect. Coming next: native Apple HealthKit reader.');
+        setStatusTitle('Health Sync Not Available');
+        setStatusBody('Health sync is available on supported Android and iOS devices.');
       }
       return;
     }
-    if (typeof Platform.Version === 'number' && Platform.Version < 26) {
+    if (Platform.OS === 'android' && typeof Platform.Version === 'number' && Platform.Version < 26) {
       if (isMountedRef.current) {
         setStage('not_supported');
         setConnectionState('no_signals');
@@ -323,8 +328,8 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
     }
 
     try {
-      const sdkStatus = await getSdkStatus();
-      if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
+      const sdkStatus = Platform.OS === 'android' ? await getSdkStatus() : SdkAvailabilityStatus.SDK_AVAILABLE;
+      if (Platform.OS === 'android' && sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
         if (isMountedRef.current) {
           setStage('not_supported');
           setPendingInstall(true);
@@ -343,9 +348,10 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
         setStatusBody('Reading sleep, activity, and heart recovery data securely from your device.');
       }
 
-      const result = await runHealthSync('health-connect', wellness);
+      const appId = Platform.OS === 'ios' ? 'apple-health' : 'health-connect';
+      const result = await runHealthSync(appId, wellness);
       addWearableSyncData(result.payload);
-      setSelectedDeviceId('health-connect');
+      setSelectedDeviceId(appId);
       setLastResult(result);
 
       const state = classifyRecoveryConnectionState(result.payload);
@@ -379,19 +385,25 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
           setStatusTitle('Recovery Connection Paused');
           setStatusBody('Recovery connection is temporarily unavailable. Please retry in a moment.');
         }
+      } else if (message.includes('healthkit_unavailable')) {
+        if (isMountedRef.current) {
+          setStage('not_supported');
+          setStatusTitle('Apple Health Not Available');
+          setStatusBody('Apple Health is not available on this device.');
+        }
       } else if (message.includes('permission')) {
         if (isMountedRef.current) {
           setStage('permission_denied');
           setConnectionState('permission_missing');
           setStatusTitle('Permission Needed');
-          setStatusBody('Open Health Connect permissions and allow at least one supported signal to sync.');
+              setStatusBody('Open device health permissions and allow at least one supported signal to sync.');
         }
       } else if (message.includes('INSUFFICIENT_DATA')) {
         if (isMountedRef.current) {
           setStage('insufficient_data');
           setConnectionState('no_recent_data');
           setStatusTitle('No Recent Recovery Signals');
-          setStatusBody('Permissions are connected, but no recent Health Connect records were available to sync.');
+              setStatusBody('Permissions are connected, but no recent health records were available to sync.');
         }
       } else {
         if (isMountedRef.current) {
@@ -412,7 +424,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
   }, [addWearableSyncData, setSelectedDeviceId, setWellness, wellness]);
 
   // Stability guard:
-  // avoid auto-triggering Health Connect permission/data reads during
+  // avoid auto-triggering native health permission/data reads during
   // screen transitions (logout/login/home sync navigation), which can crash
   // on some Android builds. Sync starts via explicit user action.
   useEffect(() => {
@@ -498,7 +510,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
             return <View key={domain.key} style={[styles.onboardingDomain, isSynced && styles.onboardingDomainSynced]}><View style={styles.domainLeft}><Ionicons name={domain.icon} size={20} color={isSynced ? colors.success : palette.textSecondary} /><Text style={[styles.domainTitle, { color: palette.textPrimary }]}>{domain.key}</Text></View><Text style={[styles.domainStatus, { color: isSynced ? colors.success : palette.textSecondary }]}>{label}</Text></View>;
           })}
         </View>
-        <View style={styles.platformTruth}><Text style={[styles.supportText, { color: palette.textSecondary }]}>{Platform.OS === 'android' ? 'Android Health Connect · read-only access' : 'Apple Health is not available in this build · continue without connecting'}</Text></View>
+        <View style={styles.platformTruth}><Text style={[styles.supportText, { color: palette.textSecondary }]}>{Platform.OS === 'android' ? 'Android Health Connect · read-only access' : 'Apple Health · read-only access'}</Text></View>
         {error ? <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text> : null}
       </OnboardingShell>
     );
@@ -507,7 +519,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
   return (
     <Screen scroll contentStyle={styles.screenContent}>
       <View style={styles.container}>
-        <PageHeader title="Health Connect" onBack={() => navigation.goBack()} />
+        <PageHeader title={Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect'} onBack={() => navigation.goBack()} />
         <View style={[styles.heroCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
           <View style={[styles.heroIcon, { backgroundColor: isLight ? '#EAF8F5' : '#143532' }]}>
             <Ionicons name={stageIcon[stage]} size={26} color={isLight ? '#087B6C' : '#66FCF1'} />
@@ -520,8 +532,9 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
         <View style={[styles.infoCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#F8FAFC' : palette.cardMuted }]}>
           <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>What Fiteatsy reads</Text>
           <Text style={[styles.supportText, { color: palette.textSecondary }]}>
-            Read-only health signals from Health Connect compatible wellness apps including Samsung Health, Google Fit,
-            NoiseFit, boAt Crest, Fitbit, and more.
+            {Platform.OS === 'ios'
+              ? 'Read-only health signals stored in Apple Health by your iPhone, Apple Watch, and compatible wellness apps.'
+              : 'Read-only health signals from Health Connect compatible wellness apps including Samsung Health, Google Fit, NoiseFit, boAt Crest, Fitbit, and more.'}
           </Text>
         </View>
 

@@ -9,7 +9,7 @@
     <key>EXUpdatesLaunchWaitMs</key>
     <integer>0</integer>
     <key>EXUpdatesRuntimeVersion</key>
-    <string>1.0.0-native-20260825-health-connect-d2</string>
+    <string>1.0.0-native-20260827-healthkit-ios-v1</string>
     <key>EXUpdatesRequestHeaders</key>
     <dict>
       <key>expo-channel-name</key>

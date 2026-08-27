@@ -50,6 +50,8 @@
     <string>Allow Fiteatsy to use your camera to capture health reports.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <key>NSHealthShareUsageDescription</key>
+    <string>Allow Fiteatsy to read your activity, sleep, heart, recovery, weight, energy and distance data to calculate your health insights.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Allow Fiteatsy to access your photos for health report upload.</string>
     <key>RCTNewArchEnabled</key>
