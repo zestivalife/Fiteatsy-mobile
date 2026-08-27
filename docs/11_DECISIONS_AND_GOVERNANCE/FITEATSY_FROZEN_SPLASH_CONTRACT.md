@@ -21,7 +21,7 @@ artwork while React Native and the video module initialise.
 | Android native bridge | `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/res/values/styles.xml`, `android/app/src/main/res/values/colors.xml`, and `android/app/src/main/res/drawable/ic_launcher_background.xml` |
 | User-facing video splash | `src/screens/auth/SplashScreen.tsx` |
 | Official logo | `src/assets/brand/fiteatsy-logo.svg` |
-| Automated authority | `scripts/verify-frozen-splash.mjs` and `test/videoIntro.test.ts` |
+| Automated authority | `scripts/verify-frozen-splash.mjs`, `test/videoIntro.test.ts`, and `.github/workflows/frozen-splash-contract.yml` |
 
 Generated native files are verification targets, not an independent product
 authority. Clean prebuild output must conform to this chain.
