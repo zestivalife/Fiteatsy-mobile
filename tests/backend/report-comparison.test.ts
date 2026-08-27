@@ -59,6 +59,61 @@ test('canonical comparison classifies range movement without naïve numeric dire
   assert.equal(projection.needsAttention[0].displayName, 'LDL');
 });
 
+test('persisted B12 aliases resolve symmetrically through the canonical biomarker authority', () => {
+  const variants = ['B12', 'b12', ' Vitamin B12 ', 'vitamin b12', 'Vitamin-B12'];
+  for (const previousName of variants) {
+    const previous = report('previous', '2026-06-02', [parameter(previousName, 180, 'low', 'pg/mL', '200-900')]);
+    const latest = report('latest', '2026-08-27', [parameter('Vitamin B12', 310, 'normal', 'pg/mL', '200-900')]);
+    const projection = buildReportComparison(latest, previous);
+
+    assert.equal(projection.summary.improvedCount, 1, previousName);
+    assert.equal(projection.summary.incomparableCount, 0, previousName);
+    assert.equal(projection.improved[0]?.biomarkerId, 'vitamin b12', previousName);
+  }
+
+  const previous = report('previous', '2026-06-02', [parameter('Vitamin B12', 310, 'normal', 'pg/mL', '200-900')]);
+  const latest = report('latest', '2026-08-27', [parameter('B12', 180, 'low', 'pg/mL', '200-900')]);
+  const reverse = buildReportComparison(latest, previous);
+  assert.equal(reverse.summary.needsAttentionCount, 1);
+  assert.equal(reverse.summary.incomparableCount, 0);
+});
+
+test('B12 alias matching preserves unit safety, missing-marker safety, and same-name controls', () => {
+  for (const name of ['B12', 'Vitamin B12']) {
+    const previous = report('previous', '2026-06-02', [parameter(name, 180, 'low', 'pg/mL', '200-900')]);
+    const latest = report('latest', '2026-08-27', [parameter(name, 310, 'normal', 'pg/mL', '200-900')]);
+    const projection = buildReportComparison(latest, previous);
+    assert.equal(projection.summary.improvedCount, 1, name);
+  }
+
+  const incompatible = buildReportComparison(
+    report('latest', '2026-08-27', [parameter('Vitamin B12', 310, 'normal', 'pmol/L', '200-900')]),
+    report('previous', '2026-06-02', [parameter('B12', 180, 'low', 'pg/mL', '200-900')])
+  );
+  assert.equal(incompatible.summary.comparableCount, 0);
+  assert.equal(incompatible.summary.incomparableCount, 1);
+
+  const missing = buildReportComparison(
+    report('latest', '2026-08-27', [parameter('Ferritin', 30, 'normal', 'ng/mL', '20-300')]),
+    report('previous', '2026-06-02', [parameter('B12', 180, 'low', 'pg/mL', '200-900')])
+  );
+  assert.equal(missing.summary.comparableCount, 0);
+  assert.equal(missing.summary.incomparableCount, 2);
+});
+
+test('duplicate aliases in one report collapse to one canonical comparison identity', () => {
+  const previous = report('previous', '2026-06-02', [
+    parameter('B12', 180, 'low', 'pg/mL', '200-900'),
+    parameter('Vitamin B12', 180, 'low', 'pg/mL', '200-900')
+  ]);
+  const latest = report('latest', '2026-08-27', [parameter('Vitamin B12', 310, 'normal', 'pg/mL', '200-900')]);
+  const projection = buildReportComparison(latest, previous);
+
+  assert.equal(projection.summary.comparableCount, 1);
+  assert.equal(projection.summary.improvedCount, 1);
+  assert.equal(projection.summary.incomparableCount, 0);
+});
+
 test('missing markers and incompatible units remain incomparable and out of positive/attention counts', () => {
   const previous = report('previous', '2026-06-02', [parameter('Vitamin B12', 8, 'low', 'pg/mL')]);
   const latest = report('latest', '2026-08-27', [

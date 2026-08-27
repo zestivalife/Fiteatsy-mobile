@@ -125,8 +125,10 @@ const compareMatched = (latest: ParsedParameter, previous: ParsedParameter): Rep
   return { classification: 'stable', delta, rationale: 'No meaningful range-status change was established.' };
 };
 
-const keyFor = (parameter: ParsedParameter) =>
-  (parameter.canonicalBiomarkerId ?? parameter.canonicalName ?? canonicalBiomarkerName(parameter.name)).trim().toLowerCase();
+const keyFor = (parameter: ParsedParameter) => {
+  const persistedIdentity = parameter.canonicalName ?? parameter.canonicalBiomarkerId ?? parameter.name;
+  return canonicalBiomarkerName(persistedIdentity).trim().toLowerCase();
+};
 
 const reportMeta = (report: ReportRecord) => ({
   id: report.id,
