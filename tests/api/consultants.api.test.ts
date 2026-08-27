@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { pool } from '../../backend/src/db/pool.js';
 import { createBiomarkerObservation, upsertBiomarker } from '../../backend/src/modules/biomarkers/biomarkers.repository.js';
 import { ingestHealthObservations } from '../../backend/src/modules/health/health-observations.repository.js';
+import { createProfessionalAssignment } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
 import { createReportRecord } from '../../backend/src/modules/reports/reports.store.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson, patchJson, postJson } from '../helpers/http.js';
@@ -118,13 +120,22 @@ test('registered Fiteatsy users appear in consultant client discovery without du
   assert.equal(response.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
   assert.equal(response.body.clients[0].email, email);
   assert.equal(response.body.clients[0].mobile, '919900001234');
-  assert.equal(response.body.clients[0].mobileNumberMasked, '******1234');
+  assert.equal(response.body.clients[0].mobileNumberMasked, '********1234');
   assert.equal(response.body.clients[0].status, 'active');
   assert.equal(response.body.clients[0].accountStatus, 'active');
   assert.equal(response.body.clients[0].profileCompleted, false);
   assert.equal(response.body.clients[0].reportsCount, 0);
   assert.equal(response.body.clients[0].biomarkerStatus, null);
-  assert.equal(response.body.clients[0].lastHealthUpdate, null);
+  const canonicalHealthProfile = await pool.query(
+    'select updated_at from health_profiles where user_id = $1 and client_id = $2',
+    [client.current.body.accountId, await getClientDatabaseId(client)]
+  );
+  assert.equal(canonicalHealthProfile.rows.length, 1);
+  const lastHealthUpdate = String(response.body.clients[0].lastHealthUpdate);
+  assert.equal(Number.isFinite(Date.parse(lastHealthUpdate)), true);
+  const canonicalHealthUpdatedAt = new Date(canonicalHealthProfile.rows[0].updated_at);
+  canonicalHealthUpdatedAt.setUTCMilliseconds(0);
+  assert.equal(new Date(lastHealthUpdate).toISOString(), canonicalHealthUpdatedAt.toISOString());
   assert.equal(typeof response.body.clients[0].registeredAt, 'string');
   assert.equal(typeof response.body.clients[0].lastActiveAt, 'string');
 });
@@ -160,28 +171,76 @@ test('consultant client discovery is assignment-scoped and independent of subscr
 });
 
 test('consultant discovery backfills missing client records for registered users', async () => {
-  const client = await createAuthenticatedSession(server.baseUrl, {
-    name: 'Legacy Client',
-    email: `legacy-client-${Date.now()}@example.com`
-  });
-  await pool.query('delete from fiteatsy_clients where account_user_id = $1', [client.current.body.accountId]);
+  const accountId = crypto.randomUUID();
+  const email = `legacy-client-${Date.now()}@example.com`;
+  const registeredAt = new Date().toISOString();
+  await pool.query(
+    `insert into users (
+       id, name, email_normalized, mobile_number_normalized,
+       email_verified_at, mobile_verified_at, status, version,
+       last_login_at, created_at, updated_at
+     ) values ($1, $2, $3, $4, $5, $5, 'active', 1, $5, $5, $5)`,
+    [accountId, 'Legacy Client', email, '919900009999', registeredAt]
+  );
+
+  const beforeBackfill = await pool.query(
+    'select count(*)::int as total from fiteatsy_clients where account_user_id = $1',
+    [accountId]
+  );
+  assert.equal(beforeBackfill.rows[0].total, 0);
 
   const consultant = await createConsultantSession();
-  const initialResponse = await getJson(server.baseUrl, '/v1/consultants/clients', {
+  const discoveryOptions = {
     headers: authHeaders(consultant.token)
-  });
-  assert.equal(initialResponse.response.status, 200);
-  assert.deepEqual(initialResponse.body.clients, []);
-  await assignClientToConsultant(client, consultant);
-  const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
-    headers: authHeaders(consultant.token)
-  });
+  };
+  const initialResponses = await Promise.all([
+    getJson(server.baseUrl, '/v1/consultants/clients', discoveryOptions),
+    getJson(server.baseUrl, '/v1/consultants/clients', discoveryOptions)
+  ]);
+  for (const initialResponse of initialResponses) {
+    assert.equal(initialResponse.response.status, 200);
+    assert.deepEqual(initialResponse.body.clients, []);
+  }
 
-  assert.equal(response.response.status, 200);
-  assert.equal(response.body.clients.length, 1);
-  assert.equal(response.body.clients[0].name, 'Legacy Client');
-  const clientRow = await pool.query('select count(*)::int as total from fiteatsy_clients where account_user_id = $1', [client.current.body.accountId]);
-  assert.equal(clientRow.rows[0].total, 1);
+  const clientRows = await pool.query(
+    'select id, fiteatsy_client_id from fiteatsy_clients where account_user_id = $1',
+    [accountId]
+  );
+  assert.equal(clientRows.rowCount, 1);
+  const canonicalClientId = String(clientRows.rows[0].id);
+  const publicClientId = String(clientRows.rows[0].fiteatsy_client_id);
+
+  const assignment = await createProfessionalAssignment({
+    actorUserId: consultant.current.body.accountId,
+    clientUserId: accountId,
+    professionalUserId: consultant.current.body.accountId,
+    professionalType: 'CONSULTANT',
+    relationshipType: 'CLIENT_CARE',
+    reason: 'Valid missing-projection discovery fixture'
+  });
+  assert.ok(assignment);
+
+  const first = await getJson(server.baseUrl, '/v1/consultants/clients', discoveryOptions);
+  const second = await getJson(server.baseUrl, '/v1/consultants/clients', discoveryOptions);
+  for (const response of [first, second]) {
+    assert.equal(response.response.status, 200);
+    assert.equal(response.body.clients.length, 1);
+    assert.equal(response.body.clients[0].name, 'Legacy Client');
+    assert.equal(response.body.clients[0].clientId, publicClientId);
+  }
+
+  const integrity = await pool.query(
+    `select
+       (select count(*)::int from fiteatsy_clients where account_user_id = $1) as client_total,
+       (select count(*)::int from consultant_client_assignments where client_user_id = $1 and status = 'active') as assignment_total,
+       (select count(*)::int from health_profiles where user_id = $1 and client_id <> $2) as cross_client_health_total,
+       (select count(*)::int from health_profiles hp left join fiteatsy_clients c on c.id = hp.client_id and c.account_user_id = hp.user_id where hp.user_id = $1 and c.id is null) as orphan_health_total`,
+    [accountId, canonicalClientId]
+  );
+  assert.equal(integrity.rows[0].client_total, 1);
+  assert.equal(integrity.rows[0].assignment_total, 1);
+  assert.equal(integrity.rows[0].cross_client_health_total, 0);
+  assert.equal(integrity.rows[0].orphan_health_total, 0);
 });
 
 test('consultant discovery repairs inactive client mappings and preserves client ids', async () => {
@@ -324,7 +383,7 @@ test('consultant client profile returns real onboarding fields only', async () =
   assert.equal(profile.body.client.mobile, '919811112222');
   assert.equal(profile.body.client.status, 'active');
   assert.equal(profile.body.client.accountStatus, 'active');
-  assert.equal(profile.body.client.mobileNumberMasked, '******2222');
+  assert.equal(profile.body.client.mobileNumberMasked, '********2222');
   assert.equal(profile.body.onboarding.height, 162);
   assert.equal(profile.body.onboarding.weight, 61);
   assert.equal(profile.body.onboarding.goal, 'Improve energy');
@@ -351,6 +410,7 @@ test('GET /v1/consultants/clients/:clientId/workspace returns incomplete states 
     email: `workspace-new-client-${Date.now()}@example.com`
   });
   const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
 
   const workspace = await getJson(
     server.baseUrl,
@@ -361,8 +421,8 @@ test('GET /v1/consultants/clients/:clientId/workspace returns incomplete states 
   assert.equal(workspace.response.status, 200);
   assert.equal(workspace.body.client.id, client.current.body.client.fiteatsyClientId);
   assert.equal(workspace.body.completeness.onboardingStatus, 'INCOMPLETE');
-  assert.equal(workspace.body.completeness.profileCompletionScore, 20);
-  assert.ok(workspace.body.completeness.missingFields.includes('height'));
+  assert.equal(workspace.body.completeness.profileCompletionScore, 0);
+  assert.ok(workspace.body.completeness.missingFields.includes('Height'));
   assert.equal(workspace.body.bodyMetrics.bmi, null);
   assert.equal(workspace.body.bodyMetrics.unavailableReasons.bmi, 'Height and weight are required.');
   assert.equal(workspace.body.nutritionProtocol.calorieTarget, null);
@@ -404,7 +464,7 @@ test('consultant medication monitoring uses client tracker data and enforces ass
         { id: 'evening', time24h: '20:00', mealRelation: 'after_meal' }
       ],
       duration: {
-        startDateISO: `${baseDate}T00:00:00.000Z`,
+        startDateISO: istScheduledFor(0),
         endDateISO: null,
         ongoing: true
       }
@@ -412,8 +472,8 @@ test('consultant medication monitoring uses client tracker data and enforces ass
     reminderSound: 'default',
     status: 'active',
     notificationEnabled: true,
-    createdAtISO: `${baseDate}T00:00:00.000Z`,
-    updatedAtISO: `${baseDate}T00:00:00.000Z`
+    createdAtISO: istScheduledFor(0),
+    updatedAtISO: istScheduledFor(0)
   };
 
   const snapshot = await postJson(
@@ -427,7 +487,7 @@ test('consultant medication monitoring uses client tracker data and enforces ass
           medicationId,
           scheduledForISO: morningScheduledForISO,
           status: 'taken',
-          actionedAtISO: `${baseDate}T08:04:00.000Z`,
+          actionedAtISO: istScheduledFor(0, '08:04'),
           snoozedUntilISO: null,
           note: null
         },
@@ -497,11 +557,11 @@ test('consultant medication monitoring uses client tracker data and enforces ass
   assert.equal(denied.body.error, 'CLIENT_NOT_FOUND');
 });
 
-const isoDay = (offsetDays: number) => {
-  const date = new Date();
+const istScheduledFor = (offsetDays: number, time24h = '00:00') => {
+  const date = new Date(Date.now() + 330 * 60 * 1000);
   date.setUTCHours(0, 0, 0, 0);
   date.setUTCDate(date.getUTCDate() + offsetDays);
-  return date.toISOString().slice(0, 10);
+  return new Date(`${date.toISOString().slice(0, 10)}T${time24h}:00.000+05:30`).toISOString();
 };
 
 const buildDailyMedication = (startOffsetDays: number, id = 'med-exception-metformin') => ({
@@ -515,7 +575,7 @@ const buildDailyMedication = (startOffsetDays: number, id = 'med-exception-metfo
       { id: 'morning', time24h: '00:00', mealRelation: 'after_meal' }
     ],
     duration: {
-      startDateISO: `${isoDay(startOffsetDays)}T00:00:00.000Z`,
+      startDateISO: istScheduledFor(startOffsetDays),
       endDateISO: null,
       ongoing: true
     }
@@ -523,8 +583,8 @@ const buildDailyMedication = (startOffsetDays: number, id = 'med-exception-metfo
   reminderSound: 'default',
   status: 'active',
   notificationEnabled: true,
-  createdAtISO: `${isoDay(startOffsetDays)}T00:00:00.000Z`,
-  updatedAtISO: `${isoDay(0)}T00:00:00.000Z`
+  createdAtISO: istScheduledFor(startOffsetDays),
+  updatedAtISO: istScheduledFor(0)
 });
 
 const buildDenseDailyMedication = (startOffsetDays: number, id = 'med-exception-dense', slotCount = 100) => ({
@@ -541,7 +601,7 @@ const buildDenseDailyMedication = (startOffsetDays: number, id = 'med-exception-
       };
     }),
     duration: {
-      startDateISO: `${isoDay(startOffsetDays)}T00:00:00.000Z`,
+      startDateISO: istScheduledFor(startOffsetDays),
       endDateISO: null,
       ongoing: true
     }
@@ -559,12 +619,13 @@ const buildDenseTakenLogs = (
       const hour = Math.floor(index / 60);
       const minute = index % 60;
       const time24h = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      const scheduledForISO = istScheduledFor(offset, time24h);
       return {
         id: `log-${medicationId}-${offset}-${index}`,
         medicationId,
-        scheduledForISO: `${isoDay(offset)}T${time24h}:00.000Z`,
+        scheduledForISO,
         status: 'taken',
-        actionedAtISO: `${isoDay(offset)}T${time24h}:10.000Z`,
+        actionedAtISO: new Date(Date.parse(scheduledForISO) + 10 * 60 * 1000).toISOString(),
         snoozedUntilISO: null,
         note: null
       };
@@ -583,25 +644,25 @@ test('consultant medication exception intelligence detects operational adherence
     ...[-13, -12, -11, -10, -9, -8, -7].map((offset) => ({
       id: `log-taken-prev-${offset}`,
       medicationId: medication.id,
-      scheduledForISO: `${isoDay(offset)}T00:00:00.000Z`,
+      scheduledForISO: istScheduledFor(offset),
       status: 'taken',
-      actionedAtISO: `${isoDay(offset)}T00:04:00.000Z`,
+      actionedAtISO: istScheduledFor(offset, '00:04'),
       snoozedUntilISO: null,
       note: null
     })),
     ...[-6, -5, -4, -3].map((offset) => ({
       id: `log-taken-current-${offset}`,
       medicationId: medication.id,
-      scheduledForISO: `${isoDay(offset)}T00:00:00.000Z`,
+      scheduledForISO: istScheduledFor(offset),
       status: 'taken',
-      actionedAtISO: `${isoDay(offset)}T00:04:00.000Z`,
+      actionedAtISO: istScheduledFor(offset, '00:04'),
       snoozedUntilISO: null,
       note: null
     })),
     ...[-2, -1, 0].map((offset) => ({
       id: `log-missed-current-${offset}`,
       medicationId: medication.id,
-      scheduledForISO: `${isoDay(offset)}T00:00:00.000Z`,
+      scheduledForISO: istScheduledFor(offset),
       status: 'missed',
       actionedAtISO: null,
       snoozedUntilISO: null,
@@ -692,8 +753,8 @@ test('consultant medication exception intelligence detects operational adherence
     `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/medication-exceptions`,
     { headers: authHeaders(otherConsultant.token) }
   );
-  assert.equal(directDenied.response.status, 403);
-  assert.equal(directDenied.body.error, 'CLIENT_MEDICATION_ACCESS_DENIED');
+  assert.equal(directDenied.response.status, 404);
+  assert.equal(directDenied.body.error, 'CLIENT_NOT_FOUND');
 
   const acknowledge = await postJson(
     server.baseUrl,
@@ -730,7 +791,7 @@ test('medication exception rule thresholds handle non-trigger edge cases', async
       logs: [{
         id: 'log-one-missed',
         medicationId: oneMissedMedication.id,
-        scheduledForISO: `${isoDay(0)}T00:00:00.000Z`,
+        scheduledForISO: istScheduledFor(0),
         status: 'missed',
         actionedAtISO: null,
         snoozedUntilISO: null,
@@ -805,25 +866,25 @@ test('medication exception rule thresholds handle non-trigger edge cases', async
         {
           id: 'log-snoozed-taken-snoozed',
           medicationId: snoozedTakenMedication.id,
-          scheduledForISO: `${isoDay(-2)}T00:00:00.000Z`,
+          scheduledForISO: istScheduledFor(-2),
           status: 'snoozed',
-          actionedAtISO: `${isoDay(-2)}T00:04:00.000Z`,
-          snoozedUntilISO: `${isoDay(-2)}T00:30:00.000Z`,
+          actionedAtISO: istScheduledFor(-2, '00:04'),
+          snoozedUntilISO: istScheduledFor(-2, '00:30'),
           note: null
         },
         {
           id: 'log-snoozed-taken-taken',
           medicationId: snoozedTakenMedication.id,
-          scheduledForISO: `${isoDay(-1)}T00:00:00.000Z`,
+          scheduledForISO: istScheduledFor(-1),
           status: 'taken',
-          actionedAtISO: `${isoDay(-1)}T00:04:00.000Z`,
+          actionedAtISO: istScheduledFor(-1, '00:04'),
           snoozedUntilISO: null,
           note: null
         },
         {
           id: 'log-snoozed-taken-missed',
           medicationId: snoozedTakenMedication.id,
-          scheduledForISO: `${isoDay(0)}T00:00:00.000Z`,
+          scheduledForISO: istScheduledFor(0),
           status: 'missed',
           actionedAtISO: null,
           snoozedUntilISO: null,
@@ -877,9 +938,9 @@ test('80 percent medication adherence does not create a low-adherence exception'
   const logs = [-4, -3, -2, -1].map((offset) => ({
     id: `log-threshold-${offset}`,
     medicationId: medication.id,
-    scheduledForISO: `${isoDay(offset)}T00:00:00.000Z`,
+    scheduledForISO: istScheduledFor(offset),
     status: 'taken',
-    actionedAtISO: `${isoDay(offset)}T00:04:00.000Z`,
+    actionedAtISO: istScheduledFor(offset, '00:04'),
     snoozedUntilISO: null,
     note: null
   }));
@@ -924,11 +985,37 @@ test('GET /v1/consultants/clients/:clientId/workspace exposes calculated health 
       wellnessGoals: ['Improve energy'],
       activityLevel: 'Moderate',
       dietType: 'Vegetarian',
-      primaryConditions: ['Vitamin D deficiency']
+      primaryConditions: ['Vitamin D deficiency'],
+      sleepHours: 7,
+      sleepGoalHours: 8,
+      sleepQualityLabel: 'Good',
+      smokingStatus: 'Never',
+      alcoholFrequency: 'Monthly',
+      exerciseFrequency: '3-4x/week',
+      stressLevelLabel: 'Moderate',
+      preferredCuisines: ['Maharashtrian', 'South Indian'],
+      foodAllergies: ['Peanuts'],
+      foodsDisliked: ['Bitter gourd'],
+      mealsPerDay: 3,
+      waterIntakeLiters: 2.5,
+      previousConditions: ['Anemia'],
+      familyHistoryConditions: ['Diabetes'],
+      currentMedicines: ['Vitamin D3'],
+      medicalNotes: 'Prefers early dinners.',
+      pcosStatus: 'No',
+      thyroidStatus: 'No',
+      diabetesStatus: 'No',
+      hypertensionStatus: 'No',
+      cholesterolStatus: 'Borderline',
+      heartConditionStatus: 'No',
+      pregnancyStatus: 'Not applicable',
+      breastfeedingStatus: 'No',
+      previousSurgeries: ['None']
     },
     { headers: authHeaders(client.token) }
   );
   const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
 
   const workspace = await getJson(
     server.baseUrl,
@@ -977,7 +1064,7 @@ test('GET /v1/consultants/clients/:clientId/workspace exposes calculated health 
 
   const calculationRows = await pool.query(
     'select count(*)::int as total from health_calculations where user_id = $1 and client_id = $2',
-    [client.current.body.accountId, client.current.body.client.id]
+    [client.current.body.accountId, await getClientDatabaseId(client)]
   );
   assert.equal(calculationRows.rows[0].total >= 6, true);
 });
@@ -988,6 +1075,7 @@ test('GET /v1/clients/:clientId/workspace exposes canonical contract, assignment
     email: `canonical-contract-client-${Date.now()}@example.com`
   });
   const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
 
   await patchJson(
     server.baseUrl,
@@ -1016,11 +1104,11 @@ test('GET /v1/clients/:clientId/workspace exposes canonical contract, assignment
   assert.equal(response.body.access.requestAccountId, consultant.current.body.accountId);
   assert.equal(response.body.access.requestRole, 'consultant');
   assert.equal(response.body.access.consentValidation.status, 'granted');
-  assert.equal(response.body.access.assignmentValidation.status, 'unassigned');
+  assert.equal(response.body.access.assignmentValidation.status, 'assigned_to_requestor');
   assert.equal(response.body.healthProfile.gender, 'Male');
   assert.equal(response.body.healthProfile.heightCm, 174);
   assert.equal(response.body.healthProfile.currentWeightKg, 76);
-  assert.equal(response.body.healthProfile.assignedConsultantId, null);
+  assert.equal(response.body.healthProfile.assignedConsultantId, consultant.current.body.accountId);
   assert.equal(response.body.sourceMetadata.sourceProduct, 'Fiteatsy');
   assert.equal(response.body.sourceMetadata.sourceClientRef, client.current.body.client.fiteatsyClientId);
   assert.ok(Array.isArray(response.body.provenance.sources));
@@ -1092,7 +1180,8 @@ test('consultant workspace contract syncs wearable summaries and source metadata
     email: `wearable-sync-client-${Date.now()}@example.com`
   });
   const consultant = await createConsultantSession();
-  const owner = { accountId: client.current.body.accountId, clientId: client.current.body.client.id };
+  await assignClientToConsultant(client, consultant);
+  const owner = { accountId: client.current.body.accountId, clientId: await getClientDatabaseId(client) };
 
   await ingestHealthObservations(owner, [
     {
@@ -1150,7 +1239,8 @@ test('consultant workspace contract flags stale synced sources without falling b
     email: `stale-sync-client-${Date.now()}@example.com`
   });
   const consultant = await createConsultantSession();
-  const owner = { accountId: client.current.body.accountId, clientId: client.current.body.client.id };
+  await assignClientToConsultant(client, consultant);
+  const owner = { accountId: client.current.body.accountId, clientId: await getClientDatabaseId(client) };
 
   await patchJson(
     server.baseUrl,

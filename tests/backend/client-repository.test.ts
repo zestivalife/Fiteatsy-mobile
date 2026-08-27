@@ -10,6 +10,7 @@ import {
 } from '../../backend/src/modules/client/client.repository.js';
 import { resolveVerifiedAccountIdentity } from '../../backend/src/modules/auth/auth.repository.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
+import { syntheticOperationalPhone } from '../helpers/canonicalFixtures.js';
 
 const CLIENT_MIGRATION_FILE = '0002_m3a_client_identity_foundation.sql';
 
@@ -55,7 +56,7 @@ test('createOrResolveClientForAccount reactivates stale client mappings and pres
         updated_at
       ) values ($1, $2, $3, $4, $5, $5, 'active', 1, $5, $5, $5)
     `,
-    ['stale-client-user', 'Stale Client User', 'stale-client@example.com', '+919876543211', timestamp]
+    ['stale-client-user', 'Stale Client User', 'stale-client@example.com', syntheticOperationalPhone(1), timestamp]
   );
 
   await pool.query(
@@ -101,7 +102,7 @@ test('migration backfills one client for an existing account and records the mig
         updated_at
       ) values ($1, $2, $3, $4, $5, $5, 'active', 1, $5, $5, $5)
     `,
-    ['legacy-account-user', 'Legacy User', 'legacy@example.com', '+919876543297', timestamp]
+    ['legacy-account-user', 'Legacy User', 'legacy@example.com', syntheticOperationalPhone(2), timestamp]
   );
 
   await pool.query('drop table if exists fiteatsy_clients cascade');

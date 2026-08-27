@@ -159,30 +159,9 @@ test('GET /v1/biomarkers and /v1/biomarkers/history return client-owned biomarke
 
 test('GET /v1/intelligence/scores calculates traceable scores from validated client data', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
-  await postJson(server.baseUrl, '/v1/health/observations:batch', {
-    observations: [
-      {
-        metricType: 'steps',
-        value: 9200,
-        unit: 'count',
-        measuredAtISO: '2026-08-04T06:00:00.000Z',
-        sourceProvider: 'health-connect',
-        sourceRecordId: 'hc-score-steps-1',
-        syncKey: 'hc-score-steps-1'
-      },
-      {
-        metricType: 'sleep_minutes',
-        value: 430,
-        unit: 'min',
-        measuredAtISO: '2026-08-04T06:00:00.000Z',
-        sourceProvider: 'health-connect',
-        sourceRecordId: 'hc-score-sleep-1',
-        syncKey: 'hc-score-sleep-1'
-      }
-    ]
-  }, {
-    headers: authHeaders(session.token)
-  });
+  const controlledNowMs = Date.now();
+  const recentMeasuredAtISO = new Date(controlledNowMs - 60_000).toISOString();
+  const recentTestDate = new Date(controlledNowMs - 60_000).toISOString().slice(0, 10);
   const biomarker = await upsertBiomarker({
     canonicalName: 'Vitamin D',
     aliases: ['25-OH Vitamin D'],
@@ -198,10 +177,34 @@ test('GET /v1/intelligence/scores calculates traceable scores from validated cli
     biomarkerId: biomarker.id,
     value: 34,
     unit: 'ng/mL',
-    testDate: '2026-08-04',
+    testDate: recentTestDate,
     confidence: 0.9,
     validationStatus: 'validated',
     referenceRange: '30-100'
+  });
+  await postJson(server.baseUrl, '/v1/health/observations:batch', {
+    observations: [
+      {
+        metricType: 'steps',
+        value: 9200,
+        unit: 'count',
+        measuredAtISO: recentMeasuredAtISO,
+        sourceProvider: 'health-connect',
+        sourceRecordId: 'hc-score-steps-1',
+        syncKey: 'hc-score-steps-1'
+      },
+      {
+        metricType: 'sleep_minutes',
+        value: 430,
+        unit: 'min',
+        measuredAtISO: recentMeasuredAtISO,
+        sourceProvider: 'health-connect',
+        sourceRecordId: 'hc-score-sleep-1',
+        syncKey: 'hc-score-sleep-1'
+      }
+    ]
+  }, {
+    headers: authHeaders(session.token)
   });
 
   const scores = await getJson(server.baseUrl, '/v1/intelligence/scores', {

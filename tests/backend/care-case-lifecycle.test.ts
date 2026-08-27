@@ -19,11 +19,12 @@ const createOwner = async (label: string): Promise<ClientOwnershipContext> => {
   return { accountId: user.id, clientId: client.id };
 };
 
-test('care case state machine accepts short forward transitions and blocks long jumps', () => {
+test('care case state machine accepts monotonic forward reconciliation and blocks regressions', () => {
   assert.equal(validateStageTransition('new_client', 'health_profile_pending'), true);
-  assert.equal(validateStageTransition('new_client', 'ready_for_consultant'), false);
-  assert.equal(validateStageTransition('new_client', 'diet_published'), false);
+  assert.equal(validateStageTransition('new_client', 'ready_for_consultant'), true);
+  assert.equal(validateStageTransition('new_client', 'diet_published'), true);
   assert.equal(validateStageTransition('consultant_review', 'blood_report_pending'), false);
+  assert.equal(validateStageTransition('diet_published', 'consultant_review'), false);
 });
 
 test('care case transition writes timeline, health event, and notification', async () => {

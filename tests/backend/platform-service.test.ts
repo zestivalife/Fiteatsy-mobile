@@ -7,10 +7,11 @@ import {
   syncReportPipelineToPlatform,
   upsertHealthProfile,
 } from '../../backend/src/modules/platform/platform.service.js';
-import { createReportRecord } from '../../backend/src/modules/reports/reports.store.js';
+import { createReportRecord, updateReportStatus } from '../../backend/src/modules/reports/reports.store.js';
 import { resolveVerifiedAccountIdentity } from '../../backend/src/modules/auth/auth.repository.js';
 import { ClientOwnershipContext } from '../../backend/src/modules/platform/platform.types.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
+import { canonicalCompleteHealthProfile } from '../helpers/canonicalFixtures.js';
 
 test.beforeEach(async () => {
   await resetBackendStateForTests();
@@ -27,43 +28,7 @@ const createOwner = async (label: string): Promise<ClientOwnershipContext> => {
 
 test('service layer upserts health profile and derives completion bundle', async () => {
   const owner = await createOwner('svc-001');
-  const bundle = await upsertHealthProfile(owner, {
-    dateOfBirthISO: '1991-05-20T00:00:00.000Z',
-    gender: 'Male',
-    heightCm: 172,
-    currentWeightKg: 78,
-    foodsLiked: ['dal'],
-    currentMedicines: ['none'],
-    wakeTime: '06:00',
-    breakfastTime: '08:00',
-    lunchTime: '13:00',
-    dinnerTime: '20:00',
-    sleepTime: '22:30',
-    mealsPerDay: 3,
-    waterIntakeLiters: 2.5,
-    outsideFoodFrequency: 'weekly',
-    cookingAtHome: 'yes',
-    whoCooks: 'self',
-    dietType: 'veg',
-    regionalCuisine: 'Indian',
-    foodsDisliked: ['soda'],
-    foodAllergies: ['none'],
-    foodIntolerances: ['none'],
-    currentSupplements: ['omega-3'],
-    primaryConditions: ['Prediabetes'],
-    wellnessGoals: ['Sugar Control'],
-    occupation: 'Engineer',
-    workingHoursLabel: '9-6',
-    shiftType: 'day',
-    activityLevel: 'moderate',
-    workMode: 'hybrid',
-    travelFrequency: 'low',
-    goalWeightKg: 72,
-    waistCm: 90,
-    hipCm: 98,
-    neckCm: 38,
-    bodyFatPct: 26,
-  });
+  const bundle = await upsertHealthProfile(owner, canonicalCompleteHealthProfile());
   assert.equal(bundle.profile.calculatedAge !== null, true);
   assert.equal(bundle.careCase.currentStage, 'blood_report_pending');
   assert.ok(bundle.nutrition.completionPercent >= 90);
@@ -87,15 +52,17 @@ test('service layer syncs report pipeline milestones into care case timeline', a
     heightCm: 160,
     currentWeightKg: 60,
   });
-  createReportRecord({
+  const report = await createReportRecord({
     userId: owner.accountId,
+    clientId: owner.clientId,
     fileName: 'baseline.pdf',
     mimeType: 'application/pdf',
     fileSize: 1024,
   });
+  await updateReportStatus(report.id, 'PUBLISHED');
   const sync = await syncReportPipelineToPlatform(
     owner,
-    'rep_fake',
+    report.id,
     'analysis_completed',
     'AI validation completed for baseline.pdf'
   );

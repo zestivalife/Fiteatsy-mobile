@@ -20,6 +20,8 @@ test.beforeEach(async () => {
 
 test('wearables endpoints support app discovery, connect, ingest, live sync, and legacy sync', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
+  const controlledNowMs = Date.now();
+  const recentRecordedAtISO = new Date(controlledNowMs - 60_000).toISOString();
   const apps = await getJson(server.baseUrl, '/v1/wearables/health-apps?platform=ios');
   assert.equal(apps.response.status, 200);
 
@@ -36,20 +38,27 @@ test('wearables endpoints support app discovery, connect, ingest, live sync, and
     headers: authHeaders(session.token)
   });
   assert.equal(connections.response.status, 200);
-  assert.equal(connections.body.connections.length, 1);
+  assert.equal(connections.body.connections.length, 0);
   assert.equal(connections.body.userId, session.current.body.accountId);
 
   const ingest = await postJson(server.baseUrl, '/v1/wearables/records/ingest', {
     appId: 'apple-health',
     platform: 'ios',
     records: [
-      { type: 'sleep_minutes', value: 420, recordedAtISO: '2026-07-02T03:00:00.000Z' },
-      { type: 'resting_heart_rate', value: 67, recordedAtISO: '2026-07-02T03:00:00.000Z' },
+      { type: 'sleep_minutes', value: 420, recordedAtISO: recentRecordedAtISO },
+      { type: 'resting_heart_rate', value: 67, recordedAtISO: recentRecordedAtISO },
     ],
   }, {
     headers: authHeaders(session.token)
   });
   assert.equal(ingest.response.status, 200);
+
+  const durableConnections = await getJson(server.baseUrl, '/v1/wearables/connections/wear-user', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(durableConnections.response.status, 200);
+  assert.equal(durableConnections.body.connections.length, 1);
+  assert.equal(durableConnections.body.userId, session.current.body.accountId);
 
   const live = await postJson(server.baseUrl, '/v1/wearables/sync/live', {
     appId: 'apple-health',
@@ -63,12 +72,14 @@ test('wearables endpoints support app discovery, connect, ingest, live sync, and
     deviceId: 'device-1',
     brand: 'Apple',
     model: 'Watch',
+  }, {
+    headers: authHeaders(session.token)
   });
   assert.equal(legacy.response.status, 410);
   assert.equal(legacy.body.error, 'LEGACY_SYNC_REMOVED');
 });
 
-test('wearables endpoints return 400 and 404 on invalid or missing connection payloads', async () => {
+test('wearables endpoints return validation errors and insufficient-data status for invalid or empty connection payloads', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   const invalidConnect = await postJson(server.baseUrl, '/v1/wearables/connect-app', {
     appId: 'unknown',
@@ -84,7 +95,8 @@ test('wearables endpoints return 400 and 404 on invalid or missing connection pa
   }, {
     headers: authHeaders(session.token)
   });
-  assert.equal(missingLive.response.status, 404);
+  assert.equal(missingLive.response.status, 409);
+  assert.equal(missingLive.body.error, 'INSUFFICIENT_DATA');
 
   const invalidIngest = await postJson(server.baseUrl, '/v1/wearables/records/ingest', {
     appId: 'apple-health',
