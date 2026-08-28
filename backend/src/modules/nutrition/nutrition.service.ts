@@ -7,6 +7,7 @@ import {
   listValidatedBiomarkerSummaryForClient,
   type ConsultantBiomarkerSummary,
 } from '../consultants/consultants.repository.js';
+import { BIOMARKER_CLINICAL_CALCULATION_VERSION } from '../biomarkers/biomarker-clinical-semantics.js';
 import { calculateHealthMetrics } from '../health/health-calculations.service.js';
 import { listLatestHealthScores } from '../intelligence/health-scores.repository.js';
 import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId, listHealthEvents } from '../platform/platform.store.js';
@@ -254,7 +255,7 @@ const inferRiskLevel = (signals: {
   let score = 0;
   if ((signals.bmi ?? 0) >= 30) score += 2;
   else if ((signals.bmi ?? 0) >= 25) score += 1;
-  if (signals.biomarkers.some((item) => /b12|vitamin d|ferritin|hba1c|glucose|cholesterol|triglyceride/i.test(item.name))) score += 1;
+  if (signals.biomarkers.some((item) => item.clinicalStatus === 'LOW' || item.clinicalStatus === 'HIGH')) score += 1;
   if (['sedentary', 'inactive', 'light'].includes(lower(signals.activityLevel))) score += 1;
   if (['poor', 'worst', 'fair', 'average'].includes(lower(signals.sleepQuality))) score += 1;
   if (score >= 4) return 'high' as const;
@@ -268,10 +269,10 @@ const buildFoodRecommendations = (input: {
   biomarkers: ConsultantBiomarkerSummary[];
 }) => {
   const suggestions = new Set<string>();
-  if (input.biomarkers.some((item) => /b12/i.test(item.name))) {
+  if (input.biomarkers.some((item) => /b12/i.test(item.name) && item.clinicalStatus === 'LOW')) {
     suggestions.add('Include B12-rich foods such as dairy, eggs, fish, or fortified options aligned to dietary preference.');
   }
-  if (input.biomarkers.some((item) => /vitamin d/i.test(item.name))) {
+  if (input.biomarkers.some((item) => /vitamin d/i.test(item.name) && item.clinicalStatus === 'LOW')) {
     suggestions.add('Prioritise vitamin D supportive foods and daylight exposure routines alongside consultant review.');
   }
   if (input.conditions.some((item) => /diabetes|prediabetes|insulin/i.test(item))) {
@@ -288,7 +289,7 @@ const buildFoodRecommendations = (input: {
   return Array.from(suggestions).slice(0, 5);
 };
 
-const buildNutritionIntelligence = (input: {
+export const buildNutritionIntelligence = (input: {
   goal: string | null;
   age: number | null;
   gender: string | null;
@@ -315,6 +316,8 @@ const buildNutritionIntelligence = (input: {
   const recommendations: NutritionIntelligence['recommendations'] = [];
   const nutritionFocus = new Set<string>();
   const consultantActions = new Set<string>();
+  const sourceForBiomarker = (biomarker: ConsultantBiomarkerSummary) =>
+    `biomarkers.${biomarker.biomarkerId}.report.${biomarker.sourceReportId ?? 'unknown'}`;
 
   if ((input.bmi ?? 0) >= 25) {
     observations.push({
@@ -333,41 +336,49 @@ const buildNutritionIntelligence = (input: {
 
   for (const biomarker of input.biomarkers) {
     const biomarkerName = biomarker.name.toLowerCase();
-    if (/b12/.test(biomarkerName)) {
+    if (/b12/.test(biomarkerName) && biomarker.clinicalStatus === 'LOW') {
       observations.push({
-        title: 'Vitamin B12 support required',
-        detail: `${biomarker.name} is ${biomarker.value} ${biomarker.unit}.`,
-        sources: [`biomarkers.${biomarker.name}`],
+        title: 'Vitamin B12 result is below the report reference interval',
+        detail: `${biomarker.name} is ${biomarker.value} ${biomarker.unit} (reference ${biomarker.referenceRange ?? 'not available'}).`,
+        sources: [sourceForBiomarker(biomarker)],
       });
       recommendations.push({
-        title: 'Increase B12-rich food exposure',
-        detail: 'Add consistent B12-supportive foods and review supplementation needs before publishing.',
-        sources: [`biomarkers.${biomarker.name}`],
+        title: 'Consider B12-supportive foods during Consultant review',
+        detail: "Include B12-supportive foods compatible with the client's dietary pattern; this does not prescribe supplementation or medication.",
+        sources: [sourceForBiomarker(biomarker)],
         requiresConsultantReview: true,
       });
-      nutritionFocus.add('micronutrient repletion');
+      nutritionFocus.add('micronutrient support');
     }
-    if (/vitamin d/.test(biomarkerName)) {
+    if (/vitamin d/.test(biomarkerName) && biomarker.clinicalStatus === 'LOW') {
       observations.push({
-        title: 'Vitamin D status may affect recovery readiness',
-        detail: `${biomarker.name} is ${biomarker.value} ${biomarker.unit}.`,
-        sources: [`biomarkers.${biomarker.name}`],
+        title: 'Vitamin D result is below the report reference interval',
+        detail: `${biomarker.name} is ${biomarker.value} ${biomarker.unit} (reference ${biomarker.referenceRange ?? 'not available'}).`,
+        sources: [sourceForBiomarker(biomarker)],
       });
-      nutritionFocus.add('recovery readiness');
+      nutritionFocus.add('recovery support');
     }
-    if (/hba1c|glucose/.test(biomarkerName)) {
+    if (/hba1c|fasting glucose/.test(biomarkerName) && biomarker.clinicalStatus === 'HIGH') {
       observations.push({
-        title: 'Glucose regulation needs meal-structure support',
-        detail: `${biomarker.name} is ${biomarker.value} ${biomarker.unit}.`,
-        sources: [`biomarkers.${biomarker.name}`],
+        title: 'Glucose marker is above the report reference interval',
+        detail: `${biomarker.name} is ${biomarker.value} ${biomarker.unit} (reference ${biomarker.referenceRange ?? 'not available'}).`,
+        sources: [sourceForBiomarker(biomarker)],
       });
       recommendations.push({
-        title: 'Stabilise carb distribution',
-        detail: 'Pair carbs with protein and fibre across the day rather than concentrating them in one meal window.',
-        sources: [`biomarkers.${biomarker.name}`, 'nutritionProtocol.macroTargets'],
+        title: 'Review carbohydrate distribution',
+        detail: 'During Consultant review, consider pairing carbohydrates with protein and fibre across the day; this does not diagnose diabetes or alter medication.',
+        sources: [sourceForBiomarker(biomarker), 'nutritionProtocol.macroTargets'],
         requiresConsultantReview: true,
       });
-      nutritionFocus.add('glucose stability');
+      nutritionFocus.add('glucose-aware meal structure');
+    }
+    if (/creatinine|egfr|alanine aminotransferase|aspartate aminotransferase|bilirubin|sgpt|sgot/.test(biomarkerName)
+      && biomarker.clinicalStatus !== 'NORMAL' && biomarker.clinicalStatus !== 'UNKNOWN') {
+      consultantActions.add(`Clinical review required for ${biomarker.name}; no automated renal or hepatic food restriction was applied.`);
+    }
+    if ((biomarker.clinicalStatus === 'LOW' || biomarker.clinicalStatus === 'HIGH')
+      && !/b12|vitamin d|hba1c|fasting glucose|creatinine|egfr|alanine aminotransferase|aspartate aminotransferase|bilirubin|sgpt|sgot/.test(biomarkerName)) {
+      consultantActions.add(`Review ${biomarker.name} from report ${biomarker.sourceReportId ?? 'with unavailable provenance'} before publishing; no automated food rule was applied.`);
     }
   }
 
@@ -433,11 +444,11 @@ const buildNutritionIntelligence = (input: {
   }
 
   const abnormalities = input.biomarkers
-    .filter((item) => lower(item.status) !== 'normal')
+    .filter((item) => item.clinicalStatus === 'LOW' || item.clinicalStatus === 'HIGH')
     .map((item) => `${item.name} ${item.value} ${item.unit}`);
 
   const deficiencies = input.biomarkers
-    .filter((item) => /b12|vitamin|ferritin|iron|folate/i.test(item.name) && lower(item.status) !== 'normal')
+    .filter((item) => /b12|vitamin|ferritin|iron|folate/i.test(item.name) && item.clinicalStatus === 'LOW')
     .map((item) => item.name);
 
   return {
@@ -470,13 +481,20 @@ const buildNutritionIntelligence = (input: {
       waterIntakeLiters: input.waterIntakeLiters,
     },
     biomarkerSnapshot: input.biomarkers.map((item) => ({
+      biomarkerId: item.biomarkerId,
       name: item.name,
+      canonicalMarkerName: item.canonicalMarkerName,
+      rawMarkerName: item.rawMarkerName,
+      sourceReportId: item.sourceReportId,
       value: item.value,
       unit: item.unit,
-      status: item.status,
+      validationStatus: item.validationStatus,
+      clinicalStatus: item.clinicalStatus,
+      comparisonStatus: item.comparisonStatus,
       referenceRange: item.referenceRange,
       testDate: item.testDate,
     })),
+    biomarkerClinicalCalculationVersion: BIOMARKER_CLINICAL_CALCULATION_VERSION,
     abnormalities: abnormalities.slice(0, 8),
     deficiencies: unique(deficiencies).slice(0, 6),
     wellnessScores: input.wellnessScores,
@@ -1336,13 +1354,20 @@ const buildSourceSnapshot = (input: {
   bmi: input.bmi,
   weightKg: input.weightKg,
   biomarkers: input.biomarkers.map((item) => ({
+    biomarkerId: item.biomarkerId,
     name: item.name,
+    canonicalMarkerName: item.canonicalMarkerName,
+    rawMarkerName: item.rawMarkerName,
+    sourceReportId: item.sourceReportId,
     value: item.value,
     unit: item.unit,
-    status: item.status,
+    validationStatus: item.validationStatus,
+    clinicalStatus: item.clinicalStatus,
+    comparisonStatus: item.comparisonStatus,
     referenceRange: item.referenceRange,
     testDate: item.testDate,
   })),
+  biomarkerClinicalCalculationVersion: BIOMARKER_CLINICAL_CALCULATION_VERSION,
   healthProfile: input.healthProfile,
   calorieTarget: input.calorieTarget,
   proteinTargetGrams: input.proteinTargetGrams,

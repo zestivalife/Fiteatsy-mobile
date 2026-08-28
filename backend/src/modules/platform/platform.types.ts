@@ -425,13 +425,20 @@ export type NutritionPlanSourceSnapshot = {
   bmi: number | null;
   weightKg: number | null;
   biomarkers: Array<{
+    biomarkerId: string;
     name: string;
+    canonicalMarkerName: string;
+    rawMarkerName: string | null;
+    sourceReportId: string | null;
     value: number;
     unit: string;
-    status: string;
+    validationStatus: string;
+    clinicalStatus: string;
+    comparisonStatus: string;
     referenceRange: string | null;
     testDate: string;
   }>;
+  biomarkerClinicalCalculationVersion?: string;
   healthProfile: Record<string, unknown>;
   calorieTarget: number | null;
   proteinTargetGrams: number | null;
@@ -486,13 +493,20 @@ export type NutritionIntelligence = {
     waterIntakeLiters: number | null;
   };
   biomarkerSnapshot: Array<{
+    biomarkerId: string;
     name: string;
+    canonicalMarkerName: string;
+    rawMarkerName: string | null;
+    sourceReportId: string | null;
     value: number;
     unit: string;
-    status: string;
+    validationStatus: string;
+    clinicalStatus: string;
+    comparisonStatus: string;
     referenceRange: string | null;
     testDate: string;
   }>;
+  biomarkerClinicalCalculationVersion: string;
   abnormalities: string[];
   deficiencies: string[];
   wellnessScores: {
