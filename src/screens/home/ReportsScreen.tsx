@@ -52,7 +52,8 @@ import {
   ReportComparisonItem,
   ReportComparisonProjection,
   ReportDto,
-  uploadAndAnalyzeReport
+  uploadAndAnalyzeReport,
+  waitForReportAnalysis
 } from '../../services/reportUploadService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -329,7 +330,8 @@ export const ReportsScreen = () => {
   const [processingPercent, setProcessingPercent] = useState(0);
   const [processingMessage, setProcessingMessage] = useState('Uploading Report');
   const [processingStatus, setProcessingStatus] = useState('UPLOADED');
-  const [processingIntent, setProcessingIntent] = useState<'upload' | 'reanalysis' | null>(null);
+  const [processingIntent, setProcessingIntent] = useState<'upload' | 'reanalysis' | 'resume' | null>(null);
+  const [pendingReportId, setPendingReportId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
   const initialReportDate = useMemo(() => new Date(), []);
@@ -370,6 +372,23 @@ export const ReportsScreen = () => {
   const [deleteAllConfirmation, setDeleteAllConfirmation] = useState('');
   const heroAnim = useRef(new Animated.Value(1)).current;
   const activeUploadController = useRef<AbortController | null>(null);
+
+  const openUploadSheet = () => {
+    if (activeUploadController.current) return;
+    setShowProcessing(false);
+    setShowUploadPreparing(false);
+    setUploadBusy(false);
+    setAnalysisLaunching(false);
+    setProcessingIntent(null);
+    setShowDatePicker(false);
+    setShowUploadSheet(true);
+  };
+
+  const closeUploadSheet = () => {
+    if (uploadBusy || analysisLaunching) return;
+    setShowDatePicker(false);
+    setShowUploadSheet(false);
+  };
 
   const shimmer = useRef(new Animated.Value(0)).current;
   const authenticatedReportOwnerKey = authSession
@@ -444,6 +463,10 @@ export const ReportsScreen = () => {
       return item ? [...acc, item] : acc;
     }, []);
     setReports(hydratedReports);
+    const pending = reportDtos.find((report) =>
+      ['UPLOADED', 'PROCESSING', 'DOCUMENT_ANALYSIS_COMPLETED', 'EXTRACTION_COMPLETED', 'VALIDATION_PENDING', 'VALIDATION_COMPLETED', 'PRIORITIZATION_COMPLETED', 'SCORE_GENERATED'].includes(report.status)
+    );
+    setPendingReportId(pending?.id ?? null);
     try {
       setComparison(await getCurrentReportComparison());
       setComparisonError(null);
@@ -540,6 +563,44 @@ export const ReportsScreen = () => {
       active = false;
     };
   }, [authenticatedReportOwnerKey]);
+
+  useEffect(() => {
+    if (!authSession || !pendingReportId || showProcessing || activeUploadController.current) return;
+    const controller = new AbortController();
+    activeUploadController.current = controller;
+    setProcessingIntent('resume');
+    setProcessingPhase('processing');
+    setProcessingMessage('Restoring report analysis...');
+    setProcessingStatus('PROCESSING');
+    setShowProcessing(true);
+    waitForReportAnalysis({
+      reportId: pendingReportId,
+      signal: controller.signal,
+      onProgress: (event) => {
+        setProcessingPhase(event.stage);
+        setProcessingPercent(event.percent);
+        setProcessingMessage(event.message);
+        setProcessingStatus(event.status ?? event.stage.toUpperCase());
+      }
+    })
+      .then(async () => {
+        setPendingReportId(null);
+        await refreshReportData();
+        setShowProcessing(false);
+        setProcessingIntent(null);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setShowProcessing(false);
+        setProcessingIntent(null);
+        setShowUploadSheet(true);
+        setUploadError(error instanceof Error ? error.message : 'Unable to restore report analysis.');
+      })
+      .finally(() => {
+        if (activeUploadController.current === controller) activeUploadController.current = null;
+      });
+    return () => controller.abort();
+  }, [authSession, pendingReportId]);
 
   const hydratePickedFile = async (
     uri: string,
@@ -944,6 +1005,7 @@ export const ReportsScreen = () => {
   const startReanalysis = async () => {
     if (!reanalysisReportId || reanalysisBusy) return;
     const controller = new AbortController();
+    activeUploadController.current = controller;
     try {
       setReanalysisBusy(true);
       setUploadError(null);
@@ -955,7 +1017,22 @@ export const ReportsScreen = () => {
       setProcessingStep(2);
       setShowUploadSheet(false);
       setShowProcessing(true);
-      const analysis = await reanalyzeReport(reanalysisReportId, controller.signal);
+      let analysis: ReportAnalysisResponse;
+      try {
+        analysis = await reanalyzeReport(reanalysisReportId, controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        analysis = await waitForReportAnalysis({
+          reportId: reanalysisReportId,
+          signal: controller.signal,
+          onProgress: (event) => {
+            setProcessingPhase(event.stage);
+            setProcessingPercent(event.percent);
+            setProcessingMessage(event.message);
+            setProcessingStatus(event.status ?? event.stage.toUpperCase());
+          }
+        });
+      }
       setProcessingPhase('completed');
       setProcessingPercent(100);
       setProcessingMessage(
@@ -996,6 +1073,7 @@ export const ReportsScreen = () => {
       const detail = error instanceof Error ? error.message : 'Re-analysis failed. Please retry with a clearer file.';
       setUploadError(`Some information could not be confidently analysed. ${detail}`);
     } finally {
+      if (activeUploadController.current === controller) activeUploadController.current = null;
       setReanalysisBusy(false);
     }
   };
@@ -1039,7 +1117,7 @@ export const ReportsScreen = () => {
           <Text style={[styles.headerTitle, !isLight && styles.headerTitleDark]}>My Health</Text>
           <Text style={[styles.headerSubtitle, !isLight && styles.headerSubtitleDark]}>REPORTS &amp; INTELLIGENCE</Text>
         </View>
-        <Pressable style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]} onPress={() => setShowUploadSheet(true)}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Upload health report" style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]} onPress={openUploadSheet}>
           <Ionicons name="cloud-upload-outline" size={18} color={isLight ? palette.teal : sectionHighlight} />
         </Pressable>
       </View>
@@ -1386,7 +1464,7 @@ export const ReportsScreen = () => {
       ) : null}
 
       {!showUploadSheet && !showProcessing ? (
-        <Pressable style={[styles.fab, { backgroundColor: sectionHighlight }]} onPress={() => setShowUploadSheet(true)}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Upload health report" style={[styles.fab, { backgroundColor: sectionHighlight }]} onPress={openUploadSheet}>
           <Ionicons name="cloud-upload-outline" size={24} color={colors.white} />
         </Pressable>
       ) : null}
@@ -1441,17 +1519,27 @@ export const ReportsScreen = () => {
         statusBarTranslucent
         presentationStyle="overFullScreen"
         hardwareAccelerated
-        onRequestClose={() => setShowUploadSheet(false)}
+        onRequestClose={closeUploadSheet}
       >
         <View style={styles.sheetBackdrop}>
-          <Pressable style={styles.sheetDismissZone} onPress={() => setShowUploadSheet(false)} />
+          <Pressable accessibilityRole="button" accessibilityLabel="Close upload report" style={styles.sheetDismissZone} onPress={closeUploadSheet} />
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Add Health Report</Text>
-            <Text style={styles.sheetSubtitle}>Fiteatsy will analyse all parameters automatically</Text>
+            <View style={styles.sheetHeadingRow}>
+              <View style={styles.sheetHeadingIcon}>
+                <Ionicons name="cloud-upload-outline" size={20} color={colors.success} />
+              </View>
+              <View style={styles.sheetHeadingCopy}>
+                <Text style={styles.sheetTitle}>Add Health Report</Text>
+                <Text style={styles.sheetSubtitle}>Choose a report source to begin secure analysis.</Text>
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close upload report" style={styles.sheetCloseButton} onPress={closeUploadSheet}>
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScrollContent}>
-              <View style={styles.uploadMethodRow}>
+              <View style={styles.uploadMethodList}>
                 {[
                   { key: 'camera', icon: 'camera-outline', title: 'Take Photo', copy: 'Photograph your report' },
                   { key: 'gallery', icon: 'image-outline', title: 'Choose Photo', copy: 'Select from library' },
@@ -1461,12 +1549,20 @@ export const ReportsScreen = () => {
                   return (
                     <Pressable
                       key={item.key}
+                      accessibilityRole="button"
+                      accessibilityLabel={item.title}
+                      disabled={uploadBusy || analysisLaunching}
                       style={[styles.uploadMethodCard, active && styles.uploadMethodCardActive]}
                       onPress={() => pickUpload(item.key as 'camera' | 'gallery' | 'pdf')}
                     >
-                      <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={26} color={isLight ? palette.teal : sectionHighlight} />
-                      <Text style={styles.uploadMethodTitle}>{item.title}</Text>
-                      <Text style={styles.uploadMethodCopy}>{item.copy}</Text>
+                      <View style={styles.uploadMethodIcon}>
+                        <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={21} color={colors.success} />
+                      </View>
+                      <View style={styles.uploadMethodCopyWrap}>
+                        <Text style={styles.uploadMethodTitle}>{item.title}</Text>
+                        <Text style={styles.uploadMethodCopy}>{item.copy}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                     </Pressable>
                   );
                 })}
@@ -1561,6 +1657,7 @@ export const ReportsScreen = () => {
 
               <Pressable
                 style={[styles.primaryBtn, (!selectedUpload || uploadBusy || analysisLaunching) && styles.primaryBtnDisabled]}
+                disabled={!selectedUpload || uploadBusy || analysisLaunching}
                 onPress={startAnalysis}
               >
                 <Text style={styles.primaryBtnText}>{analysisLaunching ? 'Starting upload...' : 'Upload Report'}</Text>
@@ -1570,7 +1667,7 @@ export const ReportsScreen = () => {
         </View>
       </Modal>
 
-      <Modal visible={showProcessing} animationType="fade" transparent>
+      <Modal visible={showProcessing} animationType="fade" transparent statusBarTranslucent onRequestClose={() => undefined}>
         <View style={styles.processingScreen}>
           <View style={styles.processingCenter}>
             <View style={styles.processingLogo}>
@@ -1618,14 +1715,15 @@ export const ReportsScreen = () => {
             <View style={styles.processingTrack}>
               <View style={[styles.processingFill, { width: `${processingPercent}%` }]} />
             </View>
-            <Text style={styles.processingHint}>{processingPercent}% complete · This can take 15–45 seconds for large reports.</Text>
-            <ActivityIndicator color={palette.purple} style={{ marginTop: 8 }} />
+            <Text style={styles.processingHint}>{processingPercent}% complete · Live status: {processingStatus}</Text>
+            <ActivityIndicator color={colors.success} style={{ marginTop: 8 }} />
             <Pressable
               style={styles.processingCancelBtn}
               onPress={() => {
                 activeUploadController.current?.abort();
                 setShowProcessing(false);
                 setAnalysisLaunching(false);
+                setProcessingIntent(null);
                 setShowUploadSheet(true);
                 setUploadError('Analysis cancelled. You can retry now.');
               }}
@@ -2691,15 +2789,15 @@ const styles = StyleSheet.create({
     flex: 1
   },
   sheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: colors.cardRaised,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderWidth: 1,
     borderColor: colors.stroke,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 18,
-    maxHeight: '78%',
+    maxHeight: '86%',
     shadowColor: '#000',
     shadowOpacity: 0.32,
     shadowRadius: 16,
@@ -2718,50 +2816,80 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   sheetTitle: {
-    fontSize: 17,
-    fontFamily: 'Exo_600SemiBold',
-    color: '#000000'
+    fontSize: 20,
+    fontFamily: 'Exo_700Bold',
+    color: colors.white
   },
   sheetSubtitle: {
     marginTop: 4,
-    marginBottom: 12,
     fontSize: 13,
-    color: '#000000'
+    color: colors.textSecondary
   },
-  uploadMethodRow: {
+  sheetHeadingRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 18
+  },
+  sheetHeadingIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(53,209,140,0.12)'
+  },
+  sheetHeadingCopy: {
+    flex: 1
+  },
+  sheetCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.cardMuted
+  },
+  uploadMethodList: {
+    gap: 10,
     marginBottom: 12
   },
   uploadMethodCard: {
-    width: '31%',
-    minHeight: 132,
+    width: '100%',
+    minHeight: 72,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: colors.stroke,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    backgroundColor: colors.cardMuted
+  },
+  uploadMethodCardActive: {
+    borderColor: colors.success,
+    backgroundColor: 'rgba(53,209,140,0.10)'
+  },
+  uploadMethodIcon: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    backgroundColor: '#FFFFFF'
+    backgroundColor: 'rgba(53,209,140,0.10)'
   },
-  uploadMethodCardActive: {
-    borderColor: palette.teal,
-    backgroundColor: palette.tealLight
+  uploadMethodCopyWrap: {
+    flex: 1,
+    marginLeft: 12
   },
   uploadMethodTitle: {
-    marginTop: 6,
-    fontSize: 13,
-    fontFamily: 'Exo_600SemiBold',
-    color: '#000000',
-    textAlign: 'center'
+    fontSize: 15,
+    fontFamily: 'Exo_700Bold',
+    color: colors.white
   },
   uploadMethodCopy: {
     marginTop: 2,
-    fontSize: 11,
-    color: '#000000',
-    textAlign: 'center'
+    fontSize: 12,
+    color: colors.textSecondary
   },
   uploadStatusRow: {
     flexDirection: 'row',
@@ -2827,7 +2955,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: colors.stroke,
     backgroundColor: colors.cardMuted,
     flexDirection: 'row',
     alignItems: 'center',
@@ -2906,7 +3034,7 @@ const styles = StyleSheet.create({
   },
   processingScreen: {
     flex: 1,
-    backgroundColor: palette.bg,
+    backgroundColor: colors.bgPrimary,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -2918,7 +3046,9 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: palette.purple,
+    backgroundColor: 'rgba(53,209,140,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(53,209,140,0.36)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14
@@ -2926,14 +3056,14 @@ const styles = StyleSheet.create({
   processingTitle: {
     fontSize: 20,
     fontFamily: 'Exo_600SemiBold',
-    color: palette.textDark,
+    color: colors.white,
     marginBottom: 6,
     textAlign: 'center'
   },
   processingStatusText: {
     marginBottom: 14,
     fontSize: 12,
-    color: palette.textLight,
+    color: colors.success,
     fontFamily: 'Exo_600SemiBold',
     letterSpacing: 0.3
   },
@@ -2952,14 +3082,14 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: colors.card,
+    borderColor: colors.stroke,
+    backgroundColor: colors.cardMuted,
     alignItems: 'center',
     justifyContent: 'center'
   },
   stepDotActive: {
-    borderColor: palette.teal,
-    backgroundColor: palette.tealLight
+    borderColor: colors.success,
+    backgroundColor: 'rgba(53,209,140,0.16)'
   },
   stepDotDone: {
     borderColor: '#60AF00',
@@ -2967,18 +3097,18 @@ const styles = StyleSheet.create({
   },
   stepText: {
     fontSize: 14,
-    color: palette.textMid
+    color: colors.textSecondary
   },
   stepTextActive: {
-    color: palette.textDark,
+    color: colors.white,
     fontFamily: 'Exo_600SemiBold'
   },
   findingCard: {
     width: '100%',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: '#FFFFFF',
+    borderColor: colors.stroke,
+    backgroundColor: colors.cardMuted,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 14
@@ -2986,13 +3116,13 @@ const styles = StyleSheet.create({
   findingTitle: {
     fontSize: 12,
     fontFamily: 'Exo_700Bold',
-    color: palette.textDark,
+    color: colors.white,
     marginBottom: 4
   },
   findingText: {
     fontSize: 12,
     lineHeight: 18,
-    color: palette.textMid
+    color: colors.textSecondary
   },
   processingTrack: {
     width: '100%',
@@ -3008,7 +3138,7 @@ const styles = StyleSheet.create({
   processingHint: {
     marginTop: 10,
     fontSize: 12,
-    color: palette.textLight
+    color: colors.textSecondary
   },
   processingCancelBtn: {
     marginTop: 14,
@@ -3016,15 +3146,15 @@ const styles = StyleSheet.create({
     minWidth: 108,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: colors.stroke,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.card
+    backgroundColor: colors.cardMuted
   },
   processingCancelText: {
     fontSize: 13,
     fontFamily: 'Exo_600SemiBold',
-    color: colors.textPrimary
+    color: colors.white
   },
   reviewBackdrop: {
     flex: 1,
