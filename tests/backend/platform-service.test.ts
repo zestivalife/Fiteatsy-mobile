@@ -9,6 +9,8 @@ import {
 } from '../../backend/src/modules/platform/platform.service.js';
 import { createReportRecord, updateReportStatus } from '../../backend/src/modules/reports/reports.store.js';
 import { resolveVerifiedAccountIdentity } from '../../backend/src/modules/auth/auth.repository.js';
+import { transitionCareCaseStage } from '../../backend/src/modules/platform/platform.lifecycle.js';
+import { listHealthEvents, listTimelineEvents } from '../../backend/src/modules/platform/platform.store.js';
 import { ClientOwnershipContext } from '../../backend/src/modules/platform/platform.types.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
 import { canonicalCompleteHealthProfile } from '../helpers/canonicalFixtures.js';
@@ -71,6 +73,35 @@ test('service layer syncs report pipeline milestones into care case timeline', a
   assert.ok(bundle);
   assert.equal(bundle?.careCase.currentStage, 'ready_for_consultant');
   assert.ok((bundle?.reportCount ?? 0) > 0);
+});
+
+test('report pipeline remains independent after a diet is published', async () => {
+  const owner = await createOwner('report-004');
+  const initial = await upsertHealthProfile(owner, canonicalCompleteHealthProfile());
+  await transitionCareCaseStage(initial.careCase, 'diet_published', 'Approved diet was published.');
+
+  const sync = await syncReportPipelineToPlatform(
+    owner,
+    'report-follow-up',
+    'uploaded',
+    'Follow-up blood report uploaded.'
+  );
+
+  assert.ok(sync);
+  const bundle = await getHealthProfileBundle(owner);
+  assert.equal(bundle?.careCase.currentStage, 'diet_published');
+  assert.equal(
+    (await listTimelineEvents(initial.careCase.id)).some(
+      (event) => event.kind === 'blood_report_uploaded' && event.metadata.reportId === 'report-follow-up'
+    ),
+    true
+  );
+  assert.equal(
+    (await listHealthEvents(initial.careCase.id)).some(
+      (event) => event.type === 'blood_report_uploaded' && event.payload.reportId === 'report-follow-up'
+    ),
+    true
+  );
 });
 
 test('service layer assigns consultant to care case', async () => {

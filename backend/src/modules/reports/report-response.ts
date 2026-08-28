@@ -6,6 +6,17 @@ const keyForBiomarker = (name: string) => canonicalBiomarkerName(name).toLowerCa
 const publicReviewReason = (name: string) =>
   `${name} needs review before it can be shown or used for health intelligence.`;
 
+const internalDomainErrorPatterns = [
+  /invalid care case transition/i,
+];
+
+export const sanitizeReportErrorForPublic = (error?: string | null) => {
+  if (!error) return error;
+  return internalDomainErrorPatterns.some((pattern) => pattern.test(error))
+    ? "We couldn't analyse this report. Please try again or choose another file."
+    : error;
+};
+
 export const sanitizeReportAnalysisForPublic = (analysis: ReportAnalysisResult): ReportAnalysisResult => {
   const rejectedBiomarkers = analysis.qualityGate.rejectedBiomarkers ?? [];
   const rejectedKeys = new Set(
