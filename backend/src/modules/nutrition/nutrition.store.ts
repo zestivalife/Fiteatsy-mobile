@@ -432,8 +432,7 @@ export const updateDietPlanVersionContent = async (input: {
         source_snapshot = $5::jsonb,
         lifecycle_status = coalesce($6, lifecycle_status),
         review_notes = $7,
-        updated_at = $8,
-        version = version + 1
+        updated_at = $8
       where id = $1
         and diet_plan_id = $2
         and deleted_at is null
@@ -567,8 +566,7 @@ export const updateDietPlanLifecycle = async (input: {
       update diet_plan_versions
       set
         lifecycle_status = $3,
-        updated_at = $4,
-        version = version + 1
+        updated_at = $4
       where id = $1
         and diet_plan_id = $2
         and deleted_at is null
@@ -605,8 +603,7 @@ export const publishApprovedDietPlanVersion = async (input: {
       `
         update diet_plan_versions
         set lifecycle_status = 'published',
-            updated_at = $3,
-            version = version + 1
+            updated_at = $3
         where id = $1
           and diet_plan_id = $2
           and lifecycle_status in ('approved', 'published')
@@ -680,8 +677,7 @@ export const updateDietPlanVersionExportPaths = async (input: {
       set
         exported_doc_path = coalesce($3, exported_doc_path),
         exported_pdf_path = coalesce($4, exported_pdf_path),
-        updated_at = $5,
-        version = version + 1
+        updated_at = $5
       where id = $1
         and diet_plan_id = $2
         and deleted_at is null
