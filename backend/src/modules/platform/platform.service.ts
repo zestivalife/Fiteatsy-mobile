@@ -16,7 +16,7 @@ import {
   updateCareCase,
 } from './platform.store.js';
 import { calculateAgeFromDob, calculateNutritionProfileCompletion } from './platform.calculations.js';
-import { createOperationalTicket, transitionCareCaseStage } from './platform.lifecycle.js';
+import { createOperationalTicket, transitionCareCaseStage, validateStageTransition } from './platform.lifecycle.js';
 import { CareCaseStage, ClientOwnershipContext, HealthProfileRecord } from './platform.types.js';
 
 const nowIso = () => new Date().toISOString();
@@ -226,7 +226,10 @@ export const syncReportPipelineToPlatform = async (
   );
 
   const nextStage = inferStage(nextBundle.profile, reportCount, recomputedNutrition.readinessScore);
-  if (nextBundle.careCase.currentStage !== nextStage) {
+  if (
+    nextBundle.careCase.currentStage !== nextStage &&
+    validateStageTransition(nextBundle.careCase.currentStage, nextStage)
+  ) {
     await transitionCareCaseStage(nextBundle.careCase, nextStage, `Report pipeline advanced to ${stage}.`);
   }
 

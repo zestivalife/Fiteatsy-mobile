@@ -4,6 +4,7 @@ import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { deleteRequest, getJson, patchJson, postJson } from '../helpers/http.js';
 import { buildLabReportPdf, buildMultipartReportForm } from '../helpers/reportFixtures.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
+import { pool } from '../../backend/src/db/pool.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
@@ -179,6 +180,67 @@ test('report comparison and reanalyze endpoints preserve the selected validated 
   );
   assert.equal(reanalyze.response.status, 200);
   assert.equal(reanalyze.body.reportId, secondBody.reportId);
+});
+
+test('published diet clients can upload, re-analyze, and retain multiple report-history records without care-stage regression', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  await pool.query(
+    `update care_cases
+        set current_stage = 'diet_published',
+            previous_stage = 'ai_draft_generated',
+            updated_at = now()
+      where user_id = $1`,
+    [session.current.body.accountId]
+  );
+
+  const first = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
+    method: 'POST',
+    headers: authHeaders(session.token),
+    body: buildMultipartReportForm({ reportName: 'published-client-first.pdf', reportDate: '14 Mar 2026' }),
+  });
+  const firstBody = await first.json();
+  assert.equal(first.status, 200);
+  assert.equal(firstBody.status, 'PARTIALLY_VALIDATED');
+
+  const afterFirst = await getJson(server.baseUrl, '/v1/platform/care-cases/current', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(afterFirst.response.status, 200);
+  assert.equal(afterFirst.body.currentStage, 'diet_published');
+
+  const reanalyzed = await postJson(
+    server.baseUrl,
+    `/v1/reports/${firstBody.reportId}/reanalyze`,
+    {},
+    { headers: authHeaders(session.token) }
+  );
+  assert.equal(reanalyzed.response.status, 200);
+  assert.equal(reanalyzed.body.reportId, firstBody.reportId);
+
+  const second = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
+    method: 'POST',
+    headers: authHeaders(session.token),
+    body: buildMultipartReportForm({ reportName: 'published-client-second.pdf', reportDate: '20 Apr 2026' }),
+  });
+  const secondBody = await second.json();
+  assert.equal(second.status, 200);
+  assert.notEqual(secondBody.reportId, firstBody.reportId);
+
+  const history = await getJson(server.baseUrl, '/v1/reports?limit=50', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(history.response.status, 200);
+  assert.equal(history.body.total, 2);
+  assert.deepEqual(
+    new Set(history.body.items.map((item: { id: string }) => item.id)),
+    new Set([firstBody.reportId, secondBody.reportId])
+  );
+
+  const afterSecond = await getJson(server.baseUrl, '/v1/platform/care-cases/current', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(afterSecond.response.status, 200);
+  assert.equal(afterSecond.body.currentStage, 'diet_published');
 });
 
 test('duplicate report upload reuses the existing publishable report', async () => {

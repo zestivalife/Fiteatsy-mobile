@@ -25,7 +25,7 @@ import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { createProcessingJob, updateProcessingJobStatus } from '../processing/processing-jobs.repository.js';
 import { persistReportIntelligence } from './report-intelligence.pipeline.js';
 import { documentHash } from './report-governance.js';
-import { sanitizeReportAnalysisForPublic } from './report-response.js';
+import { sanitizeReportAnalysisForPublic, sanitizeReportErrorForPublic } from './report-response.js';
 import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
 import { clearHealthScoresForOwner } from '../intelligence/health-scores.repository.js';
 import { buildReportComparison, sortAnalysableReports } from './report-comparison.js';
@@ -61,7 +61,7 @@ const toReportDto = (record: Awaited<ReturnType<typeof getReport>>) => {
     source: record.source,
     createdAtISO: record.createdAtISO,
     updatedAtISO: record.updatedAtISO,
-    error: record.error,
+    error: sanitizeReportErrorForPublic(record.error),
     analysisVersion: record.analysisVersion,
     document: analysis?.document,
     qualityGate: analysis?.qualityGate,
@@ -312,7 +312,7 @@ reportsRouter.get('/:reportId/status', async (req, res) => {
     reportId: report!.id,
     status: report!.status,
     updatedAtISO: report!.updatedAtISO,
-    error: report!.error,
+    error: sanitizeReportErrorForPublic(report!.error),
     document: analysis?.document,
     qualityGate: analysis?.qualityGate,
     healthAssessment: analysis?.healthAssessment,
@@ -534,7 +534,10 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
     logReportRuntime('reanalysis:failed', { reportId: report!.id, processingJobId: processingJob.id, message });
     await updateReportStatus(report!.id, 'REVIEW_REQUIRED', message);
     await updateProcessingJobStatus(processingJob.id, 'failed', message);
-    return res.status(422).json({ error: 'REANALYSIS_FAILED', message });
+    return res.status(422).json({
+      error: 'REANALYSIS_FAILED',
+      message: sanitizeReportErrorForPublic(message)
+    });
   }
 });
 
@@ -668,7 +671,7 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
     }
     return res.status(422).json({
       error: 'ANALYSIS_START_FAILED',
-      message
+      message: sanitizeReportErrorForPublic(message)
     });
   }
 });
@@ -765,7 +768,7 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
     }
     return res.status(422).json({
       error: 'ANALYSIS_FAILED',
-      message
+      message: sanitizeReportErrorForPublic(message)
     });
   }
 });

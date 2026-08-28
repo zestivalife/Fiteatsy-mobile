@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { analyzeReportBuffer } from '../../backend/src/modules/reports/reports.service.js';
-import { sanitizeReportAnalysisForPublic } from '../../backend/src/modules/reports/report-response.js';
+import {
+  sanitizeReportAnalysisForPublic,
+  sanitizeReportErrorForPublic
+} from '../../backend/src/modules/reports/report-response.js';
 import { buildLabReportPdf } from '../helpers/reportFixtures.js';
 import { reportExtractionEvaluationCases } from '../evaluation/report-extraction.dataset.js';
 
@@ -43,4 +46,12 @@ test('public report responses keep needs-review biomarkers visible but hide inva
   assert.equal(publicAnalysis.qualityGate.evidenceTraceability.some((item) => item.validation_status === 'NEEDS_REVIEW'), true);
   assert.equal(JSON.stringify(publicAnalysis).includes('HbA1c value 1 c'), false);
   assert.equal(JSON.stringify(publicAnalysis).includes('ALT value 1 in'), false);
+});
+
+test('public report responses do not expose internal care-case transition diagnostics', () => {
+  assert.equal(
+    sanitizeReportErrorForPublic('Invalid care case transition from diet_published to blood_report_pending'),
+    "We couldn't analyse this report. Please try again or choose another file."
+  );
+  assert.equal(sanitizeReportErrorForPublic('The uploaded document is unreadable.'), 'The uploaded document is unreadable.');
 });
