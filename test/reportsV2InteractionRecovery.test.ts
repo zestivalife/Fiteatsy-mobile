@@ -6,7 +6,7 @@ jest.mock('../src/services/apiClient', () => ({
   buildAuthorizationHeaders: () => ({ Authorization: 'Bearer test' })
 }));
 
-import { statusToReportProgress } from '../src/services/reportUploadService';
+import { statusToReportPresentation } from '../src/services/reportUploadService';
 
 const screenSource = fs.readFileSync(
   path.join(process.cwd(), 'src/screens/home/ReportsScreen.tsx'),
@@ -30,17 +30,38 @@ describe('Reports V2 interaction recovery contract', () => {
   it('reconciles a non-terminal backend job after navigation or restart', () => {
     expect(screenSource).toContain("setProcessingIntent('resume')");
     expect(screenSource).toContain('waitForReportAnalysis({');
-    expect(screenSource).toContain('Live status: {processingStatus}');
+    expect(screenSource).toContain('processingStatus ? <Text style={styles.processingStatusText}>Status: {processingStatus}</Text> : null');
+    expect(screenSource).not.toContain('failSafeTimeout');
+    expect(screenSource).not.toContain('Analysis is taking too long');
+    expect(screenSource).toContain("pollError.message !== 'REQUEST_TIMEOUT'");
   });
 
   it.each([
-    ['UPLOADED', 'uploaded', 30],
-    ['PROCESSING', 'processing', 45],
-    ['EXTRACTION_COMPLETED', 'extraction', 74],
-    ['VALIDATION_COMPLETED', 'validation', 88],
-    ['PUBLISHED', 'completed', 100],
-    ['FAILED', 'failed', 100]
-  ] as const)('maps %s from backend state without a timer-driven status', (status, stage, percent) => {
-    expect(statusToReportProgress(status)).toMatchObject({ stage, percent });
+    ['UPLOADED', 'uploaded', 'Report uploaded'],
+    ['PROCESSING', 'processing', 'Analysing your report'],
+    ['DOCUMENT_ANALYSIS_COMPLETED', 'processing', 'Reading complete'],
+    ['EXTRACTION_COMPLETED', 'extraction', 'Health markers extracted'],
+    ['VALIDATION_PENDING', 'validation', 'Validating results'],
+    ['VALIDATION_COMPLETED', 'validation', 'Results validated'],
+    ['PRIORITIZATION_COMPLETED', 'validation', 'Preparing insights'],
+    ['SCORE_GENERATED', 'validation', 'Finalising health insights'],
+    ['PUBLISHED', 'completed', 'Report analysis completed.'],
+    ['FAILED', 'failed', 'Processing failed because the backend could not complete analysis.'],
+    ['FUTURE_BACKEND_STATUS', 'processing', 'Analysing your report']
+  ] as const)('maps %s to truthful backend-derived presentation', (status, stage, message) => {
+    const presentation = statusToReportPresentation(status);
+    expect(presentation).toMatchObject({ stage, message });
+    expect(presentation).not.toHaveProperty('percent');
+  });
+
+  it('does not render fabricated percentages, stage checklists, or time estimates', () => {
+    expect(screenSource).not.toContain('% complete');
+    expect(screenSource).not.toContain('processingPercent');
+    expect(screenSource).not.toContain('processingStep');
+    expect(screenSource).not.toContain('preparingProgress');
+    expect(screenSource).not.toContain('stepText.map');
+    expect(screenSource).not.toContain('~2 min');
+    expect(screenSource).not.toContain('15–45 seconds');
+    expect(screenSource).toContain('Analysis time can vary depending on the report.');
   });
 });
