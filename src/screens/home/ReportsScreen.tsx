@@ -1035,11 +1035,30 @@ export const ReportsScreen = () => {
     <Screen scroll contentStyle={[styles.screenContent, !isLight && styles.screenContentDark]}>
       <View style={styles.header}>
         <AppBackButton onPress={() => navigation.goBack()} iconOnly style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]} />
-        <Text style={[styles.headerTitle, !isLight && styles.headerTitleDark]}>My Health</Text>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.headerTitle, !isLight && styles.headerTitleDark]}>My Health</Text>
+          <Text style={[styles.headerSubtitle, !isLight && styles.headerSubtitleDark]}>REPORTS &amp; INTELLIGENCE</Text>
+        </View>
         <Pressable style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]} onPress={() => setShowUploadSheet(true)}>
           <Ionicons name="cloud-upload-outline" size={18} color={isLight ? palette.teal : sectionHighlight} />
         </Pressable>
       </View>
+
+      <Card style={[styles.profileSummaryCard, !isLight && styles.profileSummaryCardDark]}>
+        <View style={styles.profileSummaryTopRow}>
+          <Text style={[styles.profileSummaryTitle, !isLight && styles.profileSummaryTitleDark]}>Health Profile</Text>
+          <Text style={styles.profileSummaryPercent}>{profileCompletion.completionPercent}%</Text>
+        </View>
+        <View style={styles.profileSummaryBottomRow}>
+          <View style={[styles.profileSummaryTrack, !isLight && styles.profileSummaryTrackDark]}>
+            <View style={[styles.profileSummaryFill, { width: `${profileCompletion.completionPercent}%` as any }]} />
+          </View>
+          <Text style={styles.profileSummaryAction}>Complete →</Text>
+        </View>
+        <Text numberOfLines={1} style={[styles.profileSummaryMissing, !isLight && styles.profileSummaryMissingDark]}>
+          {topMissingProfileFields.length} details remaining · {topMissingProfileFields.join(' · ') || 'Profile ready'}
+        </Text>
+      </Card>
 
       {latestReport ? (
         <Card style={[styles.heroCard, !isLight && styles.heroCardDark, heroExpanded && styles.heroCardInteractive]}>
@@ -1113,43 +1132,28 @@ export const ReportsScreen = () => {
           <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>Checking your completed health reports and biomarkers...</Text>
         </Card>
       ) : (
-        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
-          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>
-            {profileCompletion.completionPercent < 80 ? 'Complete your health profile' : 'Your health baseline is ready'}
+        <Card style={[styles.noReportCard, !isLight && styles.noReportCardDark]}>
+          <View style={styles.noReportIconWrap}>
+            <Ionicons name="document-text-outline" size={28} color={sectionHighlight} />
+          </View>
+          <Text style={[styles.noReportTitle, !isLight && styles.noReportTitleDark]}>Understand your health report</Text>
+          <Text style={[styles.noReportCopy, !isLight && styles.noReportCopyDark]}>
+            Upload your blood or diagnostic report and Fiteatsy will organise your biomarkers, highlight important changes and help you understand what deserves attention.
           </Text>
-          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
-            {profileCompletion.completionPercent < 80
-              ? 'Complete your basics, body metrics, activity level, and health goal so Fiteatsy can calculate safer targets while you prepare your first report.'
-              : 'Upload a blood report to unlock biomarker analysis, risk indicators, trend comparison, and your AI health summary. No demo biomarkers are shown here.'}
-          </Text>
-          {profileCompletion.completionPercent < 80 ? (
-            <View style={styles.profilePromptBox}>
-              <Text style={[styles.profilePromptTitle, !isLight && styles.profilePromptTitleDark]}>
-                Profile completion · {profileCompletion.completionPercent}%
-              </Text>
-              <View style={[styles.profilePromptTrack, !isLight && styles.profilePromptTrackDark]}>
-                <View style={[styles.profilePromptFill, { width: `${profileCompletion.completionPercent}%` as any }]} />
-              </View>
-              <Text style={[styles.profilePromptMissing, !isLight && styles.profilePromptMissingDark]}>
-                Missing: {topMissingProfileFields.join(' · ') || 'No critical profile gaps'}
-              </Text>
-              <Text style={[styles.profilePromptHint, !isLight && styles.profilePromptHintDark]}>
-                Open Home → Health Profile to complete now, or connect health data to enrich recovery intelligence.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.profilePromptBox}>
-              <Text style={[styles.profilePromptTitle, !isLight && styles.profilePromptTitleDark]}>
-                Upload your first report to unlock
-              </Text>
-              <Text style={[styles.profilePromptMissing, !isLight && styles.profilePromptMissingDark]}>
-                Biomarker analysis · Risk indicators · AI health summary
-              </Text>
-              <Text style={[styles.profilePromptHint, !isLight && styles.profilePromptHintDark]}>
-                This screen stays empty until your own reports, wearable data, or profile inputs create real health intelligence.
-              </Text>
-            </View>
-          )}
+          <Pressable accessibilityRole="button" style={styles.noReportUploadButton} onPress={() => setShowUploadSheet(true)}>
+            <Text style={styles.noReportUploadText}>Upload Health Report</Text>
+          </Pressable>
+          <View style={styles.noReportMetaRow}>
+            <Ionicons name="lock-closed-outline" size={13} color={colors.textMuted} />
+            <Text style={[styles.noReportMetaText, !isLight && styles.noReportCopyDark]}>PDF supported · Securely encrypted</Text>
+          </View>
+          <Text style={styles.noReportLearnMore}>How report analysis works →</Text>
+          <View style={[styles.noReportTrustRow, !isLight && styles.noReportTrustRowDark]}>
+            <Ionicons name="shield-checkmark-outline" size={15} color={colors.textMuted} />
+            <Text style={[styles.noReportTrustText, !isLight && styles.noReportCopyDark]}>
+              Your health reports are securely stored and only shared with authorised care professionals.
+            </Text>
+          </View>
           {reportsLoadError ? (
             <View>
               <Text style={styles.uploadErrorText}>History sync: {reportsLoadError}</Text>
@@ -1326,7 +1330,7 @@ export const ReportsScreen = () => {
         </>
       ) : null}
 
-      <View style={styles.sectionHead}>
+      {reports.length > 0 ? <View style={styles.sectionHead}>
         <Text style={[styles.sectionTitle, !isLight && styles.sectionTitleDark]}>Report History</Text>
         <View style={styles.historyActions}>
           {reports.length > 0 ? (
@@ -1344,7 +1348,7 @@ export const ReportsScreen = () => {
             <Text style={styles.countChipText}>{showHistory ? 'Hide history' : `View history (${reportCountLabel})`}</Text>
           </Pressable>
         </View>
-      </View>
+      </View> : null}
 
       {showHistory ? (
         <View style={styles.reportList}>
@@ -1742,6 +1746,174 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: 'Exo_600SemiBold',
     color: palette.textDark
+  },
+  headerCopy: {
+    alignItems: 'center'
+  },
+  headerSubtitle: {
+    marginTop: 3,
+    fontSize: 9,
+    letterSpacing: 2,
+    fontFamily: 'Exo_500Medium',
+    color: palette.textLight
+  },
+  profileSummaryCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    marginBottom: 12,
+    padding: 14
+  },
+  profileSummaryCardDark: {
+    borderColor: colors.stroke,
+    backgroundColor: '#151515'
+  },
+  profileSummaryTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  profileSummaryTitle: {
+    fontSize: 14,
+    fontFamily: 'Exo_700Bold',
+    color: palette.textDark
+  },
+  profileSummaryTitleDark: {
+    color: colors.white
+  },
+  profileSummaryPercent: {
+    fontSize: 14,
+    fontFamily: 'Exo_700Bold',
+    color: colors.success
+  },
+  profileSummaryBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 10
+  },
+  profileSummaryTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: '#E5EAF0'
+  },
+  profileSummaryTrackDark: {
+    backgroundColor: '#2A2A2A'
+  },
+  profileSummaryFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: colors.success
+  },
+  profileSummaryAction: {
+    fontSize: 12,
+    fontFamily: 'Exo_600SemiBold',
+    color: colors.success
+  },
+  profileSummaryMissing: {
+    marginTop: 8,
+    fontSize: 11,
+    color: palette.textLight
+  },
+  profileSummaryMissingDark: {
+    color: colors.textMuted
+  },
+  noReportCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    marginBottom: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    alignItems: 'center'
+  },
+  noReportCardDark: {
+    borderColor: colors.stroke,
+    backgroundColor: '#101010'
+  },
+  noReportIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(53, 209, 140, 0.10)'
+  },
+  noReportTitle: {
+    marginTop: 18,
+    maxWidth: 260,
+    textAlign: 'center',
+    fontSize: 22,
+    lineHeight: 28,
+    fontFamily: 'Exo_700Bold',
+    color: palette.textDark
+  },
+  noReportTitleDark: {
+    color: colors.white
+  },
+  noReportCopy: {
+    marginTop: 12,
+    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 22,
+    color: palette.textLight
+  },
+  noReportCopyDark: {
+    color: colors.textMuted
+  },
+  noReportUploadButton: {
+    width: '100%',
+    minHeight: 52,
+    marginTop: 22,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.success
+  },
+  noReportUploadText: {
+    fontSize: 15,
+    fontFamily: 'Exo_700Bold',
+    color: '#071009'
+  },
+  noReportMetaRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7
+  },
+  noReportMetaText: {
+    fontSize: 11,
+    color: palette.textLight
+  },
+  noReportLearnMore: {
+    marginTop: 16,
+    fontSize: 13,
+    fontFamily: 'Exo_600SemiBold',
+    color: colors.success,
+    textDecorationLine: 'underline'
+  },
+  noReportTrustRow: {
+    width: '100%',
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9
+  },
+  noReportTrustRowDark: {
+    borderTopColor: colors.stroke
+  },
+  noReportTrustText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 17,
+    color: palette.textLight
   },
   heroCard: {
     borderRadius: 16,
@@ -2968,6 +3140,9 @@ const styles = StyleSheet.create({
   },
   headerTitleDark: {
     color: colors.white
+  },
+  headerSubtitleDark: {
+    color: colors.textMuted
   },
   heroCardDark: {
     backgroundColor: colors.cardMuted,
