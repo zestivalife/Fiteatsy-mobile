@@ -325,11 +325,9 @@ export const ReportsScreen = () => {
   const [sortMode, setSortMode] = useState<'latest' | 'oldest' | 'lab' | 'type'>('latest');
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [showProcessing, setShowProcessing] = useState(false);
-  const [processingStep, setProcessingStep] = useState(0);
   const [processingPhase, setProcessingPhase] = useState<ProcessingPhase>('uploading');
-  const [processingPercent, setProcessingPercent] = useState(0);
   const [processingMessage, setProcessingMessage] = useState('Uploading Report');
-  const [processingStatus, setProcessingStatus] = useState('UPLOADED');
+  const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [processingIntent, setProcessingIntent] = useState<'upload' | 'reanalysis' | 'resume' | null>(null);
   const [pendingReportId, setPendingReportId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -355,7 +353,6 @@ export const ReportsScreen = () => {
   const [reanalysisReportId, setReanalysisReportId] = useState<string | null>(null);
   const [reanalysisBusy, setReanalysisBusy] = useState(false);
   const [showUploadPreparing, setShowUploadPreparing] = useState(false);
-  const [preparingProgress, setPreparingProgress] = useState(0);
   const [analysisLaunching, setAnalysisLaunching] = useState(false);
   const [lastPickSource, setLastPickSource] = useState<'camera' | 'gallery' | 'pdf' | null>(null);
   const [analysisReview, setAnalysisReview] = useState<AnalysisReviewState | null>(null);
@@ -571,14 +568,13 @@ export const ReportsScreen = () => {
     setProcessingIntent('resume');
     setProcessingPhase('processing');
     setProcessingMessage('Restoring report analysis...');
-    setProcessingStatus('PROCESSING');
+    setProcessingStatus(null);
     setShowProcessing(true);
     waitForReportAnalysis({
       reportId: pendingReportId,
       signal: controller.signal,
       onProgress: (event) => {
         setProcessingPhase(event.stage);
-        setProcessingPercent(event.percent);
         setProcessingMessage(event.message);
         setProcessingStatus(event.status ?? event.stage.toUpperCase());
       }
@@ -638,24 +634,13 @@ export const ReportsScreen = () => {
     setUploadBusy(true);
     setLastPickSource(source);
     setUploadType(source);
-    let progressTimer: ReturnType<typeof setInterval> | null = null;
     const startPreparing = () => {
-      setPreparingProgress(0);
       setShowUploadPreparing(true);
-      progressTimer = setInterval(() => {
-        setPreparingProgress((prev) => {
-          if (prev >= 92) return prev;
-          return prev + 8;
-        });
-      }, 120);
     };
     const finishPreparing = () => {
-      setPreparingProgress(100);
-      if (progressTimer) clearInterval(progressTimer);
       setTimeout(() => setShowUploadPreparing(false), 180);
     };
     const stopPreparingWithError = () => {
-      if (progressTimer) clearInterval(progressTimer);
       setShowUploadPreparing(false);
     };
 
@@ -766,9 +751,8 @@ export const ReportsScreen = () => {
     setUploadType(selectedUpload.source);
     setAnalysisLaunching(true);
     setProcessingPhase('uploading');
-    setProcessingPercent(8);
     setProcessingMessage('Uploading Report');
-    setProcessingStatus('UPLOADED');
+    setProcessingStatus(null);
     setProcessingIntent('upload');
     setShowUploadSheet(false);
     setShowProcessing(true);
@@ -881,70 +865,58 @@ export const ReportsScreen = () => {
       return;
     }
 
-    setProcessingStep(0);
     setProcessingPhase('uploading');
-    setProcessingPercent(8);
     setProcessingMessage('Uploading Report');
-    setProcessingStatus('UPLOADED');
+    setProcessingStatus(null);
     let cancelled = false;
     const controller = new AbortController();
     activeUploadController.current = controller;
-    const failSafeTimeout = setTimeout(() => {
-      if (cancelled) return;
-      controller.abort();
-      setProcessingPhase('failed');
-      setProcessingMessage('Processing failed. Analysis is taking too long.');
-      setShowProcessing(false);
-      setAnalysisLaunching(false);
-      setShowUploadSheet(true);
-      setUploadError('Analysis is taking too long. Please retry. If issue continues, restart backend and app.');
-    }, 125000);
 
     const execute = async () => {
       try {
         if (!selectedUpload) throw new Error('No report file selected.');
-        const analysis: ReportAnalysisResponse = await uploadAndAnalyzeReport({
-          fileUri: selectedUpload.uri,
-          fileName: selectedUpload.name,
-          mimeType: selectedUpload.mimeType,
-          source: selectedUpload.source,
-          reportDate,
-          labName,
-          signal: controller.signal,
-          onProgress: (event) => {
-            if (cancelled) return;
-            if (event.reportId) {
-              setReanalysisReportId(event.reportId);
-            }
-            setProcessingPhase(event.stage);
-            setProcessingPercent(event.percent);
-            setProcessingMessage(event.message);
-            setProcessingStatus(event.status ?? event.stage.toUpperCase());
-            const statusStep: Record<string, number> = {
-              UPLOADED: 0,
-              PROCESSING: 1,
-              DOCUMENT_ANALYSIS_COMPLETED: 2,
-              EXTRACTION_COMPLETED: 3,
-              VALIDATION_PENDING: 4,
-              VALIDATION_COMPLETED: 4,
-              PRIORITIZATION_COMPLETED: 5,
-              SCORE_GENERATED: 6,
-              PUBLISHED: 6,
-              PARTIALLY_VALIDATED: 6
-            };
-            const nextStep = statusStep[event.status ?? ''] ?? (event.stage === 'failed' ? 4 : 1);
-            setProcessingStep(nextStep);
+        let activeReportId: string | null = null;
+        const onProgress: NonNullable<Parameters<typeof uploadAndAnalyzeReport>[0]['onProgress']> = (event) => {
+          if (cancelled) return;
+          if (event.reportId) {
+            activeReportId = event.reportId;
+            setReanalysisReportId(event.reportId);
           }
-        });
+          setProcessingPhase(event.stage);
+          setProcessingMessage(event.message);
+          setProcessingStatus(event.status ?? event.stage.toUpperCase());
+        };
+        let analysis: ReportAnalysisResponse | null = null;
+        try {
+          analysis = await uploadAndAnalyzeReport({
+            fileUri: selectedUpload.uri,
+            fileName: selectedUpload.name,
+            mimeType: selectedUpload.mimeType,
+            source: selectedUpload.source,
+            reportDate,
+            labName,
+            signal: controller.signal,
+            onProgress
+          });
+        } catch (error) {
+          if (!(error instanceof Error) || error.message !== 'REQUEST_TIMEOUT' || !activeReportId) throw error;
+          while (!controller.signal.aborted) {
+            try {
+              analysis = await waitForReportAnalysis({ reportId: activeReportId, signal: controller.signal, onProgress });
+              break;
+            } catch (pollError) {
+              if (!(pollError instanceof Error) || pollError.message !== 'REQUEST_TIMEOUT') throw pollError;
+            }
+          }
+          if (!analysis) throw new Error('REQUEST_CANCELLED');
+        }
 
         if (cancelled) return;
         setProcessingPhase('completed');
-        setProcessingPercent(100);
         setProcessingMessage(
           analysis.status === 'PARTIALLY_VALIDATED' ? 'Report analysed. Some biomarkers need review.' : 'Report analysis completed.'
         );
         setProcessingStatus(analysis.status === 'PARTIALLY_VALIDATED' ? 'PARTIALLY_VALIDATED' : 'PUBLISHED');
-        setProcessingStep(6);
         setReportDate(analysis.reportDate);
         setLabName(analysis.labName);
 
@@ -987,7 +959,6 @@ export const ReportsScreen = () => {
         setUploadError(`Some information could not be confidently analysed. ${detail}`);
       } finally {
         activeUploadController.current = null;
-        clearTimeout(failSafeTimeout);
       }
     };
     execute();
@@ -998,7 +969,6 @@ export const ReportsScreen = () => {
       if (activeUploadController.current === controller) {
         activeUploadController.current = null;
       }
-      clearTimeout(failSafeTimeout);
     };
   }, [showProcessing, processingIntent]);
 
@@ -1010,11 +980,9 @@ export const ReportsScreen = () => {
       setReanalysisBusy(true);
       setUploadError(null);
       setProcessingPhase('processing');
-      setProcessingPercent(45);
       setProcessingMessage('Re-analysing report with document intelligence...');
-      setProcessingStatus('REANALYSIS');
+      setProcessingStatus(null);
       setProcessingIntent('reanalysis');
-      setProcessingStep(2);
       setShowUploadSheet(false);
       setShowProcessing(true);
       let analysis: ReportAnalysisResponse;
@@ -1027,19 +995,16 @@ export const ReportsScreen = () => {
           signal: controller.signal,
           onProgress: (event) => {
             setProcessingPhase(event.stage);
-            setProcessingPercent(event.percent);
             setProcessingMessage(event.message);
             setProcessingStatus(event.status ?? event.stage.toUpperCase());
           }
         });
       }
       setProcessingPhase('completed');
-      setProcessingPercent(100);
       setProcessingMessage(
         analysis.status === 'PARTIALLY_VALIDATED' ? 'Report re-analysed. Some biomarkers need review.' : 'Report analysis completed.'
       );
       setProcessingStatus(analysis.status === 'PARTIALLY_VALIDATED' ? 'PARTIALLY_VALIDATED' : 'PUBLISHED');
-      setProcessingStep(6);
 
       const previous = reports.find((report) => report.id !== analysis.reportId) ?? reports[0] ?? null;
       const newReport = toReportItem(analysis, { id: analysis.reportId, source: selectedUpload?.source });
@@ -1099,15 +1064,6 @@ export const ReportsScreen = () => {
   });
 
   const reportCountLabel = `${reports.length}`;
-  const stepText = [
-    'Uploading report',
-    'Reading document',
-    'Detecting report structure',
-    'Scanning pages and extracting health parameters',
-    'Validating extracted values',
-    'Checking health markers',
-    'Generating health assessment'
-  ];
 
   return (
     <Screen scroll contentStyle={[styles.screenContent, !isLight && styles.screenContentDark]}>
@@ -1678,40 +1634,12 @@ export const ReportsScreen = () => {
               )}
             </View>
             <Text style={styles.processingTitle}>{processingMessage}</Text>
-            <Text style={styles.processingStatusText}>
-              Status: {processingStatus}
+            <Text style={styles.processingFileName}>
+              {selectedUpload?.name ?? reports.find((report) => report.id === pendingReportId)?.labName ?? 'Health report'}
             </Text>
+            {processingStatus ? <Text style={styles.processingStatusText}>Status: {processingStatus}</Text> : null}
 
-            <View style={styles.processingSteps}>
-              {stepText.map((step, index) => {
-                const done = processingStep > index;
-                const active = processingStep === index;
-                return (
-                  <View key={step} style={styles.stepRow}>
-                    <View style={[styles.stepDot, done && styles.stepDotDone, active && styles.stepDotActive]}>
-                      {done ? <Ionicons name="checkmark" size={12} color={colors.white} /> : null}
-                    </View>
-                    <Text style={[styles.stepText, active && styles.stepTextActive]}>
-                      {step} {done ? 'Done' : ''}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-
-            {processingPhase === 'extraction' || processingPhase === 'validation' || processingPhase === 'completed' ? (
-              <View style={styles.findingCard}>
-                <Text style={styles.findingTitle}>Extraction checks</Text>
-                {['Reading visible report rows', 'Mapping original names to biomarkers', 'Validating values, units, and ranges'].map((item) => (
-                  <Text key={item} style={styles.findingText}>• {item}</Text>
-                ))}
-              </View>
-            ) : null}
-
-            <View style={styles.processingTrack}>
-              <View style={[styles.processingFill, { width: `${processingPercent}%` }]} />
-            </View>
-            <Text style={styles.processingHint}>{processingPercent}% complete · Live status: {processingStatus}</Text>
+            <Text style={styles.processingHint}>Analysis time can vary depending on the report.</Text>
             <ActivityIndicator color={colors.success} style={{ marginTop: 8 }} />
             <Pressable
               style={styles.processingCancelBtn}
@@ -1737,11 +1665,8 @@ export const ReportsScreen = () => {
               <Ionicons name="cloud-upload-outline" size={34} color={colors.white} />
             </View>
             <Text style={styles.processingTitle}>Preparing Report Upload</Text>
-            <Text style={styles.processingHint}>Optimizing and validating file...</Text>
-            <View style={styles.processingTrack}>
-              <View style={[styles.processingFill, { width: `${preparingProgress}%` }]} />
-            </View>
-            <Text style={styles.processingHint}>{preparingProgress}% complete</Text>
+            <Text style={styles.processingHint}>Preparing your report for upload.</Text>
+            <ActivityIndicator color={colors.success} style={{ marginTop: 12 }} />
           </View>
         </View>
       </Modal>
@@ -2895,73 +2820,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Exo_600SemiBold',
     letterSpacing: 0.3
   },
-  processingSteps: {
-    width: '100%',
-    marginBottom: 14,
-    gap: 8
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  stepDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    backgroundColor: colors.cardMuted,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  stepDotActive: {
-    borderColor: colors.success,
-    backgroundColor: 'rgba(53,209,140,0.16)'
-  },
-  stepDotDone: {
-    borderColor: '#60AF00',
-    backgroundColor: '#60AF00'
-  },
-  stepText: {
-    fontSize: 14,
-    color: colors.textSecondary
-  },
-  stepTextActive: {
-    color: colors.white,
-    fontFamily: 'Exo_600SemiBold'
-  },
-  findingCard: {
-    width: '100%',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.stroke,
-    backgroundColor: colors.cardMuted,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 14
-  },
-  findingTitle: {
-    fontSize: 12,
-    fontFamily: 'Exo_700Bold',
-    color: colors.white,
-    marginBottom: 4
-  },
-  findingText: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.textSecondary
-  },
-  processingTrack: {
-    width: '100%',
-    height: 4,
-    borderRadius: 8,
-    backgroundColor: '#2A2A2A',
-    overflow: 'hidden'
-  },
-  processingFill: {
-    height: '100%',
-    backgroundColor: palette.teal
+  processingFileName: {
+    marginTop: 6,
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center'
   },
   processingHint: {
     marginTop: 10,

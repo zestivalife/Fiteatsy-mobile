@@ -164,7 +164,7 @@ export type ReportComparisonProjection = {
 };
 
 type UploadProgressStage = 'uploading' | 'uploaded' | 'processing' | 'extraction' | 'validation' | 'completed' | 'failed';
-type UploadProgressEvent = { stage: UploadProgressStage; percent: number; message: string; status?: string; reportId?: string };
+type UploadProgressEvent = { stage: UploadProgressStage; message: string; status?: string; reportId?: string };
 
 const REQUEST_TIMEOUT_MS = 30000;
 const STATUS_REQUEST_TIMEOUT_MS = 20000;
@@ -254,45 +254,44 @@ const requestJson = async <T>(baseUrl: string, path: string, options?: RequestIn
   }
 };
 
-export const statusToReportProgress = (status: string): { stage: UploadProgressStage; percent: number; message: string; step: string } => {
+export const statusToReportPresentation = (status: string): { stage: UploadProgressStage; message: string; step: string } => {
   switch (status) {
     case 'UPLOADED':
-      return { stage: 'uploaded', percent: 30, message: 'Uploading report...', step: 'UPLOADED' };
+      return { stage: 'uploaded', message: 'Report uploaded', step: 'UPLOADED' };
     case 'PROCESSING':
-      return { stage: 'processing', percent: 45, message: 'Reading document...', step: 'PROCESSING' };
+      return { stage: 'processing', message: 'Analysing your report', step: 'PROCESSING' };
     case 'DOCUMENT_ANALYSIS_COMPLETED':
-      return { stage: 'processing', percent: 58, message: 'Understanding pages and report structure...', step: 'DOCUMENT_ANALYSIS_COMPLETED' };
+      return { stage: 'processing', message: 'Reading complete', step: 'DOCUMENT_ANALYSIS_COMPLETED' };
     case 'EXTRACTION_COMPLETED':
     case 'EXTRACTED':
-      return { stage: 'extraction', percent: 74, message: 'Extracting health parameters...', step: 'EXTRACTION_COMPLETED' };
+      return { stage: 'extraction', message: 'Health markers extracted', step: 'EXTRACTION_COMPLETED' };
     case 'VALIDATION_PENDING':
-      return { stage: 'validation', percent: 84, message: 'Validating extracted values...', step: 'VALIDATION_PENDING' };
+      return { stage: 'validation', message: 'Validating results', step: 'VALIDATION_PENDING' };
     case 'VALIDATION_COMPLETED':
     case 'VALIDATED':
-      return { stage: 'validation', percent: 88, message: 'Validating extracted values...', step: 'VALIDATION_COMPLETED' };
+      return { stage: 'validation', message: 'Results validated', step: 'VALIDATION_COMPLETED' };
     case 'PRIORITIZATION_COMPLETED':
     case 'PRIORITIZED':
-      return { stage: 'validation', percent: 94, message: 'Calculating health impact...', step: 'PRIORITIZATION_COMPLETED' };
+      return { stage: 'validation', message: 'Preparing insights', step: 'PRIORITIZATION_COMPLETED' };
     case 'SCORE_GENERATED':
     case 'SCORED':
-      return { stage: 'validation', percent: 98, message: 'Generating intelligence...', step: 'SCORE_GENERATED' };
+      return { stage: 'validation', message: 'Finalising health insights', step: 'SCORE_GENERATED' };
     case 'COMPLETED':
     case 'PUBLISHED':
     case 'PARTIALLY_VALIDATED':
       return {
         stage: 'completed',
-        percent: 100,
         message: status === 'PARTIALLY_VALIDATED' ? 'Report analysed. Some biomarkers need review.' : 'Report analysis completed.',
         step: status === 'PARTIALLY_VALIDATED' ? 'PARTIALLY_VALIDATED' : 'PUBLISHED'
       };
     case 'REVIEW_REQUIRED':
-      return { stage: 'failed', percent: 100, message: 'Manual review is required before results can be shown.', step: 'REVIEW_REQUIRED' };
+      return { stage: 'failed', message: 'Manual review is required before results can be shown.', step: 'REVIEW_REQUIRED' };
     case 'INSUFFICIENT_DATA':
-      return { stage: 'failed', percent: 100, message: 'Insufficient report data. Replace with a clearer or complete report.', step: 'INSUFFICIENT_DATA' };
+      return { stage: 'failed', message: 'Insufficient report data. Replace with a clearer or complete report.', step: 'INSUFFICIENT_DATA' };
     case 'FAILED':
-      return { stage: 'failed', percent: 100, message: 'Processing failed because the backend could not complete analysis.', step: 'FAILED' };
+      return { stage: 'failed', message: 'Processing failed because the backend could not complete analysis.', step: 'FAILED' };
     default:
-      return { stage: 'processing', percent: 45, message: 'Processing health information...', step: status };
+      return { stage: 'processing', message: 'Analysing your report', step: status };
   }
 };
 
@@ -321,10 +320,9 @@ export const waitForReportAnalysis = async (params: {
       `/v1/reports/${encodeURIComponent(params.reportId)}/status`,
       { signal: params.signal }
     );
-    const progress = statusToReportProgress(statusPayload.status);
+    const progress = statusToReportPresentation(statusPayload.status);
     params.onProgress?.({
       stage: progress.stage,
-      percent: progress.percent,
       message: statusPayload.error ? `${progress.message} ${statusPayload.error}` : progress.message,
       status: progress.step,
       reportId: statusPayload.reportId
@@ -452,7 +450,7 @@ export const uploadAndAnalyzeReport = async (params: {
     const abortFromCaller = () => controller.abort();
     params.signal?.addEventListener('abort', abortFromCaller, { once: true });
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    params.onProgress?.({ stage: 'uploading', percent: 12, message: 'Uploading Report', status: 'UPLOADING' });
+    params.onProgress?.({ stage: 'uploading', message: 'Uploading report', status: 'UPLOADING' });
     try {
       const authHeaders = buildAuthorizationHeaders();
       logReportDebug('upload:request', {
@@ -487,7 +485,6 @@ export const uploadAndAnalyzeReport = async (params: {
 
       params.onProgress?.({
         stage: 'uploaded',
-        percent: 35,
         message: startPayload.message ?? 'Report uploaded successfully. Processing health information...',
         status: startPayload.status ?? 'UPLOADED',
         reportId: startPayload.reportId
@@ -501,7 +498,7 @@ export const uploadAndAnalyzeReport = async (params: {
           `/v1/reports/${encodeURIComponent(startPayload.reportId)}/status`,
           { signal: params.signal }
         );
-        const progress = statusToReportProgress(statusPayload.status);
+        const progress = statusToReportPresentation(statusPayload.status);
         logReportDebug('poll:status', {
           baseUrl,
           reportId: statusPayload.reportId,
@@ -510,7 +507,6 @@ export const uploadAndAnalyzeReport = async (params: {
         });
         params.onProgress?.({
           stage: progress.stage,
-          percent: progress.percent,
           message: statusPayload.error ? `${progress.message} ${statusPayload.error}` : progress.message,
           status: progress.step,
           reportId: statusPayload.reportId
