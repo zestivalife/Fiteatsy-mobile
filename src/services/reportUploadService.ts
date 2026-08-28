@@ -254,7 +254,7 @@ const requestJson = async <T>(baseUrl: string, path: string, options?: RequestIn
   }
 };
 
-const statusToProgress = (status: string): { stage: UploadProgressStage; percent: number; message: string; step: string } => {
+export const statusToReportProgress = (status: string): { stage: UploadProgressStage; percent: number; message: string; step: string } => {
   switch (status) {
     case 'UPLOADED':
       return { stage: 'uploaded', percent: 30, message: 'Uploading report...', step: 'UPLOADED' };
@@ -294,6 +294,51 @@ const statusToProgress = (status: string): { stage: UploadProgressStage; percent
     default:
       return { stage: 'processing', percent: 45, message: 'Processing health information...', step: status };
   }
+};
+
+const isSuccessfulReportStatus = (status: string) =>
+  status === 'COMPLETED' || status === 'PUBLISHED' || status === 'PARTIALLY_VALIDATED';
+
+const isFailedReportStatus = (status: string) =>
+  status === 'FAILED' || status === 'REVIEW_REQUIRED' || status === 'INSUFFICIENT_DATA';
+
+export const getAnalyzedReport = (reportId: string, signal?: AbortSignal) =>
+  requestJson<ReportDto>(apiBaseUrl, `/v1/reports/${encodeURIComponent(reportId)}`, { signal });
+
+export const waitForReportAnalysis = async (params: {
+  reportId: string;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  onProgress?: (event: UploadProgressEvent) => void;
+}): Promise<ReportAnalysisResponse> => {
+  const startedAt = Date.now();
+  const timeoutMs = params.timeoutMs ?? POLL_TIMEOUT_MS;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    await sleep(POLL_INTERVAL_MS, params.signal);
+    const statusPayload = await requestJson<{ reportId: string; status: string; error?: string }>(
+      apiBaseUrl,
+      `/v1/reports/${encodeURIComponent(params.reportId)}/status`,
+      { signal: params.signal }
+    );
+    const progress = statusToReportProgress(statusPayload.status);
+    params.onProgress?.({
+      stage: progress.stage,
+      percent: progress.percent,
+      message: statusPayload.error ? `${progress.message} ${statusPayload.error}` : progress.message,
+      status: progress.step,
+      reportId: statusPayload.reportId
+    });
+    if (isFailedReportStatus(statusPayload.status)) {
+      throw new Error(statusPayload.error ?? progress.message);
+    }
+    if (isSuccessfulReportStatus(statusPayload.status)) {
+      const report = await getAnalyzedReport(params.reportId, params.signal);
+      if (!report.analysis) throw new Error('Report completed but analysis payload is missing.');
+      return { ...report.analysis, reportId: report.id, status: report.status };
+    }
+  }
+  throw new Error('REQUEST_TIMEOUT');
 };
 
 export const listAnalyzedReports = async (): Promise<ReportDto[]> => {
@@ -456,7 +501,7 @@ export const uploadAndAnalyzeReport = async (params: {
           `/v1/reports/${encodeURIComponent(startPayload.reportId)}/status`,
           { signal: params.signal }
         );
-        const progress = statusToProgress(statusPayload.status);
+        const progress = statusToReportProgress(statusPayload.status);
         logReportDebug('poll:status', {
           baseUrl,
           reportId: statusPayload.reportId,
@@ -535,13 +580,17 @@ export const reanalyzeReport = async (reportId: string, signal?: AbortSignal): P
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
-          signal
+          signal,
+          timeoutMs: POLL_TIMEOUT_MS
         }
       );
       return { ...payload, reportId: payload.reportId ?? reportId };
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'network_error';
       logReportDebug('reanalyze:failure', { baseUrl, reportId, error: lastError });
+      if (lastError === 'REQUEST_TIMEOUT') {
+        return waitForReportAnalysis({ reportId, signal, timeoutMs: POLL_TIMEOUT_MS });
+      }
       if (isTerminalHttpError(error)) throw error;
     }
   }
