@@ -2,6 +2,10 @@ import { canonicalBiomarkerName } from './report-governance.js';
 import { sanitizeReportAnalysisForPublic } from './report-response.js';
 import type { ParsedParameter } from './reports.service.js';
 import type { ReportRecord } from './reports.store.js';
+import {
+  compareBiomarkerObservations,
+  type BiomarkerClinicalStatus
+} from '../biomarkers/biomarker-clinical-semantics.js';
 
 export type ReportComparisonClassification = 'improved' | 'stable' | 'needs_attention' | 'changed' | 'incomparable';
 
@@ -64,8 +68,6 @@ export const sortAnalysableReports = (reports: ReportRecord[]) =>
     return dateDelta === 0 ? Date.parse(b.createdAtISO) - Date.parse(a.createdAtISO) : dateDelta;
   });
 
-const normalizeUnit = (unit: string) => unit.trim().replace(/μ/g, 'µ').replace(/\s+/g, '').toLowerCase();
-
 const parseRange = (range: string): { min?: number; max?: number } => {
   const normalized = range.replace(/\s+/g, '');
   const between = normalized.match(/(-?\d+(?:\.\d+)?)[-–](-?\d+(?:\.\d+)?)/);
@@ -85,44 +87,65 @@ const abnormalDistance = (parameter: ParsedParameter) => {
 };
 
 const compareMatched = (latest: ParsedParameter, previous: ParsedParameter): ReportComparisonItem['comparison'] => {
-  if (normalizeUnit(latest.unit) !== normalizeUnit(previous.unit)) {
+  const delta = latest.value - previous.value;
+  const toClinicalStatus = (status: ParsedParameter['status']): BiomarkerClinicalStatus => status.toUpperCase() as BiomarkerClinicalStatus;
+  const canonicalStatus = compareBiomarkerObservations(
+    {
+      value: latest.value,
+      unit: latest.unit,
+      referenceRange: latest.referenceRange,
+      clinicalStatus: toClinicalStatus(latest.status)
+    },
+    {
+      value: previous.value,
+      unit: previous.unit,
+      referenceRange: previous.referenceRange,
+      clinicalStatus: toClinicalStatus(previous.status)
+    }
+  );
+
+  if (canonicalStatus === 'INCOMPARABLE') {
     return { classification: 'incomparable', delta: null, rationale: 'Units are not canonically compatible.' };
   }
-
-  const delta = latest.value - previous.value;
-  if (latest.status === 'normal' && previous.status !== 'normal') {
-    return { classification: 'improved', delta, rationale: 'Moved into the expected range.' };
+  if (canonicalStatus === 'IMPROVED') {
+    return {
+      classification: 'improved',
+      delta,
+      rationale: latest.status === 'normal' ? 'Moved into the expected range.' : 'Moved closer to the expected range.'
+    };
   }
-  if (latest.status !== 'normal' && previous.status === 'normal') {
+  if (canonicalStatus === 'NEEDS_ATTENTION') {
+    const movedFromNormal = previous.status === 'normal';
     return {
       classification: 'needs_attention',
       delta,
-      rationale: latest.status === 'high' ? 'Now above the report reference range.' : 'Now below the report reference range.'
+      rationale: latest.status === 'high'
+        ? `${movedFromNormal ? 'Now' : 'Moved further'} above the report reference range.`
+        : `${movedFromNormal ? 'Now' : 'Moved further'} below the report reference range.`
     };
   }
-  if (latest.status === 'normal' && previous.status === 'normal') {
-    return { classification: 'stable', delta, rationale: 'Remains within the expected range.' };
+  if (canonicalStatus === 'STABLE') {
+    return {
+      classification: 'stable',
+      delta,
+      rationale: latest.status === 'normal'
+        ? 'Remains within the expected range.'
+        : 'No meaningful range-status change was established.'
+    };
   }
-  if (latest.status !== previous.status) {
+  if (canonicalStatus === 'CHANGED') {
     return { classification: 'changed', delta, rationale: 'Changed since your previous report.' };
   }
 
   const latestDistance = abnormalDistance(latest);
   const previousDistance = abnormalDistance(previous);
-  if (latestDistance == null || previousDistance == null) {
-    return { classification: 'changed', delta, rationale: 'Changed since your previous report.' };
-  }
-  if (latestDistance < previousDistance) {
-    return { classification: 'improved', delta, rationale: 'Moved closer to the expected range.' };
-  }
-  if (latestDistance > previousDistance) {
-    return {
-      classification: 'needs_attention',
-      delta,
-      rationale: latest.status === 'high' ? 'Moved further above the report reference range.' : 'Moved further below the report reference range.'
-    };
-  }
-  return { classification: 'stable', delta, rationale: 'No meaningful range-status change was established.' };
+  return {
+    classification: latestDistance == null || previousDistance == null ? 'incomparable' : 'changed',
+    delta: latestDistance == null || previousDistance == null ? null : delta,
+    rationale: latestDistance == null || previousDistance == null
+      ? 'The available reference data is not comparable.'
+      : 'Changed since your previous report.'
+  };
 };
 
 const keyFor = (parameter: ParsedParameter) => {
