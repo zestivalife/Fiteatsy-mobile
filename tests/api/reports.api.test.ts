@@ -184,7 +184,15 @@ test('report comparison and reanalyze endpoints preserve the selected validated 
 
 test('published diet clients can upload, re-analyze, and retain multiple report-history records without care-stage regression', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
-  await pool.query(
+  const materialized = await patchJson(
+    server.baseUrl,
+    '/v1/platform/health-profile',
+    {},
+    { headers: authHeaders(session.token) }
+  );
+  assert.equal(materialized.response.status, 200);
+
+  const promoted = await pool.query(
     `update care_cases
         set current_stage = 'diet_published',
             previous_stage = 'ai_draft_generated',
@@ -192,6 +200,7 @@ test('published diet clients can upload, re-analyze, and retain multiple report-
       where user_id = $1`,
     [session.current.body.accountId]
   );
+  assert.equal(promoted.rowCount, 1);
 
   const first = await fetch(`${server.baseUrl}/v1/reports/analyze`, {
     method: 'POST',
