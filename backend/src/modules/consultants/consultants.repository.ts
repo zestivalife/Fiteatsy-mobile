@@ -1,6 +1,12 @@
 import { pool } from '../../db/pool.js';
 import { createOrResolveClientForAccount } from '../client/client.repository.js';
 import type { HealthCalculationInput, HealthMetrics } from '../health/health-calculations.service.js';
+import {
+  compareBiomarkerObservations,
+  deriveBiomarkerClinicalStatus,
+  type BiomarkerClinicalStatus,
+  type BiomarkerComparisonStatus
+} from '../biomarkers/biomarker-clinical-semantics.js';
 
 type ConsultantOnboardingProjection = {
   age?: number | null;
@@ -108,14 +114,22 @@ export type ConsultantClientProfileRecord = {
 export type ConsultantBiomarkerSummary = {
   biomarkerId: string;
   name: string;
+  canonicalMarkerName: string;
+  rawMarkerName: string | null;
+  sourceReportId: string | null;
   value: number;
   unit: string;
-  status: 'VALIDATED';
+  validationStatus: string;
+  clinicalStatus: BiomarkerClinicalStatus;
   referenceRange: string | null;
   confidence: number;
   testDate: string;
-  trend: 'UP' | 'DOWN' | 'STABLE' | null;
+  comparisonStatus: BiomarkerComparisonStatus;
   previousValue: number | null;
+  previousUnit: string | null;
+  previousReferenceRange: string | null;
+  previousClinicalStatus: BiomarkerClinicalStatus | null;
+  previousSourceReportId: string | null;
   previousTestDate: string | null;
 };
 
@@ -129,6 +143,19 @@ export type ConsultantReportSummary = {
   fileSize: number;
   uploadedAt: string;
   updatedAt: string;
+  biomarkers: Array<{
+    biomarkerId: string;
+    canonicalMarkerName: string;
+    rawMarkerName: string | null;
+    sourceReportId: string;
+    value: number;
+    unit: string;
+    validationStatus: string;
+    clinicalStatus: BiomarkerClinicalStatus;
+    referenceRange: string | null;
+    confidence: number;
+    testDate: string;
+  }>;
 };
 
 export type ConsultantWearableMetricSummary = {
@@ -679,12 +706,19 @@ export const listValidatedBiomarkerSummaryForClient = async (
       select
         latest.biomarker_id,
         latest.canonical_name,
+        latest.original_parameter_name,
+        latest.source_report_id,
         latest.value,
         latest.unit,
+        latest.validation_status,
         latest.reference_range,
         latest.confidence,
         latest.test_date,
         previous.value as previous_value,
+        previous.unit as previous_unit,
+        previous.reference_range as previous_reference_range,
+        previous.validation_status as previous_validation_status,
+        previous.source_report_id as previous_source_report_id,
         previous.test_date as previous_test_date
       from ranked latest
       left join ranked previous
@@ -699,18 +733,44 @@ export const listValidatedBiomarkerSummaryForClient = async (
   return result.rows.map((row) => {
     const value = Number(row.value);
     const previousValue = row.previous_value == null ? null : Number(row.previous_value);
-    const trend = previousValue == null ? null : value > previousValue ? 'UP' : value < previousValue ? 'DOWN' : 'STABLE';
+    const validationStatus = String(row.validation_status).toUpperCase();
+    const referenceRange = row.reference_range == null ? null : String(row.reference_range);
+    const unit = String(row.unit);
+    const clinicalStatus = deriveBiomarkerClinicalStatus({ value, unit, referenceRange, validationStatus });
+    const previousUnit = row.previous_unit == null ? null : String(row.previous_unit);
+    const previousReferenceRange = row.previous_reference_range == null ? null : String(row.previous_reference_range);
+    const previousClinicalStatus = previousValue == null || previousUnit == null
+      ? null
+      : deriveBiomarkerClinicalStatus({
+          value: previousValue,
+          unit: previousUnit,
+          referenceRange: previousReferenceRange,
+          validationStatus: String(row.previous_validation_status ?? '')
+        });
     return {
       biomarkerId: String(row.biomarker_id),
       name: String(row.canonical_name),
+      canonicalMarkerName: String(row.canonical_name),
+      rawMarkerName: row.original_parameter_name == null ? null : String(row.original_parameter_name),
+      sourceReportId: row.source_report_id == null ? null : String(row.source_report_id),
       value,
-      unit: String(row.unit),
-      status: 'VALIDATED',
-      referenceRange: row.reference_range == null ? null : String(row.reference_range),
+      unit,
+      validationStatus,
+      clinicalStatus,
+      referenceRange,
       confidence: Number(row.confidence),
       testDate: new Date(String(row.test_date)).toISOString().slice(0, 10),
-      trend,
+      comparisonStatus: compareBiomarkerObservations(
+        { value, unit, referenceRange, clinicalStatus },
+        previousValue == null || previousUnit == null || previousClinicalStatus == null
+          ? null
+          : { value: previousValue, unit: previousUnit, referenceRange: previousReferenceRange, clinicalStatus: previousClinicalStatus }
+      ),
       previousValue,
+      previousUnit,
+      previousReferenceRange,
+      previousClinicalStatus,
+      previousSourceReportId: row.previous_source_report_id == null ? null : String(row.previous_source_report_id),
       previousTestDate: row.previous_test_date == null ? null : new Date(String(row.previous_test_date)).toISOString().slice(0, 10)
     };
   });
@@ -724,20 +784,44 @@ export const listConsultantReportSummariesForClient = async (
   const result = await pool.query(
     `
       select
-        id,
-        report_type,
-        original_filename,
-        processing_status,
-        report_date,
-        lab_name,
-        file_size,
-        created_at,
-        updated_at
-      from health_reports
-      where client_id = $1
-        and user_id = $2
-        and deleted_at is null
-      order by updated_at desc, created_at desc
+        hr.id,
+        hr.report_type,
+        hr.original_filename,
+        hr.processing_status,
+        hr.report_date,
+        hr.lab_name,
+        hr.file_size,
+        hr.created_at,
+        hr.updated_at,
+        coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'biomarkerId', bo.biomarker_id,
+              'canonicalMarkerName', b.canonical_name,
+              'rawMarkerName', bo.original_parameter_name,
+              'sourceReportId', bo.source_report_id,
+              'value', bo.value,
+              'unit', bo.unit,
+              'validationStatus', upper(bo.validation_status),
+              'referenceRange', bo.reference_range,
+              'confidence', bo.confidence,
+              'testDate', bo.test_date
+            ) order by b.canonical_name asc
+          ) filter (where bo.id is not null),
+          '[]'::jsonb
+        ) as biomarkers
+      from health_reports hr
+      left join biomarker_observations bo
+        on bo.source_report_id = hr.id
+        and bo.client_id = hr.client_id
+        and bo.user_id = hr.user_id
+        and bo.validation_status = 'validated'
+      left join biomarkers b on b.id = bo.biomarker_id
+      where hr.client_id = $1
+        and hr.user_id = $2
+        and hr.deleted_at is null
+      group by hr.id
+      order by hr.updated_at desc, hr.created_at desc
       limit $3
     `,
     [internalClientId, accountId, limit]
@@ -752,7 +836,26 @@ export const listConsultantReportSummariesForClient = async (
     labName: row.lab_name == null ? null : String(row.lab_name),
     fileSize: Number(row.file_size),
     uploadedAt: new Date(String(row.created_at)).toISOString(),
-    updatedAt: new Date(String(row.updated_at)).toISOString()
+    updatedAt: new Date(String(row.updated_at)).toISOString(),
+    biomarkers: (Array.isArray(row.biomarkers) ? row.biomarkers : []).map((marker: Record<string, unknown>) => {
+      const value = Number(marker.value);
+      const unit = String(marker.unit);
+      const referenceRange = marker.referenceRange == null ? null : String(marker.referenceRange);
+      const validationStatus = String(marker.validationStatus);
+      return {
+        biomarkerId: String(marker.biomarkerId),
+        canonicalMarkerName: String(marker.canonicalMarkerName),
+        rawMarkerName: marker.rawMarkerName == null ? null : String(marker.rawMarkerName),
+        sourceReportId: String(marker.sourceReportId),
+        value,
+        unit,
+        validationStatus,
+        clinicalStatus: deriveBiomarkerClinicalStatus({ value, unit, referenceRange, validationStatus }),
+        referenceRange,
+        confidence: Number(marker.confidence),
+        testDate: new Date(String(marker.testDate)).toISOString().slice(0, 10)
+      };
+    })
   }));
 };
 

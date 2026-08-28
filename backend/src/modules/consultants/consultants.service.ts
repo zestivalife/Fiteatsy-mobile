@@ -434,8 +434,21 @@ const buildProvenance = ({
       key: 'biomarkers',
       sourceType: 'biomarkers',
       lastUpdatedAt: biomarkers[0]?.testDate ? new Date(biomarkers[0].testDate).toISOString() : null,
-      freshness: biomarkers.length ? 'fresh' : 'no_data',
-      fields: ['name', 'value', 'unit', 'referenceRange', 'trend']
+      freshness: freshnessFromTimestamp(
+        biomarkers[0]?.testDate ? new Date(biomarkers[0].testDate).toISOString() : null,
+      ),
+      fields: [
+        'biomarkerId',
+        'canonicalMarkerName',
+        'rawMarkerName',
+        'sourceReportId',
+        'value',
+        'unit',
+        'validationStatus',
+        'clinicalStatus',
+        'referenceRange',
+        'comparisonStatus'
+      ]
     },
     {
       key: 'wearables',

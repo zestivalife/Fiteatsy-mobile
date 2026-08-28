@@ -1126,35 +1126,144 @@ test('consultant workspace contract syncs reports and validated biomarkers from 
   await assignClientToConsultant(client, consultant);
   const owner = { accountId: client.current.body.accountId, clientId: await getClientDatabaseId(client) };
 
-  const report = await createReportRecord({
+  const reportA = await createReportRecord({
     userId: owner.accountId,
     clientId: owner.clientId,
-    fileName: 'vitamin-d-panel.pdf',
+    fileName: 'metabolic-panel.pdf',
     mimeType: 'application/pdf',
     fileSize: 2048,
-    labName: 'Lal PathLabs',
+    labName: 'QA Lab A',
     reportDate: '2026-08-01',
     reportType: 'blood_report'
   });
   await pool.query(
     'update health_reports set processing_status = $2, updated_at = $3 where id = $1',
-    [report.id, 'PUBLISHED', '2026-08-02T08:15:00.000Z']
+    [reportA.id, 'PUBLISHED', '2026-08-02T08:15:00.000Z']
   );
+  const reportB = await createReportRecord({
+    userId: owner.accountId,
+    clientId: owner.clientId,
+    fileName: 'lipid-vitamin-panel.pdf',
+    mimeType: 'application/pdf',
+    fileSize: 3072,
+    labName: 'QA Lab B',
+    reportDate: '2026-08-10',
+    reportType: 'blood_report'
+  });
+  await pool.query(
+    'update health_reports set processing_status = $2, updated_at = $3 where id = $1',
+    [reportB.id, 'PUBLISHED', '2026-08-11T08:15:00.000Z']
+  );
+  const fixtures = [
+    { reportId: reportA.id, canonicalName: 'Vitamin B12', rawName: 'B12', category: 'Micronutrient', value: 180, unit: 'pg/mL', range: '200-900', testDate: '2026-08-01' },
+    { reportId: reportA.id, canonicalName: 'HbA1c', rawName: 'Glycated Haemoglobin', category: 'Metabolic', value: 5.4, unit: '%', range: '<5.7', testDate: '2026-08-01' },
+    { reportId: reportB.id, canonicalName: 'Vitamin D', rawName: '25 OH Vitamin D', category: 'Micronutrient', value: 18, unit: 'ng/mL', range: '30-100', testDate: '2026-08-10' },
+    { reportId: reportB.id, canonicalName: 'LDL Cholesterol', rawName: 'LDL', category: 'Heart & Lipids', value: 142, unit: 'mg/dL', range: '<130', testDate: '2026-08-10' }
+  ];
+  for (const fixture of fixtures) {
+    const biomarker = await upsertBiomarker({
+      canonicalName: fixture.canonicalName,
+      aliases: [fixture.rawName],
+      category: fixture.category,
+      standardUnit: fixture.unit
+    });
+    await createBiomarkerObservation(owner, {
+      biomarkerId: biomarker.id,
+      sourceReportId: fixture.reportId,
+      value: fixture.value,
+      unit: fixture.unit,
+      testDate: fixture.testDate,
+      confidence: 0.98,
+      validationStatus: 'validated',
+      originalParameterName: fixture.rawName,
+      referenceRange: fixture.range
+    });
+  }
+
+  const response = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.reports.length, 2);
+  assert.equal(response.body.biomarkers.length, 4);
+  const projectedReportA = response.body.reports.find((item: { id: string }) => item.id === reportA.id);
+  const projectedReportB = response.body.reports.find((item: { id: string }) => item.id === reportB.id);
+  assert.equal(projectedReportA.labName, 'QA Lab A');
+  assert.equal(projectedReportB.labName, 'QA Lab B');
+  assert.deepEqual(projectedReportA.biomarkers.map((item: { canonicalMarkerName: string }) => item.canonicalMarkerName).sort(), ['HbA1c', 'Vitamin B12']);
+  assert.deepEqual(projectedReportB.biomarkers.map((item: { canonicalMarkerName: string }) => item.canonicalMarkerName).sort(), ['LDL Cholesterol', 'Vitamin D']);
+  assert.equal(projectedReportA.biomarkers.every((item: { sourceReportId: string }) => item.sourceReportId === reportA.id), true);
+  assert.equal(projectedReportB.biomarkers.every((item: { sourceReportId: string }) => item.sourceReportId === reportB.id), true);
+  const vitaminD = response.body.biomarkers.find((item: { canonicalMarkerName: string }) => item.canonicalMarkerName === 'Vitamin D');
+  assert.equal(vitaminD.rawMarkerName, '25 OH Vitamin D');
+  assert.equal(vitaminD.sourceReportId, reportB.id);
+  assert.equal(vitaminD.validationStatus, 'VALIDATED');
+  assert.equal(vitaminD.clinicalStatus, 'LOW');
+  assert.equal(vitaminD.comparisonStatus, 'UNKNOWN');
+  assert.equal(vitaminD.value, 18);
+  assert.equal(vitaminD.referenceRange, '30-100');
+  assert.ok(response.body.provenance.sources.some((item: { key: string, freshness: string }) => item.key === 'reports' && item.freshness === 'stale'));
+  assert.ok(response.body.provenance.sources.some((item: { key: string, freshness: string }) => item.key === 'biomarkers' && item.freshness === 'stale'));
+});
+
+test('consultant latest biomarker projection preserves previous value and both report identities', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Biomarker History Client',
+    email: `biomarker-history-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
+  const owner = { accountId: client.current.body.accountId, clientId: await getClientDatabaseId(client) };
   const biomarker = await upsertBiomarker({
-    canonicalName: 'Vitamin D',
-    aliases: ['25 OH Vitamin D'],
+    canonicalName: 'Vitamin B12',
+    aliases: ['B12'],
     category: 'Micronutrient',
-    standardUnit: 'ng/mL'
+    standardUnit: 'pg/mL'
+  });
+  const reportA = await createReportRecord({
+    userId: owner.accountId,
+    clientId: owner.clientId,
+    fileName: 'b12-a.pdf',
+    mimeType: 'application/pdf',
+    fileSize: 1024,
+    labName: 'QA Lab A',
+    reportDate: '2026-08-01',
+    reportType: 'blood_report'
+  });
+  const reportB = await createReportRecord({
+    userId: owner.accountId,
+    clientId: owner.clientId,
+    fileName: 'b12-b.pdf',
+    mimeType: 'application/pdf',
+    fileSize: 1024,
+    labName: 'QA Lab B',
+    reportDate: '2026-08-10',
+    reportType: 'blood_report'
   });
   await createBiomarkerObservation(owner, {
     biomarkerId: biomarker.id,
-    sourceReportId: report.id,
-    value: 18,
-    unit: 'ng/mL',
+    sourceReportId: reportA.id,
+    value: 180,
+    unit: 'pg/mL',
     testDate: '2026-08-01',
     confidence: 0.98,
     validationStatus: 'validated',
-    referenceRange: '30-100'
+    originalParameterName: 'B12',
+    referenceRange: '200-900'
+  });
+  await createBiomarkerObservation(owner, {
+    biomarkerId: biomarker.id,
+    sourceReportId: reportB.id,
+    value: 310,
+    unit: 'pg/mL',
+    testDate: '2026-08-10',
+    confidence: 0.98,
+    validationStatus: 'validated',
+    originalParameterName: 'Vitamin B12',
+    referenceRange: '200-900'
   });
 
   const response = await getJson(
@@ -1164,14 +1273,14 @@ test('consultant workspace contract syncs reports and validated biomarkers from 
   );
 
   assert.equal(response.response.status, 200);
-  assert.equal(response.body.reports.length, 1);
-  assert.equal(response.body.reports[0].labName, 'Lal PathLabs');
-  assert.equal(response.body.reports[0].processingStatus, 'PUBLISHED');
-  assert.equal(response.body.biomarkers.length, 1);
-  assert.equal(response.body.biomarkers[0].name, 'Vitamin D');
-  assert.equal(response.body.biomarkers[0].value, 18);
-  assert.equal(response.body.biomarkers[0].referenceRange, '30-100');
-  assert.ok(response.body.provenance.sources.some((item: { key: string, freshness: string }) => item.key === 'reports' && item.freshness === 'stale'));
+  const b12 = response.body.biomarkers.find((item: { canonicalMarkerName: string }) => item.canonicalMarkerName === 'Vitamin B12');
+  assert.equal(b12.value, 310);
+  assert.equal(b12.sourceReportId, reportB.id);
+  assert.equal(b12.clinicalStatus, 'NORMAL');
+  assert.equal(b12.previousValue, 180);
+  assert.equal(b12.previousSourceReportId, reportA.id);
+  assert.equal(b12.previousClinicalStatus, 'LOW');
+  assert.equal(b12.comparisonStatus, 'IMPROVED');
 });
 
 test('consultant workspace contract syncs wearable summaries and source metadata', async () => {
