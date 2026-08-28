@@ -15,8 +15,11 @@ describe('report chronology integrity', () => {
     expect(routes).toContain('if (input.manualDate) analysis.reportDate = input.manualDate');
   });
 
-  it('orders biomarker comparisons by canonical test date', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'src/screens/home/ReportsScreen.tsx'), 'utf8');
-    expect(source).toContain('new Date(b.testDate).getTime() - new Date(a.testDate).getTime()');
+  it('orders report comparisons by canonical report date on the backend', () => {
+    const comparison = fs.readFileSync(path.join(process.cwd(), 'backend/src/modules/reports/report-comparison.ts'), 'utf8');
+    const service = fs.readFileSync(path.join(process.cwd(), 'src/services/reportUploadService.ts'), 'utf8');
+    expect(comparison).toContain('parseReportDate(b) - parseReportDate(a)');
+    expect(comparison).toContain('report.reportDate ?? report.analysis?.reportDate');
+    expect(service).toContain("'/v1/reports/comparison/current'");
   });
 });

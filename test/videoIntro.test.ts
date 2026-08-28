@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 
 const source = fs.readFileSync(
@@ -7,6 +8,10 @@ const source = fs.readFileSync(
 );
 const appConfig = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), 'app.json'), 'utf8')
+);
+const frozenBridgePlugin = fs.readFileSync(
+  path.join(process.cwd(), 'plugins/withFrozenSplashBridge.js'),
+  'utf8'
 );
 const iosLaunchScreen = fs.readFileSync(
   path.join(process.cwd(), 'ios/Fiteatsy/SplashScreen.storyboard'),
@@ -17,6 +22,14 @@ const androidLaunchBackground = fs.readFileSync(
     process.cwd(),
     'android/app/src/main/res/drawable/ic_launcher_background.xml'
   ),
+  'utf8'
+);
+const androidStyles = fs.readFileSync(
+  path.join(process.cwd(), 'android/app/src/main/res/values/styles.xml'),
+  'utf8'
+);
+const androidColors = fs.readFileSync(
+  path.join(process.cwd(), 'android/app/src/main/res/values/colors.xml'),
   'utf8'
 );
 const iosUpdatesConfig = fs.readFileSync(
@@ -75,7 +88,42 @@ describe('premium app-level video intro contract', () => {
       backgroundColor: '#000000'
     });
     expect(iosLaunchScreen).not.toContain('SplashScreenLegacy');
+    expect(iosLaunchScreen).not.toContain('<imageView');
+    expect(iosLaunchScreen).not.toContain('<image ');
+    expect(iosLaunchScreen).toContain('alpha="1.000" white="0.000"');
     expect(androidLaunchBackground).not.toContain('splashscreen_logo');
+    expect(androidLaunchBackground).toContain('@color/splashscreen_background');
+    expect(androidStyles).toContain(
+      '<item name="android:windowBackground">@drawable/ic_launcher_background</item>'
+    );
+    expect(androidColors).toContain(
+      '<color name="splashscreen_background">#000000</color>'
+    );
+    expect(appConfig.expo.plugins).toContain('./plugins/withFrozenSplashBridge');
+    expect(frozenBridgePlugin).toContain('IOS_STORYBOARD');
+    expect(frozenBridgePlugin).toContain('ANDROID_BLACK_BACKGROUND');
+  });
+
+  it('quarantines every prohibited legacy launch asset from active source paths', () => {
+    for (const relativePath of [
+      'src/assets/splash.png',
+      'android/app/src/main/res/drawable-mdpi/splashscreen_logo.png',
+      'android/app/src/main/res/drawable-hdpi/splashscreen_logo.png',
+      'android/app/src/main/res/drawable-xhdpi/splashscreen_logo.png',
+      'android/app/src/main/res/drawable-xxhdpi/splashscreen_logo.png',
+      'android/app/src/main/res/drawable-xxxhdpi/splashscreen_logo.png'
+    ]) {
+      expect(fs.existsSync(path.join(process.cwd(), relativePath))).toBe(false);
+    }
+  });
+
+  it('protects the current official logo by deterministic content hash', () => {
+    const logo = fs.readFileSync(
+      path.join(process.cwd(), 'src/assets/brand/fiteatsy-logo.svg')
+    );
+    expect(crypto.createHash('sha256').update(logo).digest('hex')).toBe(
+      '59bdffba51d80546750862b5366bde6ec06e6cb9f7b92c19bc99be0a2b7aab0e'
+    );
   });
 
   it('pins native production builds to the production OTA channel', () => {

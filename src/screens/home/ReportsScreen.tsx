@@ -43,13 +43,14 @@ import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletio
 import { resolveClientName } from '../../utils/clientIdentity';
 import { BUSINESS_TIME_ZONE, toDayKey } from '../../utils/date';
 import {
-  BiomarkerHistoryItem,
   deleteAllAnalyzedReports,
   deleteAnalyzedReport,
+  getCurrentReportComparison,
   listAnalyzedReports,
-  listBiomarkerHistory,
   reanalyzeReport,
   ReportAnalysisResponse,
+  ReportComparisonItem,
+  ReportComparisonProjection,
   ReportDto,
   uploadAndAnalyzeReport
 } from '../../services/reportUploadService';
@@ -64,7 +65,6 @@ type ReportItem = {
   parameters: number;
   abnormal: number;
   score: number | null;
-  trend: 'up' | 'down' | 'flat';
   categoryScores: Record<CategoryKey, number>;
   parametersData: ReportParameter[];
   uploadSource?: 'camera' | 'gallery' | 'pdf';
@@ -176,19 +176,9 @@ const buildCategoryScores = (parameters: ReportParameter[]): Record<CategoryKey,
 
 const toReportItem = (
   analysis: ReportAnalysisResponse,
-  fallback: { id?: string; source?: 'camera' | 'gallery' | 'pdf'; createdAtISO?: string } = {},
-  previous?: ReportItem | null
+  fallback: { id?: string; source?: 'camera' | 'gallery' | 'pdf'; createdAtISO?: string } = {}
 ): ReportItem => {
   const abnormal = analysis.parameters.filter((parameter) => parameter.status !== 'normal').length;
-  const trend: ReportItem['trend'] = previous
-    ? analysis.score != null && previous.score != null
-      ? analysis.score > previous.score
-        ? 'up'
-        : analysis.score < previous.score
-          ? 'down'
-          : 'flat'
-      : 'flat'
-    : 'flat';
   return {
     id: analysis.reportId ?? fallback.id ?? `rep-${Date.now()}`,
     labName: analysis.labName,
@@ -196,7 +186,6 @@ const toReportItem = (
     parameters: analysis.parameters.length,
     abnormal,
     score: analysis.score,
-    trend,
     categoryScores: analysis.categoryScores ?? buildCategoryScores(analysis.parameters),
     parametersData: analysis.parameters,
     uploadSource: fallback.source,
@@ -204,7 +193,7 @@ const toReportItem = (
   };
 };
 
-const reportDtoToItem = (report: ReportDto, previous?: ReportItem | null) => {
+const reportDtoToItem = (report: ReportDto) => {
   if (!report.analysis || (report.status !== 'COMPLETED' && report.status !== 'PUBLISHED' && report.status !== 'PARTIALLY_VALIDATED')) return null;
   return toReportItem(
     {
@@ -212,17 +201,8 @@ const reportDtoToItem = (report: ReportDto, previous?: ReportItem | null) => {
       reportId: report.id,
       status: report.status
     },
-    { id: report.id, source: report.source, createdAtISO: report.createdAtISO },
-    previous
+    { id: report.id, source: report.source, createdAtISO: report.createdAtISO }
   );
-};
-
-const buildTrendLabel = (current: BiomarkerHistoryItem, prior: BiomarkerHistoryItem) => {
-  const delta = current.value - prior.value;
-  if (Math.abs(delta) < 0.01) return 'Stable';
-  if (current.validationStatus === 'validated' && prior.validationStatus !== 'validated') return 'Improved';
-  if (current.validationStatus !== 'validated' && prior.validationStatus === 'validated') return 'Needs monitoring';
-  return delta < 0 ? 'Improved' : 'Needs monitoring';
 };
 
 const buildSpecificFallbackSummary = (_parameters: ReportParameter[], _userName?: string) =>
@@ -300,15 +280,6 @@ const SwipeableReportCard = ({
             <View style={[styles.scoreBadge, { backgroundColor: scorePillBg(report.score) }]}>
               <Text style={[styles.scoreBadgeText, { color: scoreColor(report.score) }]}>{report.score ?? 'Review'}</Text>
             </View>
-            <Text
-              style={[
-                styles.trend,
-                report.trend === 'up' ? styles.trendUp : report.trend === 'down' ? styles.trendDown : styles.trendFlat,
-                !isLight && styles.trendDark
-              ]}
-            >
-              {report.trend === 'up' ? '↑' : report.trend === 'down' ? '↓' : '→'}
-            </Text>
           </View>
         </Pressable>
       </Animated.View>
@@ -316,13 +287,38 @@ const SwipeableReportCard = ({
   );
 };
 
+const comparisonValue = (item: ReportComparisonItem, side: 'previous' | 'latest') => {
+  const reading = item[side];
+  return reading ? `${reading.value} ${reading.unit}`.trim() : 'Not reported';
+};
+
+const ComparisonMarkerRow = ({ item, tone }: { item: ReportComparisonItem; tone: 'good' | 'attention' | 'neutral' }) => (
+  <View style={styles.comparisonMarkerRow}>
+    <View style={styles.comparisonMarkerCopy}>
+      <Text style={styles.comparisonMarkerName}>{item.displayName}</Text>
+      <Text style={styles.comparisonMarkerValues}>
+        {comparisonValue(item, 'previous')} → {comparisonValue(item, 'latest')}
+      </Text>
+    </View>
+    <Text
+      style={[
+        styles.comparisonMarkerStatus,
+        tone === 'good' ? styles.comparisonGood : tone === 'attention' ? styles.comparisonAttention : styles.comparisonNeutral
+      ]}
+    >
+      {tone === 'good' ? 'Improved' : tone === 'attention' ? 'Needs attention' : 'Changed'}
+    </Text>
+  </View>
+);
+
 export const ReportsScreen = () => {
   const navigation = useNavigation<Nav>();
   const { wellness, onboarding, checkIns, themeMode, authSession } = useAppContext();
   const clientName = resolveClientName(authSession?.user.name);
   const isLight = themeMode === 'light';
   const [reports, setReports] = useState<ReportItem[]>([]);
-  const [biomarkerHistory, setBiomarkerHistory] = useState<BiomarkerHistoryItem[]>([]);
+  const [comparison, setComparison] = useState<ReportComparisonProjection | null>(null);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [reportsLoading, setReportsLoading] = useState(true);
   const [reportsLoadError, setReportsLoadError] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'latest' | 'oldest' | 'lab' | 'type'>('latest');
@@ -360,7 +356,6 @@ export const ReportsScreen = () => {
   const [preparingProgress, setPreparingProgress] = useState(0);
   const [analysisLaunching, setAnalysisLaunching] = useState(false);
   const [lastPickSource, setLastPickSource] = useState<'camera' | 'gallery' | 'pdf' | null>(null);
-  const [latestComparisonSummary, setLatestComparisonSummary] = useState<string | null>(null);
   const [analysisReview, setAnalysisReview] = useState<AnalysisReviewState | null>(null);
   const [showAnalysisReview, setShowAnalysisReview] = useState(false);
 
@@ -421,36 +416,6 @@ export const ReportsScreen = () => {
     () => latestReport?.parametersData.filter((parameter) => parameter.status !== 'normal') ?? [],
     [latestReport]
   );
-  const biomarkerTrends = useMemo(() => {
-    const grouped = new Map<string, BiomarkerHistoryItem[]>();
-    biomarkerHistory.forEach((item) => {
-      const key = item.biomarkerId || item.biomarkerName;
-      grouped.set(key, [...(grouped.get(key) ?? []), item]);
-    });
-
-    return Array.from(grouped.values())
-      .map((items) => {
-        const sorted = [...items].sort((a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime());
-        const current = sorted[0];
-        const prior = sorted[1];
-        if (!current || !prior) return null;
-        return {
-          name: current.biomarkerName,
-          current,
-          prior,
-          delta: current.value - prior.value,
-          label: buildTrendLabel(current, prior)
-        };
-      })
-      .filter(Boolean)
-      .slice(0, 5) as Array<{
-        name: string;
-        current: BiomarkerHistoryItem;
-        prior: BiomarkerHistoryItem;
-        delta: number;
-        label: string;
-      }>;
-  }, [biomarkerHistory]);
   const reportDateRange = useMemo(() => {
     if (reports.length === 0) return 'No reports';
     const dates = reports.map((report) => report.date).filter(Boolean);
@@ -459,9 +424,9 @@ export const ReportsScreen = () => {
 
   const clearReportDerivedState = () => {
     setReports([]);
-    setBiomarkerHistory([]);
+    setComparison(null);
+    setComparisonError(null);
     setReportsLoadError(null);
-    setLatestComparisonSummary(null);
     setAnalysisReview(null);
     setShowAnalysisReview(false);
     setNuetraSummary('');
@@ -473,13 +438,19 @@ export const ReportsScreen = () => {
 
   const refreshReportData = async () => {
     setReportsLoadError(null);
-    const [reportDtos, history] = await Promise.all([listAnalyzedReports(), listBiomarkerHistory()]);
+    const reportDtos = await listAnalyzedReports();
     const hydratedReports = reportDtos.reduce<ReportItem[]>((acc, dto) => {
-      const item = reportDtoToItem(dto, acc[0] ?? null);
+      const item = reportDtoToItem(dto);
       return item ? [...acc, item] : acc;
     }, []);
     setReports(hydratedReports);
-    setBiomarkerHistory(history);
+    try {
+      setComparison(await getCurrentReportComparison());
+      setComparisonError(null);
+    } catch {
+      setComparison(null);
+      setComparisonError('Comparison is temporarily unavailable. Your latest report remains available.');
+    }
   };
 
   const reloadReportsAfterDelete = async () => {
@@ -745,7 +716,6 @@ export const ReportsScreen = () => {
   const applyAnalysisReview = () => {
     if (!analysisReview) return;
     setReports((prev) => [analysisReview.report, ...prev.filter((item) => item.id !== analysisReview.report.id)]);
-    setLatestComparisonSummary(analysisReview.comparisonSummary);
     setNuetraSummary(analysisReview.summary);
     setActionPlan(analysisReview.actionPlan);
     setShowAnalysisReview(false);
@@ -918,7 +888,7 @@ export const ReportsScreen = () => {
         setLabName(analysis.labName);
 
         const previous = reports[0] ?? null;
-        const newReport = toReportItem(analysis, { id: analysis.reportId, source: selectedUpload.source }, previous);
+        const newReport = toReportItem(analysis, { id: analysis.reportId, source: selectedUpload.source });
 
         const prevText = previous ? `Compared with ${previous.date} (${previous.labName}), ` : '';
         const comparisonSummary = previous
@@ -995,7 +965,7 @@ export const ReportsScreen = () => {
       setProcessingStep(6);
 
       const previous = reports.find((report) => report.id !== analysis.reportId) ?? reports[0] ?? null;
-      const newReport = toReportItem(analysis, { id: analysis.reportId, source: selectedUpload?.source }, previous);
+      const newReport = toReportItem(analysis, { id: analysis.reportId, source: selectedUpload?.source });
       const comparisonSummary = previous
         ? `Compared with ${previous.date} (${previous.labName}), ${analysis.summary}`
         : 'This is your first health report. Future reports will be compared against this baseline.';
@@ -1191,6 +1161,8 @@ export const ReportsScreen = () => {
         </Card>
       )}
 
+      {latestReport ? (
+        <>
       <Card style={[styles.nuetraCard, !isLight && styles.nuetraCardDark]}>
         <View style={styles.nuetraBadge}>
           <Text style={styles.nuetraBadgeText}>Fiteatsy AI</Text>
@@ -1224,6 +1196,87 @@ export const ReportsScreen = () => {
           <Text style={[styles.askNuetra, !isLight && styles.askNuetraDark]}>Ask Fiteatsy anything →</Text>
         </Pressable>
       </Card>
+
+      {comparison ? (
+        <Card style={[styles.comparisonCard, !isLight && styles.comparisonCardDark]}>
+          <View style={styles.comparisonHeader}>
+            <View style={styles.comparisonHeaderCopy}>
+              <Text style={[styles.comparisonTitle, !isLight && styles.comparisonTitleDark]}>Since Your Last Report</Text>
+              <Text style={[styles.comparisonSubtitle, !isLight && styles.comparisonSubtitleDark]}>
+                vs. {comparison.previousReport.title} · {comparison.previousReport.reportDate}
+              </Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('ReportComparison')}>
+              <Text style={styles.comparisonLink}>Full comparison →</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.comparisonStats}>
+            {[
+              { value: comparison.summary.improvedCount, label: 'Improved', tone: styles.comparisonGood },
+              { value: comparison.summary.stableCount, label: 'Stable', tone: styles.comparisonNeutral },
+              { value: comparison.summary.needsAttentionCount, label: 'Needs attention', tone: styles.comparisonAttention }
+            ].map((stat) => (
+              <View key={stat.label} style={[styles.comparisonStat, !isLight && styles.comparisonStatDark]}>
+                <Text style={[styles.comparisonStatValue, stat.tone]}>{stat.value}</Text>
+                <Text style={[styles.comparisonStatLabel, !isLight && styles.comparisonStatLabelDark]}>{stat.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {comparison.improved.length > 0 ? (
+            <View style={styles.comparisonGroup}>
+              <Text style={[styles.comparisonGroupTitle, styles.comparisonGood]}>What Improved</Text>
+              {comparison.improved.slice(0, 3).map((item) => (
+                <ComparisonMarkerRow key={`improved-${item.biomarkerId}`} item={item} tone="good" />
+              ))}
+            </View>
+          ) : null}
+
+          {comparison.needsAttention.length > 0 ? (
+            <View style={styles.comparisonGroup}>
+              <Text style={[styles.comparisonGroupTitle, styles.comparisonAttention]}>Needs Attention</Text>
+              {comparison.needsAttention.slice(0, 3).map((item) => (
+                <ComparisonMarkerRow key={`attention-${item.biomarkerId}`} item={item} tone="attention" />
+              ))}
+            </View>
+          ) : null}
+
+          {comparison.changed.length > 0 ? (
+            <View style={styles.comparisonGroup}>
+              <Text style={[styles.comparisonGroupTitle, styles.comparisonNeutral]}>Changed</Text>
+              {comparison.changed.slice(0, 2).map((item) => (
+                <ComparisonMarkerRow key={`changed-${item.biomarkerId}`} item={item} tone="neutral" />
+              ))}
+            </View>
+          ) : null}
+
+          {comparison.summary.incomparableCount > 0 ? (
+            <Text style={[styles.comparisonFootnote, !isLight && styles.comparisonSubtitleDark]}>
+              {comparison.summary.incomparableCount} marker{comparison.summary.incomparableCount === 1 ? '' : 's'} could not be compared safely because units or readings differ.
+            </Text>
+          ) : null}
+        </Card>
+      ) : reports.length > 1 ? (
+        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
+          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Since Your Last Report</Text>
+          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
+            {comparisonError ?? 'A safe marker-by-marker comparison is not available for these reports.'}
+          </Text>
+          {comparisonError ? (
+            <Pressable style={styles.retryBtn} onPress={() => void refreshReportData()}>
+              <Text style={styles.retryBtnText}>Retry comparison</Text>
+            </Pressable>
+          ) : null}
+        </Card>
+      ) : (
+        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
+          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Your First Report Is Your Baseline</Text>
+          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
+            Upload a future report and Fiteatsy will compare matching biomarkers using verified units and reference ranges.
+          </Text>
+        </Card>
+      )}
 
       <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
         <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Category Breakdown</Text>
@@ -1269,6 +1322,8 @@ export const ReportsScreen = () => {
             </View>
           ))}
         </Card>
+      ) : null}
+        </>
       ) : null}
 
       <View style={styles.sectionHead}>
@@ -1324,50 +1379,6 @@ export const ReportsScreen = () => {
             </Text>
           ) : null}
         </View>
-      ) : null}
-
-      {latestComparisonSummary ? (
-        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
-          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Recovery-Oriented Comparison</Text>
-          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>{latestComparisonSummary}</Text>
-        </Card>
-      ) : null}
-
-      {biomarkerTrends.length > 0 ? (
-        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
-          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Biomarker Trend Chart</Text>
-          {biomarkerTrends.map((trend) => {
-            const maxValue = Math.max(Math.abs(trend.prior.value), Math.abs(trend.current.value), 1);
-            const previousWidth = Math.max(10, Math.min(100, (Math.abs(trend.prior.value) / maxValue) * 100));
-            const currentWidth = Math.max(10, Math.min(100, (Math.abs(trend.current.value) / maxValue) * 100));
-            const positive = trend.label === 'Improved';
-            return (
-              <View key={trend.name} style={[styles.trendChartRow, !isLight && styles.trendChartRowDark]}>
-                <View style={styles.trendChartHead}>
-                  <Text style={[styles.trendChartName, !isLight && styles.trendChartNameDark]}>{trend.name}</Text>
-                  <Text style={[styles.trendChartBadge, positive ? styles.trendChartBadgeGood : styles.trendChartBadgeWatch]}>
-                    {trend.label}
-                  </Text>
-                </View>
-                <View style={styles.trendBarLine}>
-                  <Text style={[styles.trendBarLabel, !isLight && styles.trendBarLabelDark]}>{trend.prior.value} {trend.prior.unit}</Text>
-                  <View style={styles.trendTrack}><View style={[styles.trendPreviousFill, { width: `${previousWidth}%` }]} /></View>
-                </View>
-                <View style={styles.trendBarLine}>
-                  <Text style={[styles.trendBarLabel, !isLight && styles.trendBarLabelDark]}>{trend.current.value} {trend.current.unit}</Text>
-                  <View style={styles.trendTrack}><View style={[styles.trendCurrentFill, { width: `${currentWidth}%` }]} /></View>
-                </View>
-              </View>
-            );
-          })}
-        </Card>
-      ) : latestReport ? (
-        <Card style={[styles.detailCard, !isLight && styles.detailCardDark]}>
-          <Text style={[styles.detailTitle, !isLight && styles.detailTitleDark]}>Biomarker Trend Chart</Text>
-          <Text style={[styles.detailEmpty, !isLight && styles.detailEmptyDark]}>
-            This is your first health report. Future reports will be compared against this baseline.
-          </Text>
-        </Card>
       ) : null}
 
       {!showUploadSheet && !showProcessing ? (
@@ -1955,6 +1966,141 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 13
   },
+  comparisonCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#D9E2D3',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 12,
+    padding: 16
+  },
+  comparisonCardDark: {
+    borderColor: colors.stroke,
+    backgroundColor: colors.card
+  },
+  comparisonHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12
+  },
+  comparisonHeaderCopy: {
+    flex: 1
+  },
+  comparisonTitle: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: 'Exo_700Bold',
+    color: palette.textDark
+  },
+  comparisonTitleDark: {
+    color: colors.white
+  },
+  comparisonSubtitle: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 18,
+    color: palette.textMid
+  },
+  comparisonSubtitleDark: {
+    color: colors.textSecondary
+  },
+  comparisonLink: {
+    paddingTop: 2,
+    fontSize: 12,
+    lineHeight: 20,
+    fontFamily: 'Exo_600SemiBold',
+    color: colors.success
+  },
+  comparisonStats: {
+    marginTop: 16,
+    flexDirection: 'row',
+    gap: 8
+  },
+  comparisonStat: {
+    flex: 1,
+    minHeight: 72,
+    borderRadius: 12,
+    backgroundColor: '#F5F7F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4
+  },
+  comparisonStatDark: {
+    backgroundColor: colors.cardMuted
+  },
+  comparisonStatValue: {
+    fontSize: 24,
+    lineHeight: 30,
+    fontFamily: 'Exo_700Bold'
+  },
+  comparisonStatLabel: {
+    marginTop: 2,
+    fontSize: 10,
+    lineHeight: 14,
+    textAlign: 'center',
+    color: palette.textMid
+  },
+  comparisonStatLabelDark: {
+    color: colors.textSecondary
+  },
+  comparisonGood: {
+    color: colors.success
+  },
+  comparisonAttention: {
+    color: colors.danger
+  },
+  comparisonNeutral: {
+    color: colors.textMuted
+  },
+  comparisonGroup: {
+    marginTop: 18
+  },
+  comparisonGroupTitle: {
+    marginBottom: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: 'Exo_700Bold',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase'
+  },
+  comparisonMarkerRow: {
+    minHeight: 56,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.stroke
+  },
+  comparisonMarkerCopy: {
+    flex: 1
+  },
+  comparisonMarkerName: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: 'Exo_600SemiBold',
+    color: colors.textPrimary
+  },
+  comparisonMarkerValues: {
+    marginTop: 2,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.textSecondary
+  },
+  comparisonMarkerStatus: {
+    maxWidth: 104,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'right',
+    fontFamily: 'Exo_600SemiBold'
+  },
+  comparisonFootnote: {
+    marginTop: 14,
+    fontSize: 11,
+    lineHeight: 17,
+    color: palette.textMid
+  },
   parameterRow: {
     borderWidth: 1,
     borderColor: colors.stroke,
@@ -2251,19 +2397,6 @@ const styles = StyleSheet.create({
   scoreBadgeText: {
     fontSize: 17,
     fontFamily: 'Exo_700Bold'
-  },
-  trend: {
-    fontSize: 16,
-    fontFamily: 'Exo_700Bold'
-  },
-  trendUp: {
-    color: '#60AF00'
-  },
-  trendDown: {
-    color: palette.coral
-  },
-  trendFlat: {
-    color: palette.textMid
   },
   fab: {
     position: 'absolute',
@@ -3024,7 +3157,4 @@ const styles = StyleSheet.create({
   reportMetaDark: {
     color: '#4A4A4A'
   },
-  trendDark: {
-    opacity: 0.95
-  }
 });

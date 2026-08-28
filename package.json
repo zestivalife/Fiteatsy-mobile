@@ -12,6 +12,7 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "test": "jest",
+    "test:splash-contract": "node scripts/verify-frozen-splash.mjs && jest --runInBand test/videoIntro.test.ts",
     "test:canonical-data-contract": "jest --runInBand test/canonicalClientDataContract.test.ts && cd backend && node --import tsx --test ../test/onboardingGate.test.ts"
   },
   "dependencies": {

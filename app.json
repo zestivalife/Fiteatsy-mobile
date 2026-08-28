@@ -80,7 +80,8 @@
           "NSHealthUpdateUsageDescription": false
         }
       ],
-      "expo-video"
+      "expo-video",
+      "./plugins/withFrozenSplashBridge"
     ]
   }
 }

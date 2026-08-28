@@ -134,6 +134,35 @@ export type ReportDto = {
   }>;
 };
 
+export type ReportComparisonClassification = 'improved' | 'stable' | 'needs_attention' | 'changed' | 'incomparable';
+
+export type ReportComparisonItem = {
+  biomarkerId: string;
+  displayName: string;
+  category: 'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins';
+  previous: { value: number; unit: string; status: 'normal' | 'low' | 'high'; referenceRange: string } | null;
+  latest: { value: number; unit: string; status: 'normal' | 'low' | 'high'; referenceRange: string } | null;
+  comparison: { classification: ReportComparisonClassification; delta: number | null; rationale: string };
+};
+
+export type ReportComparisonProjection = {
+  latestReport: { id: string; reportDate: string; title: string };
+  previousReport: { id: string; reportDate: string; title: string };
+  summary: {
+    comparableCount: number;
+    improvedCount: number;
+    stableCount: number;
+    needsAttentionCount: number;
+    changedCount: number;
+    incomparableCount: number;
+  };
+  improved: ReportComparisonItem[];
+  needsAttention: ReportComparisonItem[];
+  stable: ReportComparisonItem[];
+  changed: ReportComparisonItem[];
+  incomparable: ReportComparisonItem[];
+};
+
 type UploadProgressStage = 'uploading' | 'uploaded' | 'processing' | 'extraction' | 'validation' | 'completed' | 'failed';
 type UploadProgressEvent = { stage: UploadProgressStage; percent: number; message: string; status?: string; reportId?: string };
 
@@ -281,6 +310,15 @@ export const listAnalyzedReports = async (): Promise<ReportDto[]> => {
     }
   }
   throw new Error(lastError);
+};
+
+export const getCurrentReportComparison = async (): Promise<ReportComparisonProjection | null> => {
+  try {
+    return await requestJson<ReportComparisonProjection>(apiBaseUrl, '/v1/reports/comparison/current');
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('REPORT_API_HTTP_404')) return null;
+    throw error;
+  }
 };
 
 export const listBiomarkerHistory = async (): Promise<BiomarkerHistoryItem[]> => {

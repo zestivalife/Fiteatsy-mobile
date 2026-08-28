@@ -77,7 +77,11 @@ export const assertDestructiveTestResetAllowed = (
     source.FITEATSY_TEST_ENVIRONMENT
   ].filter(Boolean).join(' ');
 
-  if (PRODUCTION_NAME_PATTERN.test(designations) || PRODUCTION_NAME_PATTERN.test(database)) {
+  if (
+    PRODUCTION_NAME_PATTERN.test(hostname)
+    || PRODUCTION_NAME_PATTERN.test(database)
+    || PRODUCTION_NAME_PATTERN.test(designations)
+  ) {
     return blocked('production-like database target is forbidden', { environment, hostname, database });
   }
   const localhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';

@@ -20,6 +20,7 @@ import { HomeScreen } from '../screens/home/HomeScreen';
 import { TrackerScreen } from '../screens/home/TrackerScreen';
 import { TrackerDetailScreen } from '../screens/home/TrackerDetailScreen';
 import { ReportsScreen } from '../screens/home/ReportsScreen';
+import { ReportComparisonScreen } from '../screens/home/ReportComparisonScreen';
 import { SessionsScreen } from '../screens/home/SessionsScreen';
 import { FocusScreen } from '../screens/wellness/FocusScreen';
 import { BreathingScreen } from '../screens/wellness/BreathingScreen';
@@ -145,6 +146,7 @@ export const AppNavigation = () => {
         {__DEV__ ? <Stack.Screen name="HealthSyncDebug" component={HealthSyncDebugScreen} /> : null}
         <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
+        <Stack.Screen name="ReportComparison" component={ReportComparisonScreen} />
         <Stack.Screen name="Sessions" component={SessionsScreen} />
         <Stack.Screen name="Cycle" component={CycleScreen} />
         <Stack.Screen name="NutritionPlan" component={NutritionPlanScreen} />
