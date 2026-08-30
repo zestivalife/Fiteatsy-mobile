@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ChoiceCard, OnboardingAction, OnboardingShell, QuestionHeader } from '../../components/onboarding/OnboardingShell';
@@ -122,9 +122,14 @@ const MetricCore = ({ value, suffix, min, max, onValueChange, onMinus, onPlus, o
     onValueChange(bounded);
     setEntry(String(bounded));
   };
-  return <View style={styles.metricWrap}><Animated.View style={[styles.metricEntryRow, { opacity }]}><TextInput accessibilityLabel={`Enter ${suffix}`} keyboardType="decimal-pad" returnKeyType="done" value={entry} onChangeText={setEntry} onBlur={commit} onSubmitEditing={commit} selectTextOnFocus style={styles.metricInput} /><Text style={styles.metricSuffix}>{suffix}</Text></Animated.View><View style={styles.ruler}><View style={styles.marker} />{Array.from({ length: 17 }, (_, index) => <View key={index} style={[styles.tick, index % 4 === 0 && styles.majorTick]} />)}</View><View style={styles.metricButtons}><Pressable accessibilityRole="button" accessibilityLabel="Decrease value" onPress={onMinus} style={styles.metricButton}><Text style={styles.metricButtonText}>−</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Increase value" onPress={onPlus} style={styles.metricButton}><Text style={styles.metricButtonText}>+</Text></Pressable></View></View>;
+  const updateEntry = (next: string) => {
+    setEntry(next);
+    const parsed = Number(next);
+    if (Number.isFinite(parsed) && parsed >= min && parsed <= max) onValueChange(parsed);
+  };
+  return <View style={styles.metricWrap}><Animated.View style={[styles.metricEntryRow, { opacity }]}><TextInput accessibilityLabel={`Enter ${suffix}`} accessibilityHint={`Allowed range ${min} to ${max} ${suffix}`} keyboardType="decimal-pad" returnKeyType="done" value={entry} onChangeText={updateEntry} onBlur={commit} onSubmitEditing={() => { commit(); Keyboard.dismiss(); }} selectTextOnFocus style={styles.metricInput} /><Text style={styles.metricSuffix}>{suffix}</Text></Animated.View><Text style={styles.metricRange}>Enter {min}–{max} {suffix}</Text><View style={styles.ruler}><View style={styles.marker} />{Array.from({ length: 17 }, (_, index) => <View key={index} style={[styles.tick, index % 4 === 0 && styles.majorTick]} />)}</View><View style={styles.metricButtons}><Pressable accessibilityRole="button" accessibilityLabel="Decrease value" onPress={onMinus} style={styles.metricButton}><Text style={styles.metricButtonText}>−</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Increase value" onPress={onPlus} style={styles.metricButton}><Text style={styles.metricButtonText}>+</Text></Pressable></View></View>;
 };
-const Segment = ({ values, selected, onSelect }: { values: string[]; selected: string; onSelect: (value: string) => void }) => <View style={styles.segment}>{values.map((value) => <Pressable key={value} onPress={() => onSelect(value)} style={[styles.segmentItem, selected === value && styles.segmentActive]}><Text style={[styles.segmentText, selected === value && styles.segmentTextActive]}>{value}</Text></Pressable>)}</View>;
+const Segment = ({ values, selected, onSelect }: { values: string[]; selected: string; onSelect: (value: string) => void }) => <View style={styles.segment}>{values.map((value) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: selected === value }} onPress={() => onSelect(value)} style={[styles.segmentItem, selected === value && styles.segmentActive]}><Text style={[styles.segmentText, selected === value && styles.segmentTextActive]}>{value}</Text></Pressable>)}</View>;
 
 const styles = StyleSheet.create({
   list: { gap: spacing.sm }, binary: { gap: spacing.sm },
@@ -132,6 +137,7 @@ const styles = StyleSheet.create({
   segmentItem: { flex: 1, minHeight: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, segmentActive: { backgroundColor: '#49DF86' },
   segmentText: { ...typography.bodyStrong, color: colors.textSecondary }, segmentTextActive: { color: '#07120D' },
   metricWrap: { alignItems: 'center', paddingTop: spacing.xl }, metricEntryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs }, metricInput: { ...typography.metric, minWidth: 96, fontSize: 32, lineHeight: 40, color: colors.textPrimary, textAlign: 'right', paddingVertical: 0 }, metricSuffix: { ...typography.bodyStrong, fontSize: 16, color: colors.success },
+  metricRange: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
   ruler: { height: 100, width: '100%', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', position: 'relative', marginVertical: spacing.lg },
   marker: { position: 'absolute', left: '50%', bottom: 0, width: 3, height: 88, borderRadius: 2, backgroundColor: colors.success },
   tick: { width: 2, height: 20, backgroundColor: colors.stroke }, majorTick: { height: 36, backgroundColor: colors.textSecondary },

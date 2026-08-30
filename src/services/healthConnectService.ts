@@ -70,7 +70,7 @@ const safeReadRecords = async <TRecord>(
   options: Parameters<typeof readRecords>[1]
 ): Promise<Array<TRecord>> => {
   try {
-    const response = await readRecords(recordType, options);
+    const response = await withHealthConnectTimeout(readRecords(recordType, options));
     return (response?.records ?? []) as Array<TRecord>;
   } catch (error) {
     console.warn('[HealthConnect] readRecords_failed', recordType, error instanceof Error ? error.message : 'unknown_error');
@@ -174,7 +174,7 @@ export const getHealthConnectRuntimeDiagnostics = async (): Promise<HealthConnec
 
   let sdkStatus: number;
   try {
-    sdkStatus = await getSdkStatus();
+    sdkStatus = await withHealthConnectTimeout(getSdkStatus());
   } catch {
     return { ...base, sdkStatus: 'status_check_failed' };
   }
@@ -185,8 +185,8 @@ export const getHealthConnectRuntimeDiagnostics = async (): Promise<HealthConnec
   let initialized = false;
   let granted: Array<Permission> = [];
   try {
-    initialized = await initialize();
-    granted = (await getGrantedPermissions()) as Array<Permission>;
+    initialized = await withHealthConnectTimeout(initialize());
+    granted = (await withHealthConnectTimeout(getGrantedPermissions())) as Array<Permission>;
   } catch {
     return { ...base, sdkStatus: String(sdkStatus), initialized: false, permissionStates: {}, grantedPermissions: [] };
   }
@@ -290,7 +290,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
 
   let sdkStatus: number;
   try {
-    sdkStatus = await getSdkStatus();
+    sdkStatus = await withHealthConnectTimeout(getSdkStatus());
   } catch {
     throw new Error('health_connect_status_failed');
   }
@@ -301,7 +301,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
 
   let initialized = false;
   try {
-    initialized = await initialize();
+    initialized = await withHealthConnectTimeout(initialize());
   } catch {
     throw new Error('health_connect_initialize_failed');
   }
@@ -312,7 +312,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
 
   let granted: Array<Permission> = [];
   try {
-    granted = (await getGrantedPermissions()) as Array<Permission>;
+    granted = (await withHealthConnectTimeout(getGrantedPermissions())) as Array<Permission>;
   } catch {
     throw new Error('health_connect_permission_flow_failed');
   }

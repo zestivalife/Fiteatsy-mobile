@@ -59,7 +59,7 @@ export const OnboardingShell = ({ phase, phaseLabel, step, total, onBack, childr
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
           {onBack ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Go back" hitSlop={8} onPress={onBack} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
@@ -69,7 +69,7 @@ export const OnboardingShell = ({ phase, phaseLabel, step, total, onBack, childr
           <View style={styles.progressColumn}>
             <View style={styles.phaseRow}>
               <Text style={[styles.phase, phaseLabel && styles.phaseQualifier]}>{phaseLabel ?? phase}</Text>
-              <Text style={styles.counter}>Step {step} of {total}</Text>
+              <Text accessibilityLabel={`Step ${step} of ${total}`} style={styles.counter}>Step {step} of {total}</Text>
             </View>
             <View style={styles.segments}>
               {[0, 1, 2, 3, 4].map((index) => {

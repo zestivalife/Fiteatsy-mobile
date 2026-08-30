@@ -86,7 +86,8 @@ export const OnboardingFoodPreferencesFlow = ({
   );
 
   return (
-    <OnboardingShell phase="LIFESTYLE" phaseLabel="LIFESTYLE · NUTRITION" step={step} total={4} onBack={back} direction={direction} action={action}>
+    <OnboardingShell phase="LIFESTYLE" phaseLabel="LIFESTYLE · NUTRITION" step={step} total={4} onBack={saving ? undefined : back} direction={direction} action={action}>
+      <View pointerEvents={saving ? 'none' : 'auto'} accessibilityState={{ disabled: saving }}>
       {step === 1 ? <>
         <QuestionHeader title="What best describes how you usually eat?" description="We'll use this to recommend meals that already fit your lifestyle." />
         <View style={styles.stack}>{diets.map((choice) => <LargeChoice key={choice.value} choice={choice} selected={profile.dietType === choice.value} onPress={() => update('dietType', choice.value as FoodPreferenceProfile['dietType'])} />)}</View>
@@ -139,6 +140,7 @@ export const OnboardingFoodPreferencesFlow = ({
         </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </> : null}
+      </View>
     </OnboardingShell>
   );
 };

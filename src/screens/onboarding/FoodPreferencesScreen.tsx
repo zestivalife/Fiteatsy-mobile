@@ -83,7 +83,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
           }
         }
       })
-      .catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'Unable to load food preferences.'))
+      .catch(() => setError("We couldn't load your food preferences. Please check your connection and try again."))
       .finally(() => setLoading(false));
   }, [clientId, mode]);
 
@@ -93,7 +93,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       setFoodError(null);
       searchFoodCatalogue(foodQuery)
         .then((response) => setFoodItems(response.items))
-        .catch((requestError) => setFoodError(requestError instanceof Error ? requestError.message : 'Unable to load foods.'))
+        .catch(() => setFoodError("Foods couldn't be loaded. Check your connection and try again."))
         .finally(() => setFoodLoading(false));
     }, 250);
     return () => clearTimeout(timer);
@@ -164,6 +164,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
 
   return (
     <Screen scroll>
+      <View pointerEvents={saving ? 'none' : 'auto'} accessibilityState={{ disabled: saving }}>
       <Text style={[styles.eyebrow, { color: palette.blue }]}>FOOD PREFERENCES</Text>
       <Text style={[styles.title, { color: palette.textPrimary }]}>Food Preferences</Text>
       <Text style={[styles.body, { color: palette.textSecondary }]}>Your choices help your consultant personalise recommendations. Clinical restrictions remain managed separately.</Text>
@@ -211,6 +212,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       </Card>
 
       {savedAt ? <Text style={[styles.saved, { color: palette.textSecondary }]}>Last updated {new Date(savedAt).toLocaleDateString()}</Text> : null}
+      </View>
       {error ? <Text style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
       <PrimaryButton title={saving ? 'Saving...' : 'Save food preferences'} onPress={save} disabled={saving} />
     </Screen>
