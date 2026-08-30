@@ -261,7 +261,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen>
+    <Screen testID="auth.signUp.root">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
         {phase === 'collect' ? (
           <>

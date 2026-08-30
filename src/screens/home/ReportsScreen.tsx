@@ -1066,14 +1066,14 @@ export const ReportsScreen = () => {
   const reportCountLabel = `${reports.length}`;
 
   return (
-    <Screen scroll contentStyle={[styles.screenContent, !isLight && styles.screenContentDark]}>
+    <Screen testID="reports.root" scroll contentStyle={[styles.screenContent, !isLight && styles.screenContentDark]}>
       <View style={styles.header}>
         <AppBackButton onPress={() => navigation.goBack()} iconOnly style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]} />
         <View style={styles.headerCopy}>
           <Text style={[styles.headerTitle, !isLight && styles.headerTitleDark]}>My Health</Text>
           <Text style={[styles.headerSubtitle, !isLight && styles.headerSubtitleDark]}>REPORTS &amp; INTELLIGENCE</Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Upload health report" style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]} onPress={openUploadSheet}>
+        <Pressable testID="reports.upload" accessibilityRole="button" accessibilityLabel="Upload health report" style={[styles.headerIconBtn, !isLight && styles.headerIconBtnDark]} onPress={openUploadSheet}>
           <Ionicons name="cloud-upload-outline" size={18} color={isLight ? palette.teal : sectionHighlight} />
         </Pressable>
       </View>
@@ -1174,7 +1174,7 @@ export const ReportsScreen = () => {
           <Text style={[styles.noReportCopy, !isLight && styles.noReportCopyDark]}>
             Upload your blood or diagnostic report and Fiteatsy will organise your biomarkers, highlight important changes and help you understand what deserves attention.
           </Text>
-          <Pressable accessibilityRole="button" style={styles.noReportUploadButton} onPress={() => setShowUploadSheet(true)}>
+          <Pressable testID="reports.upload.empty" accessibilityRole="button" style={styles.noReportUploadButton} onPress={() => setShowUploadSheet(true)}>
             <Text style={styles.noReportUploadText}>Upload Health Report</Text>
           </Pressable>
           <View style={styles.noReportMetaRow}>
@@ -1420,7 +1420,7 @@ export const ReportsScreen = () => {
       ) : null}
 
       {!showUploadSheet && !showProcessing ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Upload health report" style={[styles.fab, { backgroundColor: sectionHighlight }]} onPress={openUploadSheet}>
+        <Pressable testID="reports.upload.fab" accessibilityRole="button" accessibilityLabel="Upload health report" style={[styles.fab, { backgroundColor: sectionHighlight }]} onPress={openUploadSheet}>
           <Ionicons name="cloud-upload-outline" size={24} color={colors.white} />
         </Pressable>
       ) : null}

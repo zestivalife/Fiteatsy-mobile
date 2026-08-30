@@ -465,7 +465,7 @@ export const MedicationCalendarScreen = () => {
   );
 
   return (
-    <Screen>
+    <Screen testID="medication.root">
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <PageHeader
           title="Medication Tracker"

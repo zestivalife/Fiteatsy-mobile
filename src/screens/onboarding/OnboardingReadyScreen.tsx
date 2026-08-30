@@ -21,13 +21,13 @@ export const OnboardingReadyScreen = ({ navigation }: Props) => {
   const consultantReady = Boolean(onboarding?.assignedConsultantId);
   const enter = () => { void clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId); setWearableSetupCompleted(true); navigation.reset({ index: 0, routes: [{ name: 'Main' }] }); };
 
-  return <OnboardingShell phase="READY" step={1} total={1} onBack={() => navigation.goBack()} scroll action={<View><OnboardingAction title="Enter Fiteatsy" onPress={enter} /><OnboardingAction title="Review my answers" secondary onPress={() => navigation.navigate('OnboardingBasics')} /></View>}>
+  return <OnboardingShell phase="READY" step={1} total={1} onBack={() => navigation.goBack()} scroll action={<View><OnboardingAction testID="ready.enter" title="Enter Fiteatsy" onPress={enter} /><OnboardingAction testID="ready.review" title="Review my answers" secondary onPress={() => navigation.navigate('OnboardingBasics')} /></View>}>
     <Animated.View style={[styles.hero, { opacity: reveal, transform: [{ scale: reveal.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
       <View style={styles.checkHero}><Ionicons name="checkmark" size={36} color={colors.textPrimary} /></View>
       <Text style={styles.title}>Your profile setup is complete</Text>
       <Text style={styles.subtitle}>Optional connections and consultant matching can continue after you enter Fiteatsy.</Text>
     </Animated.View>
-    <View style={styles.list}>
+    <View testID="ready.root" style={styles.list}>
       <Status icon="person-outline" label="Health profile" status={healthReady ? 'Ready' : 'Needs attention'} tone="green" />
       <Status icon="pulse-outline" label="Recovery baseline" status={recoveryReady ? 'Ready' : 'Needs attention'} tone="green" />
       <Status icon="heart-outline" label="Nutrition profile" status={nutritionReady ? 'Ready' : 'Needs attention'} tone="green" />

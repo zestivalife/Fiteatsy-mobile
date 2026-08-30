@@ -9,12 +9,14 @@ type Props = {
   loading?: boolean;
   variant?: 'primary' | 'secondary';
   style?: StyleProp<ViewStyle>;
+  testID?: string;
 };
 
-export const PrimaryButton = ({ title, onPress, disabled = false, loading = false, variant = 'primary', style }: Props) => {
+export const PrimaryButton = ({ title, onPress, disabled = false, loading = false, variant = 'primary', style, testID }: Props) => {
   const unavailable = disabled || loading;
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityState={{ disabled: unavailable, busy: loading }}

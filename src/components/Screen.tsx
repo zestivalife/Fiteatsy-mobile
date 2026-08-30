@@ -8,11 +8,13 @@ import { useAppContext } from '../state/AppContext';
 export const Screen = ({
   children,
   scroll = false,
-  contentStyle
+  contentStyle,
+  testID
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  testID?: string;
 }) => {
   const { themeMode } = useAppContext();
   const themeGradients = getThemeGradients(themeMode);
@@ -20,7 +22,7 @@ export const Screen = ({
 
   return (
     <LinearGradient colors={[...backgroundGradient]} style={styles.gradient}>
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} testID={testID}>
         {scroll ? (
           <ScrollView contentContainerStyle={[styles.content, contentStyle]} showsVerticalScrollIndicator={false}>{children}</ScrollView>
         ) : (

@@ -307,7 +307,7 @@ export const HomeScreen = () => {
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} testID="home.root">
       <LinearGradient colors={['#262B2F', '#16191D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.screenGradient}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.referenceFrame}>
@@ -463,7 +463,7 @@ const RecoveryPanel = ({
   }, [clampedScore, scoreArcProgress]);
 
   return (
-    <View style={styles.recoveryPanel}>
+    <View style={styles.recoveryPanel} testID="home.recoveryCore">
       <View style={styles.recoveryStage}>
         <View style={styles.starShadow} pointerEvents="none">
           <RecoveryStarAsset width={406} height={492} pointerEvents="none" />
@@ -517,7 +517,7 @@ const RecoveryPanel = ({
         >
           <Text style={styles.coreScore}>{selectedScore == null ? '--/100' : `${selectedScore}/100`}</Text>
           <Text style={styles.coreLabel}>{selectedLabel}</Text>
-          <View style={[styles.stateChip, { backgroundColor: selectedScore == null ? '#23272D' : selectedColor }]}>
+          <View testID="home.recoveryCore.state" style={[styles.stateChip, { backgroundColor: selectedScore == null ? '#23272D' : selectedColor }]}>
             <Text style={styles.stateChipText}>{selectedState.label}</Text>
           </View>
         </Pressable>

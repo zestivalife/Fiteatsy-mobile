@@ -62,7 +62,7 @@ export const OnboardingShell = ({ phase, phaseLabel, step, total, onBack, childr
       <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
           {onBack ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Go back" hitSlop={8} onPress={onBack} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+            <Pressable testID="onboarding.back" accessibilityRole="button" accessibilityLabel="Go back" hitSlop={8} onPress={onBack} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
               <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
             </Pressable>
           ) : <View style={styles.backSpacer} />}
@@ -71,7 +71,7 @@ export const OnboardingShell = ({ phase, phaseLabel, step, total, onBack, childr
               <Text style={[styles.phase, phaseLabel && styles.phaseQualifier]}>{phaseLabel ?? phase}</Text>
               <Text accessibilityLabel={`Step ${step} of ${total}`} style={styles.counter}>Step {step} of {total}</Text>
             </View>
-            <View style={styles.segments}>
+            <View testID="onboarding.progress" style={styles.segments}>
               {[0, 1, 2, 3, 4].map((index) => {
                 const completed = index < currentPhase;
                 const current = index === currentPhase;
@@ -90,8 +90,9 @@ export const OnboardingShell = ({ phase, phaseLabel, step, total, onBack, childr
   );
 };
 
-export const OnboardingAction = ({ title, onPress, disabled = false, secondary }: { title: string; onPress: () => void; disabled?: boolean; secondary?: boolean }) => (
+export const OnboardingAction = ({ title, onPress, disabled = false, secondary, testID }: { title: string; onPress: () => void; disabled?: boolean; secondary?: boolean; testID?: string }) => (
   <Pressable
+    testID={testID ?? (title === 'Continue' ? 'onboarding.continue' : title === 'Skip for now' ? 'onboarding.skip' : undefined)}
     accessibilityRole="button"
     accessibilityState={{ disabled }}
     disabled={disabled}

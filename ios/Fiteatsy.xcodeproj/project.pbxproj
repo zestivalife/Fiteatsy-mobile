@@ -8,13 +8,25 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		1C23F6326198722A021058F2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6B9DD1738E262F47928DD681 /* Foundation.framework */; };
 		2DF8462E8D0C2513BCFD2114 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 2B4BAB4C0C398CFD3EFE4B4F /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		40CC07BFCF49BE5C77923593 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958A63C649AAD5415D63FAE7 /* ExpoModulesProvider.swift */; };
+		9B5F01EE94A3E8D4EFA6A28E /* FiteatsyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E983DDF008CA5547C83D52 /* FiteatsyUITests.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		C7F058B7A480AAB4D4C9DC20 /* libPods-Fiteatsy.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0320D64BE0B76831B209C788 /* libPods-Fiteatsy.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		FBE90A499C674875EA1B3247 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
+			remoteInfo = Fiteatsy;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0320D64BE0B76831B209C788 /* libPods-Fiteatsy.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Fiteatsy.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -23,6 +35,8 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Fiteatsy/Info.plist; sourceTree = "<group>"; };
 		21CE2DFCE40D006D14DA1C2F /* Pods-Fiteatsy.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Fiteatsy.debug.xcconfig"; path = "Target Support Files/Pods-Fiteatsy/Pods-Fiteatsy.debug.xcconfig"; sourceTree = "<group>"; };
 		2B4BAB4C0C398CFD3EFE4B4F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Fiteatsy/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		48DE9BB2E6C5D6C0A7B25ABD /* FiteatsyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FiteatsyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6B9DD1738E262F47928DD681 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		958A63C649AAD5415D63FAE7 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Fiteatsy/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Fiteatsy/SplashScreen.storyboard; sourceTree = "<group>"; };
 		AC384A55E488BDC88DCF32D0 /* Pods-Fiteatsy.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Fiteatsy.release.xcconfig"; path = "Target Support Files/Pods-Fiteatsy/Pods-Fiteatsy.release.xcconfig"; sourceTree = "<group>"; };
@@ -30,6 +44,7 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Fiteatsy/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Fiteatsy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Fiteatsy-Bridging-Header.h"; path = "Fiteatsy/Fiteatsy-Bridging-Header.h"; sourceTree = "<group>"; };
+		F5E983DDF008CA5547C83D52 /* FiteatsyUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FiteatsyUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -38,6 +53,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				C7F058B7A480AAB4D4C9DC20 /* libPods-Fiteatsy.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FBED316AE3D3EF2255A3CC4D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C23F6326198722A021058F2 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -81,8 +104,18 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				0320D64BE0B76831B209C788 /* libPods-Fiteatsy.a */,
+				BAE065759EB9A0954413BC91 /* iOS */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		482BF72F5EEC23B9C52833B8 /* FiteatsyUITests */ = {
+			isa = PBXGroup;
+			children = (
+				F5E983DDF008CA5547C83D52 /* FiteatsyUITests.swift */,
+			);
+			name = FiteatsyUITests;
+			path = FiteatsyUITests;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -101,6 +134,7 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				02F13FDD330F3D6954796274 /* Pods */,
 				EAC6D6B7E700E6DA70F163AF /* ExpoModulesProviders */,
+				482BF72F5EEC23B9C52833B8 /* FiteatsyUITests */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -111,8 +145,17 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* Fiteatsy.app */,
+				48DE9BB2E6C5D6C0A7B25ABD /* FiteatsyUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		BAE065759EB9A0954413BC91 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				6B9DD1738E262F47928DD681 /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -157,6 +200,24 @@
 			productReference = 13B07F961A680F5B00A75B9A /* Fiteatsy.app */;
 			productType = "com.apple.product-type.application";
 		};
+		76E8100306C57641345DA4B5 /* FiteatsyUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6006035C62E1C5ED86818CCF /* Build configuration list for PBXNativeTarget "FiteatsyUITests" */;
+			buildPhases = (
+				285C155C50AE124D40DAEFA8 /* Sources */,
+				FBED316AE3D3EF2255A3CC4D /* Frameworks */,
+				6D72C75104A6029DE52255F9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E27F7D861B86894245CBB567 /* PBXTargetDependency */,
+			);
+			name = FiteatsyUITests;
+			productName = FiteatsyUITests;
+			productReference = 48DE9BB2E6C5D6C0A7B25ABD /* FiteatsyUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -184,6 +245,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* Fiteatsy */,
+				76E8100306C57641345DA4B5 /* FiteatsyUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -197,6 +259,13 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				2DF8462E8D0C2513BCFD2114 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6D72C75104A6029DE52255F9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -348,7 +417,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		285C155C50AE124D40DAEFA8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9B5F01EE94A3E8D4EFA6A28E /* FiteatsyUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E27F7D861B86894245CBB567 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Fiteatsy;
+			target = 13B07F861A680F5B00A75B9A /* Fiteatsy */;
+			targetProxy = FBE90A499C674875EA1B3247 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -535,6 +621,41 @@
 			};
 			name = Release;
 		};
+		D0613364276534DA2CD91F7F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = com.fiteatsy.health.FiteatsyUITests;
+				PRODUCT_MODULE_NAME = FiteatsyUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Fiteatsy;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		EB62F460D980BA4002B4F9DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = com.fiteatsy.health.FiteatsyUITests;
+				PRODUCT_MODULE_NAME = FiteatsyUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Fiteatsy;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -543,6 +664,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6006035C62E1C5ED86818CCF /* Build configuration list for PBXNativeTarget "FiteatsyUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D0613364276534DA2CD91F7F /* Release */,
+				EB62F460D980BA4002B4F9DA /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

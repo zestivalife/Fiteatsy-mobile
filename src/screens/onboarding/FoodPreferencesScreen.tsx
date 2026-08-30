@@ -194,7 +194,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   };
 
   if (loadState === 'loading') {
-    return <Screen><View style={styles.center} accessibilityRole="progressbar" accessibilityLabel="Loading your food preferences"><Card><View style={styles.loadCard}><ActivityIndicator color={palette.blue} size="large" /><Text style={[styles.loadTitle, { color: palette.textPrimary }]}>Loading your food preferences</Text><Text style={[styles.body, styles.centerText, { color: palette.textSecondary }]}>Bringing back your saved choices.</Text></View></Card></View></Screen>;
+    return <Screen><View testID="food.loading" style={styles.center} accessibilityRole="progressbar" accessibilityLabel="Loading your food preferences"><Card><View style={styles.loadCard}><ActivityIndicator color={palette.blue} size="large" /><Text style={[styles.loadTitle, { color: palette.textPrimary }]}>Loading your food preferences</Text><Text style={[styles.body, styles.centerText, { color: palette.textSecondary }]}>Bringing back your saved choices.</Text></View></Card></View></Screen>;
   }
 
   if (loadState !== 'content') {
@@ -206,10 +206,10 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       </View>
       <View style={styles.center}>
         <Card>
-          <View style={styles.loadCard}>
+          <View testID="food.error" style={styles.loadCard}>
             <Text style={[styles.loadTitle, { color: palette.textPrimary }]}>{error}</Text>
             <Text style={[styles.body, styles.centerText, { color: palette.textSecondary }]}>{loadState === 'offline' ? 'Check your connection and try again.' : loadState === 'auth_required' ? 'Your saved selections are still safe.' : 'Please try again.'}</Text>
-            <PrimaryButton title="Try again" onPress={loadPreferences} />
+            <PrimaryButton testID="food.retry" title="Try again" onPress={loadPreferences} />
           </View>
         </Card>
       </View>
@@ -287,7 +287,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       {savedAt ? <Text style={[styles.saved, { color: palette.textSecondary }]}>Last updated {new Date(savedAt).toLocaleDateString()}</Text> : null}
       </View>
       {error ? <Text style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
-      <PrimaryButton title={saving ? 'Saving...' : 'Save food preferences'} onPress={save} disabled={saving} />
+      <PrimaryButton testID="food.save" title={saving ? 'Saving...' : 'Save food preferences'} onPress={save} disabled={saving} />
     </Screen>
   );
 };
@@ -321,13 +321,13 @@ const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery,
   return <Card>
     <SectionTitle title={title} color={palette.textPrimary} />
     <Text style={[styles.helper, { color: palette.textSecondary }]}>{helper}</Text>
-    <TextInput accessibilityLabel={`Search ${title}`} value={activeMode === mode ? query : ''} onFocus={() => setMode(mode)} onChangeText={(value) => { setMode(mode); setQuery(value); }} placeholder="Search foods" placeholderTextColor={palette.textSecondary} style={[styles.searchInput, { color: palette.textPrimary, backgroundColor: palette.cardMuted, borderColor: palette.stroke }]} />
-    {activeMode === mode && loading ? <Text style={[styles.helper, { color: palette.textSecondary }]}>Searching foods...</Text> : null}
-    {activeMode === mode && error ? <Text style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
+    <TextInput testID="food.avoid.search" accessibilityLabel={`Search ${title}`} value={activeMode === mode ? query : ''} onFocus={() => setMode(mode)} onChangeText={(value) => { setMode(mode); setQuery(value); }} placeholder="Search foods" placeholderTextColor={palette.textSecondary} style={[styles.searchInput, { color: palette.textPrimary, backgroundColor: palette.cardMuted, borderColor: palette.stroke }]} />
+    {activeMode === mode && loading ? <Text testID="food.loading" style={[styles.helper, { color: palette.textSecondary }]}>Searching foods...</Text> : null}
+    {activeMode === mode && error ? <Text testID="food.error" style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
     {activeMode === mode && !loading && !error && !items.length ? <Text style={[styles.helper, { color: palette.textSecondary }]}>No foods found.</Text> : null}
     <View style={styles.choiceGrid}>{(activeMode === mode ? items : []).map((item) => {
       const active = selected.includes(item.id);
-      return <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => onToggle(item.id)} style={[styles.choice, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }, active && { backgroundColor: palette.blue, borderColor: palette.blue }]}><Text style={[styles.choiceText, { color: active ? '#FFFFFF' : palette.textPrimary }]}>{item.displayName}</Text></Pressable>;
+      return <Pressable testID={`food.result.${item.id}`} key={item.id} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => onToggle(item.id)} style={[styles.choice, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }, active && { backgroundColor: palette.blue, borderColor: palette.blue }]}><Text style={[styles.choiceText, { color: active ? '#FFFFFF' : palette.textPrimary }]}>{item.displayName}</Text></Pressable>;
     })}</View>
     {selected.length ? <Text style={[styles.selectedCount, { color: palette.textSecondary }]}>{selected.length} selected</Text> : null}
   </Card>;

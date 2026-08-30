@@ -890,6 +890,7 @@ const CurvedHealthTabs = ({
         return (
           <Pressable
             key={tab.key}
+            testID={`tracker.${tab.key}`}
             style={styles.curvedTab}
             onPress={() => onChange(tab.key)}
             accessibilityRole="tab"
@@ -1659,10 +1660,11 @@ export const TrackerScreen = () => {
   };
 
   return (
-    <Screen scroll contentStyle={styles.screenContent}>
+    <Screen testID="tracker.root" scroll contentStyle={styles.screenContent}>
       <View style={styles.topRow}>
         <View style={[styles.tabSwitch, isLight ? styles.tabSwitchLight : styles.tabSwitchDark]}>
           <Pressable
+            testID="tracker.health"
             style={[styles.tabButton, activeTab === 'health' && styles.tabButtonActive, activeTab === 'health' && { backgroundColor: sectionHighlight }]}
             onPress={() => setActiveTab('health')}
             accessibilityRole="button"
@@ -1671,6 +1673,7 @@ export const TrackerScreen = () => {
             <Text style={[styles.tabText, !isLight && styles.tabTextDark, activeTab === 'health' && styles.tabTextActive]}>Health Tracker</Text>
           </Pressable>
           <Pressable
+            testID="tracker.wellness"
             style={[styles.tabButton, activeTab === 'wellness' && styles.tabButtonActive, activeTab === 'wellness' && { backgroundColor: sectionHighlight }]}
             onPress={() => setActiveTab('wellness')}
             accessibilityRole="button"

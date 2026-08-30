@@ -22,6 +22,7 @@ const dairy: Choice[] = [{ label: 'Yes', value: 'allowed' }, { label: 'Prefer li
 const proteins: Choice[] = [{ label: 'Eggs', value: 'egg' }, { label: 'Chicken', value: 'chicken' }, { label: 'Fish', value: 'fish' }, { label: 'Mutton', value: 'mutton' }, { label: 'Paneer', value: 'paneer' }, { label: 'Dal / Pulses', value: 'dal_pulses' }];
 
 const toggle = (values: string[], value: string) => values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+const identifier = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
 export const OnboardingFoodPreferencesFlow = ({
   profile,
@@ -75,8 +76,8 @@ export const OnboardingFoodPreferencesFlow = ({
 
   const action = step === 4 ? (
     <>
-      <OnboardingAction title={saving ? 'Saving...' : saveFailed ? 'Try again' : 'Looks good'} onPress={onSave} disabled={saving || !profile.dietType} />
-      <OnboardingAction title="Edit preferences" onPress={() => go(1)} secondary />
+      <OnboardingAction testID="food.save" title={saving ? 'Saving...' : saveFailed ? 'Try again' : 'Looks good'} onPress={onSave} disabled={saving || !profile.dietType} />
+      <OnboardingAction testID="food.edit" title="Edit preferences" onPress={() => go(1)} secondary />
     </>
   ) : (
     <>
@@ -90,7 +91,7 @@ export const OnboardingFoodPreferencesFlow = ({
       <View pointerEvents={saving ? 'none' : 'auto'} accessibilityState={{ disabled: saving }}>
       {step === 1 ? <>
         <QuestionHeader title="What best describes how you usually eat?" description="We'll use this to recommend meals that already fit your lifestyle." />
-        <View style={styles.stack}>{diets.map((choice) => <LargeChoice key={choice.value} choice={choice} selected={profile.dietType === choice.value} onPress={() => update('dietType', choice.value as FoodPreferenceProfile['dietType'])} />)}</View>
+        <View style={styles.stack}>{diets.map((choice) => <LargeChoice testID={`food.diet.${choice.value}`} key={choice.value} choice={choice} selected={profile.dietType === choice.value} onPress={() => update('dietType', choice.value as FoodPreferenceProfile['dietType'])} />)}</View>
         <Info text="Preferences help personalise suggestions. Medical restrictions are managed separately." />
       </> : null}
 
@@ -98,8 +99,8 @@ export const OnboardingFoodPreferencesFlow = ({
         <QuestionHeader title="Which cuisines feel most like home?" description="Choose all you enjoy. We'll prioritise familiar foods where they fit your plan." />
         {profile.cuisines.length ? <Text style={styles.count}>{profile.cuisines.length} selected</Text> : null}
         <View style={styles.chips}>
-          {cuisines.map((label) => <Chip key={label} label={label} selected={profile.cuisines.includes(label)} onPress={() => update('cuisines', toggle(profile.cuisines, label))} accent={colors.blue} />)}
-          <Chip label="No strong preference" selected={profile.cuisines.length === 0} onPress={() => update('cuisines', [])} accent={colors.blue} />
+          {cuisines.map((label) => <Chip testID={`food.cuisine.${identifier(label)}`} key={label} label={label} selected={profile.cuisines.includes(label)} onPress={() => update('cuisines', toggle(profile.cuisines, label))} accent={colors.blue} />)}
+          <Chip testID="food.cuisine.none" label="No strong preference" selected={profile.cuisines.length === 0} onPress={() => update('cuisines', [])} accent={colors.blue} />
         </View>
         <Info text={profile.cuisines.length ? `We'll prioritise familiar ${dietLabel.toLowerCase()} ${profile.cuisines[0]} meal options.` : 'No cuisine preference will be applied.'} />
       </> : null}
@@ -107,9 +108,9 @@ export const OnboardingFoodPreferencesFlow = ({
       {step === 3 ? <>
         <QuestionHeader title="What usually works for your meals?" description="A few everyday choices help us make your plan easier to follow." />
         <FieldLabel text="Main-meal staple" />
-        <View style={styles.equalRow}>{staples.map((choice) => <Chip key={choice.value} label={choice.label} selected={profile.staplePreference === choice.value} onPress={() => update('staplePreference', choice.value as FoodPreferenceProfile['staplePreference'])} />)}</View>
+        <View style={styles.equalRow}>{staples.map((choice) => <Chip testID={`food.staple.${choice.value}`} key={choice.value} label={choice.label} selected={profile.staplePreference === choice.value} onPress={() => update('staplePreference', choice.value as FoodPreferenceProfile['staplePreference'])} />)}</View>
         <FieldLabel text="Dairy" />
-        <View style={styles.equalRow}>{dairy.map((choice) => <Chip key={choice.value} label={choice.label} selected={profile.dairyPreference === choice.value} onPress={() => update('dairyPreference', choice.value as FoodPreferenceProfile['dairyPreference'])} accent={colors.blue} />)}</View>
+        <View style={styles.equalRow}>{dairy.map((choice) => <Chip testID={`food.dairy.${choice.value}`} key={choice.value} label={choice.label} selected={profile.dairyPreference === choice.value} onPress={() => update('dairyPreference', choice.value as FoodPreferenceProfile['dairyPreference'])} accent={colors.blue} />)}</View>
         <FieldLabel text="Protein choices you enjoy" />
         <View style={styles.chips}>{proteins.map((choice) => <Chip key={choice.value} label={choice.label} selected={profile.proteins.includes(choice.value)} onPress={() => update('proteins', toggle(profile.proteins, choice.value))} />)}</View>
         <Info text={profile.cuisines.length ? `We'll prioritise familiar ${dietLabel.toLowerCase()} ${profile.cuisines[0]} meal options.` : 'These preferences support future consultant-reviewed meal planning.'} />
@@ -118,16 +119,16 @@ export const OnboardingFoodPreferencesFlow = ({
       {step === 4 ? <>
         <QuestionHeader title="Anything you prefer not to eat?" description="Tell us what you dislike or normally avoid. Medical allergies and restrictions are handled separately." />
         <View style={styles.modeRow}>
-          <Chip label="Don't enjoy" selected={foodMode === 'dislikedFoodIds'} onPress={() => setFoodMode('dislikedFoodIds')} accent={preferenceAccent} />
-          <Chip label="Prefer to avoid" selected={foodMode === 'avoidedFoodIds'} onPress={() => setFoodMode('avoidedFoodIds')} accent={preferenceAccent} />
+          <Chip testID="food.avoid.mode.disliked" label="Don't enjoy" selected={foodMode === 'dislikedFoodIds'} onPress={() => setFoodMode('dislikedFoodIds')} accent={preferenceAccent} />
+          <Chip testID="food.avoid.mode.prefer" label="Prefer to avoid" selected={foodMode === 'avoidedFoodIds'} onPress={() => setFoodMode('avoidedFoodIds')} accent={preferenceAccent} />
         </View>
         <View style={styles.searchWrap}>
           <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
-          <TextInput accessibilityLabel="Search foods" value={foodQuery} onChangeText={setFoodQuery} placeholder="Add food" placeholderTextColor={colors.textSecondary} style={styles.search} />
+          <TextInput testID="food.avoid.search" accessibilityLabel="Search foods" value={foodQuery} onChangeText={setFoodQuery} placeholder="Add food" placeholderTextColor={colors.textSecondary} style={styles.search} />
         </View>
-        {foodLoading ? <Text style={styles.helper}>Searching foods...</Text> : null}
-        {foodError ? <Text style={styles.error}>{foodError}</Text> : null}
-        {!foodLoading && !foodError ? <View style={styles.chips}>{foodItems.map((item) => <Chip key={item.id} label={item.displayName} selected={selectedFoodIds.includes(item.id)} onPress={() => update(foodMode, toggle(selectedFoodIds, item.id))} accent={preferenceAccent} />)}</View> : null}
+        {foodLoading ? <Text testID="food.loading" style={styles.helper}>Searching foods...</Text> : null}
+        {foodError ? <Text testID="food.error" style={styles.error}>{foodError}</Text> : null}
+        {!foodLoading && !foodError ? <View style={styles.chips}>{foodItems.map((item) => <Chip testID={`food.result.${item.id}`} key={item.id} label={item.displayName} selected={selectedFoodIds.includes(item.id)} onPress={() => update(foodMode, toggle(selectedFoodIds, item.id))} accent={preferenceAccent} />)}</View> : null}
         <Info text="Have an allergy or intolerance? Manage health restrictions separately." />
         <View style={styles.divider} />
         <View style={styles.summary}>
@@ -138,19 +139,19 @@ export const OnboardingFoodPreferencesFlow = ({
           <SummaryRow label="Dairy" value={dairyLabel} />
           <SummaryRow label="Foods to avoid" value={[...profile.dislikedFoodIds, ...profile.avoidedFoodIds].map((id) => foodLabels.get(id)).filter(Boolean).join(', ') || 'None selected'} />
         </View>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text testID="food.error" style={styles.error}>{error}</Text> : null}
       </> : null}
       </View>
     </OnboardingShell>
   );
 };
 
-const LargeChoice = ({ choice, selected, onPress }: { choice: Choice; selected: boolean; onPress: () => void }) => <Pressable accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.largeChoice, selected && styles.selectedChoice, pressed && styles.pressed]}>
+const LargeChoice = ({ choice, selected, onPress, testID }: { choice: Choice; selected: boolean; onPress: () => void; testID?: string }) => <Pressable testID={testID} accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.largeChoice, selected && styles.selectedChoice, pressed && styles.pressed]}>
   {choice.icon ? <View style={[styles.icon, selected && styles.selectedIcon]}><Ionicons name={choice.icon} size={20} color={selected ? colors.success : colors.textSecondary} /></View> : null}
   <Text style={styles.choiceText}>{choice.label}</Text><View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <Ionicons name="checkmark" size={16} color="#06100B" /> : null}</View>
 </Pressable>;
 
-const Chip = ({ label, selected, onPress, accent = colors.success }: { label: string; selected: boolean; onPress: () => void; accent?: string }) => <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: selected }} onPress={onPress} style={({ pressed }) => [styles.chip, selected && { borderColor: accent, backgroundColor: `${accent}12` }, pressed && styles.pressed]}><Text style={[styles.chipText, selected && { color: accent }]}>{selected ? '✓  ' : ''}{label}</Text></Pressable>;
+const Chip = ({ label, selected, onPress, accent = colors.success, testID }: { label: string; selected: boolean; onPress: () => void; accent?: string; testID?: string }) => <Pressable testID={testID} accessibilityRole="checkbox" accessibilityState={{ checked: selected }} onPress={onPress} style={({ pressed }) => [styles.chip, selected && { borderColor: accent, backgroundColor: `${accent}12` }, pressed && styles.pressed]}><Text style={[styles.chipText, selected && { color: accent }]}>{selected ? '✓  ' : ''}{label}</Text></Pressable>;
 const FieldLabel = ({ text }: { text: string }) => <Text style={styles.fieldLabel}>{text}</Text>;
 const Info = ({ text }: { text: string }) => <View style={styles.info}><Ionicons name="information-circle-outline" size={18} color={colors.blue} /><Text style={styles.infoText}>{text}</Text></View>;
 const SummaryRow = ({ label, value }: { label: string; value: string }) => <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{label}</Text><Text style={styles.summaryValue}>{value}</Text></View>;

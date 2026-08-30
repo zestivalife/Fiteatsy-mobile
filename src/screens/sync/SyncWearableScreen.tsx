@@ -558,7 +558,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   }
 
   return (
-    <Screen scroll contentStyle={styles.screenContent}>
+    <Screen testID="healthConnect.root" scroll contentStyle={styles.screenContent}>
       <View style={styles.container}>
         <PageHeader title="Health Connect" onBack={() => navigation.goBack()} />
         <View style={[styles.heroCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
@@ -643,12 +643,13 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         ) : null}
 
         <PrimaryButton
+          testID="healthConnect.primary"
           title={primaryTitle}
           onPress={handlePrimary}
           disabled={isRunning}
         />
 
-        <Pressable style={styles.skipInline} onPress={skipForNow}>
+        <Pressable testID="healthConnect.skip" style={styles.skipInline} onPress={skipForNow}>
           <Text style={[styles.skipInlineText, { color: palette.textSecondary }]}>
             {stage === 'partial' ? 'Continue with available data' : canViewInsights ? 'Finish without more sync' : 'Skip for now'}
           </Text>
