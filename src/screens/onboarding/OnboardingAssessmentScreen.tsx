@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ChoiceCard, OnboardingAction, OnboardingShell, QuestionHeader } from '../../components/onboarding/OnboardingShell';
@@ -39,7 +39,8 @@ export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
   const { onboarding, setOnboarding, setAssessment, submitCheckIn, setMood, authSession } = useAppContext();
   const recoveryStart = route.params?.startPhase === 'recovery';
   const lifestyleSeed = route.params?.lifestyle;
-  const [step, setStep] = useState(recoveryStart ? 5 : 1);
+  const resumeStep = Math.max(1, Math.min(4, route.params?.resumeStep ?? 1));
+  const [step, setStep] = useState(recoveryStart ? resumeStep + 4 : resumeStep);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [heightCm, setHeightCm] = useState(lifestyleSeed?.heightCm ?? onboarding?.heightCm ?? 170);
   const [weightKg, setWeightKg] = useState(lifestyleSeed?.weightKg ?? onboarding?.currentWeightKg ?? 68);
@@ -99,8 +100,8 @@ export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
   };
 
   return <OnboardingShell key={step} phase={phase} step={phaseStep} total={4} onBack={back} direction={direction} action={<OnboardingAction title="Continue" onPress={next} />}>
-    {step === 1 ? <Metric title="What is your height?" description="Used to estimate your metabolic rate and ideal weight range." value={heightCm} suffix="cm" onMinus={() => changeMetric(setHeightCm, heightCm, heightCm - 1, 130, 220)} onPlus={() => changeMetric(setHeightCm, heightCm, heightCm + 1, 130, 220)} opacity={valueOpacity} /> : null}
-    {step === 2 ? <View><QuestionHeader title="What is your weight?" description="Used to personalise your nutrition and activity targets." /><Segment values={['kg', 'lbs']} selected={unit} onSelect={(value) => setUnit(value as 'kg' | 'lbs')} /><MetricCore value={unit === 'kg' ? weightKg : Math.round(weightKg * 2.20462)} suffix={unit} onMinus={() => changeMetric(setWeightKg, weightKg, weightKg - 1, 35, 220)} onPlus={() => changeMetric(setWeightKg, weightKg, weightKg + 1, 35, 220)} opacity={valueOpacity} /></View> : null}
+    {step === 1 ? <Metric title="What is your height?" description="Used to estimate your metabolic rate and ideal weight range." value={heightCm} suffix="cm" min={130} max={220} onValueChange={setHeightCm} onMinus={() => changeMetric(setHeightCm, heightCm, heightCm - 1, 130, 220)} onPlus={() => changeMetric(setHeightCm, heightCm, heightCm + 1, 130, 220)} opacity={valueOpacity} /> : null}
+    {step === 2 ? <View><QuestionHeader title="What is your weight?" description="Used to personalise your nutrition and activity targets." /><Segment values={['kg', 'lbs']} selected={unit} onSelect={(value) => setUnit(value as 'kg' | 'lbs')} /><MetricCore value={unit === 'kg' ? weightKg : Math.round(weightKg * 2.2046226218487757)} suffix={unit} min={unit === 'kg' ? 35 : 77} max={unit === 'kg' ? 220 : 485} onValueChange={(value) => setWeightKg(unit === 'kg' ? value : value / 2.2046226218487757)} onMinus={() => unit === 'kg' ? changeMetric(setWeightKg, weightKg, weightKg - 1, 35, 220) : setWeightKg((Math.round(weightKg * 2.2046226218487757) - 1) / 2.2046226218487757)} onPlus={() => unit === 'kg' ? changeMetric(setWeightKg, weightKg, weightKg + 1, 35, 220) : setWeightKg((Math.round(weightKg * 2.2046226218487757) + 1) / 2.2046226218487757)} opacity={valueOpacity} /></View> : null}
     {step === 3 ? <View><QuestionHeader title="How active are you?" description="We use this to set your calorie and recovery targets." /><View style={styles.list}>{activities.map((item) => <ChoiceCard key={item.value} label={item.value} description={item.description} selected={activity === item.value} accent="#FF8A35" onPress={() => setActivity(item.value)} />)}</View></View> : null}
     {step === 4 ? <View><QuestionHeader title="Typical sleep duration?" description="Sleep affects every aspect of recovery, metabolism, and mood." /><View style={styles.sleepRow}>{sleepOptions.map((item) => <Pressable accessibilityRole="radio" accessibilityState={{ selected: sleep.label === item.label }} key={item.label} onPress={() => setSleep(item)} style={[styles.sleepCard, sleep.label === item.label && styles.sleepActive]}><Ionicons name="moon-outline" size={22} color={sleep.label === item.label ? '#62A8FF' : colors.textPrimary} /><Text style={[styles.sleepText, sleep.label === item.label && styles.sleepTextActive]}>{item.label}</Text></Pressable>)}</View><Text style={styles.insight}>•  Most adults need 7–9 hours for optimal recovery</Text></View> : null}
     {step === 5 ? <View><QuestionHeader title="How’s your mood today?" description="Mood patterns help us personalise your recovery and energy insights." /><View style={styles.moodRow}>{moods.map((item) => <Pressable accessibilityRole="radio" accessibilityState={{ selected: moodChoice.label === item.label }} key={item.label} onPress={() => setMoodChoice(item)} style={[styles.moodCard, moodChoice.label === item.label && styles.moodActive]}><Text style={styles.emoji}>{item.emoji}</Text><Text style={styles.moodText}>{item.label}</Text></Pressable>)}</View><Text style={[styles.insight, styles.greenInsight]}>{moodChoice.copy}</Text></View> : null}
@@ -110,8 +111,19 @@ export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
   </OnboardingShell>;
 };
 
-const Metric = ({ title, description, ...props }: { title: string; description: string; value: number; suffix: string; onMinus: () => void; onPlus: () => void; opacity: Animated.Value }) => <View><QuestionHeader title={title} description={description} /><MetricCore {...props} /></View>;
-const MetricCore = ({ value, suffix, onMinus, onPlus, opacity }: { value: number; suffix: string; onMinus: () => void; onPlus: () => void; opacity: Animated.Value }) => <View style={styles.metricWrap}><Animated.Text style={[styles.metric, { opacity }]}>{value} <Text style={styles.metricSuffix}>{suffix}</Text></Animated.Text><View style={styles.ruler}><View style={styles.marker} />{Array.from({ length: 17 }, (_, index) => <View key={index} style={[styles.tick, index % 4 === 0 && styles.majorTick]} />)}</View><View style={styles.metricButtons}><Pressable accessibilityRole="button" accessibilityLabel="Decrease value" onPress={onMinus} style={styles.metricButton}><Text style={styles.metricButtonText}>−</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Increase value" onPress={onPlus} style={styles.metricButton}><Text style={styles.metricButtonText}>+</Text></Pressable></View></View>;
+const Metric = ({ title, description, ...props }: { title: string; description: string; value: number; suffix: string; min: number; max: number; onValueChange: (value: number) => void; onMinus: () => void; onPlus: () => void; opacity: Animated.Value }) => <View><QuestionHeader title={title} description={description} /><MetricCore {...props} /></View>;
+const MetricCore = ({ value, suffix, min, max, onValueChange, onMinus, onPlus, opacity }: { value: number; suffix: string; min: number; max: number; onValueChange: (value: number) => void; onMinus: () => void; onPlus: () => void; opacity: Animated.Value }) => {
+  const [entry, setEntry] = useState(String(value));
+  useEffect(() => setEntry(String(value)), [value]);
+  const commit = () => {
+    const parsed = Number(entry);
+    if (!Number.isFinite(parsed)) { setEntry(String(value)); return; }
+    const bounded = Math.max(min, Math.min(max, parsed));
+    onValueChange(bounded);
+    setEntry(String(bounded));
+  };
+  return <View style={styles.metricWrap}><Animated.View style={[styles.metricEntryRow, { opacity }]}><TextInput accessibilityLabel={`Enter ${suffix}`} keyboardType="decimal-pad" returnKeyType="done" value={entry} onChangeText={setEntry} onBlur={commit} onSubmitEditing={commit} selectTextOnFocus style={styles.metricInput} /><Text style={styles.metricSuffix}>{suffix}</Text></Animated.View><View style={styles.ruler}><View style={styles.marker} />{Array.from({ length: 17 }, (_, index) => <View key={index} style={[styles.tick, index % 4 === 0 && styles.majorTick]} />)}</View><View style={styles.metricButtons}><Pressable accessibilityRole="button" accessibilityLabel="Decrease value" onPress={onMinus} style={styles.metricButton}><Text style={styles.metricButtonText}>−</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Increase value" onPress={onPlus} style={styles.metricButton}><Text style={styles.metricButtonText}>+</Text></Pressable></View></View>;
+};
 const Segment = ({ values, selected, onSelect }: { values: string[]; selected: string; onSelect: (value: string) => void }) => <View style={styles.segment}>{values.map((value) => <Pressable key={value} onPress={() => onSelect(value)} style={[styles.segmentItem, selected === value && styles.segmentActive]}><Text style={[styles.segmentText, selected === value && styles.segmentTextActive]}>{value}</Text></Pressable>)}</View>;
 
 const styles = StyleSheet.create({
@@ -119,7 +131,7 @@ const styles = StyleSheet.create({
   segment: { flexDirection: 'row', borderWidth: 1, borderColor: colors.stroke, borderRadius: radius.lg, backgroundColor: colors.cardMuted, padding: 4 },
   segmentItem: { flex: 1, minHeight: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, segmentActive: { backgroundColor: '#49DF86' },
   segmentText: { ...typography.bodyStrong, color: colors.textSecondary }, segmentTextActive: { color: '#07120D' },
-  metricWrap: { alignItems: 'center', paddingTop: spacing.xl }, metric: { ...typography.metric, fontSize: 32, lineHeight: 40, color: colors.textPrimary }, metricSuffix: { fontSize: 16, color: colors.success },
+  metricWrap: { alignItems: 'center', paddingTop: spacing.xl }, metricEntryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs }, metricInput: { ...typography.metric, minWidth: 96, fontSize: 32, lineHeight: 40, color: colors.textPrimary, textAlign: 'right', paddingVertical: 0 }, metricSuffix: { ...typography.bodyStrong, fontSize: 16, color: colors.success },
   ruler: { height: 100, width: '100%', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', position: 'relative', marginVertical: spacing.lg },
   marker: { position: 'absolute', left: '50%', bottom: 0, width: 3, height: 88, borderRadius: 2, backgroundColor: colors.success },
   tick: { width: 2, height: 20, backgroundColor: colors.stroke }, majorTick: { height: 36, backgroundColor: colors.textSecondary },

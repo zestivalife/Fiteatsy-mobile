@@ -9,6 +9,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import {
   emptyFoodPreferenceProfile,
+  foodPreferencesMatch,
   getFoodPreferences,
   saveFoodPreferences,
   searchFoodCatalogue,
@@ -20,6 +21,7 @@ import { getOnboardingRuntimeProgress, setOnboardingRuntimeProgress } from '../.
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FoodPreferences'>;
 type Choice = { label: string; value: string };
+type SaveState = 'idle' | 'saving' | 'success' | 'error_recoverable' | 'error_nonrecoverable';
 
 const diets: Choice[] = [
   { label: 'Vegetarian', value: 'vegetarian' },
@@ -45,8 +47,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const mode = route.params?.mode ?? 'profile';
   const [profile, setProfile] = useState<FoodPreferenceProfile>(emptyFoodPreferenceProfile());
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [foodQuery, setFoodQuery] = useState('');
@@ -57,6 +58,9 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const [initialOnboardingStep, setInitialOnboardingStep] = useState(1);
   const clientId = authSession?.client.fiteatsyClientId;
   const completionStarted = useRef(false);
+  const saveInFlight = useRef(false);
+  const saving = saveState === 'saving';
+  const saveFailed = saveState === 'error_recoverable' || saveState === 'error_nonrecoverable';
 
   useEffect(() => {
     Promise.all([
@@ -68,6 +72,16 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
         setProfile({ ...emptyFoodPreferenceProfile(), ...source, likedFoodIds: source.likedFoodIds ?? [], dislikedFoodIds: source.dislikedFoodIds ?? [], avoidedFoodIds: source.avoidedFoodIds ?? [] });
         if (progress?.phase === 'food') setInitialOnboardingStep(Math.max(1, Math.min(4, progress.step)));
         setSavedAt(response.updatedAtISO);
+        if (mode === 'onboarding' && progress?.phase === 'food' && progress.foodDraft && (progress.saveState === 'saving' || progress.saveState === 'error_recoverable')) {
+          if (foodPreferencesMatch(progress.foodDraft, response.profile)) {
+            completionStarted.current = true;
+            void setOnboardingRuntimeProgress(clientId, { phase: 'recovery', step: 1, lifestyle: route.params?.lifestyle, foodDraft: response.profile, saveState: 'success' });
+            navigation.replace('OnboardingAssessment', { startPhase: 'recovery', resumeStep: 1, lifestyle: route.params?.lifestyle });
+          } else {
+            setSaveState('error_recoverable');
+            setError("We couldn't confirm whether your preferences were saved.\nYour selections are still here. Please try again.");
+          }
+        }
       })
       .catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'Unable to load food preferences.'))
       .finally(() => setLoading(false));
@@ -91,32 +105,37 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const update = <K extends keyof FoodPreferenceProfile>(key: K, value: FoodPreferenceProfile[K]) => setProfile((current) => ({ ...current, [key]: value }));
   const persistOnboardingProgress = useCallback((step: number, foodDraft: FoodPreferenceProfile) => {
     if (completionStarted.current) return;
-    void setOnboardingRuntimeProgress(clientId, { phase: 'food', step, lifestyle: route.params?.lifestyle, foodDraft });
+    void setOnboardingRuntimeProgress(clientId, { phase: 'food', step, lifestyle: route.params?.lifestyle, foodDraft, saveState: 'idle' });
   }, [clientId, route.params?.lifestyle]);
   const save = async () => {
+    if (saveInFlight.current) return;
     if (!profile.dietType) {
+      setSaveState('error_nonrecoverable');
       setError('Choose the diet that best describes you.');
       return;
     }
+    saveInFlight.current = true;
     completionStarted.current = mode === 'onboarding';
-    setSaving(true);
-    setSaveFailed(false);
+    setSaveState('saving');
     setError(null);
     try {
+      if (mode === 'onboarding') await setOnboardingRuntimeProgress(clientId, { phase: 'food', step: 4, lifestyle: route.params?.lifestyle, foodDraft: profile, saveState: 'saving' });
       const response = await saveFoodPreferences(profile);
+      setSaveState('success');
       setProfile(response.profile);
       setSavedAt(response.updatedAtISO);
       if (mode === 'onboarding') {
-        await setOnboardingRuntimeProgress(clientId, { phase: 'recovery', step: 1, lifestyle: route.params?.lifestyle, foodDraft: response.profile });
-        navigation.push('OnboardingAssessment', { startPhase: 'recovery', lifestyle: route.params?.lifestyle });
+        await setOnboardingRuntimeProgress(clientId, { phase: 'recovery', step: 1, lifestyle: route.params?.lifestyle, foodDraft: response.profile, saveState: 'success' });
+        navigation.push('OnboardingAssessment', { startPhase: 'recovery', resumeStep: 1, lifestyle: route.params?.lifestyle });
       }
       else navigation.goBack();
     } catch (requestError) {
       completionStarted.current = false;
-      setSaveFailed(true);
+      setSaveState('error_recoverable');
       setError("We couldn't save your preferences.\nYour selections are still here. Please try again.");
+      if (mode === 'onboarding') await setOnboardingRuntimeProgress(clientId, { phase: 'food', step: 4, lifestyle: route.params?.lifestyle, foodDraft: profile, saveState: 'error_recoverable' });
     } finally {
-      setSaving(false);
+      saveInFlight.current = false;
     }
   };
 

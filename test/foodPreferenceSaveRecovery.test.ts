@@ -58,9 +58,9 @@ describe('food preference save recovery', () => {
     expect(mockApiFetch).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['NETWORK_ERROR', 'SERVER_ERROR'])('reconciles ambiguous %s failures after persistence', async (code) => {
+  it.each(['NETWORK_ERROR', 'SERVER_ERROR', 'CONFLICT'])('reconciles ambiguous %s failures after persistence', async (code) => {
     const requested = profile();
-    mockPutJson.mockRejectedValueOnce(new ApiClientError(code as 'NETWORK_ERROR' | 'SERVER_ERROR', 'ambiguous'));
+    mockPutJson.mockRejectedValueOnce(new ApiClientError(code as 'NETWORK_ERROR' | 'SERVER_ERROR' | 'CONFLICT', 'ambiguous'));
     mockApiFetch.mockResolvedValueOnce(response(requested));
     await expect(saveFoodPreferences(requested)).resolves.toEqual(response(requested));
   });

@@ -120,6 +120,32 @@ export const updateFoodPreferenceProfile = async (
   const client = await pool.connect();
   try {
     await client.query('begin');
+    const current = await client.query(
+      `select id, food_preference_profile, food_preference_updated_at
+         from health_profiles
+        where client_id = $1 and deleted_at is null
+        order by updated_at desc limit 1
+        for update`,
+      [context.internalClientId],
+    );
+    if (!current.rowCount) {
+      await client.query('rollback');
+      return null;
+    }
+    const currentProfile = normalizeFoodPreferenceProfile(
+      (current.rows[0].food_preference_profile ?? {}) as Partial<FoodPreferenceProfile>,
+    );
+    if (JSON.stringify(currentProfile) === JSON.stringify(profile)) {
+      await client.query('commit');
+      return {
+        clientId: publicClientId,
+        profile,
+        updatedBy: actorType,
+        updatedAtISO: current.rows[0].food_preference_updated_at
+          ? new Date(current.rows[0].food_preference_updated_at).toISOString()
+          : null,
+      };
+    }
     const updated = await client.query(
       `update health_profiles
           set food_preference_profile = $1::jsonb,
@@ -127,13 +153,9 @@ export const updateFoodPreferenceProfile = async (
               food_preference_updated_at = $3,
               updated_at = $3,
               version = version + 1
-        where id = (
-          select id from health_profiles
-           where client_id = $4 and deleted_at is null
-           order by updated_at desc limit 1
-        )
+        where id = $4
         returning id`,
-      [JSON.stringify(profile), actorUserId, updatedAt, context.internalClientId],
+      [JSON.stringify(profile), actorUserId, updatedAt, current.rows[0].id],
     );
     if (!updated.rowCount) {
       await client.query('rollback');

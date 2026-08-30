@@ -73,7 +73,10 @@ export const foodPreferencesMatch = (left: FoodPreferenceProfile, right: FoodPre
 
 const isAmbiguousSaveFailure = (error: unknown) =>
   error instanceof ApiClientError
-  && (error.code === 'TIMEOUT' || error.code === 'NETWORK_ERROR' || error.code === 'SERVER_ERROR');
+  && (error.code === 'TIMEOUT'
+    || error.code === 'NETWORK_ERROR'
+    || error.code === 'SERVER_ERROR'
+    || error.code === 'CONFLICT');
 
 export const saveFoodPreferences = async (profile: FoodPreferenceProfile) => {
   try {

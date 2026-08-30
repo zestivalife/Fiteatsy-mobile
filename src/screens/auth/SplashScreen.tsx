@@ -79,11 +79,19 @@ export const SplashScreen = ({ navigation }: Props) => {
       return;
     }
     if (onboardingStatus !== 'COMPLETED' && progress?.phase === 'recovery') {
-      transitionTo(() => navigation.replace('OnboardingAssessment', { startPhase: 'recovery', lifestyle: progress.lifestyle }));
+      transitionTo(() => navigation.replace('OnboardingAssessment', { startPhase: 'recovery', resumeStep: progress.step, lifestyle: progress.lifestyle }));
+      return;
+    }
+    if (onboardingStatus !== 'COMPLETED' && progress?.phase === 'lifestyle') {
+      transitionTo(() => navigation.replace('OnboardingAssessment', { startPhase: 'lifestyle', resumeStep: progress.step, lifestyle: progress.lifestyle }));
       return;
     }
     if (progress?.phase === 'connect') {
       transitionTo(() => navigation.replace('SyncWearable'));
+      return;
+    }
+    if (progress?.phase === 'ready') {
+      transitionTo(() => navigation.replace('OnboardingReady'));
       return;
     }
     if (onboardingStatus === 'NOT_STARTED' || onboardingResumeStep === 'basics') {

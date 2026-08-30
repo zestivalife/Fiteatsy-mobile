@@ -331,7 +331,6 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
           setStatusTitle('Health Connect Needed');
           setStatusBody('Health Connect helps securely sync your recovery signals.');
         }
-        await openHealthConnectPlayStore();
         return;
       }
 
@@ -445,7 +444,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         : isRunning
           ? 'Syncing...'
           : pendingInstall
-            ? 'Continue After Install'
+            ? 'Open Health Connect'
             : stage === 'connected_ready'
               ? 'Start First Sync'
               : stage === 'permission_denied'
@@ -457,6 +456,10 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
                   : 'Connect Health Data';
 
   const handlePrimary = () => {
+    if (pendingInstall) {
+      void openHealthConnectPlayStore();
+      return;
+    }
     if (stage === 'intro') {
       setStage('permission_explainer');
       return;
@@ -479,7 +482,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         step={1}
         total={3}
         onBack={() => navigation.goBack()}
-        action={<View><OnboardingAction title={primaryTitle === 'Continue' ? 'Connect Health Data' : primaryTitle} onPress={handlePrimary} disabled={isRunning} /><OnboardingAction title="I'll do this later" secondary onPress={skipForNow} /></View>}
+        action={<View><OnboardingAction title={primaryTitle === 'Continue' ? 'Connect Health Data' : primaryTitle} onPress={handlePrimary} disabled={isRunning} /><OnboardingAction title="Set up later" secondary onPress={skipForNow} /></View>}
       >
         <QuestionHeader title="Connect your health data" description="Fiteatsy can automatically understand your activity, sleep, heart and recovery patterns." />
         <View style={styles.onboardingDomains}>

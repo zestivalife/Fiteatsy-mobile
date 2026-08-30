@@ -15,6 +15,7 @@ export type OnboardingRuntimeProgress = {
   step: number;
   lifestyle?: OnboardingLifestyleDraft;
   foodDraft?: FoodPreferenceProfile;
+  saveState?: 'idle' | 'saving' | 'success' | 'error_recoverable' | 'error_nonrecoverable';
 };
 
 const keyFor = (clientId: string) => `fiteatsy.onboarding.runtime.v2:${clientId}`;

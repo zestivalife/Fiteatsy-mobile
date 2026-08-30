@@ -8,6 +8,7 @@ export type RootStackParamList = {
   OnboardingNotifications: undefined;
   OnboardingAssessment: {
     startPhase?: 'lifestyle' | 'recovery';
+    resumeStep?: number;
     lifestyle?: { heightCm: number; weightKg: number; activityLevel: string; sleepHours: number; sleepQuality: string };
   } | undefined;
   OnboardingReady: undefined;
