@@ -32,6 +32,7 @@ export const OnboardingFoodPreferencesFlow = ({
   foodLoading,
   foodError,
   saving,
+  saveFailed,
   error,
   initialStep,
   onProgress,
@@ -46,6 +47,7 @@ export const OnboardingFoodPreferencesFlow = ({
   foodLoading: boolean;
   foodError: string | null;
   saving: boolean;
+  saveFailed: boolean;
   error: string | null;
   initialStep: number;
   onProgress: (step: number, profile: FoodPreferenceProfile) => void;
@@ -73,7 +75,7 @@ export const OnboardingFoodPreferencesFlow = ({
 
   const action = step === 4 ? (
     <>
-      <OnboardingAction title={saving ? 'Saving...' : 'Looks good'} onPress={onSave} disabled={saving || !profile.dietType} />
+      <OnboardingAction title={saving ? 'Saving...' : saveFailed ? 'Try again' : 'Looks good'} onPress={onSave} disabled={saving || !profile.dietType} />
       <OnboardingAction title="Edit preferences" onPress={() => go(1)} secondary />
     </>
   ) : (
@@ -120,9 +122,9 @@ export const OnboardingFoodPreferencesFlow = ({
         </View>
         <View style={styles.searchWrap}>
           <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
-          <TextInput accessibilityLabel="Search verified foods" value={foodQuery} onChangeText={setFoodQuery} placeholder="Add food" placeholderTextColor={colors.textSecondary} style={styles.search} />
+          <TextInput accessibilityLabel="Search foods" value={foodQuery} onChangeText={setFoodQuery} placeholder="Add food" placeholderTextColor={colors.textSecondary} style={styles.search} />
         </View>
-        {foodLoading ? <Text style={styles.helper}>Searching verified foods...</Text> : null}
+        {foodLoading ? <Text style={styles.helper}>Searching foods...</Text> : null}
         {foodError ? <Text style={styles.error}>{foodError}</Text> : null}
         {!foodLoading && !foodError ? <View style={styles.chips}>{foodItems.map((item) => <Chip key={item.id} label={item.displayName} selected={selectedFoodIds.includes(item.id)} onPress={() => update(foodMode, toggle(selectedFoodIds, item.id))} accent={preferenceAccent} />)}</View> : null}
         <Info text="Have an allergy or intolerance? Manage health restrictions separately." />
@@ -133,7 +135,7 @@ export const OnboardingFoodPreferencesFlow = ({
           <SummaryRow label="Cuisines" value={profile.cuisines.join(' · ') || 'No strong preference'} />
           <SummaryRow label="Staple" value={stapleLabel} />
           <SummaryRow label="Dairy" value={dairyLabel} />
-          <SummaryRow label="Avoids" value={[...profile.dislikedFoodIds, ...profile.avoidedFoodIds].map((id) => foodLabels.get(id)).filter(Boolean).join(', ') || `${profile.dislikedFoodIds.length + profile.avoidedFoodIds.length} verified foods selected`} />
+          <SummaryRow label="Foods to avoid" value={[...profile.dislikedFoodIds, ...profile.avoidedFoodIds].map((id) => foodLabels.get(id)).filter(Boolean).join(', ') || 'None selected'} />
         </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </> : null}

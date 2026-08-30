@@ -13,7 +13,17 @@ import { HealthObservationDraft, WearableSyncPayload } from '../types';
 type HealthConnectMetricStatus = 'synced' | 'no_permission' | 'no_recent_data' | 'unsupported' | 'unavailable';
 
 const DAY = 24 * 60 * 60 * 1000;
+export const HEALTH_CONNECT_OPERATION_TIMEOUT_MS = 30_000;
 const now = () => Date.now();
+
+export const withHealthConnectTimeout = <T>(operation: Promise<T>, timeoutMs = HEALTH_CONNECT_OPERATION_TIMEOUT_MS): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('health_connect_operation_timed_out')), timeoutMs);
+    operation.then(
+      (value) => { clearTimeout(timeout); resolve(value); },
+      (error) => { clearTimeout(timeout); reject(error); }
+    );
+  });
 
 const toIso = (ms: number) => new Date(ms).toISOString();
 
@@ -97,7 +107,7 @@ export const requestHealthConnectPermissionsOnly = async (): Promise<HealthConne
 
   let sdkStatus: number;
   try {
-    sdkStatus = await getSdkStatus();
+    sdkStatus = await withHealthConnectTimeout(getSdkStatus());
   } catch {
     throw new Error('health_connect_status_failed');
   }
@@ -107,7 +117,7 @@ export const requestHealthConnectPermissionsOnly = async (): Promise<HealthConne
 
   let initialized = false;
   try {
-    initialized = await initialize();
+    initialized = await withHealthConnectTimeout(initialize());
   } catch {
     throw new Error('health_connect_initialize_failed');
   }
@@ -116,12 +126,12 @@ export const requestHealthConnectPermissionsOnly = async (): Promise<HealthConne
   }
 
   try {
-    await requestPermission(permissionList);
+    await withHealthConnectTimeout(requestPermission(permissionList));
   } catch {
     throw new Error('health_connect_permission_flow_failed');
   }
 
-  const granted = (await getGrantedPermissions()) as Array<Permission>;
+  const granted = (await withHealthConnectTimeout(getGrantedPermissions())) as Array<Permission>;
   const grantedSet = new Set(granted.map((permission) => toPermissionKey(permission as Permission)));
   const permissionStates = {
     Steps: hasPermission(grantedSet, 'Steps'),

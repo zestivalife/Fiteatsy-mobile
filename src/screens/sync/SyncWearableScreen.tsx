@@ -15,7 +15,7 @@ import {
   openHealthConnectPlayStore,
   type RecoveryConnectionState
 } from '../../services/healthAppService';
-import { requestHealthConnectPermissionsOnly } from '../../services/healthConnectService';
+import { requestHealthConnectPermissionsOnly, withHealthConnectTimeout } from '../../services/healthConnectService';
 import { HealthSyncResult, runHealthSync } from '../../services/healthSyncManager';
 import { WearableSyncPayload } from '../../types';
 
@@ -184,7 +184,7 @@ const formatSyncTime = (iso?: string | null) => {
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
 };
 
-export const SyncWearableScreen = ({ navigation, route }: Props) => {
+export const SyncWearableScreen = ({ navigation }: Props) => {
   const {
     themeMode,
     wearableSetupCompleted,
@@ -213,7 +213,6 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const isMountedRef = useRef(true);
   const inFlightRef = useRef(false);
-  const autoSyncStartedRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -323,7 +322,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
     }
 
     try {
-      const sdkStatus = await getSdkStatus();
+      const sdkStatus = await withHealthConnectTimeout(getSdkStatus());
       if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
         if (isMountedRef.current) {
           setStage('not_supported');
@@ -343,7 +342,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
         setStatusBody('Reading sleep, activity, and heart recovery data securely from your device.');
       }
 
-      const result = await runHealthSync('health-connect', wellness);
+      const result = await withHealthConnectTimeout(runHealthSync('health-connect', wellness));
       addWearableSyncData(result.payload);
       setSelectedDeviceId('health-connect');
       setLastResult(result);
@@ -396,8 +395,8 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
       } else {
         if (isMountedRef.current) {
           setStage('failed');
-          setStatusTitle('Recovery Signals Pending');
-          setStatusBody('Recovery signals are still calibrating. You can continue and sync again anytime.');
+          setStatusTitle('Recovery Connection Paused');
+          setStatusBody('Recovery connection is temporarily unavailable. Please try again or open Settings.');
         }
       }
       if (isMountedRef.current) {
@@ -410,16 +409,6 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
       }
     }
   }, [addWearableSyncData, setSelectedDeviceId, setWellness, wellness]);
-
-  // Stability guard:
-  // avoid auto-triggering Health Connect permission/data reads during
-  // screen transitions (logout/login/home sync navigation), which can crash
-  // on some Android builds. Sync starts via explicit user action.
-  useEffect(() => {
-    if (!route.params?.autoSync || autoSyncStartedRef.current) return;
-    autoSyncStartedRef.current = true;
-    void runRecoveryConnection();
-  }, [route.params?.autoSync, runRecoveryConnection]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
@@ -447,7 +436,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
   const completedDomains = domainRows.filter((domain) => summarizeDomain(domain, metrics, false) === 'Synced').map((domain) => domain.key);
   const missingDomains = domainRows.filter((domain) => summarizeDomain(domain, metrics, false) !== 'Synced').map((domain) => domain.key);
   const content = stageContent[stage];
-  const canViewInsights = stage === 'completed' || stage === 'partial' || stage === 'insufficient_data' || stage === 'failed';
+  const canViewInsights = stage === 'completed' || stage === 'partial' || stage === 'insufficient_data';
   const primaryTitle =
     stage === 'intro'
       ? 'Continue'
@@ -461,6 +450,8 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
               ? 'Start First Sync'
               : stage === 'permission_denied'
                 ? 'Try Again'
+                : stage === 'failed'
+                  ? 'Try Again'
                 : canViewInsights
                   ? 'View Insights'
                   : 'Connect Health Data';
@@ -576,7 +567,7 @@ export const SyncWearableScreen = ({ navigation, route }: Props) => {
           </View>
         ) : null}
 
-        {stage === 'permission_denied' ? (
+        {stage === 'permission_denied' || stage === 'failed' ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Open device settings for health permissions"

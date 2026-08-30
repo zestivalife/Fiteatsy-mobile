@@ -33,4 +33,24 @@ describe('Health Connect D2 production contracts', () => {
     expect(sync).not.toContain('requestPermission(');
     expect(sync).toContain('getGrantedPermissions()');
   });
+
+  it('bounds native calls and requires an explicit user sync action', () => {
+    const screen = read('src/screens/sync/SyncWearableScreen.tsx');
+    const home = read('src/screens/home/HomeScreen.tsx');
+    expect(service).toContain('HEALTH_CONNECT_OPERATION_TIMEOUT_MS = 30_000');
+    expect(service).toContain('withHealthConnectTimeout');
+    expect(screen).toContain('withHealthConnectTimeout(getSdkStatus())');
+    expect(screen).toContain("withHealthConnectTimeout(runHealthSync('health-connect', wellness))");
+    expect(screen).not.toContain('route.params?.autoSync');
+    expect(home).toContain("navigation.navigate('SyncWearable')");
+    expect(home).not.toContain("navigation.navigate('SyncWearable', { autoSync: true })");
+  });
+
+  it('settles failures into retryable UI instead of unlocked insights', () => {
+    const screen = read('src/screens/sync/SyncWearableScreen.tsx');
+    expect(screen).toMatch(/stage === 'failed'\s*\? 'Try Again'/);
+    expect(screen).not.toContain("stage === 'failed' || stage === 'insufficient_data'");
+    expect(screen).toContain("setStage('failed')");
+    expect(screen).toContain('setIsRunning(false)');
+  });
 });

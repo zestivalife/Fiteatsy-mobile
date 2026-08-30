@@ -43,7 +43,11 @@ describe('Onboarding V2 contract', () => {
     expect(flow).toContain("update('staplePreference'");
     expect(flow).toContain("update('dairyPreference'");
     expect(flow).toContain("update('proteins'");
-    expect(flow).toContain('verified foods selected');
+    expect(flow).toContain('Foods to avoid');
+    expect(flow).toContain('None selected');
+    expect(flow).toContain("saveFailed ? 'Try again'");
+    expect(screen).toContain("We couldn't save your preferences.");
+    expect(screen).toContain('Your selections are still here. Please try again.');
   });
 
   it('resumes the client-scoped canonical onboarding phase and step', () => {

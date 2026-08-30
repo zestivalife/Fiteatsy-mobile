@@ -46,6 +46,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const [profile, setProfile] = useState<FoodPreferenceProfile>(emptyFoodPreferenceProfile());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [foodQuery, setFoodQuery] = useState('');
@@ -99,6 +100,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
     }
     completionStarted.current = mode === 'onboarding';
     setSaving(true);
+    setSaveFailed(false);
     setError(null);
     try {
       const response = await saveFoodPreferences(profile);
@@ -111,7 +113,8 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       else navigation.goBack();
     } catch (requestError) {
       completionStarted.current = false;
-      setError(requestError instanceof Error ? requestError.message : 'Unable to save food preferences. Please try again.');
+      setSaveFailed(true);
+      setError("We couldn't save your preferences.\nYour selections are still here. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -133,6 +136,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       foodLoading={foodLoading}
       foodError={foodError}
       saving={saving}
+      saveFailed={saveFailed}
       error={error}
       onSave={save}
       onExit={() => navigation.goBack()}
@@ -173,7 +177,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
         <Text style={[styles.helper, { color: palette.textSecondary }]}>Medical intolerances are kept in your Health Profile.</Text>
       </Card>
 
-      <FoodPicker title="Foods you enjoy" helper="Choose verified foods you'd like us to consider more often." mode="likedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.likedFoodIds} onToggle={(id) => update('likedFoodIds', toggle(profile.likedFoodIds, id))} palette={palette} />
+      <FoodPicker title="Foods you enjoy" helper="Choose foods you'd like us to consider more often." mode="likedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.likedFoodIds} onToggle={(id) => update('likedFoodIds', toggle(profile.likedFoodIds, id))} palette={palette} />
       <FoodPicker title="Foods you don't enjoy" helper="Dislikes are different from allergies." mode="dislikedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.dislikedFoodIds} onToggle={(id) => update('dislikedFoodIds', toggle(profile.dislikedFoodIds, id))} palette={palette} />
       <FoodPicker title="Anything you specifically avoid?" helper="Avoided foods are not treated as medical allergies." mode="avoidedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.avoidedFoodIds} onToggle={(id) => update('avoidedFoodIds', toggle(profile.avoidedFoodIds, id))} palette={palette} />
 
@@ -223,10 +227,10 @@ const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery,
   return <Card>
     <SectionTitle title={title} color={palette.textPrimary} />
     <Text style={[styles.helper, { color: palette.textSecondary }]}>{helper}</Text>
-    <TextInput accessibilityLabel={`Search ${title}`} value={activeMode === mode ? query : ''} onFocus={() => setMode(mode)} onChangeText={(value) => { setMode(mode); setQuery(value); }} placeholder="Search verified foods" placeholderTextColor={palette.textSecondary} style={[styles.searchInput, { color: palette.textPrimary, backgroundColor: palette.cardMuted, borderColor: palette.stroke }]} />
-    {activeMode === mode && loading ? <Text style={[styles.helper, { color: palette.textSecondary }]}>Searching verified foods...</Text> : null}
+    <TextInput accessibilityLabel={`Search ${title}`} value={activeMode === mode ? query : ''} onFocus={() => setMode(mode)} onChangeText={(value) => { setMode(mode); setQuery(value); }} placeholder="Search foods" placeholderTextColor={palette.textSecondary} style={[styles.searchInput, { color: palette.textPrimary, backgroundColor: palette.cardMuted, borderColor: palette.stroke }]} />
+    {activeMode === mode && loading ? <Text style={[styles.helper, { color: palette.textSecondary }]}>Searching foods...</Text> : null}
     {activeMode === mode && error ? <Text style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
-    {activeMode === mode && !loading && !error && !items.length ? <Text style={[styles.helper, { color: palette.textSecondary }]}>No verified foods found.</Text> : null}
+    {activeMode === mode && !loading && !error && !items.length ? <Text style={[styles.helper, { color: palette.textSecondary }]}>No foods found.</Text> : null}
     <View style={styles.choiceGrid}>{(activeMode === mode ? items : []).map((item) => {
       const active = selected.includes(item.id);
       return <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => onToggle(item.id)} style={[styles.choice, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }, active && { backgroundColor: palette.blue, borderColor: palette.blue }]}><Text style={[styles.choiceText, { color: active ? '#FFFFFF' : palette.textPrimary }]}>{item.displayName}</Text></Pressable>;
