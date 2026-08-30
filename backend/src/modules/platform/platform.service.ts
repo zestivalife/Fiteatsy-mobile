@@ -42,7 +42,10 @@ export const upsertHealthProfile = async (owner: ClientOwnershipContext, patch: 
   );
   const careCase = await createCareCaseIfMissing(owner, profile.id);
   const nextStage = inferStage(profile, reportCount, nutrition.readinessScore);
-  if (careCase.currentStage !== nextStage) {
+  if (
+    careCase.currentStage !== nextStage &&
+    validateStageTransition(careCase.currentStage, nextStage)
+  ) {
     await transitionCareCaseStage(careCase, nextStage, 'Profile completion and report availability recalculated.');
   }
 

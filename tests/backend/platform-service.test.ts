@@ -104,6 +104,18 @@ test('report pipeline remains independent after a diet is published', async () =
   );
 });
 
+test('health profile updates preserve advanced care case stages', async () => {
+  for (const stage of ['ai_draft_generated', 'diet_published'] as const) {
+    const owner = await createOwner(`profile-${stage}`);
+    const initial = await upsertHealthProfile(owner, canonicalCompleteHealthProfile());
+    await transitionCareCaseStage(initial.careCase, stage, `Care case advanced to ${stage}.`);
+
+    const updated = await upsertHealthProfile(owner, { occupation: 'Updated occupation' });
+
+    assert.equal(updated.careCase.currentStage, stage);
+  }
+});
+
 test('service layer assigns consultant to care case', async () => {
   const owner = await createOwner('assign-004');
   const bundle = await upsertHealthProfile(owner, {});
