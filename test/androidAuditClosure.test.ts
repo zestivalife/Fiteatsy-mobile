@@ -54,6 +54,20 @@ describe('Android UX and reliability closure contract', () => {
     expect(service).not.toContain('putJson<FoodPreferenceResponse>(FOOD_PREFERENCES_PATH, profile);\n      return putJson');
   });
 
+  it('keeps preference loading bounded, single-flight and recoverable', () => {
+    const screen = read('src/screens/onboarding/FoodPreferencesScreen.tsx');
+
+    expect(screen).toContain("type LoadState = 'loading' | 'content' | 'offline' | 'auth_required' | 'error_recoverable'");
+    expect(screen).toContain('loadInFlight.current');
+    expect(screen).toContain('OPTIONAL_HYDRATION_TIMEOUT_MS');
+    expect(screen).toContain('resolveOptionalHydration(getOnboardingRuntimeProgress(clientId), null)');
+    expect(screen).toContain("setLoadState(classifyFoodPreferenceLoadError(requestError))");
+    expect(screen).toContain("We couldn't load your food preferences.");
+    expect(screen).toContain('title="Try again" onPress={loadPreferences}');
+    expect(screen).toContain('accessibilityLabel="Go back"');
+    expect(screen).not.toContain('Promise.all([\n      getFoodPreferences()');
+  });
+
   it('keeps onboarding keyboard-safe, accessible and restart-aware', () => {
     const shell = read('src/components/onboarding/OnboardingShell.tsx');
     const assessment = read('src/screens/onboarding/OnboardingAssessmentScreen.tsx');

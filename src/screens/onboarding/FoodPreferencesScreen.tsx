@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
@@ -18,10 +18,38 @@ import {
 } from '../../services/foodPreferenceService';
 import { OnboardingFoodPreferencesFlow } from './OnboardingFoodPreferencesFlow';
 import { getOnboardingRuntimeProgress, setOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
+import { ApiClientError } from '../../services/apiClient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FoodPreferences'>;
 type Choice = { label: string; value: string };
 type SaveState = 'idle' | 'saving' | 'success' | 'error_recoverable' | 'error_nonrecoverable';
+type LoadState = 'loading' | 'content' | 'offline' | 'auth_required' | 'error_recoverable';
+
+const OPTIONAL_HYDRATION_TIMEOUT_MS = 2_000;
+
+const resolveOptionalHydration = async <T,>(request: Promise<T>, fallback: T): Promise<T> => {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      request,
+      new Promise<T>((resolve) => {
+        timeout = setTimeout(() => resolve(fallback), OPTIONAL_HYDRATION_TIMEOUT_MS);
+      })
+    ]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+};
+
+export const classifyFoodPreferenceLoadError = (error: unknown): Exclude<LoadState, 'loading' | 'content'> => {
+  if (error instanceof ApiClientError) {
+    if (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN') return 'auth_required';
+    if (error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT') return 'offline';
+  }
+  return 'error_recoverable';
+};
 
 const diets: Choice[] = [
   { label: 'Vegetarian', value: 'vegetarian' },
@@ -46,7 +74,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const palette = getThemeColors(themeMode);
   const mode = route.params?.mode ?? 'profile';
   const [profile, setProfile] = useState<FoodPreferenceProfile>(emptyFoodPreferenceProfile());
-  const [loading, setLoading] = useState(true);
+  const [loadState, setLoadState] = useState<LoadState>('loading');
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -58,34 +86,60 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const [initialOnboardingStep, setInitialOnboardingStep] = useState(1);
   const clientId = authSession?.client.fiteatsyClientId;
   const completionStarted = useRef(false);
+  const loadInFlight = useRef(false);
+  const loadAttempt = useRef(0);
   const saveInFlight = useRef(false);
   const saving = saveState === 'saving';
   const saveFailed = saveState === 'error_recoverable' || saveState === 'error_nonrecoverable';
 
-  useEffect(() => {
-    Promise.all([
-      getFoodPreferences(),
-      mode === 'onboarding' ? getOnboardingRuntimeProgress(clientId) : Promise.resolve(null)
-    ])
-      .then(([response, progress]) => {
-        const source = progress?.phase === 'food' && progress.foodDraft ? progress.foodDraft : response.profile;
-        setProfile({ ...emptyFoodPreferenceProfile(), ...source, likedFoodIds: source.likedFoodIds ?? [], dislikedFoodIds: source.dislikedFoodIds ?? [], avoidedFoodIds: source.avoidedFoodIds ?? [] });
-        if (progress?.phase === 'food') setInitialOnboardingStep(Math.max(1, Math.min(4, progress.step)));
-        setSavedAt(response.updatedAtISO);
-        if (mode === 'onboarding' && progress?.phase === 'food' && progress.foodDraft && (progress.saveState === 'saving' || progress.saveState === 'error_recoverable')) {
-          if (foodPreferencesMatch(progress.foodDraft, response.profile)) {
-            completionStarted.current = true;
-            void setOnboardingRuntimeProgress(clientId, { phase: 'recovery', step: 1, lifestyle: route.params?.lifestyle, foodDraft: response.profile, saveState: 'success' });
-            navigation.replace('OnboardingAssessment', { startPhase: 'recovery', resumeStep: 1, lifestyle: route.params?.lifestyle });
-          } else {
-            setSaveState('error_recoverable');
-            setError("We couldn't confirm whether your preferences were saved.\nYour selections are still here. Please try again.");
-          }
+  const loadPreferences = useCallback(async () => {
+    if (loadInFlight.current) return;
+    loadInFlight.current = true;
+    const attempt = ++loadAttempt.current;
+    setLoadState('loading');
+    setError(null);
+
+    const progressRequest = mode === 'onboarding'
+      ? resolveOptionalHydration(getOnboardingRuntimeProgress(clientId), null)
+      : Promise.resolve(null);
+
+    try {
+      const response = await getFoodPreferences();
+      const progress = await progressRequest;
+      if (attempt !== loadAttempt.current) return;
+      const source = progress?.phase === 'food' && progress.foodDraft ? progress.foodDraft : response.profile;
+      setProfile({ ...emptyFoodPreferenceProfile(), ...source, likedFoodIds: source.likedFoodIds ?? [], dislikedFoodIds: source.dislikedFoodIds ?? [], avoidedFoodIds: source.avoidedFoodIds ?? [] });
+      if (progress?.phase === 'food') setInitialOnboardingStep(Math.max(1, Math.min(4, progress.step)));
+      setSavedAt(response.updatedAtISO);
+      if (mode === 'onboarding' && progress?.phase === 'food' && progress.foodDraft && (progress.saveState === 'saving' || progress.saveState === 'error_recoverable')) {
+        if (foodPreferencesMatch(progress.foodDraft, response.profile)) {
+          completionStarted.current = true;
+          void setOnboardingRuntimeProgress(clientId, { phase: 'recovery', step: 1, lifestyle: route.params?.lifestyle, foodDraft: response.profile, saveState: 'success' });
+          navigation.replace('OnboardingAssessment', { startPhase: 'recovery', resumeStep: 1, lifestyle: route.params?.lifestyle });
+        } else {
+          setSaveState('error_recoverable');
+          setError("We couldn't confirm whether your preferences were saved.\nYour selections are still here. Please try again.");
         }
-      })
-      .catch(() => setError("We couldn't load your food preferences. Please check your connection and try again."))
-      .finally(() => setLoading(false));
-  }, [clientId, mode]);
+      }
+      setLoadState('content');
+    } catch (requestError) {
+      if (attempt !== loadAttempt.current) return;
+      setLoadState(classifyFoodPreferenceLoadError(requestError));
+      setError(requestError instanceof ApiClientError && (requestError.code === 'UNAUTHORIZED' || requestError.code === 'FORBIDDEN')
+        ? 'Your session has expired. Please sign in again, then try once more.'
+        : "We couldn't load your food preferences.");
+    } finally {
+      if (attempt === loadAttempt.current) loadInFlight.current = false;
+    }
+  }, [clientId, mode, navigation, route.params?.lifestyle]);
+
+  useEffect(() => {
+    void loadPreferences();
+    return () => {
+      loadAttempt.current += 1;
+      loadInFlight.current = false;
+    };
+  }, [loadPreferences]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -139,8 +193,27 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
     }
   };
 
-  if (loading) {
-    return <Screen><View style={styles.center}><Text style={[styles.body, { color: palette.textSecondary }]}>Loading your food preferences...</Text></View></Screen>;
+  if (loadState === 'loading') {
+    return <Screen><View style={styles.center} accessibilityRole="progressbar" accessibilityLabel="Loading your food preferences"><Card><View style={styles.loadCard}><ActivityIndicator color={palette.blue} size="large" /><Text style={[styles.loadTitle, { color: palette.textPrimary }]}>Loading your food preferences</Text><Text style={[styles.body, styles.centerText, { color: palette.textSecondary }]}>Bringing back your saved choices.</Text></View></Card></View></Screen>;
+  }
+
+  if (loadState !== 'content') {
+    return <Screen>
+      <View style={styles.loadHeader}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={[styles.backButton, { borderColor: palette.stroke }]}>
+          <Text style={[styles.backLabel, { color: palette.textPrimary }]}>‹</Text>
+        </Pressable>
+      </View>
+      <View style={styles.center}>
+        <Card>
+          <View style={styles.loadCard}>
+            <Text style={[styles.loadTitle, { color: palette.textPrimary }]}>{error}</Text>
+            <Text style={[styles.body, styles.centerText, { color: palette.textSecondary }]}>{loadState === 'offline' ? 'Check your connection and try again.' : loadState === 'auth_required' ? 'Your saved selections are still safe.' : 'Please try again.'}</Text>
+            <PrimaryButton title="Try again" onPress={loadPreferences} />
+          </View>
+        </Card>
+      </View>
+    </Screen>;
   }
 
   if (mode === 'onboarding') {
@@ -262,6 +335,12 @@ const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery,
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  centerText: { textAlign: 'center' },
+  loadHeader: { minHeight: 52, alignItems: 'flex-start' },
+  backButton: { width: 44, height: 44, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  backLabel: { fontFamily: 'Exo_400Regular', fontSize: 32, lineHeight: 36, marginTop: -4 },
+  loadCard: { minWidth: 280, maxWidth: 420, gap: 12, alignItems: 'center', paddingVertical: 12 },
+  loadTitle: { ...typography.sectionTitle, textAlign: 'center' },
   eyebrow: { ...typography.caption, marginBottom: 8 },
   title: { ...typography.sectionTitle, fontSize: 20, lineHeight: 26, marginBottom: 8 },
   body: { ...typography.body, lineHeight: 22 },
