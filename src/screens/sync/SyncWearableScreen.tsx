@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { SdkAvailabilityStatus, getSdkStatus } from 'react-native-health-connect';
+import { SdkAvailabilityStatus, getSdkStatus, openHealthConnectSettings } from 'react-native-health-connect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -12,10 +12,14 @@ import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import {
   classifyRecoveryConnectionState,
-  openHealthConnectPlayStore,
   type RecoveryConnectionState
 } from '../../services/healthAppService';
-import { requestHealthConnectPermissionsOnly, withHealthConnectTimeout } from '../../services/healthConnectService';
+import {
+  inspectHealthConnectPermissions,
+  requestHealthConnectPermissionsOnly,
+  type HealthConnectPermissionPreparation,
+  withHealthConnectTimeout
+} from '../../services/healthConnectService';
 import { HealthSyncResult, runHealthSync } from '../../services/healthSyncManager';
 import { WearableSyncPayload } from '../../types';
 
@@ -213,12 +217,80 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   const isLight = themeMode === 'light';
   const isMountedRef = useRef(true);
   const inFlightRef = useRef(false);
+  const awaitingSettingsReturnRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  const applyPermissionState = useCallback((permission: HealthConnectPermissionPreparation) => {
+    setPendingInstall(false);
+    setError(null);
+    if (permission.grantedCount === permission.requestedCount) {
+      setPermissionReviewRequired(false);
+      setConnectionState('calibrating');
+      setStage('connected_ready');
+      setStatusTitle('Health Data Connected');
+      setStatusBody(`${permission.grantedCount}/${permission.requestedCount} Health Connect permissions are ready. Start your first sync when you are ready.`);
+      return;
+    }
+    if (permission.grantedCount > 0) {
+      setPermissionReviewRequired(true);
+      setConnectionState('partial');
+      setStage('connected_ready');
+      setStatusTitle('Some access allowed');
+      setStatusBody(`${permission.grantedCount}/${permission.requestedCount} health categories are available. Review permissions or sync the available data.`);
+      return;
+    }
+    setPermissionReviewRequired(true);
+    setConnectionState('permission_missing');
+    setStage('permission_denied');
+    setStatusTitle('Permission Needed');
+    setStatusBody('No supported Health Connect permissions were granted.');
+    setError('Open Health Connect settings or try again to allow at least one supported signal.');
+  }, []);
+
+  const recheckPermissionAfterSettings = useCallback(async () => {
+    try {
+      const permission = await inspectHealthConnectPermissions();
+      if (isMountedRef.current) applyPermissionState(permission);
+    } catch (permissionError) {
+      if (!isMountedRef.current) return;
+      const message = permissionError instanceof Error ? permissionError.message : 'health_connect_permission_check_failed';
+      if (message.includes('unavailable')) {
+        setPendingInstall(true);
+        setStage('not_supported');
+        setStatusTitle('Health Connect is unavailable');
+        setStatusBody('This device does not currently provide the Health Connect settings required for health sync.');
+      }
+      setError('Health Connect access could not be rechecked. You can continue without connecting health data.');
+    }
+  }, [applyPermissionState]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active' || !awaitingSettingsReturnRef.current) return;
+      awaitingSettingsReturnRef.current = false;
+      void recheckPermissionAfterSettings();
+    });
+    return () => subscription.remove();
+  }, [recheckPermissionAfterSettings]);
+
+  const openCanonicalHealthSettings = useCallback(() => {
+    if (Platform.OS !== 'android') {
+      setError('Health Connect settings are available only on supported Android devices.');
+      return;
+    }
+    try {
+      awaitingSettingsReturnRef.current = true;
+      openHealthConnectSettings();
+    } catch {
+      awaitingSettingsReturnRef.current = false;
+      setError('Health Connect settings could not be opened. You can continue without connecting health data.');
+    }
   }, []);
 
   const completeOnboardingFlow = useCallback(() => {
@@ -252,44 +324,25 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     setStatusBody('Requesting read-only access for steps, sleep, heart rate, HRV, and exercise.');
     try {
       const permission = await requestHealthConnectPermissionsOnly();
-      if (permission.grantedCount === permission.requestedCount) {
-        setPermissionReviewRequired(false);
-        setConnectionState('calibrating');
-        setStage('connected_ready');
-        setStatusTitle('Health Data Connected');
-        setStatusBody(`${permission.grantedCount}/${permission.requestedCount} Health Connect permissions are ready. Start your first sync when you are ready.`);
-      } else if (permission.grantedCount > 0) {
-        setPermissionReviewRequired(true);
-        setConnectionState('partial');
-        setStage('connected_ready');
-        setStatusTitle('Some access allowed');
-        setStatusBody(`${permission.grantedCount}/${permission.requestedCount} health categories are available. Review permissions or sync the available data.`);
-      } else {
-        setPermissionReviewRequired(true);
-        setConnectionState('permission_missing');
-        setStage('permission_denied');
-        setStatusTitle('Permission Needed');
-        setStatusBody('No supported Health Connect permissions were granted.');
-        setError('Open Settings or try again to allow at least one supported signal.');
-      }
+      applyPermissionState(permission);
     } catch (permissionError) {
       const message = permissionError instanceof Error ? permissionError.message : 'health_connect_permission_failed';
       if (message.includes('unavailable')) {
         setStage('not_supported');
         setPendingInstall(true);
-        setStatusTitle('Health Connect Needed');
-        setStatusBody('Install or update Health Connect to continue recovery sync.');
+        setStatusTitle('Health Connect is unavailable');
+        setStatusBody('This device does not currently provide the Health Connect settings required for health sync.');
       } else {
         setStage('permission_denied');
         setConnectionState('permission_missing');
         setStatusTitle('Permission Needed');
         setStatusBody('Health Connect permission could not be completed.');
       }
-      setError(message.includes('unavailable') ? 'Health Connect is required to sync health data.' : 'Health access could not be completed. Please try again.');
+      setError(message.includes('unavailable') ? 'You can continue without connecting health data.' : 'Health access could not be completed. Please try again.');
     } finally {
       setIsRunning(false);
     }
-  }, []);
+  }, [applyPermissionState]);
 
   const runRecoveryConnection = useCallback(async () => {
     if (inFlightRef.current) {
@@ -448,7 +501,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         : isRunning
           ? 'Syncing...'
           : pendingInstall
-            ? 'Open Health Connect'
+            ? 'Open Health Connect settings'
             : stage === 'connected_ready'
               ? permissionReviewRequired ? 'Review permissions' : 'Start First Sync'
               : stage === 'permission_denied'
@@ -463,18 +516,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
 
   const handlePrimary = () => {
     if (pendingInstall) {
-      void openHealthConnectPlayStore()
-        .then(() => {
-          if (!isMountedRef.current) return;
-          setPendingInstall(false);
-          setStage('failed');
-          setStatusTitle('Finish Health Connect setup');
-          setStatusBody('After installing or updating Health Connect, return here and tap Try again.');
-        })
-        .catch(() => {
-          if (!isMountedRef.current) return;
-          setError('Health Connect could not be opened. Please open it from your device settings.');
-        });
+      openCanonicalHealthSettings();
       return;
     }
     if (stage === 'intro') {
@@ -565,7 +607,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         </View>
 
         <View style={[styles.statusCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
-          <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Sync domains</Text>
+          <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Your health data</Text>
           {domainRows.map((domain) => {
             const label = summarizeDomain(domain, metrics, isRunning);
             const isSynced = label === 'Synced';
@@ -592,11 +634,11 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         {stage === 'permission_denied' || stage === 'failed' ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open device settings for health permissions"
+            accessibilityLabel="Open Health Connect settings for health permissions"
             style={[styles.secondaryButton, { borderColor: palette.stroke }]}
-            onPress={() => void Linking.openSettings().catch(() => setError('Device settings could not be opened. Please open Settings manually.'))}
+            onPress={openCanonicalHealthSettings}
           >
-            <Text style={[styles.secondaryButtonText, { color: palette.textPrimary }]}>Open Settings</Text>
+            <Text style={[styles.secondaryButtonText, { color: palette.textPrimary }]}>Open Health Connect settings</Text>
           </Pressable>
         ) : null}
 

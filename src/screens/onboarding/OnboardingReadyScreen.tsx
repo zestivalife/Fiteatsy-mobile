@@ -24,7 +24,8 @@ export const OnboardingReadyScreen = ({ navigation }: Props) => {
   return <OnboardingShell phase="READY" step={1} total={1} onBack={() => navigation.goBack()} scroll action={<View><OnboardingAction title="Enter Fiteatsy" onPress={enter} /><OnboardingAction title="Review my answers" secondary onPress={() => navigation.navigate('OnboardingBasics')} /></View>}>
     <Animated.View style={[styles.hero, { opacity: reveal, transform: [{ scale: reveal.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
       <View style={styles.checkHero}><Ionicons name="checkmark" size={36} color={colors.textPrimary} /></View>
-      <Text style={styles.title}>Your Fiteatsy profile is ready</Text><Text style={styles.subtitle}>Here's what we've set up for you</Text>
+      <Text style={styles.title}>Your profile setup is complete</Text>
+      <Text style={styles.subtitle}>Optional connections and consultant matching can continue after you enter Fiteatsy.</Text>
     </Animated.View>
     <View style={styles.list}>
       <Status icon="person-outline" label="Health profile" status={healthReady ? 'Ready' : 'Needs attention'} tone="green" />

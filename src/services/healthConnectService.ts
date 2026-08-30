@@ -100,6 +100,54 @@ export type HealthConnectPermissionPreparation = {
   permissionStates: HealthConnectRuntimeDiagnostics['permissionStates'];
 };
 
+const summarizePermissions = (granted: Array<Permission>): HealthConnectPermissionPreparation => {
+  const grantedSet = new Set(granted.map((permission) => toPermissionKey(permission)));
+  const permissionStates = {
+    Steps: hasPermission(grantedSet, 'Steps'),
+    SleepSession: hasPermission(grantedSet, 'SleepSession'),
+    RestingHeartRate: hasPermission(grantedSet, 'RestingHeartRate'),
+    HeartRateVariabilityRmssd: hasPermission(grantedSet, 'HeartRateVariabilityRmssd'),
+    ExerciseSession: hasPermission(grantedSet, 'ExerciseSession'),
+    ActiveCaloriesBurned: hasPermission(grantedSet, 'ActiveCaloriesBurned'),
+    Weight: hasPermission(grantedSet, 'Weight'),
+    Distance: hasPermission(grantedSet, 'Distance')
+  };
+
+  return {
+    grantedCount: Object.values(permissionStates).filter(Boolean).length,
+    requestedCount: permissionList.length,
+    permissionStates
+  };
+};
+
+/**
+ * Re-checks connection permission without opening a prompt, reading records or
+ * starting a sync. This is safe to call when the app returns from Android's
+ * canonical Health Connect settings screen.
+ */
+export const inspectHealthConnectPermissions = async (): Promise<HealthConnectPermissionPreparation> => {
+  if (Platform.OS !== 'android') {
+    throw new Error('health_connect_unsupported_platform');
+  }
+
+  const sdkStatus = await withHealthConnectTimeout(getSdkStatus()).catch(() => {
+    throw new Error('health_connect_status_failed');
+  });
+  if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
+    throw new Error(`health_connect_unavailable_${sdkStatus}`);
+  }
+
+  const initialized = await withHealthConnectTimeout(initialize()).catch(() => {
+    throw new Error('health_connect_initialize_failed');
+  });
+  if (!initialized) {
+    throw new Error('health_connect_initialize_failed');
+  }
+
+  const granted = (await withHealthConnectTimeout(getGrantedPermissions())) as Array<Permission>;
+  return summarizePermissions(granted);
+};
+
 export const requestHealthConnectPermissionsOnly = async (): Promise<HealthConnectPermissionPreparation> => {
   if (Platform.OS !== 'android') {
     throw new Error('health_connect_unsupported_platform');
@@ -132,23 +180,7 @@ export const requestHealthConnectPermissionsOnly = async (): Promise<HealthConne
   }
 
   const granted = (await withHealthConnectTimeout(getGrantedPermissions())) as Array<Permission>;
-  const grantedSet = new Set(granted.map((permission) => toPermissionKey(permission as Permission)));
-  const permissionStates = {
-    Steps: hasPermission(grantedSet, 'Steps'),
-    SleepSession: hasPermission(grantedSet, 'SleepSession'),
-    RestingHeartRate: hasPermission(grantedSet, 'RestingHeartRate'),
-    HeartRateVariabilityRmssd: hasPermission(grantedSet, 'HeartRateVariabilityRmssd'),
-    ExerciseSession: hasPermission(grantedSet, 'ExerciseSession'),
-    ActiveCaloriesBurned: hasPermission(grantedSet, 'ActiveCaloriesBurned'),
-    Weight: hasPermission(grantedSet, 'Weight'),
-    Distance: hasPermission(grantedSet, 'Distance')
-  };
-
-  return {
-    grantedCount: Object.values(permissionStates).filter(Boolean).length,
-    requestedCount: permissionList.length,
-    permissionStates
-  };
+  return summarizePermissions(granted);
 };
 
 export const getHealthConnectRuntimeDiagnostics = async (): Promise<HealthConnectRuntimeDiagnostics> => {

@@ -45,6 +45,11 @@ The final preference mutation performs canonical profile validation, one transac
 | P1 | error/loading hierarchy | screenshots | contextual friendly errors and truthful loading labels | closure/full regression | physical visual check required | FIXED + PHYSICAL VERIFICATION REQUIRED |
 | P1 | back/restart/resume | audit requirement | persisted runtime progress retained; saving cannot navigate back | onboarding regression | process-kill during native activity required | FIXED + PHYSICAL VERIFICATION REQUIRED |
 | P1 | completion transition | audit requirement | canonical ready screen/clear-progress transition preserved; splash not reused | onboarding + splash regression | physical timing check required | FIXED + PHYSICAL VERIFICATION REQUIRED |
+| P1 | height/weight ruler did not drag | source inspection | horizontal PanResponder now changes the canonical metric; direct entry and +/- remain available | `androidAuditClosure`, onboarding regression | physical gesture feel/OEM touch arbitration required | FIXED — EVIDENCE LEVEL L2; PHYSICAL VERIFICATION REQUIRED |
+| P1 | height lacked direct ft entry | source inspection | exact `30.48` cm/ft conversion with bounded two-decimal direct entry | `androidAuditClosure`, TypeScript | physical keyboard/unit-toggle verification required | FIXED — EVIDENCE LEVEL L2; PHYSICAL VERIFICATION REQUIRED |
+| P1 | ready screen implied every optional service was ready | source inspection | completion copy now distinguishes profile setup from optional connections and consultant matching | `androidAuditClosure`, onboarding regression | physical visual verification required | FIXED — EVIDENCE LEVEL L2; PHYSICAL VERIFICATION REQUIRED |
+| P1 | Health Connect sent unavailable devices toward Play Store / generic app settings | source inspection | removed store route and generic settings route; all permission actions now open canonical Health Connect settings | `androidAuditClosure`, Health Connect focused tests | supported/unavailable physical Android permutations required | FIXED — EVIDENCE LEVEL L2; PHYSICAL VERIFICATION REQUIRED |
+| P1 | permissions were not refreshed after returning from Health Connect settings | source inspection | app-active return performs permission-only inspection; no records are read and no sync starts | `androidAuditClosure`, Health Connect focused tests | physical settings round-trip required | FIXED — EVIDENCE LEVEL L2; PHYSICAL VERIFICATION REQUIRED |
 | P1 | safe area/touch targets/theme | physical audit | shared Shell, tokens, controls and dark theme retained | full regression | device/insets/accessibility verification required | FIXED + PHYSICAL VERIFICATION REQUIRED |
 | Frozen | accepted product modules | governance contract | no source edits | diff classification + focused/global tests | none for this source closure | FIXED + AUTOMATED VERIFIED |
 
@@ -71,3 +76,14 @@ The following cannot truthfully be closed without a new native APK and physical 
 - APK: NOT GENERATED
 - AAB: NOT GENERATED
 - OTA: NOT PUBLISHED
+
+## Execution-control verification
+
+- TypeScript: PASS
+- Focused onboarding/Health Connect contracts: 17/17 PASS
+- Full mobile regression: 152/152 PASS
+- Frozen splash contract: verifier PASS; 8/8 PASS
+- Simulator bundle/runtime launch: PASS at evidence level L4
+- Simulator observation: canonical Onboarding V2 Basics entry screen rendered from this exact candidate
+- Interactive simulator traversal: NOT EXECUTED; no claim is made for tap, drag, keyboard, back, resume, or restart behaviour
+- Physical Android verification: REQUIRED for every item identified as physical-only above

@@ -7,10 +7,15 @@ describe('Android UX and reliability closure contract', () => {
   it('keeps Health Connect explicit, bounded and free of automatic/store detours', () => {
     const screen = read('src/screens/sync/SyncWearableScreen.tsx');
     const service = read('src/services/healthConnectService.ts');
+    const appService = read('src/services/healthAppService.ts');
 
-    expect(screen).not.toContain('AppState.addEventListener');
+    expect(screen).toContain("AppState.addEventListener('change'");
+    expect(screen).toContain('inspectHealthConnectPermissions()');
+    expect(screen).not.toMatch(/AppState\.addEventListener[\s\S]{0,500}runHealthSync\(/);
     expect(screen).not.toContain('Google Fit');
     expect(screen).not.toContain("Linking.openURL('market:");
+    expect(screen).not.toContain('play.google.com/store/apps/details');
+    expect(appService).not.toContain('openHealthConnectPlayStore');
     expect(screen).toContain("title: 'Connected to Health Connect'");
     expect(screen).toContain("title: 'Connected — no recent health data found'");
     expect(screen).toContain("? 'Review permissions'");
@@ -18,7 +23,9 @@ describe('Android UX and reliability closure contract', () => {
     expect(screen).toContain("'Last synced: '");
     expect(screen).toContain("'Last sync attempt: '");
     expect(screen).toContain("title=\"Set up later\"");
-    expect(screen).toContain("setStatusBody('After installing or updating Health Connect, return here and tap Try again.')");
+    expect(screen).toContain('openHealthConnectSettings()');
+    expect(screen).toContain("setStatusTitle('Health Connect is unavailable')");
+    expect(screen).toContain('You can continue without connecting health data.');
     expect(service).toContain('withHealthConnectTimeout(readRecords(');
     expect(service).toContain('withHealthConnectTimeout(getSdkStatus()');
     expect(service).toContain('withHealthConnectTimeout(initialize()');
@@ -57,9 +64,17 @@ describe('Android UX and reliability closure contract', () => {
     expect(shell).toContain('keyboardShouldPersistTaps="handled"');
     expect(shell).toContain('accessibilityLabel={`Step ${step} of ${total}`}');
     expect(assessment).toContain('keyboardType="decimal-pad"');
+    expect(assessment).toContain('PanResponder.create');
+    expect(assessment).toContain('accessibilityRole="adjustable"');
+    expect(assessment).toContain("values={['cm', 'ft']}");
+    expect(assessment).toContain("values={['kg', 'lbs']}");
+    expect(assessment).toContain('const CM_PER_FOOT = 30.48');
+    expect(assessment).toContain('const POUNDS_PER_KILOGRAM = 2.2046226218487757');
     expect(assessment).toContain('accessibilityRole="radio"');
     expect(assessment).toContain('Keyboard.dismiss()');
     expect(progress).toContain('fiteatsy.onboarding.runtime.v2:${clientId}');
     expect(ready).toContain('clearOnboardingRuntimeProgress');
+    expect(ready).toContain('Your profile setup is complete');
+    expect(ready).toContain('Optional connections and consultant matching can continue');
   });
 });

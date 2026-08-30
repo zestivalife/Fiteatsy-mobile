@@ -1,4 +1,4 @@
-import { Linking, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { WearableSyncPayload } from '../types';
 import { apiFetch, postJson } from './apiClient';
 import { syncFromHealthConnect } from './healthConnectService';
@@ -67,15 +67,6 @@ export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<Wearab
   }
 
   throw new Error('apple_health_native_reader_not_available');
-};
-
-export const openHealthConnectPlayStore = async () => {
-  if (Platform.OS !== 'android') return;
-  const marketUrl = 'market://details?id=com.google.android.apps.healthdata';
-  const webUrl = 'https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata';
-
-  const canOpenMarket = await Linking.canOpenURL(marketUrl);
-  await Linking.openURL(canOpenMarket ? marketUrl : webUrl);
 };
 
 const metricPriority: Array<keyof NonNullable<WearableSyncPayload['dataQuality']['connectedMetrics']>> = [
