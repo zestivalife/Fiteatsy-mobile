@@ -76,7 +76,7 @@ export const discoverClientsForAssignment = async (query: string, limit: number,
             and subscriptions.revoked_at is null and subscriptions.starts_at <= now() and subscriptions.expires_at > now()
           order by subscriptions.expires_at desc limit 1
        ) subscription on true
-      where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active' and lower(coalesce(u.role, 'user')) = 'user'
+      where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active'
         and ($1 = '' or lower(u.name) like '%' || lower($1) || '%' or lower(coalesce(u.email_normalized, '')) like '%' || lower($1) || '%')
         and ($5 = 'all' or ($5 = 'unassigned' and active_assignment.id is null) or ($5 = 'assigned' and active_assignment.id is not null) or ($5 = 'mine' and active_assignment.consultant_user_id = $4))
       order by u.created_at desc limit $2 offset $3`,
@@ -116,7 +116,7 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
             and subscriptions.revoked_at is null and subscriptions.starts_at <= now() and subscriptions.expires_at > now()
           order by subscriptions.expires_at desc limit 1
        ) subscription on true
-      where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active' and lower(coalesce(u.role, 'user')) = 'user'
+      where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active'
         and ($1 = '' or lower(u.name) like '%' || lower($1) || '%' or lower(coalesce(u.email_normalized, '')) like '%' || lower($1) || '%')
         and ($5 = 'all' or ($5 = 'unassigned' and active_assignment.id is null) or ($5 = 'assigned' and active_assignment.id is not null) or ($5 = 'mine' and active_assignment.consultant_user_id = $4))
       order by u.created_at desc limit $2 offset $3`,
@@ -165,7 +165,6 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
       where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
         and lower(coalesce(professional.status, '')) = 'active'
         and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
-        and lower(coalesce(client.role, 'user')) = 'user'
      on conflict (consultant_user_id, client_user_id, scope) where status = 'active'
      do update set updated_at = now()
      returning *`,

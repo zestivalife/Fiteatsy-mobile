@@ -22,7 +22,7 @@ test.beforeEach(async () => {
   await resetTestState();
 });
 
-const promoteRole = async (userId: string, role: 'admin' | 'consultant' | 'user') => {
+const promoteRole = async (userId: string, role: 'admin' | 'consultant' | 'senior_consultant' | 'user') => {
   await pool.query('update users set role = $2 where id = $1', [userId, role]);
 };
 
@@ -269,4 +269,80 @@ test('consultant can access client list after admin role assignment', async () =
   assert.equal(list.body.clients.length, 1);
   assert.equal(list.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
   assert.equal(list.body.clients[0].name, 'QA Real Client');
+});
+
+test('senior allocation pool uses the active client mapping for a dual-role mobile registrant', async () => {
+  const senior = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Senior Client Allocator',
+    email: `senior-client-allocator-${Date.now()}@example.com`
+  });
+  const mobileClient = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Dual Role Mobile Client',
+    email: `dual-role-mobile-client-${Date.now()}@example.com`
+  });
+  await promoteRole(senior.current.body.accountId, 'senior_consultant');
+  await promoteRole(mobileClient.current.body.accountId, 'admin');
+
+  const poolResponse = await getJson(
+    server.baseUrl,
+    '/v1/professional-assignments/clients/pool?q=Dual%20Role%20Mobile%20Client&assignment=unassigned',
+    { headers: authHeaders(senior.token) }
+  );
+
+  assert.equal(poolResponse.response.status, 200);
+  assert.equal(poolResponse.body.clients.length, 1);
+  assert.equal(poolResponse.body.clients[0].userId, mobileClient.current.body.accountId);
+  assert.equal(poolResponse.body.clients[0].clientId, mobileClient.current.body.client.fiteatsyClientId);
+  assert.equal(poolResponse.body.clients[0].assignmentStatus, 'UNASSIGNED');
+
+  const duplicateCount = await pool.query(
+    'select count(*)::int as count from fiteatsy_clients where account_user_id = $1 and deleted_at is null',
+    [mobileClient.current.body.accountId]
+  );
+  assert.equal(duplicateCount.rows[0].count, 1);
+
+  const assignment = await createProfessionalAssignment({
+    actorUserId: senior.current.body.accountId,
+    clientUserId: mobileClient.current.body.accountId,
+    professionalUserId: senior.current.body.accountId,
+    professionalType: 'CONSULTANT',
+    relationshipType: 'CLIENT_CARE',
+    reason: 'Verify a mapped dual-role client remains assignable'
+  });
+  assert.notEqual(assignment, null);
+
+  const assignedResponse = await getJson(
+    server.baseUrl,
+    '/v1/professional-assignments/clients/pool?q=Dual%20Role%20Mobile%20Client&assignment=assigned',
+    { headers: authHeaders(senior.token) }
+  );
+  assert.equal(assignedResponse.response.status, 200);
+  assert.equal(assignedResponse.body.clients.length, 1);
+  assert.equal(assignedResponse.body.clients[0].assignmentStatus, 'ASSIGNED');
+});
+
+test('senior allocation pool excludes an operational identity without an active client mapping', async () => {
+  const senior = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Senior Isolation Auditor',
+    email: `senior-isolation-auditor-${Date.now()}@example.com`
+  });
+  const operationalIdentity = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Operational Identity Only',
+    email: `operational-identity-only-${Date.now()}@example.com`
+  });
+  await promoteRole(senior.current.body.accountId, 'senior_consultant');
+  await promoteRole(operationalIdentity.current.body.accountId, 'admin');
+  await pool.query(
+    "update fiteatsy_clients set status = 'inactive', deleted_at = now(), updated_at = now() where account_user_id = $1",
+    [operationalIdentity.current.body.accountId]
+  );
+
+  const poolResponse = await getJson(
+    server.baseUrl,
+    '/v1/professional-assignments/clients/pool?q=Operational%20Identity%20Only&assignment=all',
+    { headers: authHeaders(senior.token) }
+  );
+
+  assert.equal(poolResponse.response.status, 200);
+  assert.deepEqual(poolResponse.body.clients, []);
 });
