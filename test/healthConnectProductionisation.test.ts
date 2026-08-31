@@ -8,8 +8,15 @@ describe('Health Connect D2 production contracts', () => {
   const service = read('src/services/healthConnectService.ts');
 
   it('registers the native Health Connect permission delegate in MainActivity', () => {
+    const appConfig = read('app.json');
+    const configPlugin = read('plugins/withHealthConnectPermissionDelegate.js');
     const mainActivity = read(
       'android/app/src/main/java/com/fiteatsy/health/MainActivity.kt'
+    );
+    expect(appConfig).toContain('./plugins/withHealthConnectPermissionDelegate');
+    expect(configPlugin).toContain('withMainActivity');
+    expect(configPlugin).toContain(
+      'HealthConnectPermissionDelegate.setPermissionDelegate(this)'
     );
     expect(mainActivity).toContain(
       'import dev.matinzd.healthconnect.permissions.HealthConnectPermissionDelegate'
