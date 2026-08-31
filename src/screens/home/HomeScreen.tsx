@@ -337,7 +337,7 @@ export const HomeScreen = () => {
                 Icon={AssistIcon}
                 onPress={() => { void openAssist(); }}
               />
-              <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable', { autoSync: true })} />
+              <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable')} />
               <ActionPill label="Health Reports" Icon={ReportsActionIcon} onPress={() => navigation.navigate('Reports')} />
               <ActionPill label="Cycle" Icon={CycleActionIcon} onPress={() => navigation.navigate('Cycle')} />
             </View>
