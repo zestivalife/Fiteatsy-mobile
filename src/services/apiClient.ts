@@ -13,11 +13,13 @@ export type ApiClientErrorCode =
 export class ApiClientError extends Error {
   code: ApiClientErrorCode;
   status?: number;
+  serverCode?: string;
 
-  constructor(code: ApiClientErrorCode, message: string, status?: number) {
+  constructor(code: ApiClientErrorCode, message: string, status?: number, serverCode?: string) {
     super(message);
     this.code = code;
     this.status = status;
+    this.serverCode = serverCode;
   }
 }
 
@@ -111,13 +113,13 @@ export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Prom
   }
 
   if (!response.ok) {
-    let payload: { message?: string } | null = null;
+    let payload: { error?: string; message?: string } | null = null;
     try {
-      payload = (await response.json()) as { message?: string };
+      payload = (await response.json()) as { error?: string; message?: string };
     } catch {
       payload = null;
     }
-    throw new ApiClientError(toErrorCode(response.status), payload?.message ?? 'Platform request failed.', response.status);
+    throw new ApiClientError(toErrorCode(response.status), payload?.message ?? 'Platform request failed.', response.status, payload?.error);
   }
 
   return (await response.json()) as T;

@@ -33,4 +33,19 @@ describe('shared API bounded completion', () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status, json: async () => ({ message: 'classified' }) });
     await expect(apiFetch('/v1/classification')).rejects.toMatchObject({ code, status });
   });
+
+  it('preserves a structured backend error code for contract-specific UI states', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: 'DIET_PLAN_NOT_FOUND', message: 'No published plan.' }),
+    });
+
+    await expect(apiFetch('/v1/platform/nutrition-experience')).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+      serverCode: 'DIET_PLAN_NOT_FOUND',
+      message: 'No published plan.',
+    });
+  });
 });

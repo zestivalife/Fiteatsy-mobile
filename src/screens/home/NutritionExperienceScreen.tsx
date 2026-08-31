@@ -22,7 +22,7 @@ import {
   NutritionMeal,
 } from '../../services/nutritionExperienceService';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
-import { classifyNutritionLoadError, NutritionLoadState } from '../../services/nutritionLoadState';
+import { classifyNutritionLoadError, nutritionLoadCopy, NutritionLoadState } from '../../services/nutritionLoadState';
 
 const C = { bg: '#07070B', card: '#111117', raised: '#181820', line: '#272733', text: '#F3F2FA', muted: '#898899', blue: '#43C4FA', green: '#4BE38A', yellow: '#FFC229', purple: '#A985FF' };
 const fmt = (value: number | null) => value == null ? '—' : Math.round(value).toLocaleString('en-IN');
@@ -34,15 +34,6 @@ const isoDay = (date: Date) => {
   const dayOfMonth = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${dayOfMonth}`;
 };
-
-const NUTRITION_LOAD_TIMEOUT_MS = 20_000;
-const withNutritionTimeout = <T,>(request: Promise<T>): Promise<T> => new Promise((resolve, reject) => {
-  const timeout = setTimeout(
-    () => reject(new Error("Nutrition couldn't be loaded. Please try again.")),
-    NUTRITION_LOAD_TIMEOUT_MS,
-  );
-  request.then(resolve, reject).finally(() => clearTimeout(timeout));
-});
 
 type RecommendationMode = 'what-can-eat-now' | 'eating-out' | 'craving' | null;
 type PendingRecommendationEvent = {
@@ -77,7 +68,7 @@ export const NutritionExperienceScreen = () => {
     setError(null);
     setLoadState('LOADING');
     try {
-      setData(await withNutritionTimeout(getNutritionExperience(selectedDate)));
+      setData(await getNutritionExperience(selectedDate));
       setLoadState('READY');
     } catch (e) {
       setLoadState(classifyNutritionLoadError(e));
@@ -172,7 +163,10 @@ export const NutritionExperienceScreen = () => {
   };
 
   if (!data && !error) return <Screen contentStyle={styles.center}><ActivityIndicator color={C.blue} /></Screen>;
-  if (!data) return <Screen contentStyle={styles.screen}><Text style={styles.title}>Nutrition</Text><View style={styles.card}><Text style={styles.section}>Nutrition couldn't be loaded</Text><Text style={styles.body}>{error}</Text><Text style={styles.muted}>{loadState.replaceAll('_', ' ')}</Text><Pressable accessibilityRole="button" onPress={() => void refresh()}><Text style={styles.blue}>Try again</Text></Pressable></View></Screen>;
+  if (!data) {
+    const copy = nutritionLoadCopy(loadState as Exclude<NutritionLoadState, 'LOADING' | 'READY'>);
+    return <Screen contentStyle={styles.screen}><Text style={styles.title}>Nutrition</Text><View style={styles.card}><Text style={styles.section}>{copy.title}</Text><Text style={styles.body}>{copy.message}</Text>{copy.retryable ? <Pressable accessibilityRole="button" onPress={() => void refresh()}><Text style={styles.blue}>Try again</Text></Pressable> : null}</View></Screen>;
+  }
   const pending = data.meals.filter(meal => meal.state === 'PENDING').length;
   const hasRecommendationContext = data.meals.length > 0;
   const isToday = selectedDate === nutritionDate();
