@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { SdkAvailabilityStatus, getSdkStatus, openHealthConnectSettings } from 'react-native-health-connect';
+import { openHealthConnectSettings } from 'react-native-health-connect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -21,6 +21,7 @@ import {
   withHealthConnectTimeout
 } from '../../services/healthConnectService';
 import { HealthSyncResult, runHealthSync } from '../../services/healthSyncManager';
+import { markHealthConnectAwaitingPermissionReturn } from '../../services/healthConnectOperationCoordinator';
 import { WearableSyncPayload } from '../../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SyncWearable'>;
@@ -286,6 +287,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     }
     try {
       awaitingSettingsReturnRef.current = true;
+      markHealthConnectAwaitingPermissionReturn();
       openHealthConnectSettings();
     } catch {
       awaitingSettingsReturnRef.current = false;
@@ -317,6 +319,11 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       return;
     }
 
+    if (inFlightRef.current) {
+      return;
+    }
+    inFlightRef.current = true;
+
     setIsRunning(true);
     setError(null);
     setStage('requesting_permission');
@@ -340,6 +347,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       }
       setError(message.includes('unavailable') ? 'You can continue without connecting health data.' : 'Health access could not be completed. Please try again.');
     } finally {
+      inFlightRef.current = false;
       setIsRunning(false);
     }
   }, [applyPermissionState]);
@@ -383,18 +391,6 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     }
 
     try {
-      const sdkStatus = await withHealthConnectTimeout(getSdkStatus());
-      if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
-        if (isMountedRef.current) {
-          setStage('not_supported');
-          setPendingInstall(true);
-          setConnectionState(null);
-          setStatusTitle('Health Connect Needed');
-          setStatusBody('Health Connect helps securely sync your recovery signals.');
-        }
-        return;
-      }
-
       if (isMountedRef.current) {
         setPendingInstall(false);
         setStage('syncing');
@@ -432,6 +428,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       }
     } catch (syncError) {
       const message = syncError instanceof Error ? syncError.message : 'sync_failed';
+      if (message === 'health_connect_operation_in_progress') return;
       if (message.includes('health_connect_unavailable')) {
         if (isMountedRef.current) {
           setStage('not_supported');

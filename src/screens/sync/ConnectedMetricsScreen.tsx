@@ -17,11 +17,23 @@ type MetricKey =
   | 'heart_rate'
   | 'hrv'
   | 'calories'
+  | 'weight'
+  | 'distance'
   | 'workouts'
   | 'stress'
   | 'cycle'
   | 'spo2'
   | 'respiratory_rate';
+
+type MetricStatus =
+  | 'synced'
+  | 'missing'
+  | 'unsupported'
+  | 'estimated'
+  | 'no_permission'
+  | 'no_recent_data'
+  | 'unavailable'
+  | 'read_failed';
 
 const metricLabels: Record<MetricKey, string> = {
   sleep: 'Sleep Recovery',
@@ -29,6 +41,8 @@ const metricLabels: Record<MetricKey, string> = {
   heart_rate: 'Heart Rhythm',
   hrv: 'Recovery Balance',
   calories: 'Energy Burn',
+  weight: 'Body Weight',
+  distance: 'Movement Distance',
   workouts: 'Movement Sessions',
   stress: 'Calm Load',
   cycle: 'Cycle Rhythm',
@@ -37,37 +51,40 @@ const metricLabels: Record<MetricKey, string> = {
 };
 
 const statusColor = (
-  status: 'synced' | 'missing' | 'unsupported' | 'estimated' | 'no_permission' | 'no_recent_data' | 'unavailable',
+  status: MetricStatus,
   isLight: boolean
 ) => {
   if (status === 'synced') return isLight ? '#166534' : '#86EFAC';
   if (status === 'no_permission') return isLight ? '#9A3412' : '#FDBA74';
   if (status === 'no_recent_data') return isLight ? '#92400E' : '#FCD34D';
   if (status === 'unavailable') return isLight ? '#B91C1C' : '#FCA5A5';
+  if (status === 'read_failed') return isLight ? '#B91C1C' : '#FCA5A5';
   if (status === 'missing') return isLight ? '#92400E' : '#FCD34D';
   if (status === 'unsupported') return isLight ? '#475569' : '#94A3B8';
   return isLight ? '#0F766E' : '#5EEAD4';
 };
 
 const statusLabel = (
-  status: 'synced' | 'missing' | 'unsupported' | 'estimated' | 'no_permission' | 'no_recent_data' | 'unavailable'
+  status: MetricStatus
 ) => {
   if (status === 'synced') return 'REAL';
   if (status === 'no_permission') return 'NO PERMISSION';
   if (status === 'no_recent_data') return 'NO RECENT DATA';
   if (status === 'unavailable') return 'UNAVAILABLE';
+  if (status === 'read_failed') return 'READ FAILED';
   if (status === 'unsupported') return 'UNSUPPORTED';
   if (status === 'estimated') return 'ESTIMATED';
   return 'UNAVAILABLE';
 };
 
 const statusIcon = (
-  status: 'synced' | 'missing' | 'unsupported' | 'estimated' | 'no_permission' | 'no_recent_data' | 'unavailable'
+  status: MetricStatus
 ) => {
   if (status === 'synced') return 'checkmark-circle';
   if (status === 'no_permission') return 'lock-closed-outline';
   if (status === 'no_recent_data') return 'time-outline';
   if (status === 'unavailable') return 'alert-circle-outline';
+  if (status === 'read_failed') return 'alert-circle-outline';
   if (status === 'unsupported') return 'remove-circle-outline';
   if (status === 'estimated') return 'time-outline';
   return 'alert-circle-outline';
@@ -80,12 +97,14 @@ export const ConnectedMetricsScreen = ({ navigation }: Props) => {
   const latest = wearableSyncData[0] ?? null;
 
   const metricStatus = useMemo(() => {
-    const defaults: Record<MetricKey, 'synced' | 'missing' | 'unsupported' | 'estimated' | 'no_permission' | 'no_recent_data' | 'unavailable'> = {
+    const defaults: Record<MetricKey, MetricStatus> = {
       sleep: 'missing',
       steps: 'missing',
       heart_rate: 'missing',
       hrv: 'missing',
       calories: 'missing',
+      weight: 'missing',
+      distance: 'missing',
       workouts: 'missing',
       stress: 'missing',
       cycle: 'missing',
