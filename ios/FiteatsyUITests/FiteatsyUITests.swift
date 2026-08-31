@@ -20,6 +20,75 @@ final class FiteatsyUITests: XCTestCase {
     add(attachment)
   }
 
+  private func valueText(_ identifier: String) -> String {
+    let target = element(identifier)
+    XCTAssertTrue(target.waitForExistence(timeout: 10), "Missing value element \(identifier)")
+    return (target.value as? String) ?? target.label
+  }
+
+  private func numericValue(_ identifier: String) -> Double {
+    let text = valueText(identifier).replacingOccurrences(of: ",", with: ".")
+    let match = text.range(of: #"-?[0-9]+(?:\.[0-9]+)?"#, options: .regularExpression)
+    XCTAssertNotNil(match, "No numeric value exposed by \(identifier): \(text)")
+    return match.flatMap { Double(text[$0]) } ?? .nan
+  }
+
+  private func replaceText(_ field: XCUIElement, with text: String) {
+    field.tap()
+    field.press(forDuration: 0.8)
+    if app.menuItems["Select All"].waitForExistence(timeout: 2) {
+      app.menuItems["Select All"].tap()
+    }
+    field.typeText(XCUIKeyboardKey.delete.rawValue)
+    field.typeText(text)
+  }
+
+  private func dismissKeyboard() {
+    let done = app.keyboards.buttons["Done"]
+    if done.exists { done.tap() } else { app.swipeDown() }
+    XCTAssertEqual(app.keyboards.count, 0, "Numeric keyboard did not dismiss")
+  }
+
+  private func assertKeyboardAndContinueRemainUsable() {
+    XCTAssertGreaterThan(app.keyboards.count, 0, "Numeric keyboard did not become visible")
+    let action = element("onboarding.continue")
+    XCTAssertTrue(action.exists, "Sticky Continue action disappeared behind the keyboard")
+    XCTAssertTrue(action.isHittable, "Sticky Continue action is not reachable while keyboard is open")
+  }
+
+  private func exerciseMetric(prefix: String, typed: String, expected: Double, screenshot: String) {
+    let input = element("\(prefix).input")
+    XCTAssertTrue(input.waitForExistence(timeout: 20), "Missing \(prefix) direct-entry field")
+    replaceText(input, with: typed)
+    assertKeyboardAndContinueRemainUsable()
+    dismissKeyboard()
+    XCTAssertEqual(numericValue("\(prefix).value"), expected, accuracy: 0.11)
+
+    let beforeDrag = numericValue("\(prefix).value")
+    let ruler = element("\(prefix).ruler")
+    XCTAssertTrue(ruler.exists && ruler.isHittable)
+    ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.78, dy: 0.5))
+      .press(forDuration: 0.15, thenDragTo: ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.32, dy: 0.5)))
+    let afterDrag = numericValue("\(prefix).value")
+    XCTAssertNotEqual(beforeDrag, afterDrag, "Real ruler drag did not change \(prefix)")
+    ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.32, dy: 0.5))
+      .press(forDuration: 0.15, thenDragTo: ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: 0.5)))
+    XCTAssertNotEqual(afterDrag, numericValue("\(prefix).value"), "Reverse ruler drag did not change \(prefix)")
+
+    let beforeFineTune = numericValue("\(prefix).value")
+    element("\(prefix).plus").tap()
+    XCTAssertGreaterThan(numericValue("\(prefix).value"), beforeFineTune)
+    element("\(prefix).minus").tap()
+    for _ in 0..<8 { element("\(prefix).plus").tap() }
+
+    let metricValue = numericValue("\(prefix).value")
+    element("\(prefix).unit.imperial").tap()
+    XCTAssertNotEqual(metricValue, numericValue("\(prefix).value"), "Unit conversion did not update the displayed value")
+    element("\(prefix).unit.metric").tap()
+    XCTAssertEqual(numericValue("\(prefix).value"), metricValue, accuracy: 0.6, "Metric round trip drifted")
+    attachScreenshot(screenshot)
+  }
+
   @discardableResult
   private func waitForAnyRoot(timeout: TimeInterval = 30) -> XCUIElement {
     let identifiers = [
@@ -231,43 +300,56 @@ final class FiteatsyUITests: XCTestCase {
     guard ProcessInfo.processInfo.environment["FITEATSY_GOVERNED_QA_TEST_READY"] == "1" else {
       throw XCTSkip("BLOCKED — GOVERNED QA_TEST SESSION REQUIRED")
     }
+    app.launchArguments += ["-FITEATSY_L4_ONBOARDING", "1"]
     app.launch()
     XCTAssertTrue(element("onboarding.progress").waitForExistence(timeout: 30))
 
-    let heightRuler = element("height.ruler")
-    XCTAssertTrue(heightRuler.waitForExistence(timeout: 20))
-    heightRuler.coordinate(withNormalizedOffset: CGVector(dx: 0.72, dy: 0.5))
-      .press(forDuration: 0.15, thenDragTo: heightRuler.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5)))
-    app.buttons["height.plus"].tap()
-    attachScreenshot("70-height-ruler-drag")
-    app.buttons["onboarding.continue"].tap()
-
-    let weightRuler = element("weight.ruler")
-    XCTAssertTrue(weightRuler.waitForExistence(timeout: 20))
-    weightRuler.coordinate(withNormalizedOffset: CGVector(dx: 0.68, dy: 0.5))
-      .press(forDuration: 0.15, thenDragTo: weightRuler.coordinate(withNormalizedOffset: CGVector(dx: 0.42, dy: 0.5)))
-    app.buttons["weight.minus"].tap()
-    attachScreenshot("71-weight-ruler-drag")
-    app.buttons["onboarding.continue"].tap()
+    exerciseMetric(prefix: "height", typed: "184", expected: 184, screenshot: "70-height-complete-interaction")
+    element("onboarding.continue").tap()
+    exerciseMetric(prefix: "weight", typed: "70", expected: 70, screenshot: "71-weight-complete-interaction")
+    element("onboarding.back").tap()
+    XCTAssertTrue(element("height.ruler").waitForExistence(timeout: 10), "Back navigation lost Height state")
+    element("onboarding.continue").tap()
+    XCTAssertTrue(element("weight.ruler").waitForExistence(timeout: 10), "Forward navigation did not restore Weight")
+    element("onboarding.continue").tap()
 
     while app.buttons["onboarding.continue"].waitForExistence(timeout: 2) {
       app.swipeUp()
       app.buttons["onboarding.continue"].tap()
-      if element("food.save").exists { break }
+      if element("food.diet.non_vegetarian").exists { break }
     }
+    XCTAssertTrue(element("food.diet.non_vegetarian").waitForExistence(timeout: 15), "Food Preferences did not load real content")
+    element("food.diet.non_vegetarian").tap()
+    element("onboarding.continue").tap()
+    XCTAssertTrue(element("food.cuisine.maharashtrian").waitForExistence(timeout: 10))
+    element("food.cuisine.maharashtrian").tap()
+    element("food.cuisine.international_other").tap()
+    element("onboarding.continue").tap()
+    element("food.staple.both").tap()
+    element("food.dairy.limited").tap()
+    element("onboarding.continue").tap()
+    element("food.avoid.mode.disliked").tap()
     let search = app.textFields["food.avoid.search"]
-    if search.waitForExistence(timeout: 10) {
-      search.tap()
-      search.typeText("mushroom")
-      attachScreenshot("72-food-search")
-    }
-    if app.buttons["food.save"].exists {
-      app.buttons["food.save"].doubleTap()
-      XCTAssertFalse(app.buttons["food.save"].isEnabled)
-    }
+    XCTAssertTrue(search.waitForExistence(timeout: 10))
+    search.tap()
+    search.typeText("mushroom")
+    let mushroom = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "mushroom")).firstMatch
+    XCTAssertTrue(mushroom.waitForExistence(timeout: 10), "Food search did not return a Mushroom catalogue result")
+    mushroom.tap()
+    mushroom.tap()
+    mushroom.tap()
+    attachScreenshot("72-food-search-selection")
+    let save = element("food.save")
+    XCTAssertTrue(save.waitForExistence(timeout: 10))
+    save.doubleTap()
+    XCTAssertFalse(save.isEnabled, "Food save did not suppress a duplicate tap")
+    XCTAssertTrue(element("onboarding.progress").waitForExistence(timeout: 30), "Food save did not advance to Recovery")
+    attachScreenshot("73-recovery-after-food-save")
+
     app.terminate()
     app.launch()
-    _ = waitForAnyRoot()
-    attachScreenshot("73-governed-relaunch")
+    XCTAssertTrue(element("onboarding.progress").waitForExistence(timeout: 30), "Onboarding did not resume after process relaunch")
+    assertNoRuntimeFailure()
+    attachScreenshot("74-governed-relaunch-resume")
   }
 }

@@ -25,6 +25,28 @@ describe('permanent L4 XCUITest automation contract', () => {
     expect(uiTest).toContain('weight.ruler');
   });
 
+  it('keeps the real onboarding interaction matrix behind the governed identity gate', () => {
+    const uiTest = read('ios/FiteatsyUITests/FiteatsyUITests.swift');
+    [
+      'food.diet.non_vegetarian',
+      'food.cuisine.maharashtrian',
+      'food.cuisine.international_other',
+      'food.staple.both', 'food.dairy.limited',
+      'food.avoid.mode.disliked', 'food.avoid.search', 'food.save',
+    ].forEach(identifier => expect(uiTest).toContain(identifier));
+    expect(uiTest).toContain('exerciseMetric(prefix: "height"');
+    expect(uiTest).toContain('exerciseMetric(prefix: "weight"');
+    [
+      '.input', '.value', '.plus', '.minus',
+      '.unit.imperial', '.unit.metric',
+    ].forEach(identifier => expect(uiTest).toContain(identifier));
+    expect(uiTest).toContain('assertKeyboardAndContinueRemainUsable');
+    expect(uiTest).toContain('save.doubleTap()');
+    expect(uiTest).toContain('app.terminate()');
+    expect(uiTest.indexOf('FITEATSY_GOVERNED_QA_TEST_READY'))
+      .toBeLessThan(uiTest.indexOf('exerciseMetric(prefix: "height"'));
+  });
+
   it('permanently covers safe authenticated navigation and lifecycle recovery', () => {
     const uiTest = read('ios/FiteatsyUITests/FiteatsyUITests.swift');
     [
