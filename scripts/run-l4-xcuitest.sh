@@ -18,9 +18,11 @@ if [[ -e "$RESULT_PATH" ]]; then
 fi
 
 cd "$ROOT_DIR"
+export ENTRY_FILE="node_modules/expo/AppEntry.js"
 xcodebuild \
   -workspace ios/Fiteatsy.xcworkspace \
   -scheme FiteatsyUITests \
+  -configuration Release \
   -destination "platform=iOS Simulator,id=$DEVICE_ID" \
   -derivedDataPath "$DERIVED_PATH" \
   -resultBundlePath "$RESULT_PATH" \

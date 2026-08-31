@@ -77,7 +77,7 @@ export const ProfileScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen scroll>
+    <Screen testID="profile.root" scroll>
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: palette.textPrimary }]}>Fiteatsy Care Profile</Text>
         <Pressable

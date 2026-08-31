@@ -423,7 +423,7 @@ const CycleActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
 );
 
 const ActionPill = ({ label, Icon, onPress }: { label: string; Icon: SvgAsset; onPress: () => void }) => (
-  <Pressable onPress={onPress} style={styles.actionPill} accessibilityRole="button">
+  <Pressable onPress={onPress} style={styles.actionPill} accessibilityRole="button" accessibilityLabel={label}>
     <Icon width={18} height={18} />
     <Text style={styles.actionText}>{label}</Text>
   </Pressable>
@@ -515,7 +515,7 @@ const RecoveryPanel = ({
           accessibilityRole="button"
           accessibilityLabel="View today's Recovery Core score"
         >
-          <Text style={styles.coreScore}>{selectedScore == null ? '--/100' : `${selectedScore}/100`}</Text>
+          <Text style={styles.coreScore}>{selectedScore == null ? 'Calibrating' : `${selectedScore}/100`}</Text>
           <Text style={styles.coreLabel}>{selectedLabel}</Text>
           <View testID="home.recoveryCore.state" style={[styles.stateChip, { backgroundColor: selectedScore == null ? '#23272D' : selectedColor }]}>
             <Text style={styles.stateChipText}>{selectedState.label}</Text>

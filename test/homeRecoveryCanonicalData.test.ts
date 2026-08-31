@@ -21,7 +21,8 @@ describe('Journey recovery star canonical data contract', () => {
   });
 
   it('shows no score when the backend reports insufficient data', () => {
-    expect(source).toContain("selectedScore == null ? '--/100'");
+    expect(source).toContain("selectedScore == null ? 'Calibrating'");
+    expect(source).not.toContain("selectedScore == null ? '--/100'");
     expect(source).toContain("if (score == null) return { label: 'No data' }");
   });
 });

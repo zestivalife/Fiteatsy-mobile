@@ -64,7 +64,7 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen scroll contentStyle={styles.screen}>
+    <Screen testID="care.root" scroll contentStyle={styles.screen}>
       <PageHeader title="Consultant Booking" onBack={() => navigation.goBack()} />
 
       <View style={[styles.hero, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#101311' }]}>
