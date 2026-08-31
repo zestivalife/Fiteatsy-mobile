@@ -9,11 +9,22 @@ import {
   type Permission
 } from 'react-native-health-connect';
 import { HealthObservationDraft, WearableSyncPayload } from '../types';
+import { runHealthConnectOperation } from './healthConnectOperationCoordinator';
 
-type HealthConnectMetricStatus = 'synced' | 'no_permission' | 'no_recent_data' | 'unsupported' | 'unavailable';
+type HealthConnectMetricStatus = 'synced' | 'no_permission' | 'no_recent_data' | 'read_failed' | 'unsupported' | 'unavailable';
 
 const DAY = 24 * 60 * 60 * 1000;
+export const HEALTH_CONNECT_OPERATION_TIMEOUT_MS = 30_000;
 const now = () => Date.now();
+
+export const withHealthConnectTimeout = <T>(operation: Promise<T>, timeoutMs = HEALTH_CONNECT_OPERATION_TIMEOUT_MS): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('health_connect_operation_timed_out')), timeoutMs);
+    operation.then(
+      (value) => { clearTimeout(timeout); resolve(value); },
+      (error) => { clearTimeout(timeout); reject(error); }
+    );
+  });
 
 const toIso = (ms: number) => new Date(ms).toISOString();
 
@@ -60,7 +71,7 @@ const safeReadRecords = async <TRecord>(
   options: Parameters<typeof readRecords>[1]
 ): Promise<Array<TRecord>> => {
   try {
-    const response = await readRecords(recordType, options);
+    const response = await withHealthConnectTimeout(readRecords(recordType, options));
     return (response?.records ?? []) as Array<TRecord>;
   } catch (error) {
     console.warn('[HealthConnect] readRecords_failed', recordType, error instanceof Error ? error.message : 'unknown_error');
@@ -90,39 +101,8 @@ export type HealthConnectPermissionPreparation = {
   permissionStates: HealthConnectRuntimeDiagnostics['permissionStates'];
 };
 
-export const requestHealthConnectPermissionsOnly = async (): Promise<HealthConnectPermissionPreparation> => {
-  if (Platform.OS !== 'android') {
-    throw new Error('health_connect_unsupported_platform');
-  }
-
-  let sdkStatus: number;
-  try {
-    sdkStatus = await getSdkStatus();
-  } catch {
-    throw new Error('health_connect_status_failed');
-  }
-  if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
-    throw new Error(`health_connect_unavailable_${sdkStatus}`);
-  }
-
-  let initialized = false;
-  try {
-    initialized = await initialize();
-  } catch {
-    throw new Error('health_connect_initialize_failed');
-  }
-  if (!initialized) {
-    throw new Error('health_connect_initialize_failed');
-  }
-
-  try {
-    await requestPermission(permissionList);
-  } catch {
-    throw new Error('health_connect_permission_flow_failed');
-  }
-
-  const granted = (await getGrantedPermissions()) as Array<Permission>;
-  const grantedSet = new Set(granted.map((permission) => toPermissionKey(permission as Permission)));
+const summarizePermissions = (granted: Array<Permission>): HealthConnectPermissionPreparation => {
+  const grantedSet = new Set(granted.map((permission) => toPermissionKey(permission)));
   const permissionStates = {
     Steps: hasPermission(grantedSet, 'Steps'),
     SleepSession: hasPermission(grantedSet, 'SleepSession'),
@@ -141,7 +121,76 @@ export const requestHealthConnectPermissionsOnly = async (): Promise<HealthConne
   };
 };
 
-export const getHealthConnectRuntimeDiagnostics = async (): Promise<HealthConnectRuntimeDiagnostics> => {
+/**
+ * Re-checks connection permission without opening a prompt, reading records or
+ * starting a sync. This is safe to call when the app returns from Android's
+ * canonical Health Connect settings screen.
+ */
+const inspectHealthConnectPermissionsInternal = async (): Promise<HealthConnectPermissionPreparation> => {
+  if (Platform.OS !== 'android') {
+    throw new Error('health_connect_unsupported_platform');
+  }
+
+  const sdkStatus = await withHealthConnectTimeout(getSdkStatus()).catch(() => {
+    throw new Error('health_connect_status_failed');
+  });
+  if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
+    throw new Error(`health_connect_unavailable_${sdkStatus}`);
+  }
+
+  const initialized = await withHealthConnectTimeout(initialize()).catch(() => {
+    throw new Error('health_connect_initialize_failed');
+  });
+  if (!initialized) {
+    throw new Error('health_connect_initialize_failed');
+  }
+
+  const granted = (await withHealthConnectTimeout(getGrantedPermissions())) as Array<Permission>;
+  return summarizePermissions(granted);
+};
+
+export const inspectHealthConnectPermissions = () =>
+  runHealthConnectOperation('RECONCILING_PERMISSION', inspectHealthConnectPermissionsInternal);
+
+const requestHealthConnectPermissionsOnlyInternal = async (): Promise<HealthConnectPermissionPreparation> => {
+  if (Platform.OS !== 'android') {
+    throw new Error('health_connect_unsupported_platform');
+  }
+
+  let sdkStatus: number;
+  try {
+    sdkStatus = await withHealthConnectTimeout(getSdkStatus());
+  } catch {
+    throw new Error('health_connect_status_failed');
+  }
+  if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
+    throw new Error(`health_connect_unavailable_${sdkStatus}`);
+  }
+
+  let initialized = false;
+  try {
+    initialized = await withHealthConnectTimeout(initialize());
+  } catch {
+    throw new Error('health_connect_initialize_failed');
+  }
+  if (!initialized) {
+    throw new Error('health_connect_initialize_failed');
+  }
+
+  try {
+    await withHealthConnectTimeout(requestPermission(permissionList));
+  } catch {
+    throw new Error('health_connect_permission_flow_failed');
+  }
+
+  const granted = (await withHealthConnectTimeout(getGrantedPermissions())) as Array<Permission>;
+  return summarizePermissions(granted);
+};
+
+export const requestHealthConnectPermissionsOnly = () =>
+  runHealthConnectOperation('REQUESTING_PERMISSION', requestHealthConnectPermissionsOnlyInternal);
+
+const getHealthConnectRuntimeDiagnosticsInternal = async (): Promise<HealthConnectRuntimeDiagnostics> => {
   const base: HealthConnectRuntimeDiagnostics = {
     platform: Platform.OS,
     sdkStatus: 'unknown',
@@ -164,7 +213,7 @@ export const getHealthConnectRuntimeDiagnostics = async (): Promise<HealthConnec
 
   let sdkStatus: number;
   try {
-    sdkStatus = await getSdkStatus();
+    sdkStatus = await withHealthConnectTimeout(getSdkStatus());
   } catch {
     return { ...base, sdkStatus: 'status_check_failed' };
   }
@@ -175,8 +224,8 @@ export const getHealthConnectRuntimeDiagnostics = async (): Promise<HealthConnec
   let initialized = false;
   let granted: Array<Permission> = [];
   try {
-    initialized = await initialize();
-    granted = (await getGrantedPermissions()) as Array<Permission>;
+    initialized = await withHealthConnectTimeout(initialize());
+    granted = (await withHealthConnectTimeout(getGrantedPermissions())) as Array<Permission>;
   } catch {
     return { ...base, sdkStatus: String(sdkStatus), initialized: false, permissionStates: {}, grantedPermissions: [] };
   }
@@ -272,7 +321,10 @@ export const getHealthConnectRuntimeDiagnostics = async (): Promise<HealthConnec
   return diagnostics;
 };
 
-export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
+export const getHealthConnectRuntimeDiagnostics = () =>
+  runHealthConnectOperation('CHECKING', getHealthConnectRuntimeDiagnosticsInternal);
+
+const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => {
   if (Platform.OS !== 'android') {
     console.warn('[HealthConnect] Unsupported platform:', Platform.OS);
     throw new Error('health_connect_unsupported_platform');
@@ -280,7 +332,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
 
   let sdkStatus: number;
   try {
-    sdkStatus = await getSdkStatus();
+    sdkStatus = await withHealthConnectTimeout(getSdkStatus());
   } catch {
     throw new Error('health_connect_status_failed');
   }
@@ -291,7 +343,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
 
   let initialized = false;
   try {
-    initialized = await initialize();
+    initialized = await withHealthConnectTimeout(initialize());
   } catch {
     throw new Error('health_connect_initialize_failed');
   }
@@ -302,7 +354,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
 
   let granted: Array<Permission> = [];
   try {
-    granted = (await getGrantedPermissions()) as Array<Permission>;
+    granted = (await withHealthConnectTimeout(getGrantedPermissions())) as Array<Permission>;
   } catch {
     throw new Error('health_connect_permission_flow_failed');
   }
@@ -318,10 +370,27 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
     hrv: hasPermission(grantedSet, metricPermissionMap.hrv) ? 'no_recent_data' : 'no_permission',
     calories: hasPermission(grantedSet, metricPermissionMap.calories) ? 'no_recent_data' : 'no_permission',
     workouts: hasPermission(grantedSet, metricPermissionMap.workouts) ? 'no_recent_data' : 'no_permission',
+    weight: hasPermission(grantedSet, 'Weight') ? 'no_recent_data' : 'no_permission',
+    distance: hasPermission(grantedSet, 'Distance') ? 'no_recent_data' : 'no_permission',
     stress: 'unsupported',
     cycle: 'unsupported',
     spo2: 'unsupported',
     respiratory_rate: 'unsupported'
+  };
+
+  const failedMetrics: string[] = [];
+  const readMetric = async <TRecord>(
+    metric: keyof typeof connectedMetrics,
+    recordType: Parameters<typeof readRecords>[0],
+    options: Parameters<typeof readRecords>[1]
+  ): Promise<TRecord[]> => {
+    try {
+      return await safeReadRecords<TRecord>(recordType, options);
+    } catch {
+      connectedMetrics[metric] = 'read_failed';
+      failedMetrics.push(metric);
+      return [];
+    }
   };
 
   const end = toIso(now());
@@ -398,7 +467,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   }
 
   if (hasPermission(grantedSet, 'Steps')) {
-    const stepRecords = await safeReadRecords<{ startTime: string; endTime: string; count?: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('Steps', {
+    const stepRecords = await readMetric<{ startTime: string; endTime: string; count?: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('steps', 'Steps', {
       timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY), endTime: end }
     });
     const valid = stepRecords.filter((record) => within(record.endTime, DAY));
@@ -407,14 +476,14 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
       connectedMetrics.steps = 'synced';
       valid.forEach((record) => addObservation('steps', record.count ?? null, 'count', record.endTime, 'Steps', record));
       console.info('[HealthConnect] Steps read success:', stepCount);
-    } else {
+    } else if (connectedMetrics.steps !== 'read_failed') {
       connectedMetrics.steps = 'no_recent_data';
       console.warn('[HealthConnect] Steps no recent data');
     }
   }
 
   const sleepRecords = hasPermission(grantedSet, 'SleepSession')
-    ? await safeReadRecords<{ startTime: string; endTime: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('SleepSession', {
+    ? await readMetric<{ startTime: string; endTime: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('sleep', 'SleepSession', {
         timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 2), endTime: end }
       })
     : ([] as Array<{ startTime: string; endTime: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>);
@@ -425,7 +494,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
       .map((record) => Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000))
   );
   if (hasPermission(grantedSet, 'SleepSession')) {
-    connectedMetrics.sleep = sleepMinutes > 0 ? 'synced' : 'no_recent_data';
+    if (connectedMetrics.sleep !== 'read_failed') connectedMetrics.sleep = sleepMinutes > 0 ? 'synced' : 'no_recent_data';
     sleepRecords.filter((record) => within(record.endTime, DAY * 2)).forEach((record) => {
       const minutes = Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000);
       addObservation('sleep_minutes', minutes, 'min', record.endTime, 'SleepSession', record);
@@ -434,14 +503,14 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   }
 
   const hrRecords = hasPermission(grantedSet, 'RestingHeartRate')
-    ? await safeReadRecords<{ time: string; beatsPerMinute: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('RestingHeartRate', {
+    ? await readMetric<{ time: string; beatsPerMinute: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('heart_rate', 'RestingHeartRate', {
         timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
       })
     : ([] as Array<{ time: string; beatsPerMinute: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>);
   const hrValues = hrRecords.filter((record) => within(record.time, DAY * 7)).map((record) => record.beatsPerMinute ?? 0).filter((v) => v > 0);
   const heartRateAvg = avg(hrValues);
   if (hasPermission(grantedSet, 'RestingHeartRate')) {
-    connectedMetrics.heart_rate = heartRateAvg ? 'synced' : 'no_recent_data';
+    if (connectedMetrics.heart_rate !== 'read_failed') connectedMetrics.heart_rate = heartRateAvg ? 'synced' : 'no_recent_data';
     hrRecords.filter((record) => within(record.time, DAY * 7)).forEach((record) =>
       addObservation('resting_heart_rate', record.beatsPerMinute, 'bpm', record.time, 'RestingHeartRate', record)
     );
@@ -449,14 +518,14 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   }
 
   const hrvRecords = hasPermission(grantedSet, 'HeartRateVariabilityRmssd')
-    ? await safeReadRecords<{ time: string; heartRateVariabilityMillis: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('HeartRateVariabilityRmssd', {
+    ? await readMetric<{ time: string; heartRateVariabilityMillis: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('hrv', 'HeartRateVariabilityRmssd', {
         timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
       })
     : ([] as Array<{ time: string; heartRateVariabilityMillis: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>);
   const hrvValues = hrvRecords.filter((record) => within(record.time, DAY * 7)).map((record) => record.heartRateVariabilityMillis ?? 0).filter((v) => v > 0);
   const hrvAvg = avg(hrvValues);
   if (hasPermission(grantedSet, 'HeartRateVariabilityRmssd')) {
-    connectedMetrics.hrv = hrvAvg ? 'synced' : 'no_recent_data';
+    if (connectedMetrics.hrv !== 'read_failed') connectedMetrics.hrv = hrvAvg ? 'synced' : 'no_recent_data';
     hrvRecords.filter((record) => within(record.time, DAY * 7)).forEach((record) =>
       addObservation('hrv_ms', record.heartRateVariabilityMillis, 'ms', record.time, 'HeartRateVariabilityRmssd', record)
     );
@@ -464,7 +533,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   }
 
   const workoutRecords = hasPermission(grantedSet, 'ExerciseSession')
-    ? await safeReadRecords<{ startTime: string; endTime: string; title?: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('ExerciseSession', {
+    ? await readMetric<{ startTime: string; endTime: string; title?: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('workouts', 'ExerciseSession', {
         timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
       })
     : ([] as Array<{ startTime: string; endTime: string; title?: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>);
@@ -476,7 +545,7 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
   );
 
   if (hasPermission(grantedSet, 'ExerciseSession')) {
-    connectedMetrics.workouts = workoutMinutes > 0 ? 'synced' : 'no_recent_data';
+    if (connectedMetrics.workouts !== 'read_failed') connectedMetrics.workouts = workoutMinutes > 0 ? 'synced' : 'no_recent_data';
     workoutRecords.filter((record) => within(record.endTime, DAY * 7)).forEach((record) => {
       const minutes = Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000);
       addObservation('workout_minutes', minutes, 'min', record.endTime, 'ExerciseSession', record);
@@ -486,32 +555,34 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
 
   let caloriesKcal: number | null = null;
   if (hasPermission(grantedSet, 'ActiveCaloriesBurned')) {
-    const records = await safeReadRecords<{ startTime: string; endTime: string; energy: { inKilocalories: number }; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('ActiveCaloriesBurned', {
+    const records = await readMetric<{ startTime: string; endTime: string; energy: { inKilocalories: number }; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('calories', 'ActiveCaloriesBurned', {
       timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
     });
     const valid = records.filter((record) => within(record.endTime, DAY * 7));
     const values = valid.map((record) => record.energy.inKilocalories).filter((value) => value > 0);
     caloriesKcal = values.length ? sum(values) : null;
     valid.forEach((record) => addObservation('active_energy', record.energy.inKilocalories, 'kcal', record.endTime, 'ActiveCaloriesBurned', record));
-    connectedMetrics.calories = caloriesKcal == null ? 'no_recent_data' : 'synced';
+    if (connectedMetrics.calories !== 'read_failed') connectedMetrics.calories = caloriesKcal == null ? 'no_recent_data' : 'synced';
   }
 
   if (hasPermission(grantedSet, 'Weight')) {
-    const records = await safeReadRecords<{ time: string; weight: { inKilograms: number }; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('Weight', {
+    const records = await readMetric<{ time: string; weight: { inKilograms: number }; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('weight', 'Weight', {
       timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
     });
     records.filter((record) => within(record.time, DAY * 7)).forEach((record) =>
       addObservation('weight', record.weight.inKilograms, 'kg', record.time, 'Weight', record)
     );
+    if (connectedMetrics.weight !== 'read_failed') connectedMetrics.weight = records.length ? 'synced' : 'no_recent_data';
   }
 
   if (hasPermission(grantedSet, 'Distance')) {
-    const records = await safeReadRecords<{ startTime: string; endTime: string; distance: { inMeters: number }; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('Distance', {
+    const records = await readMetric<{ startTime: string; endTime: string; distance: { inMeters: number }; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('distance', 'Distance', {
       timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
     });
     records.filter((record) => within(record.endTime, DAY * 7)).forEach((record) =>
       addObservation('distance', record.distance.inMeters, 'm', record.endTime, 'Distance', record)
     );
+    if (connectedMetrics.distance !== 'read_failed') connectedMetrics.distance = records.length ? 'synced' : 'no_recent_data';
   }
 
   const realSyncedCount = observations.length;
@@ -544,7 +615,10 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
     dataQuality: {
       confidence: realSyncedCount > 0 ? 0.96 : 0,
       isEstimated: false,
-      warnings: realSyncedCount > 0 ? [] : ['No recent Health Connect records were found for the selected metrics.'],
+      warnings: [
+        ...(realSyncedCount > 0 ? [] : ['No recent Health Connect records were found for the selected metrics.']),
+        ...(failedMetrics.length ? [`Some Health Connect metrics could not be read: ${failedMetrics.join(', ')}.`] : [])
+      ],
       connectedMetrics,
       normalizedDomains: {
         Activity: stepCount > 0 || workoutMinutes > 0 ? Math.round(Math.max(stepCount / 100, workoutMinutes)) : null,
@@ -560,3 +634,10 @@ export const syncFromHealthConnect = async (): Promise<WearableSyncPayload> => {
 
   return payload;
 };
+
+export const syncFromHealthConnect = () =>
+  runHealthConnectOperation(
+    'SYNCING',
+    syncFromHealthConnectInternal,
+    (payload) => Object.values(payload.dataQuality.connectedMetrics ?? {}).includes('read_failed') ? 'PARTIAL_SUCCESS' : 'SUCCESS'
+  );
