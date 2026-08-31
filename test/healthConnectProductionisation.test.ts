@@ -7,6 +7,21 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 describe('Health Connect D2 production contracts', () => {
   const service = read('src/services/healthConnectService.ts');
 
+  it('registers the native Health Connect permission delegate in MainActivity', () => {
+    const mainActivity = read(
+      'android/app/src/main/java/com/fiteatsy/health/MainActivity.kt'
+    );
+    expect(mainActivity).toContain(
+      'import dev.matinzd.healthconnect.permissions.HealthConnectPermissionDelegate'
+    );
+    expect(mainActivity).toContain(
+      'HealthConnectPermissionDelegate.setPermissionDelegate(this)'
+    );
+    expect(mainActivity.indexOf('super.onCreate(null)')).toBeLessThan(
+      mainActivity.indexOf('HealthConnectPermissionDelegate.setPermissionDelegate(this)')
+    );
+  });
+
   it('uses real Health Connect record identities and preserves provenance', () => {
     expect(service).toContain("record?.metadata?.id?.trim()");
     expect(service).toContain('sourceApplication: record?.metadata?.dataOrigin');
