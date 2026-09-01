@@ -62,7 +62,8 @@ jobs:
           ../tests/api/subscriptions.api.test.ts
 
       - name: Run full safe backend regression against ephemeral PostgreSQL
-        run: npm --prefix backend run test:qa
+        run: node --import tsx --test --test-concurrency=1 ../tests/api/*.test.ts ../tests/backend/*.test.ts ../tests/database/*.test.ts
+        working-directory: backend
 
       - name: Build backend
         run: npm --prefix backend run build
