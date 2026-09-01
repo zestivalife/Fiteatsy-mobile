@@ -27,6 +27,8 @@ export type FoodMasterRecord = {
   cuisineTags?: string[];
   dietaryTags?: string[];
   allergenTags?: string[];
+  micronutrients?: Record<string, number | null>;
+  sourceMetadata?: Record<string, unknown>;
   verificationStatus: 'verified' | 'seed' | 'draft';
 };
 
@@ -48,6 +50,8 @@ export type MealVariantRecord = {
   dietaryTags?: string[];
   allergenTags?: string[];
   sourceType: 'verified_library' | 'consultant_custom' | 'template_variant';
+  nutritionTotals?: Record<string, number | null>;
+  sourceMetadata?: Record<string, unknown>;
   components: NutritionMealComponent[];
 };
 

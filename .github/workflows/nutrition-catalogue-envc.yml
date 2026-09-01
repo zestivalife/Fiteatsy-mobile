@@ -1,0 +1,107 @@
+name: Nutrition Catalogue ENV-C
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/usda-nutrition-catalogue-v1
+
+permissions:
+  contents: read
+
+jobs:
+  verified-catalogue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fiteatsy_test
+          POSTGRES_PASSWORD: fiteatsy_test
+          POSTGRES_DB: fiteatsy_nutrition_catalogue_envc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fiteatsy_test -d fiteatsy_nutrition_catalogue_envc_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://fiteatsy_test:fiteatsy_test@127.0.0.1:5432/fiteatsy_nutrition_catalogue_envc_test
+      REDIS_URL: redis://127.0.0.1:6379
+      FITEATSY_ALLOW_DESTRUCTIVE_TEST_RESET: "true"
+      FITEATSY_TEST_ENVIRONMENT: nutrition-catalogue-env-c-test
+      REPORTS_STORAGE_ROOT: /tmp/fiteatsy-nutrition-catalogue-reports
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Record checked-out source SHA
+        run: git rev-parse HEAD
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install locked backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Download pinned official USDA FoodData Central releases
+        run: |
+          mkdir -p /tmp/fdc
+          curl --fail --location --retry 3 \
+            --output /tmp/fdc/foundation.zip \
+            https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_json_2026-04-30.zip
+          curl --fail --location --retry 3 \
+            --output /tmp/fdc/sr-legacy.zip \
+            https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_json_2018-04.zip
+          unzip -q /tmp/fdc/foundation.zip -d /tmp/fdc
+          unzip -q /tmp/fdc/sr-legacy.zip -d /tmp/fdc
+
+      - name: Verify generated catalogue is deterministic
+        run: |
+          npm --prefix backend run nutrition:catalogue:generate -- \
+            /tmp/fdc/FoodData_Central_foundation_food_json_2026-04-30.json \
+            /tmp/fdc/FoodData_Central_sr_legacy_food_json_2018-04.json \
+            src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.json
+          git diff --exit-code -- backend/src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.json
+
+      - name: Apply production migrations to ephemeral PostgreSQL
+        run: npm --prefix backend run db:migrate
+
+      - name: Import catalogue twice and verify database contract
+        working-directory: backend
+        run: node --import tsx --test --test-concurrency=1 ../tests/database/nutrition-catalogue.database.test.ts
+
+      - name: Run catalogue and nutrition generation contracts
+        working-directory: backend
+        run: >-
+          node --import tsx --test --test-concurrency=1
+          ../tests/backend/nutrition-catalogue.test.ts
+          ../tests/backend/nutrition-architecture-freeze.test.ts
+          ../tests/backend/nutrition-final-data-contract.test.ts
+          ../tests/backend/nutrition-food-preference-contract.test.ts
+          ../tests/backend/nutrition-meal-engine.test.ts
+          ../tests/backend/diet-plan-version-store-contract.test.ts
+          ../tests/backend/published-nutrition-plan-contract.test.ts
+
+      - name: Run full safe backend regression
+        working-directory: backend
+        run: node --import tsx --test --test-concurrency=1 ../tests/api/*.test.ts ../tests/backend/*.test.ts ../tests/database/*.test.ts
+
+      - name: Build backend
+        run: npm --prefix backend run build

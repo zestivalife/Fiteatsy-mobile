@@ -26,6 +26,8 @@ type NutritionFoodRow = {
   cuisine_tags: string[] | null;
   dietary_tags: string[] | null;
   allergen_tags: string[] | null;
+  micronutrients: JsonRecord | null;
+  source_metadata: JsonRecord | null;
   verification_status: FoodMasterRecord['verificationStatus'];
 };
 
@@ -50,6 +52,8 @@ type MealVariantRow = {
   owner_scope: 'system' | 'organisation' | 'consultant';
   consultant_id: string | null;
   verification_status: 'draft' | 'seed' | 'verified';
+  nutrition_totals: JsonRecord | null;
+  source_metadata: JsonRecord | null;
   source_type: MealVariantRecord['sourceType'];
 };
 
@@ -80,6 +84,14 @@ const normalizeTagArray = (value: unknown) =>
 
 const normalizeJsonRecord = (value: unknown): JsonRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : {};
+
+const normalizeNullableNutrients = (value: unknown): Record<string, number | null> =>
+  Object.fromEntries(
+    Object.entries(normalizeJsonRecord(value)).map(([key, nutrient]) => [
+      key,
+      nutrient == null ? null : toNumberOrNull(nutrient),
+    ]),
+  );
 
 const normalizeText = (value: string | null | undefined) => (value ?? '').trim().toLowerCase();
 
@@ -149,6 +161,8 @@ const mapFoodRecord = (row: NutritionFoodRow): FoodMasterRecord => ({
   cuisineTags: normalizeTagArray(row.cuisine_tags),
   dietaryTags: normalizeTagArray(row.dietary_tags),
   allergenTags: normalizeTagArray(row.allergen_tags),
+  micronutrients: normalizeNullableNutrients(row.micronutrients),
+  sourceMetadata: normalizeJsonRecord(row.source_metadata),
   verificationStatus: row.verification_status,
 });
 
@@ -243,6 +257,8 @@ export const listVerifiedFoodMasterRecords = async () => {
         cuisine_tags,
         dietary_tags,
         allergen_tags,
+        micronutrients,
+        source_metadata,
         verification_status
       from nutrition_foods
       where deleted_at is null
@@ -314,6 +330,8 @@ export const listEligibleMealVariantRecords = async (input: {
         owner_scope,
         consultant_id,
         verification_status,
+        nutrition_totals,
+        source_metadata,
         case
           when owner_scope = 'consultant' then 'consultant_custom'
           when meal_template_id is not null then 'template_variant'
@@ -392,6 +410,8 @@ export const listEligibleMealVariantRecords = async (input: {
               cuisine_tags,
               dietary_tags,
               allergen_tags,
+              micronutrients,
+              source_metadata,
               verification_status
             from nutrition_foods
             where deleted_at is null
@@ -438,6 +458,8 @@ export const listEligibleMealVariantRecords = async (input: {
       dietaryTags: normalizeTagArray(row.dietary_tags),
       allergenTags: Array.from(new Set([...normalizeTagArray(row.allergen_tags), ...componentAllergens])),
       sourceType: row.source_type,
+      nutritionTotals: normalizeNullableNutrients(row.nutrition_totals),
+      sourceMetadata: normalizeJsonRecord(row.source_metadata),
       components,
     } satisfies MealVariantRecord;
   });
