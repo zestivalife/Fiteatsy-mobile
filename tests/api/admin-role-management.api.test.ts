@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pool } from '../../backend/src/db/pool.js';
@@ -355,6 +356,171 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
     { headers: authHeaders(otherConsultant.token) }
   );
   assert.equal(wrongConsultantDetail.response.status, 404);
+});
+
+test('all active canonical client cohorts remain allocation-visible and roster-isolated exactly once', async () => {
+  const marker = `Lifecycle Cohort ${Date.now()}`;
+  const senior = await createAuthenticatedSession(server.baseUrl, {
+    name: `${marker} Senior`, email: `lifecycle-cohort-senior-${Date.now()}@example.com`
+  });
+  const consultant = await createAuthenticatedSession(server.baseUrl, {
+    name: `${marker} Consultant`, email: `lifecycle-cohort-consultant-${Date.now()}@example.com`
+  });
+  const otherConsultant = await createAuthenticatedSession(server.baseUrl, {
+    name: `${marker} Other Consultant`, email: `lifecycle-cohort-other-${Date.now()}@example.com`
+  });
+  await promoteRole(senior.current.body.accountId, 'senior_consultant');
+  await promoteRole(consultant.current.body.accountId, 'consultant');
+  await promoteRole(otherConsultant.current.body.accountId, 'consultant');
+
+  type CohortDefinition = {
+    label: string;
+    assigned: boolean;
+    subscribed?: boolean;
+    role?: 'admin';
+    careContext?: boolean;
+    legacyTimestamp?: boolean;
+    reassign?: boolean;
+  };
+  const cohortDefinitions: CohortDefinition[] = [
+    { label: 'Unsubscribed', assigned: true },
+    { label: 'Subscribed', assigned: true, subscribed: true },
+    { label: 'Dual Role', assigned: true, role: 'admin' as const },
+    { label: 'Care Context', assigned: true, careContext: true },
+    { label: 'Legacy Timestamp', assigned: true, legacyTimestamp: true },
+    { label: 'Historical Reassignment', assigned: true, reassign: true },
+    { label: 'Unassigned', assigned: false }
+  ];
+  const cohorts = [] as Array<{
+    definition: CohortDefinition;
+    session: Awaited<ReturnType<typeof createAuthenticatedSession>>;
+  }>;
+
+  for (const definition of cohortDefinitions) {
+    const session = await createAuthenticatedSession(server.baseUrl, {
+      name: `${marker} ${definition.label}`,
+      email: `lifecycle-cohort-${definition.label.toLowerCase().replaceAll(' ', '-')}-${Date.now()}@example.com`
+    });
+    if (definition.role) await promoteRole(session.current.body.accountId, definition.role);
+    if (definition.legacyTimestamp) {
+      await pool.query("update users set created_at = timestamptz '2020-01-01 00:00:00+00' where id = $1", [
+        session.current.body.accountId
+      ]);
+    }
+    if (definition.subscribed) {
+      const planId = crypto.randomUUID();
+      await pool.query(
+        `insert into subscription_plans
+          (id, code, name, description, duration_days, duration_months, price_minor)
+         values ($1, $2, $3, 'Cohort contract plan', 30, 1, 100)`,
+        [planId, `COHORT-${Date.now()}`, `${marker} Plan`]
+      );
+      await pool.query(
+        `insert into user_subscriptions
+          (id, user_id, plan_id, status, starts_at, expires_at)
+         values ($1, $2, $3, 'ACTIVE', now() - interval '1 day', now() + interval '29 days')`,
+        [crypto.randomUUID(), session.current.body.accountId, planId]
+      );
+    }
+    if (definition.careContext) {
+      const healthProfileId = crypto.randomUUID();
+      const recoveryProgramId = crypto.randomUUID();
+      await pool.query(
+        `insert into health_profiles (id, user_id, client_id)
+         select $1, account_user_id, id from fiteatsy_clients where account_user_id = $2`,
+        [healthProfileId, session.current.body.accountId]
+      );
+      await pool.query(
+        `insert into recovery_programs (id, health_profile_id, consultant_id, current_phase)
+         values ($1, $2, $3, 'diet_published')`,
+        [recoveryProgramId, healthProfileId, consultant.current.body.accountId]
+      );
+      await pool.query(
+        `insert into care_cases
+          (id, user_id, client_id, health_profile_id, recovery_program_id, assigned_consultant_id, current_stage)
+         select $1, account_user_id, id, $3, $4, $5, 'diet_published'
+           from fiteatsy_clients where account_user_id = $2`,
+        [crypto.randomUUID(), session.current.body.accountId, healthProfileId, recoveryProgramId, consultant.current.body.accountId]
+      );
+    }
+    if (definition.assigned) {
+      if (definition.reassign) {
+        const historical = await createProfessionalAssignment({
+          actorUserId: senior.current.body.accountId,
+          clientUserId: session.current.body.accountId,
+          professionalUserId: otherConsultant.current.body.accountId,
+          professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Historical cohort assignment'
+        });
+        assert.notEqual(historical, null);
+      }
+      const assignment = await createProfessionalAssignment({
+        actorUserId: senior.current.body.accountId,
+        clientUserId: session.current.body.accountId,
+        professionalUserId: consultant.current.body.accountId,
+        professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Whole-population lifecycle matrix'
+      });
+      assert.notEqual(assignment, null);
+    }
+    cohorts.push({ definition, session });
+  }
+
+  const allocationPool = await getJson(
+    server.baseUrl,
+    `/v1/professional-assignments/clients/pool?q=${encodeURIComponent(marker)}&assignment=all&limit=50`,
+    { headers: authHeaders(senior.token) }
+  );
+  assert.equal(allocationPool.response.status, 200);
+  for (const cohort of cohorts) {
+    const matches = allocationPool.body.clients.filter(
+      (client: { clientId: string }) => client.clientId === cohort.session.current.body.client.fiteatsyClientId
+    );
+    assert.equal(matches.length, 1, `${cohort.definition.label} must appear exactly once in the Senior pool`);
+    assert.equal(matches[0].assignmentStatus, cohort.definition.assigned ? 'ASSIGNED' : 'UNASSIGNED');
+    assert.equal(matches[0].subscriptionStatus, cohort.definition.subscribed ? 'ACTIVE' : 'NONE');
+  }
+
+  const consultantRoster = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  const wrongRoster = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(otherConsultant.token)
+  });
+  assert.equal(consultantRoster.response.status, 200);
+  assert.equal(wrongRoster.response.status, 200);
+  for (const cohort of cohorts) {
+    const clientId = cohort.session.current.body.client.fiteatsyClientId;
+    assert.equal(
+      consultantRoster.body.clients.filter((client: { clientId: string }) => client.clientId === clientId).length,
+      cohort.definition.assigned ? 1 : 0,
+      `${cohort.definition.label} roster membership must match its active assignment`
+    );
+    assert.equal(
+      wrongRoster.body.clients.filter((client: { clientId: string }) => client.clientId === clientId).length,
+      0,
+      `${cohort.definition.label} must not leak into the wrong Consultant roster`
+    );
+    if (cohort.definition.assigned) {
+      const detail = await getJson(server.baseUrl, `/v1/consultants/clients/${clientId}`, {
+        headers: authHeaders(consultant.token)
+      });
+      assert.equal(detail.response.status, 200);
+      assert.equal(detail.body.client.id, clientId);
+    }
+    const wrongDetail = await getJson(server.baseUrl, `/v1/consultants/clients/${clientId}`, {
+      headers: authHeaders(otherConsultant.token)
+    });
+    assert.equal(wrongDetail.response.status, 404);
+  }
+
+  const activeAssignmentCounts = await pool.query(
+    `select client_user_id, count(*)::int as count
+       from consultant_client_assignments
+      where client_user_id = any($1::text[]) and product = 'FITEATSY' and status = 'active'
+      group by client_user_id`,
+    [cohorts.map(({ session }) => session.current.body.accountId)]
+  );
+  assert.ok(activeAssignmentCounts.rows.every((row) => row.count === 1));
+  assert.equal(activeAssignmentCounts.rowCount, cohortDefinitions.filter(({ assigned }) => assigned).length);
 });
 
 test('senior allocation pool excludes an operational identity without an active client mapping', async () => {
