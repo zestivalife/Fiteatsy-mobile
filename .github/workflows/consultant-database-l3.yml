@@ -66,12 +66,15 @@ jobs:
           status=$?
           cat consultant-database-l3.log
           if [ "$status" -ne 0 ]; then
-            grep -E -B 5 -A 24 'not ok|failureType|AssertionError|ERR_ASSERTION|error:' consultant-database-l3.log | tail -n 100 | while IFS= read -r line; do
-              escaped="${line//'%'/'%25'}"
-              escaped="${escaped//$'\r'/'%0D'}"
-              escaped="${escaped//$'\n'/'%0A'}"
-              echo "::error title=Consultant database L3::$escaped"
-            done
+            failure_block="$(awk '
+              /^not ok / { capture = 1 }
+              capture { print }
+              capture && /^  \.\.\.$/ { exit }
+            ' consultant-database-l3.log | tail -n 80)"
+            escaped="${failure_block//'%'/'%25'}"
+            escaped="${escaped//$'\r'/'%0D'}"
+            escaped="${escaped//$'\n'/'%0A'}"
+            echo "::error title=Consultant database L3::$escaped"
           fi
           exit "$status"
 
