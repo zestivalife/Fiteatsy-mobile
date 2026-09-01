@@ -440,6 +440,10 @@ export type NutritionPlanSourceSnapshot = {
   }>;
   biomarkerClinicalCalculationVersion?: string;
   healthProfile: Record<string, unknown>;
+  foodPreferences?: {
+    profile: Record<string, unknown>;
+    updatedAtISO: string | null;
+  };
   calorieTarget: number | null;
   proteinTargetGrams: number | null;
   hydrationTargetLiters: number | null;

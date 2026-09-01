@@ -83,6 +83,58 @@ const normalizeJsonRecord = (value: unknown): JsonRecord =>
 
 const normalizeText = (value: string | null | undefined) => (value ?? '').trim().toLowerCase();
 
+const normalizedValues = (values: string[] | undefined) => (values ?? []).map(normalizeText).filter(Boolean);
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const containsTerm = (text: string, value: string) => new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(value)}(?:$|[^a-z0-9])`, 'i').test(text);
+const containsAny = (text: string, values: string[]) => values.some((value) => containsTerm(text, value));
+const dairyTerms = ['milk', 'curd', 'yogurt', 'yoghurt', 'paneer', 'cheese', 'butter', 'ghee', 'cream', 'whey', 'dairy'];
+const animalMeatTerms = ['chicken', 'fish', 'mutton', 'meat', 'pork', 'beef', 'seafood', 'prawn', 'shrimp'];
+const eggTerms = ['egg', 'eggs', 'omelette', 'omelet'];
+
+export const isDietaryPatternCompatible = (dietPreference: string | null | undefined, dietaryTags: string[], searchableText = '') => {
+  const diet = normalizeText(dietPreference).replace(/[-\s]+/g, '_');
+  if (!diet) return true;
+  const tags = dietaryTags.map((tag) => normalizeText(tag).replace(/[-\s]+/g, '_'));
+  const text = normalizeText(searchableText);
+  const hasMeat = containsAny(text, animalMeatTerms) || tags.some((tag) => ['non_vegetarian', 'nonveg', 'meat', 'fish'].includes(tag));
+  const hasEgg = containsAny(text, eggTerms) || tags.some((tag) => ['egg', 'eggetarian'].includes(tag));
+  const hasDairy = containsAny(text, dairyTerms) || tags.includes('dairy');
+  if (diet === 'vegan') return !hasMeat && !hasEgg && !hasDairy;
+  if (diet === 'vegetarian' || diet === 'jain') return !hasMeat && !hasEgg;
+  if (diet === 'eggetarian') return !hasMeat;
+  return true;
+};
+
+const preferenceScore = (input: {
+  name: string;
+  cuisineTags?: string[];
+  components: Array<{ foodId?: string | null; componentName: string }>;
+}, preferences: {
+  likedFoods?: string[];
+  dislikedFoods?: string[];
+  likedFoodIds?: string[];
+  dislikedFoodIds?: string[];
+  preferredCuisines?: string[];
+  preferredProteins?: string[];
+  staplePreference?: string | null;
+  practicality?: string[];
+}) => {
+  const text = normalizeText([input.name, ...input.components.map((item) => item.componentName)].join(' '));
+  const ids = new Set(input.components.flatMap((item) => item.foodId ? [item.foodId] : []));
+  const cuisines = (input.cuisineTags ?? []).map(normalizeText);
+  let score = 0;
+  score += normalizedValues(preferences.likedFoods).filter((value) => text.includes(value)).length * 12;
+  score -= normalizedValues(preferences.dislikedFoods).filter((value) => text.includes(value)).length * 8;
+  score += (preferences.likedFoodIds ?? []).filter((id) => ids.has(id)).length * 15;
+  score -= (preferences.dislikedFoodIds ?? []).filter((id) => ids.has(id)).length * 10;
+  score += normalizedValues(preferences.preferredCuisines).filter((value) => cuisines.includes(value)).length * 6;
+  score += normalizedValues(preferences.preferredProteins).filter((value) => text.includes(value)).length * 5;
+  const staple = normalizeText(preferences.staplePreference);
+  if (staple && staple !== 'none' && staple !== 'both' && text.includes(staple)) score += 4;
+  score += normalizedValues(preferences.practicality).filter((value) => text.includes(value)).length * 2;
+  return score;
+};
+
 const mapFoodRecord = (row: NutritionFoodRow): FoodMasterRecord => ({
   id: String(row.id),
   canonicalName: String(row.canonical_name),
@@ -234,12 +286,19 @@ export const listEligibleMealVariantRecords = async (input: {
   avoidedFoods?: string[];
   avoidedFoodIds?: string[];
   likedFoodIds?: string[];
+  likedFoods?: string[];
+  dislikedFoods?: string[];
+  dislikedFoodIds?: string[];
   preferredCuisines?: string[];
+  preferredProteins?: string[];
+  staplePreference?: string | null;
+  dairyPreference?: string | null;
+  practicality?: string[];
   includeOutsideTarget?: boolean;
   limit?: number;
 }) => {
   const resultLimit = input.limit ?? 12;
-  const candidateLimit = input.preferredCuisines?.length ? Math.max(resultLimit, 120) : resultLimit;
+  const candidateLimit = Math.max(resultLimit, 120);
   const params: unknown[] = [input.mealKey ?? '', input.consultantId ?? null, candidateLimit];
   const variantsResult = await pool.query<MealVariantRow>(
     `
@@ -278,19 +337,15 @@ export const listEligibleMealVariantRecords = async (input: {
   if (!variantsResult.rowCount) return [] as MealVariantRecord[];
 
   const candidateRows = variantsResult.rows.filter((row) => {
-    const dietaryTags = normalizeTagArray(row.dietary_tags).map(normalizeText);
+    const dietaryTags = normalizeTagArray(row.dietary_tags);
     const allergenTags = normalizeTagArray(row.allergen_tags).map(normalizeText);
-    const requestedDiet = normalizeText(input.dietPreference);
     const blockedAllergens = (input.allergyTags ?? []).map(normalizeText).filter(Boolean);
     const avoidedFoods = (input.avoidedFoods ?? []).map(normalizeText).filter(Boolean);
-    const preferredCuisines = (input.preferredCuisines ?? []).map(normalizeText).filter(Boolean);
-
-    const dietCompatible = !requestedDiet || !dietaryTags.length || dietaryTags.some((tag) => requestedDiet.includes(tag) || tag.includes(requestedDiet));
+    const dietCompatible = isDietaryPatternCompatible(input.dietPreference, dietaryTags, row.variant_name);
     const allergyCompatible = blockedAllergens.every((blocked) => !allergenTags.includes(blocked));
-    const foodCompatible = avoidedFoods.every((blocked) => !normalizeText(row.variant_name).includes(blocked));
-    const cuisineCompatible = !preferredCuisines.length || normalizeTagArray(row.cuisine_tags).some((tag) => preferredCuisines.includes(normalizeText(tag)));
-
-    return dietCompatible && allergyCompatible && foodCompatible && cuisineCompatible;
+    const foodCompatible = avoidedFoods.every((blocked) => !containsTerm(normalizeText(row.variant_name), blocked));
+    const dairyCompatible = normalizeText(input.dairyPreference) !== 'avoid' || !containsAny(normalizeText(row.variant_name), dairyTerms);
+    return dietCompatible && allergyCompatible && foodCompatible && dairyCompatible;
   });
 
   if (!candidateRows.length) return [] as MealVariantRecord[];
@@ -369,29 +424,38 @@ export const listEligibleMealVariantRecords = async (input: {
     componentsByVariantId.set(component.meal_variant_id, next);
   });
 
-  const mappedVariants = candidateRows.map((row) => ({
-    id: row.id,
-    mealKey: row.meal_key,
-    name: row.variant_name,
-    description: row.description,
-    cuisineTags: normalizeTagArray(row.cuisine_tags),
-    dietaryTags: normalizeTagArray(row.dietary_tags),
-    allergenTags: normalizeTagArray(row.allergen_tags),
-    sourceType: row.source_type,
-    components: componentsByVariantId.get(row.id) ?? [],
-  } satisfies MealVariantRecord));
-  const likedIds = new Set(input.likedFoodIds ?? []);
+  const mappedVariants = candidateRows.map((row) => {
+    const components = componentsByVariantId.get(row.id) ?? [];
+    const componentAllergens = components.flatMap((component) =>
+      component.foodId ? foodsById.get(component.foodId)?.allergenTags ?? [] : [],
+    );
+    return {
+      id: row.id,
+      mealKey: row.meal_key,
+      name: row.variant_name,
+      description: row.description,
+      cuisineTags: normalizeTagArray(row.cuisine_tags),
+      dietaryTags: normalizeTagArray(row.dietary_tags),
+      allergenTags: Array.from(new Set([...normalizeTagArray(row.allergen_tags), ...componentAllergens])),
+      sourceType: row.source_type,
+      components,
+    } satisfies MealVariantRecord;
+  });
   return mappedVariants
     .filter((variant) => {
     const blocked = (input.avoidedFoods ?? []).map(normalizeText).filter(Boolean);
+    const blockedAllergens = (input.allergyTags ?? []).map(normalizeText).filter(Boolean);
     const blockedIds = new Set(input.avoidedFoodIds ?? []);
-    return blocked.every((food) => !variant.components.some((component) => normalizeText(component.componentName).includes(food))) &&
-      !variant.components.some((component) => component.foodId != null && blockedIds.has(component.foodId));
+    const searchable = normalizeText([variant.name, ...variant.components.map((component) => component.componentName)].join(' '));
+    return blocked.every((food) => !variant.components.some((component) => containsTerm(normalizeText(component.componentName), food))) &&
+      blockedAllergens.every((allergen) => !(variant.allergenTags ?? []).map(normalizeText).includes(allergen)) &&
+      !variant.components.some((component) => component.foodId != null && blockedIds.has(component.foodId)) &&
+      isDietaryPatternCompatible(input.dietPreference, variant.dietaryTags, searchable) &&
+      (normalizeText(input.dairyPreference) !== 'avoid' || !containsAny(searchable, dairyTerms));
     })
     .sort((left, right) => {
-      const leftMatches = left.components.filter((component) => component.foodId != null && likedIds.has(component.foodId)).length;
-      const rightMatches = right.components.filter((component) => component.foodId != null && likedIds.has(component.foodId)).length;
-      return rightMatches - leftMatches;
+      const score = (variant: MealVariantRecord) => preferenceScore(variant, input);
+      return score(right) - score(left) || left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
     })
     .slice(0, resultLimit);
 };
@@ -405,7 +469,14 @@ export const listMealLibrarySlotsForTarget = async (input: {
   avoidedFoods?: string[];
   avoidedFoodIds?: string[];
   likedFoodIds?: string[];
+  likedFoods?: string[];
+  dislikedFoods?: string[];
+  dislikedFoodIds?: string[];
   preferredCuisines?: string[];
+  preferredProteins?: string[];
+  staplePreference?: string | null;
+  dairyPreference?: string | null;
+  practicality?: string[];
   includeOutsideTarget?: boolean;
   limit?: number;
 }) => {
@@ -431,18 +502,17 @@ export const listMealLibrarySlotsForTarget = async (input: {
   // A verified food master record is itself a valid single-food guidance option.
   // This keeps catalogue truth available even when a deployment has not yet
   // assembled that food into a multi-component meal variant.
-  const requestedDiet = normalizeText(input.dietPreference);
   const blockedAllergens = (input.allergyTags ?? []).map(normalizeText).filter(Boolean);
   const avoidedFoods = (input.avoidedFoods ?? []).map(normalizeText).filter(Boolean);
   const avoidedIds = new Set(input.avoidedFoodIds ?? []);
-  const preferredCuisines = (input.preferredCuisines ?? []).map(normalizeText).filter(Boolean);
   const verifiedFoods = (await listVerifiedFoodMasterRecords()).filter((food) => {
     if ([food.calories, food.proteinGrams, food.carbsGrams, food.fatGrams, food.fibreGrams].some((value) => value == null)) return false;
-    if (avoidedIds.has(food.id) || avoidedFoods.some((value) => normalizeText(food.displayName).includes(value))) return false;
+    if (avoidedIds.has(food.id) || avoidedFoods.some((value) => containsTerm(normalizeText(food.displayName), value))) return false;
     if (blockedAllergens.some((value) => (food.allergenTags ?? []).map(normalizeText).includes(value))) return false;
-    if (requestedDiet && (food.dietaryTags ?? []).length && !(food.dietaryTags ?? []).map(normalizeText).some((tag) => requestedDiet.includes(tag) || tag.includes(requestedDiet))) return false;
-    return !preferredCuisines.length || (food.cuisineTags ?? []).map(normalizeText).some((tag) => preferredCuisines.includes(tag));
-  });
+    if (!isDietaryPatternCompatible(input.dietPreference, food.dietaryTags ?? [], food.displayName)) return false;
+    if (normalizeText(input.dairyPreference) === 'avoid' && containsAny(normalizeText(food.displayName), dairyTerms)) return false;
+    return true;
+  }).sort((left, right) => preferenceScore({ name: right.displayName, cuisineTags: right.cuisineTags ?? [], components: [{ foodId: right.id, componentName: right.displayName }] }, input) - preferenceScore({ name: left.displayName, cuisineTags: left.cuisineTags ?? [], components: [{ foodId: left.id, componentName: left.displayName }] }, input) || left.displayName.localeCompare(right.displayName));
   const existingIds = new Set(variantSlots.flatMap((slot) => slot.components?.flatMap((component) => component.foodId ? [component.foodId] : []) ?? []));
   const foodSlots = verifiedFoods.filter((food) => !existingIds.has(food.id)).map((food, index) => ({
     id: `food:${food.id}`,

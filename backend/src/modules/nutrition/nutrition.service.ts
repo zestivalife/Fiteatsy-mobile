@@ -42,13 +42,14 @@ import {
 } from './nutrition.store.js';
 import { generateDietPlanDocument } from './nutrition.document.js';
 import { buildRecommendationSets, calculateMealNutritionTotals, classifyMealMatch, deriveMealTargets } from './meal-engine.js';
-import { listMealLibrarySlotsForTarget, listVerifiedFoodMasterRecords } from './nutrition.library.store.js';
-import { getFoodPreferenceProfile } from './food-preferences.service.js';
+import { isDietaryPatternCompatible, listMealLibrarySlotsForTarget, listVerifiedFoodMasterRecords } from './nutrition.library.store.js';
+import { getFoodPreferenceProfile, type FoodPreferenceProfile } from './food-preferences.service.js';
 import { OptionalGuidanceContractError, validateOptionalGuidanceV2 } from './optional-guidance-contract.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
-const AVAILABLE_LIBRARY_MATCH_LIMIT = 18;
+const AVAILABLE_LIBRARY_MATCH_LIMIT = 5;
+const AVAILABLE_LIBRARY_CANDIDATE_LIMIT = 18;
 const OPTIONAL_GUIDANCE_WHAT_DISPLAY_LIMIT = 12;
 const OPTIONAL_GUIDANCE_CUISINE_DISPLAY_LIMIT = 5;
 const OPTIONAL_GUIDANCE_CRAVING_DISPLAY_LIMIT = 3;
@@ -115,6 +116,62 @@ const dedupeMealOptions = (options: NutritionMealSection['options'] | undefined)
   });
 };
 
+const canonicalReviewOptionIdentity = (option: NutritionMealSlot) => {
+  const foodIds = unique((option.components ?? []).map((component) => component.foodId)).sort();
+  if (foodIds.length > 0) return `foods:${foodIds.join('+')}`;
+  if (option.id?.trim()) return `option:${option.id.trim().toLowerCase()}`;
+  return `meal:${lower(option.meal)}::${lower(option.portion)}`;
+};
+
+/**
+ * A submitted review must be a complete, immutable clinical review unit.
+ * Candidate availability may truthfully contain fewer than five items, but the
+ * persisted Consultant selection must contain at least one valid option for
+ * every canonical meal head.
+ */
+export const assertDietPlanReviewContentComplete = (content: unknown) => {
+  const mealPlan = content && typeof content === 'object'
+    ? (content as Partial<NutritionPlanContent>).mealPlan
+    : null;
+  const failures: string[] = [];
+
+  for (const mealKey of NUTRITION_MEAL_SEQUENCE) {
+    const section = mealPlan && typeof mealPlan === 'object'
+      ? (mealPlan as Partial<NutritionPlanContent['mealPlan']>)[mealKey]
+      : null;
+    const options = Array.isArray(section?.options) ? section.options : [];
+    if (options.length === 0) {
+      failures.push(`${mealKey}: select at least one saved option`);
+      continue;
+    }
+    if (options.length > MAX_MEAL_OPTIONS_PER_SECTION) {
+      failures.push(`${mealKey}: maximum ${MAX_MEAL_OPTIONS_PER_SECTION} saved options`);
+    }
+
+    const identities = new Set<string>();
+    options.forEach((option, index) => {
+      if (!option || !option.meal?.trim() || !option.portion?.trim()) {
+        failures.push(`${mealKey}: option ${index + 1} needs a meal and portion`);
+        return;
+      }
+      if (option.sourceType === 'generated_template') {
+        failures.push(`${mealKey}: option ${index + 1} is not a persisted verified or Consultant-authored option`);
+      }
+      const identity = canonicalReviewOptionIdentity(option);
+      if (identities.has(identity)) failures.push(`${mealKey}: duplicate option ${index + 1}`);
+      identities.add(identity);
+    });
+  }
+
+  if (failures.length > 0) {
+    throw new NutritionPlanWorkflowError(
+      'DIET_PLAN_REVIEW_CONTENT_INCOMPLETE',
+      `Complete the saved diet version before review: ${failures.join('; ')}.`,
+      409,
+    );
+  }
+};
+
 type NutritionMealPlanKey = keyof NutritionPlanContent['mealPlan'];
 type NutritionRecommendationMode = 'approved' | 'outside_plan' | 'general';
 type NutritionRecommendationSource = 'published_plan' | 'published_reviewed_guidance';
@@ -171,6 +228,7 @@ const normalizeMealSection = (section: NutritionMealSection): NutritionMealSecti
     ...selectedOptions,
   ])
     .filter((option) => option.sourceType !== 'generated_template')
+    .slice(0, MAX_MEAL_OPTIONS_PER_SECTION)
     .map((option, index) => ({
     ...option,
     slot: index + 1,
@@ -1206,7 +1264,14 @@ const buildDraftContent = (input: {
   avoidedFoods?: string[];
   avoidedFoodIds?: string[];
   likedFoodIds?: string[];
+  likedFoods?: string[];
+  dislikedFoods?: string[];
+  dislikedFoodIds?: string[];
   preferredCuisines?: string[];
+  preferredProteins?: string[];
+  staplePreference?: string | null;
+  dairyPreference?: string | null;
+  practicality?: string[];
   regionalCuisine: string | null;
   lifestyleSummary: string;
   programmeName: string;
@@ -1288,6 +1353,25 @@ const buildDraftContent = (input: {
 const enrichRecommendationSets = (content: NutritionPlanContent): NutritionPlanContent =>
   normalizeNutritionPlanContent(content);
 
+const mealOptionDiversityIdentity = (option: NutritionMealSlot) => {
+  const foodIds = unique((option.components ?? []).map((component) => component.foodId)).sort();
+  if (foodIds.length > 0) return `foods:${foodIds.join('+')}`;
+  return `meal:${lower(option.meal)}::${lower(option.portion)}`;
+};
+
+export const selectDiverseMealOptions = (
+  candidates: NutritionMealSlot[],
+  usedIdentities: Set<string>,
+  limit = AVAILABLE_LIBRARY_MATCH_LIMIT,
+) => {
+  const uniqueCandidates = dedupeMealOptions(candidates);
+  const fresh = uniqueCandidates.filter((option) => !usedIdentities.has(mealOptionDiversityIdentity(option)));
+  const repeated = uniqueCandidates.filter((option) => usedIdentities.has(mealOptionDiversityIdentity(option)));
+  const selected = [...fresh, ...repeated].slice(0, limit);
+  selected.forEach((option) => usedIdentities.add(mealOptionDiversityIdentity(option)));
+  return selected.map((option, index) => ({ ...option, slot: index + 1 }));
+};
+
 const enrichMealPlanWithLibraryMatches = async (input: {
   content: NutritionPlanContent;
   consultantId: string;
@@ -1296,10 +1380,18 @@ const enrichMealPlanWithLibraryMatches = async (input: {
   avoidedFoods?: string[];
   avoidedFoodIds?: string[];
   likedFoodIds?: string[];
+  likedFoods?: string[];
+  dislikedFoods?: string[];
+  dislikedFoodIds?: string[];
   preferredCuisines?: string[];
+  preferredProteins?: string[];
+  staplePreference?: string | null;
+  dairyPreference?: string | null;
+  practicality?: string[];
 }) => {
-  const nextMealPlanEntries = await Promise.all(
-    NUTRITION_MEAL_SEQUENCE.map(async (mealKey) => {
+  const usedIdentities = new Set<string>();
+  const nextMealPlanEntries = [] as Array<readonly [typeof NUTRITION_MEAL_SEQUENCE[number], NutritionPlanContent['mealPlan'][typeof NUTRITION_MEAL_SEQUENCE[number]]]>;
+  for (const mealKey of NUTRITION_MEAL_SEQUENCE) {
       const section = input.content.mealPlan[mealKey];
       const verifiedMatches = await listMealLibrarySlotsForTarget({
         mealKey,
@@ -1310,34 +1402,79 @@ const enrichMealPlanWithLibraryMatches = async (input: {
         avoidedFoods: input.avoidedFoods,
         avoidedFoodIds: input.avoidedFoodIds,
         likedFoodIds: input.likedFoodIds,
+        likedFoods: input.likedFoods,
+        dislikedFoods: input.dislikedFoods,
+        dislikedFoodIds: input.dislikedFoodIds,
         preferredCuisines: input.preferredCuisines,
-        limit: AVAILABLE_LIBRARY_MATCH_LIMIT,
+        preferredProteins: input.preferredProteins,
+        staplePreference: input.staplePreference,
+        dairyPreference: input.dairyPreference,
+        practicality: input.practicality,
+        limit: AVAILABLE_LIBRARY_CANDIDATE_LIMIT,
       });
-      const fallbackMatches = buildCanonicalMealLibraryFallback({
-        mealKey: mealKey as keyof NutritionPlanContent['mealPlan'],
-        target: section.target,
-        dietPreference: input.dietPreference,
-      });
-      const curatedMatches = verifiedMatches.length ? verifiedMatches : fallbackMatches;
-
-      return [
+      nextMealPlanEntries.push([
         mealKey,
         {
           ...section,
           options: [],
-          availableOptions: curatedMatches.map((option, index) => ({
-            ...option,
-            slot: index + 1,
-          })),
+          availableOptions: selectDiverseMealOptions(verifiedMatches, usedIdentities),
         },
-      ] as const;
-    }),
-  );
+      ] as const);
+  }
 
   return {
     ...input.content,
     mealPlan: Object.fromEntries(nextMealPlanEntries) as unknown as NutritionPlanContent['mealPlan'],
   };
+};
+
+const foodPreferenceSearchText = (slot: NutritionMealSlot) => lower([
+  slot.meal,
+  slot.portion,
+  slot.prepNote,
+  ...(slot.cuisineTags ?? []),
+  ...(slot.dietaryTags ?? []),
+  ...(slot.components ?? []).map((component) => component.componentName),
+].filter(Boolean).join(' '));
+
+const containsFoodPreferenceTerm = (searchable: string, term: string) => {
+  const normalizedTerm = lower(term).trim();
+  if (!normalizedTerm) return false;
+  const escapedTerm = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${escapedTerm}([^a-z0-9]|$)`, 'i').test(searchable);
+};
+
+export const assertDietPlanRespectsFoodPreferences = (
+  content: NutritionPlanContent,
+  profile: FoodPreferenceProfile | null,
+  healthProfile: { foodAllergies?: string[]; foodIntolerances?: string[] } | null,
+) => {
+  const blockedTerms = unique([
+    ...(profile?.foodsAvoided ?? []),
+    ...(profile?.restrictions ?? []),
+    ...(healthProfile?.foodAllergies ?? []),
+    ...(healthProfile?.foodIntolerances ?? []),
+  ]).map(lower).filter(Boolean);
+  const blockedFoodIds = new Set(profile?.avoidedFoodIds ?? []);
+  const dairyTerms = ['milk', 'curd', 'yogurt', 'yoghurt', 'paneer', 'cheese', 'butter', 'ghee', 'cream', 'whey', 'dairy'];
+
+  for (const mealKey of NUTRITION_MEAL_SEQUENCE) {
+    const section = content.mealPlan[mealKey];
+    for (const slot of [...section.options, ...(section.availableOptions ?? [])]) {
+      const searchable = foodPreferenceSearchText(slot);
+      const blockedTerm = blockedTerms.find((term) => containsFoodPreferenceTerm(searchable, term));
+      const blockedComponent = (slot.components ?? []).find((component) => component.foodId && blockedFoodIds.has(component.foodId));
+      const dietCompatible = isDietaryPatternCompatible(profile?.dietType ?? null, slot.dietaryTags ?? [], searchable);
+      const dairyCompatible = profile?.dairyPreference !== 'avoid' || !dairyTerms.some((term) => containsFoodPreferenceTerm(searchable, term));
+      if (!blockedTerm && !blockedComponent && dietCompatible && dairyCompatible) continue;
+      const conflict = blockedTerm ?? blockedComponent?.componentName ?? profile?.dietType ?? 'dairy preference';
+      throw new NutritionPlanWorkflowError(
+        'DIET_PLAN_FOOD_PREFERENCE_CONFLICT',
+        `${section.focus || mealKey} contains “${slot.meal}”, which conflicts with the client's hard food preference “${conflict}”.`,
+        409,
+      );
+    }
+  }
 };
 
 const buildSourceSnapshot = (input: {
@@ -1350,6 +1487,7 @@ const buildSourceSnapshot = (input: {
   hydrationTargetLiters: number | null;
   wellnessScores: NutritionPlanSourceSnapshot['wellnessScores'];
   stressAssessment: NutritionPlanSourceSnapshot['stressAssessment'];
+  foodPreferences?: { profile: FoodPreferenceProfile; updatedAtISO: string | null };
 }): NutritionPlanSourceSnapshot => ({
   bmi: input.bmi,
   weightKg: input.weightKg,
@@ -1369,6 +1507,7 @@ const buildSourceSnapshot = (input: {
   })),
   biomarkerClinicalCalculationVersion: BIOMARKER_CLINICAL_CALCULATION_VERSION,
   healthProfile: input.healthProfile,
+  foodPreferences: input.foodPreferences,
   calorieTarget: input.calorieTarget,
   proteinTargetGrams: input.proteinTargetGrams,
   hydrationTargetLiters: input.hydrationTargetLiters,
@@ -1692,9 +1831,11 @@ export const generateConsultantDietPlanDraft = async (
   const allergies = unique([
     ...(healthProfile?.foodAllergies ?? []),
     ...(healthProfile?.foodIntolerances ?? []),
-    ...(healthProfile?.foodsDisliked ?? []),
   ]);
   const foodPreferences = await getFoodPreferenceProfile(publicClientId);
+  const canonicalPreferences = foodPreferences?.profile ?? null;
+  const dietPreference = canonicalPreferences?.dietType ?? healthProfile?.dietType ?? context.profile.onboarding.dietPreference;
+  const hardRestrictions = unique([...allergies, ...(canonicalPreferences?.restrictions ?? [])]);
   const draftTemplate = buildDraftContent({
     clientName: context.profile.client.name,
     age: context.profile.client.age,
@@ -1704,8 +1845,8 @@ export const generateConsultantDietPlanDraft = async (
       ...(healthProfile?.wellnessGoals ?? []),
     ]),
     conditions,
-    dietPreference: healthProfile?.dietType ?? context.profile.onboarding.dietPreference,
-    allergies,
+    dietPreference,
+    allergies: hardRestrictions,
     regionalCuisine: healthProfile?.regionalCuisine ?? null,
     lifestyleSummary: summarizeLifestyle({
       occupation: healthProfile?.occupation,
@@ -1724,16 +1865,21 @@ export const generateConsultantDietPlanDraft = async (
   const content = enrichRecommendationSets(await enrichMealPlanWithLibraryMatches({
     content: draftTemplate,
     consultantId: account.accountId,
-    dietPreference: healthProfile?.dietType ?? context.profile.onboarding.dietPreference,
-    allergies,
-    avoidedFoods: foodPreferences?.profile.foodsAvoided.concat(foodPreferences.profile.foodsDisliked) ?? [],
-    avoidedFoodIds: [
-      ...(foodPreferences?.profile.avoidedFoodIds ?? []),
-      ...(foodPreferences?.profile.dislikedFoodIds ?? []),
-    ],
-    likedFoodIds: foodPreferences?.profile.likedFoodIds ?? [],
-    preferredCuisines: foodPreferences?.profile.cuisines ?? [],
+    dietPreference,
+    allergies: hardRestrictions,
+    avoidedFoods: canonicalPreferences?.foodsAvoided ?? [],
+    avoidedFoodIds: canonicalPreferences?.avoidedFoodIds ?? [],
+    likedFoodIds: canonicalPreferences?.likedFoodIds ?? [],
+    likedFoods: canonicalPreferences?.foodsLiked ?? [],
+    dislikedFoods: canonicalPreferences?.foodsDisliked ?? [],
+    dislikedFoodIds: canonicalPreferences?.dislikedFoodIds ?? [],
+    preferredCuisines: canonicalPreferences?.cuisines ?? [],
+    preferredProteins: canonicalPreferences?.proteins ?? [],
+    staplePreference: canonicalPreferences?.staplePreference ?? null,
+    dairyPreference: canonicalPreferences?.dairyPreference ?? null,
+    practicality: canonicalPreferences?.practicality ?? [],
   }));
+  assertDietPlanRespectsFoodPreferences(content, canonicalPreferences, healthProfile ?? null);
   const sourceSnapshot = buildSourceSnapshot({
     bmi: metrics.bmi.status === 'AVAILABLE' ? metrics.bmi.value : null,
     weightKg: context.calculationInput.weightKg,
@@ -1747,6 +1893,7 @@ export const generateConsultantDietPlanDraft = async (
     hydrationTargetLiters,
     wellnessScores,
     stressAssessment,
+    foodPreferences: foodPreferences ? { profile: foodPreferences.profile, updatedAtISO: foodPreferences.updatedAtISO } : undefined,
   });
   const saved = await createOrUpdateDietPlanDraft({
     careCaseId: careCase.id,
@@ -1794,6 +1941,8 @@ export const updateConsultantDietPlanDraft = async (
       'Only draft plans or plans returned for changes can be edited.',
     );
   }
+  const foodPreferences = await getFoodPreferenceProfile(publicClientId);
+  assertDietPlanRespectsFoodPreferences(input.content, foodPreferences?.profile ?? null, workspace.healthProfile ?? null);
   const sourceSnapshot = buildSourceSnapshot({
     bmi: workspace.metrics.bmi.status === 'AVAILABLE' ? workspace.metrics.bmi.value : null,
     weightKg: workspace.context.calculationInput.weightKg,
@@ -1812,6 +1961,7 @@ export const updateConsultantDietPlanDraft = async (
       stressResilience: workspace.scoreByType.get('stress_resilience') ?? workspace.scoreByType.get('calm') ?? null,
     },
     stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
+    foodPreferences: foodPreferences ? { profile: foodPreferences.profile, updatedAtISO: foodPreferences.updatedAtISO } : undefined,
   });
 
   const draftGuidance = input.content.optionalGuidance ? {
@@ -2094,6 +2244,7 @@ export const submitConsultantDietPlanForReview = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
   const version = await getCurrentDietPlanVersion(plan.id);
   if (!version) return null;
+  assertDietPlanReviewContentComplete(version.content);
   await assertOptionalGuidanceValid(publicClientId, version.content);
   assertLifecycleTransition(version.lifecycleStatus, 'submitted_for_review');
   return updateDietPlanLifecycle({
@@ -2137,7 +2288,23 @@ export const getSeniorConsultantDietPlanReviewQueue = async (account: Authentica
   if (!canApproveOrPublishDietPlan(account)) {
     throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can access the review queue.', 403);
   }
-  return listDietPlanReviewQueue();
+  const reviews = await listDietPlanReviewQueue();
+  return reviews.map((review) => {
+    try {
+      assertDietPlanReviewContentComplete(review.version.content);
+      return { ...review, contentValidation: { status: 'ready' as const } };
+    } catch (error) {
+      if (!(error instanceof NutritionPlanWorkflowError)) throw error;
+      return {
+        ...review,
+        contentValidation: {
+          status: 'blocked' as const,
+          code: error.code,
+          message: error.message,
+        },
+      };
+    }
+  });
 };
 
 export const approveConsultantDietPlan = async (
@@ -2162,6 +2329,7 @@ export const approveConsultantDietPlan = async (
   }
   const currentVersion = await getCurrentDietPlanVersion(plan.id);
   if (!currentVersion) return null;
+  assertDietPlanReviewContentComplete(currentVersion.content);
   const guidance = await assertOptionalGuidanceValid(publicClientId, currentVersion.content);
   assertLifecycleTransition(currentVersion.lifecycleStatus, 'approved');
   const sourceSnapshot = buildSourceSnapshot({
@@ -2235,6 +2403,7 @@ export const publishConsultantDietPlan = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
   const approvedVersion = await getDietPlanVersionById(approvedVersionId);
   if (!approvedVersion) return null;
+  assertDietPlanReviewContentComplete(approvedVersion.content);
   await assertOptionalGuidanceValid(publicClientId, approvedVersion.content, true);
   const publishAction = assertPublishVersionEligibility({
     dietPlanId: plan.id,
@@ -2942,6 +3111,14 @@ const resolveFoodPreferencesFilter = async (clientId: string) => {
     avoidedFoods: profile?.foodsAvoided ?? [],
     avoidedFoodIds: profile?.avoidedFoodIds ?? [],
     likedFoodIds: profile?.likedFoodIds ?? [],
+    likedFoods: profile?.foodsLiked ?? [],
+    dislikedFoods: profile?.foodsDisliked ?? [],
+    dislikedFoodIds: profile?.dislikedFoodIds ?? [],
+    preferredCuisines: profile?.cuisines ?? [],
+    preferredProteins: profile?.proteins ?? [],
+    staplePreference: profile?.staplePreference ?? null,
+    dairyPreference: profile?.dairyPreference ?? null,
+    practicality: profile?.practicality ?? [],
   };
 };
 
