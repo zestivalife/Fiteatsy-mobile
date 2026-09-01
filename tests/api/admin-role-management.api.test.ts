@@ -423,13 +423,17 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
       );
     }
     if (definition.careContext) {
-      const healthProfileId = crypto.randomUUID();
-      const recoveryProgramId = crypto.randomUUID();
-      await pool.query(
-        `insert into health_profiles (id, user_id, client_id)
-         select $1, account_user_id, id from fiteatsy_clients where account_user_id = $2`,
-        [healthProfileId, session.current.body.accountId]
+      const healthProfile = await pool.query(
+        `select hp.id
+           from health_profiles hp
+          where hp.user_id = $1
+            and hp.status = 'active'
+            and hp.deleted_at is null`,
+        [session.current.body.accountId]
       );
+      assert.equal(healthProfile.rowCount, 1);
+      const healthProfileId = healthProfile.rows[0].id;
+      const recoveryProgramId = crypto.randomUUID();
       await pool.query(
         `insert into recovery_programs (id, health_profile_id, consultant_id, current_phase)
          values ($1, $2, $3, 'diet_published')`,
