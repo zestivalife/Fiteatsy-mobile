@@ -81,8 +81,8 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
          from nutrition_foods
         where deleted_at is null
           and source_metadata->>'catalogueVersion' = $1
-          and micronutrients ? 'vitaminB12Micrograms'
-          and micronutrients->'vitaminB12Micrograms' = 'null'::jsonb`,
+          and micronutrients ? 'vitaminB12Mcg'
+          and micronutrients->'vitaminB12Mcg' = 'null'::jsonb`,
       [NUTRITION_CATALOGUE_VERSION]
     );
     assert.ok(Number(unknowns.rows[0]?.unknown_count ?? 0) > 0, 'unknown nutrients must persist as JSON null');
