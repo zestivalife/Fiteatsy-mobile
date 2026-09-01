@@ -126,6 +126,9 @@ test('registered Fiteatsy users appear in consultant client discovery without du
   assert.equal(response.body.clients[0].profileCompleted, false);
   assert.equal(response.body.clients[0].reportsCount, 0);
   assert.equal(response.body.clients[0].biomarkerStatus, null);
+  assert.equal(response.body.clients[0].subscriptionStatus, null);
+  assert.equal(response.body.clients[0].subscriptionPlanName, null);
+  assert.equal(response.body.clients[0].subscriptionActive, false);
   const canonicalHealthProfile = await pool.query(
     'select updated_at from health_profiles where user_id = $1 and client_id = $2',
     [client.current.body.accountId, await getClientDatabaseId(client)]
@@ -162,12 +165,83 @@ test('consultant client discovery is assignment-scoped and independent of subscr
   assert.equal(assigned.response.status, 200);
   assert.equal(assigned.body.clients.length, 1);
   assert.equal(assigned.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+  assert.equal(assigned.body.clients[0].subscriptionStatus, null);
+  assert.equal(assigned.body.clients[0].subscriptionPlanName, null);
+  assert.equal(assigned.body.clients[0].subscriptionActive, false);
 
   const unrelated = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(unrelatedConsultant.token)
   });
   assert.equal(unrelated.response.status, 200);
   assert.deepEqual(unrelated.body.clients, []);
+});
+
+test('consultant client discovery projects the canonical effective subscription plan', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Subscribed Assigned Client',
+    email: `subscribed-assigned-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
+
+  const planId = crypto.randomUUID();
+  await pool.query(
+    `insert into subscription_plans (
+       id, code, name, description, duration_days, duration_months, price_minor, currency
+     ) values ($1, $2, $3, $4, 90, 3, 599900, 'INR')`,
+    [planId, `TEST_PLAN_${Date.now()}`, 'Clinical Transformation', 'Synthetic test plan']
+  );
+  await pool.query(
+    `insert into user_subscriptions (
+       id, user_id, plan_id, status, starts_at, expires_at, amount_paid_minor, currency,
+       plan_name_snapshot
+     ) values ($1, $2, $3, 'ACTIVE', now() - interval '1 day', now() + interval '89 days', 599900, 'INR', $4)`,
+    [crypto.randomUUID(), client.current.body.accountId, planId, 'Clinical Transformation']
+  );
+
+  const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.clients.length, 1);
+  assert.equal(response.body.clients[0].subscriptionStatus, 'ACTIVE');
+  assert.equal(response.body.clients[0].subscriptionPlanName, 'Clinical Transformation');
+  assert.equal(response.body.clients[0].subscriptionActive, true);
+});
+
+test('consultant client discovery does not present an expired subscription as active', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Expired Subscription Client',
+    email: `expired-subscription-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
+
+  const planId = crypto.randomUUID();
+  await pool.query(
+    `insert into subscription_plans (
+       id, code, name, description, duration_days, duration_months, price_minor, currency
+     ) values ($1, $2, $3, $4, 30, 1, 199900, 'INR')`,
+    [planId, `EXPIRED_TEST_PLAN_${Date.now()}`, 'Expired Clinical Plan', 'Synthetic expired plan']
+  );
+  await pool.query(
+    `insert into user_subscriptions (
+       id, user_id, plan_id, status, starts_at, expires_at, amount_paid_minor, currency,
+       plan_name_snapshot
+     ) values ($1, $2, $3, 'ACTIVE', now() - interval '31 days', now() - interval '1 day', 199900, 'INR', $4)`,
+    [crypto.randomUUID(), client.current.body.accountId, planId, 'Expired Clinical Plan']
+  );
+
+  const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.clients.length, 1);
+  assert.equal(response.body.clients[0].subscriptionStatus, null);
+  assert.equal(response.body.clients[0].subscriptionPlanName, null);
+  assert.equal(response.body.clients[0].subscriptionActive, false);
 });
 
 test('consultant discovery backfills missing client records for registered users', async () => {

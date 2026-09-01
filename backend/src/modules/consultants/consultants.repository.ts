@@ -74,6 +74,9 @@ export type ConsultantClientListRecord = {
   lastHealthUpdate: string | null;
   profileCompleted: boolean;
   lastActiveAt: string | null;
+  subscriptionStatus: string | null;
+  subscriptionPlanName: string | null;
+  subscriptionActive: boolean;
   onboarding: ConsultantOnboardingProjection & {
     age: number | null;
     gender: string | null;
@@ -348,6 +351,9 @@ const listClientSelect = `
     hp.heart_condition_status,
     hp.previous_surgeries,
     report_stats.reports_count,
+    active_subscription.subscription_status,
+    active_subscription.subscription_plan_name,
+    active_subscription.subscription_status is not null as subscription_active,
     case
       when hp.updated_at is null and report_stats.last_report_at is null then null
       else greatest(
@@ -390,6 +396,21 @@ const listClientSelect = `
       and hr.deleted_at is null
       and hr.processing_status = any($5)
   ) report_stats on true
+  left join lateral (
+    select
+      subscriptions.status as subscription_status,
+      coalesce(nullif(subscriptions.plan_name_snapshot, ''), plans.name) as subscription_plan_name
+    from user_subscriptions subscriptions
+    join subscription_plans plans
+      on plans.id = subscriptions.plan_id
+    where subscriptions.user_id = u.id
+      and subscriptions.status = 'ACTIVE'
+      and subscriptions.starts_at <= now()
+      and subscriptions.expires_at > now()
+      and subscriptions.revoked_at is null
+    order by subscriptions.expires_at desc, subscriptions.created_at desc
+    limit 1
+  ) active_subscription on true
   where ${eligibleUserPredicate}
     and c.id is not null
     and c.deleted_at is null
@@ -419,6 +440,9 @@ const mapListRecord = (row: Record<string, unknown>): ConsultantClientListRecord
   lastHealthUpdate: toIso(row.last_health_update),
   profileCompleted: profileCompleted(row),
   lastActiveAt: toIso(row.last_active_at),
+  subscriptionStatus: row.subscription_status == null ? null : String(row.subscription_status),
+  subscriptionPlanName: row.subscription_plan_name == null ? null : String(row.subscription_plan_name),
+  subscriptionActive: row.subscription_active === true,
   onboarding: {
     ...mapOnboardingProjection(row),
     age: toNumberOrNull(row.age),
