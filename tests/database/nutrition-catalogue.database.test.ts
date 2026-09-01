@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import pg from 'pg';
 import { importNutritionCatalogue } from '../../backend/scripts/import-nutrition-catalogue.js';
+import { closePool, pool } from '../../backend/src/db/pool.js';
 import { NUTRITION_CATALOGUE_VERSION } from '../../backend/src/modules/nutrition/catalogue/catalogue.types.js';
 
-const { Client } = pg;
 const databaseUrl = process.env.DATABASE_URL;
 const databaseTest = databaseUrl ? test : test.skip;
 
@@ -15,10 +14,8 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
   assert.deepEqual(first, second);
   assert.deepEqual(first.counts, { foods: 58, recipes: 55, mealVariants: 220 });
 
-  const client = new Client({ connectionString: databaseUrl });
-  await client.connect();
   try {
-    const release = await client.query<{
+    const release = await pool.query<{
       source_name: string;
       source_license: string;
       record_counts: { foods: number; recipes: number; mealVariants: number };
@@ -35,7 +32,7 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
     assert.equal(release.rows[0]?.status, 'active');
     assert.deepEqual(release.rows[0]?.record_counts, first.counts);
 
-    const foods = await client.query<{ count: string; distinct_count: string }>(
+    const foods = await pool.query<{ count: string; distinct_count: string }>(
       `select count(*)::text as count,
               count(distinct lower(canonical_name))::text as distinct_count
          from nutrition_foods
@@ -48,7 +45,7 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
     );
     assert.deepEqual(foods.rows[0], { count: '58', distinct_count: '58' });
 
-    const recipes = await client.query<{ count: string; distinct_count: string }>(
+    const recipes = await pool.query<{ count: string; distinct_count: string }>(
       `select count(*)::text as count,
               count(distinct lower(recipe_code))::text as distinct_count
          from nutrition_recipes
@@ -59,7 +56,7 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
     );
     assert.deepEqual(recipes.rows[0], { count: '55', distinct_count: '55' });
 
-    const variants = await client.query<{ count: string; meal_keys: string[] }>(
+    const variants = await pool.query<{ count: string; meal_keys: string[] }>(
       `select count(*)::text as count,
               array_agg(distinct meal_key order by meal_key) as meal_keys
          from nutrition_meal_variants
@@ -79,7 +76,7 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
       'midMorningSnack'
     ]);
 
-    const unknowns = await client.query<{ unknown_count: string }>(
+    const unknowns = await pool.query<{ unknown_count: string }>(
       `select count(*)::text as unknown_count
          from nutrition_foods
         where deleted_at is null
@@ -90,7 +87,7 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
     );
     assert.ok(Number(unknowns.rows[0]?.unknown_count ?? 0) > 0, 'unknown nutrients must persist as JSON null');
 
-    const manualSearch = await client.query<{ display_name: string; verification_status: string; fdc_id: string }>(
+    const manualSearch = await pool.query<{ display_name: string; verification_status: string; fdc_id: string }>(
       `select display_name, verification_status, source_metadata->>'fdcId' as fdc_id
          from nutrition_foods
         where deleted_at is null
@@ -102,6 +99,6 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
     assert.ok(manualSearch.rows.length > 0);
     assert.ok(manualSearch.rows.every((row) => row.verification_status === 'verified' && Number(row.fdc_id) > 0));
   } finally {
-    await client.end();
+    await closePool();
   }
 });
