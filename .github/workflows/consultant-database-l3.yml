@@ -55,11 +55,25 @@ jobs:
 
       - name: Run Consultant database lifecycle contracts
         working-directory: backend
-        run: >-
-          node --import tsx --test --test-concurrency=1
-          ../tests/api/admin-role-management.api.test.ts
-          ../tests/api/consultants.api.test.ts
-          ../tests/api/subscriptions.api.test.ts
+        shell: bash
+        run: |
+          set +e
+          node --import tsx --test --test-concurrency=1 \
+            ../tests/api/admin-role-management.api.test.ts \
+            ../tests/api/consultants.api.test.ts \
+            ../tests/api/subscriptions.api.test.ts \
+            > consultant-database-l3.log 2>&1
+          status=$?
+          cat consultant-database-l3.log
+          if [ "$status" -ne 0 ]; then
+            tail -n 40 consultant-database-l3.log | while IFS= read -r line; do
+              escaped="${line//'%'/'%25'}"
+              escaped="${escaped//$'\r'/'%0D'}"
+              escaped="${escaped//$'\n'/'%0A'}"
+              echo "::error title=Consultant database L3::$escaped"
+            done
+          fi
+          exit "$status"
 
       - name: Run full safe backend regression against ephemeral PostgreSQL
         run: node --import tsx --test --test-concurrency=1 ../tests/api/*.test.ts ../tests/backend/*.test.ts ../tests/database/*.test.ts
