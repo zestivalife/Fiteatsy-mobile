@@ -1,24 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const schemaSql = fs.readFileSync(
-  '/Users/l.paunikar/Desktop/fiteatsy-mobile/backend/src/db/schema.sql',
+  fileURLToPath(new URL('../../backend/src/db/schema.sql', import.meta.url)),
   'utf8'
 );
 
 const migrationSql = fs.readFileSync(
-  '/Users/l.paunikar/Desktop/fiteatsy-mobile/backend/src/db/migrations/0003_m3b1_ownership_schema_foundation.sql',
+  fileURLToPath(new URL('../../backend/src/db/migrations/0003_m3b1_ownership_schema_foundation.sql', import.meta.url)),
   'utf8'
 );
 
 const phase1bSql = fs.readFileSync(
-  '/Users/l.paunikar/Desktop/fiteatsy-mobile/backend/src/db/migrations/0001_phase1b_persistence_foundation.sql',
+  fileURLToPath(new URL('../../backend/src/db/migrations/0001_phase1b_persistence_foundation.sql', import.meta.url)),
   'utf8'
 );
 
 const m3aSql = fs.readFileSync(
-  '/Users/l.paunikar/Desktop/fiteatsy-mobile/backend/src/db/migrations/0002_m3a_client_identity_foundation.sql',
+  fileURLToPath(new URL('../../backend/src/db/migrations/0002_m3a_client_identity_foundation.sql', import.meta.url)),
   'utf8'
 );
 
