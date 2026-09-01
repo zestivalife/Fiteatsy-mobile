@@ -276,11 +276,21 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
     name: 'Senior Client Allocator',
     email: `senior-client-allocator-${Date.now()}@example.com`
   });
+  const consultant = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Dual Role Client Consultant',
+    email: `dual-role-client-consultant-${Date.now()}@example.com`
+  });
+  const otherConsultant = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Unassigned Dual Role Consultant',
+    email: `unassigned-dual-role-consultant-${Date.now()}@example.com`
+  });
   const mobileClient = await createAuthenticatedSession(server.baseUrl, {
     name: 'Dual Role Mobile Client',
     email: `dual-role-mobile-client-${Date.now()}@example.com`
   });
   await promoteRole(senior.current.body.accountId, 'senior_consultant');
+  await promoteRole(consultant.current.body.accountId, 'consultant');
+  await promoteRole(otherConsultant.current.body.accountId, 'consultant');
   await promoteRole(mobileClient.current.body.accountId, 'admin');
 
   const poolResponse = await getJson(
@@ -304,7 +314,7 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
   const assignment = await createProfessionalAssignment({
     actorUserId: senior.current.body.accountId,
     clientUserId: mobileClient.current.body.accountId,
-    professionalUserId: senior.current.body.accountId,
+    professionalUserId: consultant.current.body.accountId,
     professionalType: 'CONSULTANT',
     relationshipType: 'CLIENT_CARE',
     reason: 'Verify a mapped dual-role client remains assignable'
@@ -319,6 +329,32 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
   assert.equal(assignedResponse.response.status, 200);
   assert.equal(assignedResponse.body.clients.length, 1);
   assert.equal(assignedResponse.body.clients[0].assignmentStatus, 'ASSIGNED');
+
+  const consultantRoster = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(consultantRoster.response.status, 200);
+  assert.equal(
+    consultantRoster.body.clients.filter(
+      (client: { clientId: string }) => client.clientId === mobileClient.current.body.client.fiteatsyClientId
+    ).length,
+    1
+  );
+
+  const assignedDetail = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${mobileClient.current.body.client.fiteatsyClientId}`,
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(assignedDetail.response.status, 200);
+  assert.equal(assignedDetail.body.client.id, mobileClient.current.body.client.fiteatsyClientId);
+
+  const wrongConsultantDetail = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${mobileClient.current.body.client.fiteatsyClientId}`,
+    { headers: authHeaders(otherConsultant.token) }
+  );
+  assert.equal(wrongConsultantDetail.response.status, 404);
 });
 
 test('senior allocation pool excludes an operational identity without an active client mapping', async () => {

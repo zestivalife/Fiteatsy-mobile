@@ -1,0 +1,68 @@
+name: Consultant Database L3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/consultant-platform-audit-20260901
+
+permissions:
+  contents: read
+
+jobs:
+  consultant-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fiteatsy_test
+          POSTGRES_PASSWORD: fiteatsy_test
+          POSTGRES_DB: fiteatsy_consultant_l3_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fiteatsy_test -d fiteatsy_consultant_l3_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://fiteatsy_test:fiteatsy_test@127.0.0.1:5432/fiteatsy_consultant_l3_test
+      FITEATSY_ALLOW_DESTRUCTIVE_TEST_RESET: "true"
+      FITEATSY_TEST_ENVIRONMENT: consultant-database-l3-test
+      REPORTS_STORAGE_ROOT: /tmp/fiteatsy-consultant-l3-reports
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Record checked-out source SHA
+        run: git rev-parse HEAD
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install locked backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Apply production migrations to ephemeral PostgreSQL
+        run: npm --prefix backend run db:migrate
+
+      - name: Run Consultant database lifecycle contracts
+        working-directory: backend
+        run: >-
+          node --import tsx --test --test-concurrency=1
+          ../tests/api/admin-role-management.api.test.ts
+          ../tests/api/consultants.api.test.ts
+          ../tests/api/subscriptions.api.test.ts
+
+      - name: Run full safe backend regression against ephemeral PostgreSQL
+        run: npm --prefix backend run test:qa
+
+      - name: Build backend
+        run: npm --prefix backend run build

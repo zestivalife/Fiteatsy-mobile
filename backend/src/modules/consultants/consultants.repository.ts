@@ -297,6 +297,27 @@ const eligibleUserPredicate = `
   and lower(coalesce(u.role, 'user')) not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
 `;
 
+// A canonical mobile client can later receive an operational role without
+// ceasing to be a client. Keep the strict eligibility predicate for discovery
+// and backfill, but allow an explicitly assigned canonical client through the
+// Consultant projection. The surrounding assignment clause still scopes the
+// record to the authenticated Consultant.
+const consultantVisibleUserPredicate = `
+  u.deleted_at is null
+  and lower(coalesce(u.status, '')) = 'active'
+  and (
+    lower(coalesce(u.role, 'user')) not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
+    or exists (
+      select 1
+      from consultant_client_assignments role_client_assignment
+      where role_client_assignment.client_user_id = u.id
+        and role_client_assignment.product = 'FITEATSY'
+        and role_client_assignment.professional_type = 'CONSULTANT'
+        and role_client_assignment.status = 'active'
+    )
+  )
+`;
+
 const listClientSelect = `
   select
     c.id as internal_client_id,
@@ -411,7 +432,7 @@ const listClientSelect = `
     order by subscriptions.expires_at desc, subscriptions.created_at desc
     limit 1
   ) active_subscription on true
-  where ${eligibleUserPredicate}
+  where ${consultantVisibleUserPredicate}
     and c.id is not null
     and c.deleted_at is null
     and lower(coalesce(c.status, '')) = 'active'
@@ -599,7 +620,7 @@ export const listAssignedConsultantClientContexts = async (
         and cc.user_id = u.id
         and cc.deleted_at is null
         and lower(coalesce(cc.status, '')) = 'active'
-      where ${eligibleUserPredicate}
+      where ${consultantVisibleUserPredicate}
         and exists (
           select 1 from consultant_client_assignments cap003
           where cap003.client_user_id = u.id
