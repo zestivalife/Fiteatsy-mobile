@@ -10,7 +10,7 @@ import {
   type NutritionCatalogueManifest,
 } from '../../backend/src/modules/nutrition/catalogue/catalogue.types.js';
 
-const manifestPath = new URL('../../backend/src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.json', import.meta.url);
+const manifestPath = new URL('../../backend/src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json', import.meta.url);
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as NutritionCatalogueManifest;
 const requiredMealKeys = [
   'earlyMorning',
@@ -41,8 +41,8 @@ test('catalogue has the approved identity, source, licence, provenance and bound
   assert.ok(manifest.foods.length + manifest.recipes.length + manifest.mealVariants.length >= 300);
   assert.ok(manifest.foods.length + manifest.recipes.length + manifest.mealVariants.length <= 500);
   assert.equal(manifest.foods.length, 58);
-  assert.equal(manifest.recipes.length, 55);
-  assert.equal(manifest.mealVariants.length, 220);
+  assert.equal(manifest.recipes.length, 64);
+  assert.equal(manifest.mealVariants.length, 376);
   assert.ok(manifest.foods.every((food) => Number.isInteger(food.fdcId) && food.fdcId > 0));
   assert.equal(new Set(manifest.foods.map((food) => food.fdcId)).size, manifest.foods.length);
   assert.equal(new Set(manifest.foods.map((food) => food.id)).size, manifest.foods.length);

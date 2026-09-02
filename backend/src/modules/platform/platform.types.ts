@@ -244,6 +244,7 @@ export const NUTRITION_MEAL_ORDER = Object.freeze({
 
 export type NutritionMealSlot = {
   id?: string;
+  canonicalFamilyId?: string;
   slot: number;
   meal: string;
   portion: string;
@@ -313,6 +314,11 @@ export type NutritionMealSection = {
   recommendationSets?: NutritionMealRecommendationSet[];
   options: NutritionMealSlot[];
   availableOptions?: NutritionMealSlot[];
+  availability?: {
+    code: 'SUFFICIENT_DISTINCT_MEAL_OPTIONS' | 'INSUFFICIENT_DISTINCT_MEAL_OPTIONS';
+    requiredDistinctFamilies: number;
+    compatibleDistinctFamilies: number;
+  };
 };
 
 export type HydrationRhythmEntry = {

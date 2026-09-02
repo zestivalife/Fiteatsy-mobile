@@ -1,4 +1,4 @@
-export const NUTRITION_CATALOGUE_VERSION = 'FITEATSY-NUTRITION-CATALOGUE-v1' as const;
+export const NUTRITION_CATALOGUE_VERSION = 'FITEATSY-NUTRITION-CATALOGUE-v1.1' as const;
 
 export type NullableNutrientMap = Record<string, number | null>;
 

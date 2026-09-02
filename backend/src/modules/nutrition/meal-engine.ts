@@ -44,6 +44,7 @@ export type PortionMasterRecord = {
 
 export type MealVariantRecord = {
   id: string;
+  canonicalFamilyId: string;
   mealKey: string;
   name: string;
   description?: string | null;
@@ -189,6 +190,7 @@ export const mealVariantToSlot = (
   const totals = calculateMealNutritionTotals(variant.components);
   return {
     id: variant.id,
+    canonicalFamilyId: variant.canonicalFamilyId,
     slot,
     meal: variant.name,
     portion:

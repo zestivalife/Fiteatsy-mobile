@@ -18,6 +18,7 @@ import type {
   NutritionIntelligence,
   NutritionMealSection,
   NutritionMealSlot,
+  NutritionMealTarget,
   NutritionGuidanceItem,
   OptionalNutritionGuidance,
   NutritionPlanContent,
@@ -1388,9 +1389,40 @@ const enrichRecommendationSets = (content: NutritionPlanContent): NutritionPlanC
   normalizeNutritionPlanContent(content);
 
 const mealOptionDiversityIdentity = (option: NutritionMealSlot) => {
+  if (option.canonicalFamilyId?.trim()) return `recipe:${lower(option.canonicalFamilyId)}`;
   const foodIds = unique((option.components ?? []).map((component) => component.foodId)).sort();
   if (foodIds.length > 0) return `foods:${foodIds.join('+')}`;
   return `meal:${lower(option.meal)}::${lower(option.portion)}`;
+};
+
+const targetDistance = (option: NutritionMealSlot, target: NutritionMealTarget) => {
+  const terms = [
+    [option.approxKcal, target.calories],
+    [option.proteinGrams, target.proteinGrams],
+    [option.carbsGrams, target.carbsGrams],
+    [option.fatGrams, target.fatGrams],
+    [option.fibreGrams, target.fibreGrams],
+  ] as const;
+  return terms.reduce((score, [actual, expected]) => score + (
+    actual == null || expected == null || expected <= 0 ? 0 : Math.abs(actual - expected) / expected
+  ), 0);
+};
+
+export const optimiseDistinctMealFamilies = (
+  candidates: NutritionMealSlot[],
+  target: NutritionMealTarget,
+) => {
+  const bestByFamily = new Map<string, NutritionMealSlot>();
+  for (const candidate of candidates) {
+    const optimised = optimiseMealOptionPortion(candidate, target);
+    if (!optimised) continue;
+    const family = mealOptionDiversityIdentity(optimised);
+    const current = bestByFamily.get(family);
+    if (!current || targetDistance(optimised, target) < targetDistance(current, target)) {
+      bestByFamily.set(family, optimised);
+    }
+  }
+  return [...bestByFamily.values()];
 };
 
 export const selectDiverseMealOptions = (
@@ -1456,10 +1488,9 @@ const enrichMealPlanWithLibraryMatches = async (input: {
           limit: AVAILABLE_LIBRARY_CANDIDATE_LIMIT,
         })),
       )).flat());
-      const distinctCandidates = selectDiverseMealOptions(rawVerifiedMatches, new Set<string>(), AVAILABLE_LIBRARY_CANDIDATE_LIMIT);
-      const verifiedMatches = distinctCandidates
-        .map((option) => section.target == null ? null : optimiseMealOptionPortion(option, section.target))
-        .filter((option): option is NutritionMealSlot => option != null);
+      const verifiedMatches = section.target == null
+        ? []
+        : optimiseDistinctMealFamilies(rawVerifiedMatches, section.target);
       const selectedMatches = selectDiverseMealOptions(verifiedMatches, usedIdentities);
       nextMealPlanEntries.push([
         mealKey,
@@ -1467,6 +1498,13 @@ const enrichMealPlanWithLibraryMatches = async (input: {
           ...section,
           options: selectedMatches,
           availableOptions: selectedMatches,
+          availability: {
+            code: verifiedMatches.length >= AVAILABLE_LIBRARY_MATCH_LIMIT
+              ? 'SUFFICIENT_DISTINCT_MEAL_OPTIONS'
+              : 'INSUFFICIENT_DISTINCT_MEAL_OPTIONS',
+            requiredDistinctFamilies: AVAILABLE_LIBRARY_MATCH_LIMIT,
+            compatibleDistinctFamilies: verifiedMatches.length,
+          },
         },
       ] as const);
   }

@@ -147,6 +147,16 @@ const preferenceScore = (input: {
   return score;
 };
 
+export const selectMealVariantFamilies = (variants: MealVariantRecord[], familyLimit: number) => {
+  const selectedFamilies = new Set<string>();
+  for (const variant of variants) {
+    if (selectedFamilies.has(variant.canonicalFamilyId)) continue;
+    if (selectedFamilies.size >= familyLimit) break;
+    selectedFamilies.add(variant.canonicalFamilyId);
+  }
+  return variants.filter((variant) => selectedFamilies.has(variant.canonicalFamilyId));
+};
+
 const mapFoodRecord = (row: NutritionFoodRow): FoodMasterRecord => ({
   id: String(row.id),
   canonicalName: String(row.canonical_name),
@@ -313,9 +323,8 @@ export const listEligibleMealVariantRecords = async (input: {
   includeOutsideTarget?: boolean;
   limit?: number;
 }) => {
-  const resultLimit = input.limit ?? 12;
-  const candidateLimit = Math.max(resultLimit, 120);
-  const params: unknown[] = [input.mealKey ?? '', input.consultantId ?? null, candidateLimit];
+  const familyLimit = input.limit ?? 12;
+  const params: unknown[] = [input.mealKey ?? '', input.consultantId ?? null];
   const variantsResult = await pool.query<MealVariantRow>(
     `
       select
@@ -347,7 +356,6 @@ export const listEligibleMealVariantRecords = async (input: {
           or (owner_scope = 'consultant' and consultant_id = $2)
         )
       order by updated_at desc
-      limit $3
     `,
     params,
   );
@@ -451,6 +459,7 @@ export const listEligibleMealVariantRecords = async (input: {
     );
     return {
       id: row.id,
+      canonicalFamilyId: String(normalizeJsonRecord(row.source_metadata).recipeId ?? row.id),
       mealKey: row.meal_key,
       name: row.variant_name,
       description: row.description,
@@ -463,7 +472,7 @@ export const listEligibleMealVariantRecords = async (input: {
       components,
     } satisfies MealVariantRecord;
   });
-  return mappedVariants
+  const eligibleVariants = mappedVariants
     .filter((variant) => {
     const blocked = (input.avoidedFoods ?? []).map(normalizeText).filter(Boolean);
     const blockedAllergens = (input.allergyTags ?? []).map(normalizeText).filter(Boolean);
@@ -478,8 +487,12 @@ export const listEligibleMealVariantRecords = async (input: {
     .sort((left, right) => {
       const score = (variant: MealVariantRecord) => preferenceScore(variant, input);
       return score(right) - score(left) || left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
-    })
-    .slice(0, resultLimit);
+    });
+
+  // The discovery budget is deliberately applied to canonical recipe families,
+  // never to portion rows. Keep every useful serving candidate for each chosen
+  // family so downstream nutrition optimisation can choose the best serving.
+  return selectMealVariantFamilies(eligibleVariants, familyLimit);
 };
 
 export const listMealLibrarySlotsForTarget = async (input: {
@@ -524,6 +537,5 @@ export const listMealLibrarySlotsForTarget = async (input: {
     })
     .filter((slot) => input.includeOutsideTarget || slot.matchClassification !== 'outside_target' || variants.length <= 3);
 
-  const limit = input.limit ?? 6;
-  return variantSlots.slice(0, limit);
+  return variantSlots;
 };

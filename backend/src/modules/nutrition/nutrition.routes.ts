@@ -34,6 +34,7 @@ import { getFoodPreferenceProfile, listVerifiedFoodCatalogue, updateFoodPreferen
 
 const mealOptionSchema = z.object({
   id: z.string().optional(),
+  canonicalFamilyId: z.string().optional(),
   slot: z.number().int().min(1),
   meal: z.string(),
   portion: z.string(),
@@ -96,6 +97,11 @@ const mealSectionSchema = z.object({
   recommendationSets: z.array(recommendationSetSchema).optional(),
   options: z.array(mealOptionSchema),
   availableOptions: z.array(mealOptionSchema).optional(),
+  availability: z.object({
+    code: z.enum(['SUFFICIENT_DISTINCT_MEAL_OPTIONS', 'INSUFFICIENT_DISTINCT_MEAL_OPTIONS']),
+    requiredDistinctFamilies: z.number().int().positive(),
+    compatibleDistinctFamilies: z.number().int().nonnegative(),
+  }).optional(),
 });
 
 const hydrationRhythmEntrySchema = z.object({

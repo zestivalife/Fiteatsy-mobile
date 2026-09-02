@@ -16,7 +16,7 @@ test('locks the production catalogue to the approved artifact and seven-table al
   const raw = await readFile(APPROVED_NUTRITION_CATALOGUE_PATH, 'utf8');
   const result = validateApprovedNutritionCatalogue(raw);
   assert.equal(result.sha256, APPROVED_NUTRITION_CATALOGUE_SHA256);
-  assert.deepEqual([result.manifest.foods.length, result.manifest.recipes.length, result.manifest.mealVariants.length], [58, 55, 220]);
+  assert.deepEqual([result.manifest.foods.length, result.manifest.recipes.length, result.manifest.mealVariants.length], [58, 64, 376]);
   assert.deepEqual(NUTRITION_CATALOGUE_TABLE_ALLOWLIST, [
     'nutrition_catalogue_releases', 'nutrition_foods', 'nutrition_food_portions', 'nutrition_recipes',
     'nutrition_recipe_components', 'nutrition_meal_variants', 'nutrition_meal_variant_components',

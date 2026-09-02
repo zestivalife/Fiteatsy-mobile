@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.catalogue-import.json && node ./scripts/copy-migrations.mjs",
     "db:migrate": "tsx src/db/migrator.ts",
     "nutrition:catalogue:generate": "node ./scripts/generate-usda-catalogue.mjs",
+    "nutrition:catalogue:expand-v1.1": "node ./scripts/expand-nutrition-catalogue-v1.1.mjs ./src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.json ./src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json ./src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.1.changes.json",
     "nutrition:catalogue:import": "tsx scripts/import-nutrition-catalogue.ts",
     "nutrition:catalogue:production": "node dist/catalogue-import/scripts/import-nutrition-catalogue.js",
     "reports:purge-deleted": "tsx src/jobs/purge-deleted-reports.ts",

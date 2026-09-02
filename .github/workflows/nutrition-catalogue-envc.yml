@@ -6,6 +6,7 @@ on:
     branches:
       - codex/usda-nutrition-catalogue-v1
       - codex/calorie-macro-allocation-v1
+      - codex/unique-meal-options-repair
 
 permissions:
   contents: read
@@ -80,6 +81,10 @@ jobs:
             /tmp/fdc/FoodData_Central_sr_legacy_food_json_2018-04.json \
             src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.json
           git diff --exit-code -- backend/src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.json
+          npm --prefix backend run nutrition:catalogue:expand-v1.1
+          git diff --exit-code -- \
+            backend/src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json \
+            backend/src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.1.changes.json
 
       - name: Apply production migrations to ephemeral PostgreSQL
         run: npm --prefix backend run db:migrate
@@ -97,6 +102,7 @@ jobs:
           ../tests/backend/nutrition-final-data-contract.test.ts
           ../tests/backend/nutrition-food-preference-contract.test.ts
           ../tests/backend/nutrition-meal-engine.test.ts
+          ../tests/backend/nutrition-family-diversity.test.ts
           ../tests/backend/calorie-macro-allocation.test.ts
           ../tests/backend/diet-plan-version-store-contract.test.ts
           ../tests/backend/published-nutrition-plan-contract.test.ts

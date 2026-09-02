@@ -5,10 +5,10 @@ import { z } from 'zod';
 import { calculateRecipeNutrition, scaleNutrients } from './catalogue.nutrition.js';
 import type { NutritionCatalogueManifest, NullableNutrientMap } from './catalogue.types.js';
 
-export const APPROVED_NUTRITION_CATALOGUE_VERSION = 'FITEATSY-NUTRITION-CATALOGUE-v1' as const;
-export const APPROVED_NUTRITION_CATALOGUE_SHA256 = '775cf73607ea84b0da1017c6652d03c8e1a58cd03058391d555713102c6c55d5' as const;
+export const APPROVED_NUTRITION_CATALOGUE_VERSION = 'FITEATSY-NUTRITION-CATALOGUE-v1.1' as const;
+export const APPROVED_NUTRITION_CATALOGUE_SHA256 = 'd59b5d8e9a62f7379a292b355b3dbd30300b3db990390d60e6a8ae9f5e30f77f' as const;
 export const APPROVED_NUTRITION_CATALOGUE_PATH = fileURLToPath(
-  new URL('./data/fiteatsy-nutrition-catalogue-v1.json', import.meta.url),
+  new URL('./data/fiteatsy-nutrition-catalogue-v1.1.json', import.meta.url),
 );
 export const NUTRITION_CATALOGUE_TABLE_ALLOWLIST = Object.freeze([
   'nutrition_catalogue_releases',
@@ -62,7 +62,7 @@ const sameNutrients = (a: NullableNutrientMap, b: NullableNutrientMap) => {
 
 export const validateApprovedNutritionCatalogueStructure = (input: unknown) => {
   const manifest = manifestSchema.parse(input) as NutritionCatalogueManifest;
-  if (manifest.foods.length !== 58 || manifest.recipes.length !== 55 || manifest.mealVariants.length !== 220) {
+  if (manifest.foods.length !== 58 || manifest.recipes.length !== 64 || manifest.mealVariants.length !== 376) {
     throw new Error('Catalogue validation failed: record counts do not match the approved release');
   }
   assertUnique(manifest.foods.map((x) => x.id), 'food ID');

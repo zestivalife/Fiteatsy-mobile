@@ -12,7 +12,7 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
   const second = await importNutritionCatalogue(databaseUrl);
 
   assert.deepEqual(first, second);
-  assert.deepEqual(first.counts, { foods: 58, recipes: 55, mealVariants: 220 });
+  assert.deepEqual(first.counts, { foods: 58, recipes: 64, mealVariants: 376 });
 
   try {
     const release = await pool.query<{
@@ -65,7 +65,7 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
           and source_metadata->>'catalogueVersion' = $1`,
       [NUTRITION_CATALOGUE_VERSION]
     );
-    assert.equal(variants.rows[0]?.count, '220');
+    assert.equal(variants.rows[0]?.count, '376');
     assert.deepEqual(variants.rows[0]?.meal_keys, [
       'bedtimeNutrition',
       'breakfast',

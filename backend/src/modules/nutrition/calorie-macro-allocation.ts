@@ -117,6 +117,7 @@ export const optimiseMealOptionPortion = (option: NutritionMealSlot, target: Nut
 };
 
 const optionFamilyIdentity = (option: NutritionMealSlot) => {
+  if (option.canonicalFamilyId?.trim()) return `recipe:${option.canonicalFamilyId.trim().toLowerCase()}`;
   const foodIdentity = (option.components ?? []).map((item) => item.foodId).filter(Boolean).sort().join('+');
   return foodIdentity || option.id?.trim().toLowerCase() || option.meal.trim().toLowerCase();
 };
