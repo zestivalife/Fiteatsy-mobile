@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../../backend/src/server.js';
-import { getJson, postJson } from '../helpers/http.js';
+import { getJson, patchJson, postJson } from '../helpers/http.js';
 import { startAppServer } from '../helpers/appServer.js';
 
 const withEnv = async (
@@ -102,6 +102,21 @@ test('POST /v1/checkins stores accepted check-in payload', async () => {
   try {
     assert.equal(response.status, 201);
     assert.equal(body.status, 'stored');
+  } finally {
+    await server.close();
+  }
+});
+
+test('Diet draft updates accept a complete 35-option payload above the default JSON limit', async () => {
+  const server = await startAppServer(createApp());
+  const { response, body } = await patchJson(
+    server.baseUrl,
+    '/v1/consultants/clients/diet-payload-user/diet-plans/diet-payload-plan',
+    { dietDraftMetadata: 'x'.repeat(150 * 1024) },
+  );
+  try {
+    assert.equal(response.status, 401);
+    assert.equal(body.error, 'AUTH_REQUIRED');
   } finally {
     await server.close();
   }

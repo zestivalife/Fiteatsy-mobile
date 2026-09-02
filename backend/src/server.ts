@@ -74,9 +74,14 @@ const logStartupRoutes = () => {
 export const createApp = (options: CreateAppOptions = {}) => {
   const app = express();
   const readinessCheck = options.readinessCheck ?? checkDatabaseReadiness;
+  const parseDietDraftUpdate = express.json({ limit: '512kb' });
 
   app.use(cors());
   app.use('/v1/webhooks', razorpayWebhookRouter);
+  app.use('/v1/consultants/clients/:clientId/diet-plans/:dietPlanId', (req, res, next) => {
+    if (req.method !== 'PATCH') return next();
+    return parseDietDraftUpdate(req, res, next);
+  });
   app.use(express.json());
 
   app.get('/', (_req, res) => {
