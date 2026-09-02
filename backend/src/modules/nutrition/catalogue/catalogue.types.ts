@@ -1,4 +1,5 @@
 export const NUTRITION_CATALOGUE_VERSION = 'FITEATSY-NUTRITION-CATALOGUE-v1.1' as const;
+export const NUTRITION_CATALOGUE_PREDECESSOR_VERSION = 'FITEATSY-NUTRITION-CATALOGUE-v1' as const;
 
 export type NullableNutrientMap = Record<string, number | null>;
 
@@ -53,7 +54,7 @@ export type CatalogueMealVariant = {
 };
 
 export type NutritionCatalogueManifest = {
-  catalogueVersion: typeof NUTRITION_CATALOGUE_VERSION;
+  catalogueVersion: typeof NUTRITION_CATALOGUE_VERSION | typeof NUTRITION_CATALOGUE_PREDECESSOR_VERSION;
   source: {
     name: 'USDA FoodData Central';
     license: 'CC0-1.0';

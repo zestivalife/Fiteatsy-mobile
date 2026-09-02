@@ -9,6 +9,9 @@ export const APPROVED_NUTRITION_CATALOGUE_VERSION = 'FITEATSY-NUTRITION-CATALOGU
 export const APPROVED_NUTRITION_CATALOGUE_SHA256 = 'd59b5d8e9a62f7379a292b355b3dbd30300b3db990390d60e6a8ae9f5e30f77f' as const;
 export const APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_VERSION = 'FITEATSY-NUTRITION-CATALOGUE-v1' as const;
 export const APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_SHA256 = '775cf73607ea84b0da1017c6652d03c8e1a58cd03058391d555713102c6c55d5' as const;
+export type ApprovedNutritionCatalogueVersion =
+  | typeof APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_VERSION
+  | typeof APPROVED_NUTRITION_CATALOGUE_VERSION;
 export const APPROVED_NUTRITION_CATALOGUE_PATH = fileURLToPath(
   new URL('./data/fiteatsy-nutrition-catalogue-v1.1.json', import.meta.url),
 );
@@ -26,7 +29,7 @@ const uuid = z.string().uuid();
 const nonEmptyTags = z.array(z.string().trim().min(1));
 const nutrients = z.record(z.string(), z.number().finite().nonnegative().nullable());
 const manifestSchema = z.object({
-  catalogueVersion: z.literal(APPROVED_NUTRITION_CATALOGUE_VERSION),
+  catalogueVersion: z.enum([APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_VERSION, APPROVED_NUTRITION_CATALOGUE_VERSION]),
   source: z.object({
     name: z.literal('USDA FoodData Central'),
     license: z.literal('CC0-1.0'),
@@ -64,7 +67,10 @@ const sameNutrients = (a: NullableNutrientMap, b: NullableNutrientMap) => {
 
 export const validateApprovedNutritionCatalogueStructure = (input: unknown) => {
   const manifest = manifestSchema.parse(input) as NutritionCatalogueManifest;
-  if (manifest.foods.length !== 58 || manifest.recipes.length !== 64 || manifest.mealVariants.length !== 376) {
+  const expected = manifest.catalogueVersion === APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_VERSION
+    ? [58, 55, 220]
+    : [58, 64, 376];
+  if (manifest.foods.length !== expected[0] || manifest.recipes.length !== expected[1] || manifest.mealVariants.length !== expected[2]) {
     throw new Error('Catalogue validation failed: record counts do not match the approved release');
   }
   assertUnique(manifest.foods.map((x) => x.id), 'food ID');
@@ -105,3 +111,24 @@ export const validateApprovedNutritionCatalogue = (raw: string) => {
 
 export const loadApprovedNutritionCatalogue = async () =>
   validateApprovedNutritionCatalogue(await readFile(APPROVED_NUTRITION_CATALOGUE_PATH, 'utf8'));
+
+const approvedReleases = {
+  [APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_VERSION]: {
+    sha256: APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_SHA256,
+    path: fileURLToPath(new URL('./data/fiteatsy-nutrition-catalogue-v1.json', import.meta.url)),
+  },
+  [APPROVED_NUTRITION_CATALOGUE_VERSION]: {
+    sha256: APPROVED_NUTRITION_CATALOGUE_SHA256,
+    path: APPROVED_NUTRITION_CATALOGUE_PATH,
+  },
+} as const;
+
+export const loadApprovedNutritionCatalogueRelease = async (version: ApprovedNutritionCatalogueVersion) => {
+  const release = approvedReleases[version];
+  const raw = await readFile(release.path, 'utf8');
+  const sha256 = createHash('sha256').update(raw).digest('hex');
+  if (sha256 !== release.sha256) throw new Error(`Catalogue validation failed: ${version} SHA-256 is not approved (${sha256})`);
+  const manifest = validateApprovedNutritionCatalogueStructure(JSON.parse(raw));
+  if (manifest.catalogueVersion !== version) throw new Error('Catalogue validation failed: requested release does not match manifest version');
+  return { manifest, sha256 };
+};

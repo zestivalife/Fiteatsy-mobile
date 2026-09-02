@@ -9,13 +9,19 @@ import {
   APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_VERSION,
   APPROVED_NUTRITION_CATALOGUE_VERSION,
   NUTRITION_CATALOGUE_TABLE_ALLOWLIST,
-  loadApprovedNutritionCatalogue,
+  loadApprovedNutritionCatalogueRelease,
 } from '../src/modules/nutrition/catalogue/catalogue.import-policy.js';
+import type { ApprovedNutritionCatalogueVersion } from '../src/modules/nutrition/catalogue/catalogue.import-policy.js';
 
 const { Client } = pg;
 const PRODUCTION_IMPORT_CONFIRMATION = `${APPROVED_NUTRITION_CATALOGUE_VERSION}:${APPROVED_NUTRITION_CATALOGUE_SHA256}`;
 const macro = (n: NullableNutrientMap, key: string) => n[key] ?? null;
 const micronutrients = (n: NullableNutrientMap) => Object.fromEntries(Object.entries(n).filter(([key]) => !['calories','caloriesKcal','proteinGrams','carbohydrateGrams','fatGrams','fibreGrams'].includes(key)));
+const stableJson = (value: unknown): string => value && typeof value === 'object'
+  ? Array.isArray(value)
+    ? `[${value.map(stableJson).join(',')}]`
+    : `{${Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)).map(([key, child]) => `${JSON.stringify(key)}:${stableJson(child)}`).join(',')}}`
+  : JSON.stringify(value);
 const stableUuid = (key: string) => {
   const hex = createHash('sha256').update(key).digest('hex').slice(0, 32).split('');
   hex[12] = '4';
@@ -27,6 +33,7 @@ type ImportOptions = {
   mode?: 'test' | 'production-approved';
   confirmation?: string;
   beforeCommit?: () => void | Promise<void>;
+  releaseVersion?: ApprovedNutritionCatalogueVersion;
 };
 
 type Reconciliation = {
@@ -41,6 +48,7 @@ type Reconciliation = {
   counts: Record<string, { inserts: number; updates: number }>;
   conflicts: Array<{ entity: string; id: string; reason: string }>;
   retained: { foods: string[]; recipes: string[]; mealVariants: string[] };
+  classification: { retainedUnchanged: number; newInserts: number; validUpdates: 0; trueConflicts: number; invalid: 0 };
 };
 
 const countExistingIds = async (client: InstanceType<typeof Client>, table: string, ids: string[]) => {
@@ -61,10 +69,10 @@ const reconcileApprovedCatalogue = async (client: InstanceType<typeof Client>, m
   const hasApprovedPredecessor = predecessor.rows[0]?.manifest_sha256 === APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_SHA256;
   const release = await client.query<{ source_name: string; source_license: string; manifest_sha256: string }>(
     'select source_name, source_license, manifest_sha256 from nutrition_catalogue_releases where catalogue_version = $1',
-    [APPROVED_NUTRITION_CATALOGUE_VERSION],
+    [manifest.catalogueVersion],
   );
   if (release.rows[0] && (release.rows[0].source_name !== manifest.source.name || release.rows[0].source_license !== manifest.source.license || release.rows[0].manifest_sha256 !== sha256)) {
-    conflicts.push({ entity: 'nutrition_catalogue_releases', id: APPROVED_NUTRITION_CATALOGUE_VERSION, reason: 'existing release provenance does not match the approved manifest' });
+    conflicts.push({ entity: 'nutrition_catalogue_releases', id: manifest.catalogueVersion, reason: 'existing release provenance does not match the approved manifest' });
   }
   const foodNames = await client.query<{ id: string; canonical_name: string }>(
     'select id::text as id, canonical_name from nutrition_foods where lower(canonical_name) = any($1::text[])',
@@ -113,14 +121,24 @@ const reconcileApprovedCatalogue = async (client: InstanceType<typeof Client>, m
       conflicts.push({ entity: 'nutrition_foods', id: row.id, reason: 'existing food provenance does not match the approved manifest' });
     } else retained.foods.push(row.id);
   }
-  const existingRecipeRows = await client.query<{ id: string; recipe_code: string; catalogue_version: string }>(
-    'select id::text as id, recipe_code, catalogue_version from nutrition_recipes where id = any($1::uuid[])', [recipeIds],
+  const existingRecipeRows = await client.query<{ id: string; recipe_code: string; catalogue_version: string; display_name: string; description: string; yield_grams: string; portions: string; cuisine_tags: string[]; dietary_tags: string[]; allergen_tags: string[]; retention_method: string | null; nutrition_totals: NullableNutrientMap; source_metadata: Record<string, unknown> }>(
+    `select id::text as id, recipe_code, catalogue_version, display_name, description, yield_grams::text, portions::text,
+            cuisine_tags, dietary_tags, allergen_tags, retention_method, nutrition_totals, source_metadata
+       from nutrition_recipes where id = any($1::uuid[])`, [recipeIds],
   );
   const approvedRecipes = new Map(manifest.recipes.map((recipe) => [recipe.id, recipe]));
   for (const row of existingRecipeRows.rows) {
     const approved = approvedRecipes.get(row.id)!;
+    const sameContent = row.display_name === approved.displayName && row.description === approved.description
+      && Number(row.yield_grams) === approved.yieldGrams && Number(row.portions) === approved.portions
+      && JSON.stringify(row.cuisine_tags) === JSON.stringify(approved.cuisineTags)
+      && JSON.stringify(row.dietary_tags) === JSON.stringify(approved.dietaryTags)
+      && JSON.stringify(row.allergen_tags) === JSON.stringify(approved.allergenTags)
+      && row.retention_method === approved.retentionMethod
+      && stableJson(row.nutrition_totals) === stableJson(approved.nutritionTotals);
+    const sameProvenance = row.source_metadata?.method === 'Fiteatsy deterministic recipe composition';
     const retainedPredecessor = row.recipe_code === approved.code && row.catalogue_version === APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_VERSION && hasApprovedPredecessor;
-    if (row.recipe_code !== approved.code || !(row.catalogue_version === manifest.catalogueVersion || retainedPredecessor)) {
+    if (row.recipe_code !== approved.code || !(row.catalogue_version === manifest.catalogueVersion || retainedPredecessor) || !sameContent || !sameProvenance) {
       conflicts.push({ entity: 'nutrition_recipes', id: row.id, reason: 'existing recipe provenance does not match the approved manifest' });
     } else retained.recipes.push(row.id);
   }
@@ -154,12 +172,19 @@ const reconcileApprovedCatalogue = async (client: InstanceType<typeof Client>, m
     executedAt: new Date().toISOString(), runtimeSha: process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? null,
     existing: { foods: existingFoodRows.rowCount ?? 0, recipes: counts.nutrition_recipes.updates, mealVariants: existingVariants.rowCount ?? 0 },
     counts, conflicts, retained,
+    classification: {
+      retainedUnchanged: retained.foods.length + retained.recipes.length + retained.mealVariants.length,
+      newInserts: Object.values(counts).reduce((sum, count) => sum + count.inserts, 0),
+      validUpdates: 0,
+      trueConflicts: conflicts.length,
+      invalid: 0,
+    },
   };
 };
 
-export const dryRunApprovedNutritionCatalogue = async (databaseUrl = process.env.DATABASE_URL) => {
+export const dryRunApprovedNutritionCatalogue = async (databaseUrl = process.env.DATABASE_URL, releaseVersion: ApprovedNutritionCatalogueVersion = APPROVED_NUTRITION_CATALOGUE_VERSION) => {
   if (!databaseUrl) throw new Error('DATABASE_URL is required');
-  const { manifest, sha256 } = await loadApprovedNutritionCatalogue();
+  const { manifest, sha256 } = await loadApprovedNutritionCatalogueRelease(releaseVersion);
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
@@ -177,7 +202,9 @@ export const dryRunApprovedNutritionCatalogue = async (databaseUrl = process.env
 
 export const importNutritionCatalogue = async (databaseUrl = process.env.DATABASE_URL, options: ImportOptions = {}) => {
   if (!databaseUrl) throw new Error('DATABASE_URL is required');
-  const { manifest, sha256: sha } = await loadApprovedNutritionCatalogue();
+  const releaseVersion = options.releaseVersion ?? APPROVED_NUTRITION_CATALOGUE_VERSION;
+  if (options.mode === 'production-approved' && releaseVersion !== APPROVED_NUTRITION_CATALOGUE_VERSION) throw new Error('Production import is restricted to the approved successor release');
+  const { manifest, sha256: sha } = await loadApprovedNutritionCatalogueRelease(releaseVersion);
   const mode = options.mode ?? 'test';
   if (mode === 'test') assertDestructiveTestResetAllowed({ ...process.env, DATABASE_URL: databaseUrl });
   else if (options.confirmation !== PRODUCTION_IMPORT_CONFIRMATION) throw new Error('Exact production catalogue import confirmation is required');
@@ -217,7 +244,13 @@ export const importNutritionCatalogue = async (databaseUrl = process.env.DATABAS
     }
     await options.beforeCommit?.();
     await client.query('commit');
-    return { catalogueVersion: manifest.catalogueVersion, manifestSha256: sha, counts: { foods: manifest.foods.length, recipes: manifest.recipes.length, mealVariants: manifest.mealVariants.length } };
+    return {
+      catalogueVersion: manifest.catalogueVersion,
+      manifestSha256: sha,
+      counts: { foods: manifest.foods.length, recipes: manifest.recipes.length, mealVariants: manifest.mealVariants.length },
+      writes: reconciliation.classification.newInserts,
+      classification: reconciliation.classification,
+    };
   } catch (error) { await client.query('rollback'); throw error; } finally { await client.end(); }
 };
 

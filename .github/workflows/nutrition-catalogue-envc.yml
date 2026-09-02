@@ -95,6 +95,7 @@ jobs:
         run: |
           set +e
           node --import tsx --test --test-concurrency=1 \
+            ../tests/database/nutrition-catalogue-successor-policy.database.test.ts \
             ../tests/database/nutrition-catalogue.database.test.ts \
             > nutrition-catalogue-database.log 2>&1
           status=$?
