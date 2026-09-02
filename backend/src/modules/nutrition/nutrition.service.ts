@@ -1434,12 +1434,13 @@ const enrichMealPlanWithLibraryMatches = async (input: {
           limit: AVAILABLE_LIBRARY_CANDIDATE_LIMIT,
         })),
       )).flat());
+      const selectedMatches = selectDiverseMealOptions(verifiedMatches, usedIdentities);
       nextMealPlanEntries.push([
         mealKey,
         {
           ...section,
-          options: [],
-          availableOptions: selectDiverseMealOptions(verifiedMatches, usedIdentities),
+          options: selectedMatches,
+          availableOptions: selectedMatches,
         },
       ] as const);
   }

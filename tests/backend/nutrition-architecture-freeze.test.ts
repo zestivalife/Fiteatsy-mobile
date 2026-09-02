@@ -31,7 +31,9 @@ test('active catalogue enrichment uses verified matches and contains no fallback
   assert.match(body, /COMPATIBLE_MEAL_LIBRARY_KEYS\[mealKey\]/);
   assert.match(body, /listMealLibrarySlotsForTarget/);
   assert.match(body, /includeOutsideTarget:\s*true/);
-  assert.match(body, /selectDiverseMealOptions\(verifiedMatches, usedIdentities\)/);
+  assert.match(body, /const selectedMatches = selectDiverseMealOptions\(verifiedMatches, usedIdentities\)/);
+  assert.match(body, /options:\s*selectedMatches/);
+  assert.match(body, /availableOptions:\s*selectedMatches/);
   assert.doesNotMatch(body, /buildCanonicalMealLibraryFallback\s*\(/);
   assert.doesNotMatch(body, /generated_template/);
 });
