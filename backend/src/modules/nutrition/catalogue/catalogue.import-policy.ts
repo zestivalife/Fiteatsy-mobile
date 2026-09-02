@@ -7,6 +7,8 @@ import type { NutritionCatalogueManifest, NullableNutrientMap } from './catalogu
 
 export const APPROVED_NUTRITION_CATALOGUE_VERSION = 'FITEATSY-NUTRITION-CATALOGUE-v1.1' as const;
 export const APPROVED_NUTRITION_CATALOGUE_SHA256 = 'd59b5d8e9a62f7379a292b355b3dbd30300b3db990390d60e6a8ae9f5e30f77f' as const;
+export const APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_VERSION = 'FITEATSY-NUTRITION-CATALOGUE-v1' as const;
+export const APPROVED_NUTRITION_CATALOGUE_PREDECESSOR_SHA256 = '775cf73607ea84b0da1017c6652d03c8e1a58cd03058391d555713102c6c55d5' as const;
 export const APPROVED_NUTRITION_CATALOGUE_PATH = fileURLToPath(
   new URL('./data/fiteatsy-nutrition-catalogue-v1.1.json', import.meta.url),
 );
