@@ -61,6 +61,26 @@ test('final ranking returns exactly five canonical families and never portion al
   }
 });
 
+test('complete 2,101 kcal / 131 g day returns 35 options and avoids unnecessary cross-meal reuse', () => {
+  const usedFamilies = new Set<string>();
+  const selectedDay: NutritionMealSlot[] = [];
+  let unnecessaryReuse = 0;
+  for (const mealKey of meals) {
+    const candidates = optimiseDistinctMealFamilies(slotsFor(mealKey), targets[mealKey]);
+    const unusedBeforeSelection = candidates.filter((item) => !usedFamilies.has(item.canonicalFamilyId!)).length;
+    const selected = selectDiverseMealOptions(candidates, usedFamilies);
+    if (unusedBeforeSelection >= 5) unnecessaryReuse += selected.filter((item) => usedFamilies.has(item.canonicalFamilyId!)).length;
+    assert.equal(selected.length, 5, mealKey);
+    assert.equal(new Set(selected.map((item) => item.canonicalFamilyId)).size, 5, mealKey);
+    assert.ok(selected.every((item) => item.components.length > 0), mealKey);
+    selected.forEach((item) => usedFamilies.add(item.canonicalFamilyId!));
+    selectedDay.push(...selected);
+  }
+  assert.equal(selectedDay.length, 35);
+  assert.equal(unnecessaryReuse, 0);
+  assert.ok(usedFamilies.size >= 20);
+});
+
 test('a genuinely restricted four-family pool remains an explicit shortage', () => {
   const restricted = optimiseDistinctMealFamilies(slotsFor('breakfast'), targets.breakfast).slice(0, 4);
   const options = selectDiverseMealOptions(restricted, new Set());
