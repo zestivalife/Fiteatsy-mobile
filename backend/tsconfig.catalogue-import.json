@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist/catalogue-import",
+    "rootDir": "."
+  },
+  "include": [
+    "scripts/import-nutrition-catalogue.ts",
+    "src/modules/nutrition/catalogue/**/*.ts",
+    "src/test-support/destructive-reset-guard.ts"
+  ]
+}

@@ -10,6 +10,7 @@ const nutritionModuleSourceDir = path.join(backendRoot, 'src', 'modules', 'nutri
 const nutritionModuleTargetDir = path.join(backendRoot, 'dist', 'modules', 'nutrition');
 const catalogueDataSourceDir = path.join(nutritionModuleSourceDir, 'catalogue', 'data');
 const catalogueDataTargetDir = path.join(nutritionModuleTargetDir, 'catalogue', 'data');
+const catalogueImportDataTargetDir = path.join(backendRoot, 'dist', 'catalogue-import', 'src', 'modules', 'nutrition', 'catalogue', 'data');
 const approvedCatalogueFile = 'fiteatsy-nutrition-catalogue-v1.json';
 
 const copyMigrations = async () => {
@@ -52,10 +53,17 @@ const copyNutritionAssets = async () => {
 
 const copyApprovedCatalogue = async () => {
   await fs.mkdir(catalogueDataTargetDir, { recursive: true });
-  await fs.copyFile(
-    path.join(catalogueDataSourceDir, approvedCatalogueFile),
-    path.join(catalogueDataTargetDir, approvedCatalogueFile),
-  );
+  await fs.mkdir(catalogueImportDataTargetDir, { recursive: true });
+  await Promise.all([
+    fs.copyFile(
+      path.join(catalogueDataSourceDir, approvedCatalogueFile),
+      path.join(catalogueDataTargetDir, approvedCatalogueFile),
+    ),
+    fs.copyFile(
+      path.join(catalogueDataSourceDir, approvedCatalogueFile),
+      path.join(catalogueImportDataTargetDir, approvedCatalogueFile),
+    ),
+  ]);
   console.log(`Copied approved nutrition catalogue to ${catalogueDataTargetDir}`);
 };
 
