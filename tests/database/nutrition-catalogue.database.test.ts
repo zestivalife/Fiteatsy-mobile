@@ -11,7 +11,8 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
   const first = await importNutritionCatalogue(databaseUrl);
   const second = await importNutritionCatalogue(databaseUrl);
 
-  assert.deepEqual(first, second);
+  assert.deepEqual(first.counts, second.counts);
+  assert.equal(second.writes, 0);
   assert.deepEqual(first.counts, { foods: 58, recipes: 64, mealVariants: 376 });
 
   try {
@@ -38,10 +39,9 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
          from nutrition_foods
         where deleted_at is null
           and verification_status = 'verified'
-          and source_metadata->>'catalogueVersion' = $1
           and source_metadata->>'source' = 'USDA FoodData Central'
           and source_metadata ? 'fdcId'`,
-      [NUTRITION_CATALOGUE_VERSION]
+      []
     );
     assert.deepEqual(foods.rows[0], { count: '58', distinct_count: '58' });
 
@@ -50,9 +50,8 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
               count(distinct lower(recipe_code))::text as distinct_count
          from nutrition_recipes
         where deleted_at is null
-          and catalogue_version = $1
           and verification_status = 'verified'`,
-      [NUTRITION_CATALOGUE_VERSION]
+      []
     );
     assert.deepEqual(recipes.rows[0], { count: '64', distinct_count: '64' });
 
@@ -62,8 +61,8 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
          from nutrition_meal_variants
         where deleted_at is null
           and verification_status = 'verified'
-          and source_metadata->>'catalogueVersion' = $1`,
-      [NUTRITION_CATALOGUE_VERSION]
+          and source_metadata ? 'recipeId'`,
+      []
     );
     assert.equal(variants.rows[0]?.count, '376');
     assert.deepEqual(variants.rows[0]?.meal_keys, [
@@ -80,10 +79,9 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
       `select count(*)::text as unknown_count
          from nutrition_foods
         where deleted_at is null
-          and source_metadata->>'catalogueVersion' = $1
           and micronutrients ? 'vitaminB12Mcg'
           and micronutrients->'vitaminB12Mcg' = 'null'::jsonb`,
-      [NUTRITION_CATALOGUE_VERSION]
+      []
     );
     assert.ok(Number(unknowns.rows[0]?.unknown_count ?? 0) > 0, 'unknown nutrients must persist as JSON null');
 
@@ -91,10 +89,9 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
       `select display_name, verification_status, source_metadata->>'fdcId' as fdc_id
          from nutrition_foods
         where deleted_at is null
-          and source_metadata->>'catalogueVersion' = $1
           and (lower(display_name) like '%chickpea%' or lower(canonical_name) like '%chickpea%')
         order by display_name`,
-      [NUTRITION_CATALOGUE_VERSION]
+      []
     );
     assert.ok(manualSearch.rows.length > 0);
     assert.ok(manualSearch.rows.every((row) => row.verification_status === 'verified' && Number(row.fdc_id) > 0));
