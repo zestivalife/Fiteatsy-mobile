@@ -133,6 +133,20 @@ test('candidate selection prefers distinct recipe families before portion varian
   );
 });
 
+test('candidate selection keeps within-meal families distinct after the cross-meal pool is exhausted', () => {
+  const used = new Set(['foods:food-yoghurt', 'foods:food-poha']);
+  const candidates = [
+    slot('Yoghurt chaat — light portion', ['vegetarian'], 'food-yoghurt'),
+    slot('Yoghurt chaat — standard portion', ['vegetarian'], 'food-yoghurt'),
+    slot('Vegetable poha — standard portion', ['vegetarian'], 'food-poha'),
+  ];
+
+  assert.deepEqual(
+    selectDiverseMealOptions(candidates, used, 2).map((option) => option.meal),
+    ['Yoghurt chaat — light portion', 'Vegetable poha — standard portion'],
+  );
+});
+
 test('an empty verified catalogue result stays empty instead of fabricating a fallback', () => {
   assert.deepEqual(selectDiverseMealOptions([], new Set<string>()), []);
 });

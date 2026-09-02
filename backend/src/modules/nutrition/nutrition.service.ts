@@ -1377,14 +1377,16 @@ export const selectDiverseMealOptions = (
 ) => {
   const uniqueCandidates = dedupeMealOptions(candidates);
   const seenInMeal = new Set<string>();
-  const distinctFamilies = uniqueCandidates.filter((option) => {
+  const familyRepresentatives = uniqueCandidates.filter((option) => {
     const identity = mealOptionDiversityIdentity(option);
-    if (usedIdentities.has(identity) || seenInMeal.has(identity)) return false;
+    if (seenInMeal.has(identity)) return false;
     seenInMeal.add(identity);
     return true;
   });
-  const repeatedFamilies = uniqueCandidates.filter((option) => !distinctFamilies.includes(option));
-  const selected = [...distinctFamilies, ...repeatedFamilies].slice(0, limit);
+  const freshFamilies = familyRepresentatives.filter((option) => !usedIdentities.has(mealOptionDiversityIdentity(option)));
+  const reusedFamilies = familyRepresentatives.filter((option) => usedIdentities.has(mealOptionDiversityIdentity(option)));
+  const repeatedPortions = uniqueCandidates.filter((option) => !familyRepresentatives.includes(option));
+  const selected = [...freshFamilies, ...reusedFamilies, ...repeatedPortions].slice(0, limit);
   selected.forEach((option) => usedIdentities.add(mealOptionDiversityIdentity(option)));
   return selected.map((option, index) => ({ ...option, slot: index + 1 }));
 };
