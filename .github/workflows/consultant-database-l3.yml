@@ -93,6 +93,30 @@ jobs:
           fi
           exit "$status"
 
+      - name: Run Food Knowledge v1 database acceptance
+        working-directory: backend
+        shell: bash
+        run: |
+          set +e
+          node --import tsx --test --test-concurrency=1 \
+            ../tests/backend/food-knowledge-foundation.test.ts \
+            ../tests/database/food-knowledge-foundation.database.test.ts \
+            > food-knowledge-v1.log 2>&1
+          status=$?
+          cat food-knowledge-v1.log
+          if [ "$status" -ne 0 ]; then
+            failure_block="$(awk '
+              /^not ok / { capture = 1 }
+              capture { print }
+              capture && /^  \.\.\.$/ { exit }
+            ' food-knowledge-v1.log | tail -n 100)"
+            escaped="${failure_block//'%'/'%25'}"
+            escaped="${escaped//$'\r'/'%0D'}"
+            escaped="${escaped//$'\n'/'%0A'}"
+            echo "::error title=Food Knowledge v1 database acceptance::$escaped"
+          fi
+          exit "$status"
+
       - name: Run full safe backend regression against ephemeral PostgreSQL
         working-directory: backend
         shell: bash
