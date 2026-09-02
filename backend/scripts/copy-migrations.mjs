@@ -11,7 +11,6 @@ const nutritionModuleTargetDir = path.join(backendRoot, 'dist', 'modules', 'nutr
 const catalogueDataSourceDir = path.join(nutritionModuleSourceDir, 'catalogue', 'data');
 const catalogueDataTargetDir = path.join(nutritionModuleTargetDir, 'catalogue', 'data');
 const catalogueImportDataTargetDir = path.join(backendRoot, 'dist', 'catalogue-import', 'src', 'modules', 'nutrition', 'catalogue', 'data');
-const approvedCatalogueFile = 'fiteatsy-nutrition-catalogue-v1.json';
 
 const copyMigrations = async () => {
   const entries = await fs.readdir(sourceDir, { withFileTypes: true });
@@ -52,19 +51,14 @@ const copyNutritionAssets = async () => {
 };
 
 const copyApprovedCatalogue = async () => {
-  await fs.mkdir(catalogueDataTargetDir, { recursive: true });
-  await fs.mkdir(catalogueImportDataTargetDir, { recursive: true });
+  // The production importer is compiled into a separate output tree. Package
+  // the complete catalogue-data directory into each runtime tree so its
+  // module-relative, allowlisted path can never fall back to a source checkout.
   await Promise.all([
-    fs.copyFile(
-      path.join(catalogueDataSourceDir, approvedCatalogueFile),
-      path.join(catalogueDataTargetDir, approvedCatalogueFile),
-    ),
-    fs.copyFile(
-      path.join(catalogueDataSourceDir, approvedCatalogueFile),
-      path.join(catalogueImportDataTargetDir, approvedCatalogueFile),
-    ),
+    fs.cp(catalogueDataSourceDir, catalogueDataTargetDir, { recursive: true, force: true }),
+    fs.cp(catalogueDataSourceDir, catalogueImportDataTargetDir, { recursive: true, force: true }),
   ]);
-  console.log(`Copied approved nutrition catalogue to ${catalogueDataTargetDir}`);
+  console.log(`Copied nutrition catalogue data directory to ${catalogueDataTargetDir} and ${catalogueImportDataTargetDir}`);
 };
 
 await copyMigrations();
