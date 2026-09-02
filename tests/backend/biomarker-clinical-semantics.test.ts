@@ -34,7 +34,17 @@ const marker = (overrides: Partial<ConsultantBiomarkerSummary> & Pick<Consultant
     previousReferenceRange: overrides.previousReferenceRange ?? null,
     previousClinicalStatus: overrides.previousClinicalStatus ?? null,
     previousSourceReportId: overrides.previousSourceReportId ?? null,
-    previousTestDate: overrides.previousTestDate ?? null
+    previousTestDate: overrides.previousTestDate ?? null,
+    source: overrides.source ?? {
+      type: 'lab_report',
+      label: 'Lab Report',
+      reportId: overrides.sourceReportId ?? 'report-current',
+      reportDate: overrides.testDate ?? '2026-08-28',
+      labName: 'Test Lab',
+      fileName: 'test-report.pdf'
+    },
+    createdAtISO: overrides.createdAtISO ?? '2026-08-28T00:00:00.000Z',
+    history: overrides.history ?? []
   };
 };
 

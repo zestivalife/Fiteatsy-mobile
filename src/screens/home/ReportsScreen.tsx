@@ -832,18 +832,11 @@ export const ReportsScreen = () => {
             Object.fromEntries(
               abnormalParameters.map((parameter) => [
                 parameter.name,
-                `${parameter.name} is ${parameter.value} ${parameter.unit} (${parameter.referenceRange}); this can improve with consistent routine this week.`
+                `${parameter.name}: ${parameter.value} ${parameter.unit}. Reference range: ${parameter.referenceRange || 'Unavailable'}.`
               ])
             )
           );
-          setActionPlan(
-            abnormalParameters.slice(0, 3).map((parameter, index) => ({
-              priority: index + 1,
-              title: `Improve ${parameter.name}`,
-              detail: `${parameter.name} is ${parameter.value} ${parameter.unit}. Start one corrective habit this week and review with your clinician if needed.`,
-              requiresDoctor: parameter.status === 'critical'
-            }))
-          );
+          setActionPlan([]);
           setCrossInsights([]);
         }
       } finally {

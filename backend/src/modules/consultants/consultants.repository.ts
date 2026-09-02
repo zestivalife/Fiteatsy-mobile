@@ -134,6 +134,31 @@ export type ConsultantBiomarkerSummary = {
   previousClinicalStatus: BiomarkerClinicalStatus | null;
   previousSourceReportId: string | null;
   previousTestDate: string | null;
+  source: ConsultantBiomarkerSource;
+  createdAtISO: string;
+  history: ConsultantBiomarkerHistoryItem[];
+};
+
+export type ConsultantBiomarkerSource = {
+  type: 'lab_report' | 'manual_entry';
+  label: 'Lab Report' | 'Manual Entry';
+  reportId: string | null;
+  reportDate: string | null;
+  labName: string | null;
+  fileName: string | null;
+};
+
+export type ConsultantBiomarkerHistoryItem = {
+  observationId: string;
+  value: number;
+  unit: string;
+  referenceRange: string | null;
+  validationStatus: string;
+  clinicalStatus: BiomarkerClinicalStatus;
+  testDate: string;
+  rawMarkerName: string | null;
+  source: ConsultantBiomarkerSource;
+  createdAtISO: string;
 };
 
 export type ConsultantReportSummary = {
@@ -736,6 +761,9 @@ export const listValidatedBiomarkerSummaryForClient = async (
         select
           bo.*,
           b.canonical_name,
+          hr.report_date,
+          hr.lab_name,
+          hr.original_filename,
           row_number() over (
             partition by bo.biomarker_id
             order by bo.test_date desc, bo.created_at desc
@@ -759,12 +787,34 @@ export const listValidatedBiomarkerSummaryForClient = async (
         latest.reference_range,
         latest.confidence,
         latest.test_date,
+        latest.created_at,
+        latest.report_date,
+        latest.lab_name,
+        latest.original_filename,
         previous.value as previous_value,
         previous.unit as previous_unit,
         previous.reference_range as previous_reference_range,
         previous.validation_status as previous_validation_status,
         previous.source_report_id as previous_source_report_id,
-        previous.test_date as previous_test_date
+        previous.test_date as previous_test_date,
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+            'observationId', history.id,
+            'value', history.value,
+            'unit', history.unit,
+            'referenceRange', history.reference_range,
+            'validationStatus', upper(history.validation_status),
+            'testDate', history.test_date,
+            'rawMarkerName', history.original_parameter_name,
+            'sourceReportId', history.source_report_id,
+            'reportDate', history.report_date,
+            'labName', history.lab_name,
+            'fileName', history.original_filename,
+            'createdAtISO', history.created_at
+          ) order by history.test_date desc, history.created_at desc)
+          from ranked history
+          where history.biomarker_id = latest.biomarker_id
+        ), '[]'::jsonb) as history
       from ranked latest
       left join ranked previous
         on previous.biomarker_id = latest.biomarker_id
@@ -792,6 +842,47 @@ export const listValidatedBiomarkerSummaryForClient = async (
           referenceRange: previousReferenceRange,
           validationStatus: String(row.previous_validation_status ?? '')
         });
+    const toSource = (source: {
+      sourceReportId: unknown;
+      reportDate: unknown;
+      labName: unknown;
+      fileName: unknown;
+    }): ConsultantBiomarkerSource => ({
+      type: source.sourceReportId == null ? 'manual_entry' : 'lab_report',
+      label: source.sourceReportId == null ? 'Manual Entry' : 'Lab Report',
+      reportId: source.sourceReportId == null ? null : String(source.sourceReportId),
+      reportDate: source.reportDate == null ? null : new Date(String(source.reportDate)).toISOString().slice(0, 10),
+      labName: source.labName == null ? null : String(source.labName),
+      fileName: source.fileName == null ? null : String(source.fileName)
+    });
+    const history = (Array.isArray(row.history) ? row.history : []).map((item: Record<string, unknown>) => {
+      const historyValue = Number(item.value);
+      const historyUnit = String(item.unit);
+      const historyReferenceRange = item.referenceRange == null ? null : String(item.referenceRange);
+      const historyValidationStatus = String(item.validationStatus);
+      return {
+        observationId: String(item.observationId),
+        value: historyValue,
+        unit: historyUnit,
+        referenceRange: historyReferenceRange,
+        validationStatus: historyValidationStatus,
+        clinicalStatus: deriveBiomarkerClinicalStatus({
+          value: historyValue,
+          unit: historyUnit,
+          referenceRange: historyReferenceRange,
+          validationStatus: historyValidationStatus
+        }),
+        testDate: new Date(String(item.testDate)).toISOString().slice(0, 10),
+        rawMarkerName: item.rawMarkerName == null ? null : String(item.rawMarkerName),
+        source: toSource({
+          sourceReportId: item.sourceReportId,
+          reportDate: item.reportDate,
+          labName: item.labName,
+          fileName: item.fileName
+        }),
+        createdAtISO: new Date(String(item.createdAtISO)).toISOString()
+      } satisfies ConsultantBiomarkerHistoryItem;
+    });
     return {
       biomarkerId: String(row.biomarker_id),
       name: String(row.canonical_name),
@@ -816,7 +907,15 @@ export const listValidatedBiomarkerSummaryForClient = async (
       previousReferenceRange,
       previousClinicalStatus,
       previousSourceReportId: row.previous_source_report_id == null ? null : String(row.previous_source_report_id),
-      previousTestDate: row.previous_test_date == null ? null : new Date(String(row.previous_test_date)).toISOString().slice(0, 10)
+      previousTestDate: row.previous_test_date == null ? null : new Date(String(row.previous_test_date)).toISOString().slice(0, 10),
+      source: toSource({
+        sourceReportId: row.source_report_id,
+        reportDate: row.report_date,
+        labName: row.lab_name,
+        fileName: row.original_filename
+      }),
+      createdAtISO: new Date(String(row.created_at)).toISOString(),
+      history
     };
   });
 };

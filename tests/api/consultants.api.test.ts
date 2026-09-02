@@ -33,6 +33,15 @@ const createConsultantSession = async () => {
   return session;
 };
 
+const createSeniorConsultantSession = async () => {
+  const session = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Senior Consultant User',
+    email: `senior-consultant-${Date.now()}@example.com`
+  });
+  await pool.query('update users set role = $2 where id = $1', [session.current.body.accountId, 'senior_consultant']);
+  return session;
+};
+
 const assignClientToConsultant = async (
   client: Awaited<ReturnType<typeof createAuthenticatedSession>>,
   consultant: Awaited<ReturnType<typeof createConsultantSession>>
@@ -1319,6 +1328,15 @@ test('consultant latest biomarker projection preserves previous value and both r
   });
   await createBiomarkerObservation(owner, {
     biomarkerId: biomarker.id,
+    value: 160,
+    unit: 'pg/mL',
+    testDate: '2026-07-01',
+    confidence: 0.97,
+    validationStatus: 'validated',
+    originalParameterName: 'Serum B12'
+  });
+  await createBiomarkerObservation(owner, {
+    biomarkerId: biomarker.id,
     sourceReportId: reportA.id,
     value: 180,
     unit: 'pg/mL',
@@ -1355,6 +1373,112 @@ test('consultant latest biomarker projection preserves previous value and both r
   assert.equal(b12.previousSourceReportId, reportA.id);
   assert.equal(b12.previousClinicalStatus, 'LOW');
   assert.equal(b12.comparisonStatus, 'IMPROVED');
+  assert.deepEqual(b12.source, {
+    type: 'lab_report',
+    label: 'Lab Report',
+    reportId: reportB.id,
+    reportDate: '2026-08-10',
+    labName: 'QA Lab B',
+    fileName: 'b12-b.pdf'
+  });
+  assert.equal(b12.testDate, '2026-08-10');
+  assert.match(b12.createdAtISO, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(b12.history.length, 3);
+  assert.deepEqual(b12.history.map((item: { value: number }) => item.value), [310, 180, 160]);
+  assert.equal(b12.history[0].source.reportId, reportB.id);
+  assert.equal(b12.history[1].source.reportId, reportA.id);
+  assert.deepEqual(b12.history[2].source, {
+    type: 'manual_entry',
+    label: 'Manual Entry',
+    reportId: null,
+    reportDate: null,
+    labName: null,
+    fileName: null
+  });
+  assert.equal(b12.history[2].referenceRange, null);
+});
+
+test('Consultant biomarker projection is assignment-scoped and switches clients without leakage', async () => {
+  const clientA = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Biomarker Client A',
+    email: `biomarker-client-a-${Date.now()}@example.com`
+  });
+  const clientB = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Biomarker Client B',
+    email: `biomarker-client-b-${Date.now()}@example.com`
+  });
+  const assignedConsultant = await createConsultantSession();
+  const wrongConsultant = await createConsultantSession();
+  await assignClientToConsultant(clientA, assignedConsultant);
+  await assignClientToConsultant(clientB, assignedConsultant);
+
+  const ownerA = { accountId: clientA.current.body.accountId, clientId: await getClientDatabaseId(clientA) };
+  const ownerB = { accountId: clientB.current.body.accountId, clientId: await getClientDatabaseId(clientB) };
+  const ldl = await upsertBiomarker({
+    canonicalName: 'LDL Cholesterol', aliases: ['LDL-C'], category: 'Heart & Lipids', standardUnit: 'mg/dL'
+  });
+  const tsh = await upsertBiomarker({
+    canonicalName: 'TSH', aliases: [], category: 'Thyroid', standardUnit: 'mIU/L'
+  });
+  await createBiomarkerObservation(ownerA, {
+    biomarkerId: ldl.id, value: 133.6, unit: 'mg/dL', testDate: '2026-09-02', confidence: 1,
+    validationStatus: 'validated', originalParameterName: 'LDL-C', referenceRange: '<100'
+  });
+  await createBiomarkerObservation(ownerB, {
+    biomarkerId: tsh.id, value: 3, unit: 'mIU/L', testDate: '2026-09-01', confidence: 1,
+    validationStatus: 'validated', originalParameterName: 'TSH'
+  });
+
+  const pathA = `/v1/consultants/clients/${encodeURIComponent(clientA.current.body.client.fiteatsyClientId)}/workspace`;
+  const pathB = `/v1/consultants/clients/${encodeURIComponent(clientB.current.body.client.fiteatsyClientId)}/workspace`;
+  const projectedA = await getJson(server.baseUrl, pathA, { headers: authHeaders(assignedConsultant.token) });
+  const projectedB = await getJson(server.baseUrl, pathB, { headers: authHeaders(assignedConsultant.token) });
+  const denied = await getJson(server.baseUrl, pathA, { headers: authHeaders(wrongConsultant.token) });
+
+  assert.equal(projectedA.response.status, 200);
+  assert.equal(projectedB.response.status, 200);
+  assert.deepEqual(projectedA.body.biomarkers.map((item: { canonicalMarkerName: string }) => item.canonicalMarkerName), ['LDL Cholesterol']);
+  assert.equal(projectedA.body.biomarkers[0].value, 133.6);
+  assert.equal(projectedA.body.biomarkers[0].unit, 'mg/dL');
+  assert.equal(projectedA.body.biomarkers[0].referenceRange, '<100');
+  assert.equal(projectedA.body.biomarkers[0].testDate, '2026-09-02');
+  assert.equal(projectedA.body.biomarkers[0].source.label, 'Manual Entry');
+  assert.deepEqual(projectedB.body.biomarkers.map((item: { canonicalMarkerName: string }) => item.canonicalMarkerName), ['TSH']);
+  assert.equal(projectedB.body.biomarkers[0].referenceRange, null);
+  assert.equal(denied.response.status, 404);
+  assert.equal(denied.body.error, 'CLIENT_NOT_FOUND');
+});
+
+test('authorised assigned Senior Consultant receives the same canonical biomarker facts', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Senior Biomarker Client',
+    email: `senior-biomarker-client-${Date.now()}@example.com`
+  });
+  const senior = await createSeniorConsultantSession();
+  await assignClientToConsultant(client, senior);
+  const owner = { accountId: client.current.body.accountId, clientId: await getClientDatabaseId(client) };
+  const marker = await upsertBiomarker({
+    canonicalName: 'Ferritin', aliases: [], category: 'Micronutrient', standardUnit: 'µg/L'
+  });
+  await createBiomarkerObservation(owner, {
+    biomarkerId: marker.id, value: 48.25, unit: 'µg/L', testDate: '2026-09-02', confidence: 1,
+    validationStatus: 'validated', referenceRange: '>30'
+  });
+
+  const response = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(senior.token) }
+  );
+
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.access.requestRole, 'senior_consultant');
+  assert.equal(response.body.biomarkers.length, 1);
+  assert.equal(response.body.biomarkers[0].canonicalMarkerName, 'Ferritin');
+  assert.equal(response.body.biomarkers[0].value, 48.25);
+  assert.equal(response.body.biomarkers[0].unit, 'µg/L');
+  assert.equal(response.body.biomarkers[0].referenceRange, '>30');
+  assert.equal(response.body.biomarkers[0].testDate, '2026-09-02');
 });
 
 test('consultant workspace contract syncs wearable summaries and source metadata', async () => {
