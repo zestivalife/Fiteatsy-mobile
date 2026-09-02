@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.catalogue-import.json ./
 COPY scripts ./scripts
 COPY src ./src
 
