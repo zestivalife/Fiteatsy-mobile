@@ -45,6 +45,7 @@ import { buildRecommendationSets, calculateMealNutritionTotals, classifyMealMatc
 import { isDietaryPatternCompatible, listMealLibrarySlotsForTarget, listVerifiedFoodMasterRecords } from './nutrition.library.store.js';
 import { getFoodPreferenceProfile, type FoodPreferenceProfile } from './food-preferences.service.js';
 import { OptionalGuidanceContractError, validateOptionalGuidanceV2 } from './optional-guidance-contract.js';
+import { CALORIE_MACRO_ALLOCATION_CONFIG, CALORIE_MACRO_ALLOCATION_METHODOLOGY_VERSION, optimiseMealOptionPortion, validateAllocatedDiet } from './calorie-macro-allocation.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
@@ -173,6 +174,8 @@ export const assertDietPlanReviewContentComplete = (content: unknown) => {
       identities.add(identity);
     });
   }
+
+  if (mealPlan) failures.push(...validateAllocatedDiet(content as NutritionPlanContent).failures);
 
   if (failures.length > 0) {
     throw new NutritionPlanWorkflowError(
@@ -581,6 +584,8 @@ export const buildNutritionIntelligence = (input: {
     mealTargets: deriveMealTargets({
       caloriesTarget: input.caloriesTarget,
       proteinTargetGrams: input.proteinTargetGrams,
+      carbohydrateTargetGrams: input.carbohydrateTargetGrams,
+      fatTargetGrams: input.fatTargetGrams,
     }),
   };
 };
@@ -1290,11 +1295,17 @@ const buildDraftContent = (input: {
   intelligence: NutritionIntelligence;
   calorieTarget: number | null;
   proteinTargetGrams: number | null;
+  carbohydrateTargetGrams: number | null;
+  fatTargetGrams: number | null;
+  fibreTargetGrams: number | null;
   hydrationTargetLiters: number | null;
 }) => {
   const mealTargets = deriveMealTargets({
     caloriesTarget: input.calorieTarget,
     proteinTargetGrams: input.proteinTargetGrams,
+    carbohydrateTargetGrams: input.carbohydrateTargetGrams,
+    fatTargetGrams: input.fatTargetGrams,
+    fibreTargetGrams: input.fibreTargetGrams,
   });
 
   return {
@@ -1314,11 +1325,23 @@ const buildDraftContent = (input: {
     dailyTargets: {
       calories: input.calorieTarget,
       protein: input.proteinTargetGrams,
-      carbohydrates: input.calorieTarget == null ? null : Math.round((input.calorieTarget * .45) / 4),
-      fat: input.calorieTarget == null ? null : Math.round((input.calorieTarget * .3) / 9),
-      fibre: input.calorieTarget == null ? null : Math.max(25, Math.round((input.calorieTarget / 1000) * 14)),
+      carbohydrates: input.carbohydrateTargetGrams,
+      fat: input.fatTargetGrams,
+      fibre: input.fibreTargetGrams,
       hydration: input.hydrationTargetLiters,
       movement: '20-30 min walk or consultant-approved movement block',
+    },
+    allocationSnapshot: {
+      methodologyVersion: CALORIE_MACRO_ALLOCATION_METHODOLOGY_VERSION,
+      generatedAtISO: new Date().toISOString(),
+      targetSources: {
+        calories: 'nutrition_engine_calculation',
+        protein: input.proteinTargetGrams == null ? null : 'nutrition_engine_calculation',
+        carbohydrates: input.carbohydrateTargetGrams == null ? null : 'nutrition_engine_calculation',
+        fat: input.fatTargetGrams == null ? null : 'nutrition_engine_calculation',
+        fibre: input.fibreTargetGrams == null ? null : 'nutrition_engine_calculation',
+      },
+      tolerances: CALORIE_MACRO_ALLOCATION_CONFIG.tolerance,
     },
     mealPlan: {
       earlyMorning: mealSection('earlyMorning', '6:00-7:30 AM', 'Gentle metabolic wake-up', mealTargets.earlyMorning),
@@ -1385,8 +1408,7 @@ export const selectDiverseMealOptions = (
   });
   const freshFamilies = familyRepresentatives.filter((option) => !usedIdentities.has(mealOptionDiversityIdentity(option)));
   const reusedFamilies = familyRepresentatives.filter((option) => usedIdentities.has(mealOptionDiversityIdentity(option)));
-  const repeatedPortions = uniqueCandidates.filter((option) => !familyRepresentatives.includes(option));
-  const selected = [...freshFamilies, ...reusedFamilies, ...repeatedPortions].slice(0, limit);
+  const selected = [...freshFamilies, ...reusedFamilies].slice(0, limit);
   selected.forEach((option) => usedIdentities.add(mealOptionDiversityIdentity(option)));
   return selected.map((option, index) => ({ ...option, slot: index + 1 }));
 };
@@ -1412,7 +1434,7 @@ const enrichMealPlanWithLibraryMatches = async (input: {
   const nextMealPlanEntries = [] as Array<readonly [typeof NUTRITION_MEAL_SEQUENCE[number], NutritionPlanContent['mealPlan'][typeof NUTRITION_MEAL_SEQUENCE[number]]]>;
   for (const mealKey of NUTRITION_MEAL_SEQUENCE) {
       const section = input.content.mealPlan[mealKey];
-      const verifiedMatches = dedupeMealOptions((await Promise.all(
+      const rawVerifiedMatches = dedupeMealOptions((await Promise.all(
         COMPATIBLE_MEAL_LIBRARY_KEYS[mealKey].map((compatibleMealKey) => listMealLibrarySlotsForTarget({
           mealKey: compatibleMealKey,
           target: section.target,
@@ -1434,6 +1456,10 @@ const enrichMealPlanWithLibraryMatches = async (input: {
           limit: AVAILABLE_LIBRARY_CANDIDATE_LIMIT,
         })),
       )).flat());
+      const distinctCandidates = selectDiverseMealOptions(rawVerifiedMatches, new Set<string>(), AVAILABLE_LIBRARY_CANDIDATE_LIMIT);
+      const verifiedMatches = distinctCandidates
+        .map((option) => section.target == null ? null : optimiseMealOptionPortion(option, section.target))
+        .filter((option): option is NutritionMealSlot => option != null);
       const selectedMatches = selectDiverseMealOptions(verifiedMatches, usedIdentities);
       nextMealPlanEntries.push([
         mealKey,
@@ -1507,6 +1533,9 @@ const buildSourceSnapshot = (input: {
   healthProfile: Record<string, unknown>;
   calorieTarget: number | null;
   proteinTargetGrams: number | null;
+  carbohydrateTargetGrams?: number | null;
+  fatTargetGrams?: number | null;
+  fibreTargetGrams?: number | null;
   hydrationTargetLiters: number | null;
   wellnessScores: NutritionPlanSourceSnapshot['wellnessScores'];
   stressAssessment: NutritionPlanSourceSnapshot['stressAssessment'];
@@ -1533,6 +1562,10 @@ const buildSourceSnapshot = (input: {
   foodPreferences: input.foodPreferences,
   calorieTarget: input.calorieTarget,
   proteinTargetGrams: input.proteinTargetGrams,
+  carbohydrateTargetGrams: input.carbohydrateTargetGrams ?? null,
+  fatTargetGrams: input.fatTargetGrams ?? null,
+  fibreTargetGrams: input.fibreTargetGrams ?? null,
+  allocationMethodologyVersion: CALORIE_MACRO_ALLOCATION_METHODOLOGY_VERSION,
   hydrationTargetLiters: input.hydrationTargetLiters,
   wellnessScores: input.wellnessScores,
   stressAssessment: input.stressAssessment,
@@ -1883,6 +1916,9 @@ export const generateConsultantDietPlanDraft = async (
     intelligence: intelligencePayload.intelligence,
     calorieTarget: macroTargets?.caloriesKcal ?? null,
     proteinTargetGrams: macroTargets?.proteinGrams ?? null,
+    carbohydrateTargetGrams: macroTargets?.carbohydrateGrams ?? null,
+    fatTargetGrams: macroTargets?.fatGrams ?? null,
+    fibreTargetGrams: null,
     hydrationTargetLiters,
   });
   const content = enrichRecommendationSets(await enrichMealPlanWithLibraryMatches({
@@ -1913,6 +1949,9 @@ export const generateConsultantDietPlanDraft = async (
     },
     calorieTarget: macroTargets?.caloriesKcal ?? null,
     proteinTargetGrams: macroTargets?.proteinGrams ?? null,
+    carbohydrateTargetGrams: macroTargets?.carbohydrateGrams ?? null,
+    fatTargetGrams: macroTargets?.fatGrams ?? null,
+    fibreTargetGrams: null,
     hydrationTargetLiters,
     wellnessScores,
     stressAssessment,
@@ -2356,25 +2395,7 @@ export const approveConsultantDietPlan = async (
   assertDietPlanReviewContentComplete(currentVersion.content);
   const guidance = await assertOptionalGuidanceValid(publicClientId, currentVersion.content);
   assertLifecycleTransition(currentVersion.lifecycleStatus, 'approved');
-  const sourceSnapshot = buildSourceSnapshot({
-    bmi: workspace.metrics.bmi.status === 'AVAILABLE' ? workspace.metrics.bmi.value : null,
-    weightKg: workspace.context.calculationInput.weightKg,
-    biomarkers: workspace.biomarkers,
-    healthProfile: workspace.healthProfile ?? {},
-    calorieTarget: workspace.macroTargets?.caloriesKcal ?? null,
-    proteinTargetGrams: workspace.macroTargets?.proteinGrams ?? null,
-    hydrationTargetLiters: workspace.hydrationTargetLiters,
-    wellnessScores: {
-      nourishment: workspace.scoreByType.get('nourishment') ?? workspace.scoreByType.get('nutrition') ?? null,
-      energyBalance: workspace.scoreByType.get('energy_balance') ?? workspace.scoreByType.get('sleep') ?? null,
-      bodySupport: workspace.scoreByType.get('body_support') ?? workspace.scoreByType.get('clinical') ?? null,
-      recovery: workspace.scoreByType.get('recovery') ?? null,
-      activePerformance: workspace.scoreByType.get('active_performance') ?? workspace.scoreByType.get('activity') ?? null,
-      physicalWellnessIndex: workspace.scoreByType.get('physical_wellness_index') ?? workspace.scoreByType.get('overall') ?? null,
-      stressResilience: workspace.scoreByType.get('stress_resilience') ?? workspace.scoreByType.get('calm') ?? null,
-    },
-    stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
-  });
+  const sourceSnapshot = currentVersion.sourceSnapshot;
   const reviewedAtISO = new Date().toISOString();
   const reviewedGuidance: OptionalNutritionGuidance | undefined = guidance ? {
     ...guidance,
@@ -2439,25 +2460,7 @@ export const publishConsultantDietPlan = async (
   if (publishAction === 'already_published') {
     return { plan, version: approvedVersion };
   }
-  const sourceSnapshot = buildSourceSnapshot({
-    bmi: workspace.metrics.bmi.status === 'AVAILABLE' ? workspace.metrics.bmi.value : null,
-    weightKg: workspace.context.calculationInput.weightKg,
-    biomarkers: workspace.biomarkers,
-    healthProfile: workspace.healthProfile ?? {},
-    calorieTarget: workspace.macroTargets?.caloriesKcal ?? null,
-    proteinTargetGrams: workspace.macroTargets?.proteinGrams ?? null,
-    hydrationTargetLiters: workspace.hydrationTargetLiters,
-    wellnessScores: {
-      nourishment: workspace.scoreByType.get('nourishment') ?? workspace.scoreByType.get('nutrition') ?? null,
-      energyBalance: workspace.scoreByType.get('energy_balance') ?? workspace.scoreByType.get('sleep') ?? null,
-      bodySupport: workspace.scoreByType.get('body_support') ?? workspace.scoreByType.get('clinical') ?? null,
-      recovery: workspace.scoreByType.get('recovery') ?? null,
-      activePerformance: workspace.scoreByType.get('active_performance') ?? workspace.scoreByType.get('activity') ?? null,
-      physicalWellnessIndex: workspace.scoreByType.get('physical_wellness_index') ?? workspace.scoreByType.get('overall') ?? null,
-      stressResilience: workspace.scoreByType.get('stress_resilience') ?? workspace.scoreByType.get('calm') ?? null,
-    },
-    stressAssessment: (workspace.latestStressAssessment?.payload?.result ?? null) as NutritionPlanSourceSnapshot['stressAssessment'],
-  });
+  const sourceSnapshot = approvedVersion.sourceSnapshot;
   const result = await publishApprovedDietPlanVersion({
     dietPlanId: plan.id,
     versionId: approvedVersion.id,

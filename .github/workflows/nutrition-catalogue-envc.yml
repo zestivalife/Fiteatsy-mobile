@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - codex/usda-nutrition-catalogue-v1
+      - codex/calorie-macro-allocation-v1
 
 permissions:
   contents: read
@@ -96,6 +97,7 @@ jobs:
           ../tests/backend/nutrition-final-data-contract.test.ts
           ../tests/backend/nutrition-food-preference-contract.test.ts
           ../tests/backend/nutrition-meal-engine.test.ts
+          ../tests/backend/calorie-macro-allocation.test.ts
           ../tests/backend/diet-plan-version-store-contract.test.ts
           ../tests/backend/published-nutrition-plan-contract.test.ts
 

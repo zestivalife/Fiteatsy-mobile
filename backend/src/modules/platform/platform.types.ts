@@ -265,6 +265,9 @@ export type NutritionMealSlot = {
 export type NutritionMealTarget = {
   calories: number | null;
   proteinGrams: number | null;
+  carbsGrams?: number | null;
+  fatGrams?: number | null;
+  fibreGrams?: number | null;
   caloriesBand: {
     min: number | null;
     max: number | null;
@@ -273,6 +276,10 @@ export type NutritionMealTarget = {
     min: number | null;
     max: number | null;
   };
+  carbsBand?: { min: number | null; max: number | null };
+  fatBand?: { min: number | null; max: number | null };
+  fibreBand?: { min: number | null; max: number | null };
+  methodologyVersion?: string;
   allocationBasis: string;
 };
 
@@ -405,6 +412,25 @@ export type NutritionPlanContent = {
     hydration: number | null;
     movement: string;
   };
+  allocationSnapshot?: {
+    methodologyVersion: string;
+    generatedAtISO: string;
+    targetSources: {
+      calories: string;
+      protein: string | null;
+      carbohydrates: string | null;
+      fat: string | null;
+      fibre: string | null;
+    };
+    tolerances: {
+      mealCaloriesFraction: number;
+      dailyCaloriesFraction: number;
+      proteinFraction: number | null;
+      carbohydratesFraction: number | null;
+      fatFraction: number | null;
+      fibreFraction: number | null;
+    };
+  };
   mealPlan: {
     earlyMorning: NutritionMealSection;
     breakfast: NutritionMealSection;
@@ -446,6 +472,10 @@ export type NutritionPlanSourceSnapshot = {
   };
   calorieTarget: number | null;
   proteinTargetGrams: number | null;
+  carbohydrateTargetGrams?: number | null;
+  fatTargetGrams?: number | null;
+  fibreTargetGrams?: number | null;
+  allocationMethodologyVersion?: string;
   hydrationTargetLiters: number | null;
   wellnessScores?: {
     nourishment: number | null;

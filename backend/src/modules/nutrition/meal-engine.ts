@@ -4,6 +4,7 @@ import type {
   NutritionMealSlot,
   NutritionMealTarget,
 } from '../platform/platform.types.js';
+import { deriveVersionedMealTargets } from './calorie-macro-allocation.js';
 
 export type NutritionVector = {
   calories: number | null;
@@ -145,49 +146,19 @@ export const calculateMealNutritionTotals = (components: NutritionMealComponent[
   fibreGrams: round(sumNullable(components.map((component) => component.fibreGrams)), 1),
 });
 
-const band = (value: number | null, toleranceFraction: number) => {
-  if (value == null || !Number.isFinite(value)) {
-    return { min: null, max: null };
-  }
-  return {
-    min: round(value * (1 - toleranceFraction), 0),
-    max: round(value * (1 + toleranceFraction), 0),
-  };
-};
-
 export const deriveMealTargets = (input: {
   caloriesTarget: number | null;
   proteinTargetGrams: number | null;
-}): Record<string, NutritionMealTarget> => {
-  const calories = input.caloriesTarget ?? null;
-  const protein = input.proteinTargetGrams ?? null;
-  const allocation = {
-    earlyMorning: 0.08,
-    breakfast: 0.22,
-    midMorningSnack: 0.1,
-    lunch: 0.26,
-    eveningSnack: 0.1,
-    dinner: 0.18,
-    bedtimeNutrition: 0.06,
-  } as const;
-
-  return Object.fromEntries(
-    Object.entries(allocation).map(([mealKey, fraction]) => {
-      const calorieTarget = calories == null ? null : Math.round(calories * fraction);
-      const proteinTarget = protein == null ? null : Math.round(protein * fraction);
-      return [
-        mealKey,
-        {
-          calories: calorieTarget,
-          proteinGrams: proteinTarget,
-          caloriesBand: band(calorieTarget, 0.1),
-          proteinBand: band(proteinTarget, 0.15),
-          allocationBasis: 'Derived from approved daily energy and protein targets using the current Fiteatsy planning split.',
-        } satisfies NutritionMealTarget,
-      ];
-    }),
-  );
-};
+  carbohydrateTargetGrams?: number | null;
+  fatTargetGrams?: number | null;
+  fibreTargetGrams?: number | null;
+}): Record<string, NutritionMealTarget> => deriveVersionedMealTargets({
+  calories: input.caloriesTarget,
+  proteinGrams: input.proteinTargetGrams,
+  carbsGrams: input.carbohydrateTargetGrams,
+  fatGrams: input.fatTargetGrams,
+  fibreGrams: input.fibreTargetGrams,
+});
 
 const scoreVariance = (target: number | null, actual: number | null) => {
   if (target == null || actual == null || target <= 0) return Number.POSITIVE_INFINITY;
@@ -195,10 +166,15 @@ const scoreVariance = (target: number | null, actual: number | null) => {
 };
 
 export const classifyMealMatch = (target: NutritionMealTarget | undefined, totals: NutritionVector) => {
-  if (!target || target.calories == null || target.proteinGrams == null) return 'outside_target' as const;
+  if (!target || target.calories == null || totals.calories == null) return 'outside_target' as const;
   const calorieVariance = scoreVariance(target.calories, totals.calories);
-  const proteinVariance = scoreVariance(target.proteinGrams, totals.proteinGrams);
-  const composite = (calorieVariance + proteinVariance) / 2;
+  const configuredVariances = [
+    calorieVariance,
+    target.proteinGrams == null ? null : scoreVariance(target.proteinGrams, totals.proteinGrams),
+    target.carbsGrams == null ? null : scoreVariance(target.carbsGrams, totals.carbsGrams ?? null),
+    target.fatGrams == null ? null : scoreVariance(target.fatGrams, totals.fatGrams ?? null),
+  ].filter((value): value is number => value != null);
+  const composite = configuredVariances.reduce((sum, value) => sum + value, 0) / configuredVariances.length;
   if (composite <= 0.05) return 'best_match' as const;
   if (composite <= 0.12) return 'good_match' as const;
   if (composite <= 0.2) return 'acceptable' as const;
