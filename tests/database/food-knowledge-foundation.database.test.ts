@@ -110,6 +110,15 @@ databaseTest('database constraints reject duplicate identity, orphan relationshi
 });
 
 databaseTest('successor releases retain identity while collision, content drift and provenance drift fail closed', async () => {
+  const releaseOnly = clone();
+  releaseOnly.releaseVersion = 'FITEATSY-FOOD-KNOWLEDGE-v1-release-only';
+  releaseOnly.predecessorVersion = FOOD_KNOWLEDGE_FIXTURE_MANIFEST.releaseVersion;
+  const beforeReleaseOnly = await pool.query('select count(*)::int as count from food_knowledge_versions');
+  const releaseOnlyImport = await importFoodKnowledgeRelease(releaseOnly);
+  const afterReleaseOnly = await pool.query('select count(*)::int as count from food_knowledge_versions');
+  assert.ok(releaseOnlyImport.writes > 0);
+  assert.deepEqual(afterReleaseOnly.rows, beforeReleaseOnly.rows, 'release-only successors retain immutable versions');
+
   const successor = clone();
   successor.releaseVersion = 'FITEATSY-FOOD-KNOWLEDGE-v1.1-fixture';
   successor.predecessorVersion = FOOD_KNOWLEDGE_FIXTURE_MANIFEST.releaseVersion;
@@ -117,6 +126,9 @@ databaseTest('successor releases retain identity while collision, content drift 
   bhindi.version.id = '91000000-0000-4000-8000-000000000001';
   bhindi.version.number = 2;
   bhindi.version.nutrients.energy_kcal = 97;
+  bhindi.version.servings.forEach((serving, index) => { serving.id = `91000000-0000-4000-8100-${String(index + 1).padStart(12, '0')}`; });
+  bhindi.version.components.forEach((component, index) => { component.id = `91000000-0000-4000-8200-${String(index + 1).padStart(12, '0')}`; });
+  bhindi.version.compatibilities.forEach((compatibility, index) => { compatibility.id = `91000000-0000-4000-8300-${String(index + 1).padStart(12, '0')}`; });
   const imported = await importFoodKnowledgeRelease(successor);
   assert.ok(imported.writes > 0);
   const versions = await pool.query('select food_id, version_number from food_knowledge_versions where food_id=$1 order by version_number', [bhindi.id]);
