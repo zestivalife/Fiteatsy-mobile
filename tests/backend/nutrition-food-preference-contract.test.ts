@@ -119,6 +119,20 @@ test('candidate selection rotates exact options across meal heads before reusing
   );
 });
 
+test('candidate selection prefers distinct recipe families before portion variants', () => {
+  const used = new Set<string>();
+  const candidates = [
+    slot('Yoghurt chaat — light portion', ['vegetarian'], 'food-yoghurt'),
+    slot('Yoghurt chaat — standard portion', ['vegetarian'], 'food-yoghurt'),
+    slot('Vegetable poha — standard portion', ['vegetarian'], 'food-poha'),
+  ];
+
+  assert.deepEqual(
+    selectDiverseMealOptions(candidates, used, 2).map((option) => option.meal),
+    ['Yoghurt chaat — light portion', 'Vegetable poha — standard portion'],
+  );
+});
+
 test('an empty verified catalogue result stays empty instead of fabricating a fallback', () => {
   assert.deepEqual(selectDiverseMealOptions([], new Set<string>()), []);
 });

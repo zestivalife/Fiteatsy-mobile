@@ -50,6 +50,15 @@ const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
 const AVAILABLE_LIBRARY_MATCH_LIMIT = 5;
 const AVAILABLE_LIBRARY_CANDIDATE_LIMIT = 18;
+const COMPATIBLE_MEAL_LIBRARY_KEYS: Record<typeof NUTRITION_MEAL_SEQUENCE[number], typeof NUTRITION_MEAL_SEQUENCE[number][]> = {
+  earlyMorning: ['earlyMorning', 'midMorningSnack', 'eveningSnack', 'bedtimeNutrition'],
+  breakfast: ['breakfast'],
+  midMorningSnack: ['midMorningSnack', 'earlyMorning', 'eveningSnack', 'bedtimeNutrition'],
+  lunch: ['lunch', 'dinner'],
+  eveningSnack: ['eveningSnack', 'midMorningSnack', 'earlyMorning', 'bedtimeNutrition'],
+  dinner: ['dinner', 'lunch'],
+  bedtimeNutrition: ['bedtimeNutrition', 'eveningSnack', 'midMorningSnack', 'earlyMorning'],
+};
 const OPTIONAL_GUIDANCE_WHAT_DISPLAY_LIMIT = 12;
 const OPTIONAL_GUIDANCE_CUISINE_DISPLAY_LIMIT = 5;
 const OPTIONAL_GUIDANCE_CRAVING_DISPLAY_LIMIT = 3;
@@ -1367,9 +1376,15 @@ export const selectDiverseMealOptions = (
   limit = AVAILABLE_LIBRARY_MATCH_LIMIT,
 ) => {
   const uniqueCandidates = dedupeMealOptions(candidates);
-  const fresh = uniqueCandidates.filter((option) => !usedIdentities.has(mealOptionDiversityIdentity(option)));
-  const repeated = uniqueCandidates.filter((option) => usedIdentities.has(mealOptionDiversityIdentity(option)));
-  const selected = [...fresh, ...repeated].slice(0, limit);
+  const seenInMeal = new Set<string>();
+  const distinctFamilies = uniqueCandidates.filter((option) => {
+    const identity = mealOptionDiversityIdentity(option);
+    if (usedIdentities.has(identity) || seenInMeal.has(identity)) return false;
+    seenInMeal.add(identity);
+    return true;
+  });
+  const repeatedFamilies = uniqueCandidates.filter((option) => !distinctFamilies.includes(option));
+  const selected = [...distinctFamilies, ...repeatedFamilies].slice(0, limit);
   selected.forEach((option) => usedIdentities.add(mealOptionDiversityIdentity(option)));
   return selected.map((option, index) => ({ ...option, slot: index + 1 }));
 };
@@ -1395,26 +1410,28 @@ const enrichMealPlanWithLibraryMatches = async (input: {
   const nextMealPlanEntries = [] as Array<readonly [typeof NUTRITION_MEAL_SEQUENCE[number], NutritionPlanContent['mealPlan'][typeof NUTRITION_MEAL_SEQUENCE[number]]]>;
   for (const mealKey of NUTRITION_MEAL_SEQUENCE) {
       const section = input.content.mealPlan[mealKey];
-      const verifiedMatches = await listMealLibrarySlotsForTarget({
-        mealKey,
-        target: section.target,
-        consultantId: input.consultantId,
-        dietPreference: input.dietPreference,
-        allergyTags: input.allergies,
-        avoidedFoods: input.avoidedFoods,
-        avoidedFoodIds: input.avoidedFoodIds,
-        likedFoodIds: input.likedFoodIds,
-        likedFoods: input.likedFoods,
-        dislikedFoods: input.dislikedFoods,
-        dislikedFoodIds: input.dislikedFoodIds,
-        preferredCuisines: input.preferredCuisines,
-        preferredProteins: input.preferredProteins,
-        staplePreference: input.staplePreference,
-        dairyPreference: input.dairyPreference,
-        practicality: input.practicality,
-        includeOutsideTarget: true,
-        limit: AVAILABLE_LIBRARY_CANDIDATE_LIMIT,
-      });
+      const verifiedMatches = dedupeMealOptions((await Promise.all(
+        COMPATIBLE_MEAL_LIBRARY_KEYS[mealKey].map((compatibleMealKey) => listMealLibrarySlotsForTarget({
+          mealKey: compatibleMealKey,
+          target: section.target,
+          consultantId: input.consultantId,
+          dietPreference: input.dietPreference,
+          allergyTags: input.allergies,
+          avoidedFoods: input.avoidedFoods,
+          avoidedFoodIds: input.avoidedFoodIds,
+          likedFoodIds: input.likedFoodIds,
+          likedFoods: input.likedFoods,
+          dislikedFoods: input.dislikedFoods,
+          dislikedFoodIds: input.dislikedFoodIds,
+          preferredCuisines: input.preferredCuisines,
+          preferredProteins: input.preferredProteins,
+          staplePreference: input.staplePreference,
+          dairyPreference: input.dairyPreference,
+          practicality: input.practicality,
+          includeOutsideTarget: true,
+          limit: AVAILABLE_LIBRARY_CANDIDATE_LIMIT,
+        })),
+      )).flat());
       nextMealPlanEntries.push([
         mealKey,
         {
