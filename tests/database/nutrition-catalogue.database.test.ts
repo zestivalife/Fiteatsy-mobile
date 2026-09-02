@@ -54,7 +54,7 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
           and verification_status = 'verified'`,
       [NUTRITION_CATALOGUE_VERSION]
     );
-    assert.deepEqual(recipes.rows[0], { count: '55', distinct_count: '55' });
+    assert.deepEqual(recipes.rows[0], { count: '64', distinct_count: '64' });
 
     const variants = await pool.query<{ count: string; meal_keys: string[] }>(
       `select count(*)::text as count,
