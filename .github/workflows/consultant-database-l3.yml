@@ -62,6 +62,10 @@ jobs:
           ../tests/backend/nutrition-architecture-freeze.test.ts
           ../tests/backend/simple-consultant-approval-workflow.test.ts
 
+      - name: Run Diet Lifecycle Quality v1 database acceptance
+        working-directory: backend
+        run: node --import tsx --test --test-concurrency=1 ../tests/database/diet-lifecycle-quality.database.test.ts
+
       - name: Run Consultant database lifecycle contracts
         working-directory: backend
         shell: bash

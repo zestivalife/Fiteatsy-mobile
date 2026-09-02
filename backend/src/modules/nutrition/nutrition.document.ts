@@ -208,3 +208,10 @@ export const generateDietPlanDocument = async (plan: DietPlanRecord, version: Di
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   };
 };
+
+export const readGeneratedDietPlanDocumentXml = async (documentPath: string) => {
+  const zip = await JSZip.loadAsync(await fs.readFile(documentPath));
+  const document = zip.file('word/document.xml');
+  if (!document) throw new Error('Generated Diet DOCX is missing word/document.xml.');
+  return document.async('string');
+};

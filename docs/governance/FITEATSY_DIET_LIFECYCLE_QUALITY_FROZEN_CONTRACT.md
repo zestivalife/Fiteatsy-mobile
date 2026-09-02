@@ -21,4 +21,4 @@ Status: SOURCE CANDIDATE — production activation not yet authorised.
 
 ## Anti-reversion gate
 
-CI must cover raw-ingredient exclusion, canonical serving and required nutrition, exact 7 × 5 completeness, duplicate rejection, lifecycle identity continuity, and DOCX content parity. Production functional freeze requires a separately authorised deployment and real-client acceptance.
+CI must cover raw-ingredient exclusion, canonical serving and required nutrition, exact 7 × 5 completeness, duplicate rejection, lifecycle identity continuity, and DOCX content parity. The permanent PostgreSQL-backed gate is `tests/database/diet-lifecycle-quality.database.test.ts` in the existing `Consultant Database L3` workflow. Production functional freeze requires a separately authorised deployment and real-client acceptance.
