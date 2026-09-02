@@ -21,7 +21,15 @@ const readManifest = async (name: string) => JSON.parse(await readFile(new URL(`
 
 databaseTest('FITEATSY-CATALOGUE-SUCCESSOR-IMPORT-POLICY-v1', async () => {
   await resetBackendStateForTests();
-  await pool.query('truncate table nutrition_catalogue_releases cascade');
+  await pool.query(`truncate table
+    nutrition_meal_variant_components,
+    nutrition_meal_variants,
+    nutrition_recipe_components,
+    nutrition_recipes,
+    nutrition_food_portions,
+    nutrition_foods,
+    nutrition_catalogue_releases
+    cascade`);
   const v1 = await readManifest('fiteatsy-nutrition-catalogue-v1.json');
   const v11 = await readManifest('fiteatsy-nutrition-catalogue-v1.1.json');
 
