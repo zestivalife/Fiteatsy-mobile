@@ -117,16 +117,16 @@ const dedupeMealOptions = (options: NutritionMealSection['options'] | undefined)
 };
 
 const canonicalReviewOptionIdentity = (option: NutritionMealSlot) => {
+  if (option.id?.trim()) return `option:${option.id.trim().toLowerCase()}`;
   const foodIds = unique((option.components ?? []).map((component) => component.foodId)).sort();
   if (foodIds.length > 0) return `foods:${foodIds.join('+')}`;
-  if (option.id?.trim()) return `option:${option.id.trim().toLowerCase()}`;
   return `meal:${lower(option.meal)}::${lower(option.portion)}`;
 };
 
 /**
  * A submitted review must be a complete, immutable clinical review unit.
  * Candidate availability may truthfully contain fewer than five items, but the
- * persisted Consultant selection must contain at least one valid option for
+ * persisted Consultant selection must contain exactly five valid options for
  * every canonical meal head.
  */
 export const assertDietPlanReviewContentComplete = (content: unknown) => {
@@ -140,12 +140,8 @@ export const assertDietPlanReviewContentComplete = (content: unknown) => {
       ? (mealPlan as Partial<NutritionPlanContent['mealPlan']>)[mealKey]
       : null;
     const options = Array.isArray(section?.options) ? section.options : [];
-    if (options.length === 0) {
-      failures.push(`${mealKey}: select at least one saved option`);
-      continue;
-    }
-    if (options.length > MAX_MEAL_OPTIONS_PER_SECTION) {
-      failures.push(`${mealKey}: maximum ${MAX_MEAL_OPTIONS_PER_SECTION} saved options`);
+    if (options.length !== MAX_MEAL_OPTIONS_PER_SECTION) {
+      failures.push(`${mealKey}: exactly ${MAX_MEAL_OPTIONS_PER_SECTION} saved options required (received ${options.length})`);
     }
 
     const identities = new Set<string>();
@@ -154,8 +150,14 @@ export const assertDietPlanReviewContentComplete = (content: unknown) => {
         failures.push(`${mealKey}: option ${index + 1} needs a meal and portion`);
         return;
       }
-      if (option.sourceType === 'generated_template') {
-        failures.push(`${mealKey}: option ${index + 1} is not a persisted verified or Consultant-authored option`);
+      if (!option.id?.trim() || option.id.startsWith('food:') || !['verified_library', 'template_variant', 'consultant_custom'].includes(option.sourceType ?? '')) {
+        failures.push(`${mealKey}: option ${index + 1} is not a client-consumable recipe or meal variant`);
+      }
+      if (option.portion === 'Consultant-defined portion') {
+        failures.push(`${mealKey}: option ${index + 1} lacks canonical serving metadata`);
+      }
+      if (![option.approxKcal, option.proteinGrams].every((value) => typeof value === 'number' && Number.isFinite(value))) {
+        failures.push(`${mealKey}: option ${index + 1} needs calories and protein`);
       }
       const identity = canonicalReviewOptionIdentity(option);
       if (identities.has(identity)) failures.push(`${mealKey}: duplicate option ${index + 1}`);
@@ -279,7 +281,7 @@ export const sanitizePublishedNutritionPlanContent = (content: NutritionPlanCont
 const getLatestDownloadableDietPlanVersion = async (plan: Awaited<ReturnType<typeof getDietPlanById>>) => {
   if (!plan) return null;
   const currentVersion = plan.currentVersionId ? await getCurrentDietPlanVersion(plan.id) : null;
-  if (currentVersion && currentVersion.lifecycleStatus !== 'archived') {
+  if (currentVersion && ['approved', 'published'].includes(currentVersion.lifecycleStatus)) {
     return currentVersion;
   }
   if (plan.latestPublishedVersionId) {
@@ -1942,6 +1944,7 @@ export const updateConsultantDietPlanDraft = async (
     );
   }
   const foodPreferences = await getFoodPreferenceProfile(publicClientId);
+  assertDietPlanReviewContentComplete(input.content);
   assertDietPlanRespectsFoodPreferences(input.content, foodPreferences?.profile ?? null, workspace.healthProfile ?? null);
   const sourceSnapshot = buildSourceSnapshot({
     bmi: workspace.metrics.bmi.status === 'AVAILABLE' ? workspace.metrics.bmi.value : null,
@@ -2470,6 +2473,7 @@ export const exportConsultantDietPlanDocument = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
   const version = await getLatestDownloadableDietPlanVersion(plan);
   if (!version) return null;
+  assertDietPlanReviewContentComplete(version.content);
 
   const exported = await generateDietPlanDocument(plan, version);
   const updatedVersion = await updateDietPlanVersionExportPaths({

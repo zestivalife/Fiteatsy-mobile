@@ -516,57 +516,14 @@ export const listMealLibrarySlotsForTarget = async (input: {
         fibreGrams: slot.fibreGrams ?? totals.fibreGrams,
       } satisfies NutritionMealSlot;
     })
+    .filter((slot) => {
+      const hasCanonicalServing = Boolean(slot.portion?.trim()) && slot.portion !== 'Consultant-defined portion';
+      const hasRequiredNutrition = [slot.approxKcal, slot.proteinGrams]
+        .every((value) => typeof value === 'number' && Number.isFinite(value));
+      return hasCanonicalServing && hasRequiredNutrition;
+    })
     .filter((slot) => input.includeOutsideTarget || slot.matchClassification !== 'outside_target' || variants.length <= 3);
 
   const limit = input.limit ?? 6;
-  if (variantSlots.length >= limit) return variantSlots.slice(0, limit);
-
-  // A verified food master record is itself a valid single-food guidance option.
-  // This keeps catalogue truth available even when a deployment has not yet
-  // assembled that food into a multi-component meal variant.
-  const blockedAllergens = (input.allergyTags ?? []).map(normalizeText).filter(Boolean);
-  const avoidedFoods = (input.avoidedFoods ?? []).map(normalizeText).filter(Boolean);
-  const avoidedIds = new Set(input.avoidedFoodIds ?? []);
-  const verifiedFoods = (await listVerifiedFoodMasterRecords()).filter((food) => {
-    if ([food.calories, food.proteinGrams, food.carbsGrams, food.fatGrams, food.fibreGrams].some((value) => value == null)) return false;
-    if (avoidedIds.has(food.id) || avoidedFoods.some((value) => containsTerm(normalizeText(food.displayName), value))) return false;
-    if (blockedAllergens.some((value) => (food.allergenTags ?? []).map(normalizeText).includes(value))) return false;
-    if (!isDietaryPatternCompatible(input.dietPreference, food.dietaryTags ?? [], food.displayName)) return false;
-    if (normalizeText(input.dairyPreference) === 'avoid' && containsAny(normalizeText(food.displayName), dairyTerms)) return false;
-    return true;
-  }).sort((left, right) => preferenceScore({ name: right.displayName, cuisineTags: right.cuisineTags ?? [], components: [{ foodId: right.id, componentName: right.displayName }] }, input) - preferenceScore({ name: left.displayName, cuisineTags: left.cuisineTags ?? [], components: [{ foodId: left.id, componentName: left.displayName }] }, input) || left.displayName.localeCompare(right.displayName));
-  const existingIds = new Set(variantSlots.flatMap((slot) => slot.components?.flatMap((component) => component.foodId ? [component.foodId] : []) ?? []));
-  const foodSlots = verifiedFoods.filter((food) => !existingIds.has(food.id)).map((food, index) => ({
-    id: `food:${food.id}`,
-    slot: variantSlots.length + index + 1,
-    meal: food.displayName,
-    portion: `${food.referenceQuantity} ${food.referenceUnit}`,
-    prepNote: 'Use the verified reference serving shown.',
-    approxKcal: food.calories,
-    proteinGrams: food.proteinGrams,
-    carbsGrams: food.carbsGrams,
-    fatGrams: food.fatGrams,
-    fibreGrams: food.fibreGrams,
-    sourceType: 'verified_library' as const,
-    recommendationReason: 'Verified food catalogue option matched to the client profile and selected context.',
-    cuisineTags: food.cuisineTags,
-    dietaryTags: food.dietaryTags,
-    components: [{
-      id: `food-component:${food.id}`,
-      foodId: food.id,
-      componentName: food.displayName,
-      quantity: food.referenceQuantity,
-      quantityUnit: food.referenceUnit,
-      householdLabel: `${food.referenceQuantity} ${food.referenceUnit}`,
-      canonicalGrams: food.referenceUnit.toLowerCase() === 'g' ? food.referenceQuantity : null,
-      calories: food.calories,
-      proteinGrams: food.proteinGrams,
-      carbsGrams: food.carbsGrams,
-      fatGrams: food.fatGrams,
-      fibreGrams: food.fibreGrams,
-      locked: true,
-    }],
-  } satisfies NutritionMealSlot));
-
-  return [...variantSlots, ...foodSlots].slice(0, limit);
+  return variantSlots.slice(0, limit);
 };

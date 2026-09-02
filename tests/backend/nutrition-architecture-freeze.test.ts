@@ -34,6 +34,24 @@ test('active catalogue enrichment uses verified matches and contains no fallback
   assert.doesNotMatch(body, /generated_template/);
 });
 
+test('meal-library selection never falls back to raw nutrition food records', () => {
+  const library = readFileSync(resolve(repositoryRoot, 'backend/src/modules/nutrition/nutrition.library.store.ts'), 'utf8');
+  const selection = library.slice(library.indexOf('export const listMealLibrarySlotsForTarget'));
+  assert.doesNotMatch(selection, /listVerifiedFoodMasterRecords\(\)/);
+  assert.doesNotMatch(selection, /id:\s*`food:/);
+  assert.match(selection, /hasCanonicalServing/);
+  assert.match(selection, /hasRequiredNutrition/);
+});
+
+test('DOCX export resolves only approved content and validates completeness before generation', () => {
+  const service = readFileSync(resolve(repositoryRoot, 'backend/src/modules/nutrition/nutrition.service.ts'), 'utf8');
+  const resolver = service.slice(service.indexOf('const getLatestDownloadableDietPlanVersion'), service.indexOf('const summarizeLifestyle'));
+  const exporter = service.slice(service.indexOf('export const exportConsultantDietPlanDocument'), service.indexOf('export const logNutritionMealConsumption'));
+  assert.match(resolver, /\['approved', 'published'\]/);
+  assert.match(exporter, /assertDietPlanReviewContentComplete\(version\.content\)/);
+  assert.match(exporter, /generateDietPlanDocument\(plan, version\)/);
+});
+
 test('review, approval and publish retain the canonical completeness gate', () => {
   for (const name of [
     'submitConsultantDietPlanForReview',

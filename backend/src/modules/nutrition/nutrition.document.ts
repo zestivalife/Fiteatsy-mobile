@@ -25,14 +25,13 @@ const take = (values: Array<string | null | undefined>, count: number, fallback 
 };
 
 const flattenMealOptions = (section: NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]) =>
-  Array.from({ length: 5 }, (_, index) => {
-    const option = section.options[index];
+  section.options.map((option) => {
     return {
-      meal: option?.meal || '',
-      portion: option?.portion || '',
-      prep: option?.prepNote || '',
-      kcal: option?.approxKcal != null ? `${option.approxKcal} kcal` : '',
-      protein: option?.proteinGrams != null ? `${option.proteinGrams} g` : '',
+      meal: option.meal,
+      portion: option.portion,
+      prep: option.prepNote || '',
+      kcal: `${option.approxKcal} kcal`,
+      protein: `${option.proteinGrams} g`,
     };
   });
 

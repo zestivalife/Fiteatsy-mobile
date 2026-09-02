@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - codex/consultant-platform-audit-20260901
+      - codex/diet-lifecycle-quality-v1
 
 permissions:
   contents: read
@@ -52,6 +53,14 @@ jobs:
 
       - name: Apply production migrations to ephemeral PostgreSQL
         run: npm --prefix backend run db:migrate
+
+      - name: Run Diet Lifecycle Quality v1 contracts
+        working-directory: backend
+        run: >-
+          node --import tsx --test --test-concurrency=1
+          ../tests/backend/nutrition-food-preference-contract.test.ts
+          ../tests/backend/nutrition-architecture-freeze.test.ts
+          ../tests/backend/simple-consultant-approval-workflow.test.ts
 
       - name: Run Consultant database lifecycle contracts
         working-directory: backend

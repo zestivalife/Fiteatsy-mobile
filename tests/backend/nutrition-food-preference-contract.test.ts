@@ -45,6 +45,7 @@ const slot = (meal: string, dietaryTags: string[] = [], foodId?: string): Nutrit
   prepNote: '',
   approxKcal: 200,
   proteinGrams: 10,
+  sourceType: 'verified_library',
   dietaryTags,
   components: foodId ? [{ foodId, componentName: meal, quantity: 1, unit: 'serving' }] : [],
 });
@@ -148,13 +149,17 @@ const completeReviewContent = (): NutritionPlanContent => {
     {
       window: `${index + 6}:00`,
       focus: mealKey,
-      options: [slot(`${mealKey} option`, ['vegetarian'], `food-${mealKey}`)],
+      options: Array.from({ length: 5 }, (_, optionIndex) => ({
+        ...slot(`${mealKey} option ${optionIndex + 1}`, ['vegetarian'], `component-${mealKey}-${optionIndex + 1}`),
+        id: `variant-${mealKey}-${optionIndex + 1}`,
+        slot: optionIndex + 1,
+      })),
     },
   ])) as NutritionPlanContent['mealPlan'];
   return { mealPlan } as NutritionPlanContent;
 };
 
-test('review content requires a saved option for every canonical meal head', () => {
+test('review content requires exactly five saved options for every canonical meal head', () => {
   const content = completeReviewContent();
   assert.doesNotThrow(() => assertDietPlanReviewContentComplete(content));
   content.mealPlan.lunch.options = [];
@@ -182,4 +187,27 @@ test('review content rejects template placeholders, duplicates and more than fiv
     slot: index + 1,
   }));
   assert.throws(() => assertDietPlanReviewContentComplete(overflowContent));
+});
+
+test('review content rejects raw foods, missing canonical servings and incomplete nutrition', () => {
+  const rawFood = completeReviewContent();
+  rawFood.mealPlan.lunch.options[0] = {
+    ...rawFood.mealPlan.lunch.options[0],
+    id: 'food:raw-ingredient',
+  };
+  assert.throws(() => assertDietPlanReviewContentComplete(rawFood), /client-consumable recipe or meal variant/);
+
+  const missingServing = completeReviewContent();
+  missingServing.mealPlan.breakfast.options[0] = {
+    ...missingServing.mealPlan.breakfast.options[0],
+    portion: 'Consultant-defined portion',
+  };
+  assert.throws(() => assertDietPlanReviewContentComplete(missingServing), /canonical serving metadata/);
+
+  const missingProtein = completeReviewContent();
+  missingProtein.mealPlan.dinner.options[0] = {
+    ...missingProtein.mealPlan.dinner.options[0],
+    proteinGrams: null,
+  };
+  assert.throws(() => assertDietPlanReviewContentComplete(missingProtein), /calories and protein/);
 });
