@@ -1,12 +1,17 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { assertDestructiveTestResetAllowed } from '../src/test-support/destructive-reset-guard.js';
 import type { NutritionCatalogueManifest, NullableNutrientMap } from '../src/modules/nutrition/catalogue/catalogue.types.js';
+import {
+  APPROVED_NUTRITION_CATALOGUE_SHA256,
+  APPROVED_NUTRITION_CATALOGUE_VERSION,
+  NUTRITION_CATALOGUE_TABLE_ALLOWLIST,
+  loadApprovedNutritionCatalogue,
+} from '../src/modules/nutrition/catalogue/catalogue.import-policy.js';
 
 const { Client } = pg;
-const defaultManifest = fileURLToPath(new URL('../src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.json', import.meta.url));
+const PRODUCTION_IMPORT_CONFIRMATION = `${APPROVED_NUTRITION_CATALOGUE_VERSION}:${APPROVED_NUTRITION_CATALOGUE_SHA256}`;
 const macro = (n: NullableNutrientMap, key: string) => n[key] ?? null;
 const micronutrients = (n: NullableNutrientMap) => Object.fromEntries(Object.entries(n).filter(([key]) => !['calories','caloriesKcal','proteinGrams','carbohydrateGrams','fatGrams','fibreGrams'].includes(key)));
 const stableUuid = (key: string) => {
@@ -16,16 +21,156 @@ const stableUuid = (key: string) => {
   return `${hex.slice(0,8).join('')}-${hex.slice(8,12).join('')}-${hex.slice(12,16).join('')}-${hex.slice(16,20).join('')}-${hex.slice(20).join('')}`;
 };
 
-export const importNutritionCatalogue = async (databaseUrl = process.env.DATABASE_URL, manifestPath = defaultManifest) => {
-  assertDestructiveTestResetAllowed({ ...process.env, DATABASE_URL: databaseUrl });
+type ImportOptions = {
+  mode?: 'test' | 'production-approved';
+  confirmation?: string;
+  beforeCommit?: () => void | Promise<void>;
+};
+
+type Reconciliation = {
+  mode: 'dry-run';
+  catalogueVersion: string;
+  manifestSha256: string;
+  writes: 0;
+  invalidRecords: 0;
+  executedAt: string;
+  runtimeSha: string | null;
+  existing: { foods: number; recipes: number; mealVariants: number };
+  counts: Record<string, { inserts: number; updates: number }>;
+  conflicts: Array<{ entity: string; id: string; reason: string }>;
+};
+
+const countExistingIds = async (client: InstanceType<typeof Client>, table: string, ids: string[]) => {
+  if (!(NUTRITION_CATALOGUE_TABLE_ALLOWLIST as readonly string[]).includes(table)) {
+    throw new Error(`Catalogue reconciliation denied for non-allowlisted table: ${table}`);
+  }
+  const result = await client.query<{ id: string }>(`select id::text as id from ${table} where id = any($1::uuid[])`, [ids]);
+  return new Set(result.rows.map((row) => row.id));
+};
+
+const reconcileApprovedCatalogue = async (client: InstanceType<typeof Client>, manifest: NutritionCatalogueManifest, sha256: string): Promise<Reconciliation> => {
+  const conflicts: Reconciliation['conflicts'] = [];
+  const release = await client.query<{ source_name: string; source_license: string; manifest_sha256: string }>(
+    'select source_name, source_license, manifest_sha256 from nutrition_catalogue_releases where catalogue_version = $1',
+    [APPROVED_NUTRITION_CATALOGUE_VERSION],
+  );
+  if (release.rows[0] && (release.rows[0].source_name !== manifest.source.name || release.rows[0].source_license !== manifest.source.license || release.rows[0].manifest_sha256 !== sha256)) {
+    conflicts.push({ entity: 'nutrition_catalogue_releases', id: APPROVED_NUTRITION_CATALOGUE_VERSION, reason: 'existing release provenance does not match the approved manifest' });
+  }
+  const foodNames = await client.query<{ id: string; canonical_name: string }>(
+    'select id::text as id, canonical_name from nutrition_foods where lower(canonical_name) = any($1::text[])',
+    [manifest.foods.map((food) => food.canonicalName.toLowerCase())],
+  );
+  const approvedFoodNames = new Map(manifest.foods.map((food) => [food.canonicalName.toLowerCase(), food.id]));
+  for (const row of foodNames.rows) if (approvedFoodNames.get(row.canonical_name.toLowerCase()) !== row.id) conflicts.push({ entity: 'nutrition_foods', id: row.id, reason: 'canonical name belongs to another identity' });
+  const recipeCodes = await client.query<{ id: string; recipe_code: string; catalogue_version: string }>(
+    'select id::text as id, recipe_code, catalogue_version from nutrition_recipes where lower(recipe_code) = any($1::text[])',
+    [manifest.recipes.map((recipe) => recipe.code.toLowerCase())],
+  );
+  const approvedRecipeCodes = new Map(manifest.recipes.map((recipe) => [recipe.code.toLowerCase(), recipe.id]));
+  for (const row of recipeCodes.rows) if (approvedRecipeCodes.get(row.recipe_code.toLowerCase()) !== row.id || row.catalogue_version !== APPROVED_NUTRITION_CATALOGUE_VERSION) conflicts.push({ entity: 'nutrition_recipes', id: row.id, reason: 'recipe code or provenance belongs to another identity' });
+  const foodIds = manifest.foods.map((food) => food.id);
+  const portionIds = manifest.foods.flatMap((food) => food.portions.map((portion) => portion.id));
+  const recipeIds = manifest.recipes.map((recipe) => recipe.id);
+  const recipeComponentIds = manifest.recipes.flatMap((recipe) => recipe.components.map((component) => stableUuid(`${recipe.id}:${component.foodId}`)));
+  const variantIds = manifest.mealVariants.map((variant) => variant.id);
+  const recipes = new Map(manifest.recipes.map((recipe) => [recipe.id, recipe]));
+  const variantComponentIds = manifest.mealVariants.flatMap((variant) => recipes.get(variant.recipeId)!.components.map((component) => stableUuid(`${variant.id}:${component.foodId}`)));
+  const definitions = [
+    ['nutrition_foods', foodIds], ['nutrition_food_portions', portionIds], ['nutrition_recipes', recipeIds],
+    ['nutrition_recipe_components', recipeComponentIds], ['nutrition_meal_variants', variantIds],
+    ['nutrition_meal_variant_components', variantComponentIds],
+  ] as const;
+  const counts: Reconciliation['counts'] = {
+    nutrition_catalogue_releases: { inserts: release.rowCount ? 0 : 1, updates: release.rowCount ? 1 : 0 },
+  };
+  for (const [table, ids] of definitions) {
+    const existing = await countExistingIds(client, table, ids);
+    counts[table] = { inserts: ids.length - existing.size, updates: existing.size };
+  }
+  const existingFoodRows = await client.query<{ id: string; source_metadata: Record<string, unknown> }>(
+    'select id::text as id, source_metadata from nutrition_foods where id = any($1::uuid[])', [foodIds],
+  );
+  const approvedFoods = new Map(manifest.foods.map((food) => [food.id, food]));
+  for (const row of existingFoodRows.rows) {
+    const approved = approvedFoods.get(row.id)!;
+    if (row.source_metadata?.catalogueVersion !== manifest.catalogueVersion || row.source_metadata?.source !== manifest.source.name || Number(row.source_metadata?.fdcId) !== approved.fdcId) {
+      conflicts.push({ entity: 'nutrition_foods', id: row.id, reason: 'existing food provenance does not match the approved manifest' });
+    }
+  }
+  const existingRecipeRows = await client.query<{ id: string; recipe_code: string; catalogue_version: string }>(
+    'select id::text as id, recipe_code, catalogue_version from nutrition_recipes where id = any($1::uuid[])', [recipeIds],
+  );
+  const approvedRecipes = new Map(manifest.recipes.map((recipe) => [recipe.id, recipe]));
+  for (const row of existingRecipeRows.rows) {
+    const approved = approvedRecipes.get(row.id)!;
+    if (row.recipe_code !== approved.code || row.catalogue_version !== manifest.catalogueVersion) {
+      conflicts.push({ entity: 'nutrition_recipes', id: row.id, reason: 'existing recipe provenance does not match the approved manifest' });
+    }
+  }
+  const existingPortions = await client.query<{ id: string; food_id: string }>(
+    'select id::text as id, food_id::text as food_id from nutrition_food_portions where id = any($1::uuid[])', [portionIds],
+  );
+  const approvedPortions = new Map(manifest.foods.flatMap((food) => food.portions.map((portion) => [portion.id, food.id] as const)));
+  for (const row of existingPortions.rows) if (approvedPortions.get(row.id) !== row.food_id) conflicts.push({ entity: 'nutrition_food_portions', id: row.id, reason: 'existing portion belongs to another food' });
+  const existingComponents = await client.query<{ id: string; recipe_id: string; food_id: string }>(
+    'select id::text as id, recipe_id::text as recipe_id, food_id::text as food_id from nutrition_recipe_components where id = any($1::uuid[])', [recipeComponentIds],
+  );
+  const approvedComponents = new Map(manifest.recipes.flatMap((recipe) => recipe.components.map((component) => [stableUuid(`${recipe.id}:${component.foodId}`), `${recipe.id}:${component.foodId}`] as const)));
+  for (const row of existingComponents.rows) if (approvedComponents.get(row.id) !== `${row.recipe_id}:${row.food_id}`) conflicts.push({ entity: 'nutrition_recipe_components', id: row.id, reason: 'existing component belongs to another recipe or food' });
+  const existingVariants = await client.query<{ id: string; owner_scope: string; source_metadata: Record<string, unknown> }>(
+    'select id::text as id, owner_scope, source_metadata from nutrition_meal_variants where id = any($1::uuid[])', [variantIds],
+  );
+  const approvedVariants = new Map(manifest.mealVariants.map((variant) => [variant.id, variant]));
+  for (const row of existingVariants.rows) {
+    const approved = approvedVariants.get(row.id)!;
+    if (row.owner_scope !== 'system' || row.source_metadata?.catalogueVersion !== manifest.catalogueVersion || row.source_metadata?.recipeId !== approved.recipeId) conflicts.push({ entity: 'nutrition_meal_variants', id: row.id, reason: 'existing meal variant provenance does not match the approved manifest' });
+  }
+  const existingVariantComponents = await client.query<{ id: string; meal_variant_id: string; food_id: string }>(
+    'select id::text as id, meal_variant_id::text as meal_variant_id, food_id::text as food_id from nutrition_meal_variant_components where id = any($1::uuid[])', [variantComponentIds],
+  );
+  const approvedVariantComponents = new Map(manifest.mealVariants.flatMap((variant) => recipes.get(variant.recipeId)!.components.map((component) => [stableUuid(`${variant.id}:${component.foodId}`), `${variant.id}:${component.foodId}`] as const)));
+  for (const row of existingVariantComponents.rows) if (approvedVariantComponents.get(row.id) !== `${row.meal_variant_id}:${row.food_id}`) conflicts.push({ entity: 'nutrition_meal_variant_components', id: row.id, reason: 'existing component belongs to another meal variant or food' });
+  return {
+    mode: 'dry-run', catalogueVersion: manifest.catalogueVersion, manifestSha256: sha256, writes: 0, invalidRecords: 0,
+    executedAt: new Date().toISOString(), runtimeSha: process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? null,
+    existing: { foods: existingFoodRows.rowCount ?? 0, recipes: counts.nutrition_recipes.updates, mealVariants: existingVariants.rowCount ?? 0 },
+    counts, conflicts,
+  };
+};
+
+export const dryRunApprovedNutritionCatalogue = async (databaseUrl = process.env.DATABASE_URL) => {
   if (!databaseUrl) throw new Error('DATABASE_URL is required');
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as NutritionCatalogueManifest;
-  const sha = createHash('sha256').update(raw).digest('hex');
+  const { manifest, sha256 } = await loadApprovedNutritionCatalogue();
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query('begin transaction read only');
+    const reconciliation = await reconcileApprovedCatalogue(client, manifest, sha256);
+    await client.query('rollback');
+    return reconciliation;
+  } catch (error) {
+    await client.query('rollback').catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+};
+
+export const importNutritionCatalogue = async (databaseUrl = process.env.DATABASE_URL, options: ImportOptions = {}) => {
+  if (!databaseUrl) throw new Error('DATABASE_URL is required');
+  const { manifest, sha256: sha } = await loadApprovedNutritionCatalogue();
+  const mode = options.mode ?? 'test';
+  if (mode === 'test') assertDestructiveTestResetAllowed({ ...process.env, DATABASE_URL: databaseUrl });
+  else if (options.confirmation !== PRODUCTION_IMPORT_CONFIRMATION) throw new Error('Exact production catalogue import confirmation is required');
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
     await client.query('begin');
+    if (mode === 'production-approved') {
+      const reconciliation = await reconcileApprovedCatalogue(client, manifest, sha);
+      if (reconciliation.conflicts.length) throw new Error(`Catalogue import aborted: ${reconciliation.conflicts.length} unsafe reconciliation conflict(s)`);
+    }
     await client.query(`insert into nutrition_catalogue_releases (catalogue_version,source_name,source_license,source_releases,manifest_sha256,record_counts,status,imported_at,updated_at)
       values ($1,$2,$3,$4,$5,$6,'active',now(),now()) on conflict (catalogue_version) do update set source_releases=excluded.source_releases,manifest_sha256=excluded.manifest_sha256,record_counts=excluded.record_counts,status='active',imported_at=now(),updated_at=now()`,
       [manifest.catalogueVersion, manifest.source.name, manifest.source.license, JSON.stringify(manifest.source.releases), sha, JSON.stringify({foods:manifest.foods.length,recipes:manifest.recipes.length,mealVariants:manifest.mealVariants.length})]);
@@ -46,9 +191,18 @@ export const importNutritionCatalogue = async (databaseUrl = process.env.DATABAS
       const recipe = recipes.get(variant.recipeId)!;
       for (const [index, component] of recipe.components.entries()) await client.query(`insert into nutrition_meal_variant_components (id,meal_variant_id,food_id,component_name,quantity,quantity_unit,canonical_grams,locked,nutrition_totals,sort_order,deleted_at,updated_at) values ($1,$2,$3,$4,$5,'g',$5,true,'{}'::jsonb,$6,null,now()) on conflict (id) do update set quantity=excluded.quantity,canonical_grams=excluded.canonical_grams,sort_order=excluded.sort_order,deleted_at=null,updated_at=now()`, [stableUuid(`${variant.id}:${component.foodId}`),variant.id,component.foodId,manifest.foods.find((food)=>food.id===component.foodId)?.displayName ?? 'Ingredient',component.quantityGrams*variant.portionMultiplier,index]);
     }
+    await options.beforeCommit?.();
     await client.query('commit');
     return { catalogueVersion: manifest.catalogueVersion, manifestSha256: sha, counts: { foods: manifest.foods.length, recipes: manifest.recipes.length, mealVariants: manifest.mealVariants.length } };
   } catch (error) { await client.query('rollback'); throw error; } finally { await client.end(); }
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) importNutritionCatalogue().then((result) => console.log(JSON.stringify(result))).catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
+const runCli = async () => {
+  const action = process.argv[2];
+  if (action === '--production-dry-run') return dryRunApprovedNutritionCatalogue();
+  if (action === '--production-import') return importNutritionCatalogue(process.env.DATABASE_URL, { mode: 'production-approved', confirmation: process.env.FITEATSY_NUTRITION_CATALOGUE_IMPORT_APPROVAL });
+  if (action === '--test-import') return importNutritionCatalogue();
+  throw new Error('Explicit action required: --production-dry-run, --production-import, or --test-import');
+};
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) runCli().then((result) => console.log(JSON.stringify(result))).catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });

@@ -8,6 +8,9 @@ const sourceDir = path.join(backendRoot, 'src', 'db', 'migrations');
 const targetDir = path.join(backendRoot, 'dist', 'db', 'migrations');
 const nutritionModuleSourceDir = path.join(backendRoot, 'src', 'modules', 'nutrition');
 const nutritionModuleTargetDir = path.join(backendRoot, 'dist', 'modules', 'nutrition');
+const catalogueDataSourceDir = path.join(nutritionModuleSourceDir, 'catalogue', 'data');
+const catalogueDataTargetDir = path.join(nutritionModuleTargetDir, 'catalogue', 'data');
+const approvedCatalogueFile = 'fiteatsy-nutrition-catalogue-v1.json';
 
 const copyMigrations = async () => {
   const entries = await fs.readdir(sourceDir, { withFileTypes: true });
@@ -47,5 +50,15 @@ const copyNutritionAssets = async () => {
   console.log(`Copied ${docxFiles.length} nutrition template file(s) to ${nutritionModuleTargetDir}`);
 };
 
+const copyApprovedCatalogue = async () => {
+  await fs.mkdir(catalogueDataTargetDir, { recursive: true });
+  await fs.copyFile(
+    path.join(catalogueDataSourceDir, approvedCatalogueFile),
+    path.join(catalogueDataTargetDir, approvedCatalogueFile),
+  );
+  console.log(`Copied approved nutrition catalogue to ${catalogueDataTargetDir}`);
+};
+
 await copyMigrations();
 await copyNutritionAssets();
+await copyApprovedCatalogue();

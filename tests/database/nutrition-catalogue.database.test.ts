@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { importNutritionCatalogue } from '../../backend/scripts/import-nutrition-catalogue.js';
+import { dryRunApprovedNutritionCatalogue, importNutritionCatalogue } from '../../backend/scripts/import-nutrition-catalogue.js';
 import { closePool, pool } from '../../backend/src/db/pool.js';
 import { NUTRITION_CATALOGUE_VERSION } from '../../backend/src/modules/nutrition/catalogue/catalogue.types.js';
 
@@ -101,4 +101,21 @@ databaseTest('imports the verified USDA catalogue idempotently with durable prov
   } finally {
     await closePool();
   }
+});
+
+databaseTest('dry-run is read-only and an interrupted import rolls back atomically', async () => {
+  const before = await pool.query<{ count: string }>('select count(*)::text as count from nutrition_catalogue_releases');
+  const dryRun = await dryRunApprovedNutritionCatalogue(databaseUrl);
+  assert.equal(dryRun.writes, 0);
+  assert.equal(dryRun.invalidRecords, 0);
+  assert.equal(dryRun.conflicts.length, 0);
+  const afterDryRun = await pool.query<{ count: string }>('select count(*)::text as count from nutrition_catalogue_releases');
+  assert.deepEqual(afterDryRun.rows, before.rows);
+
+  await assert.rejects(
+    importNutritionCatalogue(databaseUrl, { beforeCommit: () => { throw new Error('forced rollback'); } }),
+    /forced rollback/,
+  );
+  const afterRollback = await pool.query<{ count: string }>('select count(*)::text as count from nutrition_catalogue_releases');
+  assert.deepEqual(afterRollback.rows, before.rows);
 });
