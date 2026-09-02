@@ -29,6 +29,7 @@ const functionBody = (name: string, nextName: string) => {
 test('active catalogue enrichment uses verified matches and contains no fallback invocation', () => {
   const body = functionBody('const enrichMealPlanWithLibraryMatches', 'const foodPreferenceSearchText');
   assert.match(body, /const verifiedMatches = await listMealLibrarySlotsForTarget/);
+  assert.match(body, /includeOutsideTarget:\s*true/);
   assert.match(body, /selectDiverseMealOptions\(verifiedMatches, usedIdentities\)/);
   assert.doesNotMatch(body, /buildCanonicalMealLibraryFallback\s*\(/);
   assert.doesNotMatch(body, /generated_template/);

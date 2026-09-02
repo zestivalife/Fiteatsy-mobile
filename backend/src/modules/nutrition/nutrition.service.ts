@@ -1412,6 +1412,7 @@ const enrichMealPlanWithLibraryMatches = async (input: {
         staplePreference: input.staplePreference,
         dairyPreference: input.dairyPreference,
         practicality: input.practicality,
+        includeOutsideTarget: true,
         limit: AVAILABLE_LIBRARY_CANDIDATE_LIMIT,
       });
       nextMealPlanEntries.push([
