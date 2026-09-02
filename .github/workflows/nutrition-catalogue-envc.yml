@@ -91,7 +91,22 @@ jobs:
 
       - name: Import catalogue twice and verify database contract
         working-directory: backend
-        run: node --import tsx --test --test-concurrency=1 ../tests/database/nutrition-catalogue.database.test.ts
+        shell: bash
+        run: |
+          set +e
+          node --import tsx --test --test-concurrency=1 \
+            ../tests/database/nutrition-catalogue.database.test.ts \
+            > nutrition-catalogue-database.log 2>&1
+          status=$?
+          cat nutrition-catalogue-database.log
+          if [ "$status" -ne 0 ]; then
+            failure_block="$(tail -n 80 nutrition-catalogue-database.log)"
+            escaped="${failure_block//'%'/'%25'}"
+            escaped="${escaped//$'\r'/'%0D'}"
+            escaped="${escaped//$'\n'/'%0A'}"
+            echo "::error title=Nutrition catalogue database contract::$escaped"
+          fi
+          exit "$status"
 
       - name: Run catalogue and nutrition generation contracts
         working-directory: backend
