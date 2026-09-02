@@ -30,6 +30,17 @@ export const patchJson = async (baseUrl: string, path: string, body: unknown, in
     body: JSON.stringify(body),
   });
 
+export const putJson = async (baseUrl: string, path: string, body: unknown, init?: RequestInit) =>
+  getJson(baseUrl, path, {
+    ...init,
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+    body: JSON.stringify(body),
+  });
+
 export const deleteRequest = async (baseUrl: string, path: string, init?: RequestInit) =>
   getJson(baseUrl, path, {
     method: 'DELETE',

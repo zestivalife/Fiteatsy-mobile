@@ -6,6 +6,7 @@ on:
     branches:
       - codex/consultant-platform-audit-20260901
       - codex/diet-lifecycle-quality-v1
+      - codex/food-preference-sync-v1
 
 permissions:
   contents: read

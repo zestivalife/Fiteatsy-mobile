@@ -7,7 +7,7 @@ import { ingestHealthObservations } from '../../backend/src/modules/health/healt
 import { createProfessionalAssignment } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
 import { createReportRecord } from '../../backend/src/modules/reports/reports.store.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
-import { getJson, patchJson, postJson } from '../helpers/http.js';
+import { getJson, patchJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
@@ -517,6 +517,103 @@ test('GET /v1/consultants/clients/:clientId/workspace returns incomplete states 
   assert.ok(workspace.body.recommendations.some((item: { title: string }) => item.title === 'Complete onboarding inputs'));
   assert.ok(workspace.body.timeline.some((item: { type: string }) => item.type === 'registration'));
   assert.equal(workspace.body.syncMetadata.dataSource, 'Fiteatsy production database');
+});
+
+test('Consultant workspace projects canonical Food Preferences with exact array parity', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Food Preference Client',
+    email: `food-preference-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
+
+  const canonicalProfile = {
+    dietType: 'vegetarian',
+    proteins: ['Paneer', 'Pulses'],
+    cuisines: ['South Indian', 'Maharashtrian', 'North Indian'],
+    foodsLiked: ['Poha', 'Idli'],
+    foodsDisliked: ['Oats', 'Bitter gourd'],
+    foodsAvoided: ['Mushroom', 'Shellfish'],
+    likedFoodIds: ['food-poha', 'food-idli'],
+    dislikedFoodIds: ['food-oats'],
+    avoidedFoodIds: ['food-mushroom'],
+    restrictions: ['No onion after sunset'],
+    staplePreference: 'rice',
+    dairyPreference: 'allowed',
+    practicality: ['Quick preparation', 'Office-friendly']
+  };
+  const savedPreferences = await putJson(server.baseUrl, '/v1/platform/food-preferences', canonicalProfile, {
+    headers: authHeaders(client.token)
+  });
+  const savedHealth = await patchJson(server.baseUrl, '/v1/platform/health-profile', {
+    foodAllergies: ['Peanuts', 'Sesame'],
+    foodIntolerances: ['Lactose']
+  }, { headers: authHeaders(client.token) });
+  assert.equal(savedPreferences.response.status, 200, JSON.stringify(savedPreferences.body));
+  assert.equal(savedHealth.response.status, 200, JSON.stringify(savedHealth.body));
+
+  const workspace = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(workspace.response.status, 200, JSON.stringify(workspace.body));
+  assert.equal(workspace.body.foodPreferences.clientId, client.current.body.client.fiteatsyClientId);
+  assert.equal(workspace.body.foodPreferences.status, 'COMPLETE');
+  assert.deepEqual(workspace.body.foodPreferences.profile, canonicalProfile);
+  assert.deepEqual(workspace.body.healthProfile.foodAllergies, ['Peanuts', 'Sesame']);
+  assert.deepEqual(workspace.body.healthProfile.foodIntolerances, ['Lactose']);
+});
+
+test('Consultant Food Preferences preserve partial and empty canonical states', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Partial Food Preference Client',
+    email: `partial-food-preference-client-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
+  const partialProfile = { cuisines: ['Maharashtrian', 'Gujarati'] };
+  const saved = await putJson(server.baseUrl, '/v1/platform/food-preferences', partialProfile, {
+    headers: authHeaders(client.token)
+  });
+  assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
+
+  const workspace = await getJson(server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(consultant.token) });
+  assert.equal(workspace.response.status, 200);
+  assert.deepEqual(workspace.body.foodPreferences.profile.cuisines, ['Maharashtrian', 'Gujarati']);
+  assert.deepEqual(workspace.body.foodPreferences.profile.proteins, []);
+  assert.equal(workspace.body.foodPreferences.profile.dietType, null);
+  assert.deepEqual(workspace.body.healthProfile.foodAllergies, []);
+  assert.deepEqual(workspace.body.healthProfile.foodIntolerances, []);
+});
+
+test('Consultant Food Preference projection is assignment-scoped and isolated by client', async () => {
+  const clientA = await createAuthenticatedSession(server.baseUrl, { name: 'Preference Client A', email: `preference-a-${Date.now()}@example.com` });
+  const clientB = await createAuthenticatedSession(server.baseUrl, { name: 'Preference Client B', email: `preference-b-${Date.now()}@example.com` });
+  const consultant = await createConsultantSession();
+  const wrongConsultant = await createConsultantSession();
+  await assignClientToConsultant(clientA, consultant);
+  await assignClientToConsultant(clientB, consultant);
+  await putJson(server.baseUrl, '/v1/platform/food-preferences', { dietType: 'vegetarian', foodsLiked: ['Idli'] }, { headers: authHeaders(clientA.token) });
+  await putJson(server.baseUrl, '/v1/platform/food-preferences', { dietType: 'vegan', foodsLiked: ['Dhokla'] }, { headers: authHeaders(clientB.token) });
+
+  const pathA = `/v1/consultants/clients/${encodeURIComponent(clientA.current.body.client.fiteatsyClientId)}/workspace`;
+  const pathB = `/v1/consultants/clients/${encodeURIComponent(clientB.current.body.client.fiteatsyClientId)}/workspace`;
+  const [projectedA, projectedB, denied] = await Promise.all([
+    getJson(server.baseUrl, pathA, { headers: authHeaders(consultant.token) }),
+    getJson(server.baseUrl, pathB, { headers: authHeaders(consultant.token) }),
+    getJson(server.baseUrl, pathA, { headers: authHeaders(wrongConsultant.token) })
+  ]);
+  assert.equal(projectedA.response.status, 200);
+  assert.equal(projectedB.response.status, 200);
+  assert.deepEqual(projectedA.body.foodPreferences.profile.foodsLiked, ['Idli']);
+  assert.equal(projectedA.body.foodPreferences.profile.dietType, 'vegetarian');
+  assert.deepEqual(projectedB.body.foodPreferences.profile.foodsLiked, ['Dhokla']);
+  assert.equal(projectedB.body.foodPreferences.profile.dietType, 'vegan');
+  assert.equal(denied.response.status, 404);
+  assert.equal(denied.body.error, 'CLIENT_NOT_FOUND');
 });
 
 test('consultant medication monitoring uses client tracker data and enforces assignment access', async () => {
