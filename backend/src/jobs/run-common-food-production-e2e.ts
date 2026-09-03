@@ -186,12 +186,12 @@ const main = async () => {
   report.performance={generateApi:metrics(generateTimes),generateRender:{...metrics(generateTimes),measurement:'API-completion proxy; browser render verified separately'},searchApi:metrics(explorerTimes),mutationApi:metrics(mutationTimes)};
   const audits=await pool.query(`select generation_run_id, meal_head, candidate_count, eligible_count, returned_count, duration_ms, generator_version, template_version, catalogue_version
     from common_food_generation_run_audit where generation_run_id = any($1::text[]) order by created_at desc`, [Object.values(report.coverage).flatMap((x:any)=>x?.generationRunId?[x.generationRunId]:[])]).catch(()=>({rows:[]} as any));
-  const fallbackAudits=await pool.query(`select id, candidate_count, eligible_count, jsonb_array_length(top_options) returned_count, duration_ms, generator_version, template_version, catalogue_snapshot_version catalogue_version from common_food_generation_runs where id like any($1::text[]) order by created_at desc`, [[...Object.values(report.coverage).flatMap((x:any)=>x?.generationRunId?[`${x.generationRunId}:%`]:[])]]);
+  const fallbackAudits=await pool.query(`select id, candidate_count, eligible_count, jsonb_array_length(top_options) returned_count, duration_ms, generator_version, template_version, catalogue_snapshot_version catalogue_version from common_food_generation_runs where id::text like any($1::text[]) order by created_at desc`, [[...Object.values(report.coverage).flatMap((x:any)=>x?.generationRunId?[`${x.generationRunId}:%`]:[])]]);
   report.observability={runRows:audits.rows.length||fallbackAudits.rows.length,sample:(audits.rows[0]??fallbackAudits.rows[0]??null),sensitivePayloadLeakage:'NONE OBSERVED'};
   assert(report.observability.runRows>=21,'GENERATION_AUDIT_EVIDENCE_MISSING');
   await pool.query(`insert into qa_provisioning_audit_events (id, actor_user_id, target_user_id, action, account_purpose, role, reason, metadata)
     values($1,null,null,'QAProductionE2ECompleted','QA_TEST','service','Authenticated Common Food Engine production acceptance completed',$2::jsonb)`,[crypto.randomUUID(),JSON.stringify({fixtureSetId:String(fixture.rows[0].id),planId,coverage:report.coverage,reportHash:hash(report)})]);
-  await pool.query(`update auth_sessions set revoked_at=now() where id=any($1::uuid[])`,[sessions.map(x=>x.id)]);
+  await pool.query(`update auth_sessions set revoked_at=now() where id::text=any($1::text[])`,[sessions.map(x=>x.id)]);
   console.log(JSON.stringify(report));
 };
 
