@@ -80,3 +80,33 @@ test('v9 preserves v8 history and never promotes missing nutrients to zero',()=>
   assert.deepEqual(incomplete.map((x:any)=>x.ingredientId),['REFINED_SUNFLOWER_OIL','SPLIT_HULLED_YELLOW_MOONG_DAL','DRY_FLATTENED_RICE_POHA']);
   assert.ok(incomplete.every((x:any)=>x.calculationEligible===false));
 });
+
+test('v10 closes sunflower from official SR Legacy evidence and keeps IFCT rights fail-closed',()=>{
+  const source=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-resolution.v10.json',import.meta.url),'utf8'));
+  const byId=new Map(source.ingredients.map((x:any)=>[x.ingredientId,x]));
+  const sunflower:any=byId.get('REFINED_SUNFLOWER_OIL');
+  assert.deepEqual(sunflower.mandatoryVector,{energyKcal:884,proteinG:0,carbohydrateG:0,fatG:100,fibreG:0});
+  assert.equal(sunflower.selectedSource.externalId,'171025'); assert.equal(sunflower.calculationReady,true);
+  for(const id of ['SPLIT_HULLED_YELLOW_MOONG_DAL','DRY_FLATTENED_RICE_POHA']) { const item:any=byId.get(id); assert.equal(item.calculationReady,false); assert.ok(item.remainingBlockers.includes('SOURCE_RIGHTS_BLOCK_CANONICAL_INGESTION')); }
+});
+
+test('v10 partially auto-advances only complete recipes through Stage B package generation',()=>{
+  const gate=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.gate-report.v10.json',import.meta.url),'utf8'));
+  const calculations=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.calculations.v10.json',import.meta.url),'utf8'));
+  assert.equal(gate.counts.formulaHashes,2); assert.equal(gate.counts.canonicalMeasurementRuns,2); assert.equal(gate.counts.calculations,2); assert.equal(gate.counts.stageBPacks,2); assert.equal(gate.counts.validationReleases,0);
+  assert.deepEqual(calculations.calculations.map((x:any)=>x.recipeId),['CP_CHAPATI','CP_BHINDI_SABJI']);
+  assert.ok(calculations.calculations.every((x:any)=>x.reconciliation==='PASS' && /^[a-f0-9]{64}$/.test(x.formulaHash) && /^[a-f0-9]{64}$/.test(x.measurementHash) && /^[a-f0-9]{64}$/.test(x.calculationHash)));
+  assert.equal(gate.productionStatus,'UNCHANGED');
+});
+
+test('v10 scaling reconciles batch, per-100g and serving without intermediate rounding',()=>{
+  const data=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.calculations.v10.json',import.meta.url),'utf8'));
+  for(const x of data.calculations) for(const code of ['energyKcal','proteinG','carbohydrateG','fatG','fibreG']) {
+    assert.ok(Math.abs(x.per100gNutrition[code]-x.batchNutrition[code]*100/(x.recipeId==='CP_CHAPATI'?175:110))<1e-12);
+    assert.ok(Math.abs(x.servingNutrition[code]-x.per100gNutrition[code]*x.servingGrams/100)<1e-12);
+  }
+});
+
+test('v10 Stage B packs require human review and contain no validation release',()=>{
+  for(const file of ['batch-1.stage-b.CP_CHAPATI.v10.json','batch-1.stage-b.CP_BHINDI_SABJI.v10.json']) { const pack=JSON.parse(fs.readFileSync(new URL(`../../backend/src/modules/nutrition/food-curation/data/${file}`,import.meta.url),'utf8')); assert.equal(pack.state,'STAGE_B_HUMAN_REVIEW_REQUIRED'); assert.equal(pack.reconciliation,'PASS'); assert.equal(pack.validationRelease,null); }
+});
