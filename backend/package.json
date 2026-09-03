@@ -16,6 +16,8 @@
     "food-curation:test": "node --import tsx --test ../tests/backend/controlled-food-curation.test.ts",
     "food-curation:status": "node --import tsx scripts/stage-b-status.ts",
     "food-curation:ingest": "node --import tsx scripts/stage-b-ingest.ts",
+    "qa:provision-common-food-e2e": "tsx scripts/provision-common-food-production-qa.ts",
+    "qa:deactivate-common-food-e2e": "tsx scripts/provision-common-food-production-qa.ts --deactivate",
     "reports:purge-deleted": "tsx src/jobs/purge-deleted-reports.ts",
     "start": "node dist/server.js",
     "test:qa": "/bin/zsh -lc 'node --import tsx --test --test-concurrency=1 ../tests/api/*.test.ts ../tests/backend/*.test.ts ../tests/database/*.test.ts'"
