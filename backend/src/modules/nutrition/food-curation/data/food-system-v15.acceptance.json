@@ -1,0 +1,12 @@
+{
+  "schemaVersion":"FITEATSY_COMMON_FOOD_SYSTEM_V15_ACCEPTANCE","baselineSha":"65743c3cb2e4467eb8318b7c39c2ac841fb5556d","candidateSha":null,"candidateShaSemantics":"Containing commit is authoritative",
+  "areas":{"01":"PASS","02":"PASS","03":"PASS","04":"PASS","05":"PASS","06":"PASS","07":"PASS","08":"PASS","09":"PASS","10":"PASS","11":"PASS","12":"PASS","13":"PARTIAL","14":"PARTIAL","15":"PARTIAL","16":"PARTIAL","17":"PASS","18":"PASS","19":"PASS","20":"PASS","21":"PARTIAL","22":"PASS","23":"PASS","24":"PARTIAL"},
+  "catalogueStats":{"sourceManifest":"FITEATSY-NUTRITION-CATALOGUE-v1.1","sourceFoods":58,"canonicalFoods":43,"activeFoods":43,"generatorEligibleFoods":41,"indianSpecificFoods":0,"globalGenericApprovedFoods":43,"validatedRecipes":3,"blockedRecipes":2,"categoriesRepresented":13},
+  "servingStats":{"definitions":43,"foodsWithDefaultServing":43,"conversionCoveragePercent":100,"missingConversions":0},
+  "mealTemplateStats":{"templates":7,"mealHeads":7,"version":"INDIA_COMMON_MEAL_TEMPLATES_V1"},
+  "coverage":{"profileCount":4,"COMPLETE_5_X_7_COVERAGE_RATE":0,"EARLY_MORNING_5_OPTION_RATE":100,"BREAKFAST_5_OPTION_RATE":100,"MID_MORNING_5_OPTION_RATE":100,"LUNCH_5_OPTION_RATE":100,"EVENING_SNACK_5_OPTION_RATE":100,"DINNER_5_OPTION_RATE":100,"BEDTIME_5_OPTION_RATE":0,"shortageRatePercent":14.285714285714286,"familyDiversityRatePercent":100,"reason":"No rights-clear complete mandatory nutrient vector is available for five distinct bedtime dairy/beverage families; null fibre was not converted to zero."},
+  "generator":{"generatorVersion":"COMMON_FOOD_COMBINATION_ENGINE_V1","rankingVersion":"COMMON_FOOD_RANKING_V1","templateVersion":"INDIA_COMMON_MEAL_TEMPLATES_V1","candidateHardLimit":500,"p50Milliseconds":2.8021669999999403,"p95Milliseconds":28.03525000000002,"deterministic":true},
+  "tests":{"newV15":18,"newV15Passed":18,"priorControlledCuration":114,"dietPlanRegression":28,"validationReleaseReplay":"3/3_PASS"},
+  "migrations":["0049_common_food_combination_engine.sql"],"consultantE2E":"NOT_RUN_NEW_ENGINE_NOT_PRODUCTION_READY","dietPlanRegression":"PASS","productionStatus":"NOT_DEPLOYED",
+  "remainingExternalBlockers":["INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:SPLIT_HULLED_YELLOW_MOONG_DAL","INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:DRY_FLATTENED_RICE_POHA","RIGHTS_CLEAR_COMPLETE_BEDTIME_DAIRY_OR_BEVERAGE_NUTRITION_REQUIRED"]
+}
