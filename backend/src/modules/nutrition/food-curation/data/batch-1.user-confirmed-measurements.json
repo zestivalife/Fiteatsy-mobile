@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "FITEATSY_MEASUREMENT_SUBMISSION_V1",
+  "batchId": "FITEATSY-FIRST-FIVE-v1",
+  "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+  "canonicalMeasurementRunsCreated": 0,
+  "notice": "Submitted physical values are preserved exactly. Null audit/formula fields were not supplied and were not fabricated. Submission hashes are not canonical Measurement Hashes.",
+  "referenceVessel": {
+    "id": "FITEATSY_KATORI_V1",
+    "emptyWeightGrams": 120,
+    "waterCapacityRunsMl": [150, 150, 150],
+    "selectedCapacityMl": 150,
+    "usage": "VESSEL_CALIBRATION_ONLY"
+  },
+  "measurements": [
+    {
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "preparationId": "CP_CHAPATI",
+      "measurementRunId": null,
+      "formulaVersion": null,
+      "formulaSha256": null,
+      "ingredientWeightsGrams": { "ATTA": 120, "DUSTING_FLOUR": 15 },
+      "waterGrams": 80,
+      "waterUse": "INGREDIENT",
+      "oilGrams": 5,
+      "finalPreparedWeightGrams": 140,
+      "servingLabel": "1 measured piece",
+      "servingWeightGrams": 35,
+      "pieceWeightObservationsGrams": [36, 35, 34, 35],
+      "producedPieceCount": 4,
+      "postCookingFatApplied": true,
+      "postCookingFatGrams": null,
+      "operator": "",
+      "measurementDate": "",
+      "equipmentId": "",
+      "referenceVesselId": null,
+      "scaleResolutionGrams": 0,
+      "status": "INCOMPLETE",
+      "notes": "All four produced pieces measured; protocol requires at least five. Post-cooking fat quantity not supplied."
+    },
+    {
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "preparationId": "CP_MOONG_DAL", "measurementRunId": null, "formulaVersion": null, "formulaSha256": null,
+      "ingredientWeightsGrams": { "RAW_MOONG_DAL": 50, "ONION": 30, "GARLIC": 5 },
+      "waterGrams": 200, "waterUse": "INGREDIENT", "oilGrams": 10, "finalPreparedWeightGrams": 240,
+      "servingLabel": "1 measured reference katori", "servingWeightGrams": 120, "servingObservationsGrams": [120, 120, 120],
+      "operator": "", "measurementDate": "", "equipmentId": "", "referenceVesselId": "FITEATSY_KATORI_V1", "scaleResolutionGrams": 0, "status": "INCOMPLETE"
+    },
+    {
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "preparationId": "CP_BHINDI_SABJI", "measurementRunId": null, "formulaVersion": null, "formulaSha256": null,
+      "ingredientWeightsGrams": { "BHINDI": 150, "POTATO": 0, "GARLIC": 5 },
+      "waterGrams": 0, "waterUse": "NONE", "oilGrams": 10, "finalPreparedWeightGrams": 110,
+      "servingLabel": "1 measured reference katori", "servingWeightGrams": 110, "servingObservationsGrams": [110, 110, 110],
+      "operator": "", "measurementDate": "", "equipmentId": "", "referenceVesselId": "FITEATSY_KATORI_V1", "scaleResolutionGrams": 0, "status": "INCOMPLETE",
+      "hardContext": { "POTATO": "ABSENT_VERIFIED", "GARLIC": "PRESENT" }
+    },
+    {
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "preparationId": "CP_BHINDI_ALOO", "measurementRunId": null, "formulaVersion": null, "formulaSha256": null,
+      "ingredientWeightsGrams": { "BHINDI": 100, "POTATO": 80, "GARLIC": 5 },
+      "waterGrams": 0, "waterUse": "NONE", "oilGrams": 12, "finalPreparedWeightGrams": 150,
+      "servingLabel": "1 measured reference katori", "servingWeightGrams": 150, "servingObservationsGrams": [150, 150, 150],
+      "operator": "", "measurementDate": "", "equipmentId": "", "referenceVesselId": "FITEATSY_KATORI_V1", "scaleResolutionGrams": 0, "status": "INCOMPLETE",
+      "hardContext": { "POTATO": "PRESENT", "GARLIC": "PRESENT" }
+    },
+    {
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "preparationId": "CP_POHA_PEANUT", "measurementRunId": null, "formulaVersion": null, "formulaSha256": null,
+      "ingredientWeightsGrams": { "DRY_POHA": 60, "PEANUT": 15, "POTATO": 40, "GARLIC": 0 },
+      "waterGrams": 250, "waterUse": "RINSE_DRAINED", "oilGrams": 10, "finalPreparedWeightGrams": 180,
+      "servingLabel": "1 measured bowl", "servingWeightGrams": 180, "servingObservationsGrams": [180, 180, 180],
+      "operator": "", "measurementDate": "", "equipmentId": "", "referenceVesselId": null, "scaleResolutionGrams": 0, "status": "INCOMPLETE",
+      "hardContext": { "PEANUT": "PRESENT", "POTATO": "PRESENT", "GARLIC": "ABSENT_VERIFIED" },
+      "notes": "250 ml was rinse water and drained; it is not retained ingredient water."
+    }
+  ]
+}

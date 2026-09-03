@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, createCalculationInputManifest, deriveStageBStatus, formulaSha256, inspectMeasurement, normalizeQuantityToGrams, reconcileCalculation, validateMeasurement } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
+import { assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, createCalculationInputManifest, deriveStageBStatus, formulaSha256, inspectMeasurement, inspectMeasurementSubmission, normalizeQuantityToGrams, reconcileCalculation, validateMeasurement } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
 import type { ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, PreparationReview } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.types.js';
 
 const approved: FoodSourceRegistryEntry = { id: 'USDA_FDC', name: 'FoodData Central', publisher: 'USDA ARS', datasetVersion: 'test-pinned', licence: 'CC0', commercialUse: 'YES', redistribution: 'YES', modification: 'YES', attribution: 'USDA ARS FoodData Central', reference: 'https://fdc.nal.usda.gov/', artefactSha256: 'a'.repeat(64), status: 'APPROVED', reviewNotes: '' };
@@ -110,4 +110,40 @@ test('Stage B schema persists measurement, calculation and hash-bound review sep
   assert.match(migration, /controlled_food_calculations/);
   assert.match(migration, /controlled_food_stage_b_reviews/);
   assert.match(migration, /reviewer_role = 'NUTRITION_REVIEWER'/);
+});
+
+test('user-confirmed Batch 1 evidence is preserved but cannot become a canonical Measurement Run without governed prerequisites', () => {
+  const batch = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.user-confirmed-measurements.json', import.meta.url), 'utf8')) as { evidenceClassification: string; canonicalMeasurementRunsCreated: number; measurements: ControlledMeasurement[] };
+  assert.equal(batch.evidenceClassification, 'USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE');
+  assert.equal(batch.canonicalMeasurementRunsCreated, 0);
+  assert.equal(batch.measurements.length, 5);
+  for (const submitted of batch.measurements) {
+    const result = inspectMeasurementSubmission(submitted);
+    assert.match(result.submissionSha256, /^[a-f0-9]{64}$/);
+    assert.equal(result.canonicalMeasurementEligible, false);
+    assert.ok(result.errors.includes('CURATION_APPROVED_FORMULA_HASH_REQUIRED'));
+    assert.ok(result.errors.includes('CURATION_OPERATOR_REQUIRED'));
+    assert.ok(result.errors.includes('CURATION_MEASUREMENT_DATE_REQUIRED'));
+    assert.ok(result.errors.includes('CURATION_EQUIPMENT_ID_REQUIRED'));
+    assert.ok(result.errors.includes('CURATION_SCALE_RESOLUTION_REQUIRED'));
+  }
+});
+
+test('Chapati submission fails the explicit five-piece protocol without fabricating an observation', () => {
+  const batch = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.user-confirmed-measurements.json', import.meta.url), 'utf8')) as { measurements: ControlledMeasurement[] };
+  const chapati = batch.measurements.find((item) => item.preparationId === 'CP_CHAPATI')!;
+  const result = inspectMeasurementSubmission(chapati);
+  assert.deepEqual(chapati.pieceWeightObservationsGrams, [36, 35, 34, 35]);
+  assert.equal(chapati.producedPieceCount, 4);
+  assert.ok(result.errors.includes('CURATION_PIECE_PROTOCOL_MINIMUM_NOT_MET'));
+  assert.ok(!result.errors.includes('CURATION_PIECE_BATCH_WEIGHT_MISMATCH'));
+});
+
+test('drained rinse water remains explicit and is never treated as retained ingredient water', () => {
+  const batch = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.user-confirmed-measurements.json', import.meta.url), 'utf8')) as { measurements: ControlledMeasurement[] };
+  const poha = batch.measurements.find((item) => item.preparationId === 'CP_POHA_PEANUT')!;
+  const result = inspectMeasurementSubmission(poha);
+  assert.equal(poha.waterUse, 'RINSE_DRAINED');
+  assert.equal(poha.waterGrams, 250);
+  assert.ok(result.warnings.includes('CURATION_DRAINED_RINSE_WATER_EXCLUDED_FROM_RETAINED_INGREDIENT_WATER'));
 });

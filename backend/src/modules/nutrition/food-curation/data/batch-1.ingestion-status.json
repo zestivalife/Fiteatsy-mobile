@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "FITEATSY_STAGE_B_INGESTION_STATUS_V1",
+  "generatedFromRepositoryState": true,
+  "submittedEvidenceCount": 5,
+  "canonicalMeasurementRunsCreated": 0,
+  "calculationsExecuted": 0,
+  "reviewsCreated": 0,
+  "validationRelease": "NOT_CREATED",
+  "primaryNextGate": "MEASUREMENT_PREREQUISITES_REQUIRED",
+  "sourceResolution": [
+    {
+      "ingredient": "RAW_MOONG_DAL",
+      "result": "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH",
+      "affectedFood": "CP_MOONG_DAL"
+    },
+    {
+      "ingredient": "FLATTENED_RICE_POHA",
+      "result": "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH",
+      "affectedFood": "CP_POHA_PEANUT"
+    },
+    {
+      "ingredient": "SEMOLINA",
+      "result": "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH",
+      "affectedFood": "BATCH_2_CP_UPMA"
+    }
+  ],
+  "foods": [
+    {
+      "preparationId": "CP_CHAPATI",
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "submissionSha256": "7f9dcc5307522718a6745c70563d9d1e632b616fc9c6ce5bc54d15c9dd0e5c58",
+      "measurementRunId": null,
+      "measurementSha256": null,
+      "canonicalMeasurementEligible": false,
+      "validationErrors": [
+        "CURATION_PIECE_PROTOCOL_MINIMUM_NOT_MET",
+        "CURATION_OPERATOR_REQUIRED",
+        "CURATION_MEASUREMENT_DATE_REQUIRED",
+        "CURATION_EQUIPMENT_ID_REQUIRED",
+        "CURATION_SCALE_RESOLUTION_REQUIRED",
+        "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
+      ],
+      "downstreamCalculationBlockers": [
+        "CURATION_POST_COOKING_FAT_QUANTITY_REQUIRED_FOR_CALCULATION"
+      ],
+      "warnings": [],
+      "state": "MEASUREMENT_INCOMPLETE"
+    },
+    {
+      "preparationId": "CP_MOONG_DAL",
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "submissionSha256": "069a279c51b31d7c54b505841431a22125f9056fe71120c09285b215454cdb1c",
+      "measurementRunId": null,
+      "measurementSha256": null,
+      "canonicalMeasurementEligible": false,
+      "validationErrors": [
+        "CURATION_OPERATOR_REQUIRED",
+        "CURATION_MEASUREMENT_DATE_REQUIRED",
+        "CURATION_EQUIPMENT_ID_REQUIRED",
+        "CURATION_SCALE_RESOLUTION_REQUIRED",
+        "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
+      ],
+      "downstreamCalculationBlockers": [
+        "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:RAW_MOONG_DAL"
+      ],
+      "warnings": [],
+      "state": "MEASUREMENT_INCOMPLETE"
+    },
+    {
+      "preparationId": "CP_BHINDI_SABJI",
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "submissionSha256": "6822a750fee7acd8cdea594428cd74ce0565eff97c6b085dd95722a3a7db2379",
+      "measurementRunId": null,
+      "measurementSha256": null,
+      "canonicalMeasurementEligible": false,
+      "validationErrors": [
+        "CURATION_OPERATOR_REQUIRED",
+        "CURATION_MEASUREMENT_DATE_REQUIRED",
+        "CURATION_EQUIPMENT_ID_REQUIRED",
+        "CURATION_SCALE_RESOLUTION_REQUIRED",
+        "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
+      ],
+      "downstreamCalculationBlockers": [],
+      "warnings": [],
+      "state": "MEASUREMENT_INCOMPLETE"
+    },
+    {
+      "preparationId": "CP_BHINDI_ALOO",
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "submissionSha256": "af1a6705ea6ff142b2e72875183449d913748ef96fff2418911d90963abb5ea8",
+      "measurementRunId": null,
+      "measurementSha256": null,
+      "canonicalMeasurementEligible": false,
+      "validationErrors": [
+        "CURATION_OPERATOR_REQUIRED",
+        "CURATION_MEASUREMENT_DATE_REQUIRED",
+        "CURATION_EQUIPMENT_ID_REQUIRED",
+        "CURATION_SCALE_RESOLUTION_REQUIRED",
+        "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
+      ],
+      "downstreamCalculationBlockers": [],
+      "warnings": [],
+      "state": "MEASUREMENT_INCOMPLETE"
+    },
+    {
+      "preparationId": "CP_POHA_PEANUT",
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "submissionSha256": "ab15f4d4bd79fe1efc1fb25852502be09a8867199998ff8e8e1d5cade4a4015f",
+      "measurementRunId": null,
+      "measurementSha256": null,
+      "canonicalMeasurementEligible": false,
+      "validationErrors": [
+        "CURATION_OPERATOR_REQUIRED",
+        "CURATION_MEASUREMENT_DATE_REQUIRED",
+        "CURATION_EQUIPMENT_ID_REQUIRED",
+        "CURATION_SCALE_RESOLUTION_REQUIRED",
+        "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
+      ],
+      "downstreamCalculationBlockers": [
+        "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:FLATTENED_RICE_POHA"
+      ],
+      "warnings": [
+        "CURATION_DRAINED_RINSE_WATER_EXCLUDED_FROM_RETAINED_INGREDIENT_WATER"
+      ],
+      "state": "MEASUREMENT_INCOMPLETE"
+    }
+  ]
+}

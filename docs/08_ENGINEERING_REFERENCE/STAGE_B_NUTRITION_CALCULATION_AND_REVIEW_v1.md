@@ -1,6 +1,6 @@
 # Stage B Nutrition Calculation and Review v1
 
-Status: engineering candidate. Real first-five calculation is blocked until governed physical measurements exist.
+Status: engineering candidate. User-confirmed physical values have been submitted, but canonical Measurement Runs remain blocked by missing audit metadata and governed Stage A formula approvals/hashes.
 
 ## Canonical path
 
@@ -21,11 +21,15 @@ Alternative terminal/intervention states are `SOURCE_DEPENDENCY_BLOCKED`, `CHANG
 
 ## Current factual state
 
-- Real first-five Measurement Runs: 0.
+- User-confirmed first-five physical submissions: 5, integrity-bound by non-canonical submission hashes.
+- Canonical first-five Measurement Runs: 0.
 - Real controlled calculations: 0.
 - Real Stage B approvals: 0.
 - Validation release: not created.
-- Primary next gate: `PHYSICAL_MEASUREMENT_EVIDENCE_REQUIRED`.
+- Primary next gate: `MEASUREMENT_PREREQUISITES_REQUIRED` (complete audit metadata, governed Stage A formula evidence, plus protocol-compliant Chapati piece sampling).
+- Missing audit data: operator, measurement date, equipment ID, and scale resolution for all five submissions.
+- Chapati: four of four produced pieces were recorded and reconcile to batch yield, but the accepted protocol explicitly requires at least five independently formed pieces; remeasurement is required. Post-cooking fat was reported without a quantitative weight and blocks calculation.
+- Peanut Poha: 250 ml water is explicitly classified as drained rinse water. The v1 calculation path does not apply an invented retention coefficient.
 - Raw Moong Dal source: unresolved in the current Pack 1 manifest.
 - Flattened Rice / Poha source: unresolved in the current Pack 1 manifest.
 - Semolina source: unresolved in the current Pack 1 manifest; not a first-five calculation dependency but remains a Batch 2 dependency.

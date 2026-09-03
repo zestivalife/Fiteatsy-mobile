@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { CalculatedPreparation, CalculationInputManifest, ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, MeasurementValidationResult, NutrientCode, NutrientVector, PreparationReview, StageBFoodStatus } from './controlled-curation.types.js';
+import type { CalculatedPreparation, CalculationInputManifest, ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, MeasurementSubmissionValidationResult, MeasurementValidationResult, NutrientCode, NutrientVector, PreparationReview, StageBFoodStatus } from './controlled-curation.types.js';
 
 const CORE: NutrientCode[] = ['energy_kcal', 'protein_g', 'carbohydrate_g', 'fat_g', 'fibre_g'];
 export const CALCULATION_METHOD_VERSION = 'FITEATSY_CONTROLLED_PREPARATION_V1' as const;
@@ -40,6 +40,35 @@ export const assertApprovedIngredient = (ingredient: IngredientFact, sources: Ma
 
 const mean = (values: number[]) => values.reduce((total, value) => total + value, 0) / values.length;
 const isSha256 = (value: string | undefined) => Boolean(value && /^[a-f0-9]{64}$/i.test(value));
+
+export const inspectMeasurementSubmission = (measurement: ControlledMeasurement): MeasurementSubmissionValidationResult => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  if (measurement.evidenceClassification !== 'USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE') errors.push('CURATION_EVIDENCE_CLASSIFICATION_INVALID');
+  if (!(measurement.finalPreparedWeightGrams > 0)) errors.push('CURATION_INVALID_MEASUREMENT_WEIGHT');
+  if (!(measurement.servingWeightGrams > 0)) errors.push('CURATION_INVALID_SERVING_WEIGHT');
+  for (const [id, value] of Object.entries(measurement.ingredientWeightsGrams)) {
+    if (!Number.isFinite(value) || value < 0) errors.push(`CURATION_INVALID_SUBMITTED_INGREDIENT:${id}`);
+  }
+  if (!Number.isFinite(measurement.waterGrams) || measurement.waterGrams < 0 || !Number.isFinite(measurement.oilGrams) || measurement.oilGrams < 0) errors.push('CURATION_INVALID_SUBMITTED_LIQUID_OR_FAT');
+  const observations = measurement.pieceWeightObservationsGrams?.length ? measurement.pieceWeightObservationsGrams : measurement.servingObservationsGrams;
+  if (!observations?.length || observations.some((value) => !Number.isFinite(value) || value <= 0)) errors.push('CURATION_SERVING_EVIDENCE_INCOMPLETE');
+  if (measurement.pieceWeightObservationsGrams) {
+    if (!Number.isInteger(measurement.producedPieceCount) || measurement.producedPieceCount! <= 0) errors.push('CURATION_PRODUCED_PIECE_COUNT_REQUIRED');
+    if (measurement.producedPieceCount !== measurement.pieceWeightObservationsGrams.length) errors.push('CURATION_PRODUCED_PIECE_OBSERVATION_MISMATCH');
+    const pieceTotal = measurement.pieceWeightObservationsGrams.reduce((sum, value) => sum + value, 0);
+    if (pieceTotal !== measurement.finalPreparedWeightGrams) errors.push('CURATION_PIECE_BATCH_WEIGHT_MISMATCH');
+    if (measurement.pieceWeightObservationsGrams.length < 5) errors.push('CURATION_PIECE_PROTOCOL_MINIMUM_NOT_MET');
+  } else if ((observations?.length ?? 0) < 3) errors.push('CURATION_SERVING_EVIDENCE_INCOMPLETE');
+  if (measurement.waterUse === 'RINSE_DRAINED') warnings.push('CURATION_DRAINED_RINSE_WATER_EXCLUDED_FROM_RETAINED_INGREDIENT_WATER');
+  if (!measurement.operator?.trim()) errors.push('CURATION_OPERATOR_REQUIRED');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(measurement.measurementDate)) errors.push('CURATION_MEASUREMENT_DATE_REQUIRED');
+  if (!measurement.equipmentId?.trim()) errors.push('CURATION_EQUIPMENT_ID_REQUIRED');
+  if (!(measurement.scaleResolutionGrams > 0)) errors.push('CURATION_SCALE_RESOLUTION_REQUIRED');
+  if (!isSha256(measurement.formulaSha256)) errors.push('CURATION_APPROVED_FORMULA_HASH_REQUIRED');
+  const submissionSha256 = calculationSha256({ ...measurement, submissionSha256: undefined, formulaSha256: measurement.formulaSha256 ?? null });
+  return { submissionSha256, evidenceClassification: 'USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE', errors, warnings, canonicalMeasurementEligible: errors.length === 0 };
+};
 
 export const inspectMeasurement = (spec: ControlledPreparationSpec, measurement: ControlledMeasurement): MeasurementValidationResult => {
   const errors: string[] = [];
@@ -82,6 +111,8 @@ export const inspectMeasurement = (spec: ControlledPreparationSpec, measurement:
     servingWeightGrams: measurement.servingWeightGrams,
     servingObservationsGrams: measurement.servingObservationsGrams ?? null,
     pieceWeightObservationsGrams: measurement.pieceWeightObservationsGrams ?? null,
+    producedPieceCount: measurement.producedPieceCount ?? null,
+    waterUse: measurement.waterUse ?? null,
     operator: measurement.operator,
     measurementDate: measurement.measurementDate,
     equipmentId: measurement.equipmentId,

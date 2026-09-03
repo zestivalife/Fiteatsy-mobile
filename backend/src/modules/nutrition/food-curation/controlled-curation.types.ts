@@ -64,6 +64,8 @@ export interface ControlledPreparationSpec {
 }
 
 export interface ControlledMeasurement {
+  evidenceClassification?: 'USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE';
+  submissionSha256?: string;
   measurementRunId?: string;
   preparationId: string;
   formulaVersion?: string;
@@ -76,6 +78,8 @@ export interface ControlledMeasurement {
   servingWeightGrams: number;
   servingObservationsGrams?: number[];
   pieceWeightObservationsGrams?: number[];
+  producedPieceCount?: number;
+  waterUse?: 'INGREDIENT' | 'RINSE_DRAINED' | 'NONE';
   operator: string;
   measurementDate: string;
   equipmentId?: string;
@@ -84,6 +88,14 @@ export interface ControlledMeasurement {
   deviations?: string[];
   status?: MeasurementState;
   notes?: string;
+}
+
+export interface MeasurementSubmissionValidationResult {
+  submissionSha256: string;
+  evidenceClassification: 'USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE';
+  errors: string[];
+  warnings: string[];
+  canonicalMeasurementEligible: boolean;
 }
 
 export interface PreparationReview {
