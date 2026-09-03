@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
-import { closePool, pool } from '../src/db/pool.js';
-import { migrateDatabase } from '../src/db/migrator.js';
-import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, revokeQaAssignment } from '../src/modules/admin/qa-provisioning.repository.js';
+import { closePool, pool } from '../db/pool.js';
+import { migrateDatabase } from '../db/migrator.js';
+import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, revokeQaAssignment } from '../modules/admin/qa-provisioning.repository.js';
 
 const PURPOSE = 'COMMON_FOOD_ENGINE_E2E';
 const FIXTURE_CODE = 'FITEATSY_COMMON_FOOD_PRODUCTION_E2E_V1';
@@ -92,4 +92,3 @@ const main = async () => {
 };
 
 void main().catch(error => { console.error(error instanceof Error ? error.message : 'PRODUCTION_QA_FAILED'); process.exitCode=1; }).finally(closePool);
-

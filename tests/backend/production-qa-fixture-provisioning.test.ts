@@ -5,7 +5,7 @@ import test from 'node:test';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 test('production QA fixture provisioning is narrow, explicit, and fail-closed', () => {
-  const script = read('../../backend/scripts/provision-common-food-production-qa.ts');
+  const script = read('../../backend/src/jobs/provision-common-food-production-qa.ts');
   assert.match(script, /ALLOW_PRODUCTION_QA_FIXTURES/);
   assert.match(script, /QA_FIXTURE_PURPOSE/);
   assert.match(script, /COMMON_FOOD_ENGINE_E2E/);
