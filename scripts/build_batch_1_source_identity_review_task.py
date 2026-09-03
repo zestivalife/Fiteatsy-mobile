@@ -8,18 +8,18 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "backend/src/modules/nutrition/FITEATSY_BATCH_1_SOURCE_IDENTITY_REVIEW_TASK_v1.docx"
+OUT = ROOT / "backend/src/modules/nutrition/FITEATSY_BATCH_1_SOURCE_IDENTITY_REVIEW_TASK_v1_UPDATED.docx"
 BLUE = "2E74B5"
 PALE = "E8EEF5"
 GRAY = "666666"
 WIDTHS = [2300, 7060]
 
 ITEMS = [
-    ("REFINED_SUNFLOWER_OIL", "USDA FDC 1750349", "Oil, sunflower", "Refined grade is not encoded. The Foundation record does not expose the complete mandatory Energy/Protein/Carbohydrate/Fat/Fibre vector.", "CC0 approved", "Incomplete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
-    ("COW_GHEE", "USDA FDC 173412", "Butter oil, anhydrous", "Cow species and ghee preparation equivalence are not established by the source description.", "CC0 approved", "Complete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
-    ("GROUNDNUT_OIL", "USDA FDC 171410", "Oil, peanut, salad or cooking", "Common-name equivalence is plausible, but the submitted grade/process is unspecified.", "CC0 approved", "Complete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
-    ("SPLIT_HULLED_YELLOW_MOONG_DAL", "No exact approved generic record", "FDC 174256 is whole mature mung seed, raw", "Whole mung and branded product records are not acceptable generic canonical proxies.", "No adopted record", "Unavailable", "CONFIRM NO MATCH   /   PROVIDE APPROVED EXACT SOURCE"),
-    ("DRY_FLATTENED_RICE_POHA", "No exact approved record", "No generic dry flattened-rice/Poha FDC record", "Generic, cooked, puffed, flour, noodle and cereal rice records are not acceptable proxies.", "No adopted record", "Unavailable", "CONFIRM NO MATCH   /   PROVIDE APPROVED EXACT SOURCE"),
+    ("REFINED_SUNFLOWER_OIL", "USDA FDC 1750349", "Oil, sunflower", "Refined grade is not established by the source description. The candidate also does not expose the complete mandatory Fiteatsy Energy/Protein/Carbohydrate/Fat/Fibre core vector. Even if identity is approved, calculation readiness remains blocked until the mandatory core vector is satisfied through an approved source path.", "CC0 approved", "Incomplete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
+    ("COW_GHEE", "USDA FDC 173412", "Butter oil, anhydrous", "Cow species and exact ghee-preparation equivalence are not established by the source description. Approval must confirm that this source is sufficiently equivalent to the required COW_GHEE identity; otherwise request an alternate approved source.", "CC0 approved", "Complete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
+    ("GROUNDNUT_OIL", "USDA FDC 171410", "Oil, peanut, salad or cooking", "Groundnut/peanut common-name equivalence is plausible, but exact grade/process is unspecified. Approval must confirm the candidate is sufficiently exact for the governed GROUNDNUT_OIL identity; otherwise request an alternate approved source.", "CC0 approved", "Complete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
+    ("SPLIT_HULLED_YELLOW_MOONG_DAL", "No exact approved generic record", "FDC 174256 is whole mature mung seed, raw", "Required preparation identity is split hulled yellow moong dal. Whole mature mung, whole green mung, generic lentils, and branded-product records are not acceptable generic canonical proxies.", "No adopted record", "Unavailable", "CONFIRM NO MATCH   /   PROVIDE APPROVED EXACT SOURCE"),
+    ("DRY_FLATTENED_RICE_POHA", "No exact approved record", "No generic dry flattened-rice/Poha FDC record", "Required preparation identity is dry flattened rice / Poha. Generic rice, cooked rice, puffed rice, rice flour, noodles, and generic rice cereal are not acceptable proxies.", "No adopted record", "Unavailable", "CONFIRM NO MATCH   /   PROVIDE APPROVED EXACT SOURCE"),
 ]
 
 def shade(cell, fill):
@@ -82,13 +82,19 @@ footer = sec.footer.paragraphs[0]; footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
 set_font(footer.add_run("Candidate-only review task | No production activation"), 8.5, False, GRAY)
 
 p=doc.add_paragraph(); p.paragraph_format.space_after=Pt(4); set_font(p.add_run("BATCH 1 SOURCE IDENTITY REVIEW TASK"), 22, True, "0B2545")
-p=doc.add_paragraph(); p.paragraph_format.space_after=Pt(14); set_font(p.add_run("FITEATSY_SOURCE_IDENTITY_REVIEW_TASK_v1 | Status: PENDING"), 11, True, BLUE)
-p=doc.add_paragraph(); p.paragraph_format.space_after=Pt(10); set_font(p.add_run("Purpose. "), 11, True); set_font(p.add_run("Record only the unresolved source-identity decisions needed by the five-food methodology cohort. Rights approval does not establish Food identity. No choice is preselected."), 11)
+p=doc.add_paragraph(); p.paragraph_format.space_after=Pt(14); set_font(p.add_run("FITEATSY_SOURCE_IDENTITY_REVIEW_TASK_v1 | Status: PENDING HUMAN IDENTITY REVIEW"), 11, True, BLUE)
+p=doc.add_paragraph(); p.paragraph_format.space_after=Pt(10); set_font(p.add_run("Purpose. "), 11, True); set_font(p.add_run("Record only the unresolved source-identity decisions needed by the five-food methodology cohort. Rights approval does not establish Food identity. No choice is preselected. Current engineering state: 7 ingredient mappings READY, Water METHOD READY, 3 candidate mappings require identity review, and 2 exact source matches remain unavailable."), 11)
 
 doc.add_heading("Reviewer record", level=1)
 t=doc.add_table(rows=0, cols=2); t.style="Table Grid"
-for label in ("Reviewer name / ID", "Qualification", "Qualification reference", "Review date", "Declaration / signature reference"):
-    add_kv(t, label, "____________________________________________________________")
+for label, value in (
+    ("Reviewer name / ID", "Priyanshi Srivastava"),
+    ("Qualification", "B. Pharma and MSc DFSM"),
+    ("Qualification reference", "2015 and 2024"),
+    ("Review date", "3 Sept 2026"),
+    ("Declaration / signature reference", "Priyanshi Srivastava"),
+):
+    add_kv(t, label, value)
 set_table_geometry(t)
 
 for idx, item in enumerate(ITEMS, 1):
@@ -103,6 +109,10 @@ for idx, item in enumerate(ITEMS, 1):
 doc.add_heading("Source record references", level=1)
 for url in ("https://fdc.nal.usda.gov/api-guide/", "https://fdc.nal.usda.gov/fdc-app.html#/food-details/1750349/nutrients", "https://fdc.nal.usda.gov/fdc-app.html#/food-details/173412/nutrients", "https://fdc.nal.usda.gov/fdc-app.html#/food-details/171410/nutrients"):
     p=doc.add_paragraph(); p.paragraph_format.space_after=Pt(3); set_font(p.add_run(url), 9, False, GRAY)
+
+doc.add_heading("Governance note", level=1)
+p=doc.add_paragraph(); p.paragraph_format.space_after=Pt(3)
+set_font(p.add_run("This task records source-identity decisions only. It does not constitute Stage A formula approval, physical-measurement approval, Stage B nutrition approval, or production release. Do not select APPROVE merely to unblock calculation. Where no exact approved source exists, CONFIRM NO MATCH is a valid outcome."), 10)
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 doc.save(OUT)

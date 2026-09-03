@@ -1,5 +1,19 @@
 import { pool } from '../../../db/pool.js';
-import type { CalculatedPreparation, ControlledMeasurement, MeasurementValidationResult, PreparationReview } from './controlled-curation.types.js';
+import type { CalculatedPreparation, ControlledMeasurement, MeasurementValidationResult, PreparationReview, SourceIdentityReviewOutcome, SourceIdentityReviewSubmission } from './controlled-curation.types.js';
+
+export const persistSourceIdentityReview = async (submission: SourceIdentityReviewSubmission, outcome: SourceIdentityReviewOutcome) => {
+  const result = await pool.query(
+    `insert into controlled_food_source_identity_reviews
+       (id, task_sha256, submission_sha256, reviewer_id, reviewer_qualification, qualification_reference, reviewed_on, declaration, decision_manifest)
+     values ($1,$2,$3,$4,$5,$6,$7::date,$8,$9::jsonb)
+     on conflict (submission_sha256) do nothing
+     returning *`,
+    [submission.submissionId, outcome.taskSha256, outcome.submissionSha256, submission.reviewerId, submission.reviewerQualification, submission.qualificationReference, submission.reviewedOn, submission.declaration, JSON.stringify({ decisions: submission.decisions, states: outcome.states })],
+  );
+  if (result.rows[0]) return result.rows[0];
+  const existing = await pool.query('select * from controlled_food_source_identity_reviews where submission_sha256=$1', [outcome.submissionSha256]);
+  return existing.rows[0];
+};
 
 export const persistMeasurementRun = async (measurement: ControlledMeasurement, validation: MeasurementValidationResult) => {
   if (validation.state !== 'COMPLETE' || !validation.measurementSha256) throw new Error('CURATION_MEASUREMENT_NOT_PERSISTABLE');

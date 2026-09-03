@@ -2,36 +2,37 @@
   "schemaVersion": "FITEATSY_STAGE_B_STATUS_V1",
   "generatedFromRepositoryState": true,
   "stageBEngineering": "CANDIDATE_IMPLEMENTED",
-  "firstFiveData": "STAGE_B_BLOCKED — PHYSICAL_MEASUREMENT_EVIDENCE_REQUIRED",
+  "firstFiveData": "PHYSICAL_EVIDENCE_PRESERVED — CANONICALISATION_BLOCKED",
   "controlledCurationMethodology": "PARTIAL",
   "indianFoodPopulation": "STILL_BLOCKED",
   "phase3ComponentHandoff": "BLOCKED",
   "production": "UNCHANGED",
-  "primaryNextGate": "PHYSICAL_MEASUREMENT_EVIDENCE_REQUIRED",
-  "realMeasurementRunsFound": 0,
+  "primaryNextGate": "STAGE_A_NUTRITIONIST_REVIEW_REQUIRED",
+  "physicalEvidenceSubmissionsFound": 5,
+  "canonicalMeasurementRunsFound": 0,
   "realCalculationsExecuted": 0,
   "realStageBApprovals": 0,
   "validationRelease": "NOT_CREATED",
   "foods": [
     {
       "preparationId": "CP_CHAPATI",
-      "state": "MEASUREMENT_REQUIRED"
+      "state": "PHYSICAL_EVIDENCE_PRESERVED_CANONICALISATION_BLOCKED"
     },
     {
       "preparationId": "CP_MOONG_DAL",
-      "state": "MEASUREMENT_REQUIRED"
+      "state": "PHYSICAL_EVIDENCE_PRESERVED_CANONICALISATION_BLOCKED"
     },
     {
       "preparationId": "CP_BHINDI_SABJI",
-      "state": "MEASUREMENT_REQUIRED"
+      "state": "PHYSICAL_EVIDENCE_PRESERVED_CANONICALISATION_BLOCKED"
     },
     {
       "preparationId": "CP_BHINDI_ALOO",
-      "state": "MEASUREMENT_REQUIRED"
+      "state": "PHYSICAL_EVIDENCE_PRESERVED_CANONICALISATION_BLOCKED"
     },
     {
       "preparationId": "CP_POHA_PEANUT",
-      "state": "MEASUREMENT_REQUIRED"
+      "state": "PHYSICAL_EVIDENCE_PRESERVED_CANONICALISATION_BLOCKED"
     }
   ]
 }

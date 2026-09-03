@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "FITEATSY_SOURCE_ACQUISITION_BLOCKERS_V1",
+  "status": "OPEN",
+  "items": [
+    {
+      "ingredient": "Split hulled yellow Moong Dal",
+      "requiredIdentity": "SPLIT_HULLED_YELLOW_MOONG_DAL",
+      "affectedFood": "CP_MOONG_DAL",
+      "existingRecordsRejected": ["USDA_FDC:174256 — whole mature mung seed, raw", "branded product records as generic truth"],
+      "unblockEvidence": "Exact source record, dataset version, usable rights evidence, and complete mandatory core Nutrition for split hulled yellow Moong Dal"
+    },
+    {
+      "ingredient": "Dry flattened rice / Poha",
+      "requiredIdentity": "DRY_FLATTENED_RICE_POHA",
+      "affectedFood": "CP_POHA_PEANUT",
+      "existingRecordsRejected": ["generic rice", "cooked rice", "puffed rice", "rice flour", "rice noodles", "generic rice cereal"],
+      "unblockEvidence": "Exact source record, dataset version, usable rights evidence, and complete mandatory core Nutrition for dry flattened rice / Poha"
+    }
+  ],
+  "licensedDataPath": "SUPPORTED_BY_SOURCE_REGISTRY_AFTER_SEPARATE_LICENCE_APPROVAL",
+  "ifctStatus": "RESEARCH_ONLY_NOT_ELIGIBLE"
+}

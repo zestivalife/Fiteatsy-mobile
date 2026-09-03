@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { BatchMeasurementAudit, CalculatedPreparation, CalculationInputManifest, ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, MeasurementSubmissionValidationResult, MeasurementValidationResult, NutrientCode, NutrientVector, PreparationReview, StageAFormulaReview, StageBFoodStatus } from './controlled-curation.types.js';
+import type { BatchMeasurementAudit, CalculatedPreparation, CalculationInputManifest, ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, MeasurementSubmissionValidationResult, MeasurementValidationResult, NutrientCode, NutrientVector, PreparationReview, SourceIdentityReviewOutcome, SourceIdentityReviewSubmission, SourceIdentityReviewTask, StageAFormulaReview, StageBFoodStatus } from './controlled-curation.types.js';
 
 const CORE: NutrientCode[] = ['energy_kcal', 'protein_g', 'carbohydrate_g', 'fat_g', 'fibre_g'];
 export const CALCULATION_METHOD_VERSION = 'FITEATSY_CONTROLLED_PREPARATION_V1' as const;
@@ -28,12 +28,61 @@ export const approvedFormulaSha256 = (spec: ControlledPreparationSpec, review: S
   return formulaSha256(spec);
 };
 
+export const sourceIdentityReviewTaskSha256 = (task: SourceIdentityReviewTask) => calculationSha256({
+  schemaVersion: task.schemaVersion,
+  items: task.items.map(({ canonicalIdentity, candidate, coreNutrition, choices }) => ({ canonicalIdentity, candidate, coreNutrition, choices })),
+});
+
+export const ingestSourceIdentityReview = (
+  task: SourceIdentityReviewTask,
+  submission: SourceIdentityReviewSubmission,
+  prior: SourceIdentityReviewSubmission[] = [],
+): SourceIdentityReviewOutcome => {
+  const expectedTaskSha256 = sourceIdentityReviewTaskSha256(task);
+  if (submission.taskSha256 !== expectedTaskSha256) throw new Error('CURATION_STALE_SOURCE_REVIEW');
+  if (!submission.submissionId.trim() || !submission.reviewerId.trim() || !submission.reviewerQualification.trim() || !submission.qualificationReference.trim() || !submission.declaration.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(submission.reviewedOn)) throw new Error('CURATION_SOURCE_REVIEW_AUTHORITY_REQUIRED');
+  if (submission.decisions.length !== task.items.length) throw new Error('CURATION_SOURCE_REVIEW_INCOMPLETE');
+  const decisionMap = new Map<string, SourceIdentityReviewSubmission['decisions'][number]>();
+  for (const decision of submission.decisions) {
+    if (decisionMap.has(decision.canonicalIdentity)) throw new Error(`CURATION_CONFLICTING_SOURCE_DECISIONS:${decision.canonicalIdentity}`);
+    decisionMap.set(decision.canonicalIdentity, decision);
+  }
+  const states: Record<string, string> = {};
+  for (const item of task.items) {
+    const decision = decisionMap.get(item.canonicalIdentity);
+    if (!decision || !item.choices.includes(decision.decision)) throw new Error(`CURATION_SOURCE_DECISION_INVALID:${item.canonicalIdentity}`);
+    if (decision.candidate !== item.candidate) throw new Error(`CURATION_STALE_SOURCE_CANDIDATE:${item.canonicalIdentity}`);
+    if (decision.decision === 'PROVIDE_APPROVED_EXACT_SOURCE') {
+      const source = decision.approvedExactSource;
+      if (!source?.sourceId.trim() || !source.recordId.trim() || !source.datasetVersion.trim() || !source.rightsEvidence.trim()) throw new Error(`CURATION_APPROVED_EXACT_SOURCE_EVIDENCE_REQUIRED:${item.canonicalIdentity}`);
+    } else if (decision.approvedExactSource) throw new Error(`CURATION_UNEXPECTED_ALTERNATE_SOURCE:${item.canonicalIdentity}`);
+    for (const historic of prior) {
+      if (historic.taskSha256 !== expectedTaskSha256) continue;
+      const earlier = historic.decisions.find((candidate) => candidate.canonicalIdentity === item.canonicalIdentity);
+      if (earlier && calculationSha256(earlier) !== calculationSha256(decision)) throw new Error(`CURATION_CONFLICTING_SOURCE_HISTORY:${item.canonicalIdentity}`);
+    }
+    states[item.canonicalIdentity] = decision.decision === 'APPROVE_EXACT_MAPPING'
+      ? (item.coreNutrition === 'COMPLETE' ? 'CANONICAL_INGREDIENT_READY' : 'IDENTITY_APPROVED_CORE_NUTRITION_INCOMPLETE')
+      : decision.decision === 'REJECT_MAPPING' ? 'SOURCE_MAPPING_REJECTED'
+        : decision.decision === 'REQUEST_ALTERNATE_SOURCE' ? 'SOURCE_ACQUISITION_REQUIRED'
+          : decision.decision === 'CONFIRM_NO_MATCH' ? 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH_CONFIRMED'
+            : 'APPROVED_EXACT_SOURCE_PENDING_REGISTRY_VALIDATION';
+  }
+  if (decisionMap.size !== task.items.length) throw new Error('CURATION_SOURCE_REVIEW_UNKNOWN_IDENTITY');
+  return { submissionSha256: calculationSha256(submission), taskSha256: expectedTaskSha256, states };
+};
+
+export const validateBatchMeasurementAudit = (audit: BatchMeasurementAudit) => {
+  if (!audit.operator.trim()) throw new Error('CURATION_OPERATOR_REQUIRED');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(audit.measurementDate)) throw new Error('CURATION_MEASUREMENT_DATE_REQUIRED');
+  if (!audit.equipmentId.trim()) throw new Error('CURATION_EQUIPMENT_ID_REQUIRED');
+  if (!(audit.scaleResolutionGrams > 0) || !Number.isFinite(audit.scaleResolutionGrams)) throw new Error('CURATION_SCALE_RESOLUTION_REQUIRED');
+  return audit;
+};
+
 export const applyBatchMeasurementAudit = (measurement: ControlledMeasurement, audit: BatchMeasurementAudit): ControlledMeasurement => ({
   ...measurement,
-  operator: audit.operator,
-  measurementDate: audit.measurementDate,
-  equipmentId: audit.equipmentId,
-  scaleResolutionGrams: audit.scaleResolutionGrams,
+  ...validateBatchMeasurementAudit(audit),
 });
 
 export const normalizeQuantityToGrams = (amount: number, unit: 'g' | 'mg' | 'µg' | 'ml', densityGramsPerMl?: number) => {

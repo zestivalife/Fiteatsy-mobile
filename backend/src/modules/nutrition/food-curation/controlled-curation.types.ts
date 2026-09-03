@@ -73,6 +73,49 @@ export interface StageAFormulaReview {
   declaration: string;
 }
 
+export type SourceIdentityDecision = 'APPROVE_EXACT_MAPPING' | 'REJECT_MAPPING' | 'REQUEST_ALTERNATE_SOURCE' | 'CONFIRM_NO_MATCH' | 'PROVIDE_APPROVED_EXACT_SOURCE';
+
+export interface SourceIdentityReviewItem {
+  canonicalIdentity: string;
+  candidate: string | null;
+  coreNutrition: 'COMPLETE' | 'INCOMPLETE' | 'UNAVAILABLE';
+  choices: SourceIdentityDecision[];
+}
+
+export interface SourceIdentityReviewTask {
+  schemaVersion: 'FITEATSY_SOURCE_IDENTITY_REVIEW_TASK_V1';
+  items: SourceIdentityReviewItem[];
+}
+
+export interface SourceIdentityReviewDecision {
+  canonicalIdentity: string;
+  decision: SourceIdentityDecision;
+  candidate: string | null;
+  approvedExactSource?: {
+    sourceId: string;
+    recordId: string;
+    datasetVersion: string;
+    rightsEvidence: string;
+  };
+}
+
+export interface SourceIdentityReviewSubmission {
+  submissionId: string;
+  taskSha256: string;
+  reviewerId: string;
+  reviewerQualification: string;
+  qualificationReference: string;
+  reviewedOn: string;
+  declaration: string;
+  decisions: SourceIdentityReviewDecision[];
+}
+
+export interface SourceIdentityReviewOutcome {
+  submissionSha256: string;
+  taskSha256: string;
+  states: Record<string, string>;
+}
+
 export interface BatchMeasurementAudit {
   operator: string;
   measurementDate: string;

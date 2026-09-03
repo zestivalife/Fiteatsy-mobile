@@ -14,7 +14,8 @@
     "requiredOncePerReviewer": ["reviewer identity", "qualification", "qualification reference", "declaration/signature"]
   },
   "sourceIdentityReview": {
-    "artifact": "FITEATSY_BATCH_1_SOURCE_IDENTITY_REVIEW_TASK_v1.docx",
+    "artifact": "FITEATSY_BATCH_1_SOURCE_IDENTITY_REVIEW_TASK_v1_UPDATED.docx",
+    "reviewerMetadataReceived": true,
     "requiredDecisions": ["REFINED_SUNFLOWER_OIL", "COW_GHEE", "GROUNDNUT_OIL"],
     "recordedNoMatch": ["SPLIT_HULLED_YELLOW_MOONG_DAL", "DRY_FLATTENED_RICE_POHA"]
   }

@@ -2,6 +2,13 @@
   "schemaVersion": "FITEATSY_SOURCE_IDENTITY_REVIEW_TASK_V1",
   "status": "PENDING",
   "notice": "No decision is preselected. Source rights approval does not establish canonical identity.",
+  "reviewer": {
+    "reviewerId": "Priyanshi Srivastava",
+    "reviewerQualification": "B. Pharma and MSc DFSM",
+    "qualificationReference": "2015 and 2024",
+    "reviewedOn": "2026-09-03",
+    "declaration": "Priyanshi Srivastava"
+  },
   "items": [
     {"canonicalIdentity":"REFINED_SUNFLOWER_OIL","candidate":"USDA_FDC:1750349","sourceDescription":"Oil, sunflower","identityConcern":"Refined grade is not encoded; mandatory Fiteatsy core Nutrition vector is incomplete.","rights":"CC0_APPROVED","coreNutrition":"INCOMPLETE","choices":["APPROVE_EXACT_MAPPING","REJECT_MAPPING","REQUEST_ALTERNATE_SOURCE"],"decision":"PENDING"},
     {"canonicalIdentity":"COW_GHEE","candidate":"USDA_FDC:173412","sourceDescription":"Butter oil, anhydrous","identityConcern":"Cow species and ghee preparation equivalence are not established by the source description.","rights":"CC0_APPROVED","coreNutrition":"COMPLETE","choices":["APPROVE_EXACT_MAPPING","REJECT_MAPPING","REQUEST_ALTERNATE_SOURCE"],"decision":"PENDING"},

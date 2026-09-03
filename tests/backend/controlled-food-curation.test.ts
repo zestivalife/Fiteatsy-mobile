@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { applyBatchMeasurementAudit, approvedFormulaSha256, assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, createCalculationInputManifest, deriveStageBStatus, formulaSha256, inspectMeasurement, inspectMeasurementSubmission, normalizeQuantityToGrams, reconcileCalculation, validateMeasurement } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
+import { applyBatchMeasurementAudit, approvedFormulaSha256, assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, createCalculationInputManifest, deriveStageBStatus, formulaSha256, ingestSourceIdentityReview, inspectMeasurement, inspectMeasurementSubmission, normalizeQuantityToGrams, reconcileCalculation, sourceIdentityReviewTaskSha256, validateBatchMeasurementAudit, validateMeasurement } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
+import type { SourceIdentityReviewSubmission, SourceIdentityReviewTask } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.types.js';
 import type { ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, PreparationReview } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.types.js';
 
 const approved: FoodSourceRegistryEntry = { id: 'USDA_FDC', name: 'FoodData Central', publisher: 'USDA ARS', datasetVersion: 'test-pinned', licence: 'CC0', commercialUse: 'YES', redistribution: 'YES', modification: 'YES', attribution: 'USDA ARS FoodData Central', reference: 'https://fdc.nal.usda.gov/', artefactSha256: 'a'.repeat(64), status: 'APPROVED', reviewNotes: '' };
@@ -217,7 +218,7 @@ test('source identity review remains concise, first-five-only and entirely pendi
   assert.equal(task.items.length, 5);
   assert.ok(task.items.every((item) => item.decision === 'PENDING'));
   assert.ok(!task.items.some((item) => item.canonicalIdentity === 'SEMOLINA'));
-  assert.equal(fs.existsSync(new URL('../../backend/src/modules/nutrition/FITEATSY_BATCH_1_SOURCE_IDENTITY_REVIEW_TASK_v1.docx', import.meta.url)), true);
+  assert.equal(fs.existsSync(new URL('../../backend/src/modules/nutrition/FITEATSY_BATCH_1_SOURCE_IDENTITY_REVIEW_TASK_v1_UPDATED.docx', import.meta.url)), true);
 });
 
 test('source revalidation separates exact identity, rights and mandatory core Nutrition', () => {
@@ -229,4 +230,72 @@ test('source revalidation separates exact identity, rights and mandatory core Nu
   assert.equal(byIdentity.get('Groundnut oil')?.coreNutrition, 'COMPLETE');
   assert.equal(byIdentity.get('Water')?.result, 'CANONICAL_PROCESS_EVIDENCE_METHOD_READY');
   assert.equal(byIdentity.has('Semolina'), false);
+});
+
+const sourceReviewTask = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-identity-review.pending.json', import.meta.url), 'utf8')) as SourceIdentityReviewTask;
+const completeSourceReview: SourceIdentityReviewSubmission = {
+  submissionId: 'source-review-fixture-1',
+  taskSha256: sourceIdentityReviewTaskSha256(sourceReviewTask),
+  reviewerId: 'reviewer-1',
+  reviewerQualification: 'Registered Dietitian',
+  qualificationReference: 'REG-123',
+  reviewedOn: '2026-09-03',
+  declaration: 'I reviewed each exact source identity.',
+  decisions: sourceReviewTask.items.map((item) => ({ canonicalIdentity: item.canonicalIdentity, candidate: item.candidate, decision: item.candidate ? 'APPROVE_EXACT_MAPPING' : 'CONFIRM_NO_MATCH' })),
+};
+
+test('source-review ingestion binds every decision to the exact current task and candidate', () => {
+  const outcome = ingestSourceIdentityReview(sourceReviewTask, completeSourceReview);
+  assert.equal(outcome.taskSha256, completeSourceReview.taskSha256);
+  assert.equal(outcome.states.REFINED_SUNFLOWER_OIL, 'IDENTITY_APPROVED_CORE_NUTRITION_INCOMPLETE');
+  assert.equal(outcome.states.COW_GHEE, 'CANONICAL_INGREDIENT_READY');
+  assert.equal(outcome.states.SPLIT_HULLED_YELLOW_MOONG_DAL, 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH_CONFIRMED');
+  assert.throws(() => ingestSourceIdentityReview(sourceReviewTask, { ...completeSourceReview, taskSha256: '0'.repeat(64) }), /CURATION_STALE_SOURCE_REVIEW/);
+  const staleCandidate = structuredClone(completeSourceReview);
+  staleCandidate.decisions[0].candidate = 'USDA_FDC:DIFFERENT';
+  assert.throws(() => ingestSourceIdentityReview(sourceReviewTask, staleCandidate), /CURATION_STALE_SOURCE_CANDIDATE/);
+});
+
+test('source-review ingestion fails closed for incomplete, duplicate, invalid and conflicting decisions', () => {
+  assert.throws(() => ingestSourceIdentityReview(sourceReviewTask, { ...completeSourceReview, decisions: completeSourceReview.decisions.slice(0, 4) }), /CURATION_SOURCE_REVIEW_INCOMPLETE/);
+  const duplicate = structuredClone(completeSourceReview);
+  duplicate.decisions[4] = structuredClone(duplicate.decisions[0]);
+  assert.throws(() => ingestSourceIdentityReview(sourceReviewTask, duplicate), /CURATION_CONFLICTING_SOURCE_DECISIONS/);
+  const rejected = structuredClone(completeSourceReview);
+  rejected.decisions[0].decision = 'REJECT_MAPPING';
+  assert.equal(ingestSourceIdentityReview(sourceReviewTask, rejected).states.REFINED_SUNFLOWER_OIL, 'SOURCE_MAPPING_REJECTED');
+  const alternate = structuredClone(completeSourceReview);
+  alternate.decisions[0].decision = 'REQUEST_ALTERNATE_SOURCE';
+  assert.equal(ingestSourceIdentityReview(sourceReviewTask, alternate).states.REFINED_SUNFLOWER_OIL, 'SOURCE_ACQUISITION_REQUIRED');
+  assert.throws(() => ingestSourceIdentityReview(sourceReviewTask, rejected, [completeSourceReview]), /CURATION_CONFLICTING_SOURCE_HISTORY/);
+});
+
+test('provided exact sources require complete identity, version and rights evidence', () => {
+  const provided = structuredClone(completeSourceReview);
+  provided.decisions[3].decision = 'PROVIDE_APPROVED_EXACT_SOURCE';
+  assert.throws(() => ingestSourceIdentityReview(sourceReviewTask, provided), /CURATION_APPROVED_EXACT_SOURCE_EVIDENCE_REQUIRED/);
+  provided.decisions[3].approvedExactSource = { sourceId: 'LICENSED_INDIA_DATA', recordId: 'MOONG-001', datasetVersion: '2026.1', rightsEvidence: 'licence-review-42' };
+  assert.equal(ingestSourceIdentityReview(sourceReviewTask, provided).states.SPLIT_HULLED_YELLOW_MOONG_DAL, 'APPROVED_EXACT_SOURCE_PENDING_REGISTRY_VALIDATION');
+});
+
+test('measurement audit metadata is validated before it can populate physical evidence', () => {
+  assert.throws(() => validateBatchMeasurementAudit({ operator: '', measurementDate: '2026-09-03', equipmentId: 'scale-1', scaleResolutionGrams: 1 }), /CURATION_OPERATOR_REQUIRED/);
+  assert.throws(() => validateBatchMeasurementAudit({ operator: 'operator-1', measurementDate: '03-09-2026', equipmentId: 'scale-1', scaleResolutionGrams: 1 }), /CURATION_MEASUREMENT_DATE_REQUIRED/);
+  assert.throws(() => validateBatchMeasurementAudit({ operator: 'operator-1', measurementDate: '2026-09-03', equipmentId: 'scale-1', scaleResolutionGrams: 0 }), /CURATION_SCALE_RESOLUTION_REQUIRED/);
+});
+
+test('source identity review persistence is append-only and separately auditable', () => {
+  const migration = fs.readFileSync(new URL('../../backend/src/db/migrations/0046_controlled_food_source_identity_review_history.sql', import.meta.url), 'utf8');
+  assert.match(migration, /controlled_food_source_identity_reviews/);
+  assert.match(migration, /submission_sha256 text not null unique/);
+  assert.match(migration, /task_sha256 text not null/);
+  assert.match(migration, /before update or delete/);
+});
+
+test('machine status distinguishes preserved physical submissions from canonical Measurement Runs', () => {
+  const statusScript = fs.readFileSync(new URL('../../backend/scripts/stage-b-status.ts', import.meta.url), 'utf8');
+  assert.match(statusScript, /batch-1\.user-confirmed-measurements\.json/);
+  assert.match(statusScript, /PHYSICAL_EVIDENCE_PRESERVED_CANONICALISATION_BLOCKED/);
+  assert.match(statusScript, /STAGE_A_NUTRITIONIST_REVIEW_REQUIRED/);
+  assert.match(statusScript, /canonicalMeasurementRunsFound: 0/);
 });
