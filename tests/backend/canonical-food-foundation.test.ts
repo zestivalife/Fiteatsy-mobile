@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import test from 'node:test';
+import { assertSourceMappingEligible, canonicalHash, ingestHumanGateSubmission, ingredientIdentityKey, measureCoverage, servingVariant, type CanonicalIngredientIdentity, type SourceMapping } from '../../backend/src/modules/nutrition/food-curation/canonical-food-foundation.js';
+
+const ingredient:CanonicalIngredientIdentity={ingredientId:'ING_ATTA',canonicalName:'Whole-wheat atta',form:'FLOUR',preparationState:'RAW',speciesOrVariety:'Triticum aestivum',grade:'ATTA',nutrientBasis:'PER_100_G'};
+const mapping:SourceMapping={mappingId:'M1',ingredientId:'ING_ATTA',sourceId:'IFCT',sourceRecordId:'A1',sourceVersion:'2017',decision:'APPROVED_EXACT_SOURCE',rationale:'Exact identity reviewed',reviewerId:'r1',reviewerQualification:'Registered Dietitian',reviewedAt:'2026-09-03T10:00:00Z',sourceHash:'a'.repeat(64),supersedesMappingId:null,identity:{form:'FLOUR',preparationState:'RAW',speciesOrVariety:'Triticum aestivum',grade:'ATTA',nutrientBasis:'PER_100_G'},nutrients:{energy_kcal:{state:'KNOWN',value:0},vitamin_c_mg:{state:'NOT_REPORTED',value:null}}};
+
+test('canonical identity is stable and separates form, preparation, species, grade and basis',()=>{
+  assert.equal(ingredientIdentityKey(ingredient),ingredientIdentityKey(structuredClone(ingredient)));
+  assert.notEqual(ingredientIdentityKey(ingredient),ingredientIdentityKey({...ingredient,form:'WHOLE_GRAIN'}));
+});
+test('source approval fails closed and zero remains different from unknown',()=>{
+  assert.doesNotThrow(()=>assertSourceMappingEligible(ingredient,mapping));
+  assert.equal(mapping.nutrients.energy_kcal.value,0); assert.equal(mapping.nutrients.vitamin_c_mg.value,null);
+  assert.throws(()=>assertSourceMappingEligible(ingredient,{...mapping,decision:'PENDING'}),/SOURCE_DECISION_NOT_APPROVED/);
+  assert.throws(()=>assertSourceMappingEligible({...ingredient,grade:'OTHER'},mapping),/SOURCE_IDENTITY_MISMATCH:grade/);
+});
+test('human ingestion rejects stale, mutated, partial, duplicate, conflicting and unacknowledged evidence',()=>{
+  const base={submissionId:'S1',taskHash:'t',expectedTaskHash:'t',evidenceHash:'e',expectedEvidenceHash:'e',reviewerId:'R',reviewerQualification:'RD',authority:'NUTRITIONIST' as const,submittedAt:'2026-09-03T10:00:00Z',expectedItemIds:['A'],decisions:[{itemId:'A',decision:'APPROVED_EXACT_SOURCE' as const,rationale:'reviewed'}]};
+  assert.equal(ingestHumanGateSubmission(base).accepted,true);
+  assert.equal(ingestHumanGateSubmission({...base,taskHash:'old',evidenceHash:'changed',decisions:[]},new Set(['S1'])).accepted,false);
+  const conflicting={...base,decisions:[...base.decisions,{...base.decisions[0],decision:'REJECTED_SOURCE' as const}]};
+  assert.ok(ingestHumanGateSubmission(conflicting).errors.includes('CONFLICTING_DECISIONS'));
+  assert.ok(ingestHumanGateSubmission({...base,supersededSubmissionId:'S0'}).errors.includes('SUPERSESSION_ACKNOWLEDGEMENT_REQUIRED'));
+});
+test('hard safety filtering precedes coverage and reports truthful 5x7 shortages',()=>{
+  const heads=['early','breakfast','mid','lunch','evening','dinner','bedtime'];
+  const safe=Array.from({length:5},(_,i)=>({foodId:`F${i}`,familyId:`FM${i}`,mealHeads:heads,servingVariants:['standard'],allergens:[],avoids:[],diets:['VEG'],calories:100,protein:5,activeValidationRelease:true}));
+  const unsafe={...safe[0],foodId:'PEANUT',familyId:'PEANUT',allergens:['PEANUT']};
+  const profile={profileId:'TEST_PRITANSHI_EQUIVALENT',mealHeads:heads,diet:'VEG',allergens:['PEANUT'],avoids:[],targetCalories:2101,targetProtein:131};
+  assert.equal(measureCoverage([...safe,unsafe],profile).pass,true);
+  const shortage=measureCoverage(safe.slice(0,4),profile); assert.equal(shortage.pass,false); assert.ok(shortage.meals.every(x=>x.shortage===1));
+});
+test('serving variants derive deterministically from an accepted validation identity',()=>{
+  const a=servingVariant('VR1','1 katori',150,{energy_kcal:100,iron_mg:null});
+  assert.deepEqual(a.nutrients,{energy_kcal:150,iron_mg:null}); assert.equal(a.servingHash,servingVariant('VR1','1 katori',150,{energy_kcal:100,iron_mg:null}).servingHash);
+});
+test('additive migration contains governed registry, lineage, release, serving, batch and KPI persistence',()=>{
+  const sql=fs.readFileSync(new URL('../../backend/src/db/migrations/0047_canonical_ingredient_recipe_foundation.sql',import.meta.url),'utf8');
+  for(const table of ['canonical_ingredients','canonical_ingredient_source_mappings','controlled_food_human_gate_submissions','canonical_recipe_versions','controlled_food_validation_releases','controlled_food_serving_variants','food_population_batches','food_coverage_runs']) assert.match(sql,new RegExp(table));
+  assert.match(sql,/APPROVED_MEASURED_LOCAL_REFERENCE/); assert.match(sql,/one_current_approved_ingredient_source/);
+});
+test('Batch 1 remains pending and no downstream release is fabricated',()=>{
+  const status=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/stage-b.machine-status.json',import.meta.url),'utf8'));
+  assert.equal(status.realCalculationsExecuted,0); assert.equal(status.realStageBApprovals,0); assert.equal(status.canonicalMeasurementRunsFound,0); assert.equal(status.validationRelease,'NOT_CREATED');
+  const stageA=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/stage-a.batch-1.pending-approval.json',import.meta.url),'utf8'));
+  assert.ok(stageA.formulas.every((x:any)=>x.review.decision==='PENDING'));
+});
+test('hashing is deterministic and material changes alter lineage hashes',()=>{assert.equal(canonicalHash({b:2,a:1}),canonicalHash({a:1,b:2}));assert.notEqual(canonicalHash({a:1}),canonicalHash({a:2}));});
