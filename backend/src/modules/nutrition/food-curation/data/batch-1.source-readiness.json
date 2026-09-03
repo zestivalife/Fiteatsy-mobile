@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "FITEATSY_BATCH_1_SOURCE_READINESS_V1",
+  "assessedAgainst": "repository-pinned Fiteatsy Catalogue v1.1 extract",
+  "sourceRegistry": "USDA_FDC:APPROVED; ICMR_NIN_IFCT_2017:RESEARCH_ONLY",
+  "ingredients": [
+    {"identity":"Whole-wheat atta","source":"USDA_FDC","sourceRecordId":"790085","result":"CANONICAL_INGREDIENT_READY","affectedFoods":["CP_CHAPATI"]},
+    {"identity":"Dusting flour","source":"USDA_FDC","sourceRecordId":"790085","result":"SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW","reason":"Stage A reviewer must confirm dusting flour is the same atta identity.","affectedFoods":["CP_CHAPATI"]},
+    {"identity":"Oil/ghee or oil","source":null,"sourceRecordId":null,"result":"NO_ACCEPTABLE_APPROVED_SOURCE_MATCH","reason":"Exact fat identity is not specified in the submitted formula evidence.","affectedFoods":["CP_CHAPATI","CP_MOONG_DAL","CP_BHINDI_SABJI","CP_BHINDI_ALOO","CP_POHA_PEANUT"]},
+    {"identity":"Raw Moong Dal — split/hulled state unresolved","source":"USDA_FDC","sourceRecordId":"174256","result":"SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW","reason":"Official candidate is whole mature mung seed, raw; it is not defensibly equivalent to split/hulled Moong Dal without identity review.","affectedFoods":["CP_MOONG_DAL"]},
+    {"identity":"Onion","source":"USDA_FDC","sourceRecordId":"790577","result":"CANONICAL_INGREDIENT_READY","affectedFoods":["CP_MOONG_DAL"]},
+    {"identity":"Garlic","source":"USDA_FDC","sourceRecordId":"169230","result":"CANONICAL_INGREDIENT_READY","affectedFoods":["CP_MOONG_DAL","CP_BHINDI_SABJI","CP_BHINDI_ALOO"]},
+    {"identity":"Bhindi / okra","source":"USDA_FDC","sourceRecordId":"169260","result":"CANONICAL_INGREDIENT_READY","affectedFoods":["CP_BHINDI_SABJI","CP_BHINDI_ALOO"]},
+    {"identity":"Potato","source":"USDA_FDC","sourceRecordId":"2346401","result":"CANONICAL_INGREDIENT_READY","affectedFoods":["CP_BHINDI_ALOO","CP_POHA_PEANUT"]},
+    {"identity":"Peanuts","source":"USDA_FDC","sourceRecordId":"2515376","result":"CANONICAL_INGREDIENT_READY","affectedFoods":["CP_POHA_PEANUT"]},
+    {"identity":"Dry flattened rice / Poha","source":null,"sourceRecordId":null,"result":"NO_ACCEPTABLE_APPROVED_SOURCE_MATCH","affectedFoods":["CP_POHA_PEANUT"]},
+    {"identity":"Semolina","source":"USDA_FDC latest channel","sourceRecordId":null,"result":"SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW","reason":"Official 2026 inventory lists fine and coarse/semi-coarse semolina, but neither is in the repository-pinned extract and no exact record was adopted.","affectedFoods":["BATCH_2_CP_UPMA"]}
+  ]
+}

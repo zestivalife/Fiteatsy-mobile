@@ -3,6 +3,13 @@
   "batchId": "FITEATSY-FIRST-FIVE-v1",
   "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
   "canonicalMeasurementRunsCreated": 0,
+  "batchAudit": {
+    "operator": null,
+    "measurementDate": null,
+    "equipmentId": null,
+    "scaleResolutionGrams": null,
+    "appliesToPreparationIds": ["CP_CHAPATI", "CP_MOONG_DAL", "CP_BHINDI_SABJI", "CP_BHINDI_ALOO", "CP_POHA_PEANUT"]
+  },
   "notice": "Submitted physical values are preserved exactly. Null audit/formula fields were not supplied and were not fabricated. Submission hashes are not canonical Measurement Hashes.",
   "referenceVessel": {
     "id": "FITEATSY_KATORI_V1",

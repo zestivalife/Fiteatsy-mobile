@@ -30,6 +30,9 @@ Alternative terminal/intervention states are `SOURCE_DEPENDENCY_BLOCKED`, `CHANG
 - Missing audit data: operator, measurement date, equipment ID, and scale resolution for all five submissions.
 - Chapati: four of four produced pieces were recorded and reconcile to batch yield, but the accepted protocol explicitly requires at least five independently formed pieces; remeasurement is required. Post-cooking fat was reported without a quantitative weight and blocks calculation.
 - Peanut Poha: 250 ml water is explicitly classified as drained rinse water. The v1 calculation path does not apply an invented retention coefficient.
+- Stage A review: actionable five-Food JSON and DOCX packs exist with every decision `PENDING`; Formula SHA-256 generation is approval-gated and deterministic.
+- Measurement audit metadata is modeled once at batch level and can be applied immutably to each submitted Food run.
+- Recipe foundation: `RECIPE_FOUNDATION_PARTIAL`. Migration 0044 preserves version-bound formula, ingredient, process-water, method, measurement, yield, and evidence hashes. A consumer-facing Recipe projection/UI remains intentionally out of scope.
 - Raw Moong Dal source: unresolved in the current Pack 1 manifest.
 - Flattened Rice / Poha source: unresolved in the current Pack 1 manifest.
 - Semolina source: unresolved in the current Pack 1 manifest; not a first-five calculation dependency but remains a Batch 2 dependency.

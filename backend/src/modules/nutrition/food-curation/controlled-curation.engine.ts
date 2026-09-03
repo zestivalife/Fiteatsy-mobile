@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { CalculatedPreparation, CalculationInputManifest, ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, MeasurementSubmissionValidationResult, MeasurementValidationResult, NutrientCode, NutrientVector, PreparationReview, StageBFoodStatus } from './controlled-curation.types.js';
+import type { BatchMeasurementAudit, CalculatedPreparation, CalculationInputManifest, ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, MeasurementSubmissionValidationResult, MeasurementValidationResult, NutrientCode, NutrientVector, PreparationReview, StageAFormulaReview, StageBFoodStatus } from './controlled-curation.types.js';
 
 const CORE: NutrientCode[] = ['energy_kcal', 'protein_g', 'carbohydrate_g', 'fat_g', 'fibre_g'];
 export const CALCULATION_METHOD_VERSION = 'FITEATSY_CONTROLLED_PREPARATION_V1' as const;
@@ -19,6 +19,21 @@ export const formulaSha256 = (spec: ControlledPreparationSpec) => calculationSha
   proposedServingLabel: spec.proposedServingLabel,
   hardContext: spec.hardContext ?? null,
   formulaVersion: spec.formulaVersion ?? 'UNVERSIONED',
+});
+
+export const approvedFormulaSha256 = (spec: ControlledPreparationSpec, review: StageAFormulaReview) => {
+  if (review.preparationId !== spec.preparationId || review.formulaVersion !== spec.formulaVersion) throw new Error('CURATION_STAGE_A_REVIEW_FORMULA_MISMATCH');
+  if (review.decision !== 'APPROVED') throw new Error('CURATION_STAGE_A_APPROVAL_REQUIRED');
+  if (!review.reviewerId.trim() || !review.reviewerQualification.trim() || !/^\d{4}-\d{2}-\d{2}T/.test(review.reviewedAt) || !review.declaration.trim()) throw new Error('CURATION_STAGE_A_REVIEW_AUTHORITY_REQUIRED');
+  return formulaSha256(spec);
+};
+
+export const applyBatchMeasurementAudit = (measurement: ControlledMeasurement, audit: BatchMeasurementAudit): ControlledMeasurement => ({
+  ...measurement,
+  operator: audit.operator,
+  measurementDate: audit.measurementDate,
+  equipmentId: audit.equipmentId,
+  scaleResolutionGrams: audit.scaleResolutionGrams,
 });
 
 export const normalizeQuantityToGrams = (amount: number, unit: 'g' | 'mg' | 'µg' | 'ml', densityGramsPerMl?: number) => {

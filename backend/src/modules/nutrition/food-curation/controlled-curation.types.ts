@@ -63,6 +63,23 @@ export interface ControlledPreparationSpec {
   };
 }
 
+export interface StageAFormulaReview {
+  preparationId: string;
+  formulaVersion: string;
+  decision: 'APPROVED' | 'CHANGES_REQUIRED' | 'REJECTED' | 'PENDING';
+  reviewerId: string;
+  reviewerQualification: string;
+  reviewedAt: string;
+  declaration: string;
+}
+
+export interface BatchMeasurementAudit {
+  operator: string;
+  measurementDate: string;
+  equipmentId: string;
+  scaleResolutionGrams: number;
+}
+
 export interface ControlledMeasurement {
   evidenceClassification?: 'USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE';
   submissionSha256?: string;

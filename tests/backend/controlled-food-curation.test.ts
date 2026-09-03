@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, createCalculationInputManifest, deriveStageBStatus, formulaSha256, inspectMeasurement, inspectMeasurementSubmission, normalizeQuantityToGrams, reconcileCalculation, validateMeasurement } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
+import { applyBatchMeasurementAudit, approvedFormulaSha256, assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, createCalculationInputManifest, deriveStageBStatus, formulaSha256, inspectMeasurement, inspectMeasurementSubmission, normalizeQuantityToGrams, reconcileCalculation, validateMeasurement } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
 import type { ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, PreparationReview } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.types.js';
 
 const approved: FoodSourceRegistryEntry = { id: 'USDA_FDC', name: 'FoodData Central', publisher: 'USDA ARS', datasetVersion: 'test-pinned', licence: 'CC0', commercialUse: 'YES', redistribution: 'YES', modification: 'YES', attribution: 'USDA ARS FoodData Central', reference: 'https://fdc.nal.usda.gov/', artefactSha256: 'a'.repeat(64), status: 'APPROVED', reviewNotes: '' };
@@ -146,4 +146,49 @@ test('drained rinse water remains explicit and is never treated as retained ingr
   assert.equal(poha.waterUse, 'RINSE_DRAINED');
   assert.equal(poha.waterGrams, 250);
   assert.ok(result.warnings.includes('CURATION_DRAINED_RINSE_WATER_EXCLUDED_FROM_RETAINED_INGREDIENT_WATER'));
+});
+
+test('Stage A formula hash requires qualified approval and ignores non-material review prose', () => {
+  const approvedReview = { preparationId: spec.preparationId, formulaVersion: spec.formulaVersion!, decision: 'APPROVED' as const, reviewerId: 'nutritionist-1', reviewerQualification: 'Registered Dietitian', reviewedAt: '2026-09-03T10:00:00Z', declaration: 'I approve this exact formula.' };
+  const hash = approvedFormulaSha256(spec, approvedReview);
+  assert.equal(hash, formulaSha256(spec));
+  assert.equal(hash, approvedFormulaSha256(structuredClone(spec), { ...approvedReview, declaration: 'Different declaration text.' }));
+  assert.notEqual(hash, approvedFormulaSha256({ ...spec, proposedWaterGrams: spec.proposedWaterGrams + 1 }, approvedReview));
+  assert.throws(() => approvedFormulaSha256(spec, { ...approvedReview, decision: 'PENDING' }), /CURATION_STAGE_A_APPROVAL_REQUIRED/);
+  assert.throws(() => approvedFormulaSha256(spec, { ...approvedReview, reviewerQualification: '' }), /CURATION_STAGE_A_REVIEW_AUTHORITY_REQUIRED/);
+});
+
+test('one explicit batch audit can populate each run without changing submitted physical values', () => {
+  const audit = { operator: 'operator-1', measurementDate: '2026-09-03', equipmentId: 'scale-1', scaleResolutionGrams: 1 };
+  const audited = applyBatchMeasurementAudit(measurement, audit);
+  assert.equal(audited.operator, audit.operator);
+  assert.equal(audited.measurementDate, audit.measurementDate);
+  assert.deepEqual(audited.ingredientWeightsGrams, measurement.ingredientWeightsGrams);
+  assert.equal(audited.finalPreparedWeightGrams, measurement.finalPreparedWeightGrams);
+});
+
+test('Stage A persistence and version-bound preparation evidence preserve recipe foundation', () => {
+  const migration = fs.readFileSync(new URL('../../backend/src/db/migrations/0044_controlled_food_stage_a_and_preparation_evidence.sql', import.meta.url), 'utf8');
+  assert.match(migration, /controlled_food_stage_a_formula_reviews/);
+  assert.match(migration, /decision in \('PENDING','APPROVED','CHANGES_REQUIRED','REJECTED'\)/);
+  assert.match(migration, /controlled_food_preparation_evidence/);
+  assert.match(migration, /formula_review_id text not null references controlled_food_stage_a_formula_reviews/);
+  assert.match(migration, /process_water_manifest jsonb/);
+});
+
+test('Stage A Batch 1 review pack is actionable and defaults every decision to pending', () => {
+  const pack = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/stage-a.batch-1.pending-approval.json', import.meta.url), 'utf8')) as { status: string; formulas: Array<{ preparationId: string; formulaVersion: string; review: { decision: string }; water: { handling: string } }> };
+  assert.equal(pack.status, 'PENDING');
+  assert.deepEqual(pack.formulas.map((item) => item.preparationId), ['CP_CHAPATI', 'CP_MOONG_DAL', 'CP_BHINDI_SABJI', 'CP_BHINDI_ALOO', 'CP_POHA_PEANUT']);
+  assert.ok(pack.formulas.every((item) => item.formulaVersion && item.review.decision === 'PENDING'));
+  assert.equal(pack.formulas.find((item) => item.preparationId === 'CP_POHA_PEANUT')?.water.handling, 'PROCESS_WATER_RINSE_DRAINED_NOT_RETAINED');
+});
+
+test('Batch 1 source readiness remains exact and fail-closed for Moong Dal, Poha and unspecified fat', () => {
+  const source = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-readiness.json', import.meta.url), 'utf8')) as { ingredients: Array<{ identity: string; result: string }> };
+  const byIdentity = new Map(source.ingredients.map((item) => [item.identity, item.result]));
+  assert.equal(byIdentity.get('Dry flattened rice / Poha'), 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH');
+  assert.equal(byIdentity.get('Raw Moong Dal — split/hulled state unresolved'), 'SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW');
+  assert.equal(byIdentity.get('Oil/ghee or oil'), 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH');
+  assert.equal(byIdentity.get('Whole-wheat atta'), 'CANONICAL_INGREDIENT_READY');
 });
