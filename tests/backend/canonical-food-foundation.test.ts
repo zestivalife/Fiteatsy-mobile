@@ -39,7 +39,7 @@ test('serving variants derive deterministically from an accepted validation iden
 test('additive migration contains governed registry, lineage, release, serving, batch and KPI persistence',()=>{
   const sql=fs.readFileSync(new URL('../../backend/src/db/migrations/0047_canonical_ingredient_recipe_foundation.sql',import.meta.url),'utf8');
   for(const table of ['canonical_ingredients','canonical_ingredient_source_mappings','controlled_food_human_gate_submissions','canonical_recipe_versions','controlled_food_validation_releases','controlled_food_serving_variants','food_population_batches','food_coverage_runs']) assert.match(sql,new RegExp(table));
-  assert.match(sql,/APPROVED_MEASURED_LOCAL_REFERENCE/); assert.match(sql,/one_current_approved_ingredient_source/);
+  assert.match(sql,/APPROVED_MEASURED_LOCAL_REFERENCE/); assert.match(sql,/CANONICAL_INGREDIENT_SOURCE_SUPERSESSION_REQUIRED/); assert.match(sql,/CANONICAL_FOUNDATION_HISTORY_IS_APPEND_ONLY/);
 });
 test('Batch 1 remains pending and no downstream release is fabricated',()=>{
   const status=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/stage-b.machine-status.json',import.meta.url),'utf8'));
