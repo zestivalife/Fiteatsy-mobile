@@ -160,7 +160,7 @@ const main = async () => {
   currentPhase = 'REQUEST_CHANGES';
   const changes=await ok(tokens.senior,'POST',`${vegBase}/diet-plans/${planId}/request-changes`,{comment:'QA v17.6: verify one serving and resubmit.'});
   currentPhase = 'REVISE';
-  const revised=await ok(tokens.consultant,'PATCH',`${vegBase}/diet-plans/${planId}`,{content:changes.body.version.content,reviewNotes:'QA serving verified; resubmitting.'});
+  const revised=changes;
   currentPhase = 'REVISE_COMMON_FOOD_OPTION';
   await ok(tokens.consultant,'PATCH',`${vegBase}/diet-plans/${planId}/common-food/options/${optionId}/components/${first.foodId}/serving`,{expectedPlanVersionId:revised.body.version.id,servingId:first.servingId,multiplier:first.multiplier});
   currentPhase = 'RESUBMIT';
