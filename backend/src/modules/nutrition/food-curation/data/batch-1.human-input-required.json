@@ -9,12 +9,13 @@
     "scaleResolutionGrams": null
   },
   "stageAReview": {
-    "artifact": "FITEATSY_STAGE_A_NUTRITIONIST_APPROVAL_PACK_BATCH_1_v1.docx",
+    "artifact": "FITEATSY_STAGE_A_NUTRITIONIST_APPROVAL_PACK_BATCH_1_v1_UPDATED.docx",
     "requiredPerFood": ["decision", "reason", "reviewer reference", "date"],
     "requiredOncePerReviewer": ["reviewer identity", "qualification", "qualification reference", "declaration/signature"]
   },
-  "chapatiOnly": {
-    "artifact": "FITEATSY_CHAPATI_PROTOCOL_COMPLIANT_REMEASUREMENT_TASK_v1.docx",
-    "required": ["approved Formula Hash binding", "actual ingredient quantities", "final cooked batch weight", "at least five independently formed piece weights", "quantitative post-cooking fat", "operator/date/equipment/scale metadata"]
+  "sourceIdentityReview": {
+    "artifact": "FITEATSY_BATCH_1_SOURCE_IDENTITY_REVIEW_TASK_v1.docx",
+    "requiredDecisions": ["REFINED_SUNFLOWER_OIL", "COW_GHEE", "GROUNDNUT_OIL"],
+    "recordedNoMatch": ["SPLIT_HULLED_YELLOW_MOONG_DAL", "DRY_FLATTENED_RICE_POHA"]
   }
 }

@@ -210,3 +210,23 @@ test('measurement submission history is append-only and separate from canonical 
   assert.match(migration, /submission_sha256 text not null unique/);
   assert.match(migration, /supersedes_submission_id text references controlled_food_measurement_submissions/);
 });
+
+test('source identity review remains concise, first-five-only and entirely pending', () => {
+  const task = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-identity-review.pending.json', import.meta.url), 'utf8')) as { status: string; items: Array<{ canonicalIdentity: string; decision: string }> };
+  assert.equal(task.status, 'PENDING');
+  assert.equal(task.items.length, 5);
+  assert.ok(task.items.every((item) => item.decision === 'PENDING'));
+  assert.ok(!task.items.some((item) => item.canonicalIdentity === 'SEMOLINA'));
+  assert.equal(fs.existsSync(new URL('../../backend/src/modules/nutrition/FITEATSY_BATCH_1_SOURCE_IDENTITY_REVIEW_TASK_v1.docx', import.meta.url)), true);
+});
+
+test('source revalidation separates exact identity, rights and mandatory core Nutrition', () => {
+  const source = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-readiness.json', import.meta.url), 'utf8')) as { schemaVersion: string; ingredients: Array<{ identity: string; coreNutrition?: string; result: string }> };
+  assert.equal(source.schemaVersion, 'FITEATSY_BATCH_1_SOURCE_READINESS_V2');
+  const byIdentity = new Map(source.ingredients.map((item) => [item.identity, item]));
+  assert.equal(byIdentity.get('Refined sunflower oil')?.coreNutrition, 'INCOMPLETE_FOR_FITEATSY_CORE');
+  assert.equal(byIdentity.get('Cow ghee')?.coreNutrition, 'COMPLETE');
+  assert.equal(byIdentity.get('Groundnut oil')?.coreNutrition, 'COMPLETE');
+  assert.equal(byIdentity.get('Water')?.result, 'CANONICAL_PROCESS_EVIDENCE_METHOD_READY');
+  assert.equal(byIdentity.has('Semolina'), false);
+});

@@ -43,7 +43,6 @@ const report = {
   sourceResolution: [
     { ingredient: 'SPLIT_HULLED_YELLOW_MOONG_DAL', result: 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH', affectedFood: 'CP_MOONG_DAL' },
     { ingredient: 'FLATTENED_RICE_POHA', result: 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH', affectedFood: 'CP_POHA_PEANUT' },
-    { ingredient: 'SEMOLINA', result: 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH', affectedFood: 'BATCH_2_CP_UPMA' }
   ],
   foods,
 };
