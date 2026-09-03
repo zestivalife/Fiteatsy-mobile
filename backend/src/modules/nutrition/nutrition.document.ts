@@ -122,6 +122,7 @@ const buildTemplateMap = (plan: DietPlanRecord, version: DietPlanVersionRecord) 
       tokens[`${tokenPrefix}_${slot}_protein`] = option.protein;
     });
   });
+  for(const raw of version.commonFoodOptions){const option=raw as Record<string,unknown>;const mealHead=String(option.mealHead??'').toLowerCase();const prefix=mealHead==='mid_morning'?'mid_morning':mealHead==='evening_snack'?'evening_snack':mealHead==='early_morning'?'early_morning':mealHead==='bedtime'?'bedtime':mealHead;const components=Array.isArray(option.components)?option.components as Array<Record<string,unknown>>:[];const index=version.commonFoodOptions.filter((candidate)=>String((candidate as Record<string,unknown>).mealHead)===String(option.mealHead)).indexOf(raw)+1;if(!prefix||index<1||index>5)continue;tokens[`${prefix}_${index}_meal`]=components.map(c=>`${ensureString(c.label,'')} ${ensureString(c.foodDisplayNameSnapshot,'')}`.trim()).join(' + ');tokens[`${prefix}_${index}_portion`]=components.map(c=>ensureString(c.label,'')).join(' • ');const nutrition=option.nutrition as Record<string,unknown>|undefined;tokens[`${prefix}_${index}_kcal`]=`${nutrition?.kcal??'Not available'} kcal`;tokens[`${prefix}_${index}_protein`]=`${nutrition?.protein??'Not available'} g`;}
 
   hydration.forEach((item, index) => {
     const slot = index + 1;

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { assignRoleAsAdmin, getAdminStatus } from './admin.service.js';
 import { assignQaClient, deactivateQa, getQaAssignmentsForAdmin, getQaIdentityForAdmin, issueQaSession, provisionQa, resetQaClientOnboarding, revokeQaClientAssignment } from './qa-provisioning.service.js';
+import { addAdminCommonFoodAlias, addAdminCommonFoodServing, CommonFoodAdminError, inspectAdminCommonFood, listAdminCommonFoods, removeAdminCommonFoodAlias, setAdminCommonFoodMeal, setAdminCommonFoodRole, setAdminCommonFoodState } from './common-food-admin.service.js';
 
 export const adminRouter = Router();
 
@@ -27,6 +28,16 @@ const qaAssignmentSchema = z.object({ consultantUserId: z.string().trim().min(1)
 const qaRevokeSchema = z.object({ reason: z.string().trim().min(3).max(240) });
 
 adminRouter.use(requireAuthenticatedAccount);
+const adminReason=z.string().trim().min(3).max(240);
+const adminError=(res:import('express').Response,error:unknown)=>{if(error instanceof CommonFoodAdminError)return res.status(error.statusCode).json({error:error.code,message:error.message});throw error;};
+adminRouter.get('/common-foods',async(req,res)=>{const parsed=z.object({active:z.enum(['true','false']).transform(x=>x==='true').optional(),category:z.string().optional(),family:z.string().optional(),sourcePolicy:z.string().optional(),generatorEligible:z.enum(['true','false']).transform(x=>x==='true').optional(),mealHead:z.string().optional()}).safeParse(req.query);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{return res.json(await listAdminCommonFoods(getAuthenticatedAccount(req),parsed.data));}catch(e){return adminError(res,e);}});
+adminRouter.get('/common-foods/:foodId',async(req,res)=>{try{return res.json(await inspectAdminCommonFood(getAuthenticatedAccount(req),req.params.foodId));}catch(e){return adminError(res,e);}});
+adminRouter.patch('/common-foods/:foodId/state',async(req,res)=>{const parsed=z.object({active:z.boolean().optional(),generatorEligible:z.boolean().optional(),reason:adminReason}).refine(x=>x.active!==undefined||x.generatorEligible!==undefined).safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{return res.json(await setAdminCommonFoodState(getAuthenticatedAccount(req),req.params.foodId,parsed.data));}catch(e){return adminError(res,e);}});
+adminRouter.post('/common-foods/:foodId/aliases',async(req,res)=>{const parsed=z.object({alias:z.string().trim().min(1),reason:adminReason}).safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{return res.status(201).json(await addAdminCommonFoodAlias(getAuthenticatedAccount(req),req.params.foodId,parsed.data));}catch(e){return adminError(res,e);}});
+adminRouter.delete('/common-foods/:foodId/aliases/:aliasId',async(req,res)=>{const parsed=z.object({reason:adminReason}).safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{return res.json(await removeAdminCommonFoodAlias(getAuthenticatedAccount(req),req.params.foodId,req.params.aliasId,parsed.data.reason));}catch(e){return adminError(res,e);}});
+adminRouter.post('/common-foods/:foodId/servings',async(req,res)=>{const parsed=z.object({displayName:z.string().min(1),grams:z.number().positive(),minMultiplier:z.number().positive(),maxMultiplier:z.number().positive(),allowedMultipliers:z.array(z.number().positive()).min(1),reason:adminReason}).safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{return res.status(201).json(await addAdminCommonFoodServing(getAuthenticatedAccount(req),req.params.foodId,parsed.data));}catch(e){return adminError(res,e);}});
+adminRouter.put('/common-foods/:foodId/meal-eligibility',async(req,res)=>{const parsed=z.object({mealHead:z.string().min(1),eligible:z.boolean(),reason:adminReason}).safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{return res.json(await setAdminCommonFoodMeal(getAuthenticatedAccount(req),req.params.foodId,parsed.data));}catch(e){return adminError(res,e);}});
+adminRouter.put('/common-foods/:foodId/roles',async(req,res)=>{const parsed=z.object({role:z.string().min(1),enabled:z.boolean(),reason:adminReason}).safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{return res.json(await setAdminCommonFoodRole(getAuthenticatedAccount(req),req.params.foodId,parsed.data));}catch(e){return adminError(res,e);}});
 
 adminRouter.get('/status', async (req, res) => {
   const result = await getAdminStatus(getAuthenticatedAccount(req));

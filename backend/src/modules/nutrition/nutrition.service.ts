@@ -47,6 +47,7 @@ import { isDietaryPatternCompatible, listMealLibrarySlotsForTarget, listVerified
 import { getFoodPreferenceProfile, type FoodPreferenceProfile } from './food-preferences.service.js';
 import { OptionalGuidanceContractError, validateOptionalGuidanceV2 } from './optional-guidance-contract.js';
 import { CALORIE_MACRO_ALLOCATION_CONFIG, CALORIE_MACRO_ALLOCATION_METHODOLOGY_VERSION, optimiseMealOptionPortion, validateAllocatedDiet } from './calorie-macro-allocation.js';
+import { freezeCombinationOptionsForLifecycle } from './common-food-consultant.repository.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
@@ -2345,6 +2346,7 @@ export const submitConsultantDietPlanForReview = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
   const version = await getCurrentDietPlanVersion(plan.id);
   if (!version) return null;
+  await freezeCombinationOptionsForLifecycle(plan.id, version.id);
   assertDietPlanReviewContentComplete(version.content);
   await assertOptionalGuidanceValid(publicClientId, version.content);
   assertLifecycleTransition(version.lifecycleStatus, 'submitted_for_review');
@@ -2624,6 +2626,11 @@ export const getPublishedDietPlanForClient = async (owner: ClientOwnershipContex
     version: {
       ...payload.version,
       content: sanitizePublishedNutritionPlanContent(payload.version.content),
+      commonFoodOptions: payload.version.commonFoodOptions.map((option) => {
+        const item=option as Record<string,unknown>;
+        const components=Array.isArray(item.components)?item.components.map((component)=>{const c=component as Record<string,unknown>;return {id:c.componentId,name:c.foodDisplayNameSnapshot,serving:c.servingDisplayNameSnapshot,multiplier:c.multiplier,grams:c.grams,millilitres:c.millilitres,nutrition:c.nutrition};}):[];
+        return {type:'COMBINATION',id:item.combinationId,summary:components.map((c)=>`${c.multiplier} × ${c.serving} ${c.name}`).join(' + '),components,nutrition:item.nutrition,optionHash:item.optionHash,version:item.snapshotVersion};
+      }),
     },
   };
 };
@@ -2968,7 +2975,8 @@ export const logClientNutritionEvent = async (owner: ClientOwnershipContext, inp
     (input.optionId && option.id === input.optionId) ||
     (!input.optionId && input.mealName && option.meal === input.mealName),
   );
-  if (input.state === 'CONSUMED_APPROVED' && !selectedOption) {
+  const selectedCombination = published.version.commonFoodOptions.find((option) => (option as Record<string,unknown>).combinationId === input.optionId) as Record<string,unknown>|undefined;
+  if (input.state === 'CONSUMED_APPROVED' && !selectedOption && !selectedCombination) {
     throw new NutritionPlanWorkflowError('OPTION_NOT_FOUND', 'Choose an approved option from the published plan.', 400);
   }
   const eventType = input.litres != null ? 'water_logged' : 'meal_logged';
@@ -2986,13 +2994,13 @@ export const logClientNutritionEvent = async (owner: ClientOwnershipContext, inp
       versionId: input.versionId,
       mealKey: input.mealKey,
       state: input.state,
-      optionId: selectedOption?.id ?? input.optionId ?? null,
+      optionId: selectedOption?.id ?? (String(selectedCombination?.combinationId??input.optionId??'') || null),
       mealName: selectedOption?.meal ?? input.mealName ?? null,
-      calories: selectedOption?.approxKcal ?? input.calories ?? null,
-      proteinGrams: selectedOption?.proteinGrams ?? input.proteinGrams ?? null,
-      carbsGrams: selectedOption?.carbsGrams ?? input.carbsGrams ?? null,
-      fatGrams: selectedOption?.fatGrams ?? input.fatGrams ?? null,
-      fibreGrams: selectedOption?.fibreGrams ?? input.fibreGrams ?? null,
+      calories: selectedCombination ? (selectedCombination.nutrition as Record<string,unknown>)?.kcal ?? null : selectedOption?.approxKcal ?? input.calories ?? null,
+      proteinGrams: selectedCombination ? (selectedCombination.nutrition as Record<string,unknown>)?.protein ?? null : selectedOption?.proteinGrams ?? input.proteinGrams ?? null,
+      carbsGrams: selectedCombination ? (selectedCombination.nutrition as Record<string,unknown>)?.carbohydrate ?? null : selectedOption?.carbsGrams ?? input.carbsGrams ?? null,
+      fatGrams: selectedCombination ? (selectedCombination.nutrition as Record<string,unknown>)?.fat ?? null : selectedOption?.fatGrams ?? input.fatGrams ?? null,
+      fibreGrams: selectedCombination ? (selectedCombination.nutrition as Record<string,unknown>)?.fibre ?? null : selectedOption?.fibreGrams ?? input.fibreGrams ?? null,
       litres: input.litres ?? null,
       nutritionDate: nutritionDateKey(eventTimeISO),
     },

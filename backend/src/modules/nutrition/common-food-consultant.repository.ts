@@ -1,5 +1,6 @@
 import { pool } from '../../db/pool.js';
 import type { GeneratedCombination, MealHead } from './common-food-engine.js';
+import { canonicalHash } from './food-curation/canonical-food-foundation.js';
 
 export type CombinationSnapshot = GeneratedCombination & { optionHash: string; snapshotVersion: number };
 
@@ -49,4 +50,12 @@ export async function getCombinationOption(id:string,planId:string):Promise<Comb
 export async function listCombinationOptions(planId:string,planVersionId:string){
   const result=await pool.query(`select distinct on (logical_option_id) logical_option_id from diet_plan_combination_options where diet_plan_id=$1 and diet_plan_version_id=$2 order by logical_option_id,version desc`,[planId,planVersionId]);
   return Promise.all(result.rows.map((row)=>getCombinationOption(String(row.logical_option_id),planId)));
+}
+
+export async function freezeCombinationOptionsForLifecycle(planId:string,planVersionId:string){
+  const options=(await listCombinationOptions(planId,planVersionId)).filter((x):x is CombinationSnapshot=>x!==null);
+  const snapshotHash=canonicalHash({planId,planVersionId,options});
+  const result=await pool.query(`update diet_plan_versions set common_food_options=$3::jsonb,common_food_snapshot_hash=$4,updated_at=now() where id=$2 and diet_plan_id=$1 and lifecycle_status in ('draft','changes_requested','submitted_for_review') returning id`,[planId,planVersionId,JSON.stringify(options),snapshotHash]);
+  if(!result.rowCount)throw Object.assign(new Error('LIFECYCLE_SNAPSHOT_FREEZE_FAILED'),{code:'LIFECYCLE_SNAPSHOT_FREEZE_FAILED'});
+  return {options,snapshotHash};
 }

@@ -610,6 +610,8 @@ export type DietPlanVersionRecord = AuditFields & {
   reviewNotes: string | null;
   exportedDocPath: string | null;
   exportedPdfPath: string | null;
+  commonFoodOptions: unknown[];
+  commonFoodSnapshotHash: string | null;
 };
 
 export type ReportPipelineProgress = {
