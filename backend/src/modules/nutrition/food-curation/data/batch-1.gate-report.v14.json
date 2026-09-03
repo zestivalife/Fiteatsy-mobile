@@ -1,0 +1,13 @@
+{
+  "schemaVersion":"FITEATSY_BATCH_1_GATE_REPORT_V14","baselineSha":"eff808353d47ead284fafacee11081147282e28d","candidateSha":null,"candidateShaSemantics":"The containing Git commit is authoritative.",
+  "indiaOnlySourcePolicy":"ENFORCED","foreignNationalFoodTablesActiveForIndianCanonicalFood":0,
+  "existingValidationReleases":[{"recipeId":"CP_CHAPATI","status":"VALIDATION_RELEASED"},{"recipeId":"CP_BHINDI_SABJI","status":"VALIDATION_RELEASED"},{"recipeId":"CP_BHINDI_ALOO","status":"VALIDATION_RELEASED"}],"validationReleaseReplay":"3/3_PASS",
+  "labReadiness":[
+    {"recipeId":"CP_MOONG_DAL","ingredientId":"SPLIT_HULLED_YELLOW_MOONG_DAL","sourceJurisdiction":"INDIA","sampleCode":"LABREF_INDIA_SPLIT_HULLED_YELLOW_MOONG_DAL_B1","sampleStatus":"READY_FOR_EVIDENCE","labStatus":"INDIA_NABL_LAB_REQUIRED","labReport":null,"canonicalVector":null,"sourceHash":null,"formulaEligible":false,"blocker":"INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:SPLIT_HULLED_YELLOW_MOONG_DAL"},
+    {"recipeId":"CP_POHA_PEANUT","ingredientId":"DRY_FLATTENED_RICE_POHA","sourceJurisdiction":"INDIA","sampleCode":"LABREF_INDIA_DRY_FLATTENED_RICE_POHA_B1","sampleStatus":"READY_FOR_EVIDENCE","labStatus":"INDIA_NABL_LAB_REQUIRED","labReport":null,"canonicalVector":null,"sourceHash":null,"formulaEligible":false,"blocker":"INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:DRY_FLATTENED_RICE_POHA"}
+  ],
+  "counts":{"validationReleases":3,"newSourceMappings":0,"newFormulaHashes":0,"newCalculations":0,"newStageBPacks":0},
+  "batchValidationStatus":"PARTIAL_3_OF_5_VALIDATION_RELEASED","indianFoodPopulationStatus":"BLOCKED_PENDING_BATCH_1_VALIDATION_COMPLETE","phase3Status":"BLOCKED","productionStatus":"UNCHANGED",
+  "dietPlanContract":{"mealHeads":7,"optionsPerMeal":5,"totalOptions":35,"lifecycleModified":false},
+  "exactBlockers":["INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:SPLIT_HULLED_YELLOW_MOONG_DAL","INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:DRY_FLATTENED_RICE_POHA"]
+}

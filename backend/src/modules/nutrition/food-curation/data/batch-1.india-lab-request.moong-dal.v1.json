@@ -1,0 +1,10 @@
+{
+  "schemaVersion":"FITEATSY_INDIA_LAB_REQUEST_V1","requestId":"FITEATSY_BATCH_1_INDIA_LAB_REQUEST_MOONG_DAL_v1","state":"AWAITING_PHYSICAL_SAMPLE_AND_LAB",
+  "canonicalIngredientId":"SPLIT_HULLED_YELLOW_MOONG_DAL","sampleCode":"LABREF_INDIA_SPLIT_HULLED_YELLOW_MOONG_DAL_B1","exactIdentity":"Split, hulled/dehusked, yellow, raw, dry Moong Dal sample supplied by Fiteatsy",
+  "countryContext":"INDIA","requiredAttributes":{"ingredientFamily":"MUNG_BEAN","split":true,"hulledDehusked":true,"colour":"YELLOW","raw":true,"dry":true,"cooked":false,"sprouted":false,"seasoned":false,"addedOil":false},
+  "sampleEvidenceRequired":["product photographs","packaging photographs","ingredient label if available","brand and manufacturer if available","purchase evidence if available","batch or lot if available","Indian purchase location and date","collection date","sample mass","physical-state confirmation","seal evidence"],
+  "chainOfCustodyEvents":["PURCHASED_IN_INDIA","REGISTERED","PHOTOGRAPHED","SEALED","SAMPLE_ID_ASSIGNED","DISPATCHED_TO_LAB","LAB_RECEIPT_CONFIRMED","TESTING_PERFORMED","REPORT_ISSUED","REPORT_INGESTED","ANALYTICAL_REVIEW_COMPLETED"],
+  "laboratory":{"country":"INDIA","preferredAccreditation":"NABL ISO/IEC 17025","requiredScope":"food proximate analysis","identitySubstitutionAllowed":false},
+  "analysis":{"basis":"per 100 g edible portion","mandatory":["Energy","Protein","Carbohydrate","Total Fat","Dietary Fibre"],"reconciliation":["Moisture","Ash"],"perNutrientMetadata":["analyticalMethod","methodStandard","methodVersion","uncertainty","LOD","LOQ","remarks"]},
+  "activationGate":"IDENTITY_CONFIRMED_FOR_INDIAN_ANALYTICAL_REFERENCE_AND_INDIAN_LOCAL_ANALYTICAL_VECTOR_VALIDATED","defaultReuseScope":"BATCH_1_RECIPE_REFERENCE","blocker":"INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:SPLIT_HULLED_YELLOW_MOONG_DAL"
+}

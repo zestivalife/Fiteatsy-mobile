@@ -1,0 +1,10 @@
+{
+  "schemaVersion":"FITEATSY_INDIA_LAB_REQUEST_V1","requestId":"FITEATSY_BATCH_1_INDIA_LAB_REQUEST_DRY_POHA_v1","state":"AWAITING_PHYSICAL_SAMPLE_AND_LAB",
+  "canonicalIngredientId":"DRY_FLATTENED_RICE_POHA","sampleCode":"LABREF_INDIA_DRY_FLATTENED_RICE_POHA_B1","exactIdentity":"Dry, uncooked, unseasoned, no-added-oil flattened rice/Poha sample supplied by Fiteatsy",
+  "countryContext":"INDIA","requiredAttributes":{"sourceGrain":"RICE","flattenedBeatenFlaked":true,"dry":true,"uncooked":true,"unseasoned":true,"addedOil":false,"preparedRecipe":false,"ingredientState":true},
+  "sampleEvidenceRequired":["product photographs","packaging photographs","product name","ingredient declaration","brand and manufacturer","batch or lot","Indian purchase evidence","dry and uncooked state confirmation","no-seasoning confirmation","no-added-oil confirmation","flattened-rice identity confirmation","seal evidence"],
+  "chainOfCustodyEvents":["PURCHASED_IN_INDIA","REGISTERED","PHOTOGRAPHED","SEALED","SAMPLE_ID_ASSIGNED","DISPATCHED_TO_LAB","LAB_RECEIPT_CONFIRMED","TESTING_PERFORMED","REPORT_ISSUED","REPORT_INGESTED","ANALYTICAL_REVIEW_COMPLETED"],
+  "laboratory":{"country":"INDIA","preferredAccreditation":"NABL ISO/IEC 17025","requiredScope":"food proximate analysis","identitySubstitutionAllowed":false},
+  "analysis":{"basis":"per 100 g edible portion","mandatory":["Energy","Protein","Carbohydrate","Total Fat","Dietary Fibre"],"reconciliation":["Moisture","Ash"],"perNutrientMetadata":["analyticalMethod","methodStandard","methodVersion","uncertainty","LOD","LOQ","remarks"]},
+  "activationGate":"IDENTITY_CONFIRMED_FOR_INDIAN_ANALYTICAL_REFERENCE_AND_INDIAN_LOCAL_ANALYTICAL_VECTOR_VALIDATED","defaultReuseScope":"BATCH_1_RECIPE_REFERENCE","blocker":"INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:DRY_FLATTENED_RICE_POHA"
+}

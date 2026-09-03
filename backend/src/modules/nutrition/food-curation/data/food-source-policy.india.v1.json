@@ -1,0 +1,10 @@
+{
+  "policyId":"FITEATSY_INDIA_ONLY_CANONICAL_FOOD_SOURCE_POLICY","version":1,"effectiveFrom":"2026-09-03",
+  "indianSpecificRule":"Indian-specific Foods require an India-authoritative rights-cleared source or an India-local accredited laboratory reference.",
+  "allowedSourceClasses":["INDIA_AUTHORITATIVE","INDIA_LOCAL_LAB"],
+  "disallowedSourceClasses":["FOREIGN_NATIONAL_DISALLOWED_FOR_INDIAN_FOOD"],
+  "genericCommodityRule":{"allowedClass":"GLOBAL_GENERIC_APPROVED","requirements":["not uniquely Indian","exact or governed equivalent identity","complete mandatory vector","approved reuse rights","human equivalence evidence"]},
+  "localLabRule":{"sampleCountry":"INDIA","labCountry":"INDIA","preferredAccreditation":"NABL ISO/IEC 17025","requiredScope":"food proximate analysis","defaultReuseScope":"BATCH_1_RECIPE_REFERENCE"},
+  "rightsRule":"Public availability is not product/database reuse permission; IFCT numeric ingestion requires applicable written rights clearance.",
+  "validationRules":["SOURCE_JURISDICTION_REQUIRED","INDIAN_COUNTRY_CONTEXT_REQUIRED","EXACT_IDENTITY_REQUIRED","RIGHTS_APPROVAL_REQUIRED","CHAIN_OF_CUSTODY_REQUIRED","VALID_IN_SCOPE_ACCREDITATION_REQUIRED","COMPLETE_MANDATORY_VECTOR_REQUIRED","METHOD_AND_BASIS_REQUIRED","HUMAN_REVIEW_REQUIRED"]
+}

@@ -137,3 +137,37 @@ export function assertIngredientSourceState(kind:'MOONG'|'POHA'|'POTATO', descri
   if (kind==='POHA' && (!(d.includes('flattened')||d.includes('beaten')) || !d.includes('rice') || d.includes('cooked') || d.includes('puffed') || d.includes('prepared'))) throw new Error('POHA_IDENTITY_MISMATCH');
   if (kind==='POTATO' && (!d.includes('potato') || !d.includes('raw') || d.includes('cooked') || d.includes('fried') || d.includes('dehydrated'))) throw new Error('POTATO_STATE_MISMATCH');
 }
+
+export const SOURCE_POLICY_CLASSES = ['INDIA_AUTHORITATIVE','INDIA_LOCAL_LAB','GLOBAL_GENERIC_APPROVED','FOREIGN_NATIONAL_DISALLOWED_FOR_INDIAN_FOOD'] as const;
+export type SourcePolicyClass = typeof SOURCE_POLICY_CLASSES[number];
+export interface SourceJurisdictionPolicy {
+  sourceJurisdiction:string; countryContext:string; isIndianSpecificFood:boolean; sourcePolicyClass:SourcePolicyClass;
+}
+export function assertIndiaSourcePolicy(source:SourceJurisdictionPolicy):void {
+  if (!source.sourceJurisdiction.trim() || !source.countryContext.trim() || !SOURCE_POLICY_CLASSES.includes(source.sourcePolicyClass)) throw new Error('SOURCE_JURISDICTION_METADATA_REQUIRED');
+  if (source.isIndianSpecificFood && !['INDIA_AUTHORITATIVE','INDIA_LOCAL_LAB'].includes(source.sourcePolicyClass)) throw new Error('FOREIGN_NATIONAL_SOURCE_REJECTED_FOR_INDIAN_CANONICAL_FOOD');
+  if (source.isIndianSpecificFood && source.countryContext!=='INDIA') throw new Error('INDIAN_COUNTRY_CONTEXT_REQUIRED');
+}
+
+export interface IndiaLocalLabEvidence {
+  canonicalIngredientId:string; sampleCode:string; sampleCountry:string; sampleIdentityConfirmed:boolean;
+  sampleIdentityHash:string; chainOfCustodyComplete:boolean; chainOfCustodyHash:string;
+  labCountry:string; labId:string; nablAccreditationNumber:string; accreditationValid:boolean;
+  foodAnalysisInScope:boolean; labReportHash:string; reportMatchesSample:boolean;
+  mandatoryVector:Record<'energyKcal'|'proteinG'|'carbohydrateG'|'fatG'|'fibreG',number|null>;
+  methodsComplete:boolean; basis:string; reviewerDecision:'APPROVED'|'PENDING'|'REJECTED'; reuseScope:string;
+}
+export function evaluateIndiaLocalLabEvidence(input:IndiaLocalLabEvidence) {
+  const errors:string[]=[];
+  if (input.sampleCountry!=='INDIA') errors.push('INDIAN_SAMPLE_REQUIRED');
+  if (!input.sampleIdentityConfirmed || !input.sampleIdentityHash.trim()) errors.push('INDIAN_SAMPLE_IDENTITY_NOT_ESTABLISHED');
+  if (!input.chainOfCustodyComplete || !input.chainOfCustodyHash.trim()) errors.push('CHAIN_OF_CUSTODY_INCOMPLETE');
+  if (input.labCountry!=='INDIA') errors.push('INDIA_BASED_LAB_REQUIRED');
+  if (!input.labId.trim() || !input.nablAccreditationNumber.trim() || !input.accreditationValid || !input.foodAnalysisInScope) errors.push('NABL_ACCREDITATION_INVALID_OR_OUT_OF_SCOPE');
+  if (!input.labReportHash.trim() || !input.reportMatchesSample) errors.push('LAB_REPORT_MANUAL_VERIFICATION_REQUIRED');
+  try { assertMandatoryNutritionVector(input.mandatoryVector); } catch { errors.push('MANDATORY_LAB_NUTRIENT_VECTOR_INCOMPLETE'); }
+  if (!input.methodsComplete || !input.basis.trim()) errors.push('ANALYTICAL_METHOD_OR_BASIS_REQUIRED');
+  if (input.reviewerDecision!=='APPROVED') errors.push('LOCAL_REFERENCE_REVIEW_REQUIRED');
+  if (!input.reuseScope.trim()) errors.push('REUSE_SCOPE_REQUIRED');
+  return {eligible:errors.length===0,state:errors.length?'INDIA_LOCAL_LAB_REFERENCE_BLOCKED':'INDIAN_LOCAL_ANALYTICAL_VECTOR_VALIDATED',errors,sourceHash:errors.length?null:canonicalHash(input)} as const;
+}
