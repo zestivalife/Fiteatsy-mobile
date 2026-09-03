@@ -79,3 +79,43 @@ export const servingVariant = (validationReleaseId:string, label:string, grams:n
   const nutrients=Object.fromEntries(Object.entries(per100g).map(([k,v])=>[k,v===null?null:v*grams/100]));
   return {validationReleaseId,label,grams,nutrients,servingHash:canonicalHash({validationReleaseId,label,grams,nutrients})};
 };
+
+export const STAGE_B_DECISIONS = ['APPROVED','CHANGES_REQUIRED','REJECTED'] as const;
+export type StageBDecision = typeof STAGE_B_DECISIONS[number];
+export interface StageBReviewInput {
+  decisionId:string; recipeId:string; recipeVersion:string; reviewPackId:string; reviewPackVersion:number;
+  formulaHash:string; expectedFormulaHash:string; measurementHash:string; expectedMeasurementHash:string;
+  calculationHash:string; expectedCalculationHash:string; reviewPackHash:string; evidenceHash:string;
+  reviewerId:string; reviewerQualification:string; qualificationReference:string; decision:StageBDecision;
+  decisionDate:string; declaration:string; rationale:string; reconciliation:'PASS'|'FAIL';
+  sourcesActive:boolean; immutableEvidence:boolean;
+}
+export function evaluateStageBReview(input:StageBReviewInput, prior?:{decisionHash:string;decision:StageBDecision}) {
+  const errors:string[]=[];
+  if (!STAGE_B_DECISIONS.includes(input.decision)) errors.push('UNSUPPORTED_STAGE_B_DECISION');
+  if (!input.reviewerId.trim() || !input.reviewerQualification.trim() || !input.qualificationReference.trim() || !input.declaration.trim() || !input.rationale.trim() || !/^\d{4}-\d{2}-\d{2}/.test(input.decisionDate)) errors.push('STAGE_B_REVIEWER_METADATA_REQUIRED');
+  if (input.formulaHash!==input.expectedFormulaHash) errors.push('STALE_FORMULA_HASH');
+  if (input.measurementHash!==input.expectedMeasurementHash) errors.push('STALE_MEASUREMENT_HASH');
+  if (input.calculationHash!==input.expectedCalculationHash) errors.push('STALE_CALCULATION_HASH');
+  if (input.reconciliation!=='PASS') errors.push('RECONCILIATION_NOT_PASSED');
+  if (!input.sourcesActive) errors.push('SOURCE_MAPPING_NOT_ACTIVE');
+  if (!input.immutableEvidence) errors.push('EVIDENCE_MUTATION');
+  const decisionHash=canonicalHash(input);
+  if (prior && prior.decisionHash!==decisionHash) errors.push(prior.decision===input.decision?'DUPLICATE_DECISION_PAYLOAD_CONFLICT':'CONFLICTING_STAGE_B_DECISION');
+  const releaseEligible=errors.length===0 && input.decision==='APPROVED';
+  return {accepted:errors.length===0,errors,decisionHash,state:errors.length?'STAGE_B_BLOCKED':input.decision==='APPROVED'?'STAGE_B_APPROVED':input.decision==='CHANGES_REQUIRED'?'STAGE_B_CHANGES_REQUIRED':'STAGE_B_REJECTED',releaseEligible};
+}
+
+export interface SourceRights { status:'APPROVED'|'MISSING'|'REJECTED'; licence:string|null; evidence:string|null; allowedUse:string|null; }
+export function assertSourceRights(rights:SourceRights):void {
+  if (rights.status!=='APPROVED' || !rights.licence?.trim() || !rights.evidence?.trim() || !rights.allowedUse?.trim()) throw new Error('SOURCE_RIGHTS_NOT_APPROVED');
+}
+export function assertMandatoryNutritionVector(v:Record<'energyKcal'|'proteinG'|'carbohydrateG'|'fatG'|'fibreG',number|null>):void {
+  for (const [field,value] of Object.entries(v)) if (value===null || !Number.isFinite(value) || value<0) throw new Error(`MANDATORY_NUTRIENT_NOT_KNOWN:${field}`);
+}
+export function assertIngredientSourceState(kind:'MOONG'|'POHA'|'POTATO', description:string):void {
+  const d=description.toLocaleLowerCase();
+  if (kind==='MOONG' && (!d.includes('mung') || !d.includes('split') || !d.includes('hulled') || !d.includes('yellow') || d.includes('cooked') || d.includes('sprout'))) throw new Error('MOONG_IDENTITY_MISMATCH');
+  if (kind==='POHA' && (!(d.includes('flattened')||d.includes('beaten')) || !d.includes('rice') || d.includes('cooked') || d.includes('puffed') || d.includes('prepared'))) throw new Error('POHA_IDENTITY_MISMATCH');
+  if (kind==='POTATO' && (!d.includes('potato') || !d.includes('raw') || d.includes('cooked') || d.includes('fried') || d.includes('dehydrated'))) throw new Error('POTATO_STATE_MISMATCH');
+}
