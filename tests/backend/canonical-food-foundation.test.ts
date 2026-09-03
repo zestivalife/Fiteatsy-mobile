@@ -58,3 +58,25 @@ test('v8 audit fails closed when only an execution contract, not human decisions
   assert.ok(report.recipes.every((recipe:any)=>recipe.stageA==='PENDING' && recipe.formulaHash===null && recipe.calculationHash===null));
   assert.equal(report.programmeState.production,'UNCHANGED');
 });
+
+test('v9 ingests 5/5 human approvals while incomplete source vectors block every calculation',()=>{
+  const decisions=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.human-gate-decisions.v2.json',import.meta.url),'utf8'));
+  const report=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.gate-report.v9.json',import.meta.url),'utf8'));
+  assert.equal(decisions.status,'IMMUTABLE_ACCEPTED');
+  assert.equal(decisions.stageA.length,5); assert.ok(decisions.stageA.every((x:any)=>x.decision==='APPROVED' && /^[a-f0-9]{64}$/.test(x.decisionHash)));
+  assert.equal(decisions.sourceDecisions.length,5); assert.ok(decisions.sourceDecisions.every((x:any)=>x.humanDecision==='APPROVED'));
+  assert.equal(report.counts.stageAApproved,5); assert.equal(report.counts.sourceHumanDecisionsApproved,5);
+  assert.equal(report.counts.calculationReadySources,2); assert.equal(report.counts.canonicalIngredientMappings,2);
+  assert.equal(report.counts.formulaHashes,0); assert.equal(report.counts.canonicalMeasurementRuns,0); assert.equal(report.counts.calculations,0); assert.equal(report.counts.validationReleases,0);
+  assert.ok(report.recipes.every((x:any)=>x.stageADecision==='APPROVED' && x.formulaHash===null && x.remainingBlockers.length===1));
+  assert.equal(report.productionStatus,'UNCHANGED');
+});
+
+test('v9 preserves v8 history and never promotes missing nutrients to zero',()=>{
+  const v8=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.gate-report.v8.json',import.meta.url),'utf8'));
+  const decisions=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.human-gate-decisions.v2.json',import.meta.url),'utf8'));
+  assert.equal(v8.packageValidation.status,'REJECTED_AS_DECISION_EVIDENCE');
+  const incomplete=decisions.sourceDecisions.filter((x:any)=>!x.nutrientVectorComplete);
+  assert.deepEqual(incomplete.map((x:any)=>x.ingredientId),['REFINED_SUNFLOWER_OIL','SPLIT_HULLED_YELLOW_MOONG_DAL','DRY_FLATTENED_RICE_POHA']);
+  assert.ok(incomplete.every((x:any)=>x.calculationEligible===false));
+});

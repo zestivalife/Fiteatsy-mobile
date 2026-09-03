@@ -1,0 +1,21 @@
+{
+  "schemaVersion":"FITEATSY_BATCH_1_HUMAN_GATE_DECISIONS_V2","submissionId":"BATCH_1_HUMAN_GATE_DECISIONS_v2","batchId":"FITEATSY-FIRST-FIVE-v1","status":"IMMUTABLE_ACCEPTED",
+  "boundBaselineSha":"32317d4ff6a4c4ff365e7fea492a09e2d740a1d7","boundTaskVersion":"FITEATSY_HUMAN_GATE_v9","boundEvidenceVersion":"FITEATSY_MEASUREMENT_SUBMISSION_V1","approvalDate":"2026-09-03","createdAt":"2026-09-03T00:00:00+05:30",
+  "reviewer":{"reviewerId":"Priyanshi Srivastava","reviewerIdentity":"Priyanshi Srivastava","reviewerQualification":"B. Pharma and MSc DFSM","qualificationReference":"2015 and 2024","declaration":"Batch 1 Stage A recipes and the five stated source-identity decisions are explicitly approved by the authorised human instruction."},
+  "stageA":[
+    {"recipeId":"CP_CHAPATI","recipeVersion":"CP_CHAPATI_STAGE_A_v1","decision":"APPROVED","rationale":"Explicit Batch 1 Stage A approval.","decisionHash":"3bd8a96eab688da025eed4fb1db78a5912eadf7a2b2ffd37b92f14c65087fb6d"},
+    {"recipeId":"CP_MOONG_DAL","recipeVersion":"CP_MOONG_DAL_STAGE_A_v1","decision":"APPROVED","rationale":"Explicit Batch 1 Stage A approval.","decisionHash":"aabf4822b0a73bf6b24f0eccddfa963ecfb448db94c64a702c4dbe6cff91ed08"},
+    {"recipeId":"CP_BHINDI_SABJI","recipeVersion":"CP_BHINDI_SABJI_STAGE_A_v1","decision":"APPROVED","rationale":"Explicit Batch 1 Stage A approval.","decisionHash":"485e25398e172f7452753b7e8145cf7a2a48d0dd16b2cc921f56eb4cbc3e4d73"},
+    {"recipeId":"CP_BHINDI_ALOO","recipeVersion":"CP_BHINDI_ALOO_STAGE_A_v1","decision":"APPROVED","rationale":"Explicit Batch 1 Stage A approval.","decisionHash":"49cf96ce7b89f79c594a937c56365ac59e984db2817431389e718a297c41c9b8"},
+    {"recipeId":"CP_POHA_PEANUT","recipeVersion":"CP_POHA_PEANUT_STAGE_A_v1","decision":"APPROVED","rationale":"Explicit Batch 1 Stage A approval.","decisionHash":"f86b6a278653a6d68f9f990b137179f8ea5fc819a842dfa6ecfe416e375e9c4e"}
+  ],
+  "sourceDecisions":[
+    {"ingredientId":"REFINED_SUNFLOWER_OIL","humanDecision":"APPROVED","decisionType":"APPROVED_EQUIVALENT_SOURCE","candidateId":"USDA_FDC:1750349","decisionHash":"4e14a0425a59e5ad3b036e1f8cc54c811f6507fff7b9fe35b3e79294a32977f4","nutrientVectorComplete":false,"calculationEligible":false,"remainingBlocker":"APPROVED_IDENTITY_NUTRIENT_VECTOR_INCOMPLETE"},
+    {"ingredientId":"COW_GHEE","humanDecision":"APPROVED","decisionType":"APPROVED_EQUIVALENT_SOURCE","candidateId":"USDA_FDC:171314","decisionHash":"b6ab1a7c44ed8a36cc60483f2bf2e6ab5a97282bb04259228b4f65605812a396","nutrientVectorComplete":true,"calculationEligible":true,"remainingBlocker":null},
+    {"ingredientId":"GROUNDNUT_OIL","humanDecision":"APPROVED","decisionType":"APPROVED_EQUIVALENT_SOURCE","candidateId":"USDA_FDC:171410","decisionHash":"728f338a430c8b986ce55b347de6f77189fc8a2fa628c005c037e307b012fb0b","nutrientVectorComplete":true,"calculationEligible":true,"remainingBlocker":null},
+    {"ingredientId":"SPLIT_HULLED_YELLOW_MOONG_DAL","humanDecision":"APPROVED","decisionType":"NO_ACCEPTABLE_SOURCE","candidateId":null,"decisionHash":"9fdac2a032505f1119766d3feafc2cf009e010e2e78c78d7a89ac19be5bea741","nutrientVectorComplete":false,"calculationEligible":false,"remainingBlocker":"APPROVED_IDENTITY_CANONICAL_NUTRIENT_VECTOR_REQUIRED"},
+    {"ingredientId":"DRY_FLATTENED_RICE_POHA","humanDecision":"APPROVED","decisionType":"NO_ACCEPTABLE_SOURCE","candidateId":null,"decisionHash":"0252e852fd2a10da5c1d1976fc77dd644f9ade2929d36b03e89bfeb75d38373f","nutrientVectorComplete":false,"calculationEligible":false,"remainingBlocker":"APPROVED_IDENTITY_CANONICAL_NUTRIENT_VECTOR_REQUIRED"}
+  ],
+  "canonicalMappingsActivated":["COW_GHEE:USDA_FDC:171314","GROUNDNUT_OIL:USDA_FDC:171410"],
+  "history":{"preservesV8Report":true,"preservesPendingPackages":true,"preservesSourceCandidateHistory":true,"preservesPhysicalEvidence":true}
+}
