@@ -88,7 +88,7 @@ export interface StageBReviewInput {
   calculationHash:string; expectedCalculationHash:string; reviewPackHash:string; evidenceHash:string;
   reviewerId:string; reviewerQualification:string; qualificationReference:string; decision:StageBDecision;
   decisionDate:string; declaration:string; rationale:string; reconciliation:'PASS'|'FAIL';
-  sourcesActive:boolean; immutableEvidence:boolean;
+  expectedReviewPackHash?:string; reviewerAuthority?:string; sourcesActive:boolean; immutableEvidence:boolean;
 }
 export function evaluateStageBReview(input:StageBReviewInput, prior?:{decisionHash:string;decision:StageBDecision}) {
   const errors:string[]=[];
@@ -97,6 +97,8 @@ export function evaluateStageBReview(input:StageBReviewInput, prior?:{decisionHa
   if (input.formulaHash!==input.expectedFormulaHash) errors.push('STALE_FORMULA_HASH');
   if (input.measurementHash!==input.expectedMeasurementHash) errors.push('STALE_MEASUREMENT_HASH');
   if (input.calculationHash!==input.expectedCalculationHash) errors.push('STALE_CALCULATION_HASH');
+  if (input.expectedReviewPackHash!==undefined && input.reviewPackHash!==input.expectedReviewPackHash) errors.push('STALE_REVIEW_PACK_HASH');
+  if (input.reviewerAuthority!==undefined && !input.reviewerAuthority.trim()) errors.push('STAGE_B_REVIEWER_AUTHORITY_REQUIRED');
   if (input.reconciliation!=='PASS') errors.push('RECONCILIATION_NOT_PASSED');
   if (!input.sourcesActive) errors.push('SOURCE_MAPPING_NOT_ACTIVE');
   if (!input.immutableEvidence) errors.push('EVIDENCE_MUTATION');
@@ -104,6 +106,22 @@ export function evaluateStageBReview(input:StageBReviewInput, prior?:{decisionHa
   if (prior && prior.decisionHash!==decisionHash) errors.push(prior.decision===input.decision?'DUPLICATE_DECISION_PAYLOAD_CONFLICT':'CONFLICTING_STAGE_B_DECISION');
   const releaseEligible=errors.length===0 && input.decision==='APPROVED';
   return {accepted:errors.length===0,errors,decisionHash,state:errors.length?'STAGE_B_BLOCKED':input.decision==='APPROVED'?'STAGE_B_APPROVED':input.decision==='CHANGES_REQUIRED'?'STAGE_B_CHANGES_REQUIRED':'STAGE_B_REJECTED',releaseEligible};
+}
+
+export interface ValidationReleaseInput {
+  validationReleaseId:string; recipeId:string; recipeName:string; recipeVersion:string; validationReleaseVersion:number;
+  stageADecisionId:string; stageADecisionHash:string; sourceDecisionIds:string[]; sourceDecisionHashes:string[];
+  canonicalIngredientMappings:Array<{ingredientId:string;sourceRef:string;sourceHash:string}>;
+  formulaHash:string; measurementHash:string; calculationHash:string; reconciliationStatus:'PASS'; reconciliationHash:string;
+  stageBDecisionId:string; stageBDecisionHash:string; releaseStatus:'VALIDATED_RELEASED'; productionActivationStatus:'NOT_PRODUCTION_ACTIVE'; createdBy:string;
+}
+export function createValidationRelease(input:ValidationReleaseInput) {
+  const releaseHash=canonicalHash(input);
+  return deepFreeze({...input,releaseHash,immutable:true as const});
+}
+function deepFreeze<T>(value:T):T {
+  if (value && typeof value==='object') { Object.freeze(value); for (const child of Object.values(value as Record<string,unknown>)) deepFreeze(child); }
+  return value;
 }
 
 export interface SourceRights { status:'APPROVED'|'MISSING'|'REJECTED'; licence:string|null; evidence:string|null; allowedUse:string|null; }

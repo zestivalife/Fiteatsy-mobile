@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "FITEATSY_STAGE_B_DECISIONS_V12",
+  "submissionId": "BATCH1_STAGE_B_APPROVAL_V12",
+  "submissionVersion": 12,
+  "baselineSha": "7455bf1ad959558119115836c12dcca023b978a9",
+  "submissionHash": "ce58bb20b87a625136aa78178401f0b76484d8517760ea0b2d720d0ac4337bbd",
+  "reviewer": {
+    "reviewerId": "Priyanshi Srivastava",
+    "reviewerIdentity": "Priyanshi Srivastava",
+    "reviewerQualification": "B. Pharma and MSc DFSM",
+    "qualificationReference": "2015 and 2024",
+    "reviewerAuthority": "AUTHORISED_BATCH_1_NUTRITION_REVIEWER"
+  },
+  "decisionDate": "2026-09-03",
+  "createdTimestamp": "2026-09-03T12:04:07Z",
+  "immutable": true,
+  "decisions": [
+    {
+      "decisionId": "STAGE_B_DECISION_V12_CP_CHAPATI",
+      "recipeId": "CP_CHAPATI",
+      "recipeVersion": "CP_CHAPATI_STAGE_A_v1",
+      "reviewPackId": "STAGE_B_CP_CHAPATI_V10",
+      "reviewPackVersion": 10,
+      "reviewPackHash": "6d7998d69ed33b4c0b9af77e9298cce54e1bbc18e4e8036a61101f1010a702cf",
+      "formulaHash": "ca63e332b0d1700ee844c916ca3f36e6b23b2933f6c9b42b4d64692ea50dab73",
+      "measurementHash": "de8723c6f2e41d89783411da09f2796b8be506e6050194c3c6dc3cc7056cda38",
+      "calculationHash": "fd4d094d3f79d24fd2600eed20be72471c9be65275f0ffde222ee82f8504ea62",
+      "reconciliationStatus": "PASS",
+      "reconciliationHash": "b97ce998f619307a0aec018b18c0b32add0ea93742e06e07edb7b4c83cd7b6a1",
+      "decision": "APPROVED",
+      "declaration": "I approve the exact Stage B review target and its bound formula, measurement, calculation and reconciliation evidence.",
+      "rationale": "Reviewed deterministic nutrition calculation and PASS reconciliation; approved for immutable validation release without production activation.",
+      "evidenceReferences": [
+        "STAGE_B_CP_CHAPATI_V10",
+        "ca63e332b0d1700ee844c916ca3f36e6b23b2933f6c9b42b4d64692ea50dab73",
+        "de8723c6f2e41d89783411da09f2796b8be506e6050194c3c6dc3cc7056cda38",
+        "fd4d094d3f79d24fd2600eed20be72471c9be65275f0ffde222ee82f8504ea62"
+      ],
+      "decisionHash": "b19aa3f19d37ede69d063a91306ef447aa3cd097bf836e1d0e53ade12c72ffa5"
+    },
+    {
+      "decisionId": "STAGE_B_DECISION_V12_CP_BHINDI_SABJI",
+      "recipeId": "CP_BHINDI_SABJI",
+      "recipeVersion": "CP_BHINDI_SABJI_STAGE_A_v1",
+      "reviewPackId": "STAGE_B_CP_BHINDI_SABJI_V10",
+      "reviewPackVersion": 10,
+      "reviewPackHash": "92ce9f5a71cfd59864c18bf6acf61d078709a9eb7681faa621157323820f7a6d",
+      "formulaHash": "18210283f4a706789e5b50b9ca720974851e08b78d44f8c0749111e2dcb25c71",
+      "measurementHash": "37f4907f6fc8b985466c898afda90dbe00e698d614e3efc1286213c7ca3cbdf9",
+      "calculationHash": "ffe9b7a4af17aa021b417e4060ebf39324aa29566f3c984aee42f9bf743dae64",
+      "reconciliationStatus": "PASS",
+      "reconciliationHash": "6f41fe65311438eb0cf0d088546530967f04804105633714c10253ec53703076",
+      "decision": "APPROVED",
+      "declaration": "I approve the exact Stage B review target and its bound formula, measurement, calculation and reconciliation evidence.",
+      "rationale": "Reviewed deterministic nutrition calculation and PASS reconciliation; approved for immutable validation release without production activation.",
+      "evidenceReferences": [
+        "STAGE_B_CP_BHINDI_SABJI_V10",
+        "18210283f4a706789e5b50b9ca720974851e08b78d44f8c0749111e2dcb25c71",
+        "37f4907f6fc8b985466c898afda90dbe00e698d614e3efc1286213c7ca3cbdf9",
+        "ffe9b7a4af17aa021b417e4060ebf39324aa29566f3c984aee42f9bf743dae64"
+      ],
+      "decisionHash": "795b21c77fe495a515cfa98d6d3137f2b5d8f0c1646a54d924c9480e3aeafd68"
+    },
+    {
+      "decisionId": "STAGE_B_DECISION_V12_CP_BHINDI_ALOO",
+      "recipeId": "CP_BHINDI_ALOO",
+      "recipeVersion": "CP_BHINDI_ALOO_STAGE_A_v1",
+      "reviewPackId": "STAGE_B_CP_BHINDI_ALOO_V11",
+      "reviewPackVersion": 11,
+      "reviewPackHash": "968a0e28ec00e0815884b947d1c4285d941fec5c82fe8c4e2c8f7ab0ebafe461",
+      "formulaHash": "e8205c452cace982b25b6fbd1c1dc8dfb879a07c522507c70f3efa4dc8b36c62",
+      "measurementHash": "7e0361192531a3cdc7282ddae5000c5899bbe5db4a568506bd89e4cc17757f4a",
+      "calculationHash": "69b430ffae4b166cb3fd7d8ef45036af2d9f73a4e48fad4764425a4878699411",
+      "reconciliationStatus": "PASS",
+      "reconciliationHash": "68af43d3976dbda0452c18e2462bdedcded92393a06cab62cffc5eb4701df9a6",
+      "decision": "APPROVED",
+      "declaration": "I approve the exact Stage B review target and its bound formula, measurement, calculation and reconciliation evidence.",
+      "rationale": "Reviewed deterministic nutrition calculation and PASS reconciliation; approved for immutable validation release without production activation.",
+      "evidenceReferences": [
+        "STAGE_B_CP_BHINDI_ALOO_V11",
+        "e8205c452cace982b25b6fbd1c1dc8dfb879a07c522507c70f3efa4dc8b36c62",
+        "7e0361192531a3cdc7282ddae5000c5899bbe5db4a568506bd89e4cc17757f4a",
+        "69b430ffae4b166cb3fd7d8ef45036af2d9f73a4e48fad4764425a4878699411"
+      ],
+      "decisionHash": "cf09ff3d771f512a853cb5239731e5c37fd7390ba81e63ecdc4c229ce8b504ab"
+    }
+  ]
+}
