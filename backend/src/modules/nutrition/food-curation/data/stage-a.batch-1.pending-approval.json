@@ -2,44 +2,44 @@
   "schemaVersion": "FITEATSY_STAGE_A_FORMULA_REVIEW_V1",
   "packId": "FITEATSY_STAGE_A_NUTRITIONIST_APPROVAL_PACK_BATCH_1_v1",
   "status": "PENDING",
-  "notice": "These formulas are proposed for Stage A review. No decision is preselected and no Formula SHA-256 exists until a qualified reviewer approves the exact material formula.",
+  "notice": "Updated formulas transcribed from the supplied Stage A pack are proposed for review. No decision is preselected and no canonical Formula SHA-256 exists until a qualified reviewer approves the exact material formula.",
   "decisionOptions": ["APPROVED", "CHANGES_REQUIRED", "REJECTED"],
   "formulas": [
     {
       "preparationId": "CP_CHAPATI", "formulaVersion": "CP_CHAPATI_STAGE_A_v1", "name": "Chapati",
-      "ingredients": [{"identity":"Whole-wheat atta","quantityGrams":120,"role":"PRIMARY"},{"identity":"Dusting flour","quantityGrams":15,"role":"SECONDARY"},{"identity":"Kneading oil/ghee","quantityGrams":5,"role":"FAT"}],
-      "water": {"quantityMl":80,"handling":"INGREDIENT"}, "preparationMethod":"GRIDDLE_COOKED",
-      "postCookingFat": {"applied":true,"quantityGrams":null}, "servingConcept":"1 measured piece; protocol minimum five independently formed pieces",
+      "ingredients": [{"identity":"Whole-wheat atta","quantityGrams":150,"role":"PRIMARY"},{"identity":"Whole-wheat atta — dusting; same identity","quantityGrams":19,"role":"SECONDARY"},{"identity":"Refined sunflower oil — dough","quantityGrams":6,"role":"FAT"},{"identity":"Cow ghee — post-cooking","quantityGrams":10,"role":"FAT"}],
+      "water": {"quantityMl":100,"handling":"INGREDIENT"}, "preparationMethod":"GRIDDLE_COOKED",
+      "postCookingFat": {"applied":true,"identity":"Cow ghee","quantityGrams":10}, "servingConcept":"1 measured piece; five independently formed pieces measured",
       "hardContext": {"present":[],"absentVerified":[],"allergens":["WHEAT"]},
-      "sourceDependencies":["Exact atta","Exact fat","Dusting flour"], "limitations":["Post-cooking fat quantity missing","Protocol-compliant remeasurement required"],
+      "sourceDependencies":["Exact atta","Refined sunflower oil","Cow ghee"], "limitations":[],
       "review":{"decision":"PENDING","reason":"","reviewerId":"","reviewerQualification":"","reviewedAt":"","declaration":""}
     },
     {
       "preparationId":"CP_MOONG_DAL","formulaVersion":"CP_MOONG_DAL_STAGE_A_v1","name":"Moong Dal",
-      "ingredients":[{"identity":"Raw Moong Dal — exact split/hulled state requires reviewer confirmation","quantityGrams":50,"role":"PRIMARY"},{"identity":"Onion","quantityGrams":30,"role":"SECONDARY"},{"identity":"Garlic","quantityGrams":5,"role":"SEASONING"},{"identity":"Oil/ghee","quantityGrams":10,"role":"FAT"}],
+      "ingredients":[{"identity":"Split hulled yellow Moong Dal","quantityGrams":50,"role":"PRIMARY"},{"identity":"Onion","quantityGrams":30,"role":"SECONDARY"},{"identity":"Garlic","quantityGrams":5,"role":"SEASONING"},{"identity":"Cow ghee","quantityGrams":10,"role":"FAT"}],
       "water":{"quantityMl":200,"handling":"INGREDIENT"},"preparationMethod":"PRESSURE_COOKED","servingConcept":"1 measured reference katori",
-      "hardContext":{"present":["ONION","GARLIC"],"absentVerified":[],"allergens":[]},"sourceDependencies":["Exact Raw Moong Dal identity","Onion","Garlic","Oil/ghee"],"limitations":["Raw Moong Dal approved source unresolved"],
+      "hardContext":{"present":["ONION","GARLIC"],"absentVerified":[],"allergens":[]},"sourceDependencies":["Split hulled yellow Moong Dal","Onion","Garlic","Cow ghee"],"limitations":["Split hulled yellow Moong Dal approved source unresolved"],
       "review":{"decision":"PENDING","reason":"","reviewerId":"","reviewerQualification":"","reviewedAt":"","declaration":""}
     },
     {
       "preparationId":"CP_BHINDI_SABJI","formulaVersion":"CP_BHINDI_SABJI_STAGE_A_v1","name":"Bhindi Sabji",
-      "ingredients":[{"identity":"Bhindi","quantityGrams":150,"role":"PRIMARY"},{"identity":"Potato","quantityGrams":0,"role":"SECONDARY"},{"identity":"Garlic","quantityGrams":5,"role":"SEASONING"},{"identity":"Oil","quantityGrams":10,"role":"FAT"}],
+      "ingredients":[{"identity":"Bhindi","quantityGrams":150,"role":"PRIMARY"},{"identity":"Potato","quantityGrams":0,"role":"SECONDARY"},{"identity":"Garlic","quantityGrams":5,"role":"SEASONING"},{"identity":"Refined sunflower oil","quantityGrams":10,"role":"FAT"}],
       "water":{"quantityMl":0,"handling":"NONE"},"preparationMethod":"PAN_COOKED","servingConcept":"1 measured reference katori",
-      "hardContext":{"present":["GARLIC"],"absentVerified":["POTATO"],"allergens":[]},"sourceDependencies":["Bhindi","Garlic","Oil"],"limitations":[],
+      "hardContext":{"present":["GARLIC"],"absentVerified":["POTATO"],"allergens":[]},"sourceDependencies":["Bhindi","Garlic","Refined sunflower oil"],"limitations":[],
       "review":{"decision":"PENDING","reason":"","reviewerId":"","reviewerQualification":"","reviewedAt":"","declaration":""}
     },
     {
       "preparationId":"CP_BHINDI_ALOO","formulaVersion":"CP_BHINDI_ALOO_STAGE_A_v1","name":"Bhindi Aloo",
-      "ingredients":[{"identity":"Bhindi","quantityGrams":100,"role":"PRIMARY"},{"identity":"Potato","quantityGrams":80,"role":"SECONDARY"},{"identity":"Garlic","quantityGrams":5,"role":"SEASONING"},{"identity":"Oil","quantityGrams":12,"role":"FAT"}],
+      "ingredients":[{"identity":"Bhindi","quantityGrams":100,"role":"PRIMARY"},{"identity":"Potato","quantityGrams":80,"role":"SECONDARY"},{"identity":"Garlic","quantityGrams":5,"role":"SEASONING"},{"identity":"Refined sunflower oil","quantityGrams":12,"role":"FAT"}],
       "water":{"quantityMl":0,"handling":"NONE"},"preparationMethod":"PAN_COOKED","servingConcept":"1 measured reference katori",
-      "hardContext":{"present":["POTATO","GARLIC"],"absentVerified":[],"allergens":[]},"sourceDependencies":["Bhindi","Potato","Garlic","Oil"],"limitations":[],
+      "hardContext":{"present":["POTATO","GARLIC"],"absentVerified":[],"allergens":[]},"sourceDependencies":["Bhindi","Potato","Garlic","Refined sunflower oil"],"limitations":[],
       "review":{"decision":"PENDING","reason":"","reviewerId":"","reviewerQualification":"","reviewedAt":"","declaration":""}
     },
     {
       "preparationId":"CP_POHA_PEANUT","formulaVersion":"CP_POHA_PEANUT_STAGE_A_v1","name":"Peanut Poha",
-      "ingredients":[{"identity":"Dry flattened rice / Poha","quantityGrams":60,"role":"PRIMARY"},{"identity":"Peanuts","quantityGrams":15,"role":"SECONDARY"},{"identity":"Potato","quantityGrams":40,"role":"SECONDARY"},{"identity":"Garlic","quantityGrams":0,"role":"SEASONING"},{"identity":"Oil","quantityGrams":10,"role":"FAT"}],
+      "ingredients":[{"identity":"Dry flattened rice / Poha","quantityGrams":60,"role":"PRIMARY"},{"identity":"Peanuts","quantityGrams":15,"role":"SECONDARY"},{"identity":"Potato","quantityGrams":40,"role":"SECONDARY"},{"identity":"Garlic","quantityGrams":0,"role":"SEASONING"},{"identity":"Groundnut oil","quantityGrams":10,"role":"FAT"}],
       "water":{"quantityMl":250,"handling":"PROCESS_WATER_RINSE_DRAINED_NOT_RETAINED"},"preparationMethod":"PAN_COOKED","servingConcept":"1 measured bowl",
-      "hardContext":{"present":["PEANUT","POTATO"],"absentVerified":["GARLIC"],"allergens":["PEANUT"]},"sourceDependencies":["Exact dry flattened rice / Poha","Peanuts","Potato","Oil"],"limitations":["Poha approved source unresolved"],
+      "hardContext":{"present":["PEANUT","POTATO"],"absentVerified":["GARLIC"],"allergens":["PEANUT"]},"sourceDependencies":["Exact dry flattened rice / Poha","Peanuts","Potato","Groundnut oil"],"limitations":["Poha approved source unresolved"],
       "review":{"decision":"PENDING","reason":"","reviewerId":"","reviewerQualification":"","reviewedAt":"","declaration":""}
     }
   ]

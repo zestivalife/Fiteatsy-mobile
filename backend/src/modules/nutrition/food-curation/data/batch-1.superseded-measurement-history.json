@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "FITEATSY_MEASUREMENT_SUBMISSION_HISTORY_V1",
+  "notice": "Append-only evidence history. This submission is superseded, not deleted, and never became a canonical Measurement Run.",
+  "submissions": [
+    {
+      "preparationId": "CP_CHAPATI",
+      "state": "SUPERSEDED",
+      "supersededBy": "UPDATED_FIVE_PIECE_SUBMISSION_2026_09_03",
+      "ingredientWeightsGrams": { "ATTA": 120, "DUSTING_FLOUR": 15 },
+      "waterGrams": 80,
+      "oilGrams": 5,
+      "finalPreparedWeightGrams": 140,
+      "pieceWeightObservationsGrams": [36, 35, 34, 35],
+      "producedPieceCount": 4,
+      "postCookingFatApplied": true,
+      "postCookingFatGrams": null,
+      "canonicalMeasurementRunCreated": false,
+      "supersessionReasons": ["PROTOCOL_MINIMUM_FIVE_PIECES_NOT_MET", "POST_COOKING_FAT_QUANTITY_MISSING"]
+    }
+  ]
+}

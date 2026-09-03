@@ -129,14 +129,23 @@ test('user-confirmed Batch 1 evidence is preserved but cannot become a canonical
   }
 });
 
-test('Chapati submission fails the explicit five-piece protocol without fabricating an observation', () => {
+test('updated Chapati submission satisfies the explicit five-piece structural protocol without becoming canonical', () => {
   const batch = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.user-confirmed-measurements.json', import.meta.url), 'utf8')) as { measurements: ControlledMeasurement[] };
   const chapati = batch.measurements.find((item) => item.preparationId === 'CP_CHAPATI')!;
   const result = inspectMeasurementSubmission(chapati);
-  assert.deepEqual(chapati.pieceWeightObservationsGrams, [36, 35, 34, 35]);
-  assert.equal(chapati.producedPieceCount, 4);
-  assert.ok(result.errors.includes('CURATION_PIECE_PROTOCOL_MINIMUM_NOT_MET'));
+  assert.deepEqual(chapati.pieceWeightObservationsGrams, [36, 35, 34, 35, 35]);
+  assert.equal(chapati.producedPieceCount, 5);
+  assert.equal(chapati.finalPreparedWeightGrams, 175);
+  assert.equal((chapati as ControlledMeasurement & { postCookingFatGrams: number }).postCookingFatGrams, 10);
+  assert.ok(!result.errors.includes('CURATION_PIECE_PROTOCOL_MINIMUM_NOT_MET'));
   assert.ok(!result.errors.includes('CURATION_PIECE_BATCH_WEIGHT_MISMATCH'));
+});
+
+test('superseded four-piece Chapati evidence remains historically preserved', () => {
+  const history = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.superseded-measurement-history.json', import.meta.url), 'utf8')) as { submissions: Array<{ state: string; producedPieceCount: number; canonicalMeasurementRunCreated: boolean }> };
+  assert.equal(history.submissions[0].state, 'SUPERSEDED');
+  assert.equal(history.submissions[0].producedPieceCount, 4);
+  assert.equal(history.submissions[0].canonicalMeasurementRunCreated, false);
 });
 
 test('drained rinse water remains explicit and is never treated as retained ingredient water', () => {
@@ -184,11 +193,20 @@ test('Stage A Batch 1 review pack is actionable and defaults every decision to p
   assert.equal(pack.formulas.find((item) => item.preparationId === 'CP_POHA_PEANUT')?.water.handling, 'PROCESS_WATER_RINSE_DRAINED_NOT_RETAINED');
 });
 
-test('Batch 1 source readiness remains exact and fail-closed for Moong Dal, Poha and unspecified fat', () => {
+test('Batch 1 source readiness records exact fats while remaining fail-closed for identity review, Moong Dal and Poha', () => {
   const source = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-readiness.json', import.meta.url), 'utf8')) as { ingredients: Array<{ identity: string; result: string }> };
   const byIdentity = new Map(source.ingredients.map((item) => [item.identity, item.result]));
   assert.equal(byIdentity.get('Dry flattened rice / Poha'), 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH');
-  assert.equal(byIdentity.get('Raw Moong Dal — split/hulled state unresolved'), 'SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW');
-  assert.equal(byIdentity.get('Oil/ghee or oil'), 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH');
+  assert.equal(byIdentity.get('Split hulled yellow Moong Dal'), 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH');
+  assert.equal(byIdentity.get('Refined sunflower oil'), 'SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW');
+  assert.equal(byIdentity.get('Cow ghee'), 'SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW');
+  assert.equal(byIdentity.get('Groundnut oil'), 'SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW');
   assert.equal(byIdentity.get('Whole-wheat atta'), 'CANONICAL_INGREDIENT_READY');
+});
+
+test('measurement submission history is append-only and separate from canonical runs', () => {
+  const migration = fs.readFileSync(new URL('../../backend/src/db/migrations/0045_controlled_food_measurement_submission_history.sql', import.meta.url), 'utf8');
+  assert.match(migration, /controlled_food_measurement_submissions/);
+  assert.match(migration, /submission_sha256 text not null unique/);
+  assert.match(migration, /supersedes_submission_id text references controlled_food_measurement_submissions/);
 });

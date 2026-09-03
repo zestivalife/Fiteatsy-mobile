@@ -14,9 +14,10 @@ if (input.evidenceClassification !== 'USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDEN
 const foods = input.measurements.map((measurement) => {
   const validation = inspectMeasurementSubmission(measurement);
   const downstreamCalculationBlockers: string[] = [];
-  if (measurement.preparationId === 'CP_CHAPATI') downstreamCalculationBlockers.push('CURATION_POST_COOKING_FAT_QUANTITY_REQUIRED_FOR_CALCULATION');
-  if (measurement.preparationId === 'CP_MOONG_DAL') downstreamCalculationBlockers.push('NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:RAW_MOONG_DAL');
-  if (measurement.preparationId === 'CP_POHA_PEANUT') downstreamCalculationBlockers.push('NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:FLATTENED_RICE_POHA');
+  if (measurement.preparationId === 'CP_CHAPATI') downstreamCalculationBlockers.push('SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:REFINED_SUNFLOWER_OIL', 'SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:COW_GHEE');
+  if (measurement.preparationId === 'CP_MOONG_DAL') downstreamCalculationBlockers.push('NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:SPLIT_HULLED_YELLOW_MOONG_DAL', 'SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:COW_GHEE');
+  if (measurement.preparationId === 'CP_BHINDI_SABJI' || measurement.preparationId === 'CP_BHINDI_ALOO') downstreamCalculationBlockers.push('SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:REFINED_SUNFLOWER_OIL');
+  if (measurement.preparationId === 'CP_POHA_PEANUT') downstreamCalculationBlockers.push('NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:FLATTENED_RICE_POHA', 'SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:GROUNDNUT_OIL');
   return {
     preparationId: measurement.preparationId,
     evidenceClassification: validation.evidenceClassification,
@@ -38,9 +39,9 @@ const report = {
   calculationsExecuted: 0,
   reviewsCreated: 0,
   validationRelease: 'NOT_CREATED',
-  primaryNextGate: 'MEASUREMENT_PREREQUISITES_REQUIRED',
+  primaryNextGate: 'STAGE_A_NUTRITIONIST_REVIEW_REQUIRED',
   sourceResolution: [
-    { ingredient: 'RAW_MOONG_DAL', result: 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH', affectedFood: 'CP_MOONG_DAL' },
+    { ingredient: 'SPLIT_HULLED_YELLOW_MOONG_DAL', result: 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH', affectedFood: 'CP_MOONG_DAL' },
     { ingredient: 'FLATTENED_RICE_POHA', result: 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH', affectedFood: 'CP_POHA_PEANUT' },
     { ingredient: 'SEMOLINA', result: 'NO_ACCEPTABLE_APPROVED_SOURCE_MATCH', affectedFood: 'BATCH_2_CP_UPMA' }
   ],

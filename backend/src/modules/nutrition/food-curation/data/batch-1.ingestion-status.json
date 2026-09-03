@@ -6,10 +6,10 @@
   "calculationsExecuted": 0,
   "reviewsCreated": 0,
   "validationRelease": "NOT_CREATED",
-  "primaryNextGate": "MEASUREMENT_PREREQUISITES_REQUIRED",
+  "primaryNextGate": "STAGE_A_NUTRITIONIST_REVIEW_REQUIRED",
   "sourceResolution": [
     {
-      "ingredient": "RAW_MOONG_DAL",
+      "ingredient": "SPLIT_HULLED_YELLOW_MOONG_DAL",
       "result": "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH",
       "affectedFood": "CP_MOONG_DAL"
     },
@@ -28,12 +28,11 @@
     {
       "preparationId": "CP_CHAPATI",
       "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "7f9dcc5307522718a6745c70563d9d1e632b616fc9c6ce5bc54d15c9dd0e5c58",
+      "submissionSha256": "7163cb432bed484bac6196b1837f34c8fb12af7706852d1268e4e7e09d07ab60",
       "measurementRunId": null,
       "measurementSha256": null,
       "canonicalMeasurementEligible": false,
       "validationErrors": [
-        "CURATION_PIECE_PROTOCOL_MINIMUM_NOT_MET",
         "CURATION_OPERATOR_REQUIRED",
         "CURATION_MEASUREMENT_DATE_REQUIRED",
         "CURATION_EQUIPMENT_ID_REQUIRED",
@@ -41,7 +40,8 @@
         "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
       ],
       "downstreamCalculationBlockers": [
-        "CURATION_POST_COOKING_FAT_QUANTITY_REQUIRED_FOR_CALCULATION"
+        "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:REFINED_SUNFLOWER_OIL",
+        "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:COW_GHEE"
       ],
       "warnings": [],
       "state": "MEASUREMENT_INCOMPLETE"
@@ -49,7 +49,7 @@
     {
       "preparationId": "CP_MOONG_DAL",
       "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "069a279c51b31d7c54b505841431a22125f9056fe71120c09285b215454cdb1c",
+      "submissionSha256": "77a1287e409d008dbbee755af526bc8cb56af797c1f96579bcbb2e8027bfe7f9",
       "measurementRunId": null,
       "measurementSha256": null,
       "canonicalMeasurementEligible": false,
@@ -61,7 +61,8 @@
         "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
       ],
       "downstreamCalculationBlockers": [
-        "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:RAW_MOONG_DAL"
+        "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:SPLIT_HULLED_YELLOW_MOONG_DAL",
+        "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:COW_GHEE"
       ],
       "warnings": [],
       "state": "MEASUREMENT_INCOMPLETE"
@@ -69,43 +70,7 @@
     {
       "preparationId": "CP_BHINDI_SABJI",
       "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "6822a750fee7acd8cdea594428cd74ce0565eff97c6b085dd95722a3a7db2379",
-      "measurementRunId": null,
-      "measurementSha256": null,
-      "canonicalMeasurementEligible": false,
-      "validationErrors": [
-        "CURATION_OPERATOR_REQUIRED",
-        "CURATION_MEASUREMENT_DATE_REQUIRED",
-        "CURATION_EQUIPMENT_ID_REQUIRED",
-        "CURATION_SCALE_RESOLUTION_REQUIRED",
-        "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
-      ],
-      "downstreamCalculationBlockers": [],
-      "warnings": [],
-      "state": "MEASUREMENT_INCOMPLETE"
-    },
-    {
-      "preparationId": "CP_BHINDI_ALOO",
-      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "af1a6705ea6ff142b2e72875183449d913748ef96fff2418911d90963abb5ea8",
-      "measurementRunId": null,
-      "measurementSha256": null,
-      "canonicalMeasurementEligible": false,
-      "validationErrors": [
-        "CURATION_OPERATOR_REQUIRED",
-        "CURATION_MEASUREMENT_DATE_REQUIRED",
-        "CURATION_EQUIPMENT_ID_REQUIRED",
-        "CURATION_SCALE_RESOLUTION_REQUIRED",
-        "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
-      ],
-      "downstreamCalculationBlockers": [],
-      "warnings": [],
-      "state": "MEASUREMENT_INCOMPLETE"
-    },
-    {
-      "preparationId": "CP_POHA_PEANUT",
-      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "ab15f4d4bd79fe1efc1fb25852502be09a8867199998ff8e8e1d5cade4a4015f",
+      "submissionSha256": "478dd4652c0a70d6f5f396bd7b13d271c7176dcde461599212c16bae3765d0c6",
       "measurementRunId": null,
       "measurementSha256": null,
       "canonicalMeasurementEligible": false,
@@ -117,7 +82,48 @@
         "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
       ],
       "downstreamCalculationBlockers": [
-        "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:FLATTENED_RICE_POHA"
+        "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:REFINED_SUNFLOWER_OIL"
+      ],
+      "warnings": [],
+      "state": "MEASUREMENT_INCOMPLETE"
+    },
+    {
+      "preparationId": "CP_BHINDI_ALOO",
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "submissionSha256": "3117b4f74c3db8ebdc6f721e5e07e63e5102b78c30624871749c281b53127a1b",
+      "measurementRunId": null,
+      "measurementSha256": null,
+      "canonicalMeasurementEligible": false,
+      "validationErrors": [
+        "CURATION_OPERATOR_REQUIRED",
+        "CURATION_MEASUREMENT_DATE_REQUIRED",
+        "CURATION_EQUIPMENT_ID_REQUIRED",
+        "CURATION_SCALE_RESOLUTION_REQUIRED",
+        "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
+      ],
+      "downstreamCalculationBlockers": [
+        "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:REFINED_SUNFLOWER_OIL"
+      ],
+      "warnings": [],
+      "state": "MEASUREMENT_INCOMPLETE"
+    },
+    {
+      "preparationId": "CP_POHA_PEANUT",
+      "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
+      "submissionSha256": "5368782268cc7d2761ca87324c0e1ac690d90c31fa952aff4d85feb551c9830c",
+      "measurementRunId": null,
+      "measurementSha256": null,
+      "canonicalMeasurementEligible": false,
+      "validationErrors": [
+        "CURATION_OPERATOR_REQUIRED",
+        "CURATION_MEASUREMENT_DATE_REQUIRED",
+        "CURATION_EQUIPMENT_ID_REQUIRED",
+        "CURATION_SCALE_RESOLUTION_REQUIRED",
+        "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
+      ],
+      "downstreamCalculationBlockers": [
+        "NO_ACCEPTABLE_APPROVED_SOURCE_MATCH:FLATTENED_RICE_POHA",
+        "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:GROUNDNUT_OIL"
       ],
       "warnings": [
         "CURATION_DRAINED_RINSE_WATER_EXCLUDED_FROM_RETAINED_INGREDIENT_WATER"
