@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "FITEATSY_BATCH_1_GATE_REPORT_V8",
+  "baselineSha": "2bbd15651443111f3eee5b54022f6e1fa0ae48fd",
+  "inputClassification": "EXECUTION_CONTRACT_ONLY_NO_AUTHORISED_HUMAN_DECISION_SUBMISSION",
+  "packageValidation": {
+    "status": "REJECTED_AS_DECISION_EVIDENCE",
+    "blockerCodes": [
+      "AUTHORISED_HUMAN_GATE_PACKAGE_NOT_SUPPLIED",
+      "EXPLICIT_STAGE_A_DECISIONS_NOT_SUPPLIED",
+      "EXPLICIT_SOURCE_IDENTITY_DECISIONS_NOT_SUPPLIED"
+    ],
+    "contentOrEvidenceMutationDetected": false
+  },
+  "reviewerAuthority": {
+    "status": "NOT_EVALUABLE_FOR_A_DECISION_SUBMISSION",
+    "blockerCode": "REVIEWER_AUTHORITY_NOT_ESTABLISHED_FOR_SUBMITTED_DECISIONS"
+  },
+  "ingredientRegistry": {
+    "approvedMappingsCreated": 0,
+    "reusedMappings": 0,
+    "pendingIdentities": [
+      "REFINED_SUNFLOWER_OIL",
+      "COW_GHEE",
+      "GROUNDNUT_OIL",
+      "SPLIT_HULLED_YELLOW_MOONG_DAL",
+      "DRY_FLATTENED_RICE_POHA"
+    ]
+  },
+  "recipes": [
+    {"recipeId":"CP_CHAPATI","name":"Chapati","stageA":"PENDING","sourceDecision":"PENDING","formulaEligibility":false,"formulaHash":null,"measurementRun":null,"measurementHash":null,"calculationStatus":"NOT_RUN","calculationHash":null,"reconciliation":"NOT_RUN","stageBPack":null,"remainingBlocker":"STAGE_A_NUTRITIONIST_REVIEW_REQUIRED"},
+    {"recipeId":"CP_MOONG_DAL","name":"Moong Dal","stageA":"PENDING","sourceDecision":"PENDING","formulaEligibility":false,"formulaHash":null,"measurementRun":null,"measurementHash":null,"calculationStatus":"NOT_RUN","calculationHash":null,"reconciliation":"NOT_RUN","stageBPack":null,"remainingBlocker":"STAGE_A_NUTRITIONIST_REVIEW_REQUIRED"},
+    {"recipeId":"CP_BHINDI_SABJI","name":"Bhindi Sabji","stageA":"PENDING","sourceDecision":"PENDING","formulaEligibility":false,"formulaHash":null,"measurementRun":null,"measurementHash":null,"calculationStatus":"NOT_RUN","calculationHash":null,"reconciliation":"NOT_RUN","stageBPack":null,"remainingBlocker":"STAGE_A_NUTRITIONIST_REVIEW_REQUIRED"},
+    {"recipeId":"CP_BHINDI_ALOO","name":"Bhindi Aloo","stageA":"PENDING","sourceDecision":"PENDING","formulaEligibility":false,"formulaHash":null,"measurementRun":null,"measurementHash":null,"calculationStatus":"NOT_RUN","calculationHash":null,"reconciliation":"NOT_RUN","stageBPack":null,"remainingBlocker":"STAGE_A_NUTRITIONIST_REVIEW_REQUIRED"},
+    {"recipeId":"CP_POHA_PEANUT","name":"Peanut Poha","stageA":"PENDING","sourceDecision":"PENDING","formulaEligibility":false,"formulaHash":null,"measurementRun":null,"measurementHash":null,"calculationStatus":"NOT_RUN","calculationHash":null,"reconciliation":"NOT_RUN","stageBPack":null,"remainingBlocker":"STAGE_A_NUTRITIONIST_REVIEW_REQUIRED"}
+  ],
+  "counts": {"stageAApproved":0,"sourceDecisionsAccepted":0,"formulaHashes":0,"canonicalMeasurementRuns":0,"calculations":0,"reconciled":0,"stageBPackages":0,"validationReleases":0},
+  "programmeState": {"indianFoodPopulation":"BLOCKED","phase3Handoff":"BLOCKED","production":"UNCHANGED"},
+  "nextGovernedAction": "SUPPLY_COMPLETED_AUTHORISED_BATCH_1_HUMAN_GATE_DECISION_PACKAGE"
+}

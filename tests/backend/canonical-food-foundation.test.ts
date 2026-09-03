@@ -48,3 +48,13 @@ test('Batch 1 remains pending and no downstream release is fabricated',()=>{
   assert.ok(stageA.formulas.every((x:any)=>x.review.decision==='PENDING'));
 });
 test('hashing is deterministic and material changes alter lineage hashes',()=>{assert.equal(canonicalHash({b:2,a:1}),canonicalHash({a:1,b:2}));assert.notEqual(canonicalHash({a:1}),canonicalHash({a:2}));});
+
+test('v8 audit fails closed when only an execution contract, not human decisions, is supplied',()=>{
+  const report=JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.gate-report.v8.json',import.meta.url),'utf8'));
+  assert.equal(report.inputClassification,'EXECUTION_CONTRACT_ONLY_NO_AUTHORISED_HUMAN_DECISION_SUBMISSION');
+  assert.equal(report.packageValidation.status,'REJECTED_AS_DECISION_EVIDENCE');
+  assert.deepEqual(report.counts,{stageAApproved:0,sourceDecisionsAccepted:0,formulaHashes:0,canonicalMeasurementRuns:0,calculations:0,reconciled:0,stageBPackages:0,validationReleases:0});
+  assert.equal(report.recipes.length,5);
+  assert.ok(report.recipes.every((recipe:any)=>recipe.stageA==='PENDING' && recipe.formulaHash===null && recipe.calculationHash===null));
+  assert.equal(report.programmeState.production,'UNCHANGED');
+});
