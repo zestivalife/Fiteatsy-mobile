@@ -69,6 +69,10 @@ jobs:
         working-directory: backend
         run: node --import tsx --test --test-concurrency=1 ../tests/database/diet-lifecycle-quality.database.test.ts
 
+      - name: Run authenticated Common Food source E2E
+        working-directory: backend
+        run: node --import tsx --test --test-concurrency=1 ../tests/api/common-food-authenticated-e2e.api.test.ts
+
       - name: Run Consultant database lifecycle contracts
         working-directory: backend
         shell: bash

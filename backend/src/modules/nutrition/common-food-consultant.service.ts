@@ -45,7 +45,24 @@ export async function generateCommonFoodPlan(account:AuthenticatedAccount,client
  return {generationRunId:runId,generatorVersion:'COMMON_FOOD_COMBINATION_ENGINE_V1',rankingVersion:'COMMON_FOOD_RANKING_V1',templateVersion:'INDIA_COMMON_MEAL_TEMPLATES_V2',catalogueVersion:'NUTRITION_CATALOGUE_V1_1',planVersionId:resolved.planVersion.id,meals};
 }
 
-export async function validateCommonFoodOption(account:AuthenticatedAccount,clientId:string,planId:string,input:{mealHead:MealHead;components:Array<{foodId:string;servingId:string;multiplier:number}>}){const r=await resolveClientMealGenerationContext({account,clientId,planId,mealHead:input.mealHead});if(!r.supported)throw new CommonFoodApiError(r.capability.code,422,r.capability.reason!);const option=validateManualCombination({foods,context:r.context,mealHead:input.mealHead,components:input.components,target:r.mealTargets[input.mealHead]});return {...option,mealHead:input.mealHead,optionHash:option.snapshotHash,planVersionId:r.planVersion.id};}
+const governedValidationError = (error: unknown): never => {
+  const code = error instanceof Error ? error.message : '';
+  if (code === 'UNSAFE_OR_INELIGIBLE_FOOD') {
+    throw new CommonFoodApiError(code, 422, 'The selected food is not eligible for this client and meal.');
+  }
+  if (code === 'SERVING_NOT_FOUND') {
+    throw new CommonFoodApiError(code, 422, 'The selected serving is not governed for this food.');
+  }
+  if (code === 'INVALID_SERVING_MULTIPLIER') {
+    throw new CommonFoodApiError(code, 422, 'The selected serving multiplier is outside the governed range.');
+  }
+  if (code === 'INVALID_MEAL_TEMPLATE') {
+    throw new CommonFoodApiError(code, 422, 'The selected components do not satisfy the governed meal template.');
+  }
+  throw error;
+};
+
+export async function validateCommonFoodOption(account:AuthenticatedAccount,clientId:string,planId:string,input:{mealHead:MealHead;components:Array<{foodId:string;servingId:string;multiplier:number}>}){const r=await resolveClientMealGenerationContext({account,clientId,planId,mealHead:input.mealHead});if(!r.supported)throw new CommonFoodApiError(r.capability.code,422,r.capability.reason!);try{const option=validateManualCombination({foods,context:r.context,mealHead:input.mealHead,components:input.components,target:r.mealTargets[input.mealHead]});return {...option,mealHead:input.mealHead,optionHash:option.snapshotHash,planVersionId:r.planVersion.id};}catch(error){return governedValidationError(error);}}
 
 export async function persistValidatedOption(account:AuthenticatedAccount,clientId:string,planId:string,input:{optionId?:string;expectedPlanVersionId:string;mealHead:MealHead;components:Array<{foodId:string;servingId:string;multiplier:number}>}){const validated=await validateCommonFoodOption(account,clientId,planId,input);if(validated.planVersionId!==input.expectedPlanVersionId)throw new CommonFoodApiError('STALE_PLAN_VERSION',409);const logicalOptionId=input.optionId??crypto.randomUUID();const prior=input.optionId?await getCombinationOption(input.optionId,planId):null;const snapshotId=crypto.randomUUID();const snapshot={combinationId:logicalOptionId,mealHead:input.mealHead,components:validated.components,nutrition:validated.nutrition,templateId:`TPL_${input.mealHead}`,templateVersion:'INDIA_COMMON_MEAL_TEMPLATES_V2',generatorVersion:'COMMON_FOOD_COMBINATION_ENGINE_V1',rankingVersion:'COMMON_FOOD_RANKING_V1',diversitySignature:canonicalHash(validated.components.map(x=>x.foodId).sort()).slice(0,24),preferenceScore:0,nutritionScore:0,overallScore:0,warnings:validated.nutrition.fibre===null?['FIBRE_NOT_REPORTED_NO_FIBRE_CLAIM']:[],shortages:[],optionHash:canonicalHash({logicalOptionId,version:(prior?.snapshotVersion??0)+1,validated}),snapshotVersion:(prior?.snapshotVersion??0)+1} satisfies CombinationSnapshot;try{await saveCombinationOption({id:snapshotId,logicalOptionId,supersedesId:null,planId,planVersionId:validated.planVersionId,expectedPlanVersionId:input.expectedPlanVersionId,mealHead:input.mealHead,snapshot});}catch(e){if((e as {code?:string}).code==='STALE_PLAN_VERSION')throw new CommonFoodApiError('STALE_PLAN_VERSION',409);throw e;}return snapshot;}
 
