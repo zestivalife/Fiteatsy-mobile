@@ -48,6 +48,7 @@ import { getFoodPreferenceProfile, type FoodPreferenceProfile } from './food-pre
 import { OptionalGuidanceContractError, validateOptionalGuidanceV2 } from './optional-guidance-contract.js';
 import { CALORIE_MACRO_ALLOCATION_CONFIG, CALORIE_MACRO_ALLOCATION_METHODOLOGY_VERSION, optimiseMealOptionPortion, validateAllocatedDiet } from './calorie-macro-allocation.js';
 import { freezeCombinationOptionsForLifecycle } from './common-food-consultant.repository.js';
+import { MEAL_HEADS as COMMON_FOOD_MEAL_HEADS } from './common-food-engine.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
@@ -183,6 +184,41 @@ export const assertDietPlanReviewContentComplete = (content: unknown) => {
     throw new NutritionPlanWorkflowError(
       'DIET_PLAN_REVIEW_CONTENT_INCOMPLETE',
       `Complete the saved diet version before review: ${failures.join('; ')}.`,
+      409,
+    );
+  }
+};
+
+export const assertCommonFoodReviewOptionsComplete = (options: unknown[]) => {
+  const failures: string[] = [];
+  for (const mealHead of COMMON_FOOD_MEAL_HEADS) {
+    const mealOptions = options.filter((option) => option && typeof option === 'object'
+      && (option as Record<string, unknown>).mealHead === mealHead);
+    if (mealOptions.length !== MAX_MEAL_OPTIONS_PER_SECTION) {
+      failures.push(`${mealHead}: exactly ${MAX_MEAL_OPTIONS_PER_SECTION} saved options required (received ${mealOptions.length})`);
+    }
+    const identities = new Set<string>();
+    mealOptions.forEach((raw, index) => {
+      const option = raw as Record<string, unknown>;
+      const components = Array.isArray(option.components) ? option.components : [];
+      const nutrition = option.nutrition && typeof option.nutrition === 'object'
+        ? option.nutrition as Record<string, unknown>
+        : {};
+      if (!String(option.combinationId ?? '').trim() || components.length === 0) {
+        failures.push(`${mealHead}: option ${index + 1} needs a persisted combination and components`);
+      }
+      if (![nutrition.kcal, nutrition.protein].every((value) => typeof value === 'number' && Number.isFinite(value))) {
+        failures.push(`${mealHead}: option ${index + 1} needs calories and protein`);
+      }
+      const identity = String(option.optionHash ?? option.diversitySignature ?? option.combinationId ?? '').trim();
+      if (!identity || identities.has(identity)) failures.push(`${mealHead}: duplicate option ${index + 1}`);
+      identities.add(identity);
+    });
+  }
+  if (failures.length > 0) {
+    throw new NutritionPlanWorkflowError(
+      'DIET_PLAN_REVIEW_CONTENT_INCOMPLETE',
+      `Complete the saved common-food diet version before review: ${failures.join('; ')}.`,
       409,
     );
   }
@@ -2346,8 +2382,9 @@ export const submitConsultantDietPlanForReview = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
   const version = await getCurrentDietPlanVersion(plan.id);
   if (!version) return null;
-  await freezeCombinationOptionsForLifecycle(plan.id, version.id);
-  assertDietPlanReviewContentComplete(version.content);
+  const frozenCommonFood = await freezeCombinationOptionsForLifecycle(plan.id, version.id);
+  if (frozenCommonFood.options.length > 0) assertCommonFoodReviewOptionsComplete(frozenCommonFood.options);
+  else assertDietPlanReviewContentComplete(version.content);
   await assertOptionalGuidanceValid(publicClientId, version.content);
   assertLifecycleTransition(version.lifecycleStatus, 'submitted_for_review');
   return updateDietPlanLifecycle({

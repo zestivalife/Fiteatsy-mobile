@@ -120,9 +120,10 @@ const main = async () => {
 
   const persisted: Json[]=[];
   for (const meal of generatedByRole.vegetarian.meals) {
-    const option=meal.options[0];
-    const saved=await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/common-food/options`,{expectedPlanVersionId:versionId,mealHead:meal.mealHead,components:option.components.map((x:Json)=>({foodId:x.foodId,servingId:x.servingId,multiplier:x.multiplier}))},201);
-    persisted.push(saved.body);
+    for (const option of meal.options) {
+      const saved=await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/common-food/options`,{expectedPlanVersionId:versionId,mealHead:meal.mealHead,components:option.components.map((x:Json)=>({foodId:x.foodId,servingId:x.servingId,multiplier:x.multiplier}))},201);
+      persisted.push(saved.body);
+    }
   }
   const baseline=persisted.find(x=>x.components.length>=2)??persisted[0];
   const optionId=String(baseline.combinationId); const first=baseline.components[0];
