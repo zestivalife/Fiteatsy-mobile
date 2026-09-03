@@ -2530,7 +2530,7 @@ export const publishConsultantDietPlan = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
   const approvedVersion = await getDietPlanVersionById(approvedVersionId);
   if (!approvedVersion) return null;
-  assertDietPlanReviewContentComplete(approvedVersion.content);
+  assertDietPlanVersionReviewComplete(approvedVersion);
   await assertOptionalGuidanceValid(publicClientId, approvedVersion.content, true);
   const publishAction = assertPublishVersionEligibility({
     dietPlanId: plan.id,
@@ -2579,7 +2579,7 @@ export const exportConsultantDietPlanDocument = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id) return null;
   const version = await getLatestDownloadableDietPlanVersion(plan);
   if (!version) return null;
-  assertDietPlanReviewContentComplete(version.content);
+  assertDietPlanVersionReviewComplete(version);
 
   const exported = await generateDietPlanDocument(plan, version);
   const updatedVersion = await updateDietPlanVersionExportPaths({
