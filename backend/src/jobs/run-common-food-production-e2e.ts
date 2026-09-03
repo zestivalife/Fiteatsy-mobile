@@ -11,6 +11,7 @@ const REQUIRED_MIGRATIONS = [
   '0052_production_qa_fixture_sets.sql',
 ];
 const MEAL_HEADS = ['EARLY_MORNING', 'BREAKFAST', 'MID_MORNING', 'LUNCH', 'EVENING_SNACK', 'DINNER', 'BEDTIME'];
+let currentPhase = 'BOOTSTRAP';
 
 type Json = Record<string, any>;
 type Timed<T> = { body: T; status: number; ms: number; bytes: Uint8Array; headers: Headers };
@@ -81,6 +82,7 @@ const main = async () => {
   const plans: Record<string, Json> = {};
   const generateTimes: number[] = [];
   for (const role of ['vegetarian','egg','non_vegetarian','vegan']) {
+    currentPhase = `GENERATE_${role.toUpperCase()}`;
     const draft = await ok(tokens.consultant, 'POST', `${pathFor(role)}/diet-plans/draft`, {}, 201);
     plans[role] = draft.body;
     const generated = await ok(tokens.consultant, 'POST', `${pathFor(role)}/diet-plans/${draft.body.plan.id}/common-food/generate`, { mealHeads: MEAL_HEADS });
@@ -101,6 +103,7 @@ const main = async () => {
   const planId = String(plans.vegetarian.plan.id);
   const versionId = String(generatedByRole.vegetarian.planVersionId);
   const catalogue = await ok(tokens.consultant,'GET',`${vegBase}/common-foods?mealHead=BREAKFAST&limit=20&offset=0`);
+  currentPhase = 'CATALOGUE_SEARCH';
   const searchable = catalogue.body.items?.find((item:Json)=>item.displayName && item.servings?.length);
   assert(searchable, 'ACTIVE_SEARCHABLE_CATALOGUE_FOOD_REQUIRED');
   const exactTerm = encodeURIComponent(searchable.displayName);
@@ -119,6 +122,7 @@ const main = async () => {
   report.explorer = { search:'PASS', searchTerm:searchable.displayName, foodId:searchable.id, alias:governedAlias ? 'PASS' : 'NOT_AVAILABLE', aliasTerm:governedAlias ?? null, filters:'PASS', pagination:'PASS', serving:exact.body.items.every((x:Json)=>x.servings.length>0)?'PASS':'FAIL' };
 
   const persisted: Json[]=[];
+  currentPhase = 'PERSIST_35_OPTIONS';
   for (const meal of generatedByRole.vegetarian.meals) {
     for (const option of meal.options) {
       const saved=await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/common-food/options`,{expectedPlanVersionId:versionId,mealHead:meal.mealHead,components:option.components.map((x:Json)=>({foodId:x.foodId,servingId:x.servingId,multiplier:x.multiplier}))},201);
@@ -147,16 +151,25 @@ const main = async () => {
   for(let i=mutationTimes.length;i<20;i++) mutationTimes.push((await ok(tokens.consultant,'PATCH',`${vegBase}/diet-plans/${planId}/common-food/options/${optionId}/components/${first.foodId}/serving`,{expectedPlanVersionId:versionId,servingId:first.servingId,multiplier:i%2?1:1.5})).ms);
 
   const savedHash=hash(reloadedBaseline);
+  currentPhase = 'SUBMIT_REVIEW';
   const submitted=await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/submit-review`,{});
+  currentPhase = 'SENIOR_QUEUE';
   const queue=await ok(tokens.senior,'GET','/v1/consultants/diet-plan-reviews');
   const review=queue.body.reviews.find((x:Json)=>x.plan.id===planId||x.dietPlan?.id===planId||x.id===planId);
   assert(review || queue.body.reviews.length>0,'SENIOR_REVIEW_QUEUE_EMPTY');
+  currentPhase = 'REQUEST_CHANGES';
   const changes=await ok(tokens.senior,'POST',`${vegBase}/diet-plans/${planId}/request-changes`,{comment:'QA v17.6: verify one serving and resubmit.'});
+  currentPhase = 'REVISE';
   const revised=await ok(tokens.consultant,'PATCH',`${vegBase}/diet-plans/${planId}`,{content:changes.body.version.content,reviewNotes:'QA serving verified; resubmitting.'});
+  currentPhase = 'REVISE_COMMON_FOOD_OPTION';
   await ok(tokens.consultant,'PATCH',`${vegBase}/diet-plans/${planId}/common-food/options/${optionId}/components/${first.foodId}/serving`,{expectedPlanVersionId:revised.body.version.id,servingId:first.servingId,multiplier:first.multiplier});
+  currentPhase = 'RESUBMIT';
   const resubmitted=await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/submit-review`,{});
+  currentPhase = 'APPROVE';
   const approved=await ok(tokens.senior,'POST',`${vegBase}/diet-plans/${planId}/approve`,{});
+  currentPhase = 'PUBLISH';
   const published=await ok(tokens.senior,'POST',`${vegBase}/diet-plans/${planId}/publish`,{approvedVersionId:approved.body.version.id});
+  currentPhase = 'DOCX';
   const docx=await ok(tokens.senior,'GET',`${vegBase}/diet-plans/${planId}/download`);
   assert(docx.bytes.length>1000 && (docx.headers.get('content-type')??'').includes('officedocument'), 'DOCX_INVALID');
   const clientRead=await ok(tokens.vegetarian,'GET','/v1/platform/nutrition-plan');
@@ -182,4 +195,4 @@ const main = async () => {
   console.log(JSON.stringify(report));
 };
 
-void main().catch(error=>{console.error(error instanceof Error?error.message:'PRODUCTION_E2E_FAILED');process.exitCode=1;}).finally(closePool);
+void main().catch(error=>{console.error(`${currentPhase}:${error instanceof Error?(error.stack??error.message):'PRODUCTION_E2E_FAILED'}`);process.exitCode=1;}).finally(closePool);
