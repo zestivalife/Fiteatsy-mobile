@@ -61,14 +61,14 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     const visible = await getJson(server.baseUrl, '/v1/consultants/clients', { headers: authHeaders(consultant.token) });
     assert.equal(visible.response.status, 200, JSON.stringify(visible.body));
     assert.ok(visible.body.clients.some((item: { clientId: string }) => item.clientId === publicClientId));
-    const denied = await getJson(server.baseUrl, `/v1/consultants/nutrition/clients/${publicClientId}/common-foods`, { headers: authHeaders(outsider.token) });
+    const denied = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, { headers: authHeaders(outsider.token) });
     assert.equal(denied.response.status, 403, JSON.stringify(denied.body));
     assert.equal(denied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 
-    const draft = await postJson(server.baseUrl, `/v1/consultants/nutrition/clients/${publicClientId}/diet-plans/draft`, {}, { headers: authHeaders(consultant.token) });
+    const draft = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/draft`, {}, { headers: authHeaders(consultant.token) });
     assert.equal(draft.response.status, 201, JSON.stringify(draft.body));
     const planId = String(draft.body.plan.id);
-    const generated = await postJson(server.baseUrl, `/v1/consultants/nutrition/clients/${publicClientId}/diet-plans/${planId}/common-food/generate`, {
+    const generated = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/generate`, {
       mealHeads: ['EARLY_MORNING', 'BREAKFAST', 'MID_MORNING', 'LUNCH', 'EVENING_SNACK', 'DINNER', 'BEDTIME'],
     }, { headers: authHeaders(consultant.token) });
     assert.equal(generated.response.status, 200, JSON.stringify(generated.body));
@@ -85,14 +85,14 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
       assert.equal(new Set(meal.options.map((option: { diversitySignature: string }) => option.diversitySignature)).size, 5);
     }
 
-    const rejected = await postJson(server.baseUrl, `/v1/consultants/nutrition/clients/${publicClientId}/diet-plans/${planId}/common-food/validate-option`, {
+    const rejected = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/validate-option`, {
       mealHead: 'BREAKFAST', components: [{ foodId: 'NOT_ELIGIBLE', servingId: 'NONE', multiplier: 1 }],
     }, { headers: authHeaders(consultant.token) });
     assert.equal(rejected.response.status, 422, JSON.stringify(rejected.body));
     assert.equal(rejected.body.error, 'UNSAFE_OR_INELIGIBLE_FOOD');
 
     const option = generated.body.meals[0].options[0];
-    const stale = await postJson(server.baseUrl, `/v1/consultants/nutrition/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+    const stale = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
       expectedPlanVersionId: crypto.randomUUID(), mealHead: generated.body.meals[0].mealHead,
       components: option.components.map((component: { foodId: string; servingId: string; multiplier: number }) => ({ foodId: component.foodId, servingId: component.servingId, multiplier: component.multiplier })),
     }, { headers: authHeaders(consultant.token) });
