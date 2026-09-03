@@ -156,3 +156,36 @@ test('v12 production safety assertion keeps every release inactive',()=>{assert.
 test('v12 source research preserves IFCT rights failure and rejects public availability as permission',()=>{const r=JSON.parse(fs.readFileSync(new URL('batch-1.remaining-source-research.v12.json',v12Dir),'utf8'));assert.equal(r.rightsEvidenceSearch.ninOrIfctProductUsePermissionFound,false);assert.equal(r.finalResult,'NO_RIGHTS_CLEAR_AUTHORITATIVE_EXACT_SOURCE_FOUND');assert.ok(r.candidates.filter((x:any)=>x.authority==='ICMR-NIN').every((x:any)=>x.selected===false&&x.rightsAssessment.includes('BLOCKED')))});
 test('v12 local-reference path requires laboratory nutrient analysis',()=>{const r=JSON.parse(fs.readFileSync(new URL('batch-1.remaining-source-research.v12.json',v12Dir),'utf8'));assert.equal(r.localReferenceAssessment.kitchenMeasurementCanSupplyNutrients,false);assert.equal(r.localReferenceAssessment.moongResult,'LABORATORY_NUTRIENT_ANALYSIS_REQUIRED_FOR_LOCAL_REFERENCE');assert.equal(r.localReferenceAssessment.pohaResult,'LABORATORY_NUTRIENT_ANALYSIS_REQUIRED_FOR_LOCAL_REFERENCE')});
 test('v12 decision hashes are deterministic and mutation-sensitive',()=>{for(const d of v12Decisions.decisions){const payload={...structuredClone(d),...v12Decisions.reviewer,decisionDate:v12Decisions.decisionDate};delete (payload as any).decisionHash;assert.equal(canonicalHash(payload),d.decisionHash);assert.notEqual(canonicalHash({...payload,decision:'REJECTED'}),d.decisionHash)}});
+
+const v13Research=JSON.parse(fs.readFileSync(new URL('batch-1.remaining-source-research.v13.json',v12Dir),'utf8'));
+test('v13 source resolution is scoped only to the two unreleased recipes',()=>{
+  assert.deepEqual(v13Research.scope,['CP_MOONG_DAL','CP_POHA_PEANUT']);
+  assert.equal(v13Research.candidates.length,6);
+  assert.ok(v13Research.candidates.every((x:any)=>v13Research.scope.includes(x.recipe)));
+});
+test('v13 accepts no source lacking both exact identity and reusable rights',()=>{
+  assert.ok(v13Research.candidates.every((x:any)=>x.decision!=='ACCEPTED'));
+  assert.equal(v13Research.result.newCanonicalSourceMappings,0);
+  assert.ok(v13Research.candidates.every((x:any)=>x.identityDecision!=='ACCEPTED' || x.rightsDecision!=='APPROVED'));
+});
+test('v13 keeps IFCT numeric ingestion prohibited without written permission',()=>{
+  assert.equal(v13Research.repositoryRightsEvidenceSearch.ninIfctWrittenProductPermissionFound,false);
+  assert.equal(v13Research.repositoryRightsEvidenceSearch.result,'IFCT_NUMERIC_INGESTION_PROHIBITED');
+  const ifct=v13Research.candidates.find((x:any)=>x.candidateSource==='Indian Food Composition Tables 2017');
+  assert.equal(ifct.mandatoryVectorComplete,false);
+  assert.equal(ifct.decision,'BLOCKED');
+});
+test('v13 preserves the three immutable v12 validation releases',()=>{
+  assert.equal(v13Research.result.newValidationReleases,0);
+  for(const id of ['CP_CHAPATI','CP_BHINDI_SABJI','CP_BHINDI_ALOO']){
+    const release=v12Release(id),payload=structuredClone(release);
+    for(const k of ['schemaVersion','releaseTimestamp','immutable','releaseHash'])delete payload[k];
+    assert.equal(canonicalHash(payload),release.releaseHash);
+  }
+});
+test('v13 remains partial, blocks downstream activation and leaves production unchanged',()=>{
+  assert.equal(v13Research.result.batchValidationStatus,'PARTIAL_3_OF_5_VALIDATION_RELEASED');
+  assert.equal(v13Research.result.indianFoodPopulationStatus,'BLOCKED_PENDING_BATCH_1_VALIDATION_COMPLETE');
+  assert.equal(v13Research.result.phase3Status,'BLOCKED');
+  assert.equal(v13Research.result.productionStatus,'UNCHANGED');
+});
