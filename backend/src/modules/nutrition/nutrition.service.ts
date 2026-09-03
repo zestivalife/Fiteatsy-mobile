@@ -224,6 +224,11 @@ export const assertCommonFoodReviewOptionsComplete = (options: unknown[]) => {
   }
 };
 
+const assertDietPlanVersionReviewComplete = (version: { content: unknown; commonFoodOptions?: unknown[] }) => {
+  if ((version.commonFoodOptions?.length ?? 0) > 0) assertCommonFoodReviewOptionsComplete(version.commonFoodOptions!);
+  else assertDietPlanReviewContentComplete(version.content);
+};
+
 type NutritionMealPlanKey = keyof NutritionPlanContent['mealPlan'];
 type NutritionRecommendationMode = 'approved' | 'outside_plan' | 'general';
 type NutritionRecommendationSource = 'published_plan' | 'published_reviewed_guidance';
@@ -2431,7 +2436,7 @@ export const getSeniorConsultantDietPlanReviewQueue = async (account: Authentica
   const reviews = await listDietPlanReviewQueue();
   return reviews.map((review) => {
     try {
-      assertDietPlanReviewContentComplete(review.version.content);
+      assertDietPlanVersionReviewComplete(review.version);
       return { ...review, contentValidation: { status: 'ready' as const } };
     } catch (error) {
       if (!(error instanceof NutritionPlanWorkflowError)) throw error;
@@ -2469,7 +2474,7 @@ export const approveConsultantDietPlan = async (
   }
   const currentVersion = await getCurrentDietPlanVersion(plan.id);
   if (!currentVersion) return null;
-  assertDietPlanReviewContentComplete(currentVersion.content);
+  assertDietPlanVersionReviewComplete(currentVersion);
   const guidance = await assertOptionalGuidanceValid(publicClientId, currentVersion.content);
   assertLifecycleTransition(currentVersion.lifecycleStatus, 'approved');
   const sourceSnapshot = currentVersion.sourceSnapshot;
