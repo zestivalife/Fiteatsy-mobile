@@ -102,7 +102,7 @@ for idx, item in enumerate(ITEMS, 1):
         doc.add_page_break()
     doc.add_heading(f"{idx}. {item[0]}", level=1)
     t=doc.add_table(rows=0, cols=2); t.style="Table Grid"
-    for label, value in zip(("Required identity","Candidate source","Source description","Identity concern","Rights","Core Nutrition","Decision choices","Decision","Reviewer initials / reference","Food-level date"), (item[0],item[1],item[2],item[3],item[4],item[5],item[6],"PENDING - reviewer must select","____________________________","____________________________")):
+    for label, value in zip(("Required identity","Candidate source","Source description","Identity concern","Rights","Core Nutrition","Decision choices","Decision","Reviewer initials / reference","Food-level date"), (item[0],item[1],item[2],item[3],item[4],item[5],item[6],"PENDING - reviewer must select","Priyanshi Srivastava","3 Sept 2026")):
         add_kv(t,label,value,PALE)
     set_table_geometry(t)
 

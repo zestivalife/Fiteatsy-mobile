@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { applyBatchMeasurementAudit, approvedFormulaSha256, assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, createCalculationInputManifest, deriveStageBStatus, formulaSha256, ingestSourceIdentityReview, inspectMeasurement, inspectMeasurementSubmission, normalizeQuantityToGrams, reconcileCalculation, sourceIdentityReviewTaskSha256, validateBatchMeasurementAudit, validateMeasurement } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
+import { applyBatchMeasurementAudit, approvedFormulaSha256, assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, createCalculationInputManifest, deriveStageBStatus, formulaSha256, ingestSourceIdentityReview, inspectMeasurement, inspectMeasurementSubmission, normalizeQuantityToGrams, reconcileCalculation, sourceIdentityReviewTaskSha256, validateBatchMeasurementAudit, validateMeasurement, validateSourceReviewerAuthority } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
 import type { SourceIdentityReviewSubmission, SourceIdentityReviewTask } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.types.js';
 import type { ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, PreparationReview } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.types.js';
 
@@ -274,8 +274,15 @@ test('provided exact sources require complete identity, version and rights evide
   const provided = structuredClone(completeSourceReview);
   provided.decisions[3].decision = 'PROVIDE_APPROVED_EXACT_SOURCE';
   assert.throws(() => ingestSourceIdentityReview(sourceReviewTask, provided), /CURATION_APPROVED_EXACT_SOURCE_EVIDENCE_REQUIRED/);
-  provided.decisions[3].approvedExactSource = { sourceId: 'LICENSED_INDIA_DATA', recordId: 'MOONG-001', datasetVersion: '2026.1', rightsEvidence: 'licence-review-42' };
+  provided.decisions[3].approvedExactSource = { sourceId: 'LICENSED_INDIA_DATA', recordId: 'MOONG-001', datasetVersion: '2026.1', exactFoodDescription: 'Split hulled yellow Moong Dal, raw', rightsEvidence: 'licence-review-42', nutrientBasis: 'per 100 g edible portion', mandatoryCoreNutritionComplete: true };
   assert.equal(ingestSourceIdentityReview(sourceReviewTask, provided).states.SPLIT_HULLED_YELLOW_MOONG_DAL, 'APPROVED_EXACT_SOURCE_PENDING_REGISTRY_VALIDATION');
+});
+
+test('submitted source reviewer metadata passes structural authority validation without self-asserting regulated scope', () => {
+  const task = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-identity-review.pending.json', import.meta.url), 'utf8')) as { reviewer: { reviewerId: string; reviewerQualification: string; qualificationReference: string; reviewedOn: string; declaration: string }; items: Array<{ decision: string; reviewerReference: string; foodLevelDate: string }> };
+  const result = validateSourceReviewerAuthority(task.reviewer);
+  assert.equal(result.state, 'METADATA_VALID_AUTHORITY_SCOPE_NOT_SELF_ASSERTED');
+  assert.ok(task.items.every((item) => item.decision === 'PENDING' && item.reviewerReference === 'Priyanshi Srivastava' && item.foodLevelDate === '2026-09-03'));
 });
 
 test('measurement audit metadata is validated before it can populate physical evidence', () => {

@@ -95,7 +95,10 @@ export interface SourceIdentityReviewDecision {
     sourceId: string;
     recordId: string;
     datasetVersion: string;
+    exactFoodDescription: string;
     rightsEvidence: string;
+    nutrientBasis: string;
+    mandatoryCoreNutritionComplete: true;
   };
 }
 
@@ -114,6 +117,14 @@ export interface SourceIdentityReviewOutcome {
   submissionSha256: string;
   taskSha256: string;
   states: Record<string, string>;
+}
+
+export interface SourceReviewerAuthority {
+  reviewerId: string;
+  reviewerQualification: string;
+  qualificationReference: string;
+  reviewedOn: string;
+  declaration: string;
 }
 
 export interface BatchMeasurementAudit {

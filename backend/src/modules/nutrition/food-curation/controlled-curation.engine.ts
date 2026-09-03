@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { BatchMeasurementAudit, CalculatedPreparation, CalculationInputManifest, ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, MeasurementSubmissionValidationResult, MeasurementValidationResult, NutrientCode, NutrientVector, PreparationReview, SourceIdentityReviewOutcome, SourceIdentityReviewSubmission, SourceIdentityReviewTask, StageAFormulaReview, StageBFoodStatus } from './controlled-curation.types.js';
+import type { BatchMeasurementAudit, CalculatedPreparation, CalculationInputManifest, ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, MeasurementSubmissionValidationResult, MeasurementValidationResult, NutrientCode, NutrientVector, PreparationReview, SourceIdentityReviewOutcome, SourceIdentityReviewSubmission, SourceIdentityReviewTask, SourceReviewerAuthority, StageAFormulaReview, StageBFoodStatus } from './controlled-curation.types.js';
 
 const CORE: NutrientCode[] = ['energy_kcal', 'protein_g', 'carbohydrate_g', 'fat_g', 'fibre_g'];
 export const CALCULATION_METHOD_VERSION = 'FITEATSY_CONTROLLED_PREPARATION_V1' as const;
@@ -33,6 +33,11 @@ export const sourceIdentityReviewTaskSha256 = (task: SourceIdentityReviewTask) =
   items: task.items.map(({ canonicalIdentity, candidate, coreNutrition, choices }) => ({ canonicalIdentity, candidate, coreNutrition, choices })),
 });
 
+export const validateSourceReviewerAuthority = (authority: SourceReviewerAuthority) => {
+  if (!authority.reviewerId.trim() || !authority.reviewerQualification.trim() || !authority.qualificationReference.trim() || !authority.declaration.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(authority.reviewedOn)) throw new Error('CURATION_SOURCE_REVIEW_AUTHORITY_REQUIRED');
+  return { state: 'METADATA_VALID_AUTHORITY_SCOPE_NOT_SELF_ASSERTED' as const, authoritySha256: calculationSha256(authority) };
+};
+
 export const ingestSourceIdentityReview = (
   task: SourceIdentityReviewTask,
   submission: SourceIdentityReviewSubmission,
@@ -40,7 +45,8 @@ export const ingestSourceIdentityReview = (
 ): SourceIdentityReviewOutcome => {
   const expectedTaskSha256 = sourceIdentityReviewTaskSha256(task);
   if (submission.taskSha256 !== expectedTaskSha256) throw new Error('CURATION_STALE_SOURCE_REVIEW');
-  if (!submission.submissionId.trim() || !submission.reviewerId.trim() || !submission.reviewerQualification.trim() || !submission.qualificationReference.trim() || !submission.declaration.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(submission.reviewedOn)) throw new Error('CURATION_SOURCE_REVIEW_AUTHORITY_REQUIRED');
+  if (!submission.submissionId.trim()) throw new Error('CURATION_SOURCE_REVIEW_SUBMISSION_ID_REQUIRED');
+  validateSourceReviewerAuthority(submission);
   if (submission.decisions.length !== task.items.length) throw new Error('CURATION_SOURCE_REVIEW_INCOMPLETE');
   const decisionMap = new Map<string, SourceIdentityReviewSubmission['decisions'][number]>();
   for (const decision of submission.decisions) {
@@ -54,7 +60,7 @@ export const ingestSourceIdentityReview = (
     if (decision.candidate !== item.candidate) throw new Error(`CURATION_STALE_SOURCE_CANDIDATE:${item.canonicalIdentity}`);
     if (decision.decision === 'PROVIDE_APPROVED_EXACT_SOURCE') {
       const source = decision.approvedExactSource;
-      if (!source?.sourceId.trim() || !source.recordId.trim() || !source.datasetVersion.trim() || !source.rightsEvidence.trim()) throw new Error(`CURATION_APPROVED_EXACT_SOURCE_EVIDENCE_REQUIRED:${item.canonicalIdentity}`);
+      if (!source?.sourceId.trim() || !source.recordId.trim() || !source.datasetVersion.trim() || !source.exactFoodDescription.trim() || !source.rightsEvidence.trim() || !source.nutrientBasis.trim() || source.mandatoryCoreNutritionComplete !== true) throw new Error(`CURATION_APPROVED_EXACT_SOURCE_EVIDENCE_REQUIRED:${item.canonicalIdentity}`);
     } else if (decision.approvedExactSource) throw new Error(`CURATION_UNEXPECTED_ALTERNATE_SOURCE:${item.canonicalIdentity}`);
     for (const historic of prior) {
       if (historic.taskSha256 !== expectedTaskSha256) continue;

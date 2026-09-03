@@ -7,6 +7,7 @@ const dataDir = path.join(backendRoot, 'src/modules/nutrition/food-curation/data
 const inputPath = process.argv[2] ? path.resolve(process.argv[2]) : path.join(dataDir, 'batch-1.user-confirmed-measurements.json');
 const outputPath = process.argv[3] ? path.resolve(process.argv[3]) : path.join(dataDir, 'stage-b.machine-status.json');
 const input = JSON.parse(fs.readFileSync(inputPath, 'utf8')) as { measurements?: Array<Record<string, unknown>> };
+const sourceReview = JSON.parse(fs.readFileSync(path.join(dataDir, 'batch-1.source-identity-review.pending.json'), 'utf8')) as { reviewer?: Record<string, string>; items?: Array<{ decision?: string }> };
 const required = ['CP_CHAPATI', 'CP_MOONG_DAL', 'CP_BHINDI_SABJI', 'CP_BHINDI_ALOO', 'CP_POHA_PEANUT'];
 const byId = new Map((input.measurements ?? []).map((item) => [String(item.preparationId ?? ''), item]));
 const physicallySubmitted = (item: Record<string, unknown> | undefined) => Boolean(item
@@ -25,6 +26,8 @@ const report = {
   phase3ComponentHandoff: 'BLOCKED',
   production: 'UNCHANGED',
   primaryNextGate: 'STAGE_A_NUTRITIONIST_REVIEW_REQUIRED',
+  sourceReviewerMetadata: sourceReview.reviewer?.reviewerId && sourceReview.reviewer?.reviewerQualification && sourceReview.reviewer?.qualificationReference && sourceReview.reviewer?.reviewedOn && sourceReview.reviewer?.declaration ? 'PRESENT_STRUCTURALLY_VALID' : 'MISSING',
+  sourceDecisionsReceived: (sourceReview.items ?? []).filter((item) => item.decision && item.decision !== 'PENDING').length,
   physicalEvidenceSubmissionsFound: submitted,
   canonicalMeasurementRunsFound: 0,
   realCalculationsExecuted: 0,
