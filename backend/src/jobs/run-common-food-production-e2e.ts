@@ -155,7 +155,7 @@ const main = async () => {
   const submitted=await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/submit-review`,{});
   currentPhase = 'SENIOR_QUEUE';
   const queue=await ok(tokens.senior,'GET','/v1/consultants/diet-plan-reviews');
-  const review=queue.body.reviews.find((x:Json)=>x.plan.id===planId||x.dietPlan?.id===planId||x.id===planId);
+  const review=queue.body.reviews.find((x:Json)=>x.plan?.id===planId||x.dietPlan?.id===planId||x.id===planId);
   assert(review || queue.body.reviews.length>0,'SENIOR_REVIEW_QUEUE_EMPTY');
   currentPhase = 'REQUEST_CHANGES';
   const changes=await ok(tokens.senior,'POST',`${vegBase}/diet-plans/${planId}/request-changes`,{comment:'QA v17.6: verify one serving and resubmit.'});
