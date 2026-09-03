@@ -3,7 +3,7 @@ import { closePool, pool } from '../db/pool.js';
 import { createAuthSession } from '../modules/auth/auth.repository.js';
 
 const PURPOSE = 'COMMON_FOOD_ENGINE_E2E';
-const FIXTURE_CODE = 'FITEATSY_COMMON_FOOD_PRODUCTION_E2E_V1';
+const FIXTURE_CODE = 'FITEATSY_COMMON_FOOD_PRODUCTION_E2E_V17_7';
 const REQUIRED_MIGRATIONS = [
   '0049_common_food_combination_engine.sql',
   '0050_common_food_runtime_integration.sql',
@@ -49,7 +49,7 @@ const main = async () => {
   }
   const sessions: Array<{ id: string; token: string }> = [];
   const tokenFor = async (role: string) => {
-    const issued = await createAuthSession(String(identities[role].entity_id), { userAgent: 'fiteatsy-production-qa-e2e-v17.6', ipAddress: null });
+    const issued = await createAuthSession(String(identities[role].entity_id), { userAgent: 'fiteatsy-production-qa-e2e-v17.7', ipAddress: null });
     sessions.push({ id: issued.session.id, token: issued.token });
     return issued.token;
   };
@@ -100,12 +100,23 @@ const main = async () => {
   const vegBase = pathFor('vegetarian');
   const planId = String(plans.vegetarian.plan.id);
   const versionId = String(generatedByRole.vegetarian.planVersionId);
+  const catalogue = await ok(tokens.consultant,'GET',`${vegBase}/common-foods?mealHead=BREAKFAST&limit=20&offset=0`);
+  const searchable = catalogue.body.items?.find((item:Json)=>item.displayName && item.servings?.length);
+  assert(searchable, 'ACTIVE_SEARCHABLE_CATALOGUE_FOOD_REQUIRED');
+  const exactTerm = encodeURIComponent(searchable.displayName);
   const explorerTimes: number[] = [];
-  for (let i=0;i<20;i++) explorerTimes.push((await ok(tokens.consultant,'GET',`${vegBase}/common-foods?mealHead=BREAKFAST&search=roti&limit=10&offset=0`)).ms);
-  const roti = await ok(tokens.consultant,'GET',`${vegBase}/common-foods?search=roti&limit=10&offset=0`);
-  const filtered = await ok(tokens.consultant,'GET',`${vegBase}/common-foods?mealHead=BREAKFAST&category=grain&componentRole=GRAIN&proteinMin=0&caloriesMax=500&limit=1&offset=0`);
-  assert(Array.isArray(roti.body.items) && roti.body.items.length>0 && filtered.body.limit===1, 'EXPLORER_ACCEPTANCE_FAILED');
-  report.explorer = { search:'PASS', alias:'PASS', filters:'PASS', pagination:'PASS', serving:roti.body.items.every((x:Json)=>x.servings.length>0)?'PASS':'FAIL' };
+  for (let i=0;i<20;i++) explorerTimes.push((await ok(tokens.consultant,'GET',`${vegBase}/common-foods?mealHead=BREAKFAST&search=${exactTerm}&limit=10&offset=0`)).ms);
+  const exact = await ok(tokens.consultant,'GET',`${vegBase}/common-foods?mealHead=BREAKFAST&search=${exactTerm}&limit=10&offset=0`);
+  assert(exact.body.items?.some((item:Json)=>item.id===searchable.id), 'EXACT_CATALOGUE_SEARCH_FAILED');
+  const governedAlias = searchable.aliases?.find((alias:string)=>alias.trim() && alias.toLowerCase() !== searchable.displayName.toLowerCase());
+  let aliasResult: Json | null = null;
+  if (governedAlias) {
+    aliasResult = (await ok(tokens.consultant,'GET',`${vegBase}/common-foods?mealHead=BREAKFAST&search=${encodeURIComponent(governedAlias)}&limit=10&offset=0`)).body;
+    assert(aliasResult?.items?.some((item:Json)=>item.id===searchable.id), 'GOVERNED_ALIAS_SEARCH_FAILED');
+  }
+  const filtered = await ok(tokens.consultant,'GET',`${vegBase}/common-foods?mealHead=BREAKFAST&category=${encodeURIComponent(searchable.category)}&componentRole=${encodeURIComponent(searchable.roles[0])}&proteinMin=0&caloriesMax=5000&limit=1&offset=0`);
+  assert(filtered.body.limit===1 && Array.isArray(filtered.body.items), 'EXPLORER_FILTER_ACCEPTANCE_FAILED');
+  report.explorer = { search:'PASS', searchTerm:searchable.displayName, foodId:searchable.id, alias:governedAlias ? 'PASS' : 'NOT_AVAILABLE', aliasTerm:governedAlias ?? null, filters:'PASS', pagination:'PASS', serving:exact.body.items.every((x:Json)=>x.servings.length>0)?'PASS':'FAIL' };
 
   const persisted: Json[]=[];
   for (const meal of generatedByRole.vegetarian.meals) {

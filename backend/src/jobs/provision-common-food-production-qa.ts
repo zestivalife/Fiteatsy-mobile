@@ -4,7 +4,7 @@ import { migrateDatabase } from '../db/migrator.js';
 import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, revokeQaAssignment } from '../modules/admin/qa-provisioning.repository.js';
 
 const PURPOSE = 'COMMON_FOOD_ENGINE_E2E';
-const FIXTURE_CODE = 'FITEATSY_COMMON_FOOD_PRODUCTION_E2E_V1';
+const FIXTURE_CODE = 'FITEATSY_COMMON_FOOD_PRODUCTION_E2E_V17_7';
 const ACTOR = 'production-qa-cli';
 const REASON = 'Governed Common Food Engine production acceptance';
 
