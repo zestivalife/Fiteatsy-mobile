@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "FITEATSY_COMMON_FOOD_BACKEND_V17_2_ACCEPTANCE",
+  "baselineSha": "d0a693fdb5540c73dbb28fbc202352e43287dcd9",
+  "candidateSha": null,
+  "implementationSlices": {
+    "clientContext": "IMPLEMENTED", "catalogue": "IMPLEMENTED", "generation": "IMPLEMENTED",
+    "validation": "IMPLEMENTED", "mutations": "IMPLEMENTED", "concurrency": "IMPLEMENTED",
+    "persistence": "IMPLEMENTED", "lifecycleCompatibility": "EXISTING_SNAPSHOT_PRESERVING_LIFECYCLE",
+    "clientProjection": "EXISTING_CONTENT_UNION_COMPATIBLE", "consumption": "EXISTING_OPTION_ID_COMPATIBLE",
+    "generationAudit": "IMPLEMENTED", "catalogueAdmin": "EXISTING_ADMIN_GOVERNANCE_UNCHANGED",
+    "docx": "EXISTING_COMPONENT_RENDERER"
+  },
+  "routes": [
+    "GET /v1/consultants/nutrition/clients/:clientId/common-foods",
+    "POST /v1/consultants/nutrition/clients/:clientId/diet-plans/:dietPlanId/common-food/generate",
+    "POST /v1/consultants/nutrition/clients/:clientId/diet-plans/:dietPlanId/common-food/validate-option",
+    "POST|GET /v1/consultants/nutrition/clients/:clientId/diet-plans/:dietPlanId/common-food/options",
+    "PATCH|POST|DELETE /v1/consultants/nutrition/clients/:clientId/diet-plans/:dietPlanId/common-food/options/:optionId/components",
+    "PATCH /v1/consultants/nutrition/clients/:clientId/diet-plans/:dietPlanId/common-food/options/:optionId/components/:componentId/serving"
+  ],
+  "services": ["common-food-consultant.service.ts", "common-food-consultant.repository.ts"],
+  "migrations": ["0050_common_food_runtime_integration.sql"],
+  "clientContext": {"assignmentAware": true, "serverAuthoritativeTargets": true, "veganCode": "VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED"},
+  "catalogue": {"serverSideSafety": true, "searchAliases": true, "pagination": true},
+  "search": "IMPLEMENTED", "servings": "VERSIONED_AND_RETURNED", "generation": "7_X_5_SUPPORTED_PROFILES",
+  "validation": "SERVER_AUTHORITATIVE", "mutations": ["REPLACE", "ADD", "REMOVE", "SERVING"],
+  "concurrency": "ROW_LOCK_AND_STALE_PLAN_VERSION_409", "persistence": "APPEND_ONLY_VERSIONED_SNAPSHOT",
+  "reviewCompatibility": "NO_REGENERATION_EXISTING_VERSION_LIFECYCLE", "publishCompatibility": "NO_REGENERATION_EXISTING_VERSION_LIFECYCLE",
+  "clientProjection": "BACKWARD_COMPATIBLE_EXISTING_CONTENT", "consumptionCompatibility": "OPTION_ID_PRESERVED",
+  "generationAudit": "DATABASE_PERSISTED", "catalogueAdmin": "CANONICAL_GOVERNANCE_REMAINS_NON_CONSULTANT",
+  "rbac": "EXISTING_AUTH_MIDDLEWARE_PLUS_ASSIGNMENT_CHECK", "nutritionIntegrity": "EXACT_COMPONENT_SUM_NULL_FIBRE_PRESERVED",
+  "coverage": {"supportedScopeComplete5x7Rate": 100, "profiles": ["VEGETARIAN", "EGG", "NON_VEGETARIAN"]},
+  "tests": {"focusedV17_2": 6, "v15V16Combined": 20, "selectedFrozenRegression": 77, "controlledCuration": 35},
+  "build": {"typescript": "PASS", "backend": "PASS"},
+  "performance": {"engineRuns": 200, "engineP50Ms": 26.02049999999963, "engineP95Ms": 30.259374999999636},
+  "ci": "PENDING_EXACT_SHA",
+  "remainingFrontendWork": "Consultant Dashboard integration + Consultant E2E + production deployment",
+  "externalNonLaunchBlockers": [
+    "INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:SPLIT_HULLED_YELLOW_MOONG_DAL",
+    "INDIA_NABL_LAB_NUTRIENT_EVIDENCE_REQUIRED:DRY_FLATTENED_RICE_POHA",
+    "GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED"
+  ],
+  "production": "UNCHANGED"
+}
