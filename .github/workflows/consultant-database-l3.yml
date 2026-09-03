@@ -8,6 +8,7 @@ on:
       - codex/diet-lifecycle-quality-v1
       - codex/food-preference-sync-v1
       - codex/food-knowledge-db-v1
+      - codex/controlled-indian-food-curation-v1
 
 permissions:
   contents: read
@@ -116,6 +117,10 @@ jobs:
             echo "::error title=Food Knowledge v1 database acceptance::$escaped"
           fi
           exit "$status"
+
+      - name: Run controlled Indian Food curation contracts
+        working-directory: backend
+        run: npm run food-curation:test
 
       - name: Run full safe backend regression against ephemeral PostgreSQL
         working-directory: backend

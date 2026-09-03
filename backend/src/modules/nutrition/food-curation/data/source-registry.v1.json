@@ -1,0 +1,47 @@
+[
+  {
+    "id": "USDA_FDC",
+    "name": "FoodData Central",
+    "publisher": "U.S. Department of Agriculture, Agricultural Research Service",
+    "datasetVersion": "repository-pinned Fiteatsy Catalogue v1.1 extract",
+    "licence": "CC0 1.0 / United States public domain",
+    "commercialUse": "YES",
+    "redistribution": "YES",
+    "modification": "YES",
+    "attribution": "U.S. Department of Agriculture, Agricultural Research Service. FoodData Central.",
+    "reference": "https://fdc.nal.usda.gov/api-guide/",
+    "artefactSha256": "d59b5d8e9a62f7379a292b355b3dbd30300b3db990390d60e6a8ae9f5e30f77f",
+    "status": "APPROVED",
+    "reviewNotes": "Official API guide states FDC data is public domain and published under CC0. Ingredient facts must retain FDC ID and pinned extract hash."
+  },
+  {
+    "id": "ICMR_NIN_IFCT_2017",
+    "name": "Indian Food Composition Tables 2017",
+    "publisher": "ICMR–National Institute of Nutrition",
+    "datasetVersion": "2017",
+    "licence": "No repository-approved commercial redistribution grant",
+    "commercialUse": "UNKNOWN",
+    "redistribution": "UNKNOWN",
+    "modification": "UNKNOWN",
+    "attribution": "Required if later licensed",
+    "reference": "https://www.nin.res.in/ebooks/IFCT2017.pdf",
+    "artefactSha256": null,
+    "status": "RESEARCH_ONLY",
+    "reviewNotes": "May inform terminology and coverage research; nutrient values cannot enter candidate facts until explicit rights are documented."
+  },
+  {
+    "id": "UNVERIFIED_WEB",
+    "name": "Unverified public web nutrition content",
+    "publisher": "Multiple",
+    "datasetVersion": "not applicable",
+    "licence": "unknown",
+    "commercialUse": "UNKNOWN",
+    "redistribution": "UNKNOWN",
+    "modification": "UNKNOWN",
+    "attribution": null,
+    "reference": "not applicable",
+    "artefactSha256": null,
+    "status": "REJECTED",
+    "reviewNotes": "Search results and competitor applications are not factual nutrition sources."
+  }
+]

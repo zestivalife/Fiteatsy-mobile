@@ -1,0 +1,25 @@
+{
+  "packId": "FITEATSY-CONTROLLED-REFERENCE-PACK-v1-draft",
+  "status": "CANDIDATE PARTIAL — HUMAN MEASUREMENT + EXPERT REVIEW REQUIRED",
+  "formulaNotice": "All quantities are proposed review inputs, not canonical nutrition or approved recipes.",
+  "approvedDirectIngredientSource": "USDA_FDC",
+  "directSourceFoods": [
+    { "fdcId": 1105314, "name": "Banana", "role": "DIRECT_SOURCE_FOOD" },
+    { "fdcId": 323294, "name": "Roasted almonds", "role": "DIRECT_SOURCE_FOOD" },
+    { "fdcId": 746778, "name": "Whole milk", "role": "DIRECT_SOURCE_FOOD" },
+    { "fdcId": 2259793, "name": "Plain yoghurt", "role": "DIRECT_SOURCE_FOOD" },
+    { "fdcId": 172448, "name": "Firm tofu", "role": "DIRECT_SOURCE_FOOD" }
+  ],
+  "controlledPreparations": [
+    { "id": "CP_CHAPATI", "name": "Chapati", "family": "WHEAT_BREAD", "proposedBatch": { "ingredientsGrams": { "fdc:790085": 100 }, "waterGrams": 70, "oilGrams": 0 }, "serving": "1 measured piece" },
+    { "id": "CP_COOKED_RICE", "name": "Plain Cooked White Rice", "family": "RICE", "proposedBatch": { "ingredientsGrams": { "fdc:2512381": 100 }, "waterGrams": 250, "oilGrams": 0 }, "serving": "1 measured reference katori" },
+    { "id": "CP_MOONG_DAL", "name": "Moong Dal Preparation", "family": "MUNG", "proposedBatch": { "ingredientsGrams": { "SOURCE_RECORD_REQUIRED:RAW_MOONG_DAL": 100, "fdc:170923": 2, "fdc:170922": 1 }, "waterGrams": 350, "oilGrams": 5 }, "serving": "1 measured reference katori", "blockedBy": "Approved raw moong-dal record required" },
+    { "id": "CP_TOFU_BHURJI", "name": "Tofu Bhurji", "family": "SOY_TOFU", "proposedBatch": { "ingredientsGrams": { "fdc:172448": 200, "fdc:790577": 50, "fdc:1999634": 80 }, "waterGrams": 0, "oilGrams": 5 }, "serving": "1 measured reference katori" },
+    { "id": "CP_BHINDI_SABJI", "name": "Bhindi Sabji", "family": "BHINDI", "proposedBatch": { "ingredientsGrams": { "fdc:169260": 300, "fdc:790577": 50, "fdc:1999634": 80 }, "waterGrams": 0, "oilGrams": 10 }, "serving": "1 measured reference katori", "proposedExcludes": ["POTATO", "GARLIC"] },
+    { "id": "CP_BHINDI_ALOO", "name": "Bhindi Aloo", "family": "BHINDI_POTATO", "proposedBatch": { "ingredientsGrams": { "fdc:169260": 250, "fdc:2346401": 150, "fdc:790577": 50, "fdc:1999634": 80 }, "waterGrams": 0, "oilGrams": 10 }, "serving": "1 measured reference katori" },
+    { "id": "CP_POHA_PEANUT", "name": "Peanut Poha", "family": "FLATTENED_RICE", "proposedBatch": { "ingredientsGrams": { "SOURCE_RECORD_REQUIRED:POHA": 200, "fdc:2515376": 20, "fdc:2346401": 100 }, "waterGrams": 100, "oilGrams": 10 }, "serving": "1 measured reference katori", "blockedBy": "Approved flattened-rice ingredient record required" },
+    { "id": "CP_UPMA", "name": "Upma", "family": "SEMOLINA_BREAKFAST", "proposedBatch": { "ingredientsGrams": { "SOURCE_RECORD_REQUIRED:SEMOLINA": 200, "fdc:790577": 50 }, "waterGrams": 500, "oilGrams": 10 }, "serving": "1 measured reference katori", "blockedBy": "Approved semolina ingredient record required" },
+    { "id": "CP_GARLIC_BHINDI", "name": "Garlic Bhindi", "family": "BHINDI", "proposedBatch": { "ingredientsGrams": { "fdc:169260": 300, "fdc:169230": 10, "fdc:1999634": 80 }, "waterGrams": 0, "oilGrams": 10 }, "serving": "1 measured reference katori" },
+    { "id": "CP_BUTTERMILK", "name": "Plain Buttermilk", "family": "DAIRY_BUTTERMILK", "proposedBatch": { "ingredientsGrams": { "fdc:2259793": 200 }, "waterGrams": 200, "oilGrams": 0 }, "serving": "1 measured reference glass" }
+  ]
+}

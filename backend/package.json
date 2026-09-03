@@ -13,6 +13,7 @@
     "nutrition:catalogue:production": "node dist/catalogue-import/scripts/import-nutrition-catalogue.js",
     "food-knowledge:fixture:dry-run": "tsx scripts/import-food-knowledge-fixture.ts --dry-run",
     "food-knowledge:fixture:import": "tsx scripts/import-food-knowledge-fixture.ts",
+    "food-curation:test": "node --import tsx --test ../tests/backend/controlled-food-curation.test.ts",
     "reports:purge-deleted": "tsx src/jobs/purge-deleted-reports.ts",
     "start": "node dist/server.js",
     "test:qa": "/bin/zsh -lc 'node --import tsx --test --test-concurrency=1 ../tests/api/*.test.ts ../tests/backend/*.test.ts ../tests/database/*.test.ts'"
