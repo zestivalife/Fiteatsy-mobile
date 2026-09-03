@@ -4,13 +4,13 @@
   "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
   "canonicalMeasurementRunsCreated": 0,
   "batchAudit": {
-    "operator": null,
-    "measurementDate": null,
-    "equipmentId": null,
-    "scaleResolutionGrams": null,
+    "operator": "Priyanshi Srivastava",
+    "measurementDate": "2026-09-03",
+    "equipmentId": "CRAE SF-400 Digital Kitchen Weighing Scale",
+    "scaleResolutionGrams": 1,
     "appliesToPreparationIds": ["CP_CHAPATI", "CP_MOONG_DAL", "CP_BHINDI_SABJI", "CP_BHINDI_ALOO", "CP_POHA_PEANUT"]
   },
-  "notice": "Updated submitted physical values are preserved exactly. Null audit/formula fields were not supplied and were not fabricated. Submission hashes are not canonical Measurement Hashes. The superseded four-piece Chapati submission is retained in batch-1.superseded-measurement-history.json.",
+  "notice": "Updated submitted physical values are preserved exactly. User-supplied audit metadata is bound once at batch level to all five listed preparation IDs. Formula fields remain null and were not fabricated. Submission hashes are not canonical Measurement Hashes. The superseded four-piece Chapati submission is retained in batch-1.superseded-measurement-history.json.",
   "referenceVessel": {
     "id": "FITEATSY_KATORI_V1",
     "emptyWeightGrams": 120,

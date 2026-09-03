@@ -8,6 +8,21 @@
   "phase3ComponentHandoff": "BLOCKED",
   "production": "UNCHANGED",
   "primaryNextGate": "STAGE_A_NUTRITIONIST_REVIEW_REQUIRED",
+  "measurementAuditMetadata": "MEASUREMENT_AUDIT_METADATA_COMPLETE",
+  "measurementAuditBindingScope": "BATCH_LEVEL_ALL_FIRST_FIVE",
+  "measurementAudit": {
+    "operator": "Priyanshi Srivastava",
+    "measurementDate": "2026-09-03",
+    "equipmentId": "CRAE SF-400 Digital Kitchen Weighing Scale",
+    "scaleResolutionGrams": 1,
+    "appliesToPreparationIds": [
+      "CP_CHAPATI",
+      "CP_MOONG_DAL",
+      "CP_BHINDI_SABJI",
+      "CP_BHINDI_ALOO",
+      "CP_POHA_PEANUT"
+    ]
+  },
   "sourceReviewerMetadata": "PRESENT_STRUCTURALLY_VALID",
   "sourceDecisionsReceived": 0,
   "physicalEvidenceSubmissionsFound": 5,

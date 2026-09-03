@@ -7,6 +7,8 @@
   "reviewsCreated": 0,
   "validationRelease": "NOT_CREATED",
   "primaryNextGate": "STAGE_A_NUTRITIONIST_REVIEW_REQUIRED",
+  "measurementAuditMetadata": "MEASUREMENT_AUDIT_METADATA_COMPLETE",
+  "measurementAuditBindingScope": "BATCH_LEVEL_ALL_FIRST_FIVE",
   "sourceResolution": [
     {
       "ingredient": "SPLIT_HULLED_YELLOW_MOONG_DAL",
@@ -23,15 +25,11 @@
     {
       "preparationId": "CP_CHAPATI",
       "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "7163cb432bed484bac6196b1837f34c8fb12af7706852d1268e4e7e09d07ab60",
+      "submissionSha256": "e0caedbaa05f337b8b9d0fc55b6bf21fcb17d0c0c9212c8e288f6347fce63203",
       "measurementRunId": null,
       "measurementSha256": null,
       "canonicalMeasurementEligible": false,
       "validationErrors": [
-        "CURATION_OPERATOR_REQUIRED",
-        "CURATION_MEASUREMENT_DATE_REQUIRED",
-        "CURATION_EQUIPMENT_ID_REQUIRED",
-        "CURATION_SCALE_RESOLUTION_REQUIRED",
         "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
       ],
       "downstreamCalculationBlockers": [
@@ -39,20 +37,16 @@
         "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:COW_GHEE"
       ],
       "warnings": [],
-      "state": "MEASUREMENT_INCOMPLETE"
+      "state": "MEASUREMENT_AUDIT_COMPLETE_STAGE_A_BLOCKED"
     },
     {
       "preparationId": "CP_MOONG_DAL",
       "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "77a1287e409d008dbbee755af526bc8cb56af797c1f96579bcbb2e8027bfe7f9",
+      "submissionSha256": "72271e2904da5316501b93d9186a8ff444ee354b84e073cd540be857e5b143b9",
       "measurementRunId": null,
       "measurementSha256": null,
       "canonicalMeasurementEligible": false,
       "validationErrors": [
-        "CURATION_OPERATOR_REQUIRED",
-        "CURATION_MEASUREMENT_DATE_REQUIRED",
-        "CURATION_EQUIPMENT_ID_REQUIRED",
-        "CURATION_SCALE_RESOLUTION_REQUIRED",
         "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
       ],
       "downstreamCalculationBlockers": [
@@ -60,60 +54,48 @@
         "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:COW_GHEE"
       ],
       "warnings": [],
-      "state": "MEASUREMENT_INCOMPLETE"
+      "state": "MEASUREMENT_AUDIT_COMPLETE_STAGE_A_BLOCKED"
     },
     {
       "preparationId": "CP_BHINDI_SABJI",
       "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "478dd4652c0a70d6f5f396bd7b13d271c7176dcde461599212c16bae3765d0c6",
+      "submissionSha256": "b3b837493b503bf8c49317af958ffe8980044e619b28f637c2dcaea88dfdc910",
       "measurementRunId": null,
       "measurementSha256": null,
       "canonicalMeasurementEligible": false,
       "validationErrors": [
-        "CURATION_OPERATOR_REQUIRED",
-        "CURATION_MEASUREMENT_DATE_REQUIRED",
-        "CURATION_EQUIPMENT_ID_REQUIRED",
-        "CURATION_SCALE_RESOLUTION_REQUIRED",
         "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
       ],
       "downstreamCalculationBlockers": [
         "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:REFINED_SUNFLOWER_OIL"
       ],
       "warnings": [],
-      "state": "MEASUREMENT_INCOMPLETE"
+      "state": "MEASUREMENT_AUDIT_COMPLETE_STAGE_A_BLOCKED"
     },
     {
       "preparationId": "CP_BHINDI_ALOO",
       "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "3117b4f74c3db8ebdc6f721e5e07e63e5102b78c30624871749c281b53127a1b",
+      "submissionSha256": "afee867dee8e5eca313dcc8f88a6739f2e98a396e0b43a602138798dca2e2078",
       "measurementRunId": null,
       "measurementSha256": null,
       "canonicalMeasurementEligible": false,
       "validationErrors": [
-        "CURATION_OPERATOR_REQUIRED",
-        "CURATION_MEASUREMENT_DATE_REQUIRED",
-        "CURATION_EQUIPMENT_ID_REQUIRED",
-        "CURATION_SCALE_RESOLUTION_REQUIRED",
         "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
       ],
       "downstreamCalculationBlockers": [
         "SOURCE_CANDIDATE_REQUIRES_IDENTITY_REVIEW:REFINED_SUNFLOWER_OIL"
       ],
       "warnings": [],
-      "state": "MEASUREMENT_INCOMPLETE"
+      "state": "MEASUREMENT_AUDIT_COMPLETE_STAGE_A_BLOCKED"
     },
     {
       "preparationId": "CP_POHA_PEANUT",
       "evidenceClassification": "USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE",
-      "submissionSha256": "5368782268cc7d2761ca87324c0e1ac690d90c31fa952aff4d85feb551c9830c",
+      "submissionSha256": "a932b92699bf1021e511bd2e4203230080934150b4590d3bae2a7cbb163eb700",
       "measurementRunId": null,
       "measurementSha256": null,
       "canonicalMeasurementEligible": false,
       "validationErrors": [
-        "CURATION_OPERATOR_REQUIRED",
-        "CURATION_MEASUREMENT_DATE_REQUIRED",
-        "CURATION_EQUIPMENT_ID_REQUIRED",
-        "CURATION_SCALE_RESOLUTION_REQUIRED",
         "CURATION_APPROVED_FORMULA_HASH_REQUIRED"
       ],
       "downstreamCalculationBlockers": [
@@ -123,7 +105,7 @@
       "warnings": [
         "CURATION_DRAINED_RINSE_WATER_EXCLUDED_FROM_RETAINED_INGREDIENT_WATER"
       ],
-      "state": "MEASUREMENT_INCOMPLETE"
+      "state": "MEASUREMENT_AUDIT_COMPLETE_STAGE_A_BLOCKED"
     }
   ]
 }

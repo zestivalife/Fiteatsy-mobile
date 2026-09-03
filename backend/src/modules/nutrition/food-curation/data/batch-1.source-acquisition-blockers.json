@@ -24,8 +24,9 @@
     }
   ],
   "additionalCandidateResearch": [
-    {"canonicalIngredient":"COW_GHEE","candidate":"USDA_FDC:171314","description":"Butter, Clarified butter (ghee)","state":"STRONGER_PREPARATION_NAME_REQUIRES_VERSION_CORE_AND_COW_SPECIES_REVIEW"},
-    {"canonicalIngredient":"REFINED_SUNFLOWER_OIL","candidates":["USDA_FDC:2710192 Sunflower oil","USDA_FDC:171025 Oil, sunflower, linoleic (approx. 65%)","USDA_FDC:171017 Oil, sunflower, linoleic (less than 60%)"],"state":"NOT_CLEARLY_EXACT_REFINED_GRADE; NOT_ADOPTED"}
+    {"canonicalIngredient":"COW_GHEE","candidate":"USDA_FDC:171314","description":"Butter, Clarified butter (ghee)","datasetVersion":"SR Legacy 2018-04","mandatoryCoreNutrition":{"energyKcal":900,"proteinGrams":0,"carbohydrateGrams":0,"fatGrams":100,"fibreGrams":0},"state":"CURRENT_BEST_REVIEW_CANDIDATE_SPECIES_DECISION_PENDING","supersedesReviewCandidate":"USDA_FDC:173412"},
+    {"canonicalIngredient":"REFINED_SUNFLOWER_OIL","currentCandidate":"USDA_FDC:1750349 Oil, sunflower","datasetVersion":"Foundation Foods 2026-04","mandatoryCoreNutritionState":"INCOMPLETE_NO_APPROVED_ZERO_INFERENCE","candidates":["USDA_FDC:171025 Oil, sunflower, linoleic (approx. 65%) — complete core but refined grade not explicit","USDA_FDC:171017 Oil, sunflower, linoleic (less than 60%) — complete core but refined grade not explicit"],"state":"NO_EXACT_REFINED_GRADE_WITH_COMPLETE_CORE_ADOPTED"},
+    {"canonicalIngredient":"GROUNDNUT_OIL","currentCandidate":"USDA_FDC:171410 Oil, peanut, salad or cooking","datasetVersion":"SR Legacy 2018-04","mandatoryCoreNutrition":{"energyKcal":884,"proteinGrams":0,"carbohydrateGrams":0,"fatGrams":100,"fibreGrams":0},"state":"BEST_AVAILABLE_CANDIDATE_IDENTITY_DECISION_PENDING"}
   ],
   "licensedDataPath": "SUPPORTED_BY_SOURCE_REGISTRY_AFTER_SEPARATE_LICENCE_APPROVAL",
   "ifctStatus": "RESEARCH_ONLY_NOT_ELIGIBLE"

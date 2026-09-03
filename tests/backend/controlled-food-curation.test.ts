@@ -222,11 +222,13 @@ test('source identity review remains concise, first-five-only and entirely pendi
 });
 
 test('source revalidation separates exact identity, rights and mandatory core Nutrition', () => {
-  const source = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-readiness.json', import.meta.url), 'utf8')) as { schemaVersion: string; ingredients: Array<{ identity: string; coreNutrition?: string; result: string }> };
+  const source = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-readiness.json', import.meta.url), 'utf8')) as { schemaVersion: string; ingredients: Array<{ identity: string; sourceRecordId?: string; candidateHistory?: Array<{ sourceRecordId: string }>; coreNutrition?: string; result: string }> };
   assert.equal(source.schemaVersion, 'FITEATSY_BATCH_1_SOURCE_READINESS_V2');
   const byIdentity = new Map(source.ingredients.map((item) => [item.identity, item]));
   assert.equal(byIdentity.get('Refined sunflower oil')?.coreNutrition, 'INCOMPLETE_FOR_FITEATSY_CORE');
   assert.equal(byIdentity.get('Cow ghee')?.coreNutrition, 'COMPLETE');
+  assert.equal(byIdentity.get('Cow ghee')?.sourceRecordId, '171314');
+  assert.deepEqual(byIdentity.get('Cow ghee')?.candidateHistory?.map((item) => item.sourceRecordId), ['173412']);
   assert.equal(byIdentity.get('Groundnut oil')?.coreNutrition, 'COMPLETE');
   assert.equal(byIdentity.get('Water')?.result, 'CANONICAL_PROCESS_EVIDENCE_METHOD_READY');
   assert.equal(byIdentity.has('Semolina'), false);
@@ -289,6 +291,40 @@ test('measurement audit metadata is validated before it can populate physical ev
   assert.throws(() => validateBatchMeasurementAudit({ operator: '', measurementDate: '2026-09-03', equipmentId: 'scale-1', scaleResolutionGrams: 1 }), /CURATION_OPERATOR_REQUIRED/);
   assert.throws(() => validateBatchMeasurementAudit({ operator: 'operator-1', measurementDate: '03-09-2026', equipmentId: 'scale-1', scaleResolutionGrams: 1 }), /CURATION_MEASUREMENT_DATE_REQUIRED/);
   assert.throws(() => validateBatchMeasurementAudit({ operator: 'operator-1', measurementDate: '2026-09-03', equipmentId: 'scale-1', scaleResolutionGrams: 0 }), /CURATION_SCALE_RESOLUTION_REQUIRED/);
+});
+
+test('user-supplied Batch 1 audit metadata validates once and binds to exactly all five submissions', () => {
+  const batch = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.user-confirmed-measurements.json', import.meta.url), 'utf8')) as { batchAudit: { operator: string; measurementDate: string; equipmentId: string; scaleResolutionGrams: number; appliesToPreparationIds: string[] }; measurements: Array<{ preparationId: string; finalPreparedWeightGrams: number }> };
+  const { appliesToPreparationIds, ...audit } = batch.batchAudit;
+  assert.deepEqual(validateBatchMeasurementAudit(audit), {
+    operator: 'Priyanshi Srivastava',
+    measurementDate: '2026-09-03',
+    equipmentId: 'CRAE SF-400 Digital Kitchen Weighing Scale',
+    scaleResolutionGrams: 1,
+  });
+  assert.deepEqual([...appliesToPreparationIds].sort(), batch.measurements.map((item) => item.preparationId).sort());
+  assert.ok(batch.measurements.every((item) => item.finalPreparedWeightGrams > 0));
+});
+
+test('ingestion status applies the shared audit before validation and remains blocked only by Stage A formula hashes', () => {
+  const status = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.ingestion-status.json', import.meta.url), 'utf8')) as { measurementAuditMetadata: string; measurementAuditBindingScope: string; foods: Array<{ validationErrors: string[]; state: string }> };
+  assert.equal(status.measurementAuditMetadata, 'MEASUREMENT_AUDIT_METADATA_COMPLETE');
+  assert.equal(status.measurementAuditBindingScope, 'BATCH_LEVEL_ALL_FIRST_FIVE');
+  assert.ok(status.foods.every((food) => food.state === 'MEASUREMENT_AUDIT_COMPLETE_STAGE_A_BLOCKED'));
+  assert.ok(status.foods.every((food) => food.validationErrors.length === 1 && food.validationErrors[0] === 'CURATION_APPROVED_FORMULA_HASH_REQUIRED'));
+});
+
+test('single Human Gate package exists without changing pending Stage A or source decisions', () => {
+  assert.equal(fs.existsSync(new URL('../../backend/src/modules/nutrition/FITEATSY_BATCH_1_HUMAN_GATE_PACKAGE_v1.docx', import.meta.url)), true);
+  const stageA = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/stage-a.batch-1.pending-approval.json', import.meta.url), 'utf8')) as { formulas: Array<{ review: { decision: string } }> };
+  const source = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.source-identity-review.pending.json', import.meta.url), 'utf8')) as { items: Array<{ decision: string }> };
+  assert.ok(stageA.formulas.every((food) => food.review.decision === 'PENDING'));
+  assert.ok(source.items.every((item) => item.decision === 'PENDING'));
+  const required = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/batch-1.human-input-required.json', import.meta.url), 'utf8')) as { batchAuditMetadata: { status: string }; humanGateArtifact: string; sourceIdentityReview: { requiredDecisions: string[]; recordedNoMatch: string[] } };
+  assert.equal(required.batchAuditMetadata.status, 'MEASUREMENT_AUDIT_METADATA_COMPLETE');
+  assert.equal(required.humanGateArtifact, 'FITEATSY_BATCH_1_HUMAN_GATE_PACKAGE_v1.docx');
+  assert.equal(required.sourceIdentityReview.requiredDecisions.length, 5);
+  assert.deepEqual(required.sourceIdentityReview.recordedNoMatch, []);
 });
 
 test('source identity review persistence is append-only and separately auditable', () => {

@@ -1,14 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateBatchMeasurementAudit } from '../src/modules/nutrition/food-curation/controlled-curation.engine.js';
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = path.join(backendRoot, 'src/modules/nutrition/food-curation/data');
 const inputPath = process.argv[2] ? path.resolve(process.argv[2]) : path.join(dataDir, 'batch-1.user-confirmed-measurements.json');
 const outputPath = process.argv[3] ? path.resolve(process.argv[3]) : path.join(dataDir, 'stage-b.machine-status.json');
-const input = JSON.parse(fs.readFileSync(inputPath, 'utf8')) as { measurements?: Array<Record<string, unknown>> };
+const input = JSON.parse(fs.readFileSync(inputPath, 'utf8')) as { batchAudit?: Record<string, unknown>; measurements?: Array<Record<string, unknown>> };
 const sourceReview = JSON.parse(fs.readFileSync(path.join(dataDir, 'batch-1.source-identity-review.pending.json'), 'utf8')) as { reviewer?: Record<string, string>; items?: Array<{ decision?: string }> };
 const required = ['CP_CHAPATI', 'CP_MOONG_DAL', 'CP_BHINDI_SABJI', 'CP_BHINDI_ALOO', 'CP_POHA_PEANUT'];
+const audit = validateBatchMeasurementAudit(input.batchAudit as Parameters<typeof validateBatchMeasurementAudit>[0]);
+const auditBindings = Array.isArray(input.batchAudit?.appliesToPreparationIds) ? input.batchAudit.appliesToPreparationIds.map(String) : [];
+if (required.some((preparationId) => !auditBindings.includes(preparationId)) || auditBindings.some((preparationId) => !required.includes(preparationId))) throw new Error('CURATION_BATCH_AUDIT_BINDING_INCOMPLETE');
 const byId = new Map((input.measurements ?? []).map((item) => [String(item.preparationId ?? ''), item]));
 const physicallySubmitted = (item: Record<string, unknown> | undefined) => Boolean(item
   && item.evidenceClassification === 'USER_CONFIRMED_PHYSICAL_MEASUREMENT_EVIDENCE'
@@ -26,6 +30,9 @@ const report = {
   phase3ComponentHandoff: 'BLOCKED',
   production: 'UNCHANGED',
   primaryNextGate: 'STAGE_A_NUTRITIONIST_REVIEW_REQUIRED',
+  measurementAuditMetadata: 'MEASUREMENT_AUDIT_METADATA_COMPLETE',
+  measurementAuditBindingScope: 'BATCH_LEVEL_ALL_FIRST_FIVE',
+  measurementAudit: audit,
   sourceReviewerMetadata: sourceReview.reviewer?.reviewerId && sourceReview.reviewer?.reviewerQualification && sourceReview.reviewer?.qualificationReference && sourceReview.reviewer?.reviewedOn && sourceReview.reviewer?.declaration ? 'PRESENT_STRUCTURALLY_VALID' : 'MISSING',
   sourceDecisionsReceived: (sourceReview.items ?? []).filter((item) => item.decision && item.decision !== 'PENDING').length,
   physicalEvidenceSubmissionsFound: submitted,

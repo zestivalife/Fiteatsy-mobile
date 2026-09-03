@@ -16,7 +16,7 @@ WIDTHS = [2300, 7060]
 
 ITEMS = [
     ("REFINED_SUNFLOWER_OIL", "USDA FDC 1750349", "Oil, sunflower", "Refined grade is not established by the source description. The candidate also does not expose the complete mandatory Fiteatsy Energy/Protein/Carbohydrate/Fat/Fibre core vector. Even if identity is approved, calculation readiness remains blocked until the mandatory core vector is satisfied through an approved source path.", "CC0 approved", "Incomplete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
-    ("COW_GHEE", "USDA FDC 173412", "Butter oil, anhydrous", "Cow species and exact ghee-preparation equivalence are not established by the source description. Approval must confirm that this source is sufficiently equivalent to the required COW_GHEE identity; otherwise request an alternate approved source.", "CC0 approved", "Complete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
+    ("COW_GHEE", "USDA FDC 171314 (SR Legacy 2018-04)", "Butter, Clarified butter (ghee)", "This is a stronger preparation-name candidate than prior FDC 173412 (Butter oil, anhydrous), which remains in candidate history. The mandatory core vector is complete, but Cow-species identity is not established by the description. Human identity review remains required.", "CC0 approved", "Complete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
     ("GROUNDNUT_OIL", "USDA FDC 171410", "Oil, peanut, salad or cooking", "Groundnut/peanut common-name equivalence is plausible, but exact grade/process is unspecified. Approval must confirm the candidate is sufficiently exact for the governed GROUNDNUT_OIL identity; otherwise request an alternate approved source.", "CC0 approved", "Complete", "APPROVE EXACT MAPPING   /   REJECT MAPPING   /   REQUEST ALTERNATE SOURCE"),
     ("SPLIT_HULLED_YELLOW_MOONG_DAL", "No exact approved generic record", "FDC 174256 is whole mature mung seed, raw", "Required preparation identity is split hulled yellow moong dal. Whole mature mung, whole green mung, generic lentils, and branded-product records are not acceptable generic canonical proxies.", "No adopted record", "Unavailable", "CONFIRM NO MATCH   /   PROVIDE APPROVED EXACT SOURCE"),
     ("DRY_FLATTENED_RICE_POHA", "No exact approved record", "No generic dry flattened-rice/Poha FDC record", "Required preparation identity is dry flattened rice / Poha. Generic rice, cooked rice, puffed rice, rice flour, noodles, and generic rice cereal are not acceptable proxies.", "No adopted record", "Unavailable", "CONFIRM NO MATCH   /   PROVIDE APPROVED EXACT SOURCE"),
@@ -107,7 +107,7 @@ for idx, item in enumerate(ITEMS, 1):
     set_table_geometry(t)
 
 doc.add_heading("Source record references", level=1)
-for url in ("https://fdc.nal.usda.gov/api-guide/", "https://fdc.nal.usda.gov/fdc-app.html#/food-details/1750349/nutrients", "https://fdc.nal.usda.gov/fdc-app.html#/food-details/173412/nutrients", "https://fdc.nal.usda.gov/fdc-app.html#/food-details/171410/nutrients"):
+for url in ("https://fdc.nal.usda.gov/api-guide/", "https://fdc.nal.usda.gov/download-datasets/", "https://fdc.nal.usda.gov/fdc-app.html#/food-details/1750349/nutrients", "https://fdc.nal.usda.gov/fdc-app.html#/food-details/171314/nutrients", "https://fdc.nal.usda.gov/fdc-app.html#/food-details/171410/nutrients"):
     p=doc.add_paragraph(); p.paragraph_format.space_after=Pt(3); set_font(p.add_run(url), 9, False, GRAY)
 
 doc.add_heading("Governance note", level=1)
