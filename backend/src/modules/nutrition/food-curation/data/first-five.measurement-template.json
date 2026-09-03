@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "FITEATSY_CONTROLLED_MEASUREMENT_V1",
+  "batchId": "FITEATSY-FIRST-FIVE-v1",
+  "status": "INCOMPLETE",
+  "notice": "Blank operator input. Null is missing, never zero. Proposed values are not actual measurements.",
+  "referenceVessel": {
+    "id": "FITEATSY_KATORI_V1",
+    "emptyWeightGrams": null,
+    "waterCapacityRunsMl": [null, null, null],
+    "selectedCapacityMl": null
+  },
+  "measurements": [
+    { "preparationId": "CP_CHAPATI", "measurementRunId": null, "formulaVersion": null, "formulaSha256": null, "ingredientWeightsGrams": {}, "waterGrams": null, "oilGrams": null, "finalPreparedWeightGrams": null, "servingLabel": "1 measured piece", "servingWeightGrams": null, "pieceWeightObservationsGrams": [null, null, null, null, null], "operator": null, "measurementDate": null, "equipmentId": null, "referenceVesselId": null, "scaleResolutionGrams": null, "deviations": [], "status": "INCOMPLETE", "notes": "" },
+    { "preparationId": "CP_MOONG_DAL", "measurementRunId": null, "formulaVersion": null, "formulaSha256": null, "ingredientWeightsGrams": {}, "waterGrams": null, "oilGrams": null, "finalPreparedWeightGrams": null, "servingLabel": "1 measured reference katori", "servingWeightGrams": null, "servingObservationsGrams": [null, null, null], "operator": null, "measurementDate": null, "equipmentId": null, "referenceVesselId": "FITEATSY_KATORI_V1", "scaleResolutionGrams": null, "deviations": [], "status": "INCOMPLETE", "notes": "" },
+    { "preparationId": "CP_BHINDI_SABJI", "measurementRunId": null, "formulaVersion": null, "formulaSha256": null, "ingredientWeightsGrams": {}, "waterGrams": null, "oilGrams": null, "finalPreparedWeightGrams": null, "servingLabel": "1 measured reference katori", "servingWeightGrams": null, "servingObservationsGrams": [null, null, null], "operator": null, "measurementDate": null, "equipmentId": null, "referenceVesselId": "FITEATSY_KATORI_V1", "scaleResolutionGrams": null, "deviations": [], "status": "INCOMPLETE", "notes": "Potato actual must be recorded as verified zero." },
+    { "preparationId": "CP_BHINDI_ALOO", "measurementRunId": null, "formulaVersion": null, "formulaSha256": null, "ingredientWeightsGrams": {}, "waterGrams": null, "oilGrams": null, "finalPreparedWeightGrams": null, "servingLabel": "1 measured reference katori", "servingWeightGrams": null, "servingObservationsGrams": [null, null, null], "operator": null, "measurementDate": null, "equipmentId": null, "referenceVesselId": "FITEATSY_KATORI_V1", "scaleResolutionGrams": null, "deviations": [], "status": "INCOMPLETE", "notes": "Potato actual must be positive." },
+    { "preparationId": "CP_POHA_PEANUT", "measurementRunId": null, "formulaVersion": null, "formulaSha256": null, "ingredientWeightsGrams": {}, "waterGrams": null, "oilGrams": null, "finalPreparedWeightGrams": null, "servingLabel": "1 measured reference katori", "servingWeightGrams": null, "servingObservationsGrams": [null, null, null], "operator": null, "measurementDate": null, "equipmentId": null, "referenceVesselId": "FITEATSY_KATORI_V1", "scaleResolutionGrams": null, "deviations": [], "status": "INCOMPLETE", "notes": "Peanut actual must be positive." }
+  ]
+}

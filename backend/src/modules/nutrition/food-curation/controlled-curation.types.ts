@@ -1,5 +1,7 @@
 export type SourceStatus = 'APPROVED' | 'RESEARCH_ONLY' | 'REJECTED' | 'NEEDS_REVIEW';
 export type ReviewState = 'DRAFT' | 'MEASURED' | 'CALCULATED' | 'VALIDATED' | 'NUTRITION_REVIEW_PENDING' | 'APPROVED' | 'CHANGES_REQUIRED' | 'REJECTED';
+export type MeasurementState = 'INCOMPLETE' | 'COMPLETE' | 'INVALID' | 'FORMULA_DEVIATION' | 'REMEASUREMENT_REQUIRED';
+export type StageBState = 'MEASUREMENT_REQUIRED' | 'SOURCE_DEPENDENCY_BLOCKED' | 'READY_FOR_CALCULATION' | 'READY_FOR_STAGE_B_REVIEW' | 'STAGE_B_APPROVED' | 'CHANGES_REQUIRED' | 'REJECTED';
 
 export interface FoodSourceRegistryEntry {
   id: string;
@@ -51,22 +53,41 @@ export interface ControlledPreparationSpec {
   mealKeys: string[];
   reviewState: ReviewState;
   formulaNotice: 'PROPOSED — REQUIRES NUTRITION REVIEW';
+  formulaVersion?: string;
+  formulaSha256?: string;
+  hardContext?: {
+    presentComponentCodes: string[];
+    absentComponentCodes: string[];
+    allergenCodes: string[];
+    dietPatterns: string[];
+  };
 }
 
 export interface ControlledMeasurement {
+  measurementRunId?: string;
   preparationId: string;
+  formulaVersion?: string;
+  formulaSha256?: string;
   ingredientWeightsGrams: Record<string, number>;
   waterGrams: number;
   oilGrams: number;
   finalPreparedWeightGrams: number;
   servingLabel: string;
   servingWeightGrams: number;
+  servingObservationsGrams?: number[];
+  pieceWeightObservationsGrams?: number[];
   operator: string;
   measurementDate: string;
+  equipmentId?: string;
+  referenceVesselId?: string | null;
   scaleResolutionGrams: number;
+  deviations?: string[];
+  status?: MeasurementState;
+  notes?: string;
 }
 
 export interface PreparationReview {
+  reviewId?: string;
   preparationId: string;
   calculationSha256: string;
   reviewerRole: 'NUTRITION_REVIEWER';
@@ -74,15 +95,54 @@ export interface PreparationReview {
   reviewedAt: string;
   state: Extract<ReviewState, 'APPROVED' | 'CHANGES_REQUIRED' | 'REJECTED'>;
   notes: string;
+  reviewerQualification?: string;
 }
 
 export interface CalculatedPreparation {
+  calculationId?: string;
   preparationId: string;
   calculationSha256: string;
+  calculationMethodVersion?: string;
+  formulaSha256?: string;
+  measurementSha256?: string;
+  sourceRegistrySha256?: string;
   finalPreparedWeightGrams: number;
   servingWeightGrams: number;
   nutrientsPer100g: NutrientVector;
   nutrientsPerServing: NutrientVector;
   allergens: string[];
   ingredientFoodVersionIds: string[];
+}
+
+export interface MeasurementValidationResult {
+  state: MeasurementState;
+  measurementSha256: string | null;
+  errors: string[];
+  warnings: string[];
+  canonicalServingWeightGrams: number | null;
+}
+
+export interface CalculationInputManifest {
+  schemaVersion: 'FITEATSY_STAGE_B_INPUT_V1';
+  preparationId: string;
+  formulaVersion: string;
+  formulaSha256: string;
+  measurementRunId: string;
+  measurementSha256: string;
+  calculationMethodVersion: 'FITEATSY_CONTROLLED_PREPARATION_V1';
+  sourceRegistrySha256: string;
+  ingredientFoodVersionIds: string[];
+  actualIngredientWeightsGrams: Record<string, number>;
+  finalPreparedWeightGrams: number;
+  servingWeightGrams: number;
+}
+
+export interface StageBFoodStatus {
+  preparationId: string;
+  state: StageBState;
+  blockerCodes: string[];
+  measurementState: MeasurementState;
+  measurementSha256: string | null;
+  calculationSha256: string | null;
+  reviewState: PreparationReview['state'] | 'NOT_FOUND';
 }

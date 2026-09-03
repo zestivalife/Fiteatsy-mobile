@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, normalizeQuantityToGrams, validateMeasurement } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
+import { assertApprovedIngredient, assertCurrentApproval, calculateControlledPreparation, calculationSha256, createCalculationInputManifest, deriveStageBStatus, formulaSha256, inspectMeasurement, normalizeQuantityToGrams, reconcileCalculation, validateMeasurement } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.engine.js';
 import type { ControlledMeasurement, ControlledPreparationSpec, FoodSourceRegistryEntry, IngredientFact, PreparationReview } from '../../backend/src/modules/nutrition/food-curation/controlled-curation.types.js';
 
 const approved: FoodSourceRegistryEntry = { id: 'USDA_FDC', name: 'FoodData Central', publisher: 'USDA ARS', datasetVersion: 'test-pinned', licence: 'CC0', commercialUse: 'YES', redistribution: 'YES', modification: 'YES', attribution: 'USDA ARS FoodData Central', reference: 'https://fdc.nal.usda.gov/', artefactSha256: 'a'.repeat(64), status: 'APPROVED', reviewNotes: '' };
@@ -9,7 +9,9 @@ const ingredient = (id: string, nutrients: IngredientFact['nutrients'], allergen
 const rice = ingredient('rice-v1', { energy_kcal: 360, protein_g: 7, carbohydrate_g: 80, fat_g: 0.6, fibre_g: 1, calcium_mg: 10, iron_mg: 1, vitamin_c_mg: null });
 const peanut = ingredient('peanut-v1', { energy_kcal: 567, protein_g: 25.8, carbohydrate_g: 16.1, fat_g: 49.2, fibre_g: 8.5, calcium_mg: 92, iron_mg: 4.6, vitamin_c_mg: 0 }, ['PEANUT']);
 const spec: ControlledPreparationSpec = { preparationId: 'cp-1', canonicalFoodId: 'food-cp-1', proposedCanonicalName: 'Measured Rice Peanut Preparation', referenceBatchName: 'Pack 1 test batch', ingredients: [{ ingredientFoodVersionId: rice.foodVersionId, quantityGrams: 100, role: 'PRIMARY' }, { ingredientFoodVersionId: peanut.foodVersionId, quantityGrams: 10, role: 'SECONDARY' }], preparationMethod: 'BOILED', proposedWaterGrams: 180, yieldMethod: 'CONTROLLED_MEASUREMENT', proposedServingLabel: '1 measured katori', foodFamily: 'RICE', mealKeys: ['breakfast'], reviewState: 'MEASURED', formulaNotice: 'PROPOSED — REQUIRES NUTRITION REVIEW' };
-const measurement: ControlledMeasurement = { preparationId: spec.preparationId, ingredientWeightsGrams: { 'rice-v1': 100, 'peanut-v1': 10 }, waterGrams: 180, oilGrams: 0, finalPreparedWeightGrams: 250, servingLabel: '1 measured katori', servingWeightGrams: 125, operator: 'operator-fixture', measurementDate: '2026-09-03', scaleResolutionGrams: 1 };
+spec.formulaVersion = 'fixture-v1';
+spec.formulaSha256 = formulaSha256(spec);
+const measurement: ControlledMeasurement = { measurementRunId: 'fixture-run-1', preparationId: spec.preparationId, formulaVersion: spec.formulaVersion, formulaSha256: spec.formulaSha256, ingredientWeightsGrams: { 'rice-v1': 100, 'peanut-v1': 10 }, waterGrams: 180, oilGrams: 0, finalPreparedWeightGrams: 250, servingLabel: '1 measured katori', servingWeightGrams: 125, servingObservationsGrams: [124, 125, 126], operator: 'operator-fixture', measurementDate: '2026-09-03', equipmentId: 'scale-fixture', referenceVesselId: 'katori-fixture', scaleResolutionGrams: 1, status: 'COMPLETE' };
 
 test('source gate accepts only explicit commercially reusable approved sources', () => {
   assert.doesNotThrow(() => assertApprovedIngredient(rice, new Map([[approved.id, approved]])));
@@ -42,8 +44,26 @@ test('verified zero is distinct from unknown', () => {
 test('measurement validation rejects mismatch, zero yield and missing audit identity', () => {
   validateMeasurement(spec, measurement);
   assert.throws(() => validateMeasurement(spec, { ...measurement, finalPreparedWeightGrams: 0 }), /CURATION_INVALID_MEASUREMENT_WEIGHT/);
-  assert.throws(() => validateMeasurement(spec, { ...measurement, ingredientWeightsGrams: { ...measurement.ingredientWeightsGrams, 'rice-v1': 99 } }), /CURATION_INGREDIENT_MEASUREMENT_MISMATCH/);
+  assert.deepEqual(inspectMeasurement(spec, { ...measurement, ingredientWeightsGrams: { ...measurement.ingredientWeightsGrams, 'rice-v1': 99 } }).warnings, ['CURATION_QUANTITY_DEVIATION:rice-v1']);
+  assert.throws(() => validateMeasurement(spec, { ...measurement, ingredientWeightsGrams: { ...measurement.ingredientWeightsGrams, 'peanut-v1': 0 } }), /CURATION_STRUCTURAL_FORMULA_DEVIATION/);
   assert.throws(() => validateMeasurement(spec, { ...measurement, operator: '' }), /CURATION_INVALID_MEASUREMENT_AUDIT/);
+});
+
+test('blank, incomplete and estimated-style measurement evidence fails closed', () => {
+  assert.equal(deriveStageBStatus(spec, null, null, null).state, 'MEASUREMENT_REQUIRED');
+  assert.throws(() => validateMeasurement(spec, { ...measurement, measurementRunId: '', servingObservationsGrams: [] }), /CURATION_MEASUREMENT_RUN_ID_REQUIRED/);
+  assert.throws(() => validateMeasurement(spec, { ...measurement, formulaSha256: '0'.repeat(64) }), /CURATION_FORMULA_HASH_MISMATCH/);
+});
+
+test('measurement and calculation manifests bind all governed hashes', () => {
+  const manifest = createCalculationInputManifest(spec, measurement, [approved]);
+  assert.match(manifest.measurementSha256, /^[a-f0-9]{64}$/);
+  assert.equal(manifest.formulaSha256, spec.formulaSha256);
+  assert.equal(manifest.actualIngredientWeightsGrams['rice-v1'], 100);
+  const calculated = calculateControlledPreparation(spec, measurement, [rice, peanut], [approved]);
+  assert.equal(reconcileCalculation(calculated), true);
+  assert.equal(calculated.measurementSha256, manifest.measurementSha256);
+  assert.equal(deriveStageBStatus(spec, measurement, calculated, null).state, 'READY_FOR_STAGE_B_REVIEW');
 });
 
 test('ingredient Food Versions are pinned and unknown versions fail closed', () => {
@@ -52,9 +72,10 @@ test('ingredient Food Versions are pinned and unknown versions fail closed', () 
 
 test('approval is bound to exact deterministic calculation hash', () => {
   const result = calculateControlledPreparation(spec, measurement, [rice, peanut], [approved]);
-  const review: PreparationReview = { preparationId: spec.preparationId, calculationSha256: result.calculationSha256, reviewerRole: 'NUTRITION_REVIEWER', reviewerId: 'qualified-reviewer-fixture', reviewedAt: '2026-09-03T00:00:00Z', state: 'APPROVED', notes: 'test fixture only' };
+  const review: PreparationReview = { preparationId: spec.preparationId, calculationSha256: result.calculationSha256, reviewerRole: 'NUTRITION_REVIEWER', reviewerId: 'qualified-reviewer-fixture', reviewerQualification: 'synthetic fixture qualification', reviewedAt: '2026-09-03T00:00:00Z', state: 'APPROVED', notes: 'test fixture only' };
   assert.doesNotThrow(() => assertCurrentApproval(result, review));
   assert.throws(() => assertCurrentApproval({ ...result, calculationSha256: 'changed' }, review), /CURATION_STALE_APPROVAL/);
+  assert.throws(() => assertCurrentApproval(result, { ...review, reviewerQualification: '' }), /CURATION_REVIEWER_AUTHORITY_REQUIRED/);
   assert.throws(() => assertCurrentApproval(result, null), /CURATION_EXPERT_APPROVAL_REQUIRED/);
 });
 
@@ -73,4 +94,20 @@ test('Pack 1 references real pinned USDA records and remains explicitly pending 
   assert.ok(pack.directSourceFoods.every((food) => available.has(food.fdcId)));
   assert.equal(new Set(pack.controlledPreparations.map((food) => food.id)).size, 10);
   assert.ok(pack.controlledPreparations.every((food) => Object.values(food.proposedBatch.ingredientsGrams).every((quantity) => quantity > 0)));
+});
+
+test('real first-five operator template is blank, explicit and cannot masquerade as evidence', () => {
+  const template = JSON.parse(fs.readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/first-five.measurement-template.json', import.meta.url), 'utf8')) as { status: string; measurements: Array<Record<string, unknown>> };
+  assert.equal(template.status, 'INCOMPLETE');
+  assert.deepEqual(template.measurements.map((item) => item.preparationId), ['CP_CHAPATI', 'CP_MOONG_DAL', 'CP_BHINDI_SABJI', 'CP_BHINDI_ALOO', 'CP_POHA_PEANUT']);
+  assert.ok(template.measurements.every((item) => item.status === 'INCOMPLETE' && item.measurementRunId === null && item.finalPreparedWeightGrams === null));
+});
+
+test('Stage B schema persists measurement, calculation and hash-bound review separately', () => {
+  const migration = fs.readFileSync(new URL('../../backend/src/db/migrations/0043_controlled_food_stage_b.sql', import.meta.url), 'utf8');
+  assert.match(migration, /controlled_food_measurement_runs/);
+  assert.match(migration, /measurement_sha256 text not null unique/);
+  assert.match(migration, /controlled_food_calculations/);
+  assert.match(migration, /controlled_food_stage_b_reviews/);
+  assert.match(migration, /reviewer_role = 'NUTRITION_REVIEWER'/);
 });
