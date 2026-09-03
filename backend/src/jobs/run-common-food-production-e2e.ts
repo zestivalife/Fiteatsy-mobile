@@ -41,7 +41,7 @@ const main = async () => {
   assert(migrations.rowCount === REQUIRED_MIGRATIONS.length, 'REQUIRED_PRODUCTION_MIGRATIONS_NOT_APPLIED');
   const entities = await pool.query(`select e.fixture_role, e.entity_id, u.role, u.account_purpose, u.status, c.fiteatsy_client_id
     from qa_fixture_entities e join users u on u.id=e.entity_id and e.entity_type='USER'
-    left join clients c on c.user_id=u.id and c.deleted_at is null where e.fixture_set_id=$1`, [fixture.rows[0].id]);
+    left join fiteatsy_clients c on c.account_user_id=u.id where e.fixture_set_id=$1`, [fixture.rows[0].id]);
   const identities = Object.fromEntries(entities.rows.map(row => [String(row.fixture_role), row]));
   for (const role of ['consultant','senior','vegetarian','egg','non_vegetarian','vegan','unassigned']) {
     const item = identities[role];
