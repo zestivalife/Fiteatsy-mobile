@@ -11,6 +11,8 @@ const nutritionModuleTargetDir = path.join(backendRoot, 'dist', 'modules', 'nutr
 const catalogueDataSourceDir = path.join(nutritionModuleSourceDir, 'catalogue', 'data');
 const catalogueDataTargetDir = path.join(nutritionModuleTargetDir, 'catalogue', 'data');
 const catalogueImportDataTargetDir = path.join(backendRoot, 'dist', 'catalogue-import', 'src', 'modules', 'nutrition', 'catalogue', 'data');
+const foodCurationDataSourceDir = path.join(nutritionModuleSourceDir, 'food-curation', 'data');
+const foodCurationDataTargetDir = path.join(nutritionModuleTargetDir, 'food-curation', 'data');
 
 const copyMigrations = async () => {
   const entries = await fs.readdir(sourceDir, { withFileTypes: true });
@@ -61,6 +63,24 @@ const copyApprovedCatalogue = async () => {
   console.log(`Copied nutrition catalogue data directory to ${catalogueDataTargetDir} and ${catalogueImportDataTargetDir}`);
 };
 
+const copyGovernedRuntimeAssets = async () => {
+  const runtimeAssets = [
+    'prepared-food-production-activation.v1.json',
+    'batch-1.calculations.v10.json',
+    'batch-1.calculations.v11.json',
+    'batch-1.validation-release.CP_CHAPATI.v1.json',
+    'batch-1.validation-release.CP_BHINDI_SABJI.v1.json',
+    'batch-1.validation-release.CP_BHINDI_ALOO.v1.json',
+  ];
+  await fs.mkdir(foodCurationDataTargetDir, { recursive: true });
+  await Promise.all(runtimeAssets.map((fileName) => fs.copyFile(
+    path.join(foodCurationDataSourceDir, fileName),
+    path.join(foodCurationDataTargetDir, fileName),
+  )));
+  console.log(`Copied ${runtimeAssets.length} governed Food runtime asset(s) to ${foodCurationDataTargetDir}`);
+};
+
 await copyMigrations();
 await copyNutritionAssets();
 await copyApprovedCatalogue();
+await copyGovernedRuntimeAssets();
