@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 import { closePool, getPool } from '../src/db/pool.js';
 import { migrateDatabase } from '../src/db/migrator.js';
 
