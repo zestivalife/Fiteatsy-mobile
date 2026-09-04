@@ -60,6 +60,9 @@ jobs:
       - name: Apply production migrations to ephemeral PostgreSQL
         run: npm --prefix backend run db:migrate
 
+      - name: Build production importer artifact
+        run: npm --prefix backend run build
+
       - name: Validate and import immutable Batch 0 catalogue
         working-directory: backend
         shell: bash
