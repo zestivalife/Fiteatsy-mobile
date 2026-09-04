@@ -65,7 +65,7 @@ create table if not exists consultant_meal_template_audit (
   revision_id uuid references consultant_meal_template_revisions(id) on delete restrict,
   event_type text not null check (event_type in ('TEMPLATE_CREATED','TEMPLATE_ACTIVATED','TEMPLATE_REVISION_CREATED','TEMPLATE_CLONED','TEMPLATE_ARCHIVED','TEMPLATE_APPLIED','TEMPLATE_APPLICATION_REJECTED')),
   actor_id text not null references users(id) on delete restrict,
-  client_id uuid references fiteatsy_clients(id) on delete restrict,
+  client_id text references fiteatsy_clients(id) on delete restrict,
   reason text,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
