@@ -24,12 +24,11 @@ export async function referenceCatalogueSummary(){
 
 export async function listNutritionVerificationQueue(){
   const result=await pool.query(`select id,canonical_name,common_names,category,subcategory,reference_state,
-    case when lower(category) ~ '(vegetable|grain|millet|pulse|legume|fruit|dairy|protein|fish|breakfast)' then 'P0'
-         when lower(category) ~ '(nut|seed|beverage|prepared|bread|staple|cooked basic|non-veg)' then 'P1' else 'P2' end priority,
-    case when lower(category) ~ '(vegetable|grain|millet|pulse|legume|fruit|dairy|protein|fish|breakfast)' then 100
-         when lower(category) ~ '(nut|seed|beverage|prepared|bread|staple|cooked basic|non-veg)' then 60 else 30 end priority_score,
+    verification_priority priority,case verification_priority when 'P0' then 100 when 'P1' then 60 else 30 end priority_score,
+    processing_status,processing_version,operational_use_state,target_roles,evidence_status,
     'AUTHORITATIVE_SOURCE_AND_SERVING_VERIFICATION_REQUIRED' pending_reason
     from food_catalogue_reference_items where batch_id=$1 order by priority_score desc,category,canonical_name`,['BATCH_0_PAN_INDIA_FOOD_SEED']);
   const counts=Object.fromEntries(['P0','P1','P2'].map(priority=>[priority,result.rows.filter(row=>row.priority===priority).length]));
-  return {items:result.rows,counts,total:result.rows.length};
+  const processingCounts=Object.fromEntries([...new Set(result.rows.map(row=>row.processing_status))].sort().map(status=>[status,result.rows.filter(row=>row.processing_status===status).length]));
+  return {items:result.rows,counts,processingCounts,total:result.rows.length,p0Processed:result.rows.filter(row=>row.priority==='P0'&&row.processing_status==='TRIAGED_PENDING_EVIDENCE').length,releaseSafety:'NO_REFERENCE_NUTRITION_ACTIVATED'};
 }

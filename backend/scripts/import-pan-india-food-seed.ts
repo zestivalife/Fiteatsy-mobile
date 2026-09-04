@@ -28,6 +28,10 @@ type ParsedRow = {
   verificationStatus:string; notes:string|null; recordHash:string;
 };
 
+const priorityFor = (category:string) => /(vegetable|grain|millet|pulse|legume|fruit|dairy|protein|fish|breakfast)/i.test(category) ? 'P0' : /(nut|seed|beverage|prepared|bread|staple|cooked basic|non-veg)/i.test(category) ? 'P1' : 'P2';
+const rolesFor = (category:string) => /vegetable/i.test(category) ? ['VEGETABLE'] : /(pulse|legume)/i.test(category) ? ['PULSE','PROTEIN'] : /(grain|millet)/i.test(category) ? ['GRAIN','STARCH'] : /fruit/i.test(category) ? ['FRUIT'] : /dairy/i.test(category) ? ['DAIRY','PROTEIN'] : /(protein|fish)/i.test(category) ? ['PROTEIN'] : [];
+const operationalUseFor = (category:string,state:string) => /fruit/i.test(category)&&['RAW','READY_TO_EAT'].includes(state) ? 'DIRECT_ADDABLE' : /dairy/i.test(category)&&!['RAW','UNCOOKED','POWDERED'].includes(state) ? 'DIRECT_ADDABLE' : ['COOKED','BOILED','STEAMED','ROASTED','BAKED','GRILLED','SAUTEED','PRESSURE_COOKED','SPROUTED','FERMENTED','READY_TO_EAT','PREPARED_DISH'].includes(state) ? 'COMPONENT_ADDABLE' : ['RAW','UNCOOKED','DRIED','DEHYDRATED','POWDERED','FLOUR','PASTE'].includes(state) ? 'INGREDIENT_ONLY' : 'PREPARATION_REQUIRED';
+
 function parseWorkbook(): { rows: ParsedRow[]; invalid: Array<{rowNumber:number;reason:string}> } {
   const workbook = XLSX.readFile(SOURCE, { cellDates:false, raw:true });
   const sheet = workbook.Sheets['Food Master'];
@@ -61,7 +65,8 @@ async function run(){
         else report.conflictRows++;
         continue;
       }
-      await client.query(`insert into food_catalogue_reference_items(id,batch_id,source_row_number,source_record_id,canonical_name,common_names,category,subcategory,reference_state,reference_nutrition_per_100g,verification_status,notes,source_record_sha256) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[id,BATCH_ID,row.rowNumber,row.sourceId,row.canonicalName,JSON.stringify(row.commonNames),row.category,row.subcategory,row.referenceState,JSON.stringify(row.nutrition),row.verificationStatus,row.notes,row.recordHash]);
+      const priority=priorityFor(row.category); const p0=priority==='P0';
+      await client.query(`insert into food_catalogue_reference_items(id,batch_id,source_row_number,source_record_id,canonical_name,common_names,category,subcategory,reference_state,reference_nutrition_per_100g,verification_status,notes,source_record_sha256,verification_priority,processing_status,operational_use_state,target_roles,evidence_status,processing_version) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,[id,BATCH_ID,row.rowNumber,row.sourceId,row.canonicalName,JSON.stringify(row.commonNames),row.category,row.subcategory,row.referenceState,JSON.stringify(row.nutrition),row.verificationStatus,row.notes,row.recordHash,priority,p0?'TRIAGED_PENDING_EVIDENCE':'UNPROCESSED',operationalUseFor(row.category,row.referenceState),JSON.stringify(rolesFor(row.category)),'AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED',p0?'P0_OPERATIONAL_TRIAGE_V17_29R':null]);
       report.insertedRows++;
     }
     await client.query(`insert into food_catalogue_import_runs(id,batch_id,source_filename,source_sha256,dry_run,source_rows,inserted_rows,unchanged_rows,protected_rows,conflict_rows,invalid_rows,report,actor)
