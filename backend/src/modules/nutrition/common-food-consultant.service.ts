@@ -11,11 +11,11 @@ import { addCombinationToDailyUsage, COMMON_FOOD_RANKING_VERSION_V3, emptyDailyF
 import { getCombinationOption, listCombinationOptions, recordCommonFoodGeneration, replaceCombinationOptionSelection, saveCombinationOption, type CombinationSnapshot } from './common-food-consultant.repository.js';
 import type { CatalogueFood } from './catalogue/catalogue.types.js';
 import { COMMON_FOOD_RANKING_V3_ENABLED } from '../../config/common-food-ranking.js';
-import { ontologyFor, validateMealQuality } from './common-food-semantics.js';
+import { ontologyFor, validateMealQuality, withSemanticServingProfile } from './common-food-semantics.js';
 import { createProductionPreparedFoods } from './prepared-food-production.js';
 
 const catalogue=JSON.parse(readFileSync(new URL('./catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json',import.meta.url),'utf8')) as {foods:CatalogueFood[]};
-const foods=[...createGovernedCommonFoodPopulation(catalogue.foods),...createProductionPreparedFoods()];
+const foods=[...createGovernedCommonFoodPopulation(catalogue.foods),...createProductionPreparedFoods()].map(withSemanticServingProfile);
 const sectionByHead:Record<MealHead,string>={EARLY_MORNING:'earlyMorning',BREAKFAST:'breakfast',MID_MORNING:'midMorningSnack',LUNCH:'lunch',EVENING_SNACK:'eveningSnack',DINNER:'dinner',BEDTIME:'bedtimeNutrition'};
 const dietMap={vegetarian:'VEGETARIAN',eggetarian:'EGG',non_vegetarian:'NON_VEGETARIAN',vegan:'VEGAN',jain:'VEGETARIAN'} as const;
 export class CommonFoodApiError extends Error{constructor(public code:string,public statusCode:number,message=code){super(message)}}
