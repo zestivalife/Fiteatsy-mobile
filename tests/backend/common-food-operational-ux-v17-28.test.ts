@@ -11,6 +11,7 @@ test('v17.28 gives every catalogue result one governed operational-use state', (
 
 test('v17.28 raw-to-prepared discovery preserves separate nutrition identities', () => {
   assert.match(source, /relatedPreparedFor/);
+  assert.match(source, /referenceRoles/);
   assert.match(source, /foodType==='VALIDATED_RECIPE'/);
   assert.match(source, /REFERENCE_DETAIL_ONLY/);
   assert.doesNotMatch(source, /reference_nutrition_per_100g[^\n]*nutritionPer100g/);
