@@ -14,7 +14,7 @@ const has=(name:string,terms:string[])=>terms.some(term=>name.includes(term));
 export const classifyVegetable=(food:Pick<CommonFood,'canonicalName'|'displayName'|'category'|'roles'|'family'>):VegetableMetadata=>{
   const name=normalized(`${food.canonicalName} ${food.displayName} ${food.family}`);
   const vegetable=food.category==='vegetable'||food.roles.includes('VEGETABLE');
-  if(!vegetable)return {vegetableClass:null,vegetableFamily:null,starchClass:has(name,['rice','chapati','roti','bread','poha','oat','millet','corn','sweet potato','potato'])?'STARCHY':'NOT_APPLICABLE'};
+  if(!vegetable)return {vegetableClass:null,vegetableFamily:null,starchClass:food.roles.some(role=>['STARCH','GRAIN','BREAD'].includes(role))||has(name,['rice','chapati','roti','bread','poha','oat','millet','wheat','corn','sweet potato','potato'])?'STARCHY':'NOT_APPLICABLE'};
   if(has(name,['sweet potato','potato','corn']))return {vegetableClass:'STARCHY_VEGETABLE',vegetableFamily:has(name,['potato'])?'POTATO':'CORN',starchClass:'STARCHY'};
   if(has(name,['beet','carrot','turnip','radish']))return {vegetableClass:'ROOT_VEGETABLE',vegetableFamily:'ROOT_VEGETABLE',starchClass:'MODERATE_STARCH'};
   if(has(name,['spinach','palak','methi','fenugreek','amaranth','leafy']))return {vegetableClass:'LEAFY_GREEN',vegetableFamily:'LEAFY_GREEN',starchClass:'NON_STARCHY'};
