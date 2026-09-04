@@ -10,6 +10,7 @@ on:
       - codex/food-knowledge-db-v1
       - codex/controlled-indian-food-curation-v1
       - codex/diet-module-unified-option-model-v17.9
+      - codex/governed-qa-handoff-v17.12
 
 permissions:
   contents: read
@@ -65,6 +66,7 @@ jobs:
           ../tests/backend/nutrition-food-preference-contract.test.ts
           ../tests/backend/nutrition-architecture-freeze.test.ts
           ../tests/backend/simple-consultant-approval-workflow.test.ts
+          ../tests/backend/qa-browser-handoff-v17-13.test.ts
 
       - name: Run Diet Lifecycle Quality v1 database acceptance
         working-directory: backend
@@ -77,6 +79,8 @@ jobs:
           set +e
           node --import tsx --test --test-concurrency=1 \
             ../tests/api/common-food-authenticated-e2e.api.test.ts \
+            ../tests/api/qa-session-handoff.api.test.ts \
+            ../tests/api/qa-provisioning.api.test.ts \
             > common-food-authenticated-e2e.log 2>&1
           status=$?
           cat common-food-authenticated-e2e.log
