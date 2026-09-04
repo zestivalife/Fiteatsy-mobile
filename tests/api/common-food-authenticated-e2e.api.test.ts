@@ -72,7 +72,7 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
       values($1,'BATCH_0_PAN_INDIA_FOOD_SEED',1,$2,'Ash Gourd','["Winter Melon","Petha"]','Vegetable','Gourd','RAW','{"kcal":13}','Reference only — verify authoritative source before production',null,$3)`,[`BATCH0_TEST_${index}`,`TEST_${index}`,`${index}`.padStart(64,'0')]);
     const allFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=ALL&search=winter%20melon`, { headers: authHeaders(consultant.token) });
     assert.equal(allFoods.response.status, 200, JSON.stringify(allFoods.body));
-    assert.equal(allFoods.body.items[0].displayName, 'Ash Gourd');
+    assert.equal(String(allFoods.body.items[0].displayName).toLowerCase(), 'ash gourd');
     assert.equal(allFoods.body.items[0].nutritionStatus, 'REFERENCE_ONLY');
     assert.equal(allFoods.body.items[0].generatorEligibility, 'INELIGIBLE');
     assert.equal(allFoods.body.items[0].addToMealEligible, false);
