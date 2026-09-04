@@ -11,6 +11,7 @@ on:
       - codex/controlled-indian-food-curation-v1
       - codex/diet-module-unified-option-model-v17.9
       - codex/governed-qa-handoff-v17.12
+      - codex/consultant-meal-templates-v17.25
 
 permissions:
   contents: read
@@ -58,6 +59,14 @@ jobs:
 
       - name: Apply production migrations to ephemeral PostgreSQL
         run: npm --prefix backend run db:migrate
+
+      - name: Validate and import immutable Batch 0 catalogue
+        working-directory: backend
+        run: |
+          npm run food-catalogue:test
+          npm run food-catalogue:batch0:dry-run
+          npm run food-catalogue:batch0:import
+          npm run food-catalogue:batch0:import
 
       - name: Run Diet Lifecycle Quality v1 contracts
         working-directory: backend

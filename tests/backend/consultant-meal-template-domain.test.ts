@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { templateStructureHash, templateStructureSchema } from '../../backend/src/modules/nutrition/consultant-meal-template.domain.js';
+const valid={name:'Balanced lunch',mealHead:'LUNCH',mealStructure:{kind:'BALANCED'},components:[{semanticRole:'BREAD',catalogEntityId:'chapati',servingSelection:{servingId:'piece',multiplier:2},servingLock:true,order:0}],visibility:'PRIVATE'} as const;
+test('template structure is deterministic and strips client health data by schema',()=>{const parsed=templateStructureSchema.parse({...valid,clientTargets:{kcal:500}});assert.equal(templateStructureHash(parsed),templateStructureHash(templateStructureSchema.parse(valid)));assert.equal('clientTargets' in parsed,false)});
+test('team visibility requires a team and private templates reject one',()=>{assert.equal(templateStructureSchema.safeParse({...valid,visibility:'TEAM'}).success,false);assert.equal(templateStructureSchema.safeParse({...valid,teamId:'team'}).success,false)});
+test('duplicate components and invalid serving multipliers fail closed',()=>{assert.equal(templateStructureSchema.safeParse({...valid,components:[valid.components[0],valid.components[0]]}).success,false);assert.equal(templateStructureSchema.safeParse({...valid,components:[{...valid.components[0],servingSelection:{servingId:'piece',multiplier:0}}]}).success,false)});

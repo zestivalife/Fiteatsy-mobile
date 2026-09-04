@@ -13,7 +13,10 @@
     "nutrition:catalogue:production": "node dist/catalogue-import/scripts/import-nutrition-catalogue.js",
     "food-knowledge:fixture:dry-run": "tsx scripts/import-food-knowledge-fixture.ts --dry-run",
     "food-knowledge:fixture:import": "tsx scripts/import-food-knowledge-fixture.ts",
+    "food-catalogue:batch0:dry-run": "tsx scripts/import-pan-india-food-seed.ts --dry-run",
+    "food-catalogue:batch0:import": "tsx scripts/import-pan-india-food-seed.ts",
     "food-curation:test": "node --import tsx --test ../tests/backend/controlled-food-curation.test.ts",
+    "food-catalogue:test": "node --import tsx --test ../tests/backend/pan-india-food-seed.test.ts ../tests/backend/consultant-meal-template-domain.test.ts",
     "food-curation:status": "node --import tsx scripts/stage-b-status.ts",
     "food-curation:ingest": "node --import tsx scripts/stage-b-ingest.ts",
     "qa:provision-common-food-e2e": "node dist/jobs/provision-common-food-production-qa.js",
@@ -33,6 +36,7 @@
     "openai": "^6.33.0",
     "pdf-parse": "^2.4.5",
     "pg": "^8.13.3",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {
