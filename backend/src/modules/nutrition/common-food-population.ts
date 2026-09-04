@@ -5,7 +5,7 @@ const CATEGORY_POLICY:Record<string,{roles:ComponentRole[];mealHeads:MealHead[];
   fruit:{roles:['FRUIT'],mealHeads:['EARLY_MORNING','BREAKFAST','MID_MORNING','EVENING_SNACK'],clientConsumable:true},
   nuts:{roles:['NUT_SEED','PROTEIN'],mealHeads:['EARLY_MORNING','BREAKFAST','MID_MORNING','EVENING_SNACK','BEDTIME'],clientConsumable:true},
   seeds:{roles:['NUT_SEED'],mealHeads:['EARLY_MORNING','BREAKFAST','MID_MORNING','EVENING_SNACK','BEDTIME'],clientConsumable:true},
-  dairy:{roles:['DAIRY','PROTEIN','BEVERAGE'],mealHeads:['BREAKFAST','MID_MORNING','LUNCH','EVENING_SNACK','DINNER','BEDTIME'],clientConsumable:true},
+  dairy:{roles:['DAIRY','PROTEIN','BEVERAGE'],mealHeads:['EARLY_MORNING','BREAKFAST','MID_MORNING','LUNCH','EVENING_SNACK','DINNER','BEDTIME'],clientConsumable:true},
   grain:{roles:['GRAIN','STARCH'],mealHeads:['BREAKFAST','LUNCH','EVENING_SNACK','DINNER'],clientConsumable:true},
   legume:{roles:['PULSE','PROTEIN'],mealHeads:['BREAKFAST','LUNCH','EVENING_SNACK','DINNER'],clientConsumable:true},
   protein:{roles:['PROTEIN'],mealHeads:['BREAKFAST','LUNCH','EVENING_SNACK','DINNER'],clientConsumable:true},
