@@ -251,7 +251,9 @@ test('optional guidance completeness is enforced only at review lifecycle bounda
 
   assert.doesNotMatch(service.slice(saveStart, saveEnd), /assertOptionalGuidanceValid/);
   assert.doesNotMatch(service.slice(generateStart, searchStart), /assertOptionalGuidanceValid/);
-  assert.match(service.slice(generateStart, searchStart), /includeOutsideTarget: true/);
+  assert.match(service.slice(generateStart, searchStart), /withinCalorieBand/);
+  assert.match(service.slice(generateStart, searchStart), /includeOutsideTarget: false/);
+  assert.match(service.slice(generateStart, searchStart), /allowIncompleteMealPlan: true/);
   assert.match(service.slice(submitStart, changesStart), /await assertOptionalGuidanceValid\(publicClientId, version\.content\)/);
   assert.match(service.slice(approveStart, publishStart), /await assertOptionalGuidanceValid\(publicClientId, currentVersion\.content\)/);
   assert.match(service.slice(publishStart), /await assertOptionalGuidanceValid\(publicClientId, approvedVersion\.content, true\)/);

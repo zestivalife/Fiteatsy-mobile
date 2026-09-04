@@ -2068,6 +2068,7 @@ export const updateConsultantDietPlanDraft = async (
   input: {
     content: NutritionPlanContent;
     reviewNotes?: string | null;
+    allowIncompleteMealPlan?: boolean;
   },
 ) => {
   if (!isConsultantRole(account)) return null;
@@ -2084,7 +2085,7 @@ export const updateConsultantDietPlanDraft = async (
     );
   }
   const foodPreferences = await getFoodPreferenceProfile(publicClientId);
-  assertDietPlanReviewContentComplete(input.content);
+  if (!input.allowIncompleteMealPlan) assertDietPlanReviewContentComplete(input.content);
   assertDietPlanRespectsFoodPreferences(input.content, foodPreferences?.profile ?? null, workspace.healthProfile ?? null);
   const sourceSnapshot = buildSourceSnapshot({
     bmi: workspace.metrics.bmi.status === 'AVAILABLE' ? workspace.metrics.bmi.value : null,
@@ -2240,10 +2241,16 @@ export const generateConsultantOptionalGuidance = async (
     throw new NutritionPlanWorkflowError('DIET_PLAN_NOT_EDITABLE', 'Optional guidance can only be generated for an editable version.', 409);
   }
   const preferences = await resolveFoodPreferencesFilter(publicClientId);
-  const target = deriveMealTargets({
+  const guidanceTargets = deriveMealTargets({
     caloriesTarget: version.content.dailyTargets.calories,
     proteinTargetGrams: version.content.dailyTargets.protein,
-  }).lunch;
+  });
+  const target = guidanceTargets.lunch;
+  const snackTarget = guidanceTargets.eveningSnack;
+  const withinCalorieBand = (slot: NutritionMealSlot, mealTarget: { calories: number | null }) => {
+    if (slot.approxKcal == null || mealTarget.calories == null) return false;
+    return slot.approxKcal >= mealTarget.calories * 0.75 && slot.approxKcal <= mealTarget.calories * 1.25;
+  };
   const planOptions = NUTRITION_MEAL_SEQUENCE.flatMap((mealKey) => {
     const section = version.content.mealPlan[mealKey];
     return section.options.map((slot) => ({ slot, mealKey, timeWindow: section.window }));
@@ -2278,12 +2285,13 @@ export const generateConsultantOptionalGuidance = async (
   const usedCuisineIds = new Set<string>();
   const eatingOutEntries: Array<[string, NutritionGuidanceItem[]]> = [];
   for (const [key, cuisine] of Object.entries(cuisineDefinitions)) {
-    const databaseCandidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, includeOutsideTarget: true, preferredCuisines: [cuisine], limit: 40 }))
-      .filter(guidanceNutritionComplete);
+    const databaseCandidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target, includeOutsideTarget: false, preferredCuisines: [cuisine], limit: 40 }))
+      .filter(guidanceNutritionComplete)
+      .filter((slot) => withinCalorieBand(slot, target));
     const cuisineKey = cuisine.replace(/[^a-z]/g, '');
     const candidates = uniqueSlots([
       ...databaseCandidates,
-      ...broadCatalogue.filter((slot) => (slot.cuisineTags ?? []).some((tag) => lower(tag).replace(/[^a-z]/g, '') === cuisineKey)),
+      ...broadCatalogue.filter((slot) => withinCalorieBand(slot, target) && (slot.cuisineTags ?? []).some((tag) => lower(tag).replace(/[^a-z]/g, '') === cuisineKey)),
     ])
       .filter((slot) => !usedCuisineIds.has(slot.id ?? slot.meal))
       .slice(0, OPTIONAL_GUIDANCE_CUISINE_DISPLAY_LIMIT);
@@ -2299,6 +2307,7 @@ export const generateConsultantOptionalGuidance = async (
   const cravings = Object.fromEntries(Object.entries(cravingDefinitions).map(([key, keywords]) => {
     const candidates = broadCatalogue
       .filter((slot) => filterByTextMatch(slot, [...keywords]))
+      .filter((slot) => withinCalorieBand(slot, snackTarget))
       .filter((slot) => !usedCravingIds.has(slot.id ?? slot.meal))
       .slice(0, OPTIONAL_GUIDANCE_CRAVING_DISPLAY_LIMIT);
     candidates.forEach((slot) => usedCravingIds.add(slot.id ?? slot.meal));
@@ -2335,6 +2344,7 @@ export const generateConsultantOptionalGuidance = async (
   return updateConsultantDietPlanDraft(publicClientId, account, dietPlanId, {
     content: { ...version.content, optionalGuidance },
     reviewNotes: version.reviewNotes,
+    allowIncompleteMealPlan: true,
   });
 };
 
