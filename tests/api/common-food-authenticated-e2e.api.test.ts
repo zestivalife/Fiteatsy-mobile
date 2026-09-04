@@ -68,6 +68,35 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     const draft = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/draft`, {}, { headers: authHeaders(consultant.token) });
     assert.equal(draft.response.status, 201, JSON.stringify(draft.body));
     const planId = String(draft.body.plan.id);
+    await pool.query(`insert into food_catalogue_reference_items(id,batch_id,source_row_number,source_record_id,canonical_name,common_names,category,subcategory,reference_state,reference_nutrition_per_100g,verification_status,notes,source_record_sha256)
+      values($1,'BATCH_0_PAN_INDIA_FOOD_SEED',1,$2,'Ash Gourd','["Winter Melon","Petha"]','Vegetable','Gourd','RAW','{"kcal":13}','Reference only — verify authoritative source before production',null,$3)`,[`BATCH0_TEST_${index}`,`TEST_${index}`,`${index}`.padStart(64,'0')]);
+    const allFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=ALL&search=winter%20melon`, { headers: authHeaders(consultant.token) });
+    assert.equal(allFoods.response.status, 200, JSON.stringify(allFoods.body));
+    assert.equal(allFoods.body.items[0].displayName, 'Ash Gourd');
+    assert.equal(allFoods.body.items[0].nutritionStatus, 'REFERENCE_ONLY');
+    assert.equal(allFoods.body.items[0].generatorEligibility, 'INELIGIBLE');
+    assert.equal(allFoods.body.items[0].addToMealEligible, false);
+    assert.equal(allFoods.body.items[0].nutritionPer100g, null);
+    assert.ok(allFoods.body.totals.catalogue > allFoods.body.totals.generatorEligible);
+    assert.ok(Array.isArray(allFoods.body.facets.states));
+    const recommendedFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST`, { headers: authHeaders(consultant.token) });
+    assert.equal(recommendedFoods.response.status, 200, JSON.stringify(recommendedFoods.body));
+    assert.ok(recommendedFoods.body.items.every((item: { nutritionStatus:string;generatorEligibility:string;mealEligibility:string }) => item.nutritionStatus === 'NUTRITION_VERIFIED' && item.generatorEligibility === 'ELIGIBLE' && item.mealEligibility === 'RECOMMENDED'));
+    if (index === 0) {
+      const durations: number[] = [];
+      for (let sample = 0; sample < 20; sample += 1) {
+        const started = performance.now();
+        const measured = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=${sample % 2 ? 'ALL' : 'RECOMMENDED'}&mealHead=BREAKFAST&limit=20&offset=0`, { headers: authHeaders(consultant.token) });
+        durations.push(performance.now() - started);
+        assert.equal(measured.response.status, 200, JSON.stringify(measured.body));
+      }
+      durations.sort((a, b) => a - b);
+      const p50 = durations[Math.ceil(durations.length * 0.5) - 1];
+      const p95 = durations[Math.ceil(durations.length * 0.95) - 1];
+      console.info(`FOOD_EXPLORER_PERFORMANCE p50=${p50.toFixed(2)}ms p95=${p95.toFixed(2)}ms samples=${durations.length}`);
+      assert.ok(p50 < 500, `Food Explorer P50 ${p50.toFixed(2)}ms exceeds 500ms`);
+      assert.ok(p95 < 500, `Food Explorer P95 ${p95.toFixed(2)}ms exceeds 500ms`);
+    }
     const generated = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/generate`, {
       mealHeads: ['EARLY_MORNING', 'BREAKFAST', 'MID_MORNING', 'LUNCH', 'EVENING_SNACK', 'DINNER', 'BEDTIME'],
     }, { headers: authHeaders(consultant.token) });

@@ -12,3 +12,24 @@ export async function listReferenceCatalogueFoods(input:{search?:string;category
     from food_catalogue_reference_items where ${where.join(' and ')} order by canonical_name,id limit $${values.length-1} offset $${values.length}`,values);
   return {rows:result.rows,total:Number(result.rows[0]?.total_count??0)};
 }
+
+export async function referenceCatalogueSummary(){
+  const [totals,groups,states]=await Promise.all([
+    pool.query(`select count(*)::int total,count(*) filter(where verification_status ilike '%pending%' or verification_status ilike '%reference%')::int nutrition_pending from food_catalogue_reference_items where batch_id=$1`,['BATCH_0_PAN_INDIA_FOOD_SEED']),
+    pool.query(`select category label,count(*)::int count from food_catalogue_reference_items where batch_id=$1 group by category order by count desc,label`,['BATCH_0_PAN_INDIA_FOOD_SEED']),
+    pool.query(`select reference_state label,count(*)::int count from food_catalogue_reference_items where batch_id=$1 group by reference_state order by count desc,label`,['BATCH_0_PAN_INDIA_FOOD_SEED']),
+  ]);
+  return {totals:totals.rows[0]??{total:0,nutrition_pending:0},groups:groups.rows,states:states.rows};
+}
+
+export async function listNutritionVerificationQueue(){
+  const result=await pool.query(`select id,canonical_name,common_names,category,subcategory,reference_state,
+    case when lower(category) in ('vegetable','vegetables','grain','grains','millet','millets','pulse','pulses','legume','legumes','fruit','fruits','dairy','protein','fish','breakfast') then 'P0'
+         when lower(category) in ('nuts','seeds','beverage','prepared dish','prepared dishes') then 'P1' else 'P2' end priority,
+    case when lower(category) in ('vegetable','vegetables','grain','grains','millet','millets','pulse','pulses','legume','legumes','fruit','fruits','dairy','protein','fish','breakfast') then 100
+         when lower(category) in ('nuts','seeds','beverage','prepared dish','prepared dishes') then 60 else 30 end priority_score,
+    'AUTHORITATIVE_SOURCE_AND_SERVING_VERIFICATION_REQUIRED' pending_reason
+    from food_catalogue_reference_items where batch_id=$1 order by priority_score desc,category,canonical_name`,['BATCH_0_PAN_INDIA_FOOD_SEED']);
+  const counts=Object.fromEntries(['P0','P1','P2'].map(priority=>[priority,result.rows.filter(row=>row.priority===priority).length]));
+  return {items:result.rows,counts,total:result.rows.length};
+}
