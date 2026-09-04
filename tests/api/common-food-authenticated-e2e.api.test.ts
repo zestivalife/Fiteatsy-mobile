@@ -68,8 +68,6 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     const draft = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/draft`, {}, { headers: authHeaders(consultant.token) });
     assert.equal(draft.response.status, 201, JSON.stringify(draft.body));
     const planId = String(draft.body.plan.id);
-    await pool.query(`insert into food_catalogue_reference_items(id,batch_id,source_row_number,source_record_id,canonical_name,common_names,category,subcategory,reference_state,reference_nutrition_per_100g,verification_status,notes,source_record_sha256)
-      values($1,'BATCH_0_PAN_INDIA_FOOD_SEED',1,$2,'Ash Gourd','["Winter Melon","Petha"]','Vegetable','Gourd','RAW','{"kcal":13}','Reference only — verify authoritative source before production',null,$3)`,[`BATCH0_TEST_${index}`,`TEST_${index}`,`${index}`.padStart(64,'0')]);
     const allFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=ALL&search=winter%20melon`, { headers: authHeaders(consultant.token) });
     assert.equal(allFoods.response.status, 200, JSON.stringify(allFoods.body));
     assert.equal(String(allFoods.body.items[0].displayName).toLowerCase(), 'ash gourd');
