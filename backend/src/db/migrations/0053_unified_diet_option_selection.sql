@@ -1,5 +1,12 @@
 begin;
 
+-- Logical candidate identities are deterministic and may legitimately recur in
+-- different plans. Version uniqueness is plan-scoped; history within a plan
+-- remains append-only and collision protected.
+drop index if exists diet_plan_combination_logical_version_uq;
+create unique index if not exists diet_plan_combination_plan_logical_version_uq
+  on diet_plan_combination_options (diet_plan_id, logical_option_id, version);
+
 create table if not exists diet_plan_option_selections (
   diet_plan_id uuid not null references diet_plans(id) on delete cascade,
   diet_plan_version_id uuid not null references diet_plan_versions(id) on delete cascade,

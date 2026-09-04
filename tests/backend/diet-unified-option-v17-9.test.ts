@@ -20,6 +20,8 @@ test('v17.9 accepts one authoritative 7x5 selection and rejects the 22/35 regres
 test('v17.9 migration is additive and separates candidate history from selected mappings',()=>{
  const sql=read('../../backend/src/db/migrations/0053_unified_diet_option_selection.sql');
  assert.match(sql,/create table if not exists diet_plan_option_selections/);
+ assert.match(sql,/diet_plan_combination_plan_logical_version_uq/);
+ assert.match(sql,/\(diet_plan_id, logical_option_id, version\)/);
  assert.match(sql,/unique \(diet_plan_version_id, meal_head, display_order\)/);
  assert.match(sql,/where display_order<=5/);
  assert.doesNotMatch(sql,/drop table|truncate|delete from diet_plan_combination_options/i);
