@@ -6,6 +6,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.resolve(scriptDir, '..');
 const sourceDir = path.join(backendRoot, 'src', 'db', 'migrations');
 const targetDir = path.join(backendRoot, 'dist', 'db', 'migrations');
+const catalogueImportMigrationTargetDir = path.join(backendRoot, 'dist', 'catalogue-import', 'src', 'db', 'migrations');
 const nutritionModuleSourceDir = path.join(backendRoot, 'src', 'modules', 'nutrition');
 const nutritionModuleTargetDir = path.join(backendRoot, 'dist', 'modules', 'nutrition');
 const catalogueDataSourceDir = path.join(nutritionModuleSourceDir, 'catalogue', 'data');
@@ -21,16 +22,23 @@ const copyMigrations = async () => {
     .map((entry) => entry.name)
     .sort((left, right) => left.localeCompare(right));
 
-  await fs.rm(targetDir, { recursive: true, force: true });
-  await fs.mkdir(targetDir, { recursive: true });
+  await Promise.all([
+    fs.rm(targetDir, { recursive: true, force: true }),
+    fs.rm(catalogueImportMigrationTargetDir, { recursive: true, force: true }),
+  ]);
+  await Promise.all([
+    fs.mkdir(targetDir, { recursive: true }),
+    fs.mkdir(catalogueImportMigrationTargetDir, { recursive: true }),
+  ]);
 
   await Promise.all(
-    sqlFiles.map((fileName) =>
-      fs.copyFile(path.join(sourceDir, fileName), path.join(targetDir, fileName))
-    )
+    sqlFiles.flatMap((fileName) => [
+      fs.copyFile(path.join(sourceDir, fileName), path.join(targetDir, fileName)),
+      fs.copyFile(path.join(sourceDir, fileName), path.join(catalogueImportMigrationTargetDir, fileName)),
+    ])
   );
 
-  console.log(`Copied ${sqlFiles.length} migration file(s) to ${targetDir}`);
+  console.log(`Copied ${sqlFiles.length} migration file(s) to ${targetDir} and ${catalogueImportMigrationTargetDir}`);
 };
 
 const copyNutritionAssets = async () => {
