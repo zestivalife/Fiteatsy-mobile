@@ -142,6 +142,13 @@ export const getQaIdentity = async (userId: string) => {
   return result.rowCount ? mapUser(result.rows[0]) : null;
 };
 
+export const isQaFixtureEntity = async (fixtureSetId: string, entityId: string, entityType = 'USER') => {
+  const result = await pool.query(`select 1 from qa_fixture_sets f join qa_fixture_entities e on e.fixture_set_id=f.id
+    where f.id=$1 and f.status='ACTIVE' and f.environment='PRODUCTION_QA' and f.expires_at>now()
+      and e.entity_type=$2 and e.entity_id=$3`, [fixtureSetId, entityType, entityId]);
+  return Boolean(result.rowCount);
+};
+
 export const listQaAssignments = async () => {
   const result = await pool.query(
     `select a.id, a.consultant_user_id, a.client_user_id, a.status, a.scope, a.starts_at, a.ends_at, a.created_at, a.updated_at,

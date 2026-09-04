@@ -182,7 +182,7 @@ export const getDietPlanById = async (dietPlanId: string) => {
   return mapDietPlan(result.rows[0]);
 };
 
-export const listDietPlanReviewQueue = async () => {
+export const listDietPlanReviewQueue = async (qaFixtureSetId?: string) => {
   const result = await pool.query(
     `select dp.id, dp.user_id, dp.consultant_id, dp.plan_status, dp.updated_at, dp.submitted_at,
             dp.review_comment, client.name as client_name,
@@ -214,7 +214,12 @@ export const listDietPlanReviewQueue = async () => {
       where dp.deleted_at is null
         and dpv.deleted_at is null
         and dp.plan_status in ('submitted_for_review', 'changes_requested')
+        and ($1::uuid is null or exists (
+          select 1 from qa_fixture_entities qfe
+          where qfe.fixture_set_id=$1::uuid and qfe.entity_type='USER' and qfe.entity_id=dp.user_id
+        ))
       order by dp.submitted_at desc nulls last, dp.updated_at desc`,
+    [qaFixtureSetId ?? null]
   );
   return result.rows.map((row) => ({
     dietPlanId: String(row.id),

@@ -53,6 +53,7 @@ export type AuthenticatedAccount = {
   authProvider: 'fiteatsy' | 'consultant_dashboard';
   user: PersistedAuthUser;
   client: PersistedClient;
+  qaSession: null | { fixtureSetId: string; purpose: string; role: 'consultant' | 'senior_consultant' };
 };
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -309,6 +310,11 @@ const rowToAuthenticatedAccount = async (
     sessionExpiresAtISO: input.sessionExpiresAtISO,
     token: input.token,
     authProvider: 'fiteatsy',
+    qaSession: row.qa_fixture_set_id == null ? null : {
+      fixtureSetId: String(row.qa_fixture_set_id),
+      purpose: String(row.qa_purpose),
+      role: String(row.qa_role) as 'consultant' | 'senior_consultant'
+    },
     client: currentClient,
     user: {
       id: String(row.user_id_value),
@@ -548,7 +554,7 @@ export const resolveVerifiedAccountIdentity = async (input: {
 
 export const createAuthSession = async (
   userId: string,
-  metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
+  metadata: Parameters<typeof createAuthSessionWithClient>[2] = {}
 ) => {
   return createAuthSessionWithClient(pool, userId, metadata);
 };
@@ -556,12 +562,19 @@ export const createAuthSession = async (
 export const createAuthSessionWithClient = async (
   client: Queryable,
   userId: string,
-  metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
+  metadata: {
+    userAgent?: string | null;
+    ipAddress?: string | null;
+    ttlMs?: number;
+    qaFixtureSetId?: string;
+    qaPurpose?: string;
+    qaRole?: 'consultant' | 'senior_consultant';
+  } = {}
 ) => {
   const token = crypto.randomBytes(32).toString('base64url');
   const sessionId = crypto.randomUUID();
   const createdAt = now();
-  const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_MS);
+  const expiresAt = new Date(createdAt.getTime() + (metadata.ttlMs ?? SESSION_TTL_MS));
   const inserted = await client.query(
     `
       insert into auth_sessions (
@@ -572,8 +585,11 @@ export const createAuthSessionWithClient = async (
         expires_at,
         last_used_at,
         user_agent,
-        ip_address
-      ) values ($1, $2, $3, $4, $5, $4, $6, $7)
+        ip_address,
+        qa_fixture_set_id,
+        qa_purpose,
+        qa_role
+      ) values ($1, $2, $3, $4, $5, $4, $6, $7, $8, $9, $10)
       returning *
     `,
     [
@@ -583,7 +599,10 @@ export const createAuthSessionWithClient = async (
       createdAt.toISOString(),
       expiresAt.toISOString(),
       metadata.userAgent ?? null,
-      metadata.ipAddress ?? null
+      metadata.ipAddress ?? null,
+      metadata.qaFixtureSetId ?? null,
+      metadata.qaPurpose ?? null,
+      metadata.qaRole ?? null
     ]
   );
   return {
@@ -789,6 +808,13 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
         and s.revoked_at is null
         and s.expires_at > now()
         and u.deleted_at is null
+        and (s.qa_fixture_set_id is null or (
+          u.account_purpose = 'QA_TEST'
+          and s.qa_purpose = 'DIET_PARTIAL_PLAN_HYDRATION_E2E'
+          and lower(u.role) = s.qa_role
+          and exists (select 1 from qa_fixture_sets f where f.id=s.qa_fixture_set_id and f.status='ACTIVE' and f.environment='PRODUCTION_QA' and f.purpose=s.qa_purpose and f.expires_at>now())
+          and exists (select 1 from qa_fixture_entities e where e.fixture_set_id=s.qa_fixture_set_id and e.entity_type='USER' and e.entity_id=u.id)
+        ))
       limit 1
     `,
     [hashToken(token)]
@@ -878,6 +904,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString(),
     token,
     authProvider: 'consultant_dashboard',
+    qaSession: null,
     user: bridgedUser,
     client: undefined as unknown as PersistedClient
   };

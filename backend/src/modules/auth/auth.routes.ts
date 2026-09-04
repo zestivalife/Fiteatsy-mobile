@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import {
@@ -15,6 +16,7 @@ import {
   exchangeQaAdminSessionHandoff,
   QA_ADMIN_HANDOFF_PURPOSE
 } from './qa-session-handoff.js';
+import { exchangeQaBrowserHandoff, QA_DIET_HYDRATION_PURPOSE } from './qa-browser-handoff.js';
 
 const signupRequestSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -50,6 +52,12 @@ const qaSessionHandoffExchangeSchema = z.object({
   targetUserId: z.string().uuid(),
   purpose: z.literal(QA_ADMIN_HANDOFF_PURPOSE)
 }).strict();
+const qaBrowserHandoffExchangeSchema = z.object({
+  code: z.string().trim().min(40).max(120),
+  fixtureSetId: z.string().uuid(),
+  role: z.enum(['consultant', 'senior_consultant']),
+  purpose: z.literal(QA_DIET_HYDRATION_PURPOSE)
+}).strict();
 
 const toHttpStatus = (code: OtpDomainError['code']): number => {
   if (code === 'OTP_NOT_FOUND') return 404;
@@ -71,6 +79,26 @@ const validationErrorResponse = (error: z.ZodError) => ({
 });
 
 export const authRouter = Router();
+
+authRouter.post('/qa-browser-handoff/exchange', async (req, res) => {
+  const expectedSecret = process.env.QA_BROWSER_BOOTSTRAP_SHARED_SECRET;
+  const suppliedSecret = req.header('x-qa-bootstrap-secret');
+  if (!expectedSecret || !suppliedSecret || suppliedSecret.length !== expectedSecret.length
+    || !crypto.timingSafeEqual(Buffer.from(suppliedSecret), Buffer.from(expectedSecret))) {
+    return res.status(404).json({ error: 'NOT_FOUND' });
+  }
+  const parsed = qaBrowserHandoffExchangeSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(validationErrorResponse(parsed.error));
+  try {
+    const result = await exchangeQaBrowserHandoff({ ...parsed.data, userAgent: req.header('user-agent') ?? null, ipAddress: req.ip || null });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.status(200).json(result);
+  } catch (error) {
+    const typed = error as Error & { status?: number; code?: string };
+    return res.status(typed.status ?? 401).json({ error: typed.code ?? 'QA_HANDOFF_DENIED', message: 'The QA browser handoff is invalid.' });
+  }
+});
 
 authRouter.post('/qa-session-handoff/exchange', async (req, res) => {
   const parsed = qaSessionHandoffExchangeSchema.safeParse(req.body);
@@ -184,6 +212,7 @@ authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
     accountId: account.accountId,
     sessionId: account.sessionId,
     sessionExpiresAtISO: account.sessionExpiresAtISO,
+    qaSession: account.qaSession,
     client: {
       fiteatsyClientId: account.client.fiteatsyClientId,
       status: account.client.status

@@ -49,6 +49,7 @@ import { OptionalGuidanceContractError, validateOptionalGuidanceV2 } from './opt
 import { CALORIE_MACRO_ALLOCATION_CONFIG, CALORIE_MACRO_ALLOCATION_METHODOLOGY_VERSION, optimiseMealOptionPortion, validateAllocatedDiet } from './calorie-macro-allocation.js';
 import { freezeCombinationOptionsForLifecycle, listCombinationOptions } from './common-food-consultant.repository.js';
 import { MEAL_HEADS as COMMON_FOOD_MEAL_HEADS } from './common-food-engine.js';
+import { isQaFixtureEntity } from '../admin/qa-provisioning.repository.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
@@ -1693,7 +1694,9 @@ export const canAccessConsultantNutritionClient = async (
     useSeniorAuthority ? undefined : account.accountId,
     professionalTypeForNutritionAccount(account),
   );
-  return context != null;
+  if (!context) return false;
+  if (account.qaSession && !await isQaFixtureEntity(account.qaSession.fixtureSetId, context.accountId)) return false;
+  return true;
 };
 
 export const assertLifecycleTransition = (
@@ -2443,7 +2446,7 @@ export const getSeniorConsultantDietPlanReviewQueue = async (account: Authentica
   if (!canApproveOrPublishDietPlan(account)) {
     throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can access the review queue.', 403);
   }
-  const reviews = await listDietPlanReviewQueue();
+  const reviews = await listDietPlanReviewQueue(account.qaSession?.fixtureSetId);
   return reviews.map((review) => {
     try {
       assertDietPlanVersionReviewComplete(review.version);
