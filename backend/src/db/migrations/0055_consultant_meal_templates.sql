@@ -73,9 +73,6 @@ create table if not exists consultant_meal_template_audit (
 
 -- Batch 0 is searchable reference data. Existing stronger records retain their
 -- current activation and eligibility semantics through the explicit backfill.
-alter table common_foods drop constraint if exists common_foods_source_policy_class_check;
-alter table common_foods add constraint common_foods_source_policy_class_check
-  check(source_policy_class in ('INDIA_AUTHORITATIVE','INDIA_LOCAL_LAB','GLOBAL_GENERIC_APPROVED','REFERENCE_ONLY'));
 alter table common_foods
   add column if not exists subcategory text,
   add column if not exists common_names jsonb not null default '[]'::jsonb,
@@ -115,6 +112,28 @@ create index if not exists common_foods_catalogue_filters_idx
   on common_foods(food_category, reference_state, catalogue_status, active);
 create unique index if not exists common_foods_source_row_unique_idx
   on common_foods(source_batch_id, source_row_number) where source_batch_id is not null;
+
+create table if not exists food_catalogue_reference_items (
+  id text primary key,
+  batch_id text not null,
+  source_row_number integer not null,
+  source_record_id text not null,
+  canonical_name text not null,
+  common_names jsonb not null default '[]'::jsonb,
+  category text not null,
+  subcategory text,
+  reference_state text not null,
+  reference_nutrition_per_100g jsonb not null,
+  verification_status text not null,
+  notes text,
+  source_record_sha256 text not null check(source_record_sha256 ~ '^[a-f0-9]{64}$'),
+  created_at timestamptz not null default now(),
+  unique(batch_id,source_row_number),
+  unique(batch_id,source_record_id)
+);
+create index if not exists food_catalogue_reference_search_idx on food_catalogue_reference_items
+  using gin(to_tsvector('simple',canonical_name || ' ' || common_names::text));
+create index if not exists food_catalogue_reference_filter_idx on food_catalogue_reference_items(category,reference_state);
 
 create table if not exists food_catalogue_import_runs (
   id uuid primary key,

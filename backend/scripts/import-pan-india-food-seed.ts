@@ -55,21 +55,13 @@ async function run(){
   try{
     await client.query('begin');
     for(const row of rows){
-      const id=`BATCH0_${row.sourceId}`; const existing=await client.query('select id,source_record_sha256,source_policy_class from common_foods where id=$1 or lower(canonical_code)=lower($2)',[id,`PAN_INDIA_${row.sourceId}`]);
+      const id=`BATCH0_${row.sourceId}`; const existing=await client.query('select id,source_record_sha256 from food_catalogue_reference_items where id=$1 or (batch_id=$2 and source_record_id=$3)',[id,BATCH_ID,row.sourceId]);
       if(existing.rows[0]){
         if(existing.rows[0].source_record_sha256===row.recordHash)report.unchangedRows++;
-        else if(existing.rows[0].source_policy_class!=='REFERENCE_ONLY')report.protectedRows++;
         else report.conflictRows++;
         continue;
       }
-      await client.query(`insert into common_foods
-        (id,canonical_code,canonical_name,display_name,food_type,food_family,food_category,food_subcategory,subcategory,country_context,is_indian_specific_food,
-         source_policy_class,source_mapping_id,source_version,physical_state,preparation_state,processing_state,vegetarian_classification,dietary_tags,
-         allergen_tags,intolerance_tags,clinical_tags,avoid_tags,nutrition_per_100g,active,client_consumable,generator_eligible,prepared_component_eligible,
-         production_active,version,common_names,reference_state,catalogue_status,nutrition_status,verification_status,source_batch_id,source_row_number,source_record_sha256)
-        values($1,$2,$3,$3,'COMMON_FOOD',$4,$5,$6,$6,'INDIA',true,'REFERENCE_ONLY',$7,'1',$8,$8,$8,'UNKNOWN','[]','[]','[]','[]','[]',$9,false,true,false,false,false,1,$10,$8,'CATALOGUED_REFERENCE','REFERENCE_ONLY',$11,$12,$13,$14)`,
-        [id,`PAN_INDIA_${row.sourceId}`,row.canonicalName,code(row.subcategory??row.category),row.category,row.subcategory,BATCH_ID,row.referenceState,JSON.stringify(row.nutrition),JSON.stringify(row.commonNames),row.verificationStatus,BATCH_ID,row.rowNumber,row.recordHash]);
-      for(const alias of row.commonNames)await client.query(`insert into common_food_aliases(id,food_id,alias,normalized_alias,version) values($1,$2,$3,$4,1) on conflict(food_id,normalized_alias,version) do nothing`,[crypto.randomUUID(),id,alias,alias.toLowerCase()]);
+      await client.query(`insert into food_catalogue_reference_items(id,batch_id,source_row_number,source_record_id,canonical_name,common_names,category,subcategory,reference_state,reference_nutrition_per_100g,verification_status,notes,source_record_sha256) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[id,BATCH_ID,row.rowNumber,row.sourceId,row.canonicalName,JSON.stringify(row.commonNames),row.category,row.subcategory,row.referenceState,JSON.stringify(row.nutrition),row.verificationStatus,row.notes,row.recordHash]);
       report.insertedRows++;
     }
     await client.query(`insert into food_catalogue_import_runs(id,batch_id,source_filename,source_sha256,dry_run,source_rows,inserted_rows,unchanged_rows,protected_rows,conflict_rows,invalid_rows,report,actor)
