@@ -62,11 +62,25 @@ jobs:
 
       - name: Validate and import immutable Batch 0 catalogue
         working-directory: backend
+        shell: bash
         run: |
-          npm run food-catalogue:test
-          npm run food-catalogue:batch0:dry-run
-          npm run food-catalogue:batch0:import
-          npm run food-catalogue:batch0:import
+          set +e
+          {
+            npm run food-catalogue:test &&
+            npm run food-catalogue:batch0:dry-run &&
+            npm run food-catalogue:batch0:import &&
+            npm run food-catalogue:batch0:import
+          } > batch0-import.log 2>&1
+          status=$?
+          cat batch0-import.log
+          if [ "$status" -ne 0 ]; then
+            failure_block="$(tail -n 100 batch0-import.log)"
+            escaped="${failure_block//'%'/'%25'}"
+            escaped="${escaped//$'\r'/'%0D'}"
+            escaped="${escaped//$'\n'/'%0A'}"
+            echo "::error title=Batch 0 catalogue acceptance::$escaped"
+          fi
+          exit "$status"
 
       - name: Run Diet Lifecycle Quality v1 contracts
         working-directory: backend
