@@ -46,8 +46,8 @@ test('ranking remains deterministic and supported catalogue coverage stays 7 by 
   const context={diet:'VEGETARIAN' as const,allergies:[],intolerances:[],avoids:[],clinicalExclusions:[],dislikes:[],preferences:[]};
   for(const mealHead of ['EARLY_MORNING','BREAKFAST','MID_MORNING','LUNCH','EVENING_SNACK','DINNER','BEDTIME'] as const){
     const target={kcal:mealHead==='LUNCH'||mealHead==='DINNER'?500:250,protein:mealHead==='LUNCH'||mealHead==='DINNER'?25:10,kcalTolerance:150,proteinTolerance:15};
-    const first=generateMealCombinations({foods:commonFoodCatalogue,context,mealHead,target});
-    const second=generateMealCombinations({foods:commonFoodCatalogue,context,mealHead,target});
+    const first=generateMealCombinations({foods:commonFoodCatalogue,context,mealHead,target,rankingV3:false});
+    const second=generateMealCombinations({foods:commonFoodCatalogue,context,mealHead,target,rankingV3:false});
     assert.deepEqual(first,second);assert.equal(first.options.length,5);assert.ok(first.options.every(option=>option.rankingVersion==='COMMON_FOOD_RANKING_V2'));
   }
 });

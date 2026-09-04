@@ -7,9 +7,10 @@ import { canAccessConsultantNutritionClient, getConsultantLatestDietPlan, Nutrit
 import { createGovernedCommonFoodPopulation } from './common-food-population.js';
 import { canonicalHash } from './food-curation/canonical-food-foundation.js';
 import { COMPONENT_ROLES, generateMealCombinations, MEAL_HEADS, validateManualCombination, type ClientFoodContext, type CommonFood, type ComponentRole, type MealHead, type MealTarget } from './common-food-engine.js';
-import { addCombinationToDailyUsage, COMMON_FOOD_RANKING_VERSION_V2, emptyDailyFoodUsage } from './common-food-ranking.js';
+import { addCombinationToDailyUsage, COMMON_FOOD_RANKING_VERSION_V3, emptyDailyFoodUsage } from './common-food-ranking.js';
 import { getCombinationOption, listCombinationOptions, recordCommonFoodGeneration, replaceCombinationOptionSelection, saveCombinationOption, type CombinationSnapshot } from './common-food-consultant.repository.js';
 import type { CatalogueFood } from './catalogue/catalogue.types.js';
+import { COMMON_FOOD_RANKING_V3_ENABLED } from '../../config/common-food-ranking.js';
 
 const catalogue=JSON.parse(readFileSync(new URL('./catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json',import.meta.url),'utf8')) as {foods:CatalogueFood[]};
 const foods=createGovernedCommonFoodPopulation(catalogue.foods);
@@ -42,8 +43,8 @@ const publicFood=(f:CommonFood)=>({id:f.id,displayName:f.displayName,aliases:f.a
 
 export async function generateCommonFoodPlan(account:AuthenticatedAccount,clientId:string,planId:string,mealHeads:MealHead[]){
  const resolved=await resolveClientMealGenerationContext({account,clientId,planId}); if(!resolved.supported)return {...resolved.capability,supported:false}; const started=performance.now(); const runId=crypto.randomUUID(); const meals=[];const dailyUsage=emptyDailyFoodUsage();const foodsById=new Map(foods.map(food=>[food.id,food]));
- for(const mealHead of mealHeads){const result=generateMealCombinations({foods,context:resolved.context,mealHead,target:resolved.mealTargets[mealHead],dailyUsage});meals.push({mealHead,target:resolved.mealTargets[mealHead],coverage:result.shortage??{state:'COMPLETE',available:result.options.length,required:5,missing:0},options:result.options.map(o=>({...o,optionHash:canonicalHash(o)}))});if(result.options[0])addCombinationToDailyUsage(dailyUsage,result.options[0].components,foodsById);await recordCommonFoodGeneration({id:`${runId}:${mealHead}`,clientId:resolved.internalClientId,consultantId:resolved.consultantId,inputHash:result.inputHash,candidateCount:result.candidateCount,eligibleCount:result.eligibleFoodCount,options:result.options,shortages:result.shortage,durationMs:performance.now()-started});}
- return {generationRunId:runId,generatorVersion:'COMMON_FOOD_COMBINATION_ENGINE_V1',rankingVersion:COMMON_FOOD_RANKING_VERSION_V2,templateVersion:'INDIA_COMMON_MEAL_TEMPLATES_V2',catalogueVersion:'NUTRITION_CATALOGUE_V1_1',planVersionId:resolved.planVersion.id,meals};
+ for(const mealHead of mealHeads){const result=generateMealCombinations({foods,context:resolved.context,mealHead,target:resolved.mealTargets[mealHead],dailyUsage,rankingV3:COMMON_FOOD_RANKING_V3_ENABLED});meals.push({mealHead,target:resolved.mealTargets[mealHead],coverage:result.shortage??{state:'COMPLETE',available:result.options.length,required:5,missing:0},options:result.options.map(o=>({...o,optionHash:canonicalHash(o)}))});if(result.options[0])addCombinationToDailyUsage(dailyUsage,result.options[0].components,foodsById,mealHead);await recordCommonFoodGeneration({id:`${runId}:${mealHead}`,clientId:resolved.internalClientId,consultantId:resolved.consultantId,inputHash:result.inputHash,candidateCount:result.candidateCount,eligibleCount:result.eligibleFoodCount,options:result.options,shortages:result.shortage,durationMs:performance.now()-started});}
+ return {generationRunId:runId,generatorVersion:'COMMON_FOOD_COMBINATION_ENGINE_V1',rankingVersion:COMMON_FOOD_RANKING_V3_ENABLED?COMMON_FOOD_RANKING_VERSION_V3:'COMMON_FOOD_RANKING_V2',templateVersion:'INDIA_COMMON_MEAL_TEMPLATES_V2',catalogueVersion:'NUTRITION_CATALOGUE_V1_1',planVersionId:resolved.planVersion.id,meals};
 }
 
 const governedValidationError = (error: unknown): never => {
