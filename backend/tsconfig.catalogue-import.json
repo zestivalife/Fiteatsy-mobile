@@ -6,6 +6,8 @@
   },
   "include": [
     "scripts/import-nutrition-catalogue.ts",
+    "scripts/import-pan-india-food-seed.ts",
+    "src/db/**/*.ts",
     "src/modules/nutrition/catalogue/**/*.ts",
     "src/test-support/destructive-reset-guard.ts"
   ]
