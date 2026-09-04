@@ -52,7 +52,7 @@ test('DOCX export resolves only approved content and validates completeness befo
   const resolver = service.slice(service.indexOf('const getLatestDownloadableDietPlanVersion'), service.indexOf('const summarizeLifestyle'));
   const exporter = service.slice(service.indexOf('export const exportConsultantDietPlanDocument'), service.indexOf('export const logNutritionMealConsumption'));
   assert.match(resolver, /\['approved', 'published'\]/);
-  assert.match(exporter, /assertDietPlanReviewContentComplete\(version\.content\)/);
+  assert.match(exporter, /assertDietPlanVersionReviewComplete\(version\)/);
   assert.match(exporter, /generateDietPlanDocument\(plan, version\)/);
 });
 
@@ -65,7 +65,7 @@ test('review, approval and publish retain the canonical completeness gate', () =
     const start = serviceSource.indexOf(`export const ${name}`);
     assert.notEqual(start, -1, `${name} must remain present`);
     const body = serviceSource.slice(start, start + 9000);
-    assert.match(body, /assertDietPlanReviewContentComplete\(/, `${name} must validate review content`);
+    assert.match(body, /assertDietPlan(?:ReviewContentComplete|VersionReviewComplete)\(/, `${name} must validate review content`);
   }
 });
 

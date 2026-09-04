@@ -47,7 +47,7 @@ import { isDietaryPatternCompatible, listMealLibrarySlotsForTarget, listVerified
 import { getFoodPreferenceProfile, type FoodPreferenceProfile } from './food-preferences.service.js';
 import { OptionalGuidanceContractError, validateOptionalGuidanceV2 } from './optional-guidance-contract.js';
 import { CALORIE_MACRO_ALLOCATION_CONFIG, CALORIE_MACRO_ALLOCATION_METHODOLOGY_VERSION, optimiseMealOptionPortion, validateAllocatedDiet } from './calorie-macro-allocation.js';
-import { freezeCombinationOptionsForLifecycle } from './common-food-consultant.repository.js';
+import { freezeCombinationOptionsForLifecycle, listCombinationOptions } from './common-food-consultant.repository.js';
 import { MEAL_HEADS as COMMON_FOOD_MEAL_HEADS } from './common-food-engine.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
@@ -2573,7 +2573,11 @@ export const getConsultantLatestDietPlan = async (publicClientId: string, accoun
   const plan = await getDietPlanByCareCaseId(workspace.careCase.id);
   if (!plan) return null;
   const version = plan.currentVersionId ? await getCurrentDietPlanVersion(plan.id) : null;
-  return version ? { plan, version } : null;
+  if (!version) return null;
+  const editableSelections = ['draft', 'changes_requested'].includes(version.lifecycleStatus)
+    ? (await listCombinationOptions(plan.id, version.id)).filter((option) => option !== null)
+    : version.commonFoodOptions;
+  return { plan, version: { ...version, commonFoodOptions: editableSelections } };
 };
 
 

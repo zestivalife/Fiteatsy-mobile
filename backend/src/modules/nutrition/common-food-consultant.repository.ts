@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import type { GeneratedCombination, MealHead } from './common-food-engine.js';
 import { canonicalHash } from './food-curation/canonical-food-foundation.js';
@@ -38,8 +39,8 @@ export async function saveCombinationOption(input:{
   } catch(error){await client.query('rollback');throw error;} finally {client.release();}
 }
 
-export async function getCombinationOption(id:string,planId:string):Promise<CombinationSnapshot|null>{
-  const result=await pool.query(`select * from diet_plan_combination_options where (logical_option_id=$1 or id=$1) and diet_plan_id=$2 order by version desc limit 1`,[id,planId]);
+export async function getCombinationOption(id:string,planId:string,planVersionId?:string):Promise<CombinationSnapshot|null>{
+  const result=await pool.query(`select * from diet_plan_combination_options where (logical_option_id=$1 or id=$1) and diet_plan_id=$2 and ($3::uuid is null or diet_plan_version_id=$3) order by version desc limit 1`,[id,planId,planVersionId??null]);
   const row=result.rows[0]; if(!row)return null;
   return {combinationId:String(row.logical_option_id),mealHead:String(row.meal_head) as MealHead,components:row.components_snapshot,
     nutrition:row.nutrition_snapshot,templateId:`TPL_${row.meal_head}`,templateVersion:String(row.template_version),
@@ -48,8 +49,45 @@ export async function getCombinationOption(id:string,planId:string):Promise<Comb
 }
 
 export async function listCombinationOptions(planId:string,planVersionId:string){
-  const result=await pool.query(`select distinct on (logical_option_id) logical_option_id from diet_plan_combination_options where diet_plan_id=$1 and diet_plan_version_id=$2 order by logical_option_id,version desc`,[planId,planVersionId]);
-  return Promise.all(result.rows.map((row)=>getCombinationOption(String(row.logical_option_id),planId)));
+  const result=await pool.query(`with selected as (
+      select logical_option_id,option_snapshot_id,meal_head,display_order from diet_plan_option_selections
+      where diet_plan_id=$1 and diet_plan_version_id=$2
+    ), legacy as (
+      select logical_option_id,id option_snapshot_id,meal_head,row_number() over(partition by meal_head order by created_at desc,version desc,id desc) display_order
+      from (select distinct on (logical_option_id) logical_option_id,meal_head,created_at,version,id
+        from diet_plan_combination_options where diet_plan_id=$1 and diet_plan_version_id=$2
+        order by logical_option_id,version desc,created_at desc,id desc) latest
+      where not exists(select 1 from selected)
+    )
+    select logical_option_id,option_snapshot_id,meal_head,display_order from selected
+    union all select logical_option_id,option_snapshot_id,meal_head,display_order from legacy where display_order<=5
+    order by meal_head,display_order`,[planId,planVersionId]);
+  return Promise.all(result.rows.map((row)=>getCombinationOption(String(row.option_snapshot_id),planId,planVersionId)));
+}
+
+export async function replaceCombinationOptionSelection(input:{planId:string;planVersionId:string;expectedPlanVersionId:string;options:CombinationSnapshot[]}){
+ const client=await pool.connect();
+ try{
+  await client.query('begin');
+  const locked=await client.query('select current_version_id from diet_plans where id=$1 and deleted_at is null for update',[input.planId]);
+  if(!locked.rows[0])throw Object.assign(new Error('DIET_PLAN_NOT_FOUND'),{code:'DIET_PLAN_NOT_FOUND'});
+  if(String(locked.rows[0].current_version_id)!==input.expectedPlanVersionId||input.planVersionId!==input.expectedPlanVersionId)throw Object.assign(new Error('STALE_PLAN_VERSION'),{code:'STALE_PLAN_VERSION'});
+  const snapshotIds=new Map<string,string>();
+  for(const option of input.options){
+   const prior=await client.query('select id,version from diet_plan_combination_options where logical_option_id=$1 and diet_plan_id=$2 order by version desc limit 1',[option.combinationId,input.planId]);
+   const version=Number(prior.rows[0]?.version??0)+1;const id=crypto.randomUUID();const optionHash=canonicalHash({logicalOptionId:option.combinationId,version,option});
+   await client.query(`insert into diet_plan_combination_options
+    (id,logical_option_id,supersedes_id,diet_plan_id,diet_plan_version_id,meal_head,source_type,generator_version,ranking_version,template_version,catalogue_snapshot_version,components_snapshot,nutrition_snapshot,diversity_signature,warnings,option_sha256,version)
+    values($1,$2,$3,$4,$5,$6,'MANUAL_COMBINATION',$7,$8,$9,'NUTRITION_CATALOGUE_V1_1',$10,$11,$12,$13,$14,$15)`,
+    [id,option.combinationId,prior.rows[0]?.id??null,input.planId,input.planVersionId,option.mealHead,option.generatorVersion,option.rankingVersion,option.templateVersion,JSON.stringify(option.components),JSON.stringify(option.nutrition),option.diversitySignature,JSON.stringify(option.warnings),optionHash,version]);
+   snapshotIds.set(option.combinationId,id);
+  }
+  await client.query('delete from diet_plan_option_selections where diet_plan_version_id=$1',[input.planVersionId]);
+  const order=new Map<string,number>();
+  for(const option of input.options){const displayOrder=(order.get(option.mealHead)??0)+1;order.set(option.mealHead,displayOrder);await client.query(`insert into diet_plan_option_selections(diet_plan_id,diet_plan_version_id,logical_option_id,option_snapshot_id,meal_head,display_order) values($1,$2,$3,$4,$5,$6)`,[input.planId,input.planVersionId,option.combinationId,snapshotIds.get(option.combinationId),option.mealHead,displayOrder]);}
+  await client.query('commit');
+ }catch(error){await client.query('rollback');throw error;}finally{client.release();}
+ return listCombinationOptions(input.planId,input.planVersionId);
 }
 
 export async function freezeCombinationOptionsForLifecycle(planId:string,planVersionId:string){

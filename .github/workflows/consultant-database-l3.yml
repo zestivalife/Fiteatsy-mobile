@@ -9,6 +9,7 @@ on:
       - codex/food-preference-sync-v1
       - codex/food-knowledge-db-v1
       - codex/controlled-indian-food-curation-v1
+      - codex/diet-module-unified-option-model-v17.9
 
 permissions:
   contents: read

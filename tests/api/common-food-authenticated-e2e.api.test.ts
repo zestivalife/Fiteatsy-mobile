@@ -91,10 +91,28 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     assert.equal(rejected.response.status, 422, JSON.stringify(rejected.body));
     assert.equal(rejected.body.error, 'UNSAFE_OR_INELIGIBLE_FOOD');
 
-    const option = generated.body.meals[0].options[0];
-    const stale = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
-      expectedPlanVersionId: crypto.randomUUID(), mealHead: generated.body.meals[0].mealHead,
-      components: option.components.map((component: { foodId: string; servingId: string; multiplier: number }) => ({ foodId: component.foodId, servingId: component.servingId, multiplier: component.multiplier })),
+    const selectedOptions = generated.body.meals.flatMap((meal: { mealHead: string; options: Array<{ combinationId: string; components: Array<{ foodId: string; servingId: string; multiplier: number }> }> }) =>
+      meal.options.map((option) => ({ optionId: option.combinationId, mealHead: meal.mealHead, components: option.components.map(({ foodId, servingId, multiplier }) => ({ foodId, servingId, multiplier })) })),
+    );
+    const partial = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+      expectedPlanVersionId: draft.body.version.id, options: selectedOptions.slice(0, 22),
+    }, { headers: authHeaders(consultant.token) });
+    assert.equal(partial.response.status, 400, JSON.stringify(partial.body));
+
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      const saved = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+        expectedPlanVersionId: draft.body.version.id, options: selectedOptions,
+      }, { headers: authHeaders(consultant.token) });
+      assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
+      assert.equal(saved.body.options.length, 35);
+      assert.equal(new Set(saved.body.options.map((item: { combinationId: string }) => item.combinationId)).size, 35);
+    }
+    const reloaded = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, { headers: authHeaders(consultant.token) });
+    assert.equal(reloaded.response.status, 200, JSON.stringify(reloaded.body));
+    assert.equal(reloaded.body.options.length, 35);
+
+    const stale = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+      expectedPlanVersionId: crypto.randomUUID(), options: selectedOptions,
     }, { headers: authHeaders(consultant.token) });
     assert.equal(stale.response.status, 409, JSON.stringify(stale.body));
     assert.equal(stale.body.error, 'STALE_PLAN_VERSION');

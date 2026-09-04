@@ -121,14 +121,12 @@ const main = async () => {
   assert(filtered.body.limit===1 && Array.isArray(filtered.body.items), 'EXPLORER_FILTER_ACCEPTANCE_FAILED');
   report.explorer = { search:'PASS', searchTerm:searchable.displayName, foodId:searchable.id, alias:governedAlias ? 'PASS' : 'NOT_AVAILABLE', aliasTerm:governedAlias ?? null, filters:'PASS', pagination:'PASS', serving:exact.body.items.every((x:Json)=>x.servings.length>0)?'PASS':'FAIL' };
 
-  const persisted: Json[]=[];
   currentPhase = 'PERSIST_35_OPTIONS';
-  for (const meal of generatedByRole.vegetarian.meals) {
-    for (const option of meal.options) {
-      const saved=await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/common-food/options`,{expectedPlanVersionId:versionId,mealHead:meal.mealHead,components:option.components.map((x:Json)=>({foodId:x.foodId,servingId:x.servingId,multiplier:x.multiplier}))},201);
-      persisted.push(saved.body);
-    }
-  }
+  const selectionPayload={expectedPlanVersionId:versionId,options:generatedByRole.vegetarian.meals.flatMap((meal:Json)=>meal.options.map((option:Json)=>({optionId:option.combinationId,mealHead:meal.mealHead,components:option.components.map((x:Json)=>({foodId:x.foodId,servingId:x.servingId,multiplier:x.multiplier}))})))};
+  const selected=await ok(tokens.consultant,'PUT',`${vegBase}/diet-plans/${planId}/common-food/options`,selectionPayload);
+  const repeatedSelection=await ok(tokens.consultant,'PUT',`${vegBase}/diet-plans/${planId}/common-food/options`,selectionPayload);
+  const persisted:Json[]=repeatedSelection.body.options;
+  assert(selected.body.options.length===35&&persisted.length===35,'ATOMIC_SELECTION_REPLACEMENT_FAILED');
   const baseline=persisted.find(x=>x.components.length>=2)??persisted[0];
   const optionId=String(baseline.combinationId); const first=baseline.components[0];
   const mutationTimes:number[]=[];
@@ -146,7 +144,7 @@ const main = async () => {
   assert(unsafe.status===422 && unsafe.body.error==='UNSAFE_OR_INELIGIBLE_FOOD', 'SAFETY_REJECTION_MISSING');
   assert(invalidServing.status===422 && invalidServing.body.error==='INVALID_SERVING_MULTIPLIER', 'INVALID_SERVING_REJECTION_MISSING');
   report.safety={allergy:'PASS (hard eligibility boundary)',intolerance:'PASS (shared hard eligibility boundary)',avoid:'PASS (shared hard eligibility boundary)',dietPattern:'PASS (hard eligibility boundary)',invalidServing:{status:invalidServing.status,code:invalidServing.body.error}};
-  const stale=await call(tokens.consultantB,'POST',`${vegBase}/diet-plans/${planId}/common-food/options`,{expectedPlanVersionId:crypto.randomUUID(),mealHead:baseline.mealHead,components:baseline.components.map((x:Json)=>({foodId:x.foodId,servingId:x.servingId,multiplier:x.multiplier}))});
+  const stale=await call(tokens.consultantB,'PUT',`${vegBase}/diet-plans/${planId}/common-food/options`,{...selectionPayload,expectedPlanVersionId:crypto.randomUUID()});
   assert(stale.status===409 && stale.body.error==='STALE_PLAN_VERSION','STALE_WRITE_NOT_REJECTED'); report.concurrency={status:stale.status,code:stale.body.error};
   for(let i=mutationTimes.length;i<20;i++) mutationTimes.push((await ok(tokens.consultant,'PATCH',`${vegBase}/diet-plans/${planId}/common-food/options/${optionId}/components/${first.foodId}/serving`,{expectedPlanVersionId:versionId,servingId:first.servingId,multiplier:i%2?1:1.5})).ms);
 
