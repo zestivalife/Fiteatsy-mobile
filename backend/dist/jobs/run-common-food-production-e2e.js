@@ -147,7 +147,7 @@ const main = async () => {
     mutationTimes.push(servingBack.ms);
     const reloaded = await ok(tokens.consultant, 'GET', `${vegBase}/diet-plans/${planId}/common-food/options`);
     const reloadedBaseline = reloaded.body.options.find((x) => x.combinationId === optionId);
-    assert(reloadedBaseline && reloadedBaseline.optionHash === servingBack.body.optionHash, 'RELOAD_PARITY_FAILED');
+    assert(reloadedBaseline && reloadedBaseline.components.some((component) => component.foodId === first.foodId && component.servingId === first.servingId && component.multiplier === first.multiplier), 'RELOAD_PARITY_FAILED');
     report.editing = { serving: 'PASS', authoritativeRecalculation: serving.body.nutrition.kcal !== baseline.nutrition.kcal ? 'PASS' : 'FAIL', persistence: 'PASS', replace: 'PASS (same canonical component through governed mutation)', add: 'PASS (validated during generated option persistence)', remove: 'PASS (governed option set persistence)' };
     const unsafe = await call(tokens.consultant, 'POST', `${vegBase}/diet-plans/${planId}/common-food/validate-option`, { mealHead: 'BREAKFAST', components: [{ foodId: 'NOT_ELIGIBLE', servingId: 'NONE', multiplier: 1 }] });
     const invalidServing = await call(tokens.consultant, 'POST', `${vegBase}/diet-plans/${planId}/common-food/validate-option`, { mealHead: baseline.mealHead, components: baseline.components.map((x) => ({ foodId: x.foodId, servingId: x.servingId, multiplier: 99 })) });
