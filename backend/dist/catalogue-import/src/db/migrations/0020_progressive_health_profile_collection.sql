@@ -1,0 +1,17 @@
+alter table health_profiles
+  add column if not exists preferred_cuisines jsonb not null default '[]'::jsonb,
+  add column if not exists sleep_hours numeric(4,1),
+  add column if not exists sleep_goal_hours numeric(4,1),
+  add column if not exists smoking_status text,
+  add column if not exists alcohol_frequency text,
+  add column if not exists exercise_frequency text,
+  add column if not exists stress_level_label text,
+  add column if not exists previous_conditions jsonb not null default '[]'::jsonb,
+  add column if not exists family_history_conditions jsonb not null default '[]'::jsonb,
+  add column if not exists medical_notes text,
+  add column if not exists pregnancy_status text,
+  add column if not exists breastfeeding_status text,
+  add column if not exists pcos_status text,
+  add column if not exists thyroid_status text,
+  add column if not exists diabetes_status text,
+  add column if not exists hypertension_status text;

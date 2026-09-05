@@ -15,6 +15,8 @@
     "food-knowledge:fixture:import": "tsx scripts/import-food-knowledge-fixture.ts",
     "food-catalogue:batch0:dry-run": "node dist/catalogue-import/scripts/import-pan-india-food-seed.js --dry-run",
     "food-catalogue:batch0:import": "node dist/catalogue-import/scripts/import-pan-india-food-seed.js",
+    "food-catalogue:p0:generate": "node scripts/generate-p0-food-verification-v17-29.mjs",
+    "food-catalogue:p0:import": "tsx scripts/import-p0-food-verification-v17-29.ts",
     "food-curation:test": "node --import tsx --test ../tests/backend/controlled-food-curation.test.ts",
     "food-catalogue:test": "node --import tsx --test ../tests/backend/pan-india-food-seed.test.ts ../tests/backend/consultant-meal-template-domain.test.ts",
     "food-curation:status": "node --import tsx scripts/stage-b-status.ts",

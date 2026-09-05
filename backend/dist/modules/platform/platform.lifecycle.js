@@ -15,7 +15,9 @@ const stageOrder = [
 export const validateStageTransition = (from, to) => {
     const currentIndex = stageOrder.indexOf(from);
     const nextIndex = stageOrder.indexOf(to);
-    return nextIndex >= currentIndex && nextIndex - currentIndex <= 2;
+    if (currentIndex === -1 || nextIndex === -1)
+        return false;
+    return nextIndex >= currentIndex;
 };
 export const transitionCareCaseStage = async (careCase, nextStage, detail) => {
     if (!validateStageTransition(careCase.currentStage, nextStage)) {

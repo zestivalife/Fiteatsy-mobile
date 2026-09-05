@@ -30,7 +30,7 @@ const normalizeActivityLevel = (activityLevel) => {
         return 'light';
     if (['moderate', 'moderately_active'].includes(normalized))
         return 'moderate';
-    if (['very_active', 'active', 'high'].includes(normalized))
+    if (['very_active', 'active', 'high', 'athlete'].includes(normalized))
         return 'very_active';
     return null;
 };

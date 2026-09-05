@@ -1,0 +1,25 @@
+export const P0_APPROVED_GENERIC_MAPPINGS = [
+  { sourceRecordId: '1', fdcId: 1999632, outcome: 'ACTIVATED_COMPONENT_ONLY' },
+  { sourceRecordId: '36', fdcId: 168448, outcome: 'ACTIVATED_COMPONENT_ONLY' },
+  { sourceRecordId: '42', fdcId: 169225, outcome: 'ACTIVATED_GENERATOR' },
+  { sourceRecordId: '50', fdcId: 169260, outcome: 'ACTIVATED_COMPONENT_ONLY' },
+  { sourceRecordId: '60', fdcId: 2346401, outcome: 'ACTIVATED_COMPONENT_ONLY' },
+  { sourceRecordId: '61', fdcId: 2346404, outcome: 'ACTIVATED_COMPONENT_ONLY' },
+  { sourceRecordId: '62', fdcId: 2258586, outcome: 'ACTIVATED_COMPONENT_ONLY' },
+  { sourceRecordId: '75', fdcId: 169230, outcome: 'SOURCE_MAPPED_NOT_GENERATOR' },
+  { sourceRecordId: '76', fdcId: 169231, outcome: 'SOURCE_MAPPED_NOT_GENERATOR' },
+  { sourceRecordId: '79', fdcId: 2685573, outcome: 'ACTIVATED_GENERATOR' },
+  { sourceRecordId: '82', fdcId: 747447, outcome: 'ACTIVATED_GENERATOR' },
+  { sourceRecordId: '102', fdcId: 1750339, outcome: 'ACTIVATED_GENERATOR' },
+  { sourceRecordId: '103', fdcId: 1105314, outcome: 'ACTIVATED_GENERATOR' },
+  { sourceRecordId: '104', fdcId: 2710833, outcome: 'ACTIVATED_GENERATOR' },
+  { sourceRecordId: '105', fdcId: 746771, outcome: 'ACTIVATED_GENERATOR' },
+  { sourceRecordId: '107', fdcId: 169926, outcome: 'ACTIVATED_GENERATOR' },
+  { sourceRecordId: '112', fdcId: 2346398, outcome: 'ACTIVATED_GENERATOR' },
+  { sourceRecordId: '136', fdcId: 2512380, outcome: 'ACTIVATED_COMPONENT_ONLY' },
+  { sourceRecordId: '144', fdcId: 790085, outcome: 'ACTIVATED_COMPONENT_ONLY' },
+  { sourceRecordId: '159', fdcId: 169705, outcome: 'ACTIVATED_COMPONENT_ONLY' },
+  { sourceRecordId: '218', fdcId: 172448, outcome: 'ACTIVATED_GENERATOR' },
+] as const;
+
+export type P0ApprovedGenericMapping = typeof P0_APPROVED_GENERIC_MAPPINGS[number];

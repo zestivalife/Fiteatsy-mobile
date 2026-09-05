@@ -19,7 +19,8 @@ export const normalizePhoneNumber = (countryDialCode, nationalNumber) => {
     };
 };
 export const normalizeCanonicalPhoneNumber = (phoneNumber) => {
-    const normalizedNumber = stripPhoneSeparators(phoneNumber);
+    const digits = stripPhoneSeparators(phoneNumber);
+    const normalizedNumber = digits.length === 10 ? `91${digits}` : digits;
     if (!/^[0-9]{10,15}$/.test(normalizedNumber)) {
         throw new Error('Phone number must contain 10 to 15 digits after normalization.');
     }

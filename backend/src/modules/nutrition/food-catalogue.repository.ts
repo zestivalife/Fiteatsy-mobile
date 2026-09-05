@@ -7,9 +7,11 @@ export async function listReferenceCatalogueFoods(input:{search?:string;category
   if(input.category)where.push(`category=${bind(input.category)}`);
   if(input.referenceState)where.push(`reference_state=${bind(input.referenceState)}`);
   values.push(input.limit,input.offset);
-  const result=await pool.query(`select id,canonical_name,canonical_name display_name,subcategory,common_names,category food_category,reference_state,
-    reference_nutrition_per_100g nutrition_per_100g,'CATALOGUED_REFERENCE' catalogue_status,'REFERENCE_ONLY' nutrition_status,verification_status,batch_id source_batch_id,count(*) over()::int total_count
-    from food_catalogue_reference_items where ${where.join(' and ')} order by canonical_name,id limit $${values.length-1} offset $${values.length}`,values);
+  const result=await pool.query(`select reference.id,reference.canonical_name,reference.canonical_name display_name,reference.subcategory,reference.common_names,reference.category food_category,reference.reference_state,
+    reference.reference_nutrition_per_100g nutrition_per_100g,'CATALOGUED_REFERENCE' catalogue_status,'REFERENCE_ONLY' nutrition_status,reference.verification_status,reference.batch_id source_batch_id,
+    reference.processing_status,reference.processing_version,reference.operational_use_state,reference.target_roles,reference.evidence_status,decision.outcome verification_outcome,count(*) over()::int total_count
+    from food_catalogue_reference_items reference left join food_catalogue_p0_verification_decisions decision on decision.reference_item_id=reference.id
+    where ${where.map(clause=>clause.replaceAll('batch_id','reference.batch_id').replaceAll('canonical_name','reference.canonical_name').replaceAll('common_names','reference.common_names').replaceAll('category','reference.category').replaceAll('reference_state','reference.reference_state')).join(' and ')} order by reference.canonical_name,reference.id limit $${values.length-1} offset $${values.length}`,values);
   return {rows:result.rows,total:Number(result.rows[0]?.total_count??0)};
 }
 

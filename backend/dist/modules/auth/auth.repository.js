@@ -1,20 +1,37 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import { createOrResolveClientForAccount, resolveCurrentClientForAccount } from '../client/client.repository.js';
+import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const CONSULTANT_DASHBOARD_BRIDGE_ROLES = new Set(['consultant', 'practitioner', 'admin', 'super_admin']);
+const CONSULTANT_DASHBOARD_BRIDGE_ROLES = new Set(['consultant', 'provider', 'dietician', 'senior_consultant']);
 const normalizeEmail = (email) => email.trim().toLowerCase();
-const normalizeMobileNumber = (mobileNumber) => mobileNumber.trim();
+const normalizeMobileNumber = (mobileNumber) => normalizeCanonicalPhoneNumber(mobileNumber);
 const getIndianNationalMobileNumber = (mobileNumber) => {
     const digits = mobileNumber.replace(/\D/g, '');
     return digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits;
 };
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 const now = () => new Date();
+const SUPPORTED_CONSULTANT_JWT_ALGORITHMS = {
+    HS256: 'sha256',
+    HS384: 'sha384',
+    HS512: 'sha512'
+};
 const base64UrlDecode = (value) => {
     const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
     const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
     return Buffer.from(`${normalized}${padding}`, 'base64');
+};
+const decodeJwtHeaderUnsafe = (token) => {
+    const parts = token.split('.');
+    if (parts.length !== 3)
+        return null;
+    try {
+        return JSON.parse(base64UrlDecode(parts[0]).toString('utf8'));
+    }
+    catch {
+        return null;
+    }
 };
 const decodeJwtPayloadUnsafe = (token) => {
     const parts = token.split('.');
@@ -27,15 +44,59 @@ const decodeJwtPayloadUnsafe = (token) => {
         return null;
     }
 };
-const getConsultantDashboardJwtSecret = () => process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEY ??
-    process.env.CONSULTANT_DASHBOARD_JWT_SECRET ??
-    process.env.JWT_SECRET_KEY ??
-    null;
-const verifyConsultantDashboardJwt = (token) => {
-    const secret = getConsultantDashboardJwtSecret();
+const splitSecretList = (value) => (value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+const expandSecretVariants = (source, secret) => {
+    const trimmed = secret.trim();
+    const variants = [{ source, secret: trimmed }];
+    const unquoted = (trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+        ? trimmed.slice(1, -1)
+        : null;
+    if (unquoted && unquoted.trim()) {
+        variants.push({ source: `${source}:unquoted`, secret: unquoted.trim() });
+    }
+    const escapedNewline = trimmed.replace(/\\n/g, '\n');
+    if (escapedNewline !== trimmed) {
+        variants.push({ source: `${source}:escaped_newline`, secret: escapedNewline });
+    }
+    const compactWhitespace = trimmed.replace(/\s+/g, '');
+    if (compactWhitespace !== trimmed && compactWhitespace) {
+        variants.push({ source: `${source}:compact_whitespace`, secret: compactWhitespace });
+    }
+    return variants;
+};
+const configuredSecret = (source, value) => value ? expandSecretVariants(source, value) : [];
+export const getConsultantDashboardJwtSecretSources = () => {
+    const candidates = [
+        ...splitSecretList(process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEYS).flatMap((secret, index) => expandSecretVariants(`CONSULTANT_DASHBOARD_JWT_SECRET_KEYS[${index}]`, secret)),
+        ...configuredSecret('CONSULTANT_DASHBOARD_JWT_SECRET_KEY', process.env.CONSULTANT_DASHBOARD_JWT_SECRET_KEY),
+        ...configuredSecret('CONSULTANT_DASHBOARD_JWT_SECRET', process.env.CONSULTANT_DASHBOARD_JWT_SECRET),
+        ...configuredSecret('AUTH_SERVICE_JWT_SECRET_KEY', process.env.AUTH_SERVICE_JWT_SECRET_KEY),
+        ...configuredSecret('AUTH_SERVICE_JWT_SECRET', process.env.AUTH_SERVICE_JWT_SECRET),
+        ...configuredSecret('API_GATEWAY_JWT_SECRET_KEY', process.env.API_GATEWAY_JWT_SECRET_KEY),
+        ...configuredSecret('API_GATEWAY_JWT_SECRET', process.env.API_GATEWAY_JWT_SECRET),
+        ...configuredSecret('JWT_SECRET_KEY', process.env.JWT_SECRET_KEY),
+        ...configuredSecret('JWT_SECRET', process.env.JWT_SECRET)
+    ].filter((item) => Boolean(item.secret));
+    const seen = new Set();
+    return candidates.filter((item) => {
+        const fingerprint = crypto.createHash('sha256').update(item.secret).digest('hex');
+        if (seen.has(fingerprint))
+            return false;
+        seen.add(fingerprint);
+        return true;
+    });
+};
+export const verifyConsultantDashboardJwt = (token) => {
+    const secretSources = getConsultantDashboardJwtSecretSources();
     const parts = token.split('.');
-    if (!secret || parts.length !== 3) {
-        return { payload: null, expiryResult: 'not_configured_or_not_jwt' };
+    if (parts.length !== 3) {
+        return { payload: null, expiryResult: 'not_jwt', matchedSecretSource: null };
+    }
+    if (secretSources.length === 0) {
+        return { payload: null, expiryResult: 'not_configured', matchedSecretSource: null };
     }
     const [headerPart, payloadPart, signaturePart] = parts;
     let header;
@@ -45,29 +106,74 @@ const verifyConsultantDashboardJwt = (token) => {
         payload = JSON.parse(base64UrlDecode(payloadPart).toString('utf8'));
     }
     catch {
-        return { payload: null, expiryResult: 'invalid_json' };
+        return { payload: null, expiryResult: 'invalid_json', matchedSecretSource: null };
     }
-    if (header.alg !== 'HS256') {
-        return { payload, expiryResult: 'unsupported_algorithm' };
+    const algorithm = typeof header.alg === 'string' ? header.alg : '';
+    const digest = SUPPORTED_CONSULTANT_JWT_ALGORITHMS[algorithm];
+    if (!digest) {
+        return { payload, expiryResult: 'unsupported_algorithm', matchedSecretSource: null };
     }
-    const expected = crypto
-        .createHmac('sha256', secret)
-        .update(`${headerPart}.${payloadPart}`)
-        .digest('base64url');
     const actual = Buffer.from(signaturePart);
-    const expectedBuffer = Buffer.from(expected);
-    if (actual.length !== expectedBuffer.length || !crypto.timingSafeEqual(actual, expectedBuffer)) {
-        return { payload, expiryResult: 'invalid_signature' };
+    const matchedSecretSource = secretSources.find(({ secret }) => {
+        const expected = crypto
+            .createHmac(digest, secret)
+            .update(`${headerPart}.${payloadPart}`)
+            .digest('base64url');
+        const expectedBuffer = Buffer.from(expected);
+        return actual.length === expectedBuffer.length && crypto.timingSafeEqual(actual, expectedBuffer);
+    });
+    if (!matchedSecretSource) {
+        return { payload, expiryResult: 'invalid_signature', matchedSecretSource: null };
     }
     const expiresAtSeconds = typeof payload.exp === 'number' ? payload.exp : null;
     if (expiresAtSeconds == null) {
-        return { payload, expiryResult: 'missing_expiry' };
+        return { payload, expiryResult: 'missing_expiry', matchedSecretSource: matchedSecretSource.source };
     }
     if (expiresAtSeconds * 1000 <= Date.now()) {
-        return { payload, expiryResult: 'expired' };
+        return { payload, expiryResult: 'expired', matchedSecretSource: matchedSecretSource.source };
     }
-    return { payload, expiryResult: 'valid' };
+    return { payload, expiryResult: 'valid', matchedSecretSource: matchedSecretSource.source };
 };
+const safeClaim = (value) => {
+    if (typeof value === 'string')
+        return value.slice(0, 120);
+    if (Array.isArray(value)) {
+        return value.filter((item) => typeof item === 'string').slice(0, 5);
+    }
+    return null;
+};
+const readStringClaim = (payload, keys) => {
+    for (const key of keys) {
+        const value = payload?.[key];
+        if (typeof value === 'string' && value.trim())
+            return value;
+    }
+    return null;
+};
+export const getConsultantDashboardJwtDiagnostics = (token, bridge) => {
+    const header = decodeJwtHeaderUnsafe(token);
+    const payload = bridge.payload ?? decodeJwtPayloadUnsafe(token);
+    return {
+        issuer: safeClaim(payload?.iss),
+        audience: safeClaim(payload?.aud),
+        algorithm: safeClaim(header?.alg),
+        keyId: safeClaim(header?.kid),
+        tokenType: readStringClaim(payload, ['type', 'token_type', 'tokenType', 'typ'])?.toLowerCase() ?? null,
+        role: readStringClaim(payload, ['role', 'user_role'])?.toLowerCase() ?? null,
+        status: readStringClaim(payload, ['status', 'account_status'])?.toUpperCase() ?? null,
+        credentialStatus: readStringClaim(payload, ['credential_status', 'credentialStatus'])?.toUpperCase() ?? null,
+        verificationResult: bridge.expiryResult,
+        matchedVerifierSource: bridge.matchedSecretSource,
+        configuredVerifierSources: getConsultantDashboardJwtSecretSources().map((item) => item.source)
+    };
+};
+export const isValidConsultantDashboardBridgePayload = (input) => input.expiryResult === 'valid' &&
+    Boolean(input.userId) &&
+    Boolean(input.role) &&
+    CONSULTANT_DASHBOARD_BRIDGE_ROLES.has(input.role ?? '') &&
+    input.tokenType === 'access' &&
+    input.status === 'ACTIVE' &&
+    input.credentialStatus === 'PERMANENT';
 const toIso = (value) => {
     if (!value)
         return null;
@@ -79,6 +185,7 @@ const mapUser = (row) => ({
     email: row.email_normalized == null ? null : String(row.email_normalized),
     mobileNumber: row.mobile_number_normalized == null ? null : String(row.mobile_number_normalized),
     role: row.role == null ? null : String(row.role),
+    accountPurpose: row.account_purpose == null ? 'PRODUCTION_USER' : String(row.account_purpose),
     status: String(row.status),
     version: Number(row.version),
     createdAtISO: new Date(String(row.created_at)).toISOString(),
@@ -113,6 +220,11 @@ const rowToAuthenticatedAccount = async (row, input) => {
         sessionExpiresAtISO: input.sessionExpiresAtISO,
         token: input.token,
         authProvider: 'fiteatsy',
+        qaSession: row.qa_fixture_set_id == null ? null : {
+            fixtureSetId: String(row.qa_fixture_set_id),
+            purpose: String(row.qa_purpose),
+            role: String(row.qa_role)
+        },
         client: currentClient,
         user: {
             id: String(row.user_id_value),
@@ -120,6 +232,7 @@ const rowToAuthenticatedAccount = async (row, input) => {
             email: row.email_normalized == null ? null : String(row.email_normalized),
             mobileNumber: row.mobile_number_normalized == null ? null : String(row.mobile_number_normalized),
             role: row.role == null ? null : String(row.role),
+            accountPurpose: row.account_purpose == null ? 'PRODUCTION_USER' : String(row.account_purpose),
             status: String(row.user_status),
             version: Number(row.user_version),
             createdAtISO: new Date(String(row.user_created_at)).toISOString(),
@@ -136,13 +249,95 @@ const isUniqueViolation = (error) => typeof error === 'object' &&
     'code' in error &&
     typeof error.code === 'string' &&
     error.code === '23505';
+const ensureConsultantDashboardBridgeUser = async (input) => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        const client = await pool.connect();
+        try {
+            await client.query('begin');
+            const existing = await client.query(`
+          select *
+          from users
+          where (id = $1 or ($2::text is not null and email_normalized = $2))
+            and deleted_at is null
+          order by case when id = $1 then 0 else 1 end, created_at asc
+          for update
+          limit 1
+        `, [input.bridgeUserId, input.bridgeEmail]);
+            const timestamp = now().toISOString();
+            const firstName = input.bridgeFirstName?.trim() || null;
+            const lastName = input.bridgeLastName?.trim() || null;
+            const resolvedName = input.bridgeName?.trim() || [firstName, lastName].filter(Boolean).join(' ') || input.bridgeEmail || 'Consultant Dashboard User';
+            if (existing.rowCount === 0) {
+                const inserted = await client.query(`
+            insert into users (
+              id,
+              name,
+              first_name,
+              last_name,
+              email_normalized,
+              mobile_number_normalized,
+              email_verified_at,
+              mobile_verified_at,
+              role,
+              status,
+              version,
+              created_at,
+              updated_at,
+              last_login_at
+            ) values (
+              $1, $2, $3, $4, $5, null, $6, null, $7, 'active', 1, $6, $6, $6
+            )
+            returning *
+          `, [input.bridgeUserId, resolvedName, firstName, lastName, input.bridgeEmail, timestamp, input.bridgeRole]);
+                await client.query('commit');
+                return mapUser(inserted.rows[0]);
+            }
+            const updated = await client.query(`
+          update users
+          set
+            name = coalesce($2, name),
+            first_name = coalesce($3, first_name),
+            last_name = coalesce($4, last_name),
+            email_normalized = coalesce($5, email_normalized),
+            role = $6,
+            status = 'active',
+            email_verified_at = coalesce(email_verified_at, $7),
+            updated_at = $7,
+            last_login_at = $7,
+            version = version + 1
+          where id = $1
+          returning *
+        `, [String(existing.rows[0].id), resolvedName, firstName, lastName, input.bridgeEmail, input.bridgeRole, timestamp]);
+            await client.query('commit');
+            return mapUser(updated.rows[0]);
+        }
+        catch (error) {
+            await client.query('rollback');
+            if (isUniqueViolation(error)) {
+                continue;
+            }
+            throw error;
+        }
+        finally {
+            client.release();
+        }
+    }
+    throw new Error('Failed to materialize consultant dashboard bridge user after retrying.');
+};
 const findUserCandidates = async (email, mobileNumber, db = pool, options = {}) => {
     const lockClause = options.lockRows ? 'for update' : '';
     const result = await db.query(`
       select *
       from users
       where deleted_at is null
-        and (email_normalized = $1 or mobile_number_normalized = $2)
+        and (
+          email_normalized = $1
+          or case
+            when length(regexp_replace(coalesce(mobile_number_normalized, ''), '[^0-9]', '', 'g')) = 10
+              then concat('91', regexp_replace(mobile_number_normalized, '[^0-9]', '', 'g'))
+            else regexp_replace(coalesce(mobile_number_normalized, ''), '[^0-9]', '', 'g')
+          end = $2
+        )
       order by created_at asc
       ${lockClause}
     `, [email, mobileNumber]);
@@ -225,11 +420,14 @@ export const resolveVerifiedAccountIdentity = async (input) => {
     throw new Error('Failed to resolve verified account identity after retrying.');
 };
 export const createAuthSession = async (userId, metadata = {}) => {
+    return createAuthSessionWithClient(pool, userId, metadata);
+};
+export const createAuthSessionWithClient = async (client, userId, metadata = {}) => {
     const token = crypto.randomBytes(32).toString('base64url');
     const sessionId = crypto.randomUUID();
     const createdAt = now();
-    const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_MS);
-    const inserted = await pool.query(`
+    const expiresAt = new Date(createdAt.getTime() + (metadata.ttlMs ?? SESSION_TTL_MS));
+    const inserted = await client.query(`
       insert into auth_sessions (
         id,
         user_id,
@@ -238,8 +436,11 @@ export const createAuthSession = async (userId, metadata = {}) => {
         expires_at,
         last_used_at,
         user_agent,
-        ip_address
-      ) values ($1, $2, $3, $4, $5, $4, $6, $7)
+        ip_address,
+        qa_fixture_set_id,
+        qa_purpose,
+        qa_role
+      ) values ($1, $2, $3, $4, $5, $4, $6, $7, $8, $9, $10)
       returning *
     `, [
         sessionId,
@@ -248,7 +449,10 @@ export const createAuthSession = async (userId, metadata = {}) => {
         createdAt.toISOString(),
         expiresAt.toISOString(),
         metadata.userAgent ?? null,
-        metadata.ipAddress ?? null
+        metadata.ipAddress ?? null,
+        metadata.qaFixtureSetId ?? null,
+        metadata.qaPurpose ?? null,
+        metadata.qaRole ?? null
     ]);
     return {
         token,
@@ -296,7 +500,11 @@ export const normalizeUserMobileNumber = async (userId, mobileNumber) => {
           from users existing
           where existing.id <> users.id
             and existing.deleted_at is null
-            and existing.mobile_number_normalized = $2
+            and case
+              when length(regexp_replace(coalesce(existing.mobile_number_normalized, ''), '[^0-9]', '', 'g')) = 10
+                then concat('91', regexp_replace(existing.mobile_number_normalized, '[^0-9]', '', 'g'))
+              else regexp_replace(coalesce(existing.mobile_number_normalized, ''), '[^0-9]', '', 'g')
+            end = $2
         )
     `, [userId, normalizeMobileNumber(mobileNumber), now().toISOString()]);
 };
@@ -395,6 +603,7 @@ export const getAuthenticatedAccountByToken = async (token) => {
         u.email_normalized,
         u.mobile_number_normalized,
         u.role,
+        u.account_purpose,
         u.status as user_status,
         u.version as user_version,
         u.created_at as user_created_at,
@@ -409,6 +618,13 @@ export const getAuthenticatedAccountByToken = async (token) => {
         and s.revoked_at is null
         and s.expires_at > now()
         and u.deleted_at is null
+        and (s.qa_fixture_set_id is null or (
+          u.account_purpose = 'QA_TEST'
+          and s.qa_purpose = 'DIET_PARTIAL_PLAN_HYDRATION_E2E'
+          and lower(u.role) = s.qa_role
+          and exists (select 1 from qa_fixture_sets f where f.id=s.qa_fixture_set_id and f.status='ACTIVE' and f.environment='PRODUCTION_QA' and f.purpose=s.qa_purpose and f.expires_at>now())
+          and exists (select 1 from qa_fixture_entities e where e.fixture_set_id=s.qa_fixture_set_id and e.entity_type='USER' and e.entity_id=u.id)
+        ))
       limit 1
     `, [hashToken(token)]);
     if (result.rows.length > 0) {
@@ -432,89 +648,63 @@ export const getAuthenticatedAccountByToken = async (token) => {
     const bridge = verifyConsultantDashboardJwt(token);
     const bridgePayload = bridge.payload ?? unsafePayload;
     const bridgeUserId = typeof bridgePayload?.sub === 'string' ? bridgePayload.sub : tokenUserId;
-    const bridgeRole = typeof bridgePayload?.role === 'string' ? bridgePayload.role.toLowerCase() : null;
+    const bridgeDiagnostics = getConsultantDashboardJwtDiagnostics(token, bridge);
+    const bridgeRole = readStringClaim(bridgePayload, ['role', 'user_role'])?.toLowerCase() ?? null;
     const bridgeEmail = typeof bridgePayload?.email === 'string' ? normalizeEmail(bridgePayload.email) : null;
-    const bridgeStatus = typeof bridgePayload?.status === 'string' ? bridgePayload.status.toUpperCase() : null;
-    const credentialStatus = typeof bridgePayload?.credential_status === 'string'
-        ? bridgePayload.credential_status.toUpperCase()
-        : null;
-    if (bridge.expiryResult !== 'valid' ||
-        !bridgeUserId ||
-        !bridgeRole ||
-        !CONSULTANT_DASHBOARD_BRIDGE_ROLES.has(bridgeRole) ||
-        bridgeStatus !== 'ACTIVE' ||
-        credentialStatus !== 'PERMANENT') {
+    const bridgeName = readStringClaim(bridgePayload, ['name', 'full_name', 'display_name']);
+    const bridgeFirstName = readStringClaim(bridgePayload, ['first_name', 'firstName', 'given_name']);
+    const bridgeLastName = readStringClaim(bridgePayload, ['last_name', 'lastName', 'family_name']);
+    const bridgeStatus = readStringClaim(bridgePayload, ['status', 'account_status'])?.toUpperCase() ?? null;
+    const bridgeType = readStringClaim(bridgePayload, ['type', 'token_type', 'tokenType', 'typ'])?.toLowerCase() ?? null;
+    const credentialStatus = readStringClaim(bridgePayload, ['credential_status', 'credentialStatus'])?.toUpperCase() ?? null;
+    if (!isValidConsultantDashboardBridgePayload({
+        expiryResult: bridge.expiryResult,
+        userId: bridgeUserId,
+        role: bridgeRole,
+        status: bridgeStatus,
+        credentialStatus,
+        tokenType: bridgeType
+    })) {
         console.info('CONSULTANT_SESSION_DEBUG', {
             tokenUserId: bridgeUserId,
             sessionFound: false,
             sessionStatus: 'missing',
-            expiryResult: bridge.expiryResult
+            expiryResult: bridge.expiryResult,
+            matchedSecretSource: bridge.matchedSecretSource,
+            tokenType: bridgeType ?? null,
+            bridge: bridgeDiagnostics
         });
         return null;
     }
-    const bridgedUser = await pool.query(`
-      select
-        u.id as user_id_value,
-        u.name,
-        u.email_normalized,
-        u.mobile_number_normalized,
-        u.role,
-        u.status as user_status,
-        u.version as user_version,
-        u.created_at as user_created_at,
-        u.updated_at as user_updated_at,
-        u.deleted_at as user_deleted_at,
-        u.last_login_at as user_last_login_at,
-        u.email_verified_at,
-        u.mobile_verified_at
-      from users u
-      where (u.id = $1 or ($2::text is not null and u.email_normalized = $2))
-        and u.deleted_at is null
-        and u.status = 'active'
-        and coalesce(u.role, 'user') = any($3)
-      limit 1
-    `, [bridgeUserId, bridgeEmail, Array.from(CONSULTANT_DASHBOARD_BRIDGE_ROLES)]);
-    const userRow = bridgedUser.rows[0];
-    if (userRow) {
-        console.info('CONSULTANT_SESSION_DEBUG', {
-            tokenUserId: bridgeUserId,
-            sessionFound: false,
-            sessionStatus: 'consultant_jwt_bridge',
-            expiryResult: bridge.expiryResult
-        });
-        return rowToAuthenticatedAccount(userRow, {
-            token,
-            sessionId: `consultant-dashboard:${bridgeUserId}`,
-            sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString()
-        });
+    if (!bridgeUserId || !bridgeRole) {
+        return null;
     }
+    const bridgedUser = await ensureConsultantDashboardBridgeUser({
+        bridgeUserId,
+        bridgeEmail,
+        bridgeRole,
+        bridgeName,
+        bridgeFirstName,
+        bridgeLastName,
+    });
     console.info('CONSULTANT_SESSION_DEBUG', {
         tokenUserId: bridgeUserId,
+        resolvedAccountId: bridgedUser.id,
         sessionFound: false,
-        sessionStatus: 'consultant_jwt_bridge_external',
-        expiryResult: bridge.expiryResult
+        sessionStatus: bridgedUser.id === bridgeUserId ? 'consultant_jwt_bridge_materialized' : 'consultant_jwt_bridge_linked',
+        expiryResult: bridge.expiryResult,
+        matchedSecretSource: bridge.matchedSecretSource,
+        tokenType: bridgeType,
+        bridge: bridgeDiagnostics
     });
     return {
-        accountId: bridgeUserId,
+        accountId: bridgedUser.id,
         sessionId: `consultant-dashboard:${bridgeUserId}`,
         sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString(),
         token,
         authProvider: 'consultant_dashboard',
-        user: {
-            id: bridgeUserId,
-            name: bridgeEmail ?? 'Consultant Dashboard User',
-            email: bridgeEmail,
-            mobileNumber: null,
-            role: bridgeRole,
-            status: 'active',
-            version: 1,
-            createdAtISO: new Date(0).toISOString(),
-            updatedAtISO: new Date(0).toISOString(),
-            deletedAtISO: null,
-            lastLoginAtISO: null,
-            emailVerifiedAtISO: null,
-            mobileVerifiedAtISO: null
-        },
+        qaSession: null,
+        user: bridgedUser,
         client: undefined
     };
 };

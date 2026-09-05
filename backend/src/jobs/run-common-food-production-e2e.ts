@@ -9,6 +9,7 @@ const REQUIRED_MIGRATIONS = [
   '0050_common_food_runtime_integration.sql',
   '0051_common_food_lifecycle_snapshot.sql',
   '0052_production_qa_fixture_sets.sql',
+  '0057_p0_food_verification_ledger.sql',
 ];
 const MEAL_HEADS = ['EARLY_MORNING', 'BREAKFAST', 'MID_MORNING', 'LUNCH', 'EVENING_SNACK', 'DINNER', 'BEDTIME'];
 let currentPhase = 'BOOTSTRAP';
@@ -120,6 +121,24 @@ const main = async () => {
   const filtered = await ok(tokens.consultant,'GET',`${vegBase}/common-foods?mealHead=BREAKFAST&category=${encodeURIComponent(searchable.category)}&componentRole=${encodeURIComponent(searchable.roles[0])}&proteinMin=0&caloriesMax=5000&limit=1&offset=0`);
   assert(filtered.body.limit===1 && Array.isArray(filtered.body.items), 'EXPLORER_FILTER_ACCEPTANCE_FAILED');
   report.explorer = { search:'PASS', searchTerm:searchable.displayName, foodId:searchable.id, alias:governedAlias ? 'PASS' : 'NOT_AVAILABLE', aliasTerm:governedAlias ?? null, filters:'PASS', pagination:'PASS', serving:exact.body.items.every((x:Json)=>x.servings.length>0)?'PASS':'FAIL' };
+
+  const cucumberSearch = await ok(tokens.consultant,'GET',`${vegBase}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST&search=cucumber&limit=10&offset=0`);
+  const cucumber = cucumberSearch.body.items.find((item: Json) => item.id === 'BATCH0_42');
+  const tofu = (await ok(tokens.consultant,'GET',`${vegBase}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST&search=tofu&limit=10&offset=0`)).body.items.find((item: Json) => item.id === 'BATCH0_218');
+  const banana = (await ok(tokens.consultant,'GET',`${vegBase}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST&search=banana&limit=10&offset=0`)).body.items.find((item: Json) => item.id === 'BATCH0_103');
+  assert(cucumber && cucumber.nutritionStatus === 'NUTRITION_VERIFIED' && cucumber.generatorEligibility === 'ELIGIBLE' && cucumber.addToMealEligible === true, 'P0_CUCUMBER_NOT_ACTIVATED');
+  assert(tofu && banana, 'P0_BREAKFAST_SUPPORT_FOODS_NOT_ACTIVATED');
+  const p0Added = await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/common-food/options`,{
+    expectedPlanVersionId: versionId,
+    mealHead: 'BREAKFAST',
+    components: [
+      { foodId: tofu.id, servingId: tofu.defaultServing.id, multiplier: 1 },
+      { foodId: cucumber.id, servingId: cucumber.defaultServing.id, multiplier: 1 },
+      { foodId: banana.id, servingId: banana.defaultServing.id, multiplier: 1 },
+    ],
+  }, 201);
+  assert(p0Added.body.components.some((component: Json) => component.foodId === 'BATCH0_42'), 'P0_ADD_TO_MEAL_PERSISTENCE_FAILED');
+  report.explorer.p0ActivatedAddToMeal = { result: 'PASS', foodId: 'BATCH0_42', displayName: 'Cucumber' };
 
   currentPhase = 'PERSIST_35_OPTIONS';
   const selectionPayload={expectedPlanVersionId:versionId,options:generatedByRole.vegetarian.meals.flatMap((meal:Json)=>meal.options.map((option:Json)=>({optionId:option.combinationId,mealHead:meal.mealHead,components:option.components.map((x:Json)=>({foodId:x.foodId,servingId:x.servingId,multiplier:x.multiplier}))})))};

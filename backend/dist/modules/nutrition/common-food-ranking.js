@@ -1,0 +1,75 @@
+export const COMMON_FOOD_RANKING_VERSION_V2 = 'COMMON_FOOD_RANKING_V2';
+export const COMMON_FOOD_RANKING_VERSION_V3 = 'COMMON_FOOD_RANKING_V3';
+export const rankingV3Weights = { calorieFit: 1, proteinFit: 1, vegetablePriority: 1, exactFoodRepeatPenalty: 1, adjacentMealRepeatPenalty: 7, vegetableFamilyPenalty: 1, grainFamilyPenalty: 4, pulseFamilyPenalty: 4, proteinFamilyPenalty: 3, starchStackPenalty: 12, mealAppropriateness: 8, pairingCompatibility: 7, intraMealSimilarityPenalty: 10 };
+const norm = (v) => v.toLowerCase().replace(/[_-]+/g, ' ').trim();
+const has = (n, t) => t.some(x => n.includes(x));
+const fam = (n, g) => g.find(([, t]) => has(n, t))?.[0] ?? null;
+/** Central product-quality taxonomy; unknowns remain neutral and this is not a clinical score. */
+const computeFoodQuality = (f) => { const n = norm(`${f.canonicalName} ${f.displayName} ${f.family}`), veg = f.category === 'vegetable' || f.roles.includes('VEGETABLE'); let vegetableClass = null, vegetableFamily = null, starchClass = 'NOT_APPLICABLE'; if (veg) {
+    if (has(n, ['sweet potato', 'potato', 'corn'])) {
+        vegetableClass = 'STARCHY_VEGETABLE';
+        vegetableFamily = has(n, ['potato']) ? 'POTATO' : 'CORN';
+        starchClass = 'STARCHY';
+    }
+    else if (has(n, ['beet', 'carrot', 'turnip', 'radish'])) {
+        vegetableClass = 'ROOT_VEGETABLE';
+        vegetFamily('ROOT_VEGETABLE', 'MODERATE_STARCH');
+    }
+    else if (has(n, ['spinach', 'palak', 'methi', 'fenugreek', 'amaranth', 'leafy'])) {
+        vegetableClass = 'LEAFY_GREEN';
+        vegetFamily('LEAFY_GREEN', 'NON_STARCHY');
+    }
+    else if (has(n, ['cauliflower', 'broccoli', 'cabbage'])) {
+        vegetableClass = 'CRUCIFEROUS';
+        vegetFamily('CRUCIFEROUS', 'NON_STARCHY');
+    }
+    else if (has(n, ['gourd', 'lauki', 'tori', 'turai', 'pumpkin'])) {
+        vegetableClass = 'GOURD';
+        vegetFamily('GOURD', 'NON_STARCHY');
+    }
+    else if (has(n, ['pea', 'bean', 'legume'])) {
+        vegetableClass = 'LEGUME_VEGETABLE';
+        vegetFamily('LEGUME_VEGETABLE', 'MODERATE_STARCH');
+    }
+    else if (has(n, ['bhindi', 'okra'])) {
+        vegetableClass = 'NON_STARCHY_VEGETABLE';
+        vegetFamily('OKRA', 'NON_STARCHY');
+    }
+    else {
+        vegetableClass = 'OTHER_VEGETABLE';
+        vegetFamily(norm(f.family) || 'OTHER_VEGETABLE', 'NON_STARCHY');
+    }
+}
+else if (f.roles.some(r => ['STARCH', 'GRAIN', 'BREAD'].includes(r)) || has(n, ['rice', 'chapati', 'roti', 'bread', 'poha', 'oat', 'millet', 'wheat', 'corn']))
+    starchClass = 'STARCHY'; function vegetFamily(v, s) { vegetableFamily = v; starchClass = s; } const grainFamily = fam(n, [['POHA', ['poha', 'rice flake']], ['RICE', ['rice']], ['WHEAT', ['wheat', 'chapati', 'roti', 'phulka']], ['OATS', ['oat']], ['MILLET', ['millet', 'bajra', 'jowar', 'ragi']], ['SEMOLINA', ['semolina', 'suji', 'upma']], ['BREAD', ['bread', 'toast']]]); const pulseFamily = fam(n, [['MOONG', ['moong', 'mung']], ['MASOOR', ['masoor', 'lentil']], ['CHANA', ['chana', 'chickpea']], ['TUR', ['tur', 'toor', 'pigeon pea']], ['URAD', ['urad']], ['RAJMA', ['rajma', 'kidney bean']], ['PEAS', ['pea']]]); const proteinFamily = f.roles.includes('PROTEIN') ? (pulseFamily ? 'PULSE' : fam(n, [['EGG', ['egg']], ['POULTRY', ['chicken', 'poultry']], ['FISH', ['fish', 'salmon', 'tuna']], ['SOY', ['soy', 'tofu']], ['DAIRY', ['milk', 'curd', 'yogurt', 'paneer', 'cheese']], ['NUTS_SEEDS', ['nut', 'seed', 'peanut', 'almond']]]) ?? 'OTHER_PROTEIN') : null; const repetitionProfile = has(n, ['potato', 'sweet potato']) ? 'STRICT_ROTATION' : has(n, ['chapati', 'roti', 'phulka', 'curd', 'milk']) ? 'FLEXIBLE_ROTATION' : grainFamily ? 'STAPLE_ROTATION' : 'MODERATE_ROTATION'; const preferred = f.mealHeads.filter(h => ['LUNCH', 'DINNER'].includes(h) ? f.roles.some(r => ['STARCH', 'GRAIN', 'BREAD', 'PULSE', 'PROTEIN', 'VEGETABLE', 'ACCOMPANIMENT'].includes(r)) : h === 'BREAKFAST' ? f.roles.some(r => ['STARCH', 'GRAIN', 'BREAD', 'PROTEIN', 'FRUIT', 'DAIRY'].includes(r)) : ['EARLY_MORNING', 'MID_MORNING'].includes(h) ? f.roles.some(r => ['FRUIT', 'NUT_SEED', 'DAIRY', 'BEVERAGE'].includes(r)) : h === 'EVENING_SNACK' ? f.roles.some(r => ['FRUIT', 'NUT_SEED', 'DAIRY', 'BEVERAGE', 'PROTEIN'].includes(r)) : f.roles.some(r => ['DAIRY', 'BEVERAGE', 'NUT_SEED'].includes(r))); return { vegetableClass, vegetableFamily, starchClass, grainFamily, pulseFamily, proteinFamily, repetitionProfile, preferredMealHeads: preferred, allowedMealHeads: [...f.mealHeads], discouragedMealHeads: f.mealHeads.filter(h => !preferred.includes(h)) }; };
+const metadataCache = new WeakMap();
+export const classifyFoodQuality = (f) => { const key = f, cached = metadataCache.get(key); if (cached)
+    return cached; const value = computeFoodQuality(f); metadataCache.set(key, value); return value; };
+export const classifyVegetable = (f) => { const m = classifyFoodQuality(f); return { vegetableClass: m.vegetableClass, vegetableFamily: m.vegetableFamily, starchClass: m.starchClass }; };
+export const emptyDailyFoodUsage = () => ({ foodCounts: {}, familyCounts: {}, grainFamilyCounts: {}, pulseFamilyCounts: {}, proteinFamilyCounts: {}, previousFoodIds: [], previousMealHead: null });
+export const addCombinationToDailyUsage = (u, c, foods, head) => { u.previousFoodIds = c.map(x => x.foodId); u.previousMealHead = head ?? null; for (const x of c) {
+    const f = foods.get(x.foodId);
+    if (!f)
+        continue;
+    const m = classifyFoodQuality(f);
+    u.foodCounts[f.id] = (u.foodCounts[f.id] ?? 0) + 1;
+    if (m.vegetableFamily)
+        u.familyCounts[m.vegetableFamily] = (u.familyCounts[m.vegetableFamily] ?? 0) + 1;
+    for (const [k, v] of [['grainFamilyCounts', m.grainFamily], ['pulseFamilyCounts', m.pulseFamily], ['proteinFamilyCounts', m.proteinFamily]])
+        if (v) {
+            const counts = u[k] ??= {};
+            counts[v] = (counts[v] ?? 0) + 1;
+        }
+} return u; };
+const priority = { NON_STARCHY_VEGETABLE: 8, LEAFY_GREEN: 8, CRUCIFEROUS: 7, GOURD: 6, LEGUME_VEGETABLE: 5, OTHER_VEGETABLE: 4, ROOT_VEGETABLE: 3, MODERATE_STARCH_VEGETABLE: 2, STARCHY_VEGETABLE: 0 };
+const curve = (c, p) => ({ STRICT_ROTATION: [0, 7, 18, 40], MODERATE_ROTATION: [0, 5, 14, 30], FLEXIBLE_ROTATION: [0, 2, 7, 18], STAPLE_ROTATION: [0, 3, 10, 24] }[p][Math.min(c, 3)]);
+export const scoreHealthAndDiversity = (i) => { const rows = i.components.flatMap(c => { const f = i.foods.get(c.foodId); return f ? [{ f, m: classifyFoodQuality(f) }] : []; }), vegs = rows.filter(x => x.m.vegetableClass), starches = rows.filter(x => x.m.starchClass === 'STARCHY'); const vegetableHealthScore = vegs.reduce((s, x) => s + priority[x.m.vegetableClass], 0) + (i.nutrition.fibre === null ? 0 : Math.min(4, i.nutrition.fibre)), starchStackingPenalty = Math.max(0, starches.length - 1) * 12, ingredientRepetitionPenalty = rows.reduce((s, x) => s + curve(i.dailyUsage?.foodCounts[x.f.id] ?? 0, 'MODERATE_ROTATION'), 0), familyDiversityPenalty = vegs.reduce((s, x) => s + Math.min(8, (i.dailyUsage?.familyCounts[x.m.vegetableFamily] ?? 0) * 3), 0); return { vegetableHealthScore, starchStackingPenalty, ingredientRepetitionPenalty, familyDiversityPenalty, healthDiversityScore: vegetableHealthScore - starchStackingPenalty - ingredientRepetitionPenalty - familyDiversityPenalty }; };
+const pairing = (roles, h) => { const hasRole = (r) => roles.includes(r); if (['LUNCH', 'DINNER'].includes(h)) {
+    if (hasRole('VEGETABLE') && roles.some(r => ['PULSE', 'PROTEIN'].includes(r)) && roles.some(r => ['STARCH', 'GRAIN', 'BREAD'].includes(r)))
+        return 1;
+    if (hasRole('FRUIT') && roles.some(r => ['STARCH', 'PULSE'].includes(r)))
+        return -1;
+} if (['EARLY_MORNING', 'MID_MORNING', 'EVENING_SNACK', 'BEDTIME'].includes(h) && roles.filter(r => ['STARCH', 'GRAIN', 'BREAD', 'PULSE', 'VEGETABLE'].includes(r)).length > 1)
+    return -1; return 0; };
+export const scoreDayAwareQuality = (i) => { const v2 = scoreHealthAndDiversity(i), rows = i.components.flatMap(c => { const f = i.foods.get(c.foodId); return f ? [{ f, m: classifyFoodQuality(f) }] : []; }); const exactFoodRepetitionPenalty = rows.reduce((s, x) => s + curve(i.dailyUsage?.foodCounts[x.f.id] ?? 0, x.m.repetitionProfile), 0), adjacentMealPenalty = rows.reduce((s, x) => s + (i.dailyUsage?.previousFoodIds?.includes(x.f.id) ? rankingV3Weights.adjacentMealRepeatPenalty : 0), 0), grainFamilyPenalty = rows.reduce((s, x) => s + (x.m.grainFamily ? (i.dailyUsage?.grainFamilyCounts?.[x.m.grainFamily] ?? 0) * rankingV3Weights.grainFamilyPenalty : 0), 0), pulseFamilyPenalty = rows.reduce((s, x) => s + (x.m.pulseFamily ? (i.dailyUsage?.pulseFamilyCounts?.[x.m.pulseFamily] ?? 0) * rankingV3Weights.pulseFamilyPenalty : 0), 0), proteinFamilyPenalty = rows.reduce((s, x) => s + (x.m.proteinFamily ? (i.dailyUsage?.proteinFamilyCounts?.[x.m.proteinFamily] ?? 0) * rankingV3Weights.proteinFamilyPenalty : 0), 0), mealAppropriateness = rows.reduce((s, x) => s + (x.m.preferredMealHeads.includes(i.mealHead) ? 2 : x.m.discouragedMealHeads.includes(i.mealHead) ? -2 : 0), 0) * rankingV3Weights.mealAppropriateness, pairingCompatibility = pairing(i.components.flatMap(c => i.foods.get(c.foodId)?.roles ?? []), i.mealHead) * rankingV3Weights.pairingCompatibility, calorieFit = Math.max(0, 10 - Math.abs((i.nutrition.kcal ?? i.targetKcal) - i.targetKcal) / Math.max(1, i.targetKcal) * 10), proteinFit = Math.max(0, 6 - Math.abs((i.nutrition.protein ?? i.targetProtein) - i.targetProtein) / Math.max(1, i.targetProtein) * 6), finalAdjustment = v2.vegetableHealthScore - v2.starchStackingPenalty - exactFoodRepetitionPenalty - v2.familyDiversityPenalty - adjacentMealPenalty - grainFamilyPenalty - pulseFamilyPenalty - proteinFamilyPenalty + mealAppropriateness + pairingCompatibility + calorieFit + proteinFit; return { ...v2, exactFoodRepetitionPenalty, adjacentMealPenalty, grainFamilyPenalty, pulseFamilyPenalty, proteinFamilyPenalty, mealAppropriateness, pairingCompatibility, calorieFit, proteinFit, finalAdjustment }; };
+export const optionSimilarity = (a, b) => { const aa = new Set(a.map(x => x.foodId)), bb = new Set(b.map(x => x.foodId)); return [...aa].filter(x => bb.has(x)).length / Math.max(aa.size, bb.size, 1); };

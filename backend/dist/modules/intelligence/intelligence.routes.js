@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { checkinSchema, generateOnePriority, generateTrackerAnalysis, trackerAnalysisSchema } from './intelligence.service.js';
+import { checkinSchema, computePss10Assessment, generateOnePriority, generateTrackerAnalysis, getRandomizedPss10Questions, pssAssessmentSchema, trackerAnalysisSchema } from './intelligence.service.js';
 import { generateActionPlan, generateCrossReferenceInsights, generateNuetraChat, generateNuetraSummary, generateParameterInsight, generateTrackerImprovement, generateTrackerMetricCoaching } from './nuetra.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
+import { addHealthEvent, getCareCaseByClientId } from '../platform/platform.store.js';
 import { listHealthScoreHistory, listLatestHealthScores } from './health-scores.repository.js';
 import { calculateHealthScores } from './health-calculation-engine.js';
+import { ingestHealthObservations } from '../health/health-observations.repository.js';
 import { getReport } from '../reports/reports.store.js';
 export const intelligenceRouter = Router();
 const currentOwner = (account) => ({
@@ -124,7 +126,7 @@ intelligenceRouter.get('/scores/history', requireAuthenticatedAccount, async (re
     const limit = Math.max(1, Math.min(200, Number(req.query.limit || 50)));
     const offset = Math.max(0, Number(req.query.offset || 0));
     const scoreType = typeof req.query.scoreType === 'string' &&
-        ['nutrition', 'clinical', 'activity', 'sleep', 'calm', 'recovery', 'overall'].includes(req.query.scoreType)
+        ['energy_balance', 'body_support', 'nourishment', 'recovery', 'physical_wellness_index', 'active_performance', 'stress_resilience', 'nutrition', 'clinical', 'activity', 'sleep', 'calm', 'overall'].includes(req.query.scoreType)
         ? req.query.scoreType
         : undefined;
     const items = await listHealthScoreHistory(owner, { scoreType, limit, offset });
@@ -143,7 +145,13 @@ intelligenceRouter.get('/summary', requireAuthenticatedAccount, async (req, res)
         scores = await calculateHealthScores(owner);
     }
     return res.status(200).json({
+        energyBalanceScore: getScoreValue(scores, 'energy_balance'),
+        bodySupportScore: getScoreValue(scores, 'body_support'),
+        nourishmentScore: getScoreValue(scores, 'nourishment'),
         recoveryScore: getScoreValue(scores, 'recovery'),
+        physicalWellnessIndex: getScoreValue(scores, 'physical_wellness_index'),
+        activePerformanceScore: getScoreValue(scores, 'active_performance'),
+        stressResilienceScore: getScoreValue(scores, 'stress_resilience'),
         nutritionScore: getScoreValue(scores, 'nutrition'),
         clinicalScore: getScoreValue(scores, 'clinical'),
         activityScore: getScoreValue(scores, 'activity'),
@@ -154,6 +162,65 @@ intelligenceRouter.get('/summary', requireAuthenticatedAccount, async (req, res)
         status: scores.some((score) => score.scoreStatus === 'calculated') ? 'calculated' : 'insufficient_data',
         calculatedAtISO: scores[0]?.calculatedAtISO ?? null
     });
+});
+intelligenceRouter.get('/stress/questions', requireAuthenticatedAccount, (req, res) => {
+    getAuthenticatedAccount(req);
+    const count = Math.max(4, Math.min(10, Number(req.query.count || 4)));
+    return res.status(200).json({
+        scale: 'PSS-10',
+        items: getRandomizedPss10Questions(count)
+    });
+});
+intelligenceRouter.post('/stress/assessments', requireAuthenticatedAccount, async (req, res) => {
+    const account = getAuthenticatedAccount(req);
+    const owner = currentOwner(account);
+    const parsed = pssAssessmentSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.flatten() });
+    }
+    try {
+        const result = computePss10Assessment(parsed.data);
+        await ingestHealthObservations(owner, [{
+                metricType: 'stress_score',
+                value: result.stressPercent,
+                unit: 'percent',
+                measuredAtISO: result.calculatedAtISO,
+                sourceProvider: 'pss10',
+                sourceRecordId: result.scale,
+                syncKey: `pss10:${owner.clientId}:${result.calculatedAtISO}`,
+                qualityStatus: 'accepted',
+            }]);
+        const careCase = await getCareCaseByClientId(owner.clientId);
+        if (careCase) {
+            await addHealthEvent({
+                careCaseId: careCase.id,
+                userId: owner.accountId,
+                type: 'stress_assessment_completed',
+                summary: `PSS-10 completed with ${result.stressBand} stress load.`,
+                payload: { scale: result.scale, answers: parsed.data.answers, result },
+                replayKey: `stress-assessment:${owner.clientId}:${result.calculatedAtISO}`,
+                eventTimeISO: result.calculatedAtISO,
+            });
+        }
+        const scores = await calculateHealthScores(owner);
+        return res.status(200).json({
+            ...result,
+            persisted: true,
+            intelligence: {
+                recalculated: true,
+                scores: scores.map((score) => ({
+                    scoreType: score.scoreType,
+                    scoreValue: score.scoreValue,
+                    scoreStatus: score.scoreStatus,
+                    confidence: score.confidence,
+                    calculatedAtISO: score.calculatedAtISO,
+                })),
+            },
+        });
+    }
+    catch (error) {
+        return res.status(400).json({ error: 'INVALID_PSS_INPUT', message: error instanceof Error ? error.message : 'Invalid stress assessment.' });
+    }
 });
 intelligenceRouter.post('/priority', requireAuthenticatedAccount, (req, res) => {
     getAuthenticatedAccount(req);

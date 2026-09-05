@@ -3,8 +3,7 @@ import { env } from '../../config/env.js';
 import { OtpDeliveryError } from './notification.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 const PINGMATE_PROVIDER_NAME = 'pingmate';
-const PINGMATE_COPY_CODE_BUTTON_PAYLOAD_PREFIX = 'https://www.whatsapp.com/otp/code/?otp_type=COPY_CODE&code=otp';
-const buildCopyCodePayload = (otp) => `${PINGMATE_COPY_CODE_BUTTON_PAYLOAD_PREFIX}${otp}`;
+const buildCopyCodePayload = (otp) => otp;
 const providerRequestIdHeaders = [
     'x-request-id',
     'x-correlation-id',
@@ -62,9 +61,17 @@ export class PingMateProvider {
         const startedAt = Date.now();
         const correlationId = crypto.randomUUID();
         const apiKey = env.pingmateApiKey;
-        const baseUrl = env.pingmateBaseUrl.replace(/\/+$/, '');
-        const requestUrl = `${baseUrl}/messages/send`;
+        const configuredBaseUrl = env.pingmateBaseUrl.replace(/\/+$/, '');
+        const requestUrl = configuredBaseUrl.endsWith('/messages/send')
+            ? configuredBaseUrl
+            : `${configuredBaseUrl}/messages/send`;
         const normalizedRecipient = normalizeCanonicalPhoneNumber(input.mobileNumber);
+        if (!/^[0-9]+$/.test(normalizedRecipient)) {
+            throw new OtpDeliveryError('OTP recipient must use the canonical digits-only phone format.', {
+                provider: PINGMATE_PROVIDER_NAME,
+                latencyMs: Date.now() - startedAt
+            });
+        }
         const requestPayload = {
             to: normalizedRecipient,
             message: {
@@ -102,7 +109,7 @@ export class PingMateProvider {
             buttonCount: 1,
             buttonType: 'url',
             buttonIndex: 0,
-            buttonPayloadShape: 'whatsapp_copy_code_url_with_otp',
+            buttonPayloadShape: 'otp_digits_only',
             sanitizedOutgoingPayload,
             outboundRequestBody: JSON.stringify(sanitizePayload(requestPayload, input))
         };

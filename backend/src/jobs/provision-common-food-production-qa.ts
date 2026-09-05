@@ -40,9 +40,9 @@ const upsertFixtureSet = async () => {
 
 const activate = async () => {
   const migrations = await pool.query(`select version from schema_migrations where version = any($1::text[]) order by version`, [[
-    '0049_common_food_combination_engine.sql', '0050_common_food_runtime_integration.sql', '0051_common_food_lifecycle_snapshot.sql', '0052_production_qa_fixture_sets.sql',
+    '0049_common_food_combination_engine.sql', '0050_common_food_runtime_integration.sql', '0051_common_food_lifecycle_snapshot.sql', '0052_production_qa_fixture_sets.sql', '0057_p0_food_verification_ledger.sql',
   ]]);
-  if (migrations.rowCount !== 4) throw new Error('REQUIRED_PRODUCTION_MIGRATIONS_NOT_APPLIED');
+  if (migrations.rowCount !== 5) throw new Error('REQUIRED_PRODUCTION_MIGRATIONS_NOT_APPLIED');
   const fixtureSetId = await upsertFixtureSet();
   const created = new Map<string, Awaited<ReturnType<typeof provisionQaIdentity>>>();
   for (const [fixtureRole, name, role, email, mobileNumber] of identities) {

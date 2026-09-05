@@ -1,7 +1,8 @@
 import { env } from '../../config/env.js';
 import { assignUserRole, countActiveAdmins, countRoleAuditEventsByReason, findActiveVerifiedUserIdByMobile, isManagedRole } from './admin.repository.js';
 const INITIAL_ADMIN_BOOTSTRAP_REASON = 'initial_admin_bootstrap';
-export const canManageRoles = (account) => account.user.role === 'admin';
+export const canManageRoles = (account) => account.user.role?.toLowerCase() === 'admin';
+const isQaAdmin = (account) => canManageRoles(account) && account.user.accountPurpose.toUpperCase() === 'QA_TEST';
 export const getAdminStatus = async (account) => {
     if (!canManageRoles(account)) {
         return {
@@ -14,7 +15,7 @@ export const getAdminStatus = async (account) => {
     return {
         ok: true,
         role: 'admin',
-        permissions: ['role_management'],
+        permissions: isQaAdmin(account) ? ['qa_provisioning'] : ['role_management'],
         bootstrapConfigured: Boolean(env.initialAdminPhone),
         activeAdmins: await countActiveAdmins(),
         bootstrapAuditRecorded: (await countRoleAuditEventsByReason(INITIAL_ADMIN_BOOTSTRAP_REASON)) > 0
@@ -29,7 +30,16 @@ export const assignRoleAsAdmin = async (actor, targetUserId, role, reason) => {
             message: 'An admin account is required to manage user roles.'
         };
     }
-    if (!isManagedRole(role)) {
+    if (isQaAdmin(actor)) {
+        return {
+            ok: false,
+            status: 403,
+            error: 'QA_ADMIN_SCOPE_RESTRICTED',
+            message: 'QA_TEST administrators cannot manage production user roles.'
+        };
+    }
+    const normalizedRole = role.toLowerCase();
+    if (!isManagedRole(normalizedRole)) {
         return {
             ok: false,
             status: 400,
@@ -40,7 +50,7 @@ export const assignRoleAsAdmin = async (actor, targetUserId, role, reason) => {
     const result = await assignUserRole({
         performedByUserId: actor.user.id,
         targetUserId,
-        role,
+        role: normalizedRole,
         reason
     });
     if (!result) {

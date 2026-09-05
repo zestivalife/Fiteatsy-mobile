@@ -1,0 +1,256 @@
+import { readFileSync } from 'node:fs';
+import crypto from 'node:crypto';
+import { getRegisteredConsultantClientProfileContext } from '../consultants/consultants.repository.js';
+import { getFoodPreferenceProfile } from './food-preferences.service.js';
+import { canAccessConsultantNutritionClient, getConsultantLatestDietPlan } from './nutrition.service.js';
+import { createGovernedCommonFoodPopulation } from './common-food-population.js';
+import { canonicalHash } from './food-curation/canonical-food-foundation.js';
+import { eligibleCommonFoods, generateMealCombinations, MEAL_HEADS, scaleNutrition, validateManualCombination } from './common-food-engine.js';
+import { addCombinationToDailyUsage, COMMON_FOOD_RANKING_VERSION_V3, emptyDailyFoodUsage } from './common-food-ranking.js';
+import { getCombinationOption, listCombinationOptions, recordCommonFoodGeneration, replaceCombinationOptionSelection, saveCombinationOption } from './common-food-consultant.repository.js';
+import { COMMON_FOOD_RANKING_V3_ENABLED } from '../../config/common-food-ranking.js';
+import { ontologyFor, validateMealQuality, withSemanticServingProfile } from './common-food-semantics.js';
+import { createProductionPreparedFoods } from './prepared-food-production.js';
+import { listNutritionVerificationQueue, listReferenceCatalogueFoods } from './food-catalogue.repository.js';
+import { createP0ApprovedGenericFoods } from './p0-approved-generic-foods.js';
+const catalogue = JSON.parse(readFileSync(new URL('./catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json', import.meta.url), 'utf8'));
+const p0Verification = JSON.parse(readFileSync(new URL('./food-curation/data/p0_food_verification_v17_29.json', import.meta.url), 'utf8'));
+const foods = [...createGovernedCommonFoodPopulation(catalogue.foods), ...createP0ApprovedGenericFoods(catalogue.foods, p0Verification.decisions), ...createProductionPreparedFoods()].map(withSemanticServingProfile);
+const sectionByHead = { EARLY_MORNING: 'earlyMorning', BREAKFAST: 'breakfast', MID_MORNING: 'midMorningSnack', LUNCH: 'lunch', EVENING_SNACK: 'eveningSnack', DINNER: 'dinner', BEDTIME: 'bedtimeNutrition' };
+const dietMap = { vegetarian: 'VEGETARIAN', eggetarian: 'EGG', non_vegetarian: 'NON_VEGETARIAN', vegan: 'VEGAN', jain: 'VEGETARIAN' };
+export class CommonFoodApiError extends Error {
+    code;
+    statusCode;
+    constructor(code, statusCode, message = code) {
+        super(message);
+        this.code = code;
+        this.statusCode = statusCode;
+    }
+}
+const roleAllowed = (account) => ['consultant', 'senior_consultant', 'admin', 'super_admin', 'platform_owner'].includes(String(account.user.role).toLowerCase());
+export async function resolveClientMealGenerationContext(input) {
+    if (!roleAllowed(input.account))
+        throw new CommonFoodApiError('ROLE_NOT_ALLOWED', 403);
+    if (!await canAccessConsultantNutritionClient(input.clientId, input.account, { allowSeniorAuthority: true }))
+        throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED', 403);
+    const [registered, prefs, latest] = await Promise.all([getRegisteredConsultantClientProfileContext(input.clientId), getFoodPreferenceProfile(input.clientId), getConsultantLatestDietPlan(input.clientId, input.account)]);
+    if (!registered)
+        throw new CommonFoodApiError('CLIENT_NOT_FOUND', 404);
+    if (!latest)
+        throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND', 404);
+    if (input.planId && latest.plan.id !== input.planId)
+        throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND', 404);
+    const p = prefs?.profile;
+    const diet = p?.dietType ? dietMap[p.dietType] : 'VEGETARIAN';
+    const content = latest.version.content;
+    const daily = content.dailyTargets;
+    const mealTargets = Object.fromEntries(MEAL_HEADS.map(head => { const section = content.mealPlan[sectionByHead[head]]; return [head, { kcal: section?.target?.calories ?? 0, protein: section?.target?.proteinGrams ?? 0, kcalTolerance: Math.max(1, ((section?.target?.caloriesBand?.max ?? 0) - (section?.target?.caloriesBand?.min ?? 0)) / 2 || 50), proteinTolerance: Math.max(1, ((section?.target?.proteinBand?.max ?? 0) - (section?.target?.proteinBand?.min ?? 0)) / 2 || 10) }]; }));
+    const restrictions = p?.restrictions ?? [];
+    const context = { diet, allergies: restrictions.filter(x => /allerg/i.test(x)), intolerances: restrictions.filter(x => /intoler/i.test(x)), avoids: [...(p?.foodsAvoided ?? []), ...(p?.avoidedFoodIds ?? [])], clinicalExclusions: [], dislikes: [...(p?.foodsDisliked ?? []), ...(p?.dislikedFoodIds ?? [])], preferences: [...(p?.foodsLiked ?? []), ...(p?.likedFoodIds ?? []), ...(p?.cuisines ?? [])] };
+    return { clientId: input.clientId, internalClientId: registered.internalClientId, consultantId: input.account.accountId, plan: latest.plan, planVersion: latest.version, context, dailyTargets: { calories: daily.calories ?? null, protein: daily.protein ?? null, carbohydrate: daily.carbohydrates ?? null, fat: daily.fat ?? null }, mealTargets, supported: diet !== 'VEGAN', capability: diet === 'VEGAN' ? { code: 'VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED', reason: 'GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED' } : { code: 'SUPPORTED', reason: null } };
+}
+const entityTypeFor = (f) => f.foodType === 'VALIDATED_RECIPE' ? 'PREPARED_DISH' : !f.clientConsumable ? 'INGREDIENT_ONLY' : f.category === 'spice' ? 'CONDIMENT' : ['fruit', 'nuts', 'dairy'].includes(f.category) ? 'READY_TO_EAT' : 'FOOD';
+const stateFor = (f) => f.foodType === 'VALIDATED_RECIPE' ? 'PREPARED_DISH' : f.servings[0]?.unit === 'piece' ? 'READY_TO_EAT' : 'AS_CATALOGUED';
+const normalizeFoodName = (value) => value.toLowerCase().replace(/\b(raw|fresh|whole|dry|dried|cooked|prepared|plain|flour|powder|leaves?)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+const titleCase = (value) => value.toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+const preparedFoods = foods.filter(food => food.foodType === 'VALIDATED_RECIPE' && food.active);
+const relatedPreparedFor = (names) => {
+    const needles = new Set(names.map(normalizeFoodName).filter(value => value.length >= 3));
+    return preparedFoods.filter(food => [food.displayName, ...food.aliases].some(name => { const haystack = normalizeFoodName(name); return [...needles].some(needle => haystack.includes(needle) || needle.includes(haystack)); })).map(food => ({ id: food.id, displayName: food.displayName, operationalUseState: 'COMPONENT_ADDABLE', productionActive: true }));
+};
+const governedOperationalUse = (f, mealHead, isRecommended) => {
+    const ontology = ontologyFor(f);
+    const secondary = ontology.primaryRole === 'FAT' || ontology.primaryRole === 'ACCOMPANIMENT' || (!ontology.clientFacing && f.clientConsumable);
+    const state = secondary ? 'SECONDARY_ONLY' : f.clientConsumable ? (f.foodType === 'VALIDATED_RECIPE' || ['VEGETABLE', 'PULSE', 'STARCH', 'PROTEIN'].includes(ontology.primaryRole) ? 'COMPONENT_ADDABLE' : 'DIRECT_ADDABLE') : 'INGREDIENT_ONLY';
+    const enabled = isRecommended && state !== 'INGREDIENT_ONLY';
+    const role = titleCase(ontology.primaryRole.replaceAll('_', ' '));
+    return { operationalUseState: state, displayStatus: state === 'SECONDARY_ONLY' ? 'Secondary component' : state === 'INGREDIENT_ONLY' ? 'Ingredient only' : 'Verified for Diet use', displayStatusTone: enabled ? 'positive' : 'neutral', primaryAction: enabled ? (state === 'COMPONENT_ADDABLE' ? `Add as ${role}` : state === 'SECONDARY_ONLY' ? 'Add as Topping' : 'Add') : (state === 'INGREDIENT_ONLY' ? 'Use in Build Meal' : 'Unavailable for this meal'), primaryActionEnabled: enabled, primaryActionReason: enabled ? null : mealHead ? 'Not eligible for the requested meal role and client context.' : 'Choose a meal context to prescribe this food.', secondaryAction: 'View details', nutritionDisplayMode: 'AUTHORITATIVE_SERVING', servingDisplay: (f.servings.find(item => item.isDefault) ?? f.servings[0])?.label ?? 'Serving profile pending', relatedPreparedItems: relatedPreparedFor([f.displayName, ...f.aliases]) };
+};
+const referenceOperationalUse = (row) => {
+    const state = String(row.reference_state ?? '').toUpperCase();
+    const category = String(row.food_category ?? '').toLowerCase();
+    const related = relatedPreparedFor([row.display_name, ...(row.common_names ?? [])]);
+    let operationalUseState = 'REFERENCE_PENDING';
+    if (/RAW|FLOUR|POWDER/.test(state))
+        operationalUseState = related.length ? 'INGREDIENT_ONLY' : 'PREPARATION_REQUIRED';
+    else if (/SPICE|CONDIMENT|OIL/.test(category) || /SEED/.test(category))
+        operationalUseState = 'SECONDARY_ONLY';
+    const primaryAction = related.length ? 'Find Prepared Options' : operationalUseState === 'INGREDIENT_ONLY' ? 'Use in Build Meal' : operationalUseState === 'PREPARATION_REQUIRED' ? 'Prepared-food verification pending' : 'Unavailable — Nutrition Pending';
+    return { operationalUseState, displayStatus: operationalUseState === 'INGREDIENT_ONLY' ? 'Raw ingredient' : operationalUseState === 'SECONDARY_ONLY' ? 'Secondary component · verification pending' : operationalUseState === 'PREPARATION_REQUIRED' ? 'Preparation required' : 'Nutrition verification pending', displayStatusTone: 'warning', primaryAction, primaryActionEnabled: false, primaryActionReason: 'Authoritative nutrition and serving verification are required before this identity can enter Diet calculation.', secondaryAction: 'View details', nutritionDisplayMode: 'REFERENCE_DETAIL_ONLY', servingDisplay: 'Serving profile pending', relatedPreparedItems: related };
+};
+const referenceRoles = (categoryValue) => { const category = categoryValue.toLowerCase(); if (/vegetable|greens/.test(category))
+    return ['VEGETABLE']; if (/pulse|legume|dal/.test(category))
+    return ['PULSE', 'PROTEIN']; if (/grain|millet|staple/.test(category))
+    return ['GRAIN', 'STARCH']; if (/fruit/.test(category))
+    return ['FRUIT']; if (/dairy/.test(category))
+    return ['DAIRY', 'PROTEIN']; if (/nut|seed/.test(category))
+    return ['NUT_SEED']; if (/beverage|drink/.test(category))
+    return ['BEVERAGE']; return []; };
+const countsBy = (items, key) => Object.entries(items.reduce((out, item) => { const values = Array.isArray(item[key]) ? item[key] : [item[key]]; for (const value of values.filter(Boolean))
+    out[value] = (out[value] ?? 0) + 1; return out; }, {})).map(([value, count]) => ({ value, count })).sort((a, b) => Number(b.count) - Number(a.count) || a.value.localeCompare(b.value));
+export async function searchCommonFoods(account, clientId, q) {
+    const resolved = await resolveClientMealGenerationContext({ account, clientId, mealHead: q.mealHead });
+    const term = (q.search ?? '').toLowerCase();
+    const eligibleIds = q.mealHead ? new Set(eligibleCommonFoods(foods, resolved.context, q.mealHead).map(food => food.id)) : null;
+    const safe = (f) => f.active && ontologyFor(f).clientFacing && !f.allergens.some(x => resolved.context.allergies.includes(x)) && !f.intolerances.some(x => resolved.context.intolerances.includes(x)) && !f.avoidTags.some(x => resolved.context.avoids.includes(x)) && !f.clinicalTags.some(x => resolved.context.clinicalExclusions.includes(x));
+    const recommended = (f) => safe(f) && f.generatorEligible && f.clientConsumable && (!eligibleIds || eligibleIds.has(f.id));
+    const governedItems = foods.filter(f => q.scope === 'ALL' ? f.active : recommended(f)).map(f => { const isRecommended = recommended(f); const use = governedOperationalUse(f, q.mealHead, isRecommended); return { ...publicFood(f, q.mealHead), ...use, entityType: entityTypeFor(f), foodState: stateFor(f), referenceState: stateFor(f), catalogueStatus: f.foodType === 'VALIDATED_RECIPE' ? 'SOURCE_IDENTIFIED' : 'NUTRITION_VERIFIED', nutritionStatus: 'NUTRITION_VERIFIED', generatorEligibility: f.generatorEligible ? 'ELIGIBLE' : 'INELIGIBLE', mealEligibility: isRecommended ? 'RECOMMENDED' : q.mealHead && f.mealHeads.includes(q.mealHead) ? 'ALLOWED' : 'NOT_ELIGIBLE', preparedEligibility: f.foodType === 'VALIDATED_RECIPE' ? (f.active ? 'PRODUCTION_ACTIVE' : 'NOT_ACTIVE') : 'NOT_APPLICABLE', verificationStatus: 'Verified for Diet use', addToMealEligible: use.primaryActionEnabled, pendingVerification: false, pendingReason: use.primaryActionReason }; });
+    const reference = await listReferenceCatalogueFoods({ limit: 1000, offset: 0 });
+    const activeReferenceIds = new Set(foods.filter(food => food.id.startsWith('BATCH0_')).map(food => food.id));
+    const referenceItems = reference.rows.filter(row => !activeReferenceIds.has(row.id)).map(row => ({ id: row.id, catalogEntityId: row.id, displayName: row.display_name, aliases: row.common_names, category: row.food_category, subcategory: row.subcategory, family: null, roles: row.target_roles?.length ? row.target_roles : referenceRoles(row.food_category), mealHeads: [], ...referenceOperationalUse(row), entityType: String(row.reference_state).includes('PREPARED') ? 'PREPARED_DISH' : ['RAW', 'FLOUR', 'POWDERED'].some(x => String(row.reference_state).includes(x)) ? 'INGREDIENT_ONLY' : 'FOOD', foodState: row.reference_state, referenceState: row.reference_state, catalogueStatus: 'CATALOGUED_REFERENCE', nutritionStatus: 'REFERENCE_ONLY', generatorEligibility: 'INELIGIBLE', mealEligibility: 'NOT_ELIGIBLE', preparedEligibility: String(row.reference_state).includes('PREPARED') ? 'NOT_PRODUCTION_ACTIVE' : 'NOT_APPLICABLE', servings: [], defaultServing: null, nutritionPer100g: null, verificationStatus: row.verification_outcome ?? row.verification_status, verificationOutcome: row.verification_outcome ?? null, processingStatus: row.processing_status, processingVersion: row.processing_version, evidenceStatus: row.evidence_status, addToMealEligible: false, pendingVerification: true, pendingReason: row.verification_outcome === 'EXTERNAL_SOURCE_REQUIRED' ? 'Exact authoritative source and serving evidence are required before activation.' : 'This food is available in the Fiteatsy catalogue, but authoritative nutrition has not yet been verified for this preparation state.', sourceBatchId: row.source_batch_id }));
+    let combined = [...governedItems, ...(q.scope === 'ALL' ? referenceItems : [])].filter((item) => !term || [item.displayName, ...(item.aliases ?? [])].some((x) => x.toLowerCase().includes(term))).filter((item) => !q.category || item.category === q.category).filter((item) => !q.family || item.family === q.family).filter((item) => !q.referenceState || item.foodState === q.referenceState).filter((item) => !q.nutritionStatus || item.nutritionStatus === q.nutritionStatus || (q.nutritionStatus === 'NUTRITION_PENDING' && item.pendingVerification)).filter((item) => !q.generatorEligibility || item.generatorEligibility === q.generatorEligibility).filter((item) => !q.entityType || item.entityType === q.entityType).filter((item) => !q.componentRole || item.roles.includes(q.componentRole)).filter((item) => !q.dietClass || item.vegetarianClass === q.dietClass).filter((item) => (q.proteinMin == null || item.nutritionPer100g?.protein != null && Number(item.nutritionPer100g.protein) >= q.proteinMin) && (q.proteinMax == null || item.nutritionPer100g?.protein != null && Number(item.nutritionPer100g.protein) <= q.proteinMax) && (q.caloriesMin == null || item.nutritionPer100g?.kcal != null && Number(item.nutritionPer100g.kcal) >= q.caloriesMin) && (q.caloriesMax == null || item.nutritionPer100g?.kcal != null && Number(item.nutritionPer100g.kcal) <= q.caloriesMax)).sort((a, b) => a.displayName.localeCompare(b.displayName));
+    const facets = { roles: countsBy(combined, 'roles'), categories: countsBy(combined, 'category'), states: countsBy(combined, 'foodState'), nutritionStatuses: countsBy(combined, 'nutritionStatus'), generatorEligibility: countsBy(combined, 'generatorEligibility'), entityTypes: countsBy(combined, 'entityType'), operationalUseStates: countsBy(combined, 'operationalUseState') };
+    const totals = { catalogue: foods.filter(f => f.active).length + Number(reference.rows.length), scope: combined.length, nutritionVerified: combined.filter((x) => x.nutritionStatus === 'NUTRITION_VERIFIED').length, referenceOnly: combined.filter((x) => x.nutritionStatus === 'REFERENCE_ONLY').length, generatorEligible: combined.filter((x) => x.generatorEligibility === 'ELIGIBLE').length, preparedActive: combined.filter((x) => x.preparedEligibility === 'PRODUCTION_ACTIVE').length, nutritionPending: combined.filter((x) => x.pendingVerification).length };
+    const items = combined.slice(q.offset, q.offset + q.limit);
+    return { items, total: combined.length, totals, facets, limit: q.limit, offset: q.offset, hasMore: q.offset + q.limit < combined.length, scope: q.scope ?? 'RECOMMENDED' };
+}
+export function getGeneratorPoolReport(account) {
+    if (!roleAllowed(account))
+        throw new CommonFoodApiError('ROLE_NOT_ALLOWED', 403);
+    const eligible = foods.filter(f => f.active && f.generatorEligible && f.clientConsumable && ontologyFor(f).clientFacing);
+    return { total: eligible.length, byRole: countsBy(eligible, 'roles'), preparedDishes: eligible.filter(f => f.foodType === 'VALIDATED_RECIPE').length, referenceOnlyEligible: 0, catalogueSeparation: 'CATALOGUE_IDENTITY_NE_GENERATOR_ELIGIBILITY' };
+}
+export function getGeneratorConcentrationReport(account) {
+    if (!roleAllowed(account))
+        throw new CommonFoodApiError('ROLE_NOT_ALLOWED', 403);
+    const profiles = [
+        { diet: 'VEGETARIAN', allergies: [], intolerances: [], avoids: [], clinicalExclusions: [], dislikes: [], preferences: [] },
+        { diet: 'VEGETARIAN', allergies: [], intolerances: [], avoids: ['peanut'], clinicalExclusions: [], dislikes: [], preferences: ['fruit'] },
+        { diet: 'EGG', allergies: [], intolerances: [], avoids: [], clinicalExclusions: [], dislikes: ['tofu'], preferences: ['vegetable'] },
+        { diet: 'NON_VEGETARIAN', allergies: [], intolerances: [], avoids: [], clinicalExclusions: [], dislikes: [], preferences: ['protein'] },
+    ];
+    const targets = { EARLY_MORNING: { kcal: 170, protein: 10, kcalTolerance: 70, proteinTolerance: 10 }, BREAKFAST: { kcal: 420, protein: 26, kcalTolerance: 120, proteinTolerance: 15 }, MID_MORNING: { kcal: 190, protein: 10, kcalTolerance: 80, proteinTolerance: 10 }, LUNCH: { kcal: 560, protein: 34, kcalTolerance: 140, proteinTolerance: 18 }, EVENING_SNACK: { kcal: 220, protein: 14, kcalTolerance: 90, proteinTolerance: 12 }, DINNER: { kcal: 470, protein: 31, kcalTolerance: 130, proteinTolerance: 17 }, BEDTIME: { kcal: 130, protein: 8, kcalTolerance: 60, proteinTolerance: 8 } };
+    const appearances = new Map();
+    let generatedOptions = 0;
+    for (const context of profiles)
+        for (const mealHead of MEAL_HEADS) {
+            const result = generateMealCombinations({ foods, context, mealHead, target: targets[mealHead], rankingV3: true, semanticV1: true });
+            generatedOptions += result.options.length;
+            for (const option of result.options)
+                for (const component of option.components) {
+                    const current = appearances.get(component.foodId) ?? { food: component.foodDisplayNameSnapshot, appearances: 0, mealHeads: {} };
+                    current.appearances++;
+                    current.mealHeads[mealHead] = (current.mealHeads[mealHead] ?? 0) + 1;
+                    appearances.set(component.foodId, current);
+                }
+        }
+    const rows = [...appearances.values()].map(row => ({ ...row, percentageOfGeneratedOptions: generatedOptions ? Number((row.appearances * 100 / generatedOptions).toFixed(2)) : 0 })).sort((a, b) => b.appearances - a.appearances || a.food.localeCompare(b.food));
+    return { profiles: profiles.length, runs: profiles.length * MEAL_HEADS.length, generatedOptions, tracked: ['Tofu', 'Spinach', 'Broccoli', 'Cauliflower', 'Yoghurt', 'Peanuts'].map(name => rows.find(row => row.food.toLowerCase().includes(name.toLowerCase())) ?? { food: name, appearances: 0, percentageOfGeneratedOptions: 0, mealHeads: {} }), top20: rows.slice(0, 20) };
+}
+export async function getNutritionVerificationQueue(account) { if (!roleAllowed(account))
+    throw new CommonFoodApiError('ROLE_NOT_ALLOWED', 403); return listNutritionVerificationQueue(); }
+const publicFood = (f, mealHead) => { const serving = f.servings.find(x => x.isDefault) ?? f.servings[0]; return { id: f.id, catalogEntityId: f.id, displayName: f.displayName, aliases: f.aliases, category: f.category, family: f.family, roles: f.roles, mealHeads: f.mealHeads, mealEligibility: !mealHead || f.mealHeads.includes(mealHead) ? 'ELIGIBLE' : 'NOT_ELIGIBLE', servings: f.servings, defaultServing: serving ? { ...serving, nutrition: scaleNutrition(f.nutrientsPer100g, serving.grams) } : null, nutritionPer100g: f.nutrientsPer100g, ontology: ontologyFor(f) }; };
+export async function generateCommonFoodPlan(account, clientId, planId, mealHeads) {
+    const resolved = await resolveClientMealGenerationContext({ account, clientId, planId });
+    if (!resolved.supported)
+        return { ...resolved.capability, supported: false };
+    const started = performance.now();
+    const runId = crypto.randomUUID();
+    const meals = [];
+    const dailyUsage = emptyDailyFoodUsage();
+    const foodsById = new Map(foods.map(food => [food.id, food]));
+    for (const mealHead of mealHeads) {
+        const result = generateMealCombinations({ foods, context: resolved.context, mealHead, target: resolved.mealTargets[mealHead], dailyUsage, rankingV3: COMMON_FOOD_RANKING_V3_ENABLED, semanticV1: true });
+        meals.push({ mealHead, target: resolved.mealTargets[mealHead], coverage: result.shortage ?? { state: 'COMPLETE', available: result.options.length, required: 5, missing: 0 }, options: result.options.map(o => ({ ...o, optionHash: canonicalHash(o) })) });
+        if (result.options[0])
+            addCombinationToDailyUsage(dailyUsage, result.options[0].components, foodsById, mealHead);
+        await recordCommonFoodGeneration({ id: `${runId}:${mealHead}`, clientId: resolved.internalClientId, consultantId: resolved.consultantId, inputHash: result.inputHash, candidateCount: result.candidateCount, eligibleCount: result.eligibleFoodCount, options: result.options, shortages: result.shortage, durationMs: performance.now() - started });
+    }
+    return { generationRunId: runId, generatorVersion: 'COMMON_FOOD_COMBINATION_ENGINE_V1', rankingVersion: COMMON_FOOD_RANKING_V3_ENABLED ? COMMON_FOOD_RANKING_VERSION_V3 : 'COMMON_FOOD_RANKING_V2', templateVersion: 'INDIA_COMMON_MEAL_TEMPLATES_V2', catalogueVersion: 'NUTRITION_CATALOGUE_V1_1', planVersionId: resolved.planVersion.id, meals };
+}
+const governedValidationError = (error) => {
+    const code = error instanceof Error ? error.message : '';
+    if (code === 'UNSAFE_OR_INELIGIBLE_FOOD') {
+        throw new CommonFoodApiError(code, 422, 'The selected food is not eligible for this client and meal.');
+    }
+    if (code === 'SERVING_NOT_FOUND') {
+        throw new CommonFoodApiError(code, 422, 'The selected serving is not governed for this food.');
+    }
+    if (code === 'INVALID_SERVING_MULTIPLIER') {
+        throw new CommonFoodApiError(code, 422, 'The selected serving multiplier is outside the governed range.');
+    }
+    if (code === 'INVALID_MEAL_TEMPLATE') {
+        throw new CommonFoodApiError(code, 422, 'The selected components do not satisfy the governed meal template.');
+    }
+    throw error;
+};
+export async function validateCommonFoodOption(account, clientId, planId, input) { const r = await resolveClientMealGenerationContext({ account, clientId, planId, mealHead: input.mealHead }); if (!r.supported)
+    throw new CommonFoodApiError(r.capability.code, 422, r.capability.reason); try {
+    const option = validateManualCombination({ foods, context: r.context, mealHead: input.mealHead, components: input.components, target: r.mealTargets[input.mealHead] });
+    const quality = validateMealQuality({ components: option.components, foods: new Map(foods.map(food => [food.id, food])), mealHead: input.mealHead, nutrition: option.nutrition, target: r.mealTargets[input.mealHead] });
+    if (!quality.eligible)
+        throw new CommonFoodApiError('MEAL_QUALITY_SANITY_FAILED', 422, quality.reasons.join(', '));
+    return { ...option, mealQuality: quality, mealHead: input.mealHead, optionHash: option.snapshotHash, planVersionId: r.planVersion.id };
+}
+catch (error) {
+    return governedValidationError(error);
+} }
+export async function persistValidatedOption(account, clientId, planId, input) { const validated = await validateCommonFoodOption(account, clientId, planId, input); if (validated.planVersionId !== input.expectedPlanVersionId)
+    throw new CommonFoodApiError('STALE_PLAN_VERSION', 409); const logicalOptionId = input.optionId ?? crypto.randomUUID(); const prior = input.optionId ? await getCombinationOption(input.optionId, planId) : null; const snapshotId = crypto.randomUUID(); const snapshot = { combinationId: logicalOptionId, mealHead: input.mealHead, components: validated.components, nutrition: validated.nutrition, templateId: `TPL_${input.mealHead}`, templateVersion: 'INDIA_COMMON_MEAL_TEMPLATES_V2', generatorVersion: 'COMMON_FOOD_COMBINATION_ENGINE_V1', rankingVersion: 'COMMON_FOOD_RANKING_V1', diversitySignature: canonicalHash(validated.components.map(x => x.foodId).sort()).slice(0, 24), preferenceScore: 0, nutritionScore: 0, overallScore: 0, warnings: validated.nutrition.fibre === null ? ['FIBRE_NOT_REPORTED_NO_FIBRE_CLAIM'] : [], shortages: [], optionHash: canonicalHash({ logicalOptionId, version: (prior?.snapshotVersion ?? 0) + 1, validated }), snapshotVersion: (prior?.snapshotVersion ?? 0) + 1 }; try {
+    await saveCombinationOption({ id: snapshotId, logicalOptionId, supersedesId: null, planId, planVersionId: validated.planVersionId, expectedPlanVersionId: input.expectedPlanVersionId, mealHead: input.mealHead, snapshot });
+}
+catch (e) {
+    if (e.code === 'STALE_PLAN_VERSION')
+        throw new CommonFoodApiError('STALE_PLAN_VERSION', 409);
+    throw e;
+} return snapshot; }
+export const assertExactCommonFoodSelection = (options) => {
+    const invalidMeal = MEAL_HEADS.find(head => options.filter(option => option.mealHead === head).length !== 5);
+    if (options.length !== 35 || new Set(options.map(option => option.optionId)).size !== 35 || invalidMeal)
+        throw new CommonFoodApiError('INVALID_OPTION_SELECTION', 422, 'Exactly five distinct options must be selected for every meal.');
+};
+export async function replaceSelectedCommonFoodOptions(account, clientId, planId, input) {
+    assertExactCommonFoodSelection(input.options);
+    const snapshots = [];
+    for (const option of input.options) {
+        const validated = await validateCommonFoodOption(account, clientId, planId, option);
+        if (validated.planVersionId !== input.expectedPlanVersionId)
+            throw new CommonFoodApiError('STALE_PLAN_VERSION', 409);
+        snapshots.push({ combinationId: option.optionId, mealHead: option.mealHead, components: validated.components, nutrition: validated.nutrition, templateId: `TPL_${option.mealHead}`, templateVersion: 'INDIA_COMMON_MEAL_TEMPLATES_V2', generatorVersion: 'COMMON_FOOD_COMBINATION_ENGINE_V1', rankingVersion: 'COMMON_FOOD_RANKING_V1', diversitySignature: canonicalHash(validated.components.map(item => item.foodId).sort()).slice(0, 24), preferenceScore: 0, nutritionScore: 0, overallScore: 0, warnings: validated.nutrition.fibre === null ? ['FIBRE_NOT_REPORTED_NO_FIBRE_CLAIM'] : [], shortages: [], optionHash: canonicalHash({ optionId: option.optionId, validated }), snapshotVersion: 1 });
+    }
+    try {
+        return { planVersionId: input.expectedPlanVersionId, options: await replaceCombinationOptionSelection({ planId, planVersionId: input.expectedPlanVersionId, expectedPlanVersionId: input.expectedPlanVersionId, options: snapshots }) };
+    }
+    catch (error) {
+        if (error.code === 'STALE_PLAN_VERSION')
+            throw new CommonFoodApiError('STALE_PLAN_VERSION', 409);
+        throw error;
+    }
+}
+export async function mutateCommonFoodOption(account, clientId, planId, optionId, expectedPlanVersionId, mutator, draft) { await resolveClientMealGenerationContext({ account, clientId, planId }); const old = await getCombinationOption(optionId, planId); if (!old && !draft)
+    throw new CommonFoodApiError('OPTION_NOT_FOUND', 404); const before = (old?.components ?? draft.components).map(x => ({ foodId: x.foodId, servingId: x.servingId, multiplier: x.multiplier })), after = mutator(before); if (after.length === before.length) {
+    const changed = after.map((x, i) => [before[i], x]).filter(([a, b]) => a.foodId !== b.foodId);
+    for (const [a, b] of changed) {
+        const oldFood = foods.find(f => f.id === a.foodId), newFood = foods.find(f => f.id === b.foodId);
+        if (!oldFood || !newFood || ontologyFor(oldFood).primaryRole !== ontologyFor(newFood).primaryRole)
+            throw new CommonFoodApiError('COMPONENT_ROLE_MISMATCH', 422, 'Replacement must preserve the structured meal component role.');
+    }
+} return persistValidatedOption(account, clientId, planId, { optionId, expectedPlanVersionId, mealHead: old?.mealHead ?? draft.mealHead, components: after }); }
+export async function autoBalanceCommonFoodOption(account, clientId, planId, optionId, input) { const resolved = await resolveClientMealGenerationContext({ account, clientId, planId }); const old = await getCombinationOption(optionId, planId); if (!old)
+    throw new CommonFoodApiError('OPTION_NOT_FOUND', 404); let current = old.components.map(x => ({ foodId: x.foodId, servingId: x.servingId, multiplier: x.multiplier })); const target = resolved.mealTargets[old.mealHead]; const distance = (n) => Math.abs((n.kcal ?? target.kcal) - target.kcal) / Math.max(1, target.kcalTolerance) + Math.abs((n.protein ?? target.protein) - target.protein) / Math.max(1, target.proteinTolerance); let validated = validateManualCombination({ foods, context: resolved.context, mealHead: old.mealHead, components: current, target }); for (let index = 0; index < current.length; index++) {
+    if (input.lockedFoodIds.includes(current[index].foodId))
+        continue;
+    const food = foods.find(f => f.id === current[index].foodId), serving = food?.servings.find(s => s.id === current[index].servingId);
+    if (!serving)
+        continue;
+    let best = current[index], bestDistance = distance(validated.nutrition);
+    for (const multiplier of serving.allowedMultipliers) {
+        const candidate = current.map((x, i) => i === index ? { ...x, multiplier } : x);
+        try {
+            const result = validateManualCombination({ foods, context: resolved.context, mealHead: old.mealHead, components: candidate, target });
+            const quality = validateMealQuality({ components: result.components, foods: new Map(foods.map(f => [f.id, f])), mealHead: old.mealHead, nutrition: result.nutrition, target });
+            const nextDistance = distance(result.nutrition);
+            if (quality.eligible && nextDistance < bestDistance) {
+                best = candidate[index];
+                bestDistance = nextDistance;
+            }
+        }
+        catch {
+            continue;
+        }
+    }
+    current = current.map((x, i) => i === index ? best : x);
+    validated = validateManualCombination({ foods, context: resolved.context, mealHead: old.mealHead, components: current, target });
+} return persistValidatedOption(account, clientId, planId, { optionId, expectedPlanVersionId: input.expectedPlanVersionId, mealHead: old.mealHead, components: current }); }
+export async function reloadCommonFoodOptions(account, clientId, planId) { const r = await resolveClientMealGenerationContext({ account, clientId, planId }); return { planVersionId: r.planVersion.id, options: (await listCombinationOptions(planId, r.planVersion.id)).filter(Boolean) }; }
+export const commonFoodCatalogue = foods;

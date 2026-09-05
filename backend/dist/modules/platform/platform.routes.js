@@ -3,16 +3,28 @@ import { z } from 'zod';
 import { assignConsultant, getHealthProfileBundle, listCareCaseEvents, listCareCaseTickets, listCareCaseTimeline, listClientNotifications, requestMissingInformation, upsertHealthProfile, } from './platform.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { getCareCaseById } from './platform.store.js';
+const ageFromDob = (value) => {
+    const dob = new Date(value);
+    const now = new Date();
+    let age = now.getFullYear() - dob.getFullYear();
+    if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) {
+        age -= 1;
+    }
+    return age;
+};
 const healthProfilePatchSchema = z.object({
-    dateOfBirthISO: z.string().datetime().optional(),
+    dateOfBirthISO: z.string().datetime().refine((value) => {
+        const age = ageFromDob(value);
+        return age >= 10 && age <= 120;
+    }, 'Age must be between 10 and 120 years.').optional(),
     gender: z.string().trim().min(1).optional(),
-    heightCm: z.number().positive().optional(),
-    currentWeightKg: z.number().positive().optional(),
-    goalWeightKg: z.number().positive().optional(),
-    waistCm: z.number().positive().optional(),
-    hipCm: z.number().positive().optional(),
-    neckCm: z.number().positive().optional(),
-    bodyFatPct: z.number().positive().optional(),
+    heightCm: z.number().min(100).max(250).optional(),
+    currentWeightKg: z.number().min(20).max(300).optional(),
+    goalWeightKg: z.number().min(20).max(300).optional(),
+    waistCm: z.number().min(40).max(220).optional(),
+    hipCm: z.number().min(40).max(220).optional(),
+    neckCm: z.number().min(20).max(80).optional(),
+    bodyFatPct: z.number().min(2).max(75).optional(),
     occupation: z.string().trim().optional(),
     workingHoursLabel: z.string().trim().optional(),
     shiftType: z.string().trim().optional(),
@@ -21,6 +33,7 @@ const healthProfilePatchSchema = z.object({
     travelFrequency: z.string().trim().optional(),
     dietType: z.string().trim().optional(),
     regionalCuisine: z.string().trim().optional(),
+    preferredCuisines: z.array(z.string().trim()).optional(),
     foodsLiked: z.array(z.string().trim()).optional(),
     foodsDisliked: z.array(z.string().trim()).optional(),
     foodAllergies: z.array(z.string().trim()).optional(),
@@ -32,13 +45,32 @@ const healthProfilePatchSchema = z.object({
     lunchTime: z.string().trim().optional(),
     dinnerTime: z.string().trim().optional(),
     sleepTime: z.string().trim().optional(),
-    mealsPerDay: z.number().int().positive().optional(),
-    waterIntakeLiters: z.number().positive().optional(),
+    mealsPerDay: z.number().int().min(1).max(8).optional(),
+    waterIntakeLiters: z.number().min(0.5).max(10).optional(),
+    sleepHours: z.number().min(0).max(16).optional(),
+    sleepGoalHours: z.number().min(4).max(12).optional(),
+    sleepQualityLabel: z.string().trim().optional(),
     outsideFoodFrequency: z.string().trim().optional(),
     cookingAtHome: z.string().trim().optional(),
     whoCooks: z.string().trim().optional(),
+    smokingStatus: z.string().trim().optional(),
+    alcoholFrequency: z.string().trim().optional(),
+    exerciseFrequency: z.string().trim().optional(),
+    stressLevelLabel: z.string().trim().optional(),
     primaryConditions: z.array(z.string().trim()).optional(),
+    previousConditions: z.array(z.string().trim()).optional(),
+    familyHistoryConditions: z.array(z.string().trim()).optional(),
     wellnessGoals: z.array(z.string().trim()).optional(),
+    medicalNotes: z.string().trim().optional(),
+    pregnancyStatus: z.string().trim().optional(),
+    breastfeedingStatus: z.string().trim().optional(),
+    pcosStatus: z.string().trim().optional(),
+    thyroidStatus: z.string().trim().optional(),
+    diabetesStatus: z.string().trim().optional(),
+    hypertensionStatus: z.string().trim().optional(),
+    cholesterolStatus: z.string().trim().optional(),
+    heartConditionStatus: z.string().trim().optional(),
+    previousSurgeries: z.array(z.string().trim()).optional(),
     assignedConsultantId: z.string().trim().optional(),
     assignedMentorId: z.string().trim().optional(),
 });

@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 const healthAppsByPlatform = {
     ios: [
         { id: 'apple-health', label: 'Apple Health', subtitle: 'iPhone wellness and activity data', brand: 'Apple' },
@@ -26,8 +25,6 @@ const supportedMetricsByApp = {
     'samsung-health': new Set(['sleep', 'heart_rate', 'hrv', 'calories', 'workouts', 'stress', 'spo2']),
     fitbit: new Set(['sleep', 'heart_rate', 'hrv', 'calories', 'workouts', 'stress', 'respiratory_rate'])
 };
-const connections = new Map();
-const recordsByConnectionId = new Map();
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const getBrandForApp = (platform, appId) => {
     const app = healthAppsByPlatform[platform].find((item) => item.id === appId);
@@ -39,41 +36,17 @@ export const connectHealthApp = (params) => {
     if (!app) {
         throw new Error('app_not_supported');
     }
-    const existing = Array.from(connections.values()).find((item) => item.userId === params.userId && item.appId === params.appId && item.platform === params.platform);
-    const connection = existing
-        ? { ...existing, status: 'connected' }
-        : {
-            id: `conn-${randomUUID()}`,
-            userId: params.userId,
-            appId: app.id,
-            appName: app.label,
-            platform: params.platform,
-            provider: providerLabel[app.brand],
-            connectedAtISO: new Date().toISOString(),
-            status: 'connected'
-        };
-    connections.set(connection.id, connection);
-    if (!recordsByConnectionId.has(connection.id)) {
-        recordsByConnectionId.set(connection.id, []);
-    }
-    return connection;
-};
-export const getConnections = (userId) => Array.from(connections.values())
-    .filter((item) => item.userId === userId)
-    .sort((a, b) => +new Date(b.connectedAtISO) - +new Date(a.connectedAtISO));
-export const ingestHealthRecords = (params) => {
-    const connection = connectHealthApp({ userId: params.userId, appId: params.appId, platform: params.platform });
-    const current = recordsByConnectionId.get(connection.id) ?? [];
-    const merged = [...params.records, ...current]
-        .filter((item) => Number.isFinite(item.value) && !Number.isNaN(+new Date(item.recordedAtISO)))
-        .slice(0, 5000);
-    recordsByConnectionId.set(connection.id, merged);
-    return {
-        connectionId: connection.id,
-        ingestedCount: params.records.length,
-        totalStored: merged.length,
-        latestRecordedAtISO: merged[0]?.recordedAtISO ?? null
+    const connection = {
+        id: `canonical-${params.userId}-${params.platform}-${params.appId}`,
+        userId: params.userId,
+        appId: app.id,
+        appName: app.label,
+        platform: params.platform,
+        provider: providerLabel[app.brand],
+        connectedAtISO: new Date().toISOString(),
+        status: 'connected'
     };
+    return connection;
 };
 const aggregateLiveMetrics = (records) => {
     const now = Date.now();
@@ -105,12 +78,12 @@ const aggregateLiveMetrics = (records) => {
                     ? 'ovulation_window'
                     : 'luteal';
     return {
-        heartRateAvg: resting == null ? 0 : Math.round(clamp(resting, 48, 115)),
-        sleepHours: sleepMinutes > 0 ? Number(clamp(sleepMinutes / 60, 0, 10).toFixed(1)) : 0,
-        hydrationLiters: hydrationMl > 0 ? Number(clamp(hydrationMl / 1000, 0, 5.5).toFixed(1)) : 0,
-        focusMinutes: Math.round(clamp(focusMinutes ?? 0, 0, 120)),
-        breathingMinutes: Math.round(clamp(breathingMinutes, 0, 60)),
-        movementMinutes: Math.round(clamp(activeMinutes, 0, 180)),
+        heartRateAvg: resting == null ? null : Math.round(clamp(resting, 48, 115)),
+        sleepHours: sleepMinutes > 0 ? Number(clamp(sleepMinutes / 60, 0, 10).toFixed(1)) : null,
+        hydrationLiters: hydrationMl > 0 ? Number(clamp(hydrationMl / 1000, 0, 5.5).toFixed(1)) : null,
+        focusMinutes: focusMinutes == null ? null : Math.round(clamp(focusMinutes, 0, 120)),
+        breathingMinutes: breathingMinutes > 0 ? Math.round(clamp(breathingMinutes, 0, 60)) : null,
+        movementMinutes: activeMinutes > 0 ? Math.round(clamp(activeMinutes, 0, 180)) : null,
         hrvMs: hrv == null ? null : Math.round(clamp(hrv, 10, 180)),
         caloriesKcal: calories > 0 ? Math.round(clamp(calories, 20, 7000)) : null,
         workoutMinutes: workoutMinutes > 0 ? Math.round(clamp(workoutMinutes, 1, 360)) : null,
@@ -121,15 +94,9 @@ const aggregateLiveMetrics = (records) => {
     };
 };
 export const buildLiveSyncPayload = (params) => {
-    const pool = getConnections(params.userId).filter((item) => item.status === 'connected');
-    const connection = params.appId
-        ? pool.find((item) => item.appId === params.appId && (!params.platform || item.platform === params.platform))
-        : pool[0];
-    if (!connection) {
-        throw new Error('connection_not_found');
-    }
+    const connection = connectHealthApp(params);
     const brand = getBrandForApp(connection.platform, connection.appId);
-    const records = recordsByConnectionId.get(connection.id) ?? [];
+    const records = params.records;
     if (records.length === 0) {
         throw new Error('insufficient_data');
     }
@@ -176,6 +143,5 @@ export const buildLiveSyncPayload = (params) => {
     return { connection, payload };
 };
 export const resetWearablesStateForTests = () => {
-    connections.clear();
-    recordsByConnectionId.clear();
+    // Legacy process-memory state was removed. Canonical test cleanup is database-backed.
 };

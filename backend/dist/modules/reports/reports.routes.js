@@ -7,9 +7,10 @@ import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/au
 import { createProcessingJob, updateProcessingJobStatus } from '../processing/processing-jobs.repository.js';
 import { persistReportIntelligence } from './report-intelligence.pipeline.js';
 import { documentHash } from './report-governance.js';
-import { sanitizeReportAnalysisForPublic } from './report-response.js';
+import { sanitizeReportAnalysisForPublic, sanitizeReportErrorForPublic } from './report-response.js';
 import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
 import { clearHealthScoresForOwner } from '../intelligence/health-scores.repository.js';
+import { buildReportComparison, sortAnalysableReports } from './report-comparison.js';
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 12 * 1024 * 1024 }
@@ -37,7 +38,7 @@ const toReportDto = (record) => {
         source: record.source,
         createdAtISO: record.createdAtISO,
         updatedAtISO: record.updatedAtISO,
-        error: record.error,
+        error: sanitizeReportErrorForPublic(record.error),
         analysisVersion: record.analysisVersion,
         document: analysis?.document,
         qualityGate: analysis?.qualityGate,
@@ -76,6 +77,13 @@ const logReportRuntime = (event, payload) => {
 const logReanalysisStage = (payload) => {
     logReportRuntime('REANALYSIS_STAGE', payload);
 };
+export const finalizeReportAfterIntelligence = async (input) => {
+    const saved = await input.attach();
+    const selectedAnalysis = saved?.analysis ?? input.analysis;
+    const intelligence = await input.persist(selectedAnalysis);
+    const completed = await input.finalize(saved?.selectedStatus ?? 'INSUFFICIENT_DATA', saved?.error);
+    return { saved, selectedAnalysis, intelligence, completed };
+};
 const analyzeAndPersistReport = async (input) => {
     logReportRuntime('processing:start', {
         reportId: input.reportId,
@@ -113,9 +121,12 @@ const analyzeAndPersistReport = async (input) => {
         status: 'VALIDATION_COMPLETED',
         validationConfidence: analysis.qualityGate.validationConfidence
     });
-    const saved = await attachReportAnalysis(input.reportId, analysis, input.analysisMode ?? 'standard');
-    const selectedAnalysis = saved?.analysis ?? analysis;
-    const intelligence = await persistReportIntelligence(input.owner, input.reportId, selectedAnalysis);
+    const { saved, selectedAnalysis, intelligence, completed } = await finalizeReportAfterIntelligence({
+        analysis,
+        attach: () => attachReportAnalysis(input.reportId, analysis, input.analysisMode ?? 'standard', true),
+        persist: (selected) => persistReportIntelligence(input.owner, input.reportId, selected),
+        finalize: (status, error) => updateReportStatus(input.reportId, status, error)
+    });
     logReportRuntime('processing:status', {
         reportId: input.reportId,
         status: 'SELECTED_ANALYSIS_PERSISTED',
@@ -131,7 +142,7 @@ const analyzeAndPersistReport = async (input) => {
     });
     logReportRuntime('processing:completed', {
         reportId: input.reportId,
-        status: saved?.status,
+        status: completed?.status,
         observationCount: intelligence.observations.length,
         scoreCount: intelligence.scores.length,
         qualityGate: selectedAnalysis.qualityGate.status
@@ -143,7 +154,7 @@ const analyzeAndPersistReport = async (input) => {
     const publicAnalysis = sanitizeReportAnalysisForPublic(selectedAnalysis);
     return {
         reportId: saved?.id,
-        status: saved?.status,
+        status: completed?.status,
         biomarkerObservations: intelligence.observations,
         healthScores: intelligence.scores.map((score) => ({
             scoreType: score.scoreType,
@@ -200,6 +211,14 @@ reportsRouter.get('/', async (req, res) => {
     const page = items.slice(offset, offset + limit).map(toReportDto);
     return res.status(200).json({ total: items.length, limit, offset, items: page });
 });
+reportsRouter.get('/comparison/current', async (req, res) => {
+    const owner = currentOwner(getAuthenticatedAccount(req));
+    const reports = sortAnalysableReports(await listReports(reportOwner(owner)));
+    if (reports.length < 2) {
+        return res.status(404).json({ error: 'REPORT_COMPARISON_NOT_AVAILABLE', message: 'Two analysed reports are required.' });
+    }
+    return res.status(200).json(buildReportComparison(reports[0], reports[1]));
+});
 reportsRouter.get('/:reportId', async (req, res) => {
     const owner = currentOwner(getAuthenticatedAccount(req));
     const report = await getReport(req.params.reportId);
@@ -224,7 +243,7 @@ reportsRouter.get('/:reportId/status', async (req, res) => {
         reportId: report.id,
         status: report.status,
         updatedAtISO: report.updatedAtISO,
-        error: report.error,
+        error: sanitizeReportErrorForPublic(report.error),
         document: analysis?.document,
         qualityGate: analysis?.qualityGate,
         healthAssessment: analysis?.healthAssessment,
@@ -438,7 +457,10 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
         logReportRuntime('reanalysis:failed', { reportId: report.id, processingJobId: processingJob.id, message });
         await updateReportStatus(report.id, 'REVIEW_REQUIRED', message);
         await updateProcessingJobStatus(processingJob.id, 'failed', message);
-        return res.status(422).json({ error: 'REANALYSIS_FAILED', message });
+        return res.status(422).json({
+            error: 'REANALYSIS_FAILED',
+            message: sanitizeReportErrorForPublic(message)
+        });
     }
 });
 reportsRouter.get('/:reportId/comparison', async (req, res) => {
@@ -455,35 +477,13 @@ reportsRouter.get('/:reportId/comparison', async (req, res) => {
     if (!ownsReport(previous, owner)) {
         return res.status(404).json({ error: 'PREVIOUS_REPORT_NOT_FOUND', message: 'Previous report not found.' });
     }
-    if (!current.analysis || !previous.analysis) {
-        return res.status(409).json({ error: 'ANALYSIS_NOT_READY', message: 'Both reports must have completed analysis.' });
+    try {
+        return res.status(200).json(buildReportComparison(current, previous));
     }
-    if (current.analysis.score == null || previous.analysis.score == null) {
-        return res.status(409).json({ error: 'ANALYSIS_NOT_PUBLISHED', message: 'Both reports must pass the quality gate before comparison.' });
+    catch (error) {
+        const code = error instanceof Error ? error.message : 'REPORT_COMPARISON_INVALID';
+        return res.status(409).json({ error: code, message: 'These reports cannot be compared.' });
     }
-    const currentAnalysis = sanitizeReportAnalysisForPublic(current.analysis);
-    const previousAnalysis = sanitizeReportAnalysisForPublic(previous.analysis);
-    const scoreDelta = currentAnalysis.score - previousAnalysis.score;
-    const currentAbnormal = currentAnalysis.parameters.filter((item) => item.status !== 'normal').length;
-    const previousAbnormal = previousAnalysis.parameters.filter((item) => item.status !== 'normal').length;
-    const abnormalDelta = currentAbnormal - previousAbnormal;
-    return res.status(200).json({
-        currentReportId: current.id,
-        previousReportId: previous.id,
-        scoreDelta,
-        abnormalDelta,
-        summary: scoreDelta > 0
-            ? `Recovery trend is improving by ${scoreDelta} points compared with the previous report.`
-            : scoreDelta < 0
-                ? `Recovery score dropped by ${Math.abs(scoreDelta)} points; review adherence and follow-up recommendations.`
-                : 'Recovery score is unchanged; continue routine and monitor follow-up markers.',
-        details: {
-            currentScore: currentAnalysis.score,
-            previousScore: previousAnalysis.score,
-            currentAbnormal,
-            previousAbnormal
-        }
-    });
 });
 reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, res) => {
     let currentReportId = null;
@@ -588,7 +588,7 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
         }
         return res.status(422).json({
             error: 'ANALYSIS_START_FAILED',
-            message
+            message: sanitizeReportErrorForPublic(message)
         });
     }
 });
@@ -681,7 +681,7 @@ reportsRouter.post('/analyze', upload.single('reportFile'), async (req, res) => 
         }
         return res.status(422).json({
             error: 'ANALYSIS_FAILED',
-            message
+            message: sanitizeReportErrorForPublic(message)
         });
     }
 });

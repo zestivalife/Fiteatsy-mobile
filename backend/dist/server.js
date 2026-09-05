@@ -12,17 +12,80 @@ import { wearablesRouter } from './modules/wearables/wearables.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { reportsRouter } from './modules/reports/reports.routes.js';
 import { platformRouter } from './modules/platform/platform.routes.js';
+import { profileRouter } from './modules/profile/profile.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { biomarkersRouter } from './modules/biomarkers/biomarkers.routes.js';
-import { consultantsRouter } from './modules/consultants/consultants.routes.js';
+import { consultantWorkspaceContractRouter, consultantsRouter } from './modules/consultants/consultants.routes.js';
+import { consultantNutritionRouter, platformNutritionRouter } from './modules/nutrition/nutrition.routes.js';
+import { medicationsRouter } from './modules/medications/medications.routes.js';
+import { assessmentsRouter } from './modules/assessments/assessments.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
+import { professionalAssignmentsRouter } from './modules/professional-assignments/professional-assignments.routes.js';
+import { delegatedRouter } from './modules/admin/delegated.routes.js';
+import { paymentsRouter, razorpayWebhookRouter, subscriptionsRouter } from './modules/subscriptions/subscriptions.routes.js';
 import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.service.js';
 import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
+const REGISTERED_ROUTE_GROUPS = [
+    'GET /',
+    'GET /health',
+    'GET /ready',
+    'GET /v1/version',
+    '/v1/intelligence',
+    '/v1/checkins',
+    '/v1/nudges',
+    '/v1/employer',
+    '/v1/wearables',
+    '/v1/auth',
+    '/v1/reports',
+    '/v1/health',
+    '/v1/biomarkers',
+    '/v1/consultants',
+    '/v1/consultants/medication-exceptions',
+    '/v1/clients',
+    '/v1/consultants/*/diet-plans',
+    '/v1/admin',
+    '/v1/admin/qa-identities',
+    '/v1/internal/delegated',
+    '/v1/subscriptions',
+    '/v1/payments',
+    '/v1/webhooks/razorpay',
+    '/v1/platform',
+    '/v1/platform/medications',
+    '/v1/platform/nutrition-plan',
+    '/v1/assessments',
+    '/v1/profile'
+];
+const logStartupRoutes = () => {
+    console.log('Fiteatsy backend startup', {
+        service: env.serviceName,
+        version: env.version,
+        environment: env.environment,
+        gitCommit: env.gitCommit,
+        routeGroups: REGISTERED_ROUTE_GROUPS
+    });
+};
 export const createApp = (options = {}) => {
     const app = express();
     const readinessCheck = options.readinessCheck ?? checkDatabaseReadiness;
+    const parseDietDraftUpdate = express.json({ limit: '512kb' });
     app.use(cors());
+    app.use('/v1/webhooks', razorpayWebhookRouter);
+    app.use('/v1/consultants/clients/:clientId/diet-plans/:dietPlanId', (req, res, next) => {
+        if (req.method !== 'PATCH')
+            return next();
+        return parseDietDraftUpdate(req, res, next);
+    });
     app.use(express.json());
+    app.get('/', (_req, res) => {
+        res.json({
+            ok: true,
+            service: env.serviceName,
+            version: env.version,
+            environment: env.environment,
+            git_commit: env.gitCommit,
+            route_groups: REGISTERED_ROUTE_GROUPS
+        });
+    });
     app.get('/health', (_req, res) => {
         res.json({ ok: true, service: env.serviceName });
     });
@@ -75,8 +138,18 @@ export const createApp = (options = {}) => {
     app.use('/v1/health', healthRouter);
     app.use('/v1/biomarkers', biomarkersRouter);
     app.use('/v1/consultants', consultantsRouter);
+    app.use('/v1/consultants', consultantNutritionRouter);
+    app.use('/v1/clients', consultantWorkspaceContractRouter);
     app.use('/v1/admin', adminRouter);
+    app.use('/v1/professional-assignments', professionalAssignmentsRouter);
+    app.use('/v1/internal/delegated', delegatedRouter);
+    app.use('/v1/subscriptions', subscriptionsRouter);
+    app.use('/v1/payments', paymentsRouter);
+    app.use('/v1/platform/medications', medicationsRouter);
     app.use('/v1/platform', platformRouter);
+    app.use('/v1/platform', platformNutritionRouter);
+    app.use('/v1/assessments', assessmentsRouter);
+    app.use('/v1/profile', profileRouter);
     app.use((error, _req, res, _next) => {
         const message = error instanceof Error ? error.message : 'Internal server error';
         return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message });
@@ -102,6 +175,7 @@ export const initializeBackend = async () => {
 };
 export const startServer = async () => {
     await initializeBackend();
+    logStartupRoutes();
     return app.listen(env.port, () => {
         console.log(`Fiteatsy backend listening on ${env.port}`);
     });

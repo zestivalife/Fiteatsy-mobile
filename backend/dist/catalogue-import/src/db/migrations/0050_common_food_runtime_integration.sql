@@ -1,0 +1,11 @@
+begin;
+alter table common_food_generation_runs add column if not exists meal_head text;
+alter table common_food_generation_runs add column if not exists coverage_status text;
+alter table diet_plan_combination_options add column if not exists logical_option_id text;
+alter table diet_plan_combination_options add column if not exists supersedes_id text references diet_plan_combination_options(id);
+update diet_plan_combination_options set logical_option_id=id where logical_option_id is null;
+alter table diet_plan_combination_options alter column logical_option_id set not null;
+create index if not exists common_food_generation_run_meal_idx on common_food_generation_runs(client_id,meal_head,created_at desc);
+create index if not exists diet_plan_combination_reload_idx on diet_plan_combination_options(diet_plan_id,diet_plan_version_id,created_at,id);
+create unique index if not exists diet_plan_combination_logical_version_uq on diet_plan_combination_options(logical_option_id,version);
+commit;

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
+import { syncLegacyProfessionalAssignment } from '../professional-assignments/professional-assignments.repository.js';
 const nowIso = () => new Date().toISOString();
 const toIso = (value) => {
     if (value == null)
@@ -50,6 +51,7 @@ const mapHealthProfile = (row) => ({
     travelFrequency: row.travel_frequency == null ? null : String(row.travel_frequency),
     dietType: row.diet_type == null ? null : String(row.diet_type),
     regionalCuisine: row.regional_cuisine == null ? null : String(row.regional_cuisine),
+    preferredCuisines: toStringArray(row.preferred_cuisines),
     foodsLiked: toStringArray(row.foods_liked),
     foodsDisliked: toStringArray(row.foods_disliked),
     foodAllergies: toStringArray(row.food_allergies),
@@ -63,11 +65,30 @@ const mapHealthProfile = (row) => ({
     sleepTime: row.sleep_time == null ? null : String(row.sleep_time),
     mealsPerDay: row.meals_per_day == null ? null : Number(row.meals_per_day),
     waterIntakeLiters: toNumberOrNull(row.water_intake_liters),
+    sleepHours: toNumberOrNull(row.sleep_hours),
+    sleepGoalHours: toNumberOrNull(row.sleep_goal_hours),
+    sleepQualityLabel: row.sleep_quality_label == null ? null : String(row.sleep_quality_label),
     outsideFoodFrequency: row.outside_food_frequency == null ? null : String(row.outside_food_frequency),
     cookingAtHome: row.cooking_at_home == null ? null : String(row.cooking_at_home),
     whoCooks: row.who_cooks == null ? null : String(row.who_cooks),
+    smokingStatus: row.smoking_status == null ? null : String(row.smoking_status),
+    alcoholFrequency: row.alcohol_frequency == null ? null : String(row.alcohol_frequency),
+    exerciseFrequency: row.exercise_frequency == null ? null : String(row.exercise_frequency),
+    stressLevelLabel: row.stress_level_label == null ? null : String(row.stress_level_label),
     primaryConditions: toStringArray(row.primary_conditions),
+    previousConditions: toStringArray(row.previous_conditions),
+    familyHistoryConditions: toStringArray(row.family_history_conditions),
     wellnessGoals: toStringArray(row.wellness_goals),
+    medicalNotes: row.medical_notes == null ? null : String(row.medical_notes),
+    pregnancyStatus: row.pregnancy_status == null ? null : String(row.pregnancy_status),
+    breastfeedingStatus: row.breastfeeding_status == null ? null : String(row.breastfeeding_status),
+    pcosStatus: row.pcos_status == null ? null : String(row.pcos_status),
+    thyroidStatus: row.thyroid_status == null ? null : String(row.thyroid_status),
+    diabetesStatus: row.diabetes_status == null ? null : String(row.diabetes_status),
+    hypertensionStatus: row.hypertension_status == null ? null : String(row.hypertension_status),
+    cholesterolStatus: row.cholesterol_status == null ? null : String(row.cholesterol_status),
+    heartConditionStatus: row.heart_condition_status == null ? null : String(row.heart_condition_status),
+    previousSurgeries: toStringArray(row.previous_surgeries),
     assignedConsultantId: row.assigned_consultant_id == null ? null : String(row.assigned_consultant_id),
     assignedMentorId: row.assigned_mentor_id == null ? null : String(row.assigned_mentor_id),
     ...mapAuditFields(row)
@@ -167,6 +188,7 @@ const buildHealthProfileDefaults = (owner) => ({
     travelFrequency: null,
     dietType: null,
     regionalCuisine: null,
+    preferredCuisines: [],
     foodsLiked: [],
     foodsDisliked: [],
     foodAllergies: [],
@@ -180,11 +202,30 @@ const buildHealthProfileDefaults = (owner) => ({
     sleepTime: null,
     mealsPerDay: null,
     waterIntakeLiters: null,
+    sleepHours: null,
+    sleepGoalHours: null,
+    sleepQualityLabel: null,
     outsideFoodFrequency: null,
     cookingAtHome: null,
     whoCooks: null,
+    smokingStatus: null,
+    alcoholFrequency: null,
+    exerciseFrequency: null,
+    stressLevelLabel: null,
     primaryConditions: [],
+    previousConditions: [],
+    familyHistoryConditions: [],
     wellnessGoals: [],
+    medicalNotes: null,
+    pregnancyStatus: null,
+    breastfeedingStatus: null,
+    pcosStatus: null,
+    thyroidStatus: null,
+    diabetesStatus: null,
+    hypertensionStatus: null,
+    cholesterolStatus: null,
+    heartConditionStatus: null,
+    previousSurgeries: [],
     assignedConsultantId: null,
     assignedMentorId: null,
     createdAtISO: nowIso(),
@@ -283,7 +324,7 @@ export const createOrUpdateHealthProfile = async (owner, patch) => {
             next.status,
             next.createdAtISO
         ]);
-        return mapHealthProfile(inserted.rows[0]);
+        return saveHealthProfileProgressiveFields(inserted.rows[0].id, owner.clientId, next);
     }
     const updated = await pool.query(`
       update health_profiles
@@ -375,6 +416,66 @@ export const createOrUpdateHealthProfile = async (owner, patch) => {
         next.status,
         nowIso(),
         owner.clientId
+    ]);
+    if (updated.rowCount === 0) {
+        throw new Error('Health profile ownership mismatch.');
+    }
+    await syncLegacyProfessionalAssignment({ clientUserId: owner.accountId, professionalUserId: next.assignedConsultantId ?? null, professionalType: 'CONSULTANT', actorUserId: owner.accountId });
+    await syncLegacyProfessionalAssignment({ clientUserId: owner.accountId, professionalUserId: next.assignedMentorId ?? null, professionalType: 'MENTOR', actorUserId: owner.accountId });
+    return saveHealthProfileProgressiveFields(updated.rows[0].id, owner.clientId, next);
+};
+const saveHealthProfileProgressiveFields = async (profileId, clientId, next) => {
+    const updated = await pool.query(`
+      update health_profiles
+      set
+        preferred_cuisines = $3::jsonb,
+        sleep_hours = $4,
+        sleep_goal_hours = $5,
+        smoking_status = $6,
+        alcohol_frequency = $7,
+        exercise_frequency = $8,
+        stress_level_label = $9,
+        previous_conditions = $10::jsonb,
+        family_history_conditions = $11::jsonb,
+        medical_notes = $12,
+        pregnancy_status = $13,
+        breastfeeding_status = $14,
+        pcos_status = $15,
+        thyroid_status = $16,
+        diabetes_status = $17,
+        hypertension_status = $18,
+        sleep_quality_label = $19,
+        cholesterol_status = $20,
+        heart_condition_status = $21,
+        previous_surgeries = $22::jsonb,
+        updated_at = $23
+      where id = $1
+        and client_id = $2
+      returning *
+    `, [
+        profileId,
+        clientId,
+        JSON.stringify(next.preferredCuisines),
+        next.sleepHours,
+        next.sleepGoalHours,
+        next.smokingStatus,
+        next.alcoholFrequency,
+        next.exerciseFrequency,
+        next.stressLevelLabel,
+        JSON.stringify(next.previousConditions),
+        JSON.stringify(next.familyHistoryConditions),
+        next.medicalNotes,
+        next.pregnancyStatus,
+        next.breastfeedingStatus,
+        next.pcosStatus,
+        next.thyroidStatus,
+        next.diabetesStatus,
+        next.hypertensionStatus,
+        next.sleepQualityLabel,
+        next.cholesterolStatus,
+        next.heartConditionStatus,
+        JSON.stringify(next.previousSurgeries),
+        nowIso(),
     ]);
     if (updated.rowCount === 0) {
         throw new Error('Health profile ownership mismatch.');
@@ -579,6 +680,8 @@ export const updateCareCase = async (careCaseId, clientId, patch) => {
     ]);
     if (updated.rowCount === 0)
         return null;
+    await syncLegacyProfessionalAssignment({ clientUserId: existing.userId, professionalUserId: next.assignedConsultantId ?? null, professionalType: 'CONSULTANT', actorUserId: existing.userId });
+    await syncLegacyProfessionalAssignment({ clientUserId: existing.userId, professionalUserId: next.assignedMentorId ?? null, professionalType: 'MENTOR', actorUserId: existing.userId });
     return mapCareCase(updated.rows[0]);
 };
 export const addTimelineEvent = async (input) => {
@@ -617,27 +720,44 @@ export const listTimelineEvents = async (careCaseId) => {
 };
 export const addHealthEvent = async (input) => {
     const createdAtISO = nowIso();
-    const inserted = await pool.query(`
-      insert into health_events (
-        id, care_case_id, user_id, event_type, summary, payload, replay_key, event_time,
-        status, version, created_at, updated_at, deleted_at
-      ) values (
-        $1, $2, $3, $4, $5, $6::jsonb, $7, $8,
-        'active', 1, $9, $9, null
-      )
-      returning *
-    `, [
-        crypto.randomUUID(),
-        input.careCaseId,
-        input.userId,
-        input.type,
-        input.summary,
-        JSON.stringify(input.payload),
-        input.replayKey,
-        input.eventTimeISO,
-        createdAtISO
-    ]);
-    return mapHealthEvent(inserted.rows[0]);
+    try {
+        const inserted = await pool.query(`
+        insert into health_events (
+          id, care_case_id, user_id, event_type, summary, payload, replay_key, event_time,
+          status, version, created_at, updated_at, deleted_at
+        ) values (
+          $1, $2, $3, $4, $5, $6::jsonb, $7, $8,
+          'active', 1, $9, $9, null
+        )
+        returning *
+      `, [
+            crypto.randomUUID(),
+            input.careCaseId,
+            input.userId,
+            input.type,
+            input.summary,
+            JSON.stringify(input.payload),
+            input.replayKey,
+            input.eventTimeISO,
+            createdAtISO
+        ]);
+        return mapHealthEvent(inserted.rows[0]);
+    }
+    catch (error) {
+        if (error?.code === '23505') {
+            const existing = await pool.query(`
+          select *
+          from health_events
+          where replay_key = $1
+            and deleted_at is null
+          limit 1
+        `, [input.replayKey]);
+            if ((existing.rowCount ?? 0) > 0) {
+                return mapHealthEvent(existing.rows[0]);
+            }
+        }
+        throw error;
+    }
 };
 export const listHealthEvents = async (careCaseId) => {
     const result = await pool.query(`

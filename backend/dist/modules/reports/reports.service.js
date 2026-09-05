@@ -2,6 +2,12 @@ import OpenAI from 'openai';
 import { PDFParse } from 'pdf-parse';
 import { env } from '../../config/env.js';
 import { buildExtractionGovernance, canonicalBiomarkerName, classifyDocument, CORE_BIOMARKERS } from './report-governance.js';
+const currentBusinessDateLabel = () => new Date().toLocaleDateString('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+});
 const AI_VISION_TIMEOUT_MS = 25000;
 const SUPPORTED_DOCUMENT_INTELLIGENCE_PROVIDERS = new Set(['openai']);
 export class AdvancedAnalysisNotAllowedError extends Error {
@@ -327,7 +333,14 @@ const buildParsedParameter = (name, parsed, index, sectionName, extractionMethod
     extractionConfidence
 });
 const parseDelimitedReportRows = (text) => {
-    const rawLines = normalizePdfTextForParsing(text).split('\n');
+    // Preserve PDF table delimiters for the primary row parser. Running the
+    // text through normalizePdfTextForParsing first collapses tabs to spaces,
+    // which makes the tab-delimited branch unreachable and forces real reports
+    // through the lower-confidence fallback scan.
+    const rawLines = text
+        .split('\n')
+        .map((line) => collapseStandaloneRepeatedLetters(line).trim())
+        .filter(Boolean);
     const out = [];
     for (let index = 0; index < rawLines.length; index += 1) {
         const cells = rawLines[index].split(/\t+/).map((cell) => normalizeWhitespace(cell)).filter(Boolean);
@@ -419,7 +432,7 @@ const parseGroupedTableParameters = (lines) => {
 const parseParameters = (text) => {
     const normalizedText = normalizePdfTextForParsing(text);
     const lines = normalizedText.split('\n').map((line) => normalizeWhitespace(line)).filter(Boolean);
-    const out = [...parseDelimitedReportRows(normalizedText), ...parseGroupedTableParameters(lines)];
+    const out = [...parseDelimitedReportRows(text), ...parseGroupedTableParameters(lines)];
     const linePattern = /^([A-Za-z][A-Za-z0-9 .(),/+%-]{2,70})\s+(-?\d+(?:\.\d+)?)\s*([A-Za-z0-9/%µμ^./-]+)?\s+(<?\s*-?\d+(?:\.\d+)?\s*(?:-|–)\s*-?\d+(?:\.\d+)?|<\s*-?\d+(?:\.\d+)?|>\s*-?\d+(?:\.\d+)?)/;
     for (const line of lines) {
         if (!looksLikeTableRow(line))
@@ -986,7 +999,7 @@ export const analyzeReportBuffer = async (buffer, mimeType) => {
     }
     const reportDate = aiDate ??
         findDate(text) ??
-        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        currentBusinessDateLabel();
     const labName = aiLab ?? findLabName(text) ?? 'Uploaded Lab Report';
     return buildReportAnalysisResult({
         text,
@@ -1020,7 +1033,7 @@ export const analyzeReportBufferAdvanced = async (buffer, mimeType, context) => 
     });
     const reportDate = advanced.reportDate ??
         findDate(text) ??
-        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        currentBusinessDateLabel();
     const labName = advanced.labName ?? findLabName(text) ?? 'Uploaded Lab Report';
     const extractionConfidence = advanced.parameters.length === 0
         ? 0

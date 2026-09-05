@@ -1,0 +1,1324 @@
+{
+  "catalogueVersion": "FITEATSY-NUTRITION-CATALOGUE-v1.1",
+  "predecessor": "FITEATSY-NUTRITION-CATALOGUE-v1",
+  "generatedAt": "2026-09-02T00:00:00.000Z",
+  "addedFoods": 0,
+  "addedRecipes": [
+    {
+      "id": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "code": "papaya-greek-yoghurt-flax-bowl",
+      "displayName": "Papaya Greek yoghurt flax bowl",
+      "components": [
+        {
+          "foodId": "3087f523-e615-4c27-8ea1-a69f72b12626",
+          "quantityGrams": 120
+        },
+        {
+          "foodId": "96624301-59e8-44d4-9229-325358635f60",
+          "quantityGrams": 90
+        },
+        {
+          "foodId": "b71adb2c-aea5-488a-a729-78166fb2f169",
+          "quantityGrams": 5
+        }
+      ],
+      "nutritionTotals": {
+        "calories": 132.2,
+        "proteinGrams": 10.734,
+        "carbohydrateGrams": 17.956,
+        "fatGrams": 2.51,
+        "fibreGrams": null,
+        "ironMg": 0.652,
+        "calciumMg": 135.4,
+        "magnesiumMg": 53.43,
+        "potassiumMg": 384.95,
+        "zincMg": 0.81,
+        "vitaminCMg": null,
+        "vitaminB12Mcg": null,
+        "folateDfeMcg": null,
+        "vitaminDMcg": null,
+        "vitaminARaeMcg": null
+      }
+    },
+    {
+      "id": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "code": "moong-buttermilk-cup",
+      "displayName": "Savoury moong buttermilk cup",
+      "components": [
+        {
+          "foodId": "3d9f1755-6033-4c15-a3c8-37ed01787166",
+          "quantityGrams": 120
+        },
+        {
+          "foodId": "43c55d21-91cc-4ff5-860a-36e304064a5c",
+          "quantityGrams": 200
+        },
+        {
+          "foodId": "1ca49b06-e049-4739-8bdb-fa760ffbed8b",
+          "quantityGrams": 60
+        },
+        {
+          "foodId": "b71adb2c-aea5-488a-a729-78166fb2f169",
+          "quantityGrams": 5
+        },
+        {
+          "foodId": "81006a8a-4b17-480d-88ae-0a821af43334",
+          "quantityGrams": 1
+        }
+      ],
+      "nutritionTotals": {
+        "calories": 146.45,
+        "proteinGrams": 10.788,
+        "carbohydrateGrams": 18.106,
+        "fatGrams": 4.452,
+        "fibreGrams": null,
+        "ironMg": 1.891,
+        "calciumMg": 283.61,
+        "magnesiumMg": 68.26,
+        "potassiumMg": 576.35,
+        "zincMg": 1.803,
+        "vitaminCMg": null,
+        "vitaminB12Mcg": null,
+        "folateDfeMcg": null,
+        "vitaminDMcg": null,
+        "vitaminARaeMcg": null
+      }
+    },
+    {
+      "id": "d07aab3f-80e5-4791-98f4-273290882159",
+      "code": "banana-greek-yoghurt-lassi",
+      "displayName": "Banana Greek yoghurt lassi",
+      "components": [
+        {
+          "foodId": "2dc68721-3e1b-4cd4-8c9d-a73d906e303f",
+          "quantityGrams": 70
+        },
+        {
+          "foodId": "96624301-59e8-44d4-9229-325358635f60",
+          "quantityGrams": 80
+        },
+        {
+          "foodId": "b47db89d-3cd6-4957-98a6-2a91b320659e",
+          "quantityGrams": 80
+        }
+      ],
+      "nutritionTotals": {
+        "calories": 156.7,
+        "proteinGrams": 11.446,
+        "carbohydrateGrams": 22.932,
+        "fatGrams": 2.019,
+        "fibreGrams": null,
+        "ironMg": 0.056,
+        "calciumMg": 193.1,
+        "magnesiumMg": 37.76,
+        "potassiumMg": 468.2,
+        "zincMg": 0.88,
+        "vitaminCMg": null,
+        "vitaminB12Mcg": null,
+        "folateDfeMcg": null,
+        "vitaminDMcg": null,
+        "vitaminARaeMcg": 67.9
+      }
+    },
+    {
+      "id": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "code": "pineapple-tofu-chaat",
+      "displayName": "Pineapple tofu chaat",
+      "components": [
+        {
+          "foodId": "a94fa0c6-5675-494c-8775-e11b3b101b5d",
+          "quantityGrams": 80
+        },
+        {
+          "foodId": "f311af93-0746-4d10-a68c-f4ad09397ca9",
+          "quantityGrams": 100
+        },
+        {
+          "foodId": "1ca49b06-e049-4739-8bdb-fa760ffbed8b",
+          "quantityGrams": 50
+        },
+        {
+          "foodId": "2da71afd-ac94-4932-8612-507de402c64f",
+          "quantityGrams": 5
+        }
+      ],
+      "nutritionTotals": {
+        "calories": 148.95,
+        "proteinGrams": 9.148,
+        "carbohydrateGrams": 18.785,
+        "fatGrams": 5.792,
+        "fibreGrams": 2.406,
+        "ironMg": 1.53,
+        "calciumMg": 182.755,
+        "magnesiumMg": 58,
+        "potassiumMg": 355.2,
+        "zincMg": 0.995,
+        "vitaminCMg": null,
+        "vitaminB12Mcg": null,
+        "folateDfeMcg": null,
+        "vitaminDMcg": null,
+        "vitaminARaeMcg": null
+      }
+    },
+    {
+      "id": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "code": "date-yoghurt-milk-cup",
+      "displayName": "Date yoghurt milk cup",
+      "components": [
+        {
+          "foodId": "b47db89d-3cd6-4957-98a6-2a91b320659e",
+          "quantityGrams": 150
+        },
+        {
+          "foodId": "96624301-59e8-44d4-9229-325358635f60",
+          "quantityGrams": 50
+        },
+        {
+          "foodId": "6b712331-f71c-4885-b970-5c7f959b5b38",
+          "quantityGrams": 10
+        }
+      ],
+      "nutritionTotals": {
+        "calories": 133.2,
+        "proteinGrams": 10.371,
+        "carbohydrateGrams": 16.67,
+        "fatGrams": 3.05,
+        "fibreGrams": null,
+        "ironMg": 0.125,
+        "calciumMg": 250.9,
+        "magnesiumMg": 28.75,
+        "potassiumMg": 378.6,
+        "zincMg": 0.954,
+        "vitaminCMg": null,
+        "vitaminB12Mcg": null,
+        "folateDfeMcg": null,
+        "vitaminDMcg": 1.695,
+        "vitaminARaeMcg": 125.7
+      }
+    },
+    {
+      "id": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "code": "milk-oat-almond-drink",
+      "displayName": "Milk oat almond drink",
+      "components": [
+        {
+          "foodId": "b47db89d-3cd6-4957-98a6-2a91b320659e",
+          "quantityGrams": 180
+        },
+        {
+          "foodId": "d04425d0-5b5b-4ad1-af7b-96defdb2d6f6",
+          "quantityGrams": 10
+        },
+        {
+          "foodId": "d0fd2e56-c0a8-49ea-9ff0-5e2a4c22efe7",
+          "quantityGrams": 5
+        }
+      ],
+      "nutritionTotals": {
+        "calories": 159.9,
+        "proteinGrams": 8.758,
+        "carbohydrateGrams": 16.26,
+        "fatGrams": 7,
+        "fibreGrams": null,
+        "ironMg": 0.631,
+        "calciumMg": 245.85,
+        "magnesiumMg": 52.2,
+        "potassiumMg": 363.3,
+        "zincMg": 1.311,
+        "vitaminCMg": null,
+        "vitaminB12Mcg": null,
+        "folateDfeMcg": null,
+        "vitaminDMcg": null,
+        "vitaminARaeMcg": 149.5
+      }
+    },
+    {
+      "id": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "code": "yoghurt-oats-flax-cup",
+      "displayName": "Yoghurt oats flax cup",
+      "components": [
+        {
+          "foodId": "f1faba13-e881-4a56-85a0-5df19bcf3faf",
+          "quantityGrams": 120
+        },
+        {
+          "foodId": "d04425d0-5b5b-4ad1-af7b-96defdb2d6f6",
+          "quantityGrams": 15
+        },
+        {
+          "foodId": "b71adb2c-aea5-488a-a729-78166fb2f169",
+          "quantityGrams": 4
+        }
+      ],
+      "nutritionTotals": {
+        "calories": 171.67,
+        "proteinGrams": 7.839,
+        "carbohydrateGrams": 18.005,
+        "fatGrams": 7.903,
+        "fibreGrams": null,
+        "ironMg": 0.939,
+        "calciumMg": 169.7,
+        "magnesiumMg": 55.11,
+        "potassiumMg": 292.87,
+        "zincMg": 1.299,
+        "vitaminCMg": null,
+        "vitaminB12Mcg": null,
+        "folateDfeMcg": null,
+        "vitaminDMcg": null,
+        "vitaminARaeMcg": null
+      }
+    },
+    {
+      "id": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "code": "tofu-millet-vegetable-cup",
+      "displayName": "Tofu millet vegetable cup",
+      "components": [
+        {
+          "foodId": "a94fa0c6-5675-494c-8775-e11b3b101b5d",
+          "quantityGrams": 80
+        },
+        {
+          "foodId": "27b2475e-ec5a-4b9e-a063-019c805ac911",
+          "quantityGrams": 15
+        },
+        {
+          "foodId": "1ca49b06-e049-4739-8bdb-fa760ffbed8b",
+          "quantityGrams": 60
+        },
+        {
+          "foodId": "546f1ac0-80b1-4366-ba48-4b6627563040",
+          "quantityGrams": 40
+        }
+      ],
+      "nutritionTotals": {
+        "calories": 133.15,
+        "proteinGrams": 9.364,
+        "carbohydrateGrams": 16.272,
+        "fatGrams": 4.231,
+        "fibreGrams": 1.921,
+        "ironMg": 1.841,
+        "calciumMg": 174.549,
+        "magnesiumMg": 55.936,
+        "potassiumMg": 309.3,
+        "zincMg": 1.138,
+        "vitaminCMg": null,
+        "vitaminB12Mcg": null,
+        "folateDfeMcg": null,
+        "vitaminDMcg": null,
+        "vitaminARaeMcg": null
+      }
+    },
+    {
+      "id": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "code": "lentil-tofu-spinach-broth",
+      "displayName": "Lentil tofu spinach broth",
+      "components": [
+        {
+          "foodId": "fdc5d36e-6dc8-4572-a1c5-263f85a91833",
+          "quantityGrams": 20
+        },
+        {
+          "foodId": "a94fa0c6-5675-494c-8775-e11b3b101b5d",
+          "quantityGrams": 30
+        },
+        {
+          "foodId": "5b09c3cb-cec3-4f5a-97fc-6c9df5b07c1a",
+          "quantityGrams": 60
+        },
+        {
+          "foodId": "546f1ac0-80b1-4366-ba48-4b6627563040",
+          "quantityGrams": 50
+        },
+        {
+          "foodId": "29a4f428-649e-4c67-a709-804069dff411",
+          "quantityGrams": 3
+        }
+      ],
+      "nutritionTotals": {
+        "calories": 142.04,
+        "proteinGrams": 9.49,
+        "carbohydrateGrams": 16.661,
+        "fatGrams": 5.219,
+        "fibreGrams": null,
+        "ironMg": 2.723,
+        "calciumMg": 118.68,
+        "magnesiumMg": 92.285,
+        "potassiumMg": 679.9,
+        "zincMg": 1.33,
+        "vitaminCMg": null,
+        "vitaminB12Mcg": null,
+        "folateDfeMcg": null,
+        "vitaminDMcg": null,
+        "vitaminARaeMcg": null
+      }
+    }
+  ],
+  "addedMealVariants": [
+    {
+      "id": "9901e979-b460-4c2f-aafc-5bb2c7e62fa5",
+      "mealKey": "earlyMorning",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "e4891e4b-cf49-4a4e-b75a-d53bceda7cd3",
+      "mealKey": "earlyMorning",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "17017701-f9ff-456f-9c60-acfb3ef08581",
+      "mealKey": "earlyMorning",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "4009d339-6c29-4253-83c6-c9f5ea32c610",
+      "mealKey": "earlyMorning",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "5d9f3e01-713a-47d8-a2a8-288b66ba934e",
+      "mealKey": "breakfast",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "eb5d314e-b183-4eb1-a389-1850efe3bfe0",
+      "mealKey": "breakfast",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "963f3322-445b-4f09-be22-4872ee52a97b",
+      "mealKey": "breakfast",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "59ba6bb4-66bf-47af-929f-4c6d25b8e82f",
+      "mealKey": "breakfast",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "cd37a942-5ebc-401f-a2af-2877138b3ced",
+      "mealKey": "midMorningSnack",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "b955ee56-0111-4685-9d6b-f251a6db9daa",
+      "mealKey": "midMorningSnack",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "d90e1bd2-9e62-4fe6-810d-1bc1079e4ea0",
+      "mealKey": "midMorningSnack",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "9e25da9a-c432-4469-aa9d-4e99327acae6",
+      "mealKey": "midMorningSnack",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "f81c7ba3-392b-4459-a105-2376535f95c4",
+      "mealKey": "eveningSnack",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "d2f2063c-e177-4f4c-822f-664e18248758",
+      "mealKey": "eveningSnack",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "db9874a4-a651-4073-beaf-d55e3929f092",
+      "mealKey": "eveningSnack",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "9c460c4b-1758-4532-8e29-6951dfa387df",
+      "mealKey": "eveningSnack",
+      "recipeId": "0a98b547-e110-421b-abf0-10869a4aaf61",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "a508a589-fdd6-4c83-b933-028ed70a8c7f",
+      "mealKey": "earlyMorning",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "e51ef4e6-67e2-4f6e-8333-49294ad324f4",
+      "mealKey": "earlyMorning",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "0382f890-6c83-41ea-87e5-94027c39d6bf",
+      "mealKey": "earlyMorning",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "935ebe19-61a7-429d-9b02-1c5440453f9b",
+      "mealKey": "earlyMorning",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "c46c86a4-aa73-4a32-9e13-9ea310e15a8a",
+      "mealKey": "breakfast",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "6a40ee9c-be60-456d-84c6-fe447bf2db79",
+      "mealKey": "breakfast",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "6a6d79de-361a-44d5-b324-7428808e45d6",
+      "mealKey": "breakfast",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "fc0dd903-19a6-43d2-8327-c3d474a3ca09",
+      "mealKey": "breakfast",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "2e748032-041f-4e8f-9cd0-a683ae754fb8",
+      "mealKey": "midMorningSnack",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "68cd2466-70eb-4f5a-a6b8-1bc224d0d39e",
+      "mealKey": "midMorningSnack",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "ac50c595-75b8-45c9-950f-679b9e419e5b",
+      "mealKey": "midMorningSnack",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "4fd21c20-b51c-48e9-ad1f-0d29fef48e18",
+      "mealKey": "midMorningSnack",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "97326594-d97b-4827-8793-3c30d6e27f65",
+      "mealKey": "eveningSnack",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "179c087d-ed17-42b2-9dfe-cf62106bfa5b",
+      "mealKey": "eveningSnack",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "b527c098-861a-43e3-a0cd-91502b1c9be2",
+      "mealKey": "eveningSnack",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "9ec50b4c-97ee-42ba-835b-3d0532604258",
+      "mealKey": "eveningSnack",
+      "recipeId": "2fdda6b1-670a-4ae6-9c7e-13ab845e00db",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "61a84290-bf5d-4d1a-a7c9-5332e6033e18",
+      "mealKey": "earlyMorning",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "2f3acf49-bfb7-46a0-9db8-1c9d7d7c1207",
+      "mealKey": "earlyMorning",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "8ad84455-4ba8-4624-919c-57fd5b54bb16",
+      "mealKey": "earlyMorning",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "ba26ee8a-e735-44e9-bdc3-92169d5cb951",
+      "mealKey": "earlyMorning",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "904b1dce-7f7c-4652-9841-70fb74da6911",
+      "mealKey": "breakfast",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "2a3e31db-3e60-43ce-b59e-d9cb57a7111e",
+      "mealKey": "breakfast",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "06c13e43-6782-4c40-8647-d864a9a85a7e",
+      "mealKey": "breakfast",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "f6d72d21-73d7-475c-9886-aeef0584d9dd",
+      "mealKey": "breakfast",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "bbe17d5a-8506-44e3-bae1-c7a040654dd9",
+      "mealKey": "midMorningSnack",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "efeadfa0-53e7-4daf-aab4-8187d326436f",
+      "mealKey": "midMorningSnack",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "8293b331-2796-4df2-8338-00c06455e2b9",
+      "mealKey": "midMorningSnack",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "2b46e15f-548f-4629-bd5a-2056033c47d1",
+      "mealKey": "midMorningSnack",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "0d801fe1-8dc1-42bb-9eb8-aa2a15d2f69d",
+      "mealKey": "eveningSnack",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "4ab9caab-c83d-4c21-89e2-8ba91326d975",
+      "mealKey": "eveningSnack",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "39ebd4ca-fb1c-4dc7-89b1-47002db7be3e",
+      "mealKey": "eveningSnack",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "90c12fcb-4089-436f-8d0b-5a6d514e61b3",
+      "mealKey": "eveningSnack",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "fde9dfdb-997b-4c6d-88ec-569fa1ebafe0",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "2ba8f69e-afe0-426d-b938-b53c92fd83fa",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "ef821c65-39ce-4ce9-b636-5d14f963a1d4",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "b057babb-eaf4-44bf-aa2d-80ce0752a9b6",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "d07aab3f-80e5-4791-98f4-273290882159",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "9d392e36-1901-4892-9574-289c065fbe9a",
+      "mealKey": "breakfast",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "c49f8312-9781-4663-ae0b-a88618743733",
+      "mealKey": "breakfast",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "609377a3-15ca-4622-a99b-2437b8eec4cf",
+      "mealKey": "breakfast",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "aeacc542-f719-41b1-bc40-8b6d6845c23b",
+      "mealKey": "breakfast",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "d65293d4-6c00-456e-aaea-4ef728d91298",
+      "mealKey": "midMorningSnack",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "a1078095-9d8d-41bb-82a9-92e52f20820b",
+      "mealKey": "midMorningSnack",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "54abfa0b-b20f-46b8-a920-dcd5c3e497db",
+      "mealKey": "midMorningSnack",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "58a6ad95-d23a-48ef-b94e-77d546c580bb",
+      "mealKey": "midMorningSnack",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "cde59aaf-0892-4870-9615-2bcd8cf6af71",
+      "mealKey": "eveningSnack",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "a5ce447f-0d0c-425b-977e-3591018d62e2",
+      "mealKey": "eveningSnack",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "cacdc94b-8c6c-4fbd-83b8-1f60257d549b",
+      "mealKey": "eveningSnack",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "f6f1c5ac-d16a-4b5e-b56d-1183aec9cc99",
+      "mealKey": "eveningSnack",
+      "recipeId": "91f80014-facf-4fee-96f6-dd57e89f75ec",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "8c58b449-2a51-48ac-85e4-f41a4a853bbc",
+      "mealKey": "earlyMorning",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "e81db88e-4a0d-4c58-9c07-5ffd2474655a",
+      "mealKey": "earlyMorning",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "d97623bd-0470-4521-90c4-655af78af32b",
+      "mealKey": "earlyMorning",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "ebe398b1-1002-42a2-924c-34158837fc80",
+      "mealKey": "earlyMorning",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "028440f7-6555-47db-9b3c-9b75b9134556",
+      "mealKey": "breakfast",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "7b8ca8cb-6970-4e67-a5c9-98ba4f9fbd89",
+      "mealKey": "breakfast",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "e5993b7b-721f-429b-b257-d18710146752",
+      "mealKey": "breakfast",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "12586034-1e4d-4e0b-ba57-1597724b0f1e",
+      "mealKey": "breakfast",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "beed203d-4cf6-4a1a-a2d0-98a765d61bf6",
+      "mealKey": "midMorningSnack",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "720a439e-0c2c-45d3-8825-c0e92e6712c3",
+      "mealKey": "midMorningSnack",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "9473ce8f-b8c3-4015-87f4-22a7e6aa07bd",
+      "mealKey": "midMorningSnack",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "677c2f92-820b-49b9-a3a0-17ceb9d1fa8f",
+      "mealKey": "midMorningSnack",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "741383b3-2d2c-4777-af58-d975529f8118",
+      "mealKey": "eveningSnack",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "dbaa74c7-aaf5-4f0c-ad60-b85ef082771f",
+      "mealKey": "eveningSnack",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "c45945c9-342e-4feb-8372-a26028145951",
+      "mealKey": "eveningSnack",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "e387c482-eb3d-4f34-a0aa-8750b92cfe22",
+      "mealKey": "eveningSnack",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "90b46d57-164a-4231-a974-a2ad1236a790",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "0abd2909-bc6b-42e7-895d-384bc005bc03",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "90f255c7-156f-44e3-bbe4-3ef1344484ca",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "f19e6553-7036-4a8e-964d-48cf12fcfe1c",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "875fe797-6d66-44a8-808d-b28c999cba52",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "e9dd30b0-144c-4ab4-aaa0-837d37f23056",
+      "mealKey": "earlyMorning",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "42f79dd7-60bb-4a44-a9a5-4d47996cc25b",
+      "mealKey": "earlyMorning",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "2d9b35cf-9027-47e0-896d-97bdda9d233d",
+      "mealKey": "earlyMorning",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "47b9e578-0cf8-44c6-bb10-07ea29b7429f",
+      "mealKey": "earlyMorning",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "c3dd72ab-8bc2-4f1f-82de-e60e36b44d8f",
+      "mealKey": "breakfast",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "14dd9e8e-6dbd-4a3e-b45d-6c2023a661d8",
+      "mealKey": "breakfast",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "a340bdbc-52fe-4d96-840f-23e205d57039",
+      "mealKey": "breakfast",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "450e601d-ba67-4ccd-b196-d6164c37d047",
+      "mealKey": "breakfast",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "38a75edd-2514-4de2-b99c-145519384b2b",
+      "mealKey": "midMorningSnack",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "0db8894b-1c93-4c93-ae15-3adafbee833c",
+      "mealKey": "midMorningSnack",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "1cb858c1-6251-46f0-86e9-c7a987e3b5f3",
+      "mealKey": "midMorningSnack",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "050b7b48-a9b5-4c15-a665-07c7146afd52",
+      "mealKey": "midMorningSnack",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "6c425933-f212-4398-9dab-56c97ef272d4",
+      "mealKey": "eveningSnack",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "76863066-0e95-4e85-a2a9-78ec28b97314",
+      "mealKey": "eveningSnack",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "70edd163-b59e-4199-ba6e-4aa6a0d10744",
+      "mealKey": "eveningSnack",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "04eb909b-0a8c-404a-a432-9abaac3c22d7",
+      "mealKey": "eveningSnack",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "ebe42fee-e9ae-40ed-8cf6-1fd17ae9be6e",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "ac4a17c6-8773-496f-aced-65421c079d90",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "37dd3909-c0bc-4d90-9f51-5f0663d1fe3f",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "ffc64b00-0f02-44a0-a3fd-32f274671a50",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "f62e0a75-0fbe-45a9-9c87-0cfb14b4c8d3",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "99a8be08-f42c-459d-8ec6-6ae15dacbc10",
+      "mealKey": "breakfast",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "caa34b42-8a3b-4b1c-aeb3-f0a9100c41e7",
+      "mealKey": "breakfast",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "e3f0ae12-505d-4ee9-9af8-23ec92450d45",
+      "mealKey": "breakfast",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "e359d64a-b182-47ef-ad88-4c51e4b1a8c1",
+      "mealKey": "breakfast",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "5d5d858d-2cf1-41d4-8df8-49ce3bc6b206",
+      "mealKey": "midMorningSnack",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "67ad1eca-1323-4fb4-bf3d-c1145c2cf48c",
+      "mealKey": "midMorningSnack",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "ad4e5637-b7d1-449c-9637-bf07354e88f7",
+      "mealKey": "midMorningSnack",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "3adca61d-3db0-4ec5-9046-2f6130af5766",
+      "mealKey": "midMorningSnack",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "ab63876b-00ee-4be2-bb89-54da4a58cc53",
+      "mealKey": "eveningSnack",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "8ee5723f-32df-401f-bd09-15ee91dc0355",
+      "mealKey": "eveningSnack",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "506c7a6f-9da8-4b25-8806-afbd6962b1dc",
+      "mealKey": "eveningSnack",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "f32bc600-1811-48c8-90dd-c05cc058d5a0",
+      "mealKey": "eveningSnack",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "276e8429-0c27-43e1-8d2c-60e4e2340e43",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "6acd8ea5-86c2-4c1c-a037-2e9bcd3c9d4e",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "da9d49b4-ad64-4c71-b4c3-dc4ce12789d3",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "64fc13d9-8f4a-496b-bd9f-b3b364fa850c",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "115b9610-72c0-442f-b5e8-cf81c5291c53",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "902304a3-daa8-4a79-95ec-06f3a291399b",
+      "mealKey": "earlyMorning",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "84174007-3335-43e2-9121-3c1bdb4d5a37",
+      "mealKey": "earlyMorning",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "098027d7-e032-4485-ab93-5f0d29a1e718",
+      "mealKey": "earlyMorning",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "1f015afe-6605-46b7-9330-ee07acec929c",
+      "mealKey": "earlyMorning",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "daca2642-6c96-4f5e-aba4-04819e3b6b11",
+      "mealKey": "breakfast",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "729dfbdc-2e2e-4720-b46d-755da5bc2175",
+      "mealKey": "breakfast",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "9d2b3837-e9d4-4fc5-a41d-e3d2d9e02b47",
+      "mealKey": "breakfast",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "f33eb35d-07bc-49c4-84ef-917f3ba23c34",
+      "mealKey": "breakfast",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "20c479e4-af0d-4928-9eb9-3372a01b6483",
+      "mealKey": "midMorningSnack",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "0aabedec-bf40-4e5d-af86-9207c84e0541",
+      "mealKey": "midMorningSnack",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "139193f8-e6e7-4463-8e03-9be07e3f5b46",
+      "mealKey": "midMorningSnack",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "8401b575-0fb2-4928-a485-437ff66bff66",
+      "mealKey": "midMorningSnack",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "db296fca-b546-4231-99dd-57d61d499b61",
+      "mealKey": "eveningSnack",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "bdd38c26-3c52-41ab-a10b-cd3b4c6438d2",
+      "mealKey": "eveningSnack",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "77a99daa-32e8-41bd-a2f3-9813da38d07c",
+      "mealKey": "eveningSnack",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "f68561ca-fa2e-4013-a8ba-be4fdf9f77c7",
+      "mealKey": "eveningSnack",
+      "recipeId": "e7f6058e-a3c3-41dd-8701-731795b8f345",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "21cf7e37-3b0f-4621-add2-2d238d07b9b6",
+      "mealKey": "earlyMorning",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "ad93dbdd-554d-4b27-83d9-7a05d7531738",
+      "mealKey": "earlyMorning",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "6ab82999-9621-4e96-b82e-f569daa51615",
+      "mealKey": "earlyMorning",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "a924fe96-84e9-4c0a-bcbf-c40a5b4068f7",
+      "mealKey": "earlyMorning",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "041c1498-a271-448d-b2d9-4b0b8127fbac",
+      "mealKey": "breakfast",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "b099a2b0-9353-46e4-8a82-1fdda31d6679",
+      "mealKey": "breakfast",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "3559f3fc-c31d-4b68-a9b6-e06fdccc25a3",
+      "mealKey": "breakfast",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "78390e84-e851-47e2-952e-e084f4293e9a",
+      "mealKey": "breakfast",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "fd8e6706-d72c-4d96-a5f6-6f685a74e282",
+      "mealKey": "midMorningSnack",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "baa5301a-16c9-448e-a251-7ba8b6971007",
+      "mealKey": "midMorningSnack",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "2d5a5458-4a69-45a9-9c59-508436699154",
+      "mealKey": "midMorningSnack",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "dbc55983-d9f3-4101-8bae-6aa22e58de80",
+      "mealKey": "midMorningSnack",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "c1b897d8-1088-40a3-8c9b-1cfbbe873ba2",
+      "mealKey": "eveningSnack",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "90d9500c-fdad-47b6-8d13-bdb9df7deceb",
+      "mealKey": "eveningSnack",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "6e31fe55-cc14-4747-95c2-4ab569506637",
+      "mealKey": "eveningSnack",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "6c64ce33-b27d-4d93-9eab-7d2e24af59ab",
+      "mealKey": "eveningSnack",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.5
+    },
+    {
+      "id": "66dd001d-8a0a-48a0-8820-7edf8e6ee5b8",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 0.75
+    },
+    {
+      "id": "499c60d5-35d0-42a4-a6fa-e4323bad3e22",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1
+    },
+    {
+      "id": "a651972f-ee5e-4e1d-b0c3-3e8776f88b3d",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.25
+    },
+    {
+      "id": "7a02331b-7494-41db-b74f-beea061789bd",
+      "mealKey": "bedtimeNutrition",
+      "recipeId": "52e63654-e2d6-44d3-9523-673acb6a0576",
+      "portionMultiplier": 1.5
+    }
+  ],
+  "familyCoverage": {
+    "earlyMorning": {
+      "previous": 3,
+      "successor": 10
+    },
+    "breakfast": {
+      "previous": 8,
+      "successor": 17
+    },
+    "midMorningSnack": {
+      "previous": 4,
+      "successor": 13
+    },
+    "lunch": {
+      "previous": 16,
+      "successor": 16
+    },
+    "eveningSnack": {
+      "previous": 4,
+      "successor": 13
+    },
+    "dinner": {
+      "previous": 16,
+      "successor": 16
+    },
+    "bedtimeNutrition": {
+      "previous": 4,
+      "successor": 9
+    }
+  }
+}

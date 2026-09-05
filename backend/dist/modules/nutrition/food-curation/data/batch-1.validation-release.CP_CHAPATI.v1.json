@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "FITEATSY_VALIDATION_RELEASE_V1",
+  "validationReleaseId": "BATCH1_CP_CHAPATI_VR1",
+  "recipeId": "CP_CHAPATI",
+  "recipeName": "Chapati",
+  "recipeVersion": "CP_CHAPATI_STAGE_A_v1",
+  "stageADecisionId": "STAGE_A_CP_CHAPATI_V1",
+  "stageADecisionHash": "3bd8a96eab688da025eed4fb1db78a5912eadf7a2b2ffd37b92f14c65087fb6d",
+  "sourceDecisionIds": [
+    "SOURCE_WHOLE_WHEAT_ATTA",
+    "SOURCE_REFINED_SUNFLOWER_OIL",
+    "SOURCE_COW_GHEE"
+  ],
+  "sourceDecisionHashes": [
+    "0c40f7002f614c05a80181414c0c53a112222ffdb8a09c719f5845f54cf2819c",
+    "61439889fd35ea36ce4cc04ad055696458498c134ac75a56f02c616208212eaa",
+    "b6ab1a7c44ed8a36cc60483f2bf2e6ab5a97282bb04259228b4f65605812a396"
+  ],
+  "canonicalSourceHashes": [
+    "0c40f7002f614c05a80181414c0c53a112222ffdb8a09c719f5845f54cf2819c",
+    "61439889fd35ea36ce4cc04ad055696458498c134ac75a56f02c616208212eaa",
+    "b6ab1a7c44ed8a36cc60483f2bf2e6ab5a97282bb04259228b4f65605812a396"
+  ],
+  "canonicalIngredientMappings": [
+    {
+      "ingredientId": "WHOLE_WHEAT_ATTA",
+      "sourceRef": "USDA_FDC:790085",
+      "sourceHash": "0c40f7002f614c05a80181414c0c53a112222ffdb8a09c719f5845f54cf2819c"
+    },
+    {
+      "ingredientId": "REFINED_SUNFLOWER_OIL",
+      "sourceRef": "USDA_FDC:171025",
+      "sourceHash": "61439889fd35ea36ce4cc04ad055696458498c134ac75a56f02c616208212eaa"
+    },
+    {
+      "ingredientId": "COW_GHEE",
+      "sourceRef": "USDA_FDC:171314",
+      "sourceHash": "b6ab1a7c44ed8a36cc60483f2bf2e6ab5a97282bb04259228b4f65605812a396"
+    }
+  ],
+  "formulaHash": "ca63e332b0d1700ee844c916ca3f36e6b23b2933f6c9b42b4d64692ea50dab73",
+  "measurementHash": "de8723c6f2e41d89783411da09f2796b8be506e6050194c3c6dc3cc7056cda38",
+  "calculationHash": "fd4d094d3f79d24fd2600eed20be72471c9be65275f0ffde222ee82f8504ea62",
+  "reconciliationStatus": "PASS",
+  "reconciliationHash": "b97ce998f619307a0aec018b18c0b32add0ea93742e06e07edb7b4c83cd7b6a1",
+  "stageBDecisionId": "STAGE_B_DECISION_V12_CP_CHAPATI",
+  "stageBDecisionHash": "b19aa3f19d37ede69d063a91306ef447aa3cd097bf836e1d0e53ade12c72ffa5",
+  "validationReleaseVersion": 1,
+  "releaseTimestamp": "2026-09-03T12:04:07Z",
+  "releaseStatus": "VALIDATED_RELEASED",
+  "releaseHash": "d3ea1ee6037f2f9b0c3b057866fac22b19da992bb9fdf2d9e4c4d6bbee31563b",
+  "productionActivationStatus": "NOT_PRODUCTION_ACTIVE",
+  "createdBy": "FITEATSY_GOVERNED_RELEASE_PIPELINE",
+  "immutable": true
+}

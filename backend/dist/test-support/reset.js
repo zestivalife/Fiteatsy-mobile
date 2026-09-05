@@ -5,11 +5,15 @@ import { resetReportsStoreForTests } from '../modules/reports/reports.store.js';
 import { resetWearablesStateForTests } from '../modules/wearables/wearables.service.js';
 import { resetWhatsappProviderForTests } from '../modules/notifications/notification.service.js';
 import { pool } from '../db/pool.js';
+import { resetQaHandoffRateLimitForTests } from '../modules/auth/qa-session-handoff.js';
+import { assertDestructiveTestResetAllowed } from './destructive-reset-guard.js';
 export const resetBackendStateForTests = async () => {
+    assertDestructiveTestResetAllowed();
     resetMigrationStateForTests();
     await migrateDatabase();
     resetOtpChallengesForTests();
     resetWhatsappProviderForTests();
+    resetQaHandoffRateLimitForTests();
     await pool.query('truncate table auth_sessions, fiteatsy_clients, users restart identity cascade');
     await resetPlatformStoreForTests();
     await resetReportsStoreForTests();

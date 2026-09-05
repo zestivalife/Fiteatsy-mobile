@@ -1,6 +1,16 @@
 import { canonicalBiomarkerName } from './report-governance.js';
 const keyForBiomarker = (name) => canonicalBiomarkerName(name).toLowerCase();
 const publicReviewReason = (name) => `${name} needs review before it can be shown or used for health intelligence.`;
+const internalDomainErrorPatterns = [
+    /invalid care case transition/i,
+];
+export const sanitizeReportErrorForPublic = (error) => {
+    if (!error)
+        return error;
+    return internalDomainErrorPatterns.some((pattern) => pattern.test(error))
+        ? "We couldn't analyse this report. Please try again or choose another file."
+        : error;
+};
 export const sanitizeReportAnalysisForPublic = (analysis) => {
     const rejectedBiomarkers = analysis.qualityGate.rejectedBiomarkers ?? [];
     const rejectedKeys = new Set(rejectedBiomarkers

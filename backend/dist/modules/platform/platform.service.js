@@ -1,7 +1,7 @@
 import { countReports } from '../reports/reports.store.js';
 import { createCareCaseIfMissing, createNotificationRecord, createOrUpdateHealthProfile, getCareCaseById, getCareCaseByClientId, getHealthProfileByClientId, listHealthEvents, listHealthTickets, listNotificationsForClient, listTimelineEvents, saveNutritionProfile, addTimelineEvent, addHealthEvent, updateCareCase, } from './platform.store.js';
 import { calculateAgeFromDob, calculateNutritionProfileCompletion } from './platform.calculations.js';
-import { createOperationalTicket, transitionCareCaseStage } from './platform.lifecycle.js';
+import { createOperationalTicket, transitionCareCaseStage, validateStageTransition } from './platform.lifecycle.js';
 const nowIso = () => new Date().toISOString();
 const inferStage = (profile, reportCount, readinessScore) => {
     if (!profile.dateOfBirthISO || !profile.gender || !profile.heightCm || !profile.currentWeightKg)
@@ -22,7 +22,8 @@ export const upsertHealthProfile = async (owner, patch) => {
     const nutrition = await saveNutritionProfile(owner, profile.id, calculateNutritionProfileCompletion(profile, reportCount));
     const careCase = await createCareCaseIfMissing(owner, profile.id);
     const nextStage = inferStage(profile, reportCount, nutrition.readinessScore);
-    if (careCase.currentStage !== nextStage) {
+    if (careCase.currentStage !== nextStage &&
+        validateStageTransition(careCase.currentStage, nextStage)) {
         await transitionCareCaseStage(careCase, nextStage, 'Profile completion and report availability recalculated.');
     }
     await addTimelineEvent({
@@ -162,7 +163,8 @@ export const syncReportPipelineToPlatform = async (owner, reportId, stage, detai
     const reportCount = await countReports({ userId: owner.accountId, clientId: owner.clientId });
     const recomputedNutrition = await saveNutritionProfile(owner, nextBundle.profile.id, calculateNutritionProfileCompletion(nextBundle.profile, reportCount));
     const nextStage = inferStage(nextBundle.profile, reportCount, recomputedNutrition.readinessScore);
-    if (nextBundle.careCase.currentStage !== nextStage) {
+    if (nextBundle.careCase.currentStage !== nextStage &&
+        validateStageTransition(nextBundle.careCase.currentStage, nextStage)) {
         await transitionCareCaseStage(nextBundle.careCase, nextStage, `Report pipeline advanced to ${stage}.`);
     }
     if (stage === 'analysis_completed') {

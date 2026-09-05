@@ -81,6 +81,32 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     assert.equal(recommendedFoods.response.status, 200, JSON.stringify(recommendedFoods.body));
     assert.ok(recommendedFoods.body.items.every((item: { nutritionStatus:string;generatorEligibility:string;mealEligibility:string }) => item.nutritionStatus === 'NUTRITION_VERIFIED' && item.generatorEligibility === 'ELIGIBLE' && item.mealEligibility === 'RECOMMENDED'));
     if (index === 0) {
+      const activatedP0 = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST&search=cucumber`, { headers: authHeaders(consultant.token) });
+      assert.equal(activatedP0.response.status, 200, JSON.stringify(activatedP0.body));
+      const cucumber = activatedP0.body.items.find((item: { id:string; displayName:string }) => item.id === 'BATCH0_42' && item.displayName === 'Cucumber');
+      assert.ok(cucumber, JSON.stringify(activatedP0.body.items));
+      assert.equal(cucumber.nutritionStatus, 'NUTRITION_VERIFIED');
+      assert.equal(cucumber.generatorEligibility, 'ELIGIBLE');
+      assert.equal(cucumber.addToMealEligible, true);
+      const activatedTofu = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST&search=tofu`, { headers: authHeaders(consultant.token) });
+      const tofu = activatedTofu.body.items.find((item: { id:string }) => item.id === 'BATCH0_218');
+      assert.ok(tofu, JSON.stringify(activatedTofu.body.items));
+      const activatedBanana = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST&search=banana`, { headers: authHeaders(consultant.token) });
+      const banana = activatedBanana.body.items.find((item: { id:string }) => item.id === 'BATCH0_103');
+      assert.ok(banana, JSON.stringify(activatedBanana.body.items));
+      const added = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+        expectedPlanVersionId: draft.body.version.id,
+        mealHead: 'BREAKFAST',
+        components: [
+          { foodId: tofu.id, servingId: tofu.defaultServing.id, multiplier: 1 },
+          { foodId: cucumber.id, servingId: cucumber.defaultServing.id, multiplier: 1 },
+          { foodId: banana.id, servingId: banana.defaultServing.id, multiplier: 1 },
+        ],
+      }, { headers: authHeaders(consultant.token) });
+      assert.equal(added.response.status, 201, JSON.stringify(added.body));
+      assert.ok(added.body.components.some((component: { foodId:string }) => component.foodId === 'BATCH0_42'));
+    }
+    if (index === 0) {
       const durations: number[] = [];
       for (let sample = 0; sample < 20; sample += 1) {
         const started = performance.now();

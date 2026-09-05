@@ -1,0 +1,105 @@
+import crypto from 'node:crypto';
+import { pool } from '../../db/pool.js';
+const access = `(t.owner_consultant_id=$1 or (t.visibility='TEAM' and exists(select 1 from consultant_team_members tm where tm.team_id=t.team_id and tm.consultant_id=$1 and tm.active)))`;
+const map = (r) => ({ id: r.template_id, stableTemplateId: r.stable_template_id, ownerConsultantId: r.owner_consultant_id, teamId: r.team_id, visibility: r.visibility, revision: { id: r.revision_id, number: Number(r.revision_number), status: r.status, name: r.name, description: r.description, mealHead: r.meal_head, mealStructure: r.meal_structure, components: r.components, structureSha256: r.structure_sha256, createdAt: r.created_at } });
+const audit = (client, event, templateId, revisionId, actorId, extra) => client.query(`insert into consultant_meal_template_audit(id,template_id,revision_id,event_type,actor_id,client_id,reason,metadata) values($1,$2,$3,$4,$5,$6,$7,$8)`, [crypto.randomUUID(), templateId, revisionId, event, actorId, extra?.clientId ?? null, extra?.reason ?? null, JSON.stringify(extra?.metadata ?? {})]);
+export async function getTemplate(actorId, templateId, revisionId) { const r = await pool.query(`select t.id template_id,t.stable_template_id,t.owner_consultant_id,t.team_id,t.visibility,r.id revision_id,r.revision_number,r.status,r.name,r.description,r.meal_head,r.meal_structure,r.components,r.structure_sha256,r.created_at from consultant_meal_templates t join consultant_meal_template_revisions r on r.template_id=t.id where t.id=$2 and ${access} and ($3::uuid is null and r.id=t.current_revision_id or r.id=$3) limit 1`, [actorId, templateId, revisionId ?? null]); return r.rows[0] ? map(r.rows[0]) : null; }
+export async function listTemplates(actorId, input) { const values = [actorId]; const where = [access, 't.archived_at is null']; const bind = (v) => { values.push(v); return `$${values.length}`; }; if (input.search) {
+    const p = bind(input.search);
+    where.push(`(lower(r.name) like '%'||lower(${p})||'%' or lower(coalesce(r.description,'')) like '%'||lower(${p})||'%' or lower(r.components::text) like '%'||lower(${p})||'%')`);
+} if (input.mealHead)
+    where.push(`r.meal_head=${bind(input.mealHead)}`); if (input.status)
+    where.push(`r.status=${bind(input.status)}`); if (input.visibility)
+    where.push(`t.visibility=${bind(input.visibility)}`); values.push(input.limit, input.offset); const result = await pool.query(`select t.id template_id,t.stable_template_id,t.owner_consultant_id,t.team_id,t.visibility,r.id revision_id,r.revision_number,r.status,r.name,r.description,r.meal_head,r.meal_structure,r.components,r.structure_sha256,r.created_at,count(*) over()::int total_count from consultant_meal_templates t join consultant_meal_template_revisions r on r.id=t.current_revision_id where ${where.join(' and ')} order by r.name,t.id limit $${values.length - 1} offset $${values.length}`, values); return { items: result.rows.map(map), total: Number(result.rows[0]?.total_count ?? 0), limit: input.limit, offset: input.offset }; }
+export async function createTemplate(actorId, value, structureSha256, stableTemplateId) { const client = await pool.connect(); try {
+    await client.query('begin');
+    if (value.visibility === 'TEAM') {
+        const m = await client.query('select 1 from consultant_team_members where team_id=$1 and consultant_id=$2 and active', [value.teamId, actorId]);
+        if (!m.rowCount)
+            throw Object.assign(new Error('TEAM_MEMBERSHIP_REQUIRED'), { code: 'TEAM_MEMBERSHIP_REQUIRED' });
+    }
+    const duplicate = await client.query(`select 1 from consultant_meal_templates t join consultant_meal_template_revisions r on r.id=t.current_revision_id where t.owner_consultant_id=$1 and lower(r.name)=lower($2) and t.archived_at is null`, [actorId, value.name]);
+    if (duplicate.rowCount)
+        throw Object.assign(new Error('TEMPLATE_NAME_EXISTS'), { code: 'TEMPLATE_NAME_EXISTS' });
+    const id = crypto.randomUUID(), revisionId = crypto.randomUUID();
+    await client.query(`insert into consultant_meal_templates(id,stable_template_id,owner_consultant_id,team_id,visibility) values($1,$2,$3,$4,$5)`, [id, stableTemplateId, actorId, value.teamId ?? null, value.visibility]);
+    await client.query(`insert into consultant_meal_template_revisions(id,template_id,revision_number,status,name,description,meal_head,meal_structure,components,structure_sha256,created_by) values($1,$2,1,'DRAFT',$3,$4,$5,$6,$7,$8,$9)`, [revisionId, id, value.name, value.description ?? null, value.mealHead, JSON.stringify(value.mealStructure), JSON.stringify(value.components), structureSha256, actorId]);
+    await client.query('update consultant_meal_templates set current_revision_id=$1 where id=$2', [revisionId, id]);
+    await audit(client, 'TEMPLATE_CREATED', id, revisionId, actorId);
+    await client.query('commit');
+    return getTemplate(actorId, id, revisionId);
+}
+catch (e) {
+    await client.query('rollback');
+    throw e;
+}
+finally {
+    client.release();
+} }
+export async function createTemplateRevision(actorId, templateId, value, structureSha256) { const client = await pool.connect(); try {
+    await client.query('begin');
+    const t = await client.query('select * from consultant_meal_templates where id=$1 and owner_consultant_id=$2 and archived_at is null for update', [templateId, actorId]);
+    if (!t.rowCount)
+        throw Object.assign(new Error('TEMPLATE_OWNER_REQUIRED'), { code: 'TEMPLATE_OWNER_REQUIRED' });
+    const current = await client.query('select status from consultant_meal_template_revisions where id=$1', [t.rows[0].current_revision_id]);
+    if (current.rows[0]?.status === 'DRAFT')
+        throw Object.assign(new Error('DRAFT_ALREADY_EXISTS'), { code: 'DRAFT_ALREADY_EXISTS' });
+    const n = await client.query('select coalesce(max(revision_number),0)+1 n from consultant_meal_template_revisions where template_id=$1', [templateId]);
+    const id = crypto.randomUUID();
+    await client.query(`insert into consultant_meal_template_revisions(id,template_id,revision_number,status,name,description,meal_head,meal_structure,components,structure_sha256,created_by) values($1,$2,$3,'DRAFT',$4,$5,$6,$7,$8,$9,$10)`, [id, templateId, n.rows[0].n, value.name, value.description ?? null, value.mealHead, JSON.stringify(value.mealStructure), JSON.stringify(value.components), structureSha256, actorId]);
+    await client.query('update consultant_meal_templates set current_revision_id=$1 where id=$2', [id, templateId]);
+    await audit(client, 'TEMPLATE_REVISION_CREATED', templateId, id, actorId);
+    await client.query('commit');
+    return getTemplate(actorId, templateId, id);
+}
+catch (e) {
+    await client.query('rollback');
+    throw e;
+}
+finally {
+    client.release();
+} }
+export async function activateTemplate(actorId, templateId) { const client = await pool.connect(); try {
+    await client.query('begin');
+    const t = await client.query('select current_revision_id from consultant_meal_templates where id=$1 and owner_consultant_id=$2 and archived_at is null for update', [templateId, actorId]);
+    if (!t.rowCount)
+        throw Object.assign(new Error('TEMPLATE_OWNER_REQUIRED'), { code: 'TEMPLATE_OWNER_REQUIRED' });
+    const id = t.rows[0].current_revision_id;
+    const r = await client.query('select status from consultant_meal_template_revisions where id=$1', [id]);
+    if (r.rows[0]?.status !== 'DRAFT')
+        throw Object.assign(new Error('TEMPLATE_DRAFT_REQUIRED'), { code: 'TEMPLATE_DRAFT_REQUIRED' });
+    await client.query("update consultant_meal_template_revisions set status='ARCHIVED',archived_at=now() where template_id=$1 and status='ACTIVE'", [templateId]);
+    await client.query("update consultant_meal_template_revisions set status='ACTIVE',activated_at=now() where id=$1", [id]);
+    await audit(client, 'TEMPLATE_ACTIVATED', templateId, id, actorId);
+    await client.query('commit');
+    return getTemplate(actorId, templateId, id);
+}
+catch (e) {
+    await client.query('rollback');
+    throw e;
+}
+finally {
+    client.release();
+} }
+export async function archiveTemplate(actorId, templateId) { const client = await pool.connect(); try {
+    await client.query('begin');
+    const t = await client.query('update consultant_meal_templates set archived_at=now() where id=$1 and owner_consultant_id=$2 and archived_at is null returning current_revision_id', [templateId, actorId]);
+    if (!t.rowCount)
+        throw Object.assign(new Error('TEMPLATE_OWNER_REQUIRED'), { code: 'TEMPLATE_OWNER_REQUIRED' });
+    await client.query("update consultant_meal_template_revisions set status='ARCHIVED',archived_at=now() where template_id=$1 and status<>'ARCHIVED'", [templateId]);
+    await audit(client, 'TEMPLATE_ARCHIVED', templateId, t.rows[0].current_revision_id, actorId);
+    await client.query('commit');
+}
+catch (e) {
+    await client.query('rollback');
+    throw e;
+}
+finally {
+    client.release();
+} }
+export async function recordTemplateApplication(input) { const client = await pool.connect(); try {
+    await audit(client, input.accepted ? 'TEMPLATE_APPLIED' : 'TEMPLATE_APPLICATION_REJECTED', input.templateId, input.revisionId, input.actorId, { clientId: input.clientId, reason: input.reason, metadata: input.metadata });
+}
+finally {
+    client.release();
+} }
