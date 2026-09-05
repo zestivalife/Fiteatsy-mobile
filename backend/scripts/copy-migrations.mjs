@@ -80,6 +80,8 @@ const copyGovernedRuntimeAssets = async () => {
     'batch-1.validation-release.CP_BHINDI_SABJI.v1.json',
     'batch-1.validation-release.CP_BHINDI_ALOO.v1.json',
     'p0_food_verification_v17_29.json',
+    'food_unblock_v17_31_before.json',
+    'food_unblock_v17_31_decisions.json',
   ];
   await fs.mkdir(foodCurationDataTargetDir, { recursive: true });
   await Promise.all(runtimeAssets.map((fileName) => fs.copyFile(

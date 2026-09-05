@@ -15,10 +15,12 @@ import { ontologyFor, validateMealQuality, withSemanticServingProfile } from './
 import { createProductionPreparedFoods } from './prepared-food-production.js';
 import { listNutritionVerificationQueue, listReferenceCatalogueFoods } from './food-catalogue.repository.js';
 import { createP0ApprovedGenericFoods } from './p0-approved-generic-foods.js';
+import { applyFoodUnblockV1731Aliases, createFoodUnblockV1731Foods } from './food-unblock-v17-31.js';
 
 const catalogue=JSON.parse(readFileSync(new URL('./catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json',import.meta.url),'utf8')) as {foods:CatalogueFood[]};
 const p0Verification=JSON.parse(readFileSync(new URL('./food-curation/data/p0_food_verification_v17_29.json',import.meta.url),'utf8')) as {decisions:Array<{sourceRecordId:string;referenceItemId:string;canonicalName:string;aliases:string[];category:string;sourceMapping:{fdcId:number}|null;generatorEligible:boolean;componentEligible:boolean}>};
-const foods=[...createGovernedCommonFoodPopulation(catalogue.foods),...createP0ApprovedGenericFoods(catalogue.foods,p0Verification.decisions),...createProductionPreparedFoods()].map(withSemanticServingProfile);
+const foodUnblockV1731=JSON.parse(readFileSync(new URL('./food-curation/data/food_unblock_v17_31_decisions.json',import.meta.url),'utf8')) as {decisions:Array<{sourceRecordId:string;referenceItemId:string;canonicalName:string;aliases:string[];category:string;sourceMapping:{fdcId:number}|null;nutritionVector:unknown;servingProfile:{servingId:string;label:string;grams:number}|null;generatorEligible:boolean;componentEligible:boolean;outcome:string;mealHeadEligibility:MealHead[]}>};
+const foods=applyFoodUnblockV1731Aliases([...createGovernedCommonFoodPopulation(catalogue.foods),...createP0ApprovedGenericFoods(catalogue.foods,p0Verification.decisions),...createFoodUnblockV1731Foods(catalogue.foods,foodUnblockV1731.decisions),...createProductionPreparedFoods()],foodUnblockV1731.decisions).map(withSemanticServingProfile);
 const sectionByHead:Record<MealHead,string>={EARLY_MORNING:'earlyMorning',BREAKFAST:'breakfast',MID_MORNING:'midMorningSnack',LUNCH:'lunch',EVENING_SNACK:'eveningSnack',DINNER:'dinner',BEDTIME:'bedtimeNutrition'};
 const dietMap={vegetarian:'VEGETARIAN',eggetarian:'EGG',non_vegetarian:'NON_VEGETARIAN',vegan:'VEGAN',jain:'VEGETARIAN'} as const;
 export class CommonFoodApiError extends Error{constructor(public code:string,public statusCode:number,message=code){super(message)}}
