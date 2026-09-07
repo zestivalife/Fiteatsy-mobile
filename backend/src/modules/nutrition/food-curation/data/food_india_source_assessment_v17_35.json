@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "FITEATSY_FOOD_INDIA_SOURCE_ASSESSMENT_V17_35",
+  "baselineSha": "6b90f3fe06cf6ff1402cc8852dda208076615ea7",
+  "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35",
+  "generatedAt": "2026-09-07T00:00:00.000Z",
+  "assessmentCount": 2,
+  "ifctElectronicReuseCleared": false,
+  "activationEligibleAlternativeCount": 0,
+  "assessments": [
+    {
+      "assessmentId": "V1735_SOURCE_IFCT2017_NIN",
+      "sourceName": "Indian Food Composition Tables 2017",
+      "sourceOrganisation": "ICMR - National Institute of Nutrition",
+      "sourceCountry": "INDIA",
+      "sourceUrl": "https://www.nin.res.in/ebooks/IFCT2017_16122024.pdf",
+      "sourceDocumentSha256": "e87629581a58faca286f4886504bc75f33d6d3771a50fb4e40e2afee2b2b32dd",
+      "sourceClass": "INDIA_AUTHORITATIVE",
+      "rightsStatus": "PRIOR_WRITTEN_PERMISSION_REQUIRED",
+      "electronicProductReuse": "NOT_CLEARED",
+      "nutritionUseDecision": "PROHIBITED",
+      "rationale": "The publication copyright page requires prior written NIN permission for electronic storage or reproduction in a product. No Fiteatsy permission artifact is present.",
+      "numericValuesIngested": false,
+      "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35"
+    },
+    {
+      "assessmentId": "V1735_SOURCE_OGD_ICAR_NUTRIENT_WATER_PRODUCTIVITY",
+      "sourceName": "Nutrient content and nutritional water productivity of selected food commodities",
+      "sourceOrganisation": "Indian Council of Agricultural Research / Department of Agricultural Research and Education",
+      "sourceCountry": "INDIA",
+      "sourceUrl": "https://ap.data.gov.in/catalog/nutrient-content-and-nutritional-water-productivity-selected-food-commodities",
+      "licenseUrl": "https://data.gov.in/godl",
+      "sourceClass": "INDIA_AUTHORITATIVE_OPEN_DATA",
+      "rightsStatus": "GODL_REUSE_ALLOWED_WITH_ATTRIBUTION",
+      "electronicProductReuse": "CLEARED",
+      "nutritionUseDecision": "NOT_ACTIVATION_ELIGIBLE",
+      "rationale": "The open dataset is reusable, but it does not establish exact identity and preparation state with the complete per-100g mandatory macro vector for the 123-item cohort.",
+      "numericValuesIngested": false,
+      "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35"
+    }
+  ],
+  "artifactSha256": "19a465cdbbd31f0477df75e7ff7569b7c762a031b463daddb25012babfba9165"
+}

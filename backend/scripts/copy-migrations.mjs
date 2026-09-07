@@ -90,6 +90,9 @@ const copyGovernedRuntimeAssets = async () => {
     'food_usda_adjudication_v17_33a_decisions.json',
     'food_usda_activation_queue_v17_33a2.json',
     'food_catalogue_closure_v17_34.json',
+    'food_india_source_assessment_v17_35.json',
+    'food_india_resolution_v17_35.json',
+    'food_india_lab_queue_v17_35.json',
   ];
   await Promise.all([
     fs.mkdir(foodCurationDataTargetDir, { recursive: true }),

@@ -45,3 +45,20 @@ test('production-style build packages the v17.34 closure importer, migration, an
   assert.match(migrationRaw, /create table if not exists food_catalogue_closure_v17_34/);
   assert.equal(JSON.parse(artifactRaw).referenceIdentityCount, 207);
 });
+
+test('production-style build packages the v17.35 India resolution importer, migration, and artifacts', async () => {
+  await execFile('npm', ['run', 'build'], { cwd: backendRoot });
+  const paths = [
+    '../../backend/dist/catalogue-import/scripts/import-food-india-resolution-v17-35.js',
+    '../../backend/dist/catalogue-import/src/db/migrations/0062_food_india_evidence_resolution_v17_35.sql',
+    '../../backend/dist/catalogue-import/src/modules/nutrition/food-curation/data/food_india_source_assessment_v17_35.json',
+    '../../backend/dist/catalogue-import/src/modules/nutrition/food-curation/data/food_india_resolution_v17_35.json',
+    '../../backend/dist/catalogue-import/src/modules/nutrition/food-curation/data/food_india_lab_queue_v17_35.json',
+  ];
+  const contents = await Promise.all(paths.map((path) => readFile(new URL(path, import.meta.url), 'utf8')));
+  assert.match(contents[0], /V17_35_PERSISTENCE_COUNT_MISMATCH/);
+  assert.match(contents[1], /create table if not exists food_india_resolution_v17_35/);
+  assert.equal(JSON.parse(contents[2]).ifctElectronicReuseCleared, false);
+  assert.equal(JSON.parse(contents[3]).cohortCount, 123);
+  assert.equal(JSON.parse(contents[4]).queueCount, 123);
+});
