@@ -182,6 +182,19 @@ jobs:
         working-directory: backend
         run: npm run food-curation:test
 
+      - name: Reset ephemeral PostgreSQL before full regression
+        working-directory: backend
+        run: |
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+          const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+          await client.connect();
+          await client.query('drop schema public cascade');
+          await client.query('create schema public');
+          await client.end();
+          NODE
+          npm run db:migrate
+
       - name: Run full safe backend regression against ephemeral PostgreSQL
         working-directory: backend
         shell: bash
