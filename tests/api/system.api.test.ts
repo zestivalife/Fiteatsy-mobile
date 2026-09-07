@@ -93,6 +93,26 @@ test('GET /v1/version returns runtime metadata', async () => {
   );
 });
 
+test('GET /v1/version prefers Railway deployment identity over a stale configured fallback', async () => {
+  await withEnv(
+    {
+      NODE_ENV: 'production',
+      GIT_COMMIT: '6e04e67899a4e187fe8e4032bc589f5a72fd88b8',
+      RAILWAY_GIT_COMMIT_SHA: '94c199585f48853bbd288874328229340d923ac1'
+    },
+    async () => {
+      const server = await startAppServer(createApp());
+      const { response, body } = await getJson(server.baseUrl, '/v1/version');
+      try {
+        assert.equal(response.status, 200);
+        assert.equal(body.git_commit, '94c199585f48853bbd288874328229340d923ac1');
+      } finally {
+        await server.close();
+      }
+    }
+  );
+});
+
 test('POST /v1/checkins stores accepted check-in payload', async () => {
   const server = await startAppServer(createApp());
   const { response, body } = await postJson(server.baseUrl, '/v1/checkins', {
