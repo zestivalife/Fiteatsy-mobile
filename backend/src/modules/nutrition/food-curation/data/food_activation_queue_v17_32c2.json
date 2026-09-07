@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "FITEATSY_FOOD_ACTIVATION_QUEUE_V17_32C2",
+  "sourceProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+  "sourceArtifact": "food_resolution_v17_32c_decisions.json",
+  "sourceArtifactSha256": "0465da2abf60be4a793ae299ecb70120e09da670e38e555bd04010e2a09c8689",
+  "queueCount": 0,
+  "generatedAt": "2026-09-07T00:00:00.000Z",
+  "records": []
+}
