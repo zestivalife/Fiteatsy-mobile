@@ -1,0 +1,573 @@
+{
+  "schemaVersion": "FITEATSY_FOOD_USDA_ACTIVATION_QUEUE_V17_32B2",
+  "sourceProcessorVersion": "FOOD_USDA_MAPPING_V17_32B1",
+  "sourceArtifact": "food_usda_mapping_v17_32b1_decisions.json",
+  "queueCount": 47,
+  "generatedAt": "2026-09-07T00:00:00.000Z",
+  "records": [
+    {
+      "referenceItemId": "BATCH0_33",
+      "selectedFdcId": 168393,
+      "canonicalName": "Bitter gourd",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_41",
+      "selectedFdcId": 170402,
+      "canonicalName": "Chayote",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_44",
+      "selectedFdcId": 2685568,
+      "canonicalName": "Zucchini",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_45",
+      "selectedFdcId": 321360,
+      "canonicalName": "Tomato",
+      "existingGovernedFoodId": "CF_699ec058-eb2c-4942-9bc4-7d851745a299",
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "ALIAS_EXISTING"
+    },
+    {
+      "referenceItemId": "BATCH0_46",
+      "selectedFdcId": 321360,
+      "canonicalName": "Cherry tomato",
+      "existingGovernedFoodId": "CF_699ec058-eb2c-4942-9bc4-7d851745a299",
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "ALIAS_EXISTING"
+    },
+    {
+      "referenceItemId": "BATCH0_48",
+      "selectedFdcId": 169228,
+      "canonicalName": "Brinjal, long",
+      "existingGovernedFoodId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "ALIAS_EXISTING"
+    },
+    {
+      "referenceItemId": "BATCH0_51",
+      "selectedFdcId": 2258588,
+      "canonicalName": "Capsicum, green",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_52",
+      "selectedFdcId": 2258590,
+      "canonicalName": "Capsicum, red",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_53",
+      "selectedFdcId": 2258589,
+      "canonicalName": "Capsicum, yellow",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_55",
+      "selectedFdcId": 2709246,
+      "canonicalName": "Raw papaya",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_57",
+      "selectedFdcId": 174687,
+      "canonicalName": "Raw jackfruit",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_58",
+      "selectedFdcId": 171714,
+      "canonicalName": "Breadfruit",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_59",
+      "selectedFdcId": 170483,
+      "canonicalName": "Drumstick pods",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_63",
+      "selectedFdcId": 2747665,
+      "canonicalName": "Radish",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_65",
+      "selectedFdcId": 2747674,
+      "canonicalName": "Turnip",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_67",
+      "selectedFdcId": 169308,
+      "canonicalName": "Colocasia root",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_69",
+      "selectedFdcId": 169985,
+      "canonicalName": "Cassava",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_71",
+      "selectedFdcId": 169250,
+      "canonicalName": "Lotus root",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_74",
+      "selectedFdcId": 170499,
+      "canonicalName": "Shallots",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_78",
+      "selectedFdcId": 168424,
+      "canonicalName": "Kohlrabi",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_80",
+      "selectedFdcId": 2346407,
+      "canonicalName": "Cabbage, green",
+      "existingGovernedFoodId": "CF_31c4731b-d789-41d4-9cbd-c9614dd328b3",
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "ALIAS_EXISTING"
+    },
+    {
+      "referenceItemId": "BATCH0_81",
+      "selectedFdcId": 2346408,
+      "canonicalName": "Cabbage, red",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_83",
+      "selectedFdcId": 2685575,
+      "canonicalName": "Brussels sprouts",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_84",
+      "selectedFdcId": 170419,
+      "canonicalName": "Green peas",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_88",
+      "selectedFdcId": 169234,
+      "canonicalName": "Hyacinth beans",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_89",
+      "selectedFdcId": 175205,
+      "canonicalName": "Broad beans",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_91",
+      "selectedFdcId": 2709806,
+      "canonicalName": "Snow peas",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_96",
+      "selectedFdcId": 169210,
+      "canonicalName": "Bamboo shoots",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_97",
+      "selectedFdcId": 2710823,
+      "canonicalName": "Asparagus",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_98",
+      "selectedFdcId": 169251,
+      "canonicalName": "Button mushroom",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_99",
+      "selectedFdcId": 168580,
+      "canonicalName": "Oyster mushroom",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_101",
+      "selectedFdcId": 169242,
+      "canonicalName": "Shiitake mushroom",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "INGREDIENT_ONLY",
+      "intendedRoles": [
+        "VEGETABLE"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_108",
+      "selectedFdcId": 173044,
+      "canonicalName": "Guava",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_109",
+      "selectedFdcId": 169134,
+      "canonicalName": "Pomegranate",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_110",
+      "selectedFdcId": 167765,
+      "canonicalName": "Watermelon",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_113",
+      "selectedFdcId": 2346412,
+      "canonicalName": "Grapes",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_114",
+      "selectedFdcId": 746773,
+      "canonicalName": "Pear",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_116",
+      "selectedFdcId": 171725,
+      "canonicalName": "Custard apple",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_118",
+      "selectedFdcId": 169086,
+      "canonicalName": "Litchi",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_120",
+      "selectedFdcId": 327046,
+      "canonicalName": "Kiwi",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_123",
+      "selectedFdcId": 325430,
+      "canonicalName": "Peach",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_124",
+      "selectedFdcId": 2710837,
+      "canonicalName": "Plum",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_125",
+      "selectedFdcId": 2710815,
+      "canonicalName": "Apricot",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_126",
+      "selectedFdcId": 173021,
+      "canonicalName": "Fig, fresh",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_129",
+      "selectedFdcId": 170169,
+      "canonicalName": "Coconut meat",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_130",
+      "selectedFdcId": 170174,
+      "canonicalName": "Tender coconut water",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "PREPARATION_REQUIRED",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "READY_TO_DRINK",
+      "activationType": "NEW_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_134",
+      "selectedFdcId": 2710824,
+      "canonicalName": "Avocado",
+      "existingGovernedFoodId": null,
+      "intendedOperationalUse": "DIRECT_ADDABLE",
+      "intendedRoles": [
+        "FRUIT"
+      ],
+      "exactState": "RAW",
+      "activationType": "NEW_MAPPING"
+    }
+  ]
+}

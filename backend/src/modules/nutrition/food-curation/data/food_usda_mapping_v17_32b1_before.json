@@ -1,0 +1,1444 @@
+{
+  "schemaVersion": "FITEATSY_FOOD_USDA_MAPPING_V17_32B1_BEFORE",
+  "baselineSha": "635d662cfed7e32580d973bf3f0f313c4f500da1",
+  "processorVersion": "FOOD_USDA_MAPPING_V17_32B1",
+  "sourceArtifact": "food_evidence_v17_32a_decisions.json",
+  "cohortCount": 88,
+  "generatedAt": "2026-09-07T00:00:00.000Z",
+  "records": [
+    {
+      "referenceItemId": "BATCH0_30",
+      "sourceRecordId": "30",
+      "canonicalName": "Bottle gourd",
+      "aliases": [
+        "Lauki",
+        "Doodhi",
+        "Ghiya"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_31",
+      "sourceRecordId": "31",
+      "canonicalName": "Ridge gourd",
+      "aliases": [
+        "Turai",
+        "Dodka"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_32",
+      "sourceRecordId": "32",
+      "canonicalName": "Sponge gourd",
+      "aliases": [
+        "Gilki",
+        "Ghosale"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_33",
+      "sourceRecordId": "33",
+      "canonicalName": "Bitter gourd",
+      "aliases": [
+        "Karela"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_34",
+      "sourceRecordId": "34",
+      "canonicalName": "Snake gourd",
+      "aliases": [
+        "Padwal",
+        "Chichinda"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_35",
+      "sourceRecordId": "35",
+      "canonicalName": "Ash gourd",
+      "aliases": [
+        "Petha",
+        "Winter melon"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_37",
+      "sourceRecordId": "37",
+      "canonicalName": "Pointed gourd",
+      "aliases": [
+        "Parwal",
+        "Potol"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_38",
+      "sourceRecordId": "38",
+      "canonicalName": "Ivy gourd",
+      "aliases": [
+        "Tindora",
+        "Kundru",
+        "Tendli"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_39",
+      "sourceRecordId": "39",
+      "canonicalName": "Round gourd",
+      "aliases": [
+        "Tinda"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_40",
+      "sourceRecordId": "40",
+      "canonicalName": "Spine gourd",
+      "aliases": [
+        "Kantola",
+        "Kakora"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_41",
+      "sourceRecordId": "41",
+      "canonicalName": "Chayote",
+      "aliases": [
+        "Chow chow"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_43",
+      "sourceRecordId": "43",
+      "canonicalName": "Yellow cucumber",
+      "aliases": [
+        "Dosakaya"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_44",
+      "sourceRecordId": "44",
+      "canonicalName": "Zucchini",
+      "aliases": [
+        "Courgette"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_45",
+      "sourceRecordId": "45",
+      "canonicalName": "Tomato",
+      "aliases": [
+        "Tamatar"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_46",
+      "sourceRecordId": "46",
+      "canonicalName": "Cherry tomato",
+      "aliases": [
+        "Cherry tomato"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_47",
+      "sourceRecordId": "47",
+      "canonicalName": "Brinjal, purple",
+      "aliases": [
+        "Baingan",
+        "Vangi"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_48",
+      "sourceRecordId": "48",
+      "canonicalName": "Brinjal, long",
+      "aliases": [
+        "Long eggplant"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_49",
+      "sourceRecordId": "49",
+      "canonicalName": "Brinjal, green",
+      "aliases": [
+        "Green brinjal"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_51",
+      "sourceRecordId": "51",
+      "canonicalName": "Capsicum, green",
+      "aliases": [
+        "Shimla mirch"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_52",
+      "sourceRecordId": "52",
+      "canonicalName": "Capsicum, red",
+      "aliases": [
+        "Red bell pepper"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_53",
+      "sourceRecordId": "53",
+      "canonicalName": "Capsicum, yellow",
+      "aliases": [
+        "Yellow bell pepper"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_54",
+      "sourceRecordId": "54",
+      "canonicalName": "Green chilli",
+      "aliases": [
+        "Hari mirch"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_55",
+      "sourceRecordId": "55",
+      "canonicalName": "Raw papaya",
+      "aliases": [
+        "Kaccha papita"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_56",
+      "sourceRecordId": "56",
+      "canonicalName": "Raw banana",
+      "aliases": [
+        "Kaccha kela",
+        "Plantain"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_57",
+      "sourceRecordId": "57",
+      "canonicalName": "Raw jackfruit",
+      "aliases": [
+        "Kathal"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_58",
+      "sourceRecordId": "58",
+      "canonicalName": "Breadfruit",
+      "aliases": [
+        "Breadfruit"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_59",
+      "sourceRecordId": "59",
+      "canonicalName": "Drumstick pods",
+      "aliases": [
+        "Moringa",
+        "Sahjan"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_63",
+      "sourceRecordId": "63",
+      "canonicalName": "Radish",
+      "aliases": [
+        "Mooli"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_64",
+      "sourceRecordId": "64",
+      "canonicalName": "Beetroot",
+      "aliases": [
+        "Chukandar"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_65",
+      "sourceRecordId": "65",
+      "canonicalName": "Turnip",
+      "aliases": [
+        "Shalgam"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_66",
+      "sourceRecordId": "66",
+      "canonicalName": "Elephant foot yam",
+      "aliases": [
+        "Suran",
+        "Jimikand"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_67",
+      "sourceRecordId": "67",
+      "canonicalName": "Colocasia root",
+      "aliases": [
+        "Arbi",
+        "Taro"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_68",
+      "sourceRecordId": "68",
+      "canonicalName": "Purple yam",
+      "aliases": [
+        "Ratalu",
+        "Kand"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_69",
+      "sourceRecordId": "69",
+      "canonicalName": "Cassava",
+      "aliases": [
+        "Tapioca",
+        "Kappa"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_70",
+      "sourceRecordId": "70",
+      "canonicalName": "Chinese potato",
+      "aliases": [
+        "Koorka"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_71",
+      "sourceRecordId": "71",
+      "canonicalName": "Lotus root",
+      "aliases": [
+        "Kamal kakdi"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_72",
+      "sourceRecordId": "72",
+      "canonicalName": "Onion, red",
+      "aliases": [
+        "Pyaz"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_73",
+      "sourceRecordId": "73",
+      "canonicalName": "Onion, white",
+      "aliases": [
+        "White onion"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_74",
+      "sourceRecordId": "74",
+      "canonicalName": "Shallots",
+      "aliases": [
+        "Small onion",
+        "Sambar onion"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_77",
+      "sourceRecordId": "77",
+      "canonicalName": "Fresh turmeric",
+      "aliases": [
+        "Kacchi haldi"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_78",
+      "sourceRecordId": "78",
+      "canonicalName": "Kohlrabi",
+      "aliases": [
+        "Ganth gobhi",
+        "Knol-khol"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_80",
+      "sourceRecordId": "80",
+      "canonicalName": "Cabbage, green",
+      "aliases": [
+        "Patta gobhi"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_81",
+      "sourceRecordId": "81",
+      "canonicalName": "Cabbage, red",
+      "aliases": [
+        "Red cabbage"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_83",
+      "sourceRecordId": "83",
+      "canonicalName": "Brussels sprouts",
+      "aliases": [
+        "Brussels sprouts"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_84",
+      "sourceRecordId": "84",
+      "canonicalName": "Green peas",
+      "aliases": [
+        "Matar"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_86",
+      "sourceRecordId": "86",
+      "canonicalName": "Cluster beans",
+      "aliases": [
+        "Gawar",
+        "Guar"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_87",
+      "sourceRecordId": "87",
+      "canonicalName": "Yardlong beans",
+      "aliases": [
+        "Chawli pods",
+        "Borboti"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_88",
+      "sourceRecordId": "88",
+      "canonicalName": "Hyacinth beans",
+      "aliases": [
+        "Sem",
+        "Valor",
+        "Avarekalu"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_89",
+      "sourceRecordId": "89",
+      "canonicalName": "Broad beans",
+      "aliases": [
+        "Fava beans",
+        "fresh"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_90",
+      "sourceRecordId": "90",
+      "canonicalName": "Cowpea pods",
+      "aliases": [
+        "Chawli green pods"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_91",
+      "sourceRecordId": "91",
+      "canonicalName": "Snow peas",
+      "aliases": [
+        "Snow peas"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_92",
+      "sourceRecordId": "92",
+      "canonicalName": "Fresh pigeon peas",
+      "aliases": [
+        "Tuvar lilva"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_93",
+      "sourceRecordId": "93",
+      "canonicalName": "Fresh chickpeas",
+      "aliases": [
+        "Hara chana"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_94",
+      "sourceRecordId": "94",
+      "canonicalName": "Banana flower",
+      "aliases": [
+        "Kele ka phool"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_95",
+      "sourceRecordId": "95",
+      "canonicalName": "Banana stem",
+      "aliases": [
+        "Kele ka tana"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_96",
+      "sourceRecordId": "96",
+      "canonicalName": "Bamboo shoots",
+      "aliases": [
+        "Bans ke kope"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_97",
+      "sourceRecordId": "97",
+      "canonicalName": "Asparagus",
+      "aliases": [
+        "Asparagus"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_98",
+      "sourceRecordId": "98",
+      "canonicalName": "Button mushroom",
+      "aliases": [
+        "Mushroom"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_99",
+      "sourceRecordId": "99",
+      "canonicalName": "Oyster mushroom",
+      "aliases": [
+        "Dhingri"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_100",
+      "sourceRecordId": "100",
+      "canonicalName": "Milky mushroom",
+      "aliases": [
+        "Milky mushroom"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_101",
+      "sourceRecordId": "101",
+      "canonicalName": "Shiitake mushroom",
+      "aliases": [
+        "Shiitake"
+      ],
+      "category": "Vegetables",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_106",
+      "sourceRecordId": "106",
+      "canonicalName": "Mosambi",
+      "aliases": [
+        "Sweet lime"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_108",
+      "sourceRecordId": "108",
+      "canonicalName": "Guava",
+      "aliases": [
+        "Amrood",
+        "Peru"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_109",
+      "sourceRecordId": "109",
+      "canonicalName": "Pomegranate",
+      "aliases": [
+        "Anar"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_110",
+      "sourceRecordId": "110",
+      "canonicalName": "Watermelon",
+      "aliases": [
+        "Tarbooz"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_111",
+      "sourceRecordId": "111",
+      "canonicalName": "Muskmelon",
+      "aliases": [
+        "Kharbooja"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_113",
+      "sourceRecordId": "113",
+      "canonicalName": "Grapes",
+      "aliases": [
+        "Angoor"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_114",
+      "sourceRecordId": "114",
+      "canonicalName": "Pear",
+      "aliases": [
+        "Nashpati"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_115",
+      "sourceRecordId": "115",
+      "canonicalName": "Chikoo",
+      "aliases": [
+        "Sapota",
+        "Sapodilla"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_116",
+      "sourceRecordId": "116",
+      "canonicalName": "Custard apple",
+      "aliases": [
+        "Sitaphal"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_117",
+      "sourceRecordId": "117",
+      "canonicalName": "Jamun",
+      "aliases": [
+        "Indian blackberry"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_118",
+      "sourceRecordId": "118",
+      "canonicalName": "Litchi",
+      "aliases": [
+        "Lychee"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_119",
+      "sourceRecordId": "119",
+      "canonicalName": "Dragon fruit",
+      "aliases": [
+        "Pitaya"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_120",
+      "sourceRecordId": "120",
+      "canonicalName": "Kiwi",
+      "aliases": [
+        "Kiwi"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_121",
+      "sourceRecordId": "121",
+      "canonicalName": "Strawberry",
+      "aliases": [
+        "Strawberry"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_122",
+      "sourceRecordId": "122",
+      "canonicalName": "Blueberry",
+      "aliases": [
+        "Blueberry"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_123",
+      "sourceRecordId": "123",
+      "canonicalName": "Peach",
+      "aliases": [
+        "Aadoo"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_124",
+      "sourceRecordId": "124",
+      "canonicalName": "Plum",
+      "aliases": [
+        "Aloo bukhara"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_125",
+      "sourceRecordId": "125",
+      "canonicalName": "Apricot",
+      "aliases": [
+        "Khubani"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_126",
+      "sourceRecordId": "126",
+      "canonicalName": "Fig, fresh",
+      "aliases": [
+        "Anjeer"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_127",
+      "sourceRecordId": "127",
+      "canonicalName": "Dates, dried",
+      "aliases": [
+        "Khajur"
+      ],
+      "category": "Fruits",
+      "exactState": "DRIED",
+      "preparationState": "DRIED",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_128",
+      "sourceRecordId": "128",
+      "canonicalName": "Raisins",
+      "aliases": [
+        "Kishmish"
+      ],
+      "category": "Fruits",
+      "exactState": "DRIED",
+      "preparationState": "DRIED",
+      "operationalUse": "INGREDIENT_ONLY",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_129",
+      "sourceRecordId": "129",
+      "canonicalName": "Coconut meat",
+      "aliases": [
+        "Nariyal"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_130",
+      "sourceRecordId": "130",
+      "canonicalName": "Tender coconut water",
+      "aliases": [
+        "Nariyal pani"
+      ],
+      "category": "Fruits",
+      "exactState": "READY_TO_DRINK",
+      "preparationState": "READY_TO_DRINK",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_131",
+      "sourceRecordId": "131",
+      "canonicalName": "Amla",
+      "aliases": [
+        "Indian gooseberry"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_132",
+      "sourceRecordId": "132",
+      "canonicalName": "Star fruit",
+      "aliases": [
+        "Kamrakh"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_133",
+      "sourceRecordId": "133",
+      "canonicalName": "Jackfruit, ripe",
+      "aliases": [
+        "Kathal"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    },
+    {
+      "referenceItemId": "BATCH0_134",
+      "sourceRecordId": "134",
+      "canonicalName": "Avocado",
+      "aliases": [
+        "Butter fruit"
+      ],
+      "category": "Fruits",
+      "exactState": "RAW",
+      "preparationState": "RAW",
+      "operationalUse": "DIRECT_ADDABLE",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "evidenceDecisionV1732A": "EXTERNAL_SOURCE_REQUIRED"
+    }
+  ]
+}
