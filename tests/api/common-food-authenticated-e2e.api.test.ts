@@ -71,10 +71,10 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     const allFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=ALL&search=winter%20melon`, { headers: authHeaders(consultant.token) });
     assert.equal(allFoods.response.status, 200, JSON.stringify(allFoods.body));
     assert.equal(String(allFoods.body.items[0].displayName).toLowerCase(), 'ash gourd');
-    assert.equal(allFoods.body.items[0].nutritionStatus, 'REFERENCE_ONLY');
-    assert.equal(allFoods.body.items[0].generatorEligibility, 'INELIGIBLE');
-    assert.equal(allFoods.body.items[0].addToMealEligible, false);
-    assert.equal(allFoods.body.items[0].nutritionPer100g, null);
+    assert.equal(allFoods.body.items[0].nutritionStatus, 'NUTRITION_VERIFIED');
+    assert.equal(allFoods.body.items[0].generatorEligibility, 'ELIGIBLE');
+    assert.equal(allFoods.body.items[0].addToMealEligible, true);
+    assert.ok(allFoods.body.items[0].nutritionPer100g);
     assert.ok(allFoods.body.totals.catalogue > allFoods.body.totals.generatorEligible);
     assert.ok(Array.isArray(allFoods.body.facets.states));
     const recommendedFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST`, { headers: authHeaders(consultant.token) });
