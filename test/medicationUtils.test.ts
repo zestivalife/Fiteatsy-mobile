@@ -89,7 +89,7 @@ describe('medicationUtils', () => {
 
   it('resolves correct slot for multi-time medications', () => {
     const med = baseMedication();
-    const slot = resolveMedicationSlotForOccurrence(med, new Date(2026, 4, 20, 20, 0, 0, 0).toISOString());
+    const slot = resolveMedicationSlotForOccurrence(med, new Date('2026-05-20T20:00:00.000+05:30').toISOString());
     expect(slot.id).toBe('slot-2');
   });
 });
