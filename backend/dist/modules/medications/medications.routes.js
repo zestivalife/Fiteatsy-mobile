@@ -20,7 +20,7 @@ const medicationSchema = z.object({
             id: z.string().min(1),
             time24h: z.string().regex(/^\d{2}:\d{2}$/),
             mealRelation: z.enum(['before_meal', 'after_meal', 'with_meal', 'empty_stomach'])
-        })).min(1).max(24).superRefine((slots, context) => {
+        })).min(1).superRefine((slots, context) => {
             const times = slots.map((slot) => slot.time24h);
             if (new Set(times).size !== times.length)
                 context.addIssue({ code: z.ZodIssueCode.custom, message: 'Reminder times must be unique.' });
