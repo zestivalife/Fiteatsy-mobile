@@ -77,6 +77,18 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     assert.ok(allFoods.body.items[0].nutritionPer100g);
     assert.ok(allFoods.body.totals.catalogue > allFoods.body.totals.generatorEligible);
     assert.ok(Array.isArray(allFoods.body.facets.states));
+    assert.equal(allFoods.body.filterSemantics.mealContextApplied, false);
+    assert.equal(allFoods.body.filterSemantics.operationalEligibilityRequired, false);
+    assert.equal(allFoods.body.roleLabels.PULSE, 'Protein / Pulse');
+    const referenceOnly = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=ALL&search=roomali%20roti`, { headers: authHeaders(consultant.token) });
+    assert.equal(referenceOnly.response.status, 200, JSON.stringify(referenceOnly.body));
+    assert.ok(referenceOnly.body.items.some((item: { nutritionStatus:string;addToMealEligible:boolean;operationalUseState:string }) => item.nutritionStatus === 'REFERENCE_ONLY' && item.addToMealEligible === false && ['PREPARATION_REQUIRED','REFERENCE_PENDING'].includes(item.operationalUseState)));
+    const noBedtimePulse = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BEDTIME&componentRole=PULSE`, { headers: authHeaders(consultant.token) });
+    assert.equal(noBedtimePulse.response.status, 200, JSON.stringify(noBedtimePulse.body));
+    assert.equal(noBedtimePulse.body.total, 0);
+    assert.match(noBedtimePulse.body.emptyGuidance.message, /No recommended Protein \/ Pulse foods.*Bedtime/);
+    assert.deepEqual(noBedtimePulse.body.emptyGuidance.actions, ['VIEW_ALL_IN_ROLE','CLEAR_ROLE_FILTER','VIEW_ALL_CATALOGUE','CHANGE_MEAL_OR_ROLE']);
+    assert.ok(noBedtimePulse.body.counts.excluded.mealSuitability > 0);
     const recommendedFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST`, { headers: authHeaders(consultant.token) });
     assert.equal(recommendedFoods.response.status, 200, JSON.stringify(recommendedFoods.body));
     assert.ok(recommendedFoods.body.items.every((item: { nutritionStatus:string;generatorEligibility:string;mealEligibility:string }) => item.nutritionStatus === 'NUTRITION_VERIFIED' && item.generatorEligibility === 'ELIGIBLE' && item.mealEligibility === 'RECOMMENDED'));
