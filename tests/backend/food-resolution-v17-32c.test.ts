@@ -81,12 +81,13 @@ test('v17.32C does not infer prepared-food nutrition or queue duplicate governed
   assert.equal(queue.records.length, 0);
 });
 
-test('v17.32C leaves runtime generator and component pools unchanged', () => {
+test('v17.32C artifact remains resolution-only while current runtime includes later accepted activations', () => {
   const active = commonFoodCatalogue.filter((food) => food.active);
   const generator = active.filter((food) => food.generatorEligible && food.clientConsumable);
   const component = active.filter((food) => food.clientConsumable);
-  assert.equal(generator.length, 103);
-  assert.equal(component.length, 114);
+  assert.equal(queue.records.length, 0);
+  assert.equal(generator.length, 115);
+  assert.equal(component.length, 126);
 });
 
 test('v17.32C artifacts are deterministic and hash-addressed', () => {

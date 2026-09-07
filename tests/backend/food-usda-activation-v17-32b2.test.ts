@@ -57,9 +57,9 @@ test('v17.32B-2 preserves required nutrition, serving, and activation gates', ()
   }
 });
 
-test('v17.32B-2 updates runtime pools additively from accepted v17.32A/B-1 baseline', () => {
-  assert.equal(generator.length, 103);
-  assert.equal(component.length, 114);
+test('v17.32B-2 frozen activation counts are preserved inside the current expanded runtime', () => {
+  assert.equal(generator.length, 115);
+  assert.equal(component.length, 126);
   assert.equal(records.filter((record) => record.generatorEligible).length, 40);
   assert.equal(records.filter((record) => record.componentEligible).length, 42);
   assert.equal(records.filter((record) => record.directAddEligible).length, 16);
