@@ -82,6 +82,9 @@ const copyGovernedRuntimeAssets = async () => {
     'p0_food_verification_v17_29.json',
     'food_unblock_v17_31_before.json',
     'food_unblock_v17_31_decisions.json',
+    'food_usda_mapping_v17_32b1_before.json',
+    'food_usda_mapping_v17_32b1_decisions.json',
+    'food_usda_activation_queue_v17_32b2.json',
   ];
   await fs.mkdir(foodCurationDataTargetDir, { recursive: true });
   await Promise.all(runtimeAssets.map((fileName) => fs.copyFile(
