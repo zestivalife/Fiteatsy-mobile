@@ -196,6 +196,10 @@ jobs:
           await client.end();
           NODE
           npm run db:migrate
+          # The full regression includes authenticated Food Explorer coverage.
+          # Recreate the same governed reference catalogue that existed before
+          # this destructive, CI-only schema reset.
+          npm run food-catalogue:batch0:import
 
       - name: Run full safe backend regression against ephemeral PostgreSQL
         working-directory: backend
