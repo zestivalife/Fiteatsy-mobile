@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "FITEATSY_FOOD_USDA_ACTIVATION_QUEUE_V17_33A2",
+  "sourceProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+  "sourceArtifact": "food_usda_adjudication_v17_33a_decisions.json",
+  "sourceArtifactSha256": "bff176e2095992520f4a5d8a14244028d88f6eeb41035ca241a425fc86a67378",
+  "queueCount": 15,
+  "generatedAt": "2026-09-07T00:00:00.000Z",
+  "records": [
+    {
+      "referenceItemId": "BATCH0_30",
+      "selectedFdcId": 169232,
+      "canonicalName": "Bottle gourd",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Gourd, white-flowered (calabash), raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_32",
+      "selectedFdcId": 168414,
+      "canonicalName": "Sponge gourd",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Gourd, dishcloth (towelgourd), raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_35",
+      "selectedFdcId": 170069,
+      "canonicalName": "Ash gourd",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Waxgourd, (chinese preserving melon), raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_47",
+      "selectedFdcId": 169228,
+      "canonicalName": "Brinjal, purple",
+      "existingGovernedFoodId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "exactState": "RAW",
+      "selectedDescription": "Eggplant, raw",
+      "activationType": "ALIAS_EXISTING"
+    },
+    {
+      "referenceItemId": "BATCH0_49",
+      "selectedFdcId": 169228,
+      "canonicalName": "Brinjal, green",
+      "existingGovernedFoodId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "exactState": "RAW",
+      "selectedDescription": "Eggplant, raw",
+      "activationType": "ALIAS_EXISTING"
+    },
+    {
+      "referenceItemId": "BATCH0_54",
+      "selectedFdcId": 170497,
+      "canonicalName": "Green chilli",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Peppers, hot chili, green, raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_56",
+      "selectedFdcId": 168215,
+      "canonicalName": "Raw banana",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Plantains, green, raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_87",
+      "selectedFdcId": 169222,
+      "canonicalName": "Yardlong beans",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Yardlong bean, raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_90",
+      "selectedFdcId": 168405,
+      "canonicalName": "Cowpea pods",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Cowpeas, young pods with seeds, raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_92",
+      "selectedFdcId": 170025,
+      "canonicalName": "Fresh pigeon peas",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Pigeonpeas, immature seeds, raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_121",
+      "selectedFdcId": 2346409,
+      "canonicalName": "Strawberry",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Strawberries, raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_122",
+      "selectedFdcId": 2346411,
+      "canonicalName": "Blueberry",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Blueberries, raw",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_127",
+      "selectedFdcId": 168191,
+      "canonicalName": "Dates, dried",
+      "existingGovernedFoodId": "CF_6b712331-f71c-4885-b970-5c7f959b5b38",
+      "exactState": "DRIED",
+      "selectedDescription": "Dates, medjool",
+      "activationType": "ALIAS_EXISTING"
+    },
+    {
+      "referenceItemId": "BATCH0_128",
+      "selectedFdcId": 168165,
+      "canonicalName": "Raisins",
+      "existingGovernedFoodId": null,
+      "exactState": "DRIED",
+      "selectedDescription": "Raisins, dark, seedless (Includes foods for USDA's Food Distribution Program)",
+      "activationType": "NEW_USDA_MAPPING"
+    },
+    {
+      "referenceItemId": "BATCH0_132",
+      "selectedFdcId": 171715,
+      "canonicalName": "Star fruit",
+      "existingGovernedFoodId": null,
+      "exactState": "RAW",
+      "selectedDescription": "Carambola, (starfruit), raw",
+      "activationType": "NEW_USDA_MAPPING"
+    }
+  ]
+}
