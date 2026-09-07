@@ -8,6 +8,7 @@
     "scripts/import-nutrition-catalogue.ts",
     "scripts/import-pan-india-food-seed.ts",
     "scripts/import-p0-food-verification-v17-29.ts",
+    "scripts/import-food-catalogue-closure-v17-34.ts",
     "src/db/**/*.ts",
     "src/modules/nutrition/catalogue/**/*.ts",
     "src/test-support/destructive-reset-guard.ts"

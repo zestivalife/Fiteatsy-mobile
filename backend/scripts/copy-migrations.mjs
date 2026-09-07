@@ -14,6 +14,7 @@ const catalogueDataTargetDir = path.join(nutritionModuleTargetDir, 'catalogue', 
 const catalogueImportDataTargetDir = path.join(backendRoot, 'dist', 'catalogue-import', 'src', 'modules', 'nutrition', 'catalogue', 'data');
 const foodCurationDataSourceDir = path.join(nutritionModuleSourceDir, 'food-curation', 'data');
 const foodCurationDataTargetDir = path.join(nutritionModuleTargetDir, 'food-curation', 'data');
+const catalogueImportFoodCurationDataTargetDir = path.join(backendRoot, 'dist', 'catalogue-import', 'src', 'modules', 'nutrition', 'food-curation', 'data');
 
 const copyMigrations = async () => {
   const entries = await fs.readdir(sourceDir, { withFileTypes: true });
@@ -85,13 +86,20 @@ const copyGovernedRuntimeAssets = async () => {
     'food_usda_mapping_v17_32b1_before.json',
     'food_usda_mapping_v17_32b1_decisions.json',
     'food_usda_activation_queue_v17_32b2.json',
+    'food_usda_adjudication_v17_33a_before.json',
+    'food_usda_adjudication_v17_33a_decisions.json',
+    'food_usda_activation_queue_v17_33a2.json',
+    'food_catalogue_closure_v17_34.json',
   ];
-  await fs.mkdir(foodCurationDataTargetDir, { recursive: true });
-  await Promise.all(runtimeAssets.map((fileName) => fs.copyFile(
-    path.join(foodCurationDataSourceDir, fileName),
-    path.join(foodCurationDataTargetDir, fileName),
-  )));
-  console.log(`Copied ${runtimeAssets.length} governed Food runtime asset(s) to ${foodCurationDataTargetDir}`);
+  await Promise.all([
+    fs.mkdir(foodCurationDataTargetDir, { recursive: true }),
+    fs.mkdir(catalogueImportFoodCurationDataTargetDir, { recursive: true }),
+  ]);
+  await Promise.all(runtimeAssets.flatMap((fileName) => [
+    fs.copyFile(path.join(foodCurationDataSourceDir, fileName), path.join(foodCurationDataTargetDir, fileName)),
+    fs.copyFile(path.join(foodCurationDataSourceDir, fileName), path.join(catalogueImportFoodCurationDataTargetDir, fileName)),
+  ]));
+  console.log(`Copied ${runtimeAssets.length} governed Food runtime asset(s) to ${foodCurationDataTargetDir} and ${catalogueImportFoodCurationDataTargetDir}`);
 };
 
 await copyMigrations();

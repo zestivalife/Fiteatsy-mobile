@@ -28,3 +28,20 @@ test('production-style build packages the allowlisted v1.1 catalogue for the com
   assert.equal(sha256, policy.APPROVED_NUTRITION_CATALOGUE_SHA256);
   assert.deepEqual([manifest.foods.length, manifest.recipes.length, manifest.mealVariants.length], [58, 64, 376]);
 });
+
+test('production-style build packages the v17.34 closure importer, migration, and artifact', async () => {
+  await execFile('npm', ['run', 'build'], { cwd: backendRoot });
+
+  const closureImporter = new URL('../../backend/dist/catalogue-import/scripts/import-food-catalogue-closure-v17-34.js', import.meta.url);
+  const closureMigration = new URL('../../backend/dist/catalogue-import/src/db/migrations/0061_food_catalogue_closure_v17_34.sql', import.meta.url);
+  const closureArtifact = new URL('../../backend/dist/catalogue-import/src/modules/nutrition/food-curation/data/food_catalogue_closure_v17_34.json', import.meta.url);
+  const [importerRaw, migrationRaw, artifactRaw] = await Promise.all([
+    readFile(closureImporter, 'utf8'),
+    readFile(closureMigration, 'utf8'),
+    readFile(closureArtifact, 'utf8'),
+  ]);
+
+  assert.match(importerRaw, /V17_34_PERSISTED_CLOSURE_COUNT_MISMATCH/);
+  assert.match(migrationRaw, /create table if not exists food_catalogue_closure_v17_34/);
+  assert.equal(JSON.parse(artifactRaw).referenceIdentityCount, 207);
+});

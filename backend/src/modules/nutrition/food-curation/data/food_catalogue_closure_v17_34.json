@@ -1,0 +1,5675 @@
+{
+  "schemaVersion": "FITEATSY_FOOD_CATALOGUE_CLOSURE_V17_34",
+  "baselineSha": "6e04e67899a4e187fe8e4032bc589f5a72fd88b8",
+  "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34",
+  "generatedAt": "2026-09-07T00:00:00.000Z",
+  "sourceArtifacts": [
+    {
+      "filename": "p0_food_verification_v17_29.json",
+      "sha256": "af0d596e471dee0034824aacfcfff8b5405ec0d50c3dd76e2d4a28b60dfc997e"
+    },
+    {
+      "filename": "food_unblock_v17_31_decisions.json",
+      "sha256": "4662c0446ad6e9272ed109bbf4e1e2fad358318a63f9634bc913258864cfd8c8"
+    },
+    {
+      "filename": "food_resolution_v17_32c_decisions.json",
+      "sha256": "b7c409e8a377017ab42b18c36b5e8c414b5a36d36afec85a1cfbe172a7321df8"
+    },
+    {
+      "filename": "food_usda_activation_queue_v17_32b2.json",
+      "sha256": "4d1fcb91015e917d88851c9f86d9095dc0a07402f45995bb2b6cc8507f34654a"
+    },
+    {
+      "filename": "food_usda_adjudication_v17_33a_decisions.json",
+      "sha256": "3e6041af8ff45260c3994f314c0109c56d50433ddf3ebf441f9dce66e1b2e4a3"
+    },
+    {
+      "filename": "food_usda_activation_queue_v17_33a2.json",
+      "sha256": "6e48154e75c4fd3e20307adb658452d4bea0f6a9f789d0164940552367823133"
+    }
+  ],
+  "referenceIdentityCount": 207,
+  "terminalStateCounts": {
+    "ACTIVATED_GOVERNED": 74,
+    "ALIAS_GOVERNED": 7,
+    "BLOCKED_EVIDENCE": 123,
+    "SOURCE_IDENTITY_LINKED": 3
+  },
+  "terminalReasonCounts": {
+    "ACTIVATED_COMPONENT_ONLY": 9,
+    "ACTIVATED_GENERATOR": 10,
+    "CULTIVAR_MISMATCH": 3,
+    "EDIBLE_PORTION_MISMATCH": 1,
+    "EXISTING_GOVERNED_IDENTITY_ALIAS": 7,
+    "EXTERNAL_SOURCE_REQUIRED": 103,
+    "IDENTITY_AMBIGUOUS_CONFIRMED": 2,
+    "READY_FOR_NEW_USDA_MAPPING": 43,
+    "READY_FOR_USDA_ACTIVATION": 12,
+    "SOURCE_MAPPED_NOT_GENERATOR": 3,
+    "STATE_MISMATCH_CONFIRMED": 2,
+    "USDA_NO_EXACT_RECORD": 12
+  },
+  "closureInvariant": "EVERY_P0_REFERENCE_IDENTITY_HAS_EXACTLY_ONE_TERMINAL_STATE",
+  "nutritionSafetyInvariant": "NO_INFERRED_OR_STATE_CROSS_MAPPED_NUTRITION",
+  "records": [
+    {
+      "closureId": "V1734_BATCH0_1",
+      "referenceItemId": "BATCH0_1",
+      "sourceRecordId": "1",
+      "canonicalName": "Spinach",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_COMPONENT_ONLY",
+      "governedFoodId": "BATCH0_1",
+      "sourceMappingId": "USDA_FDC:1999632",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_COMPONENT_ONLY"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_2",
+      "referenceItemId": "BATCH0_2",
+      "sourceRecordId": "2",
+      "canonicalName": "Fenugreek leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_3",
+      "referenceItemId": "BATCH0_3",
+      "sourceRecordId": "3",
+      "canonicalName": "Mustard greens",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_4",
+      "referenceItemId": "BATCH0_4",
+      "sourceRecordId": "4",
+      "canonicalName": "Amaranth leaves, green",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_5",
+      "referenceItemId": "BATCH0_5",
+      "sourceRecordId": "5",
+      "canonicalName": "Amaranth leaves, red",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_6",
+      "referenceItemId": "BATCH0_6",
+      "sourceRecordId": "6",
+      "canonicalName": "Bathua leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_7",
+      "referenceItemId": "BATCH0_7",
+      "sourceRecordId": "7",
+      "canonicalName": "Dill leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_8",
+      "referenceItemId": "BATCH0_8",
+      "sourceRecordId": "8",
+      "canonicalName": "Coriander leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_9",
+      "referenceItemId": "BATCH0_9",
+      "sourceRecordId": "9",
+      "canonicalName": "Mint leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_10",
+      "referenceItemId": "BATCH0_10",
+      "sourceRecordId": "10",
+      "canonicalName": "Curry leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_11",
+      "referenceItemId": "BATCH0_11",
+      "sourceRecordId": "11",
+      "canonicalName": "Drumstick leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_12",
+      "referenceItemId": "BATCH0_12",
+      "sourceRecordId": "12",
+      "canonicalName": "Colocasia leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_13",
+      "referenceItemId": "BATCH0_13",
+      "sourceRecordId": "13",
+      "canonicalName": "Malabar spinach",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_14",
+      "referenceItemId": "BATCH0_14",
+      "sourceRecordId": "14",
+      "canonicalName": "Gongura",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_15",
+      "referenceItemId": "BATCH0_15",
+      "sourceRecordId": "15",
+      "canonicalName": "Purslane",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_16",
+      "referenceItemId": "BATCH0_16",
+      "sourceRecordId": "16",
+      "canonicalName": "Water spinach",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_17",
+      "referenceItemId": "BATCH0_17",
+      "sourceRecordId": "17",
+      "canonicalName": "Sorrel leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_18",
+      "referenceItemId": "BATCH0_18",
+      "sourceRecordId": "18",
+      "canonicalName": "Radish leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_19",
+      "referenceItemId": "BATCH0_19",
+      "sourceRecordId": "19",
+      "canonicalName": "Beet greens",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_20",
+      "referenceItemId": "BATCH0_20",
+      "sourceRecordId": "20",
+      "canonicalName": "Turnip greens",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_21",
+      "referenceItemId": "BATCH0_21",
+      "sourceRecordId": "21",
+      "canonicalName": "Spring onion greens",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_22",
+      "referenceItemId": "BATCH0_22",
+      "sourceRecordId": "22",
+      "canonicalName": "Lettuce, iceberg",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_23",
+      "referenceItemId": "BATCH0_23",
+      "sourceRecordId": "23",
+      "canonicalName": "Lettuce, romaine",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_24",
+      "referenceItemId": "BATCH0_24",
+      "sourceRecordId": "24",
+      "canonicalName": "Kale",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_25",
+      "referenceItemId": "BATCH0_25",
+      "sourceRecordId": "25",
+      "canonicalName": "Bok choy",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_26",
+      "referenceItemId": "BATCH0_26",
+      "sourceRecordId": "26",
+      "canonicalName": "Celery",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_27",
+      "referenceItemId": "BATCH0_27",
+      "sourceRecordId": "27",
+      "canonicalName": "Agathi leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_28",
+      "referenceItemId": "BATCH0_28",
+      "sourceRecordId": "28",
+      "canonicalName": "Manathakkali leaves",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_29",
+      "referenceItemId": "BATCH0_29",
+      "sourceRecordId": "29",
+      "canonicalName": "Ponnanganni greens",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_30",
+      "referenceItemId": "BATCH0_30",
+      "sourceRecordId": "30",
+      "canonicalName": "Bottle gourd",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_30",
+      "sourceMappingId": "USDA_FDC:169232",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_31",
+      "referenceItemId": "BATCH0_31",
+      "sourceRecordId": "31",
+      "canonicalName": "Ridge gourd",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_32",
+      "referenceItemId": "BATCH0_32",
+      "sourceRecordId": "32",
+      "canonicalName": "Sponge gourd",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_32",
+      "sourceMappingId": "USDA_FDC:168414",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_33",
+      "referenceItemId": "BATCH0_33",
+      "sourceRecordId": "33",
+      "canonicalName": "Bitter gourd",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_33",
+      "sourceMappingId": "USDA_FDC:168393",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_34",
+      "referenceItemId": "BATCH0_34",
+      "sourceRecordId": "34",
+      "canonicalName": "Snake gourd",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_35",
+      "referenceItemId": "BATCH0_35",
+      "sourceRecordId": "35",
+      "canonicalName": "Ash gourd",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_35",
+      "sourceMappingId": "USDA_FDC:170069",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_36",
+      "referenceItemId": "BATCH0_36",
+      "sourceRecordId": "36",
+      "canonicalName": "Pumpkin",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_COMPONENT_ONLY",
+      "governedFoodId": "BATCH0_36",
+      "sourceMappingId": "USDA_FDC:168448",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_COMPONENT_ONLY"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_37",
+      "referenceItemId": "BATCH0_37",
+      "sourceRecordId": "37",
+      "canonicalName": "Pointed gourd",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_38",
+      "referenceItemId": "BATCH0_38",
+      "sourceRecordId": "38",
+      "canonicalName": "Ivy gourd",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_39",
+      "referenceItemId": "BATCH0_39",
+      "sourceRecordId": "39",
+      "canonicalName": "Round gourd",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_40",
+      "referenceItemId": "BATCH0_40",
+      "sourceRecordId": "40",
+      "canonicalName": "Spine gourd",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_41",
+      "referenceItemId": "BATCH0_41",
+      "sourceRecordId": "41",
+      "canonicalName": "Chayote",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_41",
+      "sourceMappingId": "USDA_FDC:170402",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_42",
+      "referenceItemId": "BATCH0_42",
+      "sourceRecordId": "42",
+      "canonicalName": "Cucumber",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_42",
+      "sourceMappingId": "USDA_FDC:169225",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_43",
+      "referenceItemId": "BATCH0_43",
+      "sourceRecordId": "43",
+      "canonicalName": "Yellow cucumber",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "CULTIVAR_MISMATCH",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "CULTIVAR_MISMATCH"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_44",
+      "referenceItemId": "BATCH0_44",
+      "sourceRecordId": "44",
+      "canonicalName": "Zucchini",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_44",
+      "sourceMappingId": "USDA_FDC:2685568",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_45",
+      "referenceItemId": "BATCH0_45",
+      "sourceRecordId": "45",
+      "canonicalName": "Tomato",
+      "referenceState": "RAW",
+      "terminalState": "ALIAS_GOVERNED",
+      "terminalReason": "EXISTING_GOVERNED_IDENTITY_ALIAS",
+      "governedFoodId": "CF_699ec058-eb2c-4942-9bc4-7d851745a299",
+      "sourceMappingId": "USDA_FDC:321360",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "ALIAS_EXISTING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_46",
+      "referenceItemId": "BATCH0_46",
+      "sourceRecordId": "46",
+      "canonicalName": "Cherry tomato",
+      "referenceState": "RAW",
+      "terminalState": "ALIAS_GOVERNED",
+      "terminalReason": "EXISTING_GOVERNED_IDENTITY_ALIAS",
+      "governedFoodId": "CF_699ec058-eb2c-4942-9bc4-7d851745a299",
+      "sourceMappingId": "USDA_FDC:321360",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "ALIAS_EXISTING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_47",
+      "referenceItemId": "BATCH0_47",
+      "sourceRecordId": "47",
+      "canonicalName": "Brinjal, purple",
+      "referenceState": "RAW",
+      "terminalState": "ALIAS_GOVERNED",
+      "terminalReason": "EXISTING_GOVERNED_IDENTITY_ALIAS",
+      "governedFoodId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "sourceMappingId": "USDA_FDC:169228",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "EXISTING_GOVERNED_IDENTITY_ALIAS"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "ALIAS_EXISTING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_48",
+      "referenceItemId": "BATCH0_48",
+      "sourceRecordId": "48",
+      "canonicalName": "Brinjal, long",
+      "referenceState": "RAW",
+      "terminalState": "ALIAS_GOVERNED",
+      "terminalReason": "EXISTING_GOVERNED_IDENTITY_ALIAS",
+      "governedFoodId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "sourceMappingId": "USDA_FDC:169228",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "ALIAS_EXISTING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_49",
+      "referenceItemId": "BATCH0_49",
+      "sourceRecordId": "49",
+      "canonicalName": "Brinjal, green",
+      "referenceState": "RAW",
+      "terminalState": "ALIAS_GOVERNED",
+      "terminalReason": "EXISTING_GOVERNED_IDENTITY_ALIAS",
+      "governedFoodId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "sourceMappingId": "USDA_FDC:169228",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "EXISTING_GOVERNED_IDENTITY_ALIAS"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "ALIAS_EXISTING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_50",
+      "referenceItemId": "BATCH0_50",
+      "sourceRecordId": "50",
+      "canonicalName": "Okra",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_COMPONENT_ONLY",
+      "governedFoodId": "BATCH0_50",
+      "sourceMappingId": "USDA_FDC:169260",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_COMPONENT_ONLY"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_51",
+      "referenceItemId": "BATCH0_51",
+      "sourceRecordId": "51",
+      "canonicalName": "Capsicum, green",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_51",
+      "sourceMappingId": "USDA_FDC:2258588",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_52",
+      "referenceItemId": "BATCH0_52",
+      "sourceRecordId": "52",
+      "canonicalName": "Capsicum, red",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_52",
+      "sourceMappingId": "USDA_FDC:2258590",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_53",
+      "referenceItemId": "BATCH0_53",
+      "sourceRecordId": "53",
+      "canonicalName": "Capsicum, yellow",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_53",
+      "sourceMappingId": "USDA_FDC:2258589",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_54",
+      "referenceItemId": "BATCH0_54",
+      "sourceRecordId": "54",
+      "canonicalName": "Green chilli",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_54",
+      "sourceMappingId": "USDA_FDC:170497",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_55",
+      "referenceItemId": "BATCH0_55",
+      "sourceRecordId": "55",
+      "canonicalName": "Raw papaya",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_55",
+      "sourceMappingId": "USDA_FDC:2709246",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_56",
+      "referenceItemId": "BATCH0_56",
+      "sourceRecordId": "56",
+      "canonicalName": "Raw banana",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_56",
+      "sourceMappingId": "USDA_FDC:168215",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_57",
+      "referenceItemId": "BATCH0_57",
+      "sourceRecordId": "57",
+      "canonicalName": "Raw jackfruit",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_57",
+      "sourceMappingId": "USDA_FDC:174687",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_58",
+      "referenceItemId": "BATCH0_58",
+      "sourceRecordId": "58",
+      "canonicalName": "Breadfruit",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_58",
+      "sourceMappingId": "USDA_FDC:171714",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_59",
+      "referenceItemId": "BATCH0_59",
+      "sourceRecordId": "59",
+      "canonicalName": "Drumstick pods",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_59",
+      "sourceMappingId": "USDA_FDC:170483",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_60",
+      "referenceItemId": "BATCH0_60",
+      "sourceRecordId": "60",
+      "canonicalName": "Potato",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_COMPONENT_ONLY",
+      "governedFoodId": "BATCH0_60",
+      "sourceMappingId": "USDA_FDC:2346401",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_COMPONENT_ONLY"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_61",
+      "referenceItemId": "BATCH0_61",
+      "sourceRecordId": "61",
+      "canonicalName": "Sweet potato",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_COMPONENT_ONLY",
+      "governedFoodId": "BATCH0_61",
+      "sourceMappingId": "USDA_FDC:2346404",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_COMPONENT_ONLY"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_62",
+      "referenceItemId": "BATCH0_62",
+      "sourceRecordId": "62",
+      "canonicalName": "Carrot",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_COMPONENT_ONLY",
+      "governedFoodId": "BATCH0_62",
+      "sourceMappingId": "USDA_FDC:2258586",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_COMPONENT_ONLY"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_63",
+      "referenceItemId": "BATCH0_63",
+      "sourceRecordId": "63",
+      "canonicalName": "Radish",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_63",
+      "sourceMappingId": "USDA_FDC:2747665",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_64",
+      "referenceItemId": "BATCH0_64",
+      "sourceRecordId": "64",
+      "canonicalName": "Beetroot",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_65",
+      "referenceItemId": "BATCH0_65",
+      "sourceRecordId": "65",
+      "canonicalName": "Turnip",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_65",
+      "sourceMappingId": "USDA_FDC:2747674",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_66",
+      "referenceItemId": "BATCH0_66",
+      "sourceRecordId": "66",
+      "canonicalName": "Elephant foot yam",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_67",
+      "referenceItemId": "BATCH0_67",
+      "sourceRecordId": "67",
+      "canonicalName": "Colocasia root",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_67",
+      "sourceMappingId": "USDA_FDC:169308",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_68",
+      "referenceItemId": "BATCH0_68",
+      "sourceRecordId": "68",
+      "canonicalName": "Purple yam",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_69",
+      "referenceItemId": "BATCH0_69",
+      "sourceRecordId": "69",
+      "canonicalName": "Cassava",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_69",
+      "sourceMappingId": "USDA_FDC:169985",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_70",
+      "referenceItemId": "BATCH0_70",
+      "sourceRecordId": "70",
+      "canonicalName": "Chinese potato",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_71",
+      "referenceItemId": "BATCH0_71",
+      "sourceRecordId": "71",
+      "canonicalName": "Lotus root",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_71",
+      "sourceMappingId": "USDA_FDC:169250",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_72",
+      "referenceItemId": "BATCH0_72",
+      "sourceRecordId": "72",
+      "canonicalName": "Onion, red",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "CULTIVAR_MISMATCH",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "CULTIVAR_MISMATCH"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_73",
+      "referenceItemId": "BATCH0_73",
+      "sourceRecordId": "73",
+      "canonicalName": "Onion, white",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "CULTIVAR_MISMATCH",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "STATE_MISMATCH_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "CULTIVAR_MISMATCH"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_74",
+      "referenceItemId": "BATCH0_74",
+      "sourceRecordId": "74",
+      "canonicalName": "Shallots",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_74",
+      "sourceMappingId": "USDA_FDC:170499",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_75",
+      "referenceItemId": "BATCH0_75",
+      "sourceRecordId": "75",
+      "canonicalName": "Garlic",
+      "referenceState": "RAW",
+      "terminalState": "SOURCE_IDENTITY_LINKED",
+      "terminalReason": "SOURCE_MAPPED_NOT_GENERATOR",
+      "governedFoodId": null,
+      "sourceMappingId": "USDA_FDC:169230",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "SOURCE_MAPPED_NOT_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_76",
+      "referenceItemId": "BATCH0_76",
+      "sourceRecordId": "76",
+      "canonicalName": "Ginger",
+      "referenceState": "RAW",
+      "terminalState": "SOURCE_IDENTITY_LINKED",
+      "terminalReason": "SOURCE_MAPPED_NOT_GENERATOR",
+      "governedFoodId": null,
+      "sourceMappingId": "USDA_FDC:169231",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "SOURCE_MAPPED_NOT_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_77",
+      "referenceItemId": "BATCH0_77",
+      "sourceRecordId": "77",
+      "canonicalName": "Fresh turmeric",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "STATE_MISMATCH_CONFIRMED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "STATE_MISMATCH_CONFIRMED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_78",
+      "referenceItemId": "BATCH0_78",
+      "sourceRecordId": "78",
+      "canonicalName": "Kohlrabi",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_78",
+      "sourceMappingId": "USDA_FDC:168424",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_79",
+      "referenceItemId": "BATCH0_79",
+      "sourceRecordId": "79",
+      "canonicalName": "Cauliflower",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_79",
+      "sourceMappingId": "USDA_FDC:2685573",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_80",
+      "referenceItemId": "BATCH0_80",
+      "sourceRecordId": "80",
+      "canonicalName": "Cabbage, green",
+      "referenceState": "RAW",
+      "terminalState": "ALIAS_GOVERNED",
+      "terminalReason": "EXISTING_GOVERNED_IDENTITY_ALIAS",
+      "governedFoodId": "CF_31c4731b-d789-41d4-9cbd-c9614dd328b3",
+      "sourceMappingId": "USDA_FDC:2346407",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "ALIAS_EXISTING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_81",
+      "referenceItemId": "BATCH0_81",
+      "sourceRecordId": "81",
+      "canonicalName": "Cabbage, red",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_81",
+      "sourceMappingId": "USDA_FDC:2346408",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_82",
+      "referenceItemId": "BATCH0_82",
+      "sourceRecordId": "82",
+      "canonicalName": "Broccoli",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_82",
+      "sourceMappingId": "USDA_FDC:747447",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_83",
+      "referenceItemId": "BATCH0_83",
+      "sourceRecordId": "83",
+      "canonicalName": "Brussels sprouts",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_83",
+      "sourceMappingId": "USDA_FDC:2685575",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_84",
+      "referenceItemId": "BATCH0_84",
+      "sourceRecordId": "84",
+      "canonicalName": "Green peas",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_84",
+      "sourceMappingId": "USDA_FDC:170419",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_85",
+      "referenceItemId": "BATCH0_85",
+      "sourceRecordId": "85",
+      "canonicalName": "French beans",
+      "referenceState": "RAW",
+      "terminalState": "SOURCE_IDENTITY_LINKED",
+      "terminalReason": "SOURCE_MAPPED_NOT_GENERATOR",
+      "governedFoodId": null,
+      "sourceMappingId": "USDA_FDC:2346400",
+      "effectiveProcessorVersion": "FOOD_UNBLOCK_V17_31",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "SOURCE_MAPPED_NOT_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_86",
+      "referenceItemId": "BATCH0_86",
+      "sourceRecordId": "86",
+      "canonicalName": "Cluster beans",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_87",
+      "referenceItemId": "BATCH0_87",
+      "sourceRecordId": "87",
+      "canonicalName": "Yardlong beans",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_87",
+      "sourceMappingId": "USDA_FDC:169222",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "STATE_MISMATCH_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_88",
+      "referenceItemId": "BATCH0_88",
+      "sourceRecordId": "88",
+      "canonicalName": "Hyacinth beans",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_88",
+      "sourceMappingId": "USDA_FDC:169234",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_89",
+      "referenceItemId": "BATCH0_89",
+      "sourceRecordId": "89",
+      "canonicalName": "Broad beans",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_89",
+      "sourceMappingId": "USDA_FDC:175205",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_90",
+      "referenceItemId": "BATCH0_90",
+      "sourceRecordId": "90",
+      "canonicalName": "Cowpea pods",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_90",
+      "sourceMappingId": "USDA_FDC:168405",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_91",
+      "referenceItemId": "BATCH0_91",
+      "sourceRecordId": "91",
+      "canonicalName": "Snow peas",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_91",
+      "sourceMappingId": "USDA_FDC:2709806",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_92",
+      "referenceItemId": "BATCH0_92",
+      "sourceRecordId": "92",
+      "canonicalName": "Fresh pigeon peas",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_92",
+      "sourceMappingId": "USDA_FDC:170025",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "STATE_MISMATCH_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_93",
+      "referenceItemId": "BATCH0_93",
+      "sourceRecordId": "93",
+      "canonicalName": "Fresh chickpeas",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EDIBLE_PORTION_MISMATCH",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "STATE_MISMATCH_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "EDIBLE_PORTION_MISMATCH"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_94",
+      "referenceItemId": "BATCH0_94",
+      "sourceRecordId": "94",
+      "canonicalName": "Banana flower",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_95",
+      "referenceItemId": "BATCH0_95",
+      "sourceRecordId": "95",
+      "canonicalName": "Banana stem",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_96",
+      "referenceItemId": "BATCH0_96",
+      "sourceRecordId": "96",
+      "canonicalName": "Bamboo shoots",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_96",
+      "sourceMappingId": "USDA_FDC:169210",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_97",
+      "referenceItemId": "BATCH0_97",
+      "sourceRecordId": "97",
+      "canonicalName": "Asparagus",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_97",
+      "sourceMappingId": "USDA_FDC:2710823",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_98",
+      "referenceItemId": "BATCH0_98",
+      "sourceRecordId": "98",
+      "canonicalName": "Button mushroom",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_98",
+      "sourceMappingId": "USDA_FDC:169251",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_99",
+      "referenceItemId": "BATCH0_99",
+      "sourceRecordId": "99",
+      "canonicalName": "Oyster mushroom",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_99",
+      "sourceMappingId": "USDA_FDC:168580",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_100",
+      "referenceItemId": "BATCH0_100",
+      "sourceRecordId": "100",
+      "canonicalName": "Milky mushroom",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "USDA_NO_EXACT_RECORD",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "USDA_NO_EXACT_RECORD"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_101",
+      "referenceItemId": "BATCH0_101",
+      "sourceRecordId": "101",
+      "canonicalName": "Shiitake mushroom",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_101",
+      "sourceMappingId": "USDA_FDC:169242",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_102",
+      "referenceItemId": "BATCH0_102",
+      "sourceRecordId": "102",
+      "canonicalName": "Apple",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_102",
+      "sourceMappingId": "USDA_FDC:1750339",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_103",
+      "referenceItemId": "BATCH0_103",
+      "sourceRecordId": "103",
+      "canonicalName": "Banana",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_103",
+      "sourceMappingId": "USDA_FDC:1105314",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_104",
+      "referenceItemId": "BATCH0_104",
+      "sourceRecordId": "104",
+      "canonicalName": "Mango",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_104",
+      "sourceMappingId": "USDA_FDC:2710833",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_105",
+      "referenceItemId": "BATCH0_105",
+      "sourceRecordId": "105",
+      "canonicalName": "Orange",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_105",
+      "sourceMappingId": "USDA_FDC:746771",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_106",
+      "referenceItemId": "BATCH0_106",
+      "sourceRecordId": "106",
+      "canonicalName": "Mosambi",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_107",
+      "referenceItemId": "BATCH0_107",
+      "sourceRecordId": "107",
+      "canonicalName": "Papaya",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_107",
+      "sourceMappingId": "USDA_FDC:169926",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_108",
+      "referenceItemId": "BATCH0_108",
+      "sourceRecordId": "108",
+      "canonicalName": "Guava",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_108",
+      "sourceMappingId": "USDA_FDC:173044",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_109",
+      "referenceItemId": "BATCH0_109",
+      "sourceRecordId": "109",
+      "canonicalName": "Pomegranate",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_109",
+      "sourceMappingId": "USDA_FDC:169134",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_110",
+      "referenceItemId": "BATCH0_110",
+      "sourceRecordId": "110",
+      "canonicalName": "Watermelon",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_110",
+      "sourceMappingId": "USDA_FDC:167765",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_111",
+      "referenceItemId": "BATCH0_111",
+      "sourceRecordId": "111",
+      "canonicalName": "Muskmelon",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_112",
+      "referenceItemId": "BATCH0_112",
+      "sourceRecordId": "112",
+      "canonicalName": "Pineapple",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_112",
+      "sourceMappingId": "USDA_FDC:2346398",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_113",
+      "referenceItemId": "BATCH0_113",
+      "sourceRecordId": "113",
+      "canonicalName": "Grapes",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_113",
+      "sourceMappingId": "USDA_FDC:2346412",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_114",
+      "referenceItemId": "BATCH0_114",
+      "sourceRecordId": "114",
+      "canonicalName": "Pear",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_114",
+      "sourceMappingId": "USDA_FDC:746773",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_115",
+      "referenceItemId": "BATCH0_115",
+      "sourceRecordId": "115",
+      "canonicalName": "Chikoo",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_116",
+      "referenceItemId": "BATCH0_116",
+      "sourceRecordId": "116",
+      "canonicalName": "Custard apple",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_116",
+      "sourceMappingId": "USDA_FDC:171725",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_117",
+      "referenceItemId": "BATCH0_117",
+      "sourceRecordId": "117",
+      "canonicalName": "Jamun",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_118",
+      "referenceItemId": "BATCH0_118",
+      "sourceRecordId": "118",
+      "canonicalName": "Litchi",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_118",
+      "sourceMappingId": "USDA_FDC:169086",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_119",
+      "referenceItemId": "BATCH0_119",
+      "sourceRecordId": "119",
+      "canonicalName": "Dragon fruit",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "STATE_MISMATCH_CONFIRMED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "STATE_MISMATCH_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "STATE_MISMATCH_CONFIRMED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_120",
+      "referenceItemId": "BATCH0_120",
+      "sourceRecordId": "120",
+      "canonicalName": "Kiwi",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_120",
+      "sourceMappingId": "USDA_FDC:327046",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_121",
+      "referenceItemId": "BATCH0_121",
+      "sourceRecordId": "121",
+      "canonicalName": "Strawberry",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_121",
+      "sourceMappingId": "USDA_FDC:2346409",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_122",
+      "referenceItemId": "BATCH0_122",
+      "sourceRecordId": "122",
+      "canonicalName": "Blueberry",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_122",
+      "sourceMappingId": "USDA_FDC:2346411",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_123",
+      "referenceItemId": "BATCH0_123",
+      "sourceRecordId": "123",
+      "canonicalName": "Peach",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_123",
+      "sourceMappingId": "USDA_FDC:325430",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_124",
+      "referenceItemId": "BATCH0_124",
+      "sourceRecordId": "124",
+      "canonicalName": "Plum",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_124",
+      "sourceMappingId": "USDA_FDC:2710837",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_125",
+      "referenceItemId": "BATCH0_125",
+      "sourceRecordId": "125",
+      "canonicalName": "Apricot",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_125",
+      "sourceMappingId": "USDA_FDC:2710815",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_126",
+      "referenceItemId": "BATCH0_126",
+      "sourceRecordId": "126",
+      "canonicalName": "Fig, fresh",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_126",
+      "sourceMappingId": "USDA_FDC:173021",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_127",
+      "referenceItemId": "BATCH0_127",
+      "sourceRecordId": "127",
+      "canonicalName": "Dates, dried",
+      "referenceState": "DRIED",
+      "terminalState": "ALIAS_GOVERNED",
+      "terminalReason": "EXISTING_GOVERNED_IDENTITY_ALIAS",
+      "governedFoodId": "CF_6b712331-f71c-4885-b970-5c7f959b5b38",
+      "sourceMappingId": "USDA_FDC:168191",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "STATE_MISMATCH_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "EXISTING_GOVERNED_IDENTITY_ALIAS"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "ALIAS_EXISTING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_128",
+      "referenceItemId": "BATCH0_128",
+      "sourceRecordId": "128",
+      "canonicalName": "Raisins",
+      "referenceState": "DRIED",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_128",
+      "sourceMappingId": "USDA_FDC:168165",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "STATE_MISMATCH_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_129",
+      "referenceItemId": "BATCH0_129",
+      "sourceRecordId": "129",
+      "canonicalName": "Coconut meat",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_129",
+      "sourceMappingId": "USDA_FDC:170169",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_130",
+      "referenceItemId": "BATCH0_130",
+      "sourceRecordId": "130",
+      "canonicalName": "Tender coconut water",
+      "referenceState": "READY_TO_DRINK",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_130",
+      "sourceMappingId": "USDA_FDC:170174",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_131",
+      "referenceItemId": "BATCH0_131",
+      "sourceRecordId": "131",
+      "canonicalName": "Amla",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_132",
+      "referenceItemId": "BATCH0_132",
+      "sourceRecordId": "132",
+      "canonicalName": "Star fruit",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_USDA_ACTIVATION",
+      "governedFoodId": "BATCH0_132",
+      "sourceMappingId": "USDA_FDC:171715",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "READY_FOR_USDA_ACTIVATION"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_33A2",
+          "outcome": "NEW_USDA_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_133",
+      "referenceItemId": "BATCH0_133",
+      "sourceRecordId": "133",
+      "canonicalName": "Jackfruit, ripe",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+          "outcome": "IDENTITY_AMBIGUOUS_CONFIRMED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_134",
+      "referenceItemId": "BATCH0_134",
+      "sourceRecordId": "134",
+      "canonicalName": "Avocado",
+      "referenceState": "RAW",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "READY_FOR_NEW_USDA_MAPPING",
+      "governedFoodId": "BATCH0_134",
+      "sourceMappingId": "USDA_FDC:2710824",
+      "effectiveProcessorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_USDA_ACTIVATION_V17_32B2",
+          "outcome": "NEW_MAPPING"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_135",
+      "referenceItemId": "BATCH0_135",
+      "sourceRecordId": "135",
+      "canonicalName": "Rice, white",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_136",
+      "referenceItemId": "BATCH0_136",
+      "sourceRecordId": "136",
+      "canonicalName": "Rice, brown",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_COMPONENT_ONLY",
+      "governedFoodId": "BATCH0_136",
+      "sourceMappingId": "USDA_FDC:2512380",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_COMPONENT_ONLY"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_137",
+      "referenceItemId": "BATCH0_137",
+      "sourceRecordId": "137",
+      "canonicalName": "Basmati rice",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_138",
+      "referenceItemId": "BATCH0_138",
+      "sourceRecordId": "138",
+      "canonicalName": "Parboiled rice",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_139",
+      "referenceItemId": "BATCH0_139",
+      "sourceRecordId": "139",
+      "canonicalName": "Red rice",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_140",
+      "referenceItemId": "BATCH0_140",
+      "sourceRecordId": "140",
+      "canonicalName": "Black rice",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_141",
+      "referenceItemId": "BATCH0_141",
+      "sourceRecordId": "141",
+      "canonicalName": "Flattened rice",
+      "referenceState": "DRY,_UNCOOKED",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_142",
+      "referenceItemId": "BATCH0_142",
+      "sourceRecordId": "142",
+      "canonicalName": "Puffed rice",
+      "referenceState": "DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_143",
+      "referenceItemId": "BATCH0_143",
+      "sourceRecordId": "143",
+      "canonicalName": "Wheat whole grain",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_144",
+      "referenceItemId": "BATCH0_144",
+      "sourceRecordId": "144",
+      "canonicalName": "Whole wheat flour",
+      "referenceState": "DRY",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_COMPONENT_ONLY",
+      "governedFoodId": "BATCH0_144",
+      "sourceMappingId": "USDA_FDC:790085",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_COMPONENT_ONLY"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_145",
+      "referenceItemId": "BATCH0_145",
+      "sourceRecordId": "145",
+      "canonicalName": "Refined wheat flour",
+      "referenceState": "DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_146",
+      "referenceItemId": "BATCH0_146",
+      "sourceRecordId": "146",
+      "canonicalName": "Semolina",
+      "referenceState": "DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_147",
+      "referenceItemId": "BATCH0_147",
+      "sourceRecordId": "147",
+      "canonicalName": "Broken wheat",
+      "referenceState": "DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_148",
+      "referenceItemId": "BATCH0_148",
+      "sourceRecordId": "148",
+      "canonicalName": "Barley",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_149",
+      "referenceItemId": "BATCH0_149",
+      "sourceRecordId": "149",
+      "canonicalName": "Pearl millet",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_150",
+      "referenceItemId": "BATCH0_150",
+      "sourceRecordId": "150",
+      "canonicalName": "Sorghum",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_151",
+      "referenceItemId": "BATCH0_151",
+      "sourceRecordId": "151",
+      "canonicalName": "Finger millet",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_152",
+      "referenceItemId": "BATCH0_152",
+      "sourceRecordId": "152",
+      "canonicalName": "Foxtail millet",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_153",
+      "referenceItemId": "BATCH0_153",
+      "sourceRecordId": "153",
+      "canonicalName": "Little millet",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_154",
+      "referenceItemId": "BATCH0_154",
+      "sourceRecordId": "154",
+      "canonicalName": "Kodo millet",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_155",
+      "referenceItemId": "BATCH0_155",
+      "sourceRecordId": "155",
+      "canonicalName": "Barnyard millet",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_156",
+      "referenceItemId": "BATCH0_156",
+      "sourceRecordId": "156",
+      "canonicalName": "Proso millet",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_157",
+      "referenceItemId": "BATCH0_157",
+      "sourceRecordId": "157",
+      "canonicalName": "Amaranth grain",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_158",
+      "referenceItemId": "BATCH0_158",
+      "sourceRecordId": "158",
+      "canonicalName": "Quinoa",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_159",
+      "referenceItemId": "BATCH0_159",
+      "sourceRecordId": "159",
+      "canonicalName": "Oats",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_COMPONENT_ONLY",
+      "governedFoodId": "BATCH0_159",
+      "sourceMappingId": "USDA_FDC:169705",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_COMPONENT_ONLY"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_160",
+      "referenceItemId": "BATCH0_160",
+      "sourceRecordId": "160",
+      "canonicalName": "Corn maize",
+      "referenceState": "RAW,_DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_161",
+      "referenceItemId": "BATCH0_161",
+      "sourceRecordId": "161",
+      "canonicalName": "Cornmeal",
+      "referenceState": "DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_162",
+      "referenceItemId": "BATCH0_162",
+      "sourceRecordId": "162",
+      "canonicalName": "Chickpeas, kabuli",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_163",
+      "referenceItemId": "BATCH0_163",
+      "sourceRecordId": "163",
+      "canonicalName": "Chickpeas, desi",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_164",
+      "referenceItemId": "BATCH0_164",
+      "sourceRecordId": "164",
+      "canonicalName": "Green gram, whole",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_165",
+      "referenceItemId": "BATCH0_165",
+      "sourceRecordId": "165",
+      "canonicalName": "Moong dal, split hulled yellow",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_166",
+      "referenceItemId": "BATCH0_166",
+      "sourceRecordId": "166",
+      "canonicalName": "Black gram, whole",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_167",
+      "referenceItemId": "BATCH0_167",
+      "sourceRecordId": "167",
+      "canonicalName": "Urad dal, split",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_168",
+      "referenceItemId": "BATCH0_168",
+      "sourceRecordId": "168",
+      "canonicalName": "Pigeon pea",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_169",
+      "referenceItemId": "BATCH0_169",
+      "sourceRecordId": "169",
+      "canonicalName": "Masoor dal, red",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_170",
+      "referenceItemId": "BATCH0_170",
+      "sourceRecordId": "170",
+      "canonicalName": "Masoor, whole",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_171",
+      "referenceItemId": "BATCH0_171",
+      "sourceRecordId": "171",
+      "canonicalName": "Bengal gram dal",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_172",
+      "referenceItemId": "BATCH0_172",
+      "sourceRecordId": "172",
+      "canonicalName": "Moth beans",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_173",
+      "referenceItemId": "BATCH0_173",
+      "sourceRecordId": "173",
+      "canonicalName": "Cowpeas",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_174",
+      "referenceItemId": "BATCH0_174",
+      "sourceRecordId": "174",
+      "canonicalName": "Kidney beans, red",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_175",
+      "referenceItemId": "BATCH0_175",
+      "sourceRecordId": "175",
+      "canonicalName": "Kidney beans, light",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_176",
+      "referenceItemId": "BATCH0_176",
+      "sourceRecordId": "176",
+      "canonicalName": "Black-eyed peas",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_177",
+      "referenceItemId": "BATCH0_177",
+      "sourceRecordId": "177",
+      "canonicalName": "Horse gram",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_178",
+      "referenceItemId": "BATCH0_178",
+      "sourceRecordId": "178",
+      "canonicalName": "Field beans",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_179",
+      "referenceItemId": "BATCH0_179",
+      "sourceRecordId": "179",
+      "canonicalName": "Dry peas, green",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_180",
+      "referenceItemId": "BATCH0_180",
+      "sourceRecordId": "180",
+      "canonicalName": "Dry peas, yellow",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_181",
+      "referenceItemId": "BATCH0_181",
+      "sourceRecordId": "181",
+      "canonicalName": "Soybeans",
+      "referenceState": "DRY,_RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_182",
+      "referenceItemId": "BATCH0_182",
+      "sourceRecordId": "182",
+      "canonicalName": "Edamame",
+      "referenceState": "COOKED",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_198",
+      "referenceItemId": "BATCH0_198",
+      "sourceRecordId": "198",
+      "canonicalName": "Cow milk, whole",
+      "referenceState": "LIQUID",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_199",
+      "referenceItemId": "BATCH0_199",
+      "sourceRecordId": "199",
+      "canonicalName": "Buffalo milk",
+      "referenceState": "LIQUID",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_200",
+      "referenceItemId": "BATCH0_200",
+      "sourceRecordId": "200",
+      "canonicalName": "Toned milk",
+      "referenceState": "LIQUID",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_201",
+      "referenceItemId": "BATCH0_201",
+      "sourceRecordId": "201",
+      "canonicalName": "Double toned milk",
+      "referenceState": "LIQUID",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_202",
+      "referenceItemId": "BATCH0_202",
+      "sourceRecordId": "202",
+      "canonicalName": "Skim milk",
+      "referenceState": "LIQUID",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_203",
+      "referenceItemId": "BATCH0_203",
+      "sourceRecordId": "203",
+      "canonicalName": "Curd, whole milk",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_204",
+      "referenceItemId": "BATCH0_204",
+      "sourceRecordId": "204",
+      "canonicalName": "Hung curd",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_205",
+      "referenceItemId": "BATCH0_205",
+      "sourceRecordId": "205",
+      "canonicalName": "Buttermilk",
+      "referenceState": "READY_TO_DRINK",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_206",
+      "referenceItemId": "BATCH0_206",
+      "sourceRecordId": "206",
+      "canonicalName": "Paneer",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_207",
+      "referenceItemId": "BATCH0_207",
+      "sourceRecordId": "207",
+      "canonicalName": "Low-fat paneer",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_208",
+      "referenceItemId": "BATCH0_208",
+      "sourceRecordId": "208",
+      "canonicalName": "Cheddar cheese",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_209",
+      "referenceItemId": "BATCH0_209",
+      "sourceRecordId": "209",
+      "canonicalName": "Mozzarella",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_210",
+      "referenceItemId": "BATCH0_210",
+      "sourceRecordId": "210",
+      "canonicalName": "Processed cheese",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_211",
+      "referenceItemId": "BATCH0_211",
+      "sourceRecordId": "211",
+      "canonicalName": "Khoya",
+      "referenceState": "READY_TO_USE",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_212",
+      "referenceItemId": "BATCH0_212",
+      "sourceRecordId": "212",
+      "canonicalName": "Milk powder, whole",
+      "referenceState": "DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_213",
+      "referenceItemId": "BATCH0_213",
+      "sourceRecordId": "213",
+      "canonicalName": "Milk powder, skim",
+      "referenceState": "DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_214",
+      "referenceItemId": "BATCH0_214",
+      "sourceRecordId": "214",
+      "canonicalName": "Chicken egg, whole",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_215",
+      "referenceItemId": "BATCH0_215",
+      "sourceRecordId": "215",
+      "canonicalName": "Chicken egg white",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_216",
+      "referenceItemId": "BATCH0_216",
+      "sourceRecordId": "216",
+      "canonicalName": "Chicken egg yolk",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_217",
+      "referenceItemId": "BATCH0_217",
+      "sourceRecordId": "217",
+      "canonicalName": "Duck egg",
+      "referenceState": "RAW",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_218",
+      "referenceItemId": "BATCH0_218",
+      "sourceRecordId": "218",
+      "canonicalName": "Tofu, firm",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "ACTIVATED_GOVERNED",
+      "terminalReason": "ACTIVATED_GENERATOR",
+      "governedFoodId": "BATCH0_218",
+      "sourceMappingId": "USDA_FDC:172448",
+      "effectiveProcessorVersion": "P0_VERIFICATION_V17_30A",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "ACTIVATED_GENERATOR"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_219",
+      "referenceItemId": "BATCH0_219",
+      "sourceRecordId": "219",
+      "canonicalName": "Tempeh",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_220",
+      "referenceItemId": "BATCH0_220",
+      "sourceRecordId": "220",
+      "canonicalName": "Soy chunks, dry",
+      "referenceState": "DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_221",
+      "referenceItemId": "BATCH0_221",
+      "sourceRecordId": "221",
+      "canonicalName": "Soy granules, dry",
+      "referenceState": "DRY",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    },
+    {
+      "closureId": "V1734_BATCH0_222",
+      "referenceItemId": "BATCH0_222",
+      "sourceRecordId": "222",
+      "canonicalName": "Seitan",
+      "referenceState": "READY_TO_EAT",
+      "terminalState": "BLOCKED_EVIDENCE",
+      "terminalReason": "EXTERNAL_SOURCE_REQUIRED",
+      "governedFoodId": null,
+      "sourceMappingId": null,
+      "effectiveProcessorVersion": "FOOD_RESOLUTION_V17_32C",
+      "evidenceChain": [
+        {
+          "processorVersion": "P0_VERIFICATION_V17_30A",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_UNBLOCK_V17_31",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        },
+        {
+          "processorVersion": "FOOD_RESOLUTION_V17_32C",
+          "outcome": "EXTERNAL_SOURCE_REQUIRED"
+        }
+      ],
+      "processorVersion": "FOOD_CATALOGUE_CLOSURE_V17_34"
+    }
+  ],
+  "artifactSha256": "8c8d3acd292866984644e2587c928fcb2b5db7355f829d53d4d2e1df716fd08d"
+}
