@@ -12,11 +12,11 @@ const workbook = XLSX.readFile(new URL('../src/modules/nutrition/catalogue/data/
 const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Food Master'], { defval: null });
 const normalize = value => String(value ?? '').trim().replace(/\s+/g, ' ');
 const aliases = value => normalize(value).split(/[,;/|]+/).map(normalize).filter(Boolean);
-const cohort = rows.slice(207);
-if (rows.length !== 335 || cohort.length !== 128 || cohort[0].ID !== 208 || cohort.at(-1).ID !== 335) throw new Error('V17_36_FROZEN_COHORT_MISMATCH');
+const previouslyProcessed = new Set(closure.records.map(item => item.referenceItemId));
+const cohort = rows.filter(row => !previouslyProcessed.has(`BATCH0_${row.ID}`));
+if (rows.length !== 335 || closure.records.length !== 207 || cohort.length !== 128 || cohort[0].ID !== 183 || cohort.at(-1).ID !== 335) throw new Error('V17_36_FROZEN_COHORT_MISMATCH');
 
 const runtime = {
-  218:['BATCH0_218','Tofu, firm','USDA_FDC:172448'],
   272:['CF_2da71afd-ac94-4932-8612-507de402c64f','Peanuts','USDA_FDC:2515376'],
   298:['CF_633440dd-6006-4819-b3cb-6b0368dadb84','Coconut oil','USDA_FDC:330458'],
   299:['CF_82651692-4d4b-495c-8039-aea3a16f4744','Olive oil','USDA_FDC:171413'],
@@ -35,9 +35,8 @@ const decisions = cohort.map(row => {
   let finalStatus, operationalUse, evidenceStatus, target = null;
   if (runtime[id]) { finalStatus='EXISTING_GOVERNED_RUNTIME_IDENTITY'; operationalUse = [298,299,300].includes(id)?'INGREDIENT_ONLY':'COMPONENT_ADDABLE'; evidenceStatus='EXISTING_GOVERNED_EVIDENCE'; target=runtime[id]; }
   else if (aliasMap[id]) { finalStatus='ALIAS_EXISTING'; operationalUse=id===333?'COMPONENT_ADDABLE':'SECONDARY_ONLY'; evidenceStatus='EXISTING_GOVERNED_EVIDENCE'; target=aliasMap[id]; }
-  else if (id >= 323) { finalStatus='RECIPE_OR_PREPARATION_IDENTITY'; operationalUse='PREPARATION_REQUIRED'; evidenceStatus='PREPARATION_DOMAIN_EVIDENCE_REQUIRED'; }
+  else if ((id >= 183 && id <= 197) || id >= 323) { finalStatus='RECIPE_OR_PREPARATION_IDENTITY'; operationalUse='PREPARATION_REQUIRED'; evidenceStatus='PREPARATION_DOMAIN_EVIDENCE_REQUIRED'; }
   else if (id >= 273 && id <= 322) { finalStatus='SECONDARY_ONLY'; operationalUse='SECONDARY_ONLY'; evidenceStatus='REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED'; }
-  else if ([208,209,210,211,219,222].includes(id)) { finalStatus='INDIA_LAB_VALIDATION_REQUIRED'; operationalUse='REFERENCE_PENDING'; evidenceStatus='INDIA_LAB_VALIDATION_REQUIRED'; }
   else { finalStatus='INGREDIENT_ONLY'; operationalUse='INGREDIENT_ONLY'; evidenceStatus='REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED'; }
   const sourceChecks = ['ICMR_NIN_IFCT_RIGHTS_GATE','INDIAN_GOVERNMENT_OPEN_DATA','FSSAI_IDENTITY','ICAR_PUBLICATIONS','INDIAN_SCIENTIFIC_LITERATURE','NABL_INDIA','INDIA_MARKET_PRODUCT','EXISTING_FITEATSY','USDA_APPROVED_GENERIC'].map(source=>({source,result:target&&source==='EXISTING_FITEATSY'?'EXACT_GOVERNED_MATCH':finalStatus==='INDIA_LAB_VALIDATION_REQUIRED'?'NO_COMPLETE_REUSABLE_EXACT_MATCH':'NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE'}));
   return {

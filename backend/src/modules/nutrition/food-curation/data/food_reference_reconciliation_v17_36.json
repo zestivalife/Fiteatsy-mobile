@@ -4,357 +4,751 @@
   "generatedAt": "2026-09-07T00:00:00.000Z",
   "startingCohortCount": 128,
   "decisionCounts": {
-    "INDIA_LAB_VALIDATION_REQUIRED": 6,
-    "INGREDIENT_ONLY": 57,
-    "EXISTING_GOVERNED_RUNTIME_IDENTITY": 5,
+    "RECIPE_OR_PREPARATION_IDENTITY": 27,
+    "INGREDIENT_ONLY": 49,
+    "EXISTING_GOVERNED_RUNTIME_IDENTITY": 4,
     "SECONDARY_ONLY": 44,
     "ALIAS_EXISTING": 4,
-    "RECIPE_OR_PREPARATION_IDENTITY": 12,
     "DUPLICATE_REFERENCE": 0,
     "GOVERNED_PARENT_MAPPING": 0,
-    "NEW_MAPPING": 0
+    "NEW_MAPPING": 0,
+    "INDIA_LAB_VALIDATION_REQUIRED": 0
   },
   "finalUnprocessedCount": 0,
   "decisions": [
     {
-      "decisionId": "V1736_BATCH0_208",
-      "referenceItemId": "BATCH0_208",
-      "referenceCanonicalName": "Cheddar cheese",
+      "decisionId": "V1736_BATCH0_183",
+      "referenceItemId": "BATCH0_183",
+      "referenceCanonicalName": "Chapati / roti, whole wheat",
       "aliases": [
-        "Cheddar"
+        "Roti",
+        "Phulka"
       ],
       "botanicalIdentity": null,
-      "category": "Dairy",
+      "category": "Breads & Staples",
+      "referenceState": "COOKED",
+      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
+      "aliasTarget": null,
+      "duplicateTarget": null,
+      "parentTarget": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
+      "directAddable": false,
+      "sourceChecks": [
+        {
+          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "FSSAI_IDENTITY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "ICAR_PUBLICATIONS",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_SCIENTIFIC_LITERATURE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "NABL_INDIA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIA_MARKET_PRODUCT",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "EXISTING_FITEATSY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "USDA_APPROVED_GENERIC",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        }
+      ],
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
+      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
+    },
+    {
+      "decisionId": "V1736_BATCH0_184",
+      "referenceItemId": "BATCH0_184",
+      "referenceCanonicalName": "Paratha, plain",
+      "aliases": [
+        "Plain paratha"
+      ],
+      "botanicalIdentity": null,
+      "category": "Breads & Staples",
+      "referenceState": "COOKED",
+      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
+      "aliasTarget": null,
+      "duplicateTarget": null,
+      "parentTarget": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
+      "directAddable": false,
+      "sourceChecks": [
+        {
+          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "FSSAI_IDENTITY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "ICAR_PUBLICATIONS",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_SCIENTIFIC_LITERATURE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "NABL_INDIA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIA_MARKET_PRODUCT",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "EXISTING_FITEATSY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "USDA_APPROVED_GENERIC",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        }
+      ],
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
+      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
+    },
+    {
+      "decisionId": "V1736_BATCH0_185",
+      "referenceItemId": "BATCH0_185",
+      "referenceCanonicalName": "Naan, plain",
+      "aliases": [
+        "Naan"
+      ],
+      "botanicalIdentity": null,
+      "category": "Breads & Staples",
+      "referenceState": "COOKED",
+      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
+      "aliasTarget": null,
+      "duplicateTarget": null,
+      "parentTarget": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
+      "directAddable": false,
+      "sourceChecks": [
+        {
+          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "FSSAI_IDENTITY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "ICAR_PUBLICATIONS",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_SCIENTIFIC_LITERATURE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "NABL_INDIA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIA_MARKET_PRODUCT",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "EXISTING_FITEATSY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "USDA_APPROVED_GENERIC",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        }
+      ],
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
+      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
+    },
+    {
+      "decisionId": "V1736_BATCH0_186",
+      "referenceItemId": "BATCH0_186",
+      "referenceCanonicalName": "Tandoori roti",
+      "aliases": [
+        "Tandoori roti"
+      ],
+      "botanicalIdentity": null,
+      "category": "Breads & Staples",
+      "referenceState": "COOKED",
+      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
+      "aliasTarget": null,
+      "duplicateTarget": null,
+      "parentTarget": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
+      "directAddable": false,
+      "sourceChecks": [
+        {
+          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "FSSAI_IDENTITY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "ICAR_PUBLICATIONS",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_SCIENTIFIC_LITERATURE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "NABL_INDIA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIA_MARKET_PRODUCT",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "EXISTING_FITEATSY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "USDA_APPROVED_GENERIC",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        }
+      ],
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
+      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
+    },
+    {
+      "decisionId": "V1736_BATCH0_187",
+      "referenceItemId": "BATCH0_187",
+      "referenceCanonicalName": "Roomali roti",
+      "aliases": [
+        "Rumali roti"
+      ],
+      "botanicalIdentity": null,
+      "category": "Breads & Staples",
+      "referenceState": "COOKED",
+      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
+      "aliasTarget": null,
+      "duplicateTarget": null,
+      "parentTarget": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
+      "directAddable": false,
+      "sourceChecks": [
+        {
+          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "FSSAI_IDENTITY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "ICAR_PUBLICATIONS",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_SCIENTIFIC_LITERATURE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "NABL_INDIA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIA_MARKET_PRODUCT",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "EXISTING_FITEATSY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "USDA_APPROVED_GENERIC",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        }
+      ],
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
+      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
+    },
+    {
+      "decisionId": "V1736_BATCH0_188",
+      "referenceItemId": "BATCH0_188",
+      "referenceCanonicalName": "Bhakri, jowar",
+      "aliases": [
+        "Jowar bhakri"
+      ],
+      "botanicalIdentity": null,
+      "category": "Breads & Staples",
+      "referenceState": "COOKED",
+      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
+      "aliasTarget": null,
+      "duplicateTarget": null,
+      "parentTarget": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
+      "directAddable": false,
+      "sourceChecks": [
+        {
+          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "FSSAI_IDENTITY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "ICAR_PUBLICATIONS",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_SCIENTIFIC_LITERATURE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "NABL_INDIA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIA_MARKET_PRODUCT",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "EXISTING_FITEATSY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "USDA_APPROVED_GENERIC",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        }
+      ],
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
+      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
+    },
+    {
+      "decisionId": "V1736_BATCH0_189",
+      "referenceItemId": "BATCH0_189",
+      "referenceCanonicalName": "Bhakri, bajra",
+      "aliases": [
+        "Bajra bhakri"
+      ],
+      "botanicalIdentity": null,
+      "category": "Breads & Staples",
+      "referenceState": "COOKED",
+      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
+      "aliasTarget": null,
+      "duplicateTarget": null,
+      "parentTarget": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
+      "directAddable": false,
+      "sourceChecks": [
+        {
+          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "FSSAI_IDENTITY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "ICAR_PUBLICATIONS",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_SCIENTIFIC_LITERATURE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "NABL_INDIA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIA_MARKET_PRODUCT",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "EXISTING_FITEATSY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "USDA_APPROVED_GENERIC",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        }
+      ],
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
+      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
+    },
+    {
+      "decisionId": "V1736_BATCH0_190",
+      "referenceItemId": "BATCH0_190",
+      "referenceCanonicalName": "Ragi roti",
+      "aliases": [
+        "Nachni roti"
+      ],
+      "botanicalIdentity": null,
+      "category": "Breads & Staples",
+      "referenceState": "COOKED",
+      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
+      "aliasTarget": null,
+      "duplicateTarget": null,
+      "parentTarget": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
+      "directAddable": false,
+      "sourceChecks": [
+        {
+          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "FSSAI_IDENTITY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "ICAR_PUBLICATIONS",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_SCIENTIFIC_LITERATURE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "NABL_INDIA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIA_MARKET_PRODUCT",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "EXISTING_FITEATSY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "USDA_APPROVED_GENERIC",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        }
+      ],
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
+      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
+    },
+    {
+      "decisionId": "V1736_BATCH0_191",
+      "referenceItemId": "BATCH0_191",
+      "referenceCanonicalName": "White bread",
+      "aliases": [
+        "Bread"
+      ],
+      "botanicalIdentity": null,
+      "category": "Breads & Staples",
       "referenceState": "READY_TO_EAT",
       "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INDIA_LAB_VALIDATION_REQUIRED",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
       "governedFoodId": null,
       "runtimeFoodId": null,
       "runtimeDisplayName": null,
       "aliasTarget": null,
       "duplicateTarget": null,
       "parentTarget": null,
-      "recipePreparationClassification": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
       "sourceMappingId": null,
-      "evidenceStatus": "INDIA_LAB_VALIDATION_REQUIRED",
-      "operationalUse": "REFERENCE_PENDING",
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
       "generatorEligible": false,
       "clientConsumable": false,
       "directAddable": false,
       "sourceChecks": [
         {
           "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "FSSAI_IDENTITY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "ICAR_PUBLICATIONS",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "NABL_INDIA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "INDIA_MARKET_PRODUCT",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "EXISTING_FITEATSY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "USDA_APPROVED_GENERIC",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         }
       ],
-      "exactBlockerClass": "COMPLETE_EXACT_INDIA_NUTRITION_AND_GOVERNED_SERVING_MISSING",
-      "exactMissingEvidence": "Rights-cleared complete per-100g edible-portion vector and governed serving for the exact India-market identity",
-      "requiredAnalytes": [
-        "ENERGY_KCAL",
-        "PROTEIN_G",
-        "CARBOHYDRATE_G",
-        "FAT_G",
-        "FIBRE_G",
-        "MOISTURE_G",
-        "ASH_G"
-      ],
-      "samplePreparation": "Representative India-market edible portion; exact product/state identity signed off before homogenisation",
-      "nablTestRequirement": "NABL ISO/IEC 17025 food proximate analysis",
-      "expectedEvidenceArtifact": "SIGNED_NABL_SCOPE_REPORT_WITH_SAMPLE_CHAIN_OF_CUSTODY_AND_ANALYTE_METHODS",
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
       "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
     },
     {
-      "decisionId": "V1736_BATCH0_209",
-      "referenceItemId": "BATCH0_209",
-      "referenceCanonicalName": "Mozzarella",
+      "decisionId": "V1736_BATCH0_192",
+      "referenceItemId": "BATCH0_192",
+      "referenceCanonicalName": "Whole wheat bread",
       "aliases": [
-        "Mozzarella"
+        "Brown bread"
       ],
       "botanicalIdentity": null,
-      "category": "Dairy",
+      "category": "Breads & Staples",
       "referenceState": "READY_TO_EAT",
       "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INDIA_LAB_VALIDATION_REQUIRED",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
       "governedFoodId": null,
       "runtimeFoodId": null,
       "runtimeDisplayName": null,
       "aliasTarget": null,
       "duplicateTarget": null,
       "parentTarget": null,
-      "recipePreparationClassification": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
       "sourceMappingId": null,
-      "evidenceStatus": "INDIA_LAB_VALIDATION_REQUIRED",
-      "operationalUse": "REFERENCE_PENDING",
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
       "generatorEligible": false,
       "clientConsumable": false,
       "directAddable": false,
       "sourceChecks": [
         {
           "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "FSSAI_IDENTITY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "ICAR_PUBLICATIONS",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "NABL_INDIA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "INDIA_MARKET_PRODUCT",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "EXISTING_FITEATSY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "USDA_APPROVED_GENERIC",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         }
       ],
-      "exactBlockerClass": "COMPLETE_EXACT_INDIA_NUTRITION_AND_GOVERNED_SERVING_MISSING",
-      "exactMissingEvidence": "Rights-cleared complete per-100g edible-portion vector and governed serving for the exact India-market identity",
-      "requiredAnalytes": [
-        "ENERGY_KCAL",
-        "PROTEIN_G",
-        "CARBOHYDRATE_G",
-        "FAT_G",
-        "FIBRE_G",
-        "MOISTURE_G",
-        "ASH_G"
-      ],
-      "samplePreparation": "Representative India-market edible portion; exact product/state identity signed off before homogenisation",
-      "nablTestRequirement": "NABL ISO/IEC 17025 food proximate analysis",
-      "expectedEvidenceArtifact": "SIGNED_NABL_SCOPE_REPORT_WITH_SAMPLE_CHAIN_OF_CUSTODY_AND_ANALYTE_METHODS",
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
       "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
     },
     {
-      "decisionId": "V1736_BATCH0_210",
-      "referenceItemId": "BATCH0_210",
-      "referenceCanonicalName": "Processed cheese",
+      "decisionId": "V1736_BATCH0_193",
+      "referenceItemId": "BATCH0_193",
+      "referenceCanonicalName": "Multigrain bread",
       "aliases": [
-        "Cheese slice",
-        "block"
+        "Multigrain bread"
       ],
       "botanicalIdentity": null,
-      "category": "Dairy",
+      "category": "Breads & Staples",
       "referenceState": "READY_TO_EAT",
       "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INDIA_LAB_VALIDATION_REQUIRED",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
       "governedFoodId": null,
       "runtimeFoodId": null,
       "runtimeDisplayName": null,
       "aliasTarget": null,
       "duplicateTarget": null,
       "parentTarget": null,
-      "recipePreparationClassification": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
       "sourceMappingId": null,
-      "evidenceStatus": "INDIA_LAB_VALIDATION_REQUIRED",
-      "operationalUse": "REFERENCE_PENDING",
-      "generatorEligible": false,
-      "clientConsumable": false,
-      "directAddable": false,
-      "sourceChecks": [
-        {
-          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "FSSAI_IDENTITY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "ICAR_PUBLICATIONS",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "NABL_INDIA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "INDIA_MARKET_PRODUCT",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "EXISTING_FITEATSY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "USDA_APPROVED_GENERIC",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        }
-      ],
-      "exactBlockerClass": "COMPLETE_EXACT_INDIA_NUTRITION_AND_GOVERNED_SERVING_MISSING",
-      "exactMissingEvidence": "Rights-cleared complete per-100g edible-portion vector and governed serving for the exact India-market identity",
-      "requiredAnalytes": [
-        "ENERGY_KCAL",
-        "PROTEIN_G",
-        "CARBOHYDRATE_G",
-        "FAT_G",
-        "FIBRE_G",
-        "MOISTURE_G",
-        "ASH_G"
-      ],
-      "samplePreparation": "Representative India-market edible portion; exact product/state identity signed off before homogenisation",
-      "nablTestRequirement": "NABL ISO/IEC 17025 food proximate analysis",
-      "expectedEvidenceArtifact": "SIGNED_NABL_SCOPE_REPORT_WITH_SAMPLE_CHAIN_OF_CUSTODY_AND_ANALYTE_METHODS",
-      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
-    },
-    {
-      "decisionId": "V1736_BATCH0_211",
-      "referenceItemId": "BATCH0_211",
-      "referenceCanonicalName": "Khoya",
-      "aliases": [
-        "Mawa"
-      ],
-      "botanicalIdentity": null,
-      "category": "Dairy",
-      "referenceState": "READY_TO_USE",
-      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INDIA_LAB_VALIDATION_REQUIRED",
-      "governedFoodId": null,
-      "runtimeFoodId": null,
-      "runtimeDisplayName": null,
-      "aliasTarget": null,
-      "duplicateTarget": null,
-      "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": null,
-      "evidenceStatus": "INDIA_LAB_VALIDATION_REQUIRED",
-      "operationalUse": "REFERENCE_PENDING",
-      "generatorEligible": false,
-      "clientConsumable": false,
-      "directAddable": false,
-      "sourceChecks": [
-        {
-          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "FSSAI_IDENTITY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "ICAR_PUBLICATIONS",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "NABL_INDIA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "INDIA_MARKET_PRODUCT",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "EXISTING_FITEATSY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "USDA_APPROVED_GENERIC",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        }
-      ],
-      "exactBlockerClass": "COMPLETE_EXACT_INDIA_NUTRITION_AND_GOVERNED_SERVING_MISSING",
-      "exactMissingEvidence": "Rights-cleared complete per-100g edible-portion vector and governed serving for the exact India-market identity",
-      "requiredAnalytes": [
-        "ENERGY_KCAL",
-        "PROTEIN_G",
-        "CARBOHYDRATE_G",
-        "FAT_G",
-        "FIBRE_G",
-        "MOISTURE_G",
-        "ASH_G"
-      ],
-      "samplePreparation": "Representative India-market edible portion; exact product/state identity signed off before homogenisation",
-      "nablTestRequirement": "NABL ISO/IEC 17025 food proximate analysis",
-      "expectedEvidenceArtifact": "SIGNED_NABL_SCOPE_REPORT_WITH_SAMPLE_CHAIN_OF_CUSTODY_AND_ANALYTE_METHODS",
-      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
-    },
-    {
-      "decisionId": "V1736_BATCH0_212",
-      "referenceItemId": "BATCH0_212",
-      "referenceCanonicalName": "Milk powder, whole",
-      "aliases": [
-        "Whole milk powder"
-      ],
-      "botanicalIdentity": null,
-      "category": "Dairy",
-      "referenceState": "DRY",
-      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INGREDIENT_ONLY",
-      "governedFoodId": null,
-      "runtimeFoodId": null,
-      "runtimeDisplayName": null,
-      "aliasTarget": null,
-      "duplicateTarget": null,
-      "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": null,
-      "evidenceStatus": "REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED",
-      "operationalUse": "INGREDIENT_ONLY",
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
       "generatorEligible": false,
       "clientConsumable": false,
       "directAddable": false,
@@ -405,384 +799,29 @@
       "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
     },
     {
-      "decisionId": "V1736_BATCH0_213",
-      "referenceItemId": "BATCH0_213",
-      "referenceCanonicalName": "Milk powder, skim",
+      "decisionId": "V1736_BATCH0_194",
+      "referenceItemId": "BATCH0_194",
+      "referenceCanonicalName": "Pav",
       "aliases": [
-        "Skim milk powder"
+        "Ladi pav"
       ],
       "botanicalIdentity": null,
-      "category": "Dairy",
-      "referenceState": "DRY",
-      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INGREDIENT_ONLY",
-      "governedFoodId": null,
-      "runtimeFoodId": null,
-      "runtimeDisplayName": null,
-      "aliasTarget": null,
-      "duplicateTarget": null,
-      "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": null,
-      "evidenceStatus": "REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED",
-      "operationalUse": "INGREDIENT_ONLY",
-      "generatorEligible": false,
-      "clientConsumable": false,
-      "directAddable": false,
-      "sourceChecks": [
-        {
-          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "FSSAI_IDENTITY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "ICAR_PUBLICATIONS",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "NABL_INDIA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIA_MARKET_PRODUCT",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "EXISTING_FITEATSY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "USDA_APPROVED_GENERIC",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        }
-      ],
-      "exactBlockerClass": null,
-      "exactMissingEvidence": null,
-      "requiredAnalytes": [],
-      "samplePreparation": null,
-      "nablTestRequirement": null,
-      "expectedEvidenceArtifact": null,
-      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
-    },
-    {
-      "decisionId": "V1736_BATCH0_214",
-      "referenceItemId": "BATCH0_214",
-      "referenceCanonicalName": "Chicken egg, whole",
-      "aliases": [
-        "Anda"
-      ],
-      "botanicalIdentity": null,
-      "category": "Protein Foods",
-      "referenceState": "RAW",
-      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INGREDIENT_ONLY",
-      "governedFoodId": null,
-      "runtimeFoodId": null,
-      "runtimeDisplayName": null,
-      "aliasTarget": null,
-      "duplicateTarget": null,
-      "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": null,
-      "evidenceStatus": "REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED",
-      "operationalUse": "INGREDIENT_ONLY",
-      "generatorEligible": false,
-      "clientConsumable": false,
-      "directAddable": false,
-      "sourceChecks": [
-        {
-          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "FSSAI_IDENTITY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "ICAR_PUBLICATIONS",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "NABL_INDIA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIA_MARKET_PRODUCT",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "EXISTING_FITEATSY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "USDA_APPROVED_GENERIC",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        }
-      ],
-      "exactBlockerClass": null,
-      "exactMissingEvidence": null,
-      "requiredAnalytes": [],
-      "samplePreparation": null,
-      "nablTestRequirement": null,
-      "expectedEvidenceArtifact": null,
-      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
-    },
-    {
-      "decisionId": "V1736_BATCH0_215",
-      "referenceItemId": "BATCH0_215",
-      "referenceCanonicalName": "Chicken egg white",
-      "aliases": [
-        "Egg white"
-      ],
-      "botanicalIdentity": null,
-      "category": "Protein Foods",
-      "referenceState": "RAW",
-      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INGREDIENT_ONLY",
-      "governedFoodId": null,
-      "runtimeFoodId": null,
-      "runtimeDisplayName": null,
-      "aliasTarget": null,
-      "duplicateTarget": null,
-      "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": null,
-      "evidenceStatus": "REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED",
-      "operationalUse": "INGREDIENT_ONLY",
-      "generatorEligible": false,
-      "clientConsumable": false,
-      "directAddable": false,
-      "sourceChecks": [
-        {
-          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "FSSAI_IDENTITY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "ICAR_PUBLICATIONS",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "NABL_INDIA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIA_MARKET_PRODUCT",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "EXISTING_FITEATSY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "USDA_APPROVED_GENERIC",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        }
-      ],
-      "exactBlockerClass": null,
-      "exactMissingEvidence": null,
-      "requiredAnalytes": [],
-      "samplePreparation": null,
-      "nablTestRequirement": null,
-      "expectedEvidenceArtifact": null,
-      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
-    },
-    {
-      "decisionId": "V1736_BATCH0_216",
-      "referenceItemId": "BATCH0_216",
-      "referenceCanonicalName": "Chicken egg yolk",
-      "aliases": [
-        "Egg yolk"
-      ],
-      "botanicalIdentity": null,
-      "category": "Protein Foods",
-      "referenceState": "RAW",
-      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INGREDIENT_ONLY",
-      "governedFoodId": null,
-      "runtimeFoodId": null,
-      "runtimeDisplayName": null,
-      "aliasTarget": null,
-      "duplicateTarget": null,
-      "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": null,
-      "evidenceStatus": "REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED",
-      "operationalUse": "INGREDIENT_ONLY",
-      "generatorEligible": false,
-      "clientConsumable": false,
-      "directAddable": false,
-      "sourceChecks": [
-        {
-          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "FSSAI_IDENTITY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "ICAR_PUBLICATIONS",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "NABL_INDIA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIA_MARKET_PRODUCT",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "EXISTING_FITEATSY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "USDA_APPROVED_GENERIC",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        }
-      ],
-      "exactBlockerClass": null,
-      "exactMissingEvidence": null,
-      "requiredAnalytes": [],
-      "samplePreparation": null,
-      "nablTestRequirement": null,
-      "expectedEvidenceArtifact": null,
-      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
-    },
-    {
-      "decisionId": "V1736_BATCH0_217",
-      "referenceItemId": "BATCH0_217",
-      "referenceCanonicalName": "Duck egg",
-      "aliases": [
-        "Batakh anda"
-      ],
-      "botanicalIdentity": null,
-      "category": "Protein Foods",
-      "referenceState": "RAW",
-      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INGREDIENT_ONLY",
-      "governedFoodId": null,
-      "runtimeFoodId": null,
-      "runtimeDisplayName": null,
-      "aliasTarget": null,
-      "duplicateTarget": null,
-      "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": null,
-      "evidenceStatus": "REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED",
-      "operationalUse": "INGREDIENT_ONLY",
-      "generatorEligible": false,
-      "clientConsumable": false,
-      "directAddable": false,
-      "sourceChecks": [
-        {
-          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "FSSAI_IDENTITY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "ICAR_PUBLICATIONS",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "NABL_INDIA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIA_MARKET_PRODUCT",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "EXISTING_FITEATSY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "USDA_APPROVED_GENERIC",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        }
-      ],
-      "exactBlockerClass": null,
-      "exactMissingEvidence": null,
-      "requiredAnalytes": [],
-      "samplePreparation": null,
-      "nablTestRequirement": null,
-      "expectedEvidenceArtifact": null,
-      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
-    },
-    {
-      "decisionId": "V1736_BATCH0_218",
-      "referenceItemId": "BATCH0_218",
-      "referenceCanonicalName": "Tofu, firm",
-      "aliases": [
-        "Soy paneer"
-      ],
-      "botanicalIdentity": null,
-      "category": "Protein Foods",
+      "category": "Breads & Staples",
       "referenceState": "READY_TO_EAT",
       "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "EXISTING_GOVERNED_RUNTIME_IDENTITY",
-      "governedFoodId": "BATCH0_218",
-      "runtimeFoodId": "BATCH0_218",
-      "runtimeDisplayName": "Tofu, firm",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
       "aliasTarget": null,
       "duplicateTarget": null,
       "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": "USDA_FDC:172448",
-      "evidenceStatus": "EXISTING_GOVERNED_EVIDENCE",
-      "operationalUse": "COMPONENT_ADDABLE",
-      "generatorEligible": true,
-      "clientConsumable": true,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
       "directAddable": false,
       "sourceChecks": [
         {
@@ -815,7 +854,7 @@
         },
         {
           "source": "EXISTING_FITEATSY",
-          "result": "EXACT_GOVERNED_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "USDA_APPROVED_GENERIC",
@@ -831,106 +870,27 @@
       "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
     },
     {
-      "decisionId": "V1736_BATCH0_219",
-      "referenceItemId": "BATCH0_219",
-      "referenceCanonicalName": "Tempeh",
+      "decisionId": "V1736_BATCH0_195",
+      "referenceItemId": "BATCH0_195",
+      "referenceCanonicalName": "Bread bun",
       "aliases": [
-        "Tempeh"
+        "Burger bun"
       ],
       "botanicalIdentity": null,
-      "category": "Protein Foods",
+      "category": "Breads & Staples",
       "referenceState": "READY_TO_EAT",
       "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INDIA_LAB_VALIDATION_REQUIRED",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
       "governedFoodId": null,
       "runtimeFoodId": null,
       "runtimeDisplayName": null,
       "aliasTarget": null,
       "duplicateTarget": null,
       "parentTarget": null,
-      "recipePreparationClassification": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
       "sourceMappingId": null,
-      "evidenceStatus": "INDIA_LAB_VALIDATION_REQUIRED",
-      "operationalUse": "REFERENCE_PENDING",
-      "generatorEligible": false,
-      "clientConsumable": false,
-      "directAddable": false,
-      "sourceChecks": [
-        {
-          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "FSSAI_IDENTITY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "ICAR_PUBLICATIONS",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "NABL_INDIA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "INDIA_MARKET_PRODUCT",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "EXISTING_FITEATSY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        },
-        {
-          "source": "USDA_APPROVED_GENERIC",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
-        }
-      ],
-      "exactBlockerClass": "COMPLETE_EXACT_INDIA_NUTRITION_AND_GOVERNED_SERVING_MISSING",
-      "exactMissingEvidence": "Rights-cleared complete per-100g edible-portion vector and governed serving for the exact India-market identity",
-      "requiredAnalytes": [
-        "ENERGY_KCAL",
-        "PROTEIN_G",
-        "CARBOHYDRATE_G",
-        "FAT_G",
-        "FIBRE_G",
-        "MOISTURE_G",
-        "ASH_G"
-      ],
-      "samplePreparation": "Representative India-market edible portion; exact product/state identity signed off before homogenisation",
-      "nablTestRequirement": "NABL ISO/IEC 17025 food proximate analysis",
-      "expectedEvidenceArtifact": "SIGNED_NABL_SCOPE_REPORT_WITH_SAMPLE_CHAIN_OF_CUSTODY_AND_ANALYTE_METHODS",
-      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
-    },
-    {
-      "decisionId": "V1736_BATCH0_220",
-      "referenceItemId": "BATCH0_220",
-      "referenceCanonicalName": "Soy chunks, dry",
-      "aliases": [
-        "Soya nuggets"
-      ],
-      "botanicalIdentity": null,
-      "category": "Protein Foods",
-      "referenceState": "DRY",
-      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INGREDIENT_ONLY",
-      "governedFoodId": null,
-      "runtimeFoodId": null,
-      "runtimeDisplayName": null,
-      "aliasTarget": null,
-      "duplicateTarget": null,
-      "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": null,
-      "evidenceStatus": "REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED",
-      "operationalUse": "INGREDIENT_ONLY",
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
       "generatorEligible": false,
       "clientConsumable": false,
       "directAddable": false,
@@ -981,153 +941,145 @@
       "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
     },
     {
-      "decisionId": "V1736_BATCH0_221",
-      "referenceItemId": "BATCH0_221",
-      "referenceCanonicalName": "Soy granules, dry",
+      "decisionId": "V1736_BATCH0_196",
+      "referenceItemId": "BATCH0_196",
+      "referenceCanonicalName": "Pita bread",
       "aliases": [
-        "Soya granules"
+        "Pita"
       ],
       "botanicalIdentity": null,
-      "category": "Protein Foods",
-      "referenceState": "DRY",
-      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INGREDIENT_ONLY",
-      "governedFoodId": null,
-      "runtimeFoodId": null,
-      "runtimeDisplayName": null,
-      "aliasTarget": null,
-      "duplicateTarget": null,
-      "parentTarget": null,
-      "recipePreparationClassification": null,
-      "sourceMappingId": null,
-      "evidenceStatus": "REFERENCE_IDENTITY_RETAINED_NUTRITION_NOT_ACTIVATED",
-      "operationalUse": "INGREDIENT_ONLY",
-      "generatorEligible": false,
-      "clientConsumable": false,
-      "directAddable": false,
-      "sourceChecks": [
-        {
-          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "FSSAI_IDENTITY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "ICAR_PUBLICATIONS",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "NABL_INDIA",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "INDIA_MARKET_PRODUCT",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "EXISTING_FITEATSY",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        },
-        {
-          "source": "USDA_APPROVED_GENERIC",
-          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
-        }
-      ],
-      "exactBlockerClass": null,
-      "exactMissingEvidence": null,
-      "requiredAnalytes": [],
-      "samplePreparation": null,
-      "nablTestRequirement": null,
-      "expectedEvidenceArtifact": null,
-      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
-    },
-    {
-      "decisionId": "V1736_BATCH0_222",
-      "referenceItemId": "BATCH0_222",
-      "referenceCanonicalName": "Seitan",
-      "aliases": [
-        "Wheat gluten"
-      ],
-      "botanicalIdentity": null,
-      "category": "Protein Foods",
+      "category": "Breads & Staples",
       "referenceState": "READY_TO_EAT",
       "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
-      "finalStatus": "INDIA_LAB_VALIDATION_REQUIRED",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
       "governedFoodId": null,
       "runtimeFoodId": null,
       "runtimeDisplayName": null,
       "aliasTarget": null,
       "duplicateTarget": null,
       "parentTarget": null,
-      "recipePreparationClassification": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
       "sourceMappingId": null,
-      "evidenceStatus": "INDIA_LAB_VALIDATION_REQUIRED",
-      "operationalUse": "REFERENCE_PENDING",
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
       "generatorEligible": false,
       "clientConsumable": false,
       "directAddable": false,
       "sourceChecks": [
         {
           "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "INDIAN_GOVERNMENT_OPEN_DATA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "FSSAI_IDENTITY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "ICAR_PUBLICATIONS",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "INDIAN_SCIENTIFIC_LITERATURE",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "NABL_INDIA",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "INDIA_MARKET_PRODUCT",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "EXISTING_FITEATSY",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         },
         {
           "source": "USDA_APPROVED_GENERIC",
-          "result": "NO_COMPLETE_REUSABLE_EXACT_MATCH"
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
         }
       ],
-      "exactBlockerClass": "COMPLETE_EXACT_INDIA_NUTRITION_AND_GOVERNED_SERVING_MISSING",
-      "exactMissingEvidence": "Rights-cleared complete per-100g edible-portion vector and governed serving for the exact India-market identity",
-      "requiredAnalytes": [
-        "ENERGY_KCAL",
-        "PROTEIN_G",
-        "CARBOHYDRATE_G",
-        "FAT_G",
-        "FIBRE_G",
-        "MOISTURE_G",
-        "ASH_G"
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
+      "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
+    },
+    {
+      "decisionId": "V1736_BATCH0_197",
+      "referenceItemId": "BATCH0_197",
+      "referenceCanonicalName": "Khakhra, plain",
+      "aliases": [
+        "Khakhra"
       ],
-      "samplePreparation": "Representative India-market edible portion; exact product/state identity signed off before homogenisation",
-      "nablTestRequirement": "NABL ISO/IEC 17025 food proximate analysis",
-      "expectedEvidenceArtifact": "SIGNED_NABL_SCOPE_REPORT_WITH_SAMPLE_CHAIN_OF_CUSTODY_AND_ANALYTE_METHODS",
+      "botanicalIdentity": null,
+      "category": "Breads & Staples",
+      "referenceState": "READY_TO_EAT",
+      "ediblePortion": "AS_CATALOGUED_EDIBLE_PORTION",
+      "finalStatus": "RECIPE_OR_PREPARATION_IDENTITY",
+      "governedFoodId": null,
+      "runtimeFoodId": null,
+      "runtimeDisplayName": null,
+      "aliasTarget": null,
+      "duplicateTarget": null,
+      "parentTarget": null,
+      "recipePreparationClassification": "SINGLE_FOOD_COOKED_PREPARATION",
+      "sourceMappingId": null,
+      "evidenceStatus": "PREPARATION_DOMAIN_EVIDENCE_REQUIRED",
+      "operationalUse": "PREPARATION_REQUIRED",
+      "generatorEligible": false,
+      "clientConsumable": false,
+      "directAddable": false,
+      "sourceChecks": [
+        {
+          "source": "ICMR_NIN_IFCT_RIGHTS_GATE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_GOVERNMENT_OPEN_DATA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "FSSAI_IDENTITY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "ICAR_PUBLICATIONS",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIAN_SCIENTIFIC_LITERATURE",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "NABL_INDIA",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "INDIA_MARKET_PRODUCT",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "EXISTING_FITEATSY",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        },
+        {
+          "source": "USDA_APPROVED_GENERIC",
+          "result": "NOT_REQUIRED_FOR_NON_ACTIVATED_REFERENCE"
+        }
+      ],
+      "exactBlockerClass": null,
+      "exactMissingEvidence": null,
+      "requiredAnalytes": [],
+      "samplePreparation": null,
+      "nablTestRequirement": null,
+      "expectedEvidenceArtifact": null,
       "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
     },
     {
@@ -9167,5 +9119,5 @@
       "processorVersion": "FOOD_REFERENCE_RECONCILIATION_V17_36"
     }
   ],
-  "artifactSha256": "141ce5afff7b7c333768a2a8481462daf077d883dfbf3c4053cc2ae473309480"
+  "artifactSha256": "e5bc7b7c6825152fca558a235acebd07194b338bbe1f78d95c57946a0302a4d2"
 }
