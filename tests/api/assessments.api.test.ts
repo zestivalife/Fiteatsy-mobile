@@ -109,7 +109,7 @@ test('PSS-10 completion requires all responses and persists score history', asyn
   assert.equal(completed.response.status, 200);
   assert.equal(completed.body.result.rawScore, 20);
   assert.equal(completed.body.result.maxScore, 40);
-  assert.equal(completed.body.result.instrumentVersion, 'pss10-fiteatsy-v2');
+  assert.equal(completed.body.result.instrumentVersion, 'pss10-nuetra-v17.37');
   assert.equal(completed.body.result.scoringVersion, 'pss10-scoring-v1');
   assert.equal(completed.body.result.interpretationVersion, 'pss10-interpretation-v1');
   assert.equal(completed.body.result.interpretationKey, 'MODERATE');

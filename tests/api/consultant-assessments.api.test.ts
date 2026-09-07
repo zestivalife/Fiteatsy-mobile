@@ -58,7 +58,7 @@ test('assigned consultant receives latest, previous, change, and completed histo
   const history = await getJson(server.baseUrl, `/v1/consultants/clients/${client.current.body.client.fiteatsyClientId}/assessments/PSS10/history`, { headers: authHeaders(consultant.token) });
   assert.equal(history.response.status, 200);
   assert.equal(history.body.history.length, 1);
-  assert.equal(history.body.history[0].instrumentVersion, 'pss10-fiteatsy-v2');
+  assert.equal(history.body.history[0].instrumentVersion, 'pss10-nuetra-v17.37');
   assert.equal(draft.response.status, 201);
   assert.notEqual(summary.body.assessment.history[0].id, draft.body.session.id);
 });
