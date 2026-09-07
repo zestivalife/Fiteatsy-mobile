@@ -6,7 +6,6 @@ import {
   OnboardingProfile
 } from '../types';
 
-const DEFAULT_DOB = new Date(1996, 0, 1);
 
 export const calculateAgeFromDob = (dobInput: Date | string): number => {
   const dob = dobInput instanceof Date ? dobInput : new Date(dobInput);
@@ -108,7 +107,7 @@ export const normalizeOnboardingProfile = (profile: Partial<OnboardingProfile> &
       ? new Date(profile.dateOfBirthISO)
       : typeof profile.age === 'number'
         ? deriveApproximateDobFromAge(profile.age)
-        : DEFAULT_DOB;
+        : null;
 
   const healthGoals = dedupeGoals([
     ...(profile.healthGoals ?? []),
@@ -119,7 +118,7 @@ export const normalizeOnboardingProfile = (profile: Partial<OnboardingProfile> &
 
   const primaryGoal = profile.primaryGoal ?? healthGoals[0];
   const secondaryGoals = healthGoals.filter((goal) => goal !== primaryGoal);
-  const calculatedAge = calculateAgeFromDob(dateOfBirth);
+  const calculatedAge = dateOfBirth ? calculateAgeFromDob(dateOfBirth) : undefined;
   const careTrack = profile.careTrack ?? 'Foundational Recovery Care';
   const assignedConsultant =
     profile.assignedConsultant ??
@@ -144,7 +143,7 @@ export const normalizeOnboardingProfile = (profile: Partial<OnboardingProfile> &
   return {
     ...profile,
     name: profile.name,
-    dateOfBirthISO: dateOfBirth.toISOString(),
+    dateOfBirthISO: dateOfBirth?.toISOString(),
     calculatedAge,
     age: calculatedAge,
     heightCm: profile.heightCm,
@@ -189,13 +188,13 @@ export const normalizeOnboardingProfile = (profile: Partial<OnboardingProfile> &
     alcoholFrequency: profile.alcoholFrequency,
     exerciseFrequency: profile.exerciseFrequency,
     stressLevelLabel: profile.stressLevelLabel,
-    gender: profile.gender ?? 'Prefer not to say',
+    gender: profile.gender,
     wellnessGoal: primaryGoal,
-    ageBracket: profile.ageBracket ?? toAgeBracket(calculatedAge),
+    ageBracket: profile.ageBracket ?? (calculatedAge == null ? undefined : toAgeBracket(calculatedAge)),
     primaryConditions: profile.primaryConditions ?? [],
     previousConditions: profile.previousConditions ?? [],
     familyHistoryConditions: profile.familyHistoryConditions ?? [],
-    symptomTags: profile.symptomTags ?? ['Fatigue'],
+    symptomTags: profile.symptomTags ?? [],
     healthGoals,
     primaryGoal,
     secondaryGoals,

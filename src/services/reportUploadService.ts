@@ -179,7 +179,7 @@ const safeHeaderSummary = (headers: Record<string, string>) => ({
 });
 
 const logReportDebug = (event: string, payload: Record<string, unknown>) => {
-  console.log(`[ReportsUpload] ${event}`, payload);
+  if (__DEV__) console.log(`[ReportsUpload] ${event}`, payload);
 };
 
 const isTerminalHttpError = (error: unknown) => error instanceof Error && error.message.startsWith('REPORT_API_HTTP_');

@@ -4,15 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import { StyleSheet, Text, View } from 'react-native';
 import { Pressable } from 'react-native';
 import { Screen } from '../../components/Screen';
-import { Card } from '../../components/Card';
 import { colors, getThemeColors, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
-
-const leaders = [
-  { rank: 1, name: 'Rahul Roy', score: 9240 },
-  { rank: 2, name: 'Neha Patil', score: 9010 },
-  { rank: 3, name: 'Aman Das', score: 8870 }
-];
 
 export const LeadershipScreen = () => {
   const navigation = useNavigation();
@@ -27,20 +20,10 @@ export const LeadershipScreen = () => {
           <Ionicons name="close" size={18} color={palette.textPrimary} />
         </Pressable>
       </View>
-      <Text style={[styles.subtitle, { color: palette.textSecondary }]}>Active Performance Rankings</Text>
-
-      <View style={styles.list}>
-        {leaders.map((leader) => (
-          <Card key={leader.rank}>
-            <View style={styles.row}>
-              <Text style={styles.rank}>#{leader.rank}</Text>
-              <View>
-                <Text style={[styles.name, { color: palette.textPrimary }]}>{leader.name}</Text>
-                <Text style={[styles.score, { color: palette.textSecondary }]}>{leader.score} pts</Text>
-              </View>
-            </View>
-          </Card>
-        ))}
+      <View style={styles.emptyState}>
+        <Ionicons name="people-outline" size={34} color={palette.textSecondary} />
+        <Text style={[styles.emptyTitle, { color: palette.textPrimary }]}>Community rankings are not available</Text>
+        <Text style={[styles.subtitle, { color: palette.textSecondary }]}>Fiteatsy will show rankings here only when a verified, consent-aware leaderboard service is enabled. No sample member data is displayed.</Text>
       </View>
     </Screen>
   );
@@ -70,25 +53,10 @@ const styles = StyleSheet.create({
     ...typography.body,
     marginBottom: 12
   },
-  list: {
-    gap: 10,
-    paddingBottom: 20
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
-  },
-  rank: {
-    ...typography.section,
-    fontSize: 20
-  },
-  name: {
+  emptyState: { alignItems: 'center', gap: 12, paddingHorizontal: 24, paddingVertical: 48 },
+  emptyTitle: {
     ...typography.bodyStrong,
-    fontSize: 14
-  },
-  score: {
-    ...typography.caption,
-    fontSize: 13
+    fontSize: 17,
+    textAlign: 'center'
   }
 });

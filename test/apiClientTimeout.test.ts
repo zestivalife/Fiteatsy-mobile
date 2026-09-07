@@ -2,7 +2,7 @@ jest.mock('expo-constants', () => ({
   expoConfig: { extra: { apiBaseUrl: 'https://api.fiteatsy.test' } }
 }));
 
-import { apiFetch, ApiClientError } from '../src/services/apiClient';
+import { apiFetch, registerAccessTokenProvider, registerUnauthorizedHandler } from '../src/services/apiClient';
 
 describe('shared API bounded completion', () => {
   const originalFetch = global.fetch;
@@ -10,6 +10,8 @@ describe('shared API bounded completion', () => {
   afterEach(() => {
     jest.useRealTimers();
     global.fetch = originalFetch;
+    registerAccessTokenProvider(() => null);
+    registerUnauthorizedHandler(null);
   });
 
   it('classifies a request that never settles as TIMEOUT', async () => {
@@ -47,5 +49,15 @@ describe('shared API bounded completion', () => {
       serverCode: 'DIET_PLAN_NOT_FOUND',
       message: 'No published plan.',
     });
+  });
+
+  it('invalidates an existing authenticated session after a 401 response', async () => {
+    const onUnauthorized = jest.fn();
+    registerAccessTokenProvider(() => 'expired-session-token');
+    registerUnauthorizedHandler(onUnauthorized);
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: 'SESSION_EXPIRED' }) });
+
+    await expect(apiFetch('/v1/platform/health-profile')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 });

@@ -188,6 +188,8 @@ const mapNotification = (row: Record<string, unknown>): NotificationRecord => ({
   title: String(row.title),
   body: String(row.body),
   sentAtISO: toIso(row.sent_at),
+  readAtISO: toIso(row.read_at),
+  dismissedAtISO: toIso(row.dismissed_at),
   ...mapAuditFields(row)
 });
 
@@ -977,7 +979,7 @@ export const updateHealthTicket = async (ticketId: string, patch: Partial<Health
   return mapHealthTicket(updated.rows[0]);
 };
 
-export const createNotificationRecord = async (input: Omit<NotificationRecord, 'id' | 'createdAtISO' | 'updatedAtISO' | 'deletedAtISO' | 'version' | 'status'>) => {
+export const createNotificationRecord = async (input: Omit<NotificationRecord, 'id' | 'createdAtISO' | 'updatedAtISO' | 'deletedAtISO' | 'version' | 'status' | 'readAtISO' | 'dismissedAtISO'>) => {
   const createdAtISO = nowIso();
   const inserted = await pool.query(
     `
@@ -1012,11 +1014,35 @@ export const listNotificationsForClient = async (clientId: string) => {
       from notifications
       where client_id = $1
         and deleted_at is null
+        and dismissed_at is null
       order by created_at desc
     `,
     [clientId]
   );
   return result.rows.map((row) => mapNotification(row));
+};
+
+export const updateNotificationStateForClient = async (
+  clientId: string,
+  notificationId: string,
+  action: 'read' | 'unread' | 'dismiss'
+) => {
+  const result = await pool.query(
+    `
+      update notifications
+      set
+        read_at = case when $3 = 'read' then coalesce(read_at, now()) when $3 = 'unread' then null else read_at end,
+        dismissed_at = case when $3 = 'dismiss' then coalesce(dismissed_at, now()) else dismissed_at end,
+        updated_at = now(),
+        version = version + 1
+      where id = $1
+        and client_id = $2
+        and deleted_at is null
+      returning *
+    `,
+    [notificationId, clientId, action]
+  );
+  return result.rowCount === 0 ? null : mapNotification(result.rows[0]);
 };
 
 export const resetPlatformStoreForTests = async () => {

@@ -193,6 +193,25 @@ test('platform ticket, timeline, events, assignment, and notifications flow work
   assert.ok(timeline.body.items.length > 0);
   assert.ok(tickets.body.items.length > 0);
   assert.ok(notifications.body.items.length > 0);
+  const notificationId = notifications.body.items[0].id;
+  const markedRead = await patchJson(
+    server.baseUrl,
+    `/v1/platform/notifications/${notificationId}`,
+    { action: 'read' },
+    { headers: authHeaders(session.token) }
+  );
+  assert.equal(markedRead.response.status, 200);
+  assert.equal(typeof markedRead.body.readAtISO, 'string');
+
+  const dismissed = await patchJson(
+    server.baseUrl,
+    `/v1/platform/notifications/${notificationId}`,
+    { action: 'dismiss' },
+    { headers: authHeaders(session.token) }
+  );
+  assert.equal(dismissed.response.status, 200);
+  const afterDismiss = await getJson(server.baseUrl, '/v1/platform/notifications', { headers: authHeaders(session.token) });
+  assert.equal(afterDismiss.body.items.some((item: { id: string }) => item.id === notificationId), false);
   assert.equal('clientId' in assign.body, false);
   assert.equal('clientId' in notifications.body.items[0], false);
 });

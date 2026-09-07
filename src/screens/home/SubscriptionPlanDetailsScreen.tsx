@@ -8,15 +8,17 @@ import { getThemeColors } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { formatPlanDuration, formatPlanPrice, getSubscriptionPlan, SubscriptionPlan } from '../../services/subscriptionService';
 import { useAppContext } from '../../state/AppContext';
+import { ApiClientError } from '../../services/apiClient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SubscriptionPlanDetails'>;
 export const SubscriptionPlanDetailsScreen = ({ navigation, route }: Props) => {
   const { themeMode } = useAppContext(); const palette = getThemeColors(themeMode);
-  const [plan, setPlan] = useState<SubscriptionPlan | null>(null); const [loading, setLoading] = useState(true);
-  useEffect(() => { void getSubscriptionPlan(route.params.planId).then((result) => setPlan(result.plan)).finally(() => setLoading(false)); }, [route.params.planId]);
+  const [plan, setPlan] = useState<SubscriptionPlan | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
+  const load = React.useCallback(async () => { setLoading(true); setError(null); try { setPlan((await getSubscriptionPlan(route.params.planId)).plan); } catch (cause) { setError(cause instanceof ApiClientError ? cause.message : 'Unable to load this plan right now.'); } finally { setLoading(false); } }, [route.params.planId]);
+  useEffect(() => { void load(); }, [load]);
   return <Screen scroll contentStyle={styles.screen}>
     <AppBackButton onPress={() => navigation.goBack()} label="Plans" />
-    {loading ? <ActivityIndicator color="#B59CFF" /> : plan ? <>
+    {loading ? <ActivityIndicator color="#B59CFF" /> : error ? <View style={styles.errorState}><Text accessibilityRole="alert" style={styles.errorText}>{error}</Text><Pressable accessibilityRole="button" onPress={() => { void load(); }} style={styles.primary}><Text style={styles.primaryText}>Retry</Text></Pressable></View> : plan ? <>
       {plan.recommended ? <Text style={styles.badge}>RECOMMENDED</Text> : null}
       <Text style={[styles.title, { color: palette.textPrimary }]}>{plan.name}</Text>
       <Text style={[styles.body, { color: palette.textSecondary }]}>{plan.description}</Text>
@@ -29,4 +31,4 @@ export const SubscriptionPlanDetailsScreen = ({ navigation, route }: Props) => {
     </> : <Text style={[styles.body, { color: palette.textSecondary }]}>This plan is unavailable.</Text>}
   </Screen>;
 };
-const styles = StyleSheet.create({ screen: { gap: 16 }, back: { flexDirection: 'row', alignItems: 'center', gap: 4 }, backText: { fontFamily: 'Exo_600SemiBold', fontSize: 14 }, badge: { alignSelf: 'flex-start', color: '#D8C9FF', backgroundColor: '#2B2144', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, fontFamily: 'Exo_700Bold', fontSize: 10 }, title: { fontFamily: 'Exo_700Bold', fontSize: 28, lineHeight: 34 }, body: { fontFamily: 'Exo_400Regular', fontSize: 14, lineHeight: 21 }, hero: { borderWidth: 1, borderRadius: 18, padding: 18, gap: 5 }, price: { fontFamily: 'Exo_700Bold', fontSize: 32 }, meta: { fontFamily: 'Exo_500Medium', fontSize: 13 }, section: { fontFamily: 'Exo_700Bold', fontSize: 18, marginTop: 5 }, row: { flexDirection: 'row', alignItems: 'center', gap: 9 }, primary: { minHeight: 48, backgroundColor: '#6A4FB3', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 10 }, primaryText: { color: '#FFFFFF', fontFamily: 'Exo_700Bold', fontSize: 15 } });
+const styles = StyleSheet.create({ screen: { gap: 16 }, back: { flexDirection: 'row', alignItems: 'center', gap: 4 }, backText: { fontFamily: 'Exo_600SemiBold', fontSize: 14 }, badge: { alignSelf: 'flex-start', color: '#D8C9FF', backgroundColor: '#2B2144', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, fontFamily: 'Exo_700Bold', fontSize: 10 }, title: { fontFamily: 'Exo_700Bold', fontSize: 28, lineHeight: 34 }, body: { fontFamily: 'Exo_400Regular', fontSize: 14, lineHeight: 21 }, hero: { borderWidth: 1, borderRadius: 18, padding: 18, gap: 5 }, price: { fontFamily: 'Exo_700Bold', fontSize: 32 }, meta: { fontFamily: 'Exo_500Medium', fontSize: 13 }, section: { fontFamily: 'Exo_700Bold', fontSize: 18, marginTop: 5 }, row: { flexDirection: 'row', alignItems: 'center', gap: 9 }, errorState: { alignItems: 'center', gap: 14, paddingVertical: 28 }, errorText: { color: '#F5A3AE', fontFamily: 'Exo_500Medium', fontSize: 14, textAlign: 'center' }, primary: { minHeight: 48, backgroundColor: '#6A4FB3', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 10, paddingHorizontal: 18 }, primaryText: { color: '#FFFFFF', fontFamily: 'Exo_700Bold', fontSize: 15 } });

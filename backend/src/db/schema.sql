@@ -735,6 +735,8 @@ create table if not exists notifications (
   title text not null,
   body text not null,
   sent_at timestamptz,
+  read_at timestamptz,
+  dismissed_at timestamptz,
   status text not null default 'queued',
   version integer not null default 1,
   created_at timestamptz not null default now(),
@@ -886,6 +888,10 @@ create unique index if not exists nutrition_profiles_active_client_unique
 create index if not exists notifications_client_created_idx
   on notifications (client_id, created_at desc)
   where client_id is not null;
+
+create index if not exists notifications_client_active_created_idx
+  on notifications (client_id, created_at desc)
+  where deleted_at is null and dismissed_at is null;
 
 create index if not exists health_reports_client_created_idx
   on health_reports (client_id, created_at desc)

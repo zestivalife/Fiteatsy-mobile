@@ -14,6 +14,7 @@ import {
   addTimelineEvent,
   addHealthEvent,
   updateCareCase,
+  updateNotificationStateForClient,
 } from './platform.store.js';
 import { calculateAgeFromDob, calculateNutritionProfileCompletion } from './platform.calculations.js';
 import { createOperationalTicket, transitionCareCaseStage, validateStageTransition } from './platform.lifecycle.js';
@@ -146,6 +147,8 @@ export const listCareCaseTimeline = async (careCaseId: string) => listTimelineEv
 export const listCareCaseEvents = async (careCaseId: string) => listHealthEvents(careCaseId);
 export const listCareCaseTickets = async (careCaseId: string) => listHealthTickets(careCaseId);
 export const listClientNotifications = async (owner: ClientOwnershipContext) => listNotificationsForClient(owner.clientId);
+export const updateClientNotification = async (owner: ClientOwnershipContext, notificationId: string, action: 'read' | 'unread' | 'dismiss') =>
+  updateNotificationStateForClient(owner.clientId, notificationId, action);
 
 export const assignConsultant = async (owner: ClientOwnershipContext, careCaseId: string, consultantId: string, mentorId?: string | null) => {
   const careCase = await getCareCaseById(careCaseId);

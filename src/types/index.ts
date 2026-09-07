@@ -101,10 +101,10 @@ export type ConsultantAssignmentHistoryEntry = {
 
 export type OnboardingProfile = {
   name: string;
-  dateOfBirthISO: string;
-  calculatedAge: number;
+  dateOfBirthISO?: string;
+  calculatedAge?: number;
   age?: number;
-  gender: AssessmentGender;
+  gender?: AssessmentGender;
   heightCm?: number;
   currentWeightKg?: number;
   goalWeightKg?: number;
@@ -152,7 +152,7 @@ export type OnboardingProfile = {
   stressLevelLabel?: string;
   wellnessGoal?: HealthGoal;
   wellnessGoalIds?: string[];
-  ageBracket: AgeBracket;
+  ageBracket?: AgeBracket;
   primaryConditions: HealthCondition[];
   previousConditions?: HealthCondition[];
   familyHistoryConditions?: HealthCondition[];

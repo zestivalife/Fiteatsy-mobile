@@ -2,23 +2,28 @@ import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { colors, getThemeColors, radius, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
+import { RootStackParamList } from '../../navigation/types';
 
-const searchableItems = [
-  'Focus Mode',
-  'Breathing Session',
-  'Movement Routine',
-  'Hydration Tracker',
-  'Wearable Sync',
-  'Wellness Report',
-  'Leadership Board'
+const searchableItems: Array<{ label: string; route: keyof RootStackParamList; keywords: string }> = [
+  { label: 'Focus Mode', route: 'FocusSession', keywords: 'mind session concentration' },
+  { label: 'Breathing Session', route: 'BreathingSession', keywords: 'calm stress recovery' },
+  { label: 'Movement Routine', route: 'MovementSession', keywords: 'activity exercise workout' },
+  { label: 'Hydration Tracker', route: 'HydrationSession', keywords: 'water drink' },
+  { label: 'Wearable Sync', route: 'SyncWearable', keywords: 'health connect watch device' },
+  { label: 'Health Reports', route: 'Reports', keywords: 'wellness biomarker pdf analysis' },
+  { label: 'Nutrition Plan', route: 'NutritionPlan', keywords: 'diet meals food' },
+  { label: 'Medication Tracker', route: 'MedicationCalendar', keywords: 'medicine reminder adherence' },
+  { label: 'Cycle Tracker', route: 'Cycle', keywords: 'period symptoms phase' },
+  { label: 'Consultant Care', route: 'ConsultantBooking', keywords: 'appointment expert care team' }
 ];
 
 export const SearchScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
@@ -30,7 +35,7 @@ export const SearchScreen = () => {
     if (!normalized) {
       return searchableItems;
     }
-    return searchableItems.filter((item) => item.toLowerCase().includes(normalized));
+    return searchableItems.filter((item) => `${item.label} ${item.keywords}`.toLowerCase().includes(normalized));
   }, [query]);
 
   return (
@@ -55,12 +60,12 @@ export const SearchScreen = () => {
 
       <FlatList
         data={results}
-        keyExtractor={(item) => item}
+        keyExtractor={(item) => item.route}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <Pressable accessibilityRole="button" accessibilityLabel={item}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.label}`} onPress={() => navigation.navigate(item.route as never)}>
             <Card style={styles.resultCard}>
-              <Text style={[styles.resultText, { color: darkTextStrong }]}>{item}</Text>
+              <Text style={[styles.resultText, { color: darkTextStrong }]}>{item.label}</Text>
             </Card>
           </Pressable>
         )}

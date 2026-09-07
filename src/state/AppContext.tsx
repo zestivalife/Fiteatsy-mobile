@@ -72,7 +72,7 @@ import {
   type AuthSessionResponse,
   type CurrentAuthSession
 } from '../services/authService';
-import { registerAccessTokenProvider } from '../services/apiClient';
+import { registerAccessTokenProvider, registerUnauthorizedHandler } from '../services/apiClient';
 import { queueHealthEvent } from '../services/platformEventService';
 import {
   getPlatformHealthProfile,
@@ -513,6 +513,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     registerAccessTokenProvider(() => authSession?.sessionToken ?? null);
   }, [authSession]);
+
+  useEffect(() => {
+    registerUnauthorizedHandler(() => clearPersistedAuth(authSession));
+    return () => registerUnauthorizedHandler(null);
+  }, [authSession, clearPersistedAuth]);
 
   useEffect(() => {
     const bootstrap = async () => {

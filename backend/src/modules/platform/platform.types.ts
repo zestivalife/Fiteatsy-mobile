@@ -216,6 +216,8 @@ export type NotificationRecord = AuditFields & {
   title: string;
   body: string;
   sentAtISO: string | null;
+  readAtISO: string | null;
+  dismissedAtISO: string | null;
 };
 
 export type NutritionPlanLifecycle =

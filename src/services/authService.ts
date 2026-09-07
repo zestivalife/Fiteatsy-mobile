@@ -69,6 +69,11 @@ export class AuthServiceError extends Error {
 
 const AUTH_LOG_PREFIX = '[AuthService]';
 const REDACTED = '[REDACTED]';
+const authLogger = {
+  log: (...values: unknown[]) => { if (__DEV__) console.log(...values); },
+  warn: (...values: unknown[]) => { if (__DEV__) console.warn(...values); },
+  error: (...values: unknown[]) => { if (__DEV__) console.error(...values); }
+};
 
 const sanitizeAuthPayload = (value: unknown): unknown => {
   if (Array.isArray(value)) {
@@ -127,13 +132,13 @@ const parseError = async (response: Response, url: string): Promise<never> => {
   try {
     responseText = await response.text();
     payload = responseText ? (JSON.parse(responseText) as typeof payload) : {};
-    console.warn(`${AUTH_LOG_PREFIX} ERROR RESPONSE`, {
+    authLogger.warn(`${AUTH_LOG_PREFIX} ERROR RESPONSE`, {
       url,
       status: response.status,
       responseJson: sanitizeAuthPayload(payload)
     });
   } catch (error) {
-    console.error(`${AUTH_LOG_PREFIX} ERROR RESPONSE PARSE FAILED`, {
+    authLogger.error(`${AUTH_LOG_PREFIX} ERROR RESPONSE PARSE FAILED`, {
       url,
       status: response.status,
       responseText,
@@ -157,7 +162,7 @@ const requestJson = async <T>(
   let response: Response;
   const url = `${apiBaseUrl}${path}`;
   const method = init.method ?? 'GET';
-  console.log(`${AUTH_LOG_PREFIX} REQUEST`, { apiBaseUrl, url, method });
+  authLogger.log(`${AUTH_LOG_PREFIX} REQUEST`, { apiBaseUrl, url, method });
   try {
     response = await fetch(url, {
       ...init,
@@ -167,7 +172,7 @@ const requestJson = async <T>(
       }
     });
   } catch (error) {
-    console.error(`${AUTH_LOG_PREFIX} FETCH FAILED`, {
+    authLogger.error(`${AUTH_LOG_PREFIX} FETCH FAILED`, {
       apiBaseUrl,
       url,
       method,
@@ -177,14 +182,14 @@ const requestJson = async <T>(
     throw new AuthServiceError('NETWORK_OFFLINE', `Unable to reach the authentication service at ${apiBaseUrl}.`);
   }
 
-  console.log(`${AUTH_LOG_PREFIX} RESPONSE STATUS`, { url, status: response.status });
+  authLogger.log(`${AUTH_LOG_PREFIX} RESPONSE STATUS`, { url, status: response.status });
 
   if (!response.ok) {
     return parseError(response, url);
   }
 
   if (response.status === 204) {
-    console.log(`${AUTH_LOG_PREFIX} RESPONSE EMPTY`, { url, status: response.status });
+    authLogger.log(`${AUTH_LOG_PREFIX} RESPONSE EMPTY`, { url, status: response.status });
     return undefined as T;
   }
 
@@ -192,14 +197,14 @@ const requestJson = async <T>(
   try {
     responseText = await response.text();
     const payload = (responseText ? JSON.parse(responseText) : undefined) as T;
-    console.log(`${AUTH_LOG_PREFIX} RESPONSE JSON`, {
+    authLogger.log(`${AUTH_LOG_PREFIX} RESPONSE JSON`, {
       url,
       status: response.status,
       responseJson: sanitizeAuthPayload(payload)
     });
     return payload;
   } catch (error) {
-    console.error(`${AUTH_LOG_PREFIX} RESPONSE PARSE FAILED`, {
+    authLogger.error(`${AUTH_LOG_PREFIX} RESPONSE PARSE FAILED`, {
       url,
       status: response.status,
       responseText,

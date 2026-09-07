@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, NativeModules, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -19,7 +19,6 @@ import {
   EntitlementCode,
   PremiumSource,
   SubscriptionPlan,
-  createSubscriptionCheckout,
   formatMinorPrice,
   formatPlanDuration,
   formatPlanPrice,
@@ -27,8 +26,8 @@ import {
   getSubscriptionPlans,
   hasEntitlement,
   premiumSourceEntitlements,
-  verifyRazorpayPayment
 } from '../../services/subscriptionService';
+import { runVerifiedSubscriptionCheckout } from '../../services/razorpayCheckoutService';
 import { useAppContext } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SubscriptionPlans'>;
@@ -37,53 +36,6 @@ type Choice<T extends string | null> = {
   label: string;
   value: T;
   helper: string;
-};
-
-type RazorpaySuccess = {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-};
-
-type RazorpayCheckoutModule = {
-  open(options: {
-    key: string;
-    amount: number;
-    currency: string;
-    name: string;
-    description: string;
-    order_id: string;
-    prefill: Record<string, unknown>;
-    notes: Record<string, unknown>;
-    theme: {
-      color: string;
-    };
-  }): Promise<unknown>;
-};
-
-const RAZORPAY_RUNTIME_UNAVAILABLE_MESSAGE = 'Payment checkout is unavailable in this development build.';
-
-const getRazorpayCheckout = (): RazorpayCheckoutModule | null => {
-  const hasNativeRazorpay =
-    Boolean(NativeModules.RNRazorpayCheckout) &&
-    Boolean(NativeModules.RazorpayEventEmitter);
-
-  if (!hasNativeRazorpay) {
-    return null;
-  }
-
-  try {
-    const razorpayModule = require('react-native-razorpay') as {
-      default?: RazorpayCheckoutModule;
-      open?: RazorpayCheckoutModule['open'];
-    };
-    const checkoutModule = razorpayModule.default ?? (
-      typeof razorpayModule.open === 'function' ? razorpayModule as RazorpayCheckoutModule : null
-    );
-    return checkoutModule && typeof checkoutModule.open === 'function' ? checkoutModule : null;
-  } catch {
-    return null;
-  }
 };
 
 const supportChoices: Choice<SupportPreference>[] = [
@@ -174,45 +126,20 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
     setCheckoutPlanId(plan.id);
     setErrorMessage(null);
     try {
-      const RazorpayCheckout = getRazorpayCheckout();
-      if (!RazorpayCheckout) {
-        throw new Error(RAZORPAY_RUNTIME_UNAVAILABLE_MESSAGE);
-      }
-
-      const checkoutResponse = await createSubscriptionCheckout({
-        planId: plan.id,
+      const result = await runVerifiedSubscriptionCheckout({
+        plan,
         source,
         requiredEntitlement,
         returnDestination: returnDestination ?? null,
         idempotencyKey: generateIdempotencyKey(plan.id)
       });
 
-      if (checkoutResponse.alreadyEntitled) {
+      if (result.alreadyEntitled) {
         navigateAfterActivation();
         return;
       }
 
-      if (!checkoutResponse.checkout) {
-        throw new Error('Payment provider did not return checkout details.');
-      }
-
-      const checkout = checkoutResponse.checkout;
-      const result = await RazorpayCheckout.open({
-        key: checkout.keyId,
-        amount: checkout.amount,
-        currency: checkout.currency,
-        name: 'Fiteatsy',
-        description: checkout.description,
-        order_id: checkout.orderId,
-        prefill: checkout.prefill,
-        notes: checkout.notes,
-        theme: {
-          color: '#64D900'
-        }
-      }) as RazorpaySuccess;
-
-      const verification = await verifyRazorpayPayment(result);
-      navigation.replace('PaymentSuccess', { returnDestination, priceBreakup: verification.priceBreakup });
+      navigation.replace('PaymentSuccess', { returnDestination, priceBreakup: result.priceBreakup });
     } catch (error) {
       const message =
         error instanceof ApiClientError

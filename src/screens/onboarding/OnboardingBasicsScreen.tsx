@@ -16,9 +16,7 @@ const genders: AssessmentGender[] = ['Male', 'Female', 'Prefer not to say'];
 const conditions: HealthCondition[] = ['Diabetes', 'Prediabetes', 'Hypertension', 'PCOS', 'Thyroid', 'Obesity', 'High Cholesterol', 'Gut Health'];
 
 const baseProfile = (): OnboardingProfile => ({
-  name: '', dateOfBirthISO: new Date(1996, 0, 1).toISOString(), calculatedAge: 28, age: 28,
-  gender: 'Prefer not to say', wellnessGoal: 'Better Energy', ageBracket: '25-34', primaryConditions: [],
-  symptomTags: ['Fatigue'], healthGoals: ['Better Energy'], primaryGoal: 'Better Energy', secondaryGoals: [],
+  name: '', primaryConditions: [], symptomTags: [], healthGoals: [], secondaryGoals: [],
   wearablePreference: 'later', careTrack: 'Foundational Recovery Care', assignedConsultantId: null,
   assignedConsultant: null, calendarProvider: 'None', calendarPermissionGranted: false,
   notificationPermissionGranted: false, createdAtISO: new Date().toISOString()
@@ -36,9 +34,10 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
   const seed = useMemo(() => onboarding ?? baseProfile(), [onboarding]);
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
-  const [dob, setDob] = useState(seed.dateOfBirthISO ? new Date(seed.dateOfBirthISO) : new Date(1996, 0, 1));
+  const [dob, setDob] = useState<Date | null>(seed.dateOfBirthISO ? new Date(seed.dateOfBirthISO) : null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [gender, setGender] = useState<AssessmentGender>(seed.gender ?? 'Prefer not to say');
+  const [gender, setGender] = useState<AssessmentGender | null>(seed.gender ?? null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [selectedGoals, setSelectedGoals] = useState<HealthGoal[]>(seed.healthGoals ?? []);
   const [selectedConditions, setSelectedConditions] = useState<HealthCondition[]>(seed.primaryConditions ?? []);
 
@@ -47,10 +46,13 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
     if (navigation.canGoBack()) navigation.goBack();
   };
   const next = () => {
+    setValidationError(null);
+    if (step === 2 && (!dob || !gender)) { setValidationError('Select your date of birth and gender to continue.'); return; }
+    if (step === 3 && selectedGoals.length === 0) { setValidationError('Select at least one wellness goal to continue.'); return; }
     if (step < 4) { setDirection('forward'); setStep((value) => value + 1); return; }
     const primaryGoal = selectedGoals[0] ?? null;
     setOnboarding(normalizeOnboardingProfile({
-      ...seed, name: seed.name.trim() || 'Member', dateOfBirthISO: dob.toISOString(), gender,
+      ...seed, name: seed.name.trim() || 'Member', dateOfBirthISO: dob?.toISOString(), gender: gender ?? undefined,
       primaryConditions: selectedConditions, healthGoals: selectedGoals, primaryGoal: primaryGoal ?? undefined,
       secondaryGoals: primaryGoal ? selectedGoals.slice(1) : [], wellnessGoal: primaryGoal ?? seed.wellnessGoal,
       wellnessGoalIds: selectedGoals.map(wellnessGoalIdForLabel).filter((id): id is string => Boolean(id)),
@@ -69,12 +71,13 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
       {step === 1 ? <Intro /> : null}
       {step === 2 ? <View><QuestionHeader title="Basic profile" description="Used to calculate your personal health baselines and safe targets." />
         <Text style={styles.label}>DATE OF BIRTH</Text>
-        <Pressable accessibilityRole="button" style={styles.field} onPress={() => setShowDatePicker(true)}><Text style={styles.fieldText}>{dob.toLocaleDateString('en-GB')}</Text><Ionicons name="calendar-outline" size={20} color={colors.textPrimary} /></Pressable>
-        {showDatePicker ? <DateTimePicker value={dob} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} maximumDate={new Date()} onChange={onDob} /> : null}
+        <Pressable accessibilityRole="button" accessibilityLabel="Select date of birth" style={styles.field} onPress={() => setShowDatePicker(true)}><Text style={styles.fieldText}>{dob ? dob.toLocaleDateString('en-GB') : 'Select date'}</Text><Ionicons name="calendar-outline" size={20} color={colors.textPrimary} /></Pressable>
+        {showDatePicker ? <DateTimePicker value={dob ?? new Date(2000, 0, 1)} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} maximumDate={new Date()} onChange={onDob} /> : null}
         <Text style={styles.label}>GENDER</Text><View style={styles.list}>{genders.map((item) => <ChoiceCard key={item} label={item} selected={gender === item} onPress={() => setGender(item)} />)}</View>
       </View> : null}
       {step === 3 ? <View><QuestionHeader title="What are your wellness goals?" description="Select all that apply. Your first choice becomes your primary focus." /><View style={styles.list}>{WELLNESS_GOALS.map((goal) => <ChoiceCard key={goal.id} label={goal.label === 'Weight Loss' ? 'Weight Management' : goal.label} description={selectedGoals[0] === goal.label ? 'Primary' : undefined} selected={selectedGoals.includes(goal.label)} accent="#FFBE25" onPress={() => setSelectedGoals((current) => current.includes(goal.label) ? current.filter((item) => item !== goal.label) : [...current, goal.label])} />)}</View></View> : null}
       {step === 4 ? <View><QuestionHeader title="Existing health conditions" description="Helps us keep recommendations safe and relevant for you." /><View style={styles.list}>{conditions.map((item) => <ChoiceCard key={item} label={item} selected={selectedConditions.includes(item)} onPress={() => setSelectedConditions((current) => current.includes(item) ? current.filter((condition) => condition !== item) : [...current, item])} />)}</View></View> : null}
+      {validationError ? <Text accessibilityRole="alert" style={styles.error}>{validationError}</Text> : null}
     </OnboardingShell>
   );
 };
@@ -105,5 +108,6 @@ const styles = StyleSheet.create({
   support: { ...typography.caption, fontSize: 12, color: colors.textSecondary, marginTop: spacing.xl },
   benefit: { width: '100%', minHeight: 60, borderWidth: 1, borderColor: colors.stroke, borderRadius: radius.lg, backgroundColor: colors.cardMuted, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   benefitIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  benefitText: { ...typography.bodyStrong, fontSize: 14, lineHeight: 20, color: colors.textPrimary }
+  benefitText: { ...typography.bodyStrong, fontSize: 14, lineHeight: 20, color: colors.textPrimary },
+  error: { ...typography.body, color: '#FF8A95', marginTop: spacing.md, textAlign: 'center' }
 });

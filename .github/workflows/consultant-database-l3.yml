@@ -13,6 +13,7 @@ on:
       - codex/governed-qa-handoff-v17.12
       - codex/consultant-meal-templates-v17.25
       - codex/application-review-v17.37
+      - codex/mobile-production-readiness-v17.38
 
 permissions:
   contents: read
@@ -65,7 +66,7 @@ jobs:
         run: |
           npx tsc --noEmit
           npm test -- --runInBand
-          npx expo export --platform all --output-dir /tmp/fiteatsy-v17.37-export
+          npx expo export --platform all --output-dir /tmp/fiteatsy-v17.38-export
 
       - name: Apply production migrations to ephemeral PostgreSQL
         run: npm --prefix backend run db:migrate

@@ -59,6 +59,12 @@ test('database schema includes soft delete and versioning fields', () => {
   assert.equal(hasPattern(/deleted_at timestamptz/i), true);
 });
 
+test('notification inbox state is durable and excludes dismissed records efficiently', () => {
+  assert.equal(hasPattern(/read_at timestamptz/i), true);
+  assert.equal(hasPattern(/dismissed_at timestamptz/i), true);
+  assert.equal(hasPattern(/notifications_client_active_created_idx/i), true);
+});
+
 test('database schema defines traceable health intelligence scores', () => {
   assert.equal(hasPattern(/create table if not exists health_scores/i), true);
   assert.equal(hasPattern(/score_type text not null/i), true);

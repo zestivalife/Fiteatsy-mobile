@@ -11,6 +11,7 @@ import {
   listTimelineEvents,
   saveNutritionProfile,
   updateCareCase,
+  updateNotificationStateForClient,
 } from '../../backend/src/modules/platform/platform.store.js';
 import { resolveVerifiedAccountIdentity } from '../../backend/src/modules/auth/auth.repository.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
@@ -70,7 +71,7 @@ test('repository layer persists nutrition profiles, timeline, and notifications'
     eventTimeISO: '2026-07-02T10:00:00.000Z',
     metadata: {},
   });
-  await createNotificationRecord({
+  const notification = await createNotificationRecord({
     userId: owner.accountId,
     clientId: owner.clientId,
     careCaseId: careCase.id,
@@ -81,4 +82,9 @@ test('repository layer persists nutrition profiles, timeline, and notifications'
   });
   assert.equal((await listTimelineEvents(careCase.id)).length, 1);
   assert.equal((await listNotificationsForClient(owner.clientId)).length, 1);
+  const read = await updateNotificationStateForClient(owner.clientId, notification.id, 'read');
+  assert.ok(read?.readAtISO);
+  assert.equal(await updateNotificationStateForClient('another-client', notification.id, 'dismiss'), null);
+  await updateNotificationStateForClient(owner.clientId, notification.id, 'dismiss');
+  assert.equal((await listNotificationsForClient(owner.clientId)).length, 0);
 });
