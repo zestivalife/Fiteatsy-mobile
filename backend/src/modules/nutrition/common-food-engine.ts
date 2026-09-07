@@ -42,12 +42,18 @@ export const canonicalFoodIdentity=(food:Pick<CommonFood,'canonicalCode'|'canoni
   return governed?`${food.foodType}:CODE:${governed}`:`${food.foodType}:NAME:${normalizedIdentity(food.canonicalName||food.displayName)}`;
 };
 const aliasIdentitySet=(food:Pick<CommonFood,'canonicalName'|'displayName'|'aliases'>)=>new Set([food.canonicalName,food.displayName,...food.aliases].map(normalizedIdentity).filter(Boolean));
+// Batch-0 IDs are the stable, audited activation identities exposed by the
+// Consultant API.  Earlier catalogue projections can carry the same aliases,
+// but must not win merely because they were concatenated first.
+const canonicalRepresentativePriority=(food:CommonFood)=>
+  (food.id.startsWith('BATCH0_')?100:0)+(food.generatorEligible?10:0)+(food.active?1:0);
 export const dedupeCanonicalFoods=(input:CommonFood[])=>{
   const accepted:CommonFood[]=[];
   for(const food of input){
     const aliases=aliasIdentitySet(food);
-    const duplicate=accepted.some(existing=>existing.foodType===food.foodType&&(canonicalFoodIdentity(existing)===canonicalFoodIdentity(food)||[...aliasIdentitySet(existing)].some(alias=>aliases.has(alias))));
-    if(!duplicate)accepted.push(food);
+    const duplicateIndex=accepted.findIndex(existing=>existing.foodType===food.foodType&&(canonicalFoodIdentity(existing)===canonicalFoodIdentity(food)||[...aliasIdentitySet(existing)].some(alias=>aliases.has(alias))));
+    if(duplicateIndex<0)accepted.push(food);
+    else if(canonicalRepresentativePriority(food)>canonicalRepresentativePriority(accepted[duplicateIndex]!))accepted[duplicateIndex]=food;
   }
   return accepted;
 };
