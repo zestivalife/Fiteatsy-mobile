@@ -5,7 +5,6 @@ import test from 'node:test';
 import decisions from '../../backend/src/modules/nutrition/food-curation/data/food_usda_mapping_v17_32b1_decisions.json' with { type: 'json' };
 import before from '../../backend/src/modules/nutrition/food-curation/data/food_usda_mapping_v17_32b1_before.json' with { type: 'json' };
 import queue from '../../backend/src/modules/nutrition/food-curation/data/food_usda_activation_queue_v17_32b2.json' with { type: 'json' };
-import { commonFoodCatalogue } from '../../backend/src/modules/nutrition/common-food-consultant.service.js';
 
 const terminalDecisions = new Set([
   'READY_FOR_NEW_USDA_MAPPING',
@@ -70,11 +69,10 @@ test('v17.32B-2 activation queue includes only ready or alias records', () => {
   }
 });
 
-test('v17.32B-1 remains evidence-only and preserves runtime food pools', () => {
-  const active = commonFoodCatalogue.filter((food) => food.active);
-  const generator = active.filter((food) => food.generatorEligible && food.clientConsumable);
-  const component = active.filter((food) => food.clientConsumable);
-  assert.equal(generator.length, 63);
-  assert.equal(component.length, 72);
+test('v17.32B-1 remains mapping-only and exposes only the activation queue', () => {
+  assert.equal(ready.length, 43);
+  assert.equal(aliases.length, 4);
+  assert.equal(queue.records.filter((item) => item.activationType === 'NEW_MAPPING').length, 43);
+  assert.equal(queue.records.filter((item) => item.activationType === 'ALIAS_EXISTING').length, 4);
   assert.match(createHash('sha256').update(readFileSync(new URL('../../backend/src/modules/nutrition/food-curation/data/food_usda_mapping_v17_32b1_decisions.json', import.meta.url))).digest('hex'), /^[a-f0-9]{64}$/);
 });

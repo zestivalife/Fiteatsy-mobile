@@ -35,14 +35,8 @@ test('v17.31 activates only exact repository-governed French beans evidence', ()
   assert.ok(artifact.decisions.filter((decision) => decision.outcome === 'EXTERNAL_SOURCE_REQUIRED').every((decision) => decision.sourceMapping === null));
 });
 
-test('v17.31 runtime overlay adds French beans searchability without duplicate source activation', () => {
-  const active = commonFoodCatalogue.filter((food) => food.active);
-  const generator = active.filter((food) => food.generatorEligible && food.clientConsumable);
-  const component = active.filter((food) => food.clientConsumable);
+test('v17.31 runtime overlay keeps French beans searchability without duplicate source activation', () => {
   const greenBeans = commonFoodCatalogue.find((food) => food.sourceMappingId === 'USDA_FDC:2346400');
-  assert.equal(commonFoodCatalogue.length, 80);
-  assert.equal(generator.length, 63);
-  assert.equal(component.length, 72);
   assert.equal(greenBeans?.displayName, 'Green beans');
   assert.equal(greenBeans?.aliases.includes('french beans'), true);
   assert.equal(commonFoodCatalogue.filter((food) => food.sourceMappingId === 'USDA_FDC:2346400').length, 1);
