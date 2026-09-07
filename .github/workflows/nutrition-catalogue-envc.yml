@@ -9,6 +9,7 @@ on:
       - codex/unique-meal-options-repair
       - codex/food-catalogue-v17.35
       - codex/food-catalogue-v17.36
+      - codex/food-diversity-explorer-repair-v17.39
 
 permissions:
   contents: read

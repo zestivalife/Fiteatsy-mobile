@@ -14,6 +14,7 @@ on:
       - codex/consultant-meal-templates-v17.25
       - codex/application-review-v17.37
       - codex/mobile-production-readiness-v17.38
+      - codex/food-diversity-explorer-repair-v17.39
 
 permissions:
   contents: read
