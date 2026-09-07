@@ -280,14 +280,14 @@ test('foundation endpoints reject missing auth', async () => {
 });
 
 
-test('stress intelligence exposes randomized PSS-10 questions and computes reverse-scored results', async () => {
+test('stress intelligence exposes all approved PSS-10 questions and computes reverse-scored results', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
-  const questions = await getJson(server.baseUrl, '/v1/intelligence/stress/questions?count=4', {
+  const questions = await getJson(server.baseUrl, '/v1/intelligence/stress/questions', {
     headers: authHeaders(session.token)
   });
   assert.equal(questions.response.status, 200);
   assert.equal(questions.body.scale, 'PSS-10');
-  assert.equal(questions.body.items.length, 4);
+  assert.equal(questions.body.items.length, 10);
 
   const answers = questions.body.items.map((item: { id: string }, index: number) => ({
     questionId: item.id,
