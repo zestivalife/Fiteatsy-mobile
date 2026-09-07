@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { CommonFood, ComponentRole, MealHead, Nutrients } from './common-food-engine.js';
 import { canonicalHash } from './food-curation/canonical-food-foundation.js';
 
@@ -56,8 +57,16 @@ type ActivationRecord = QueueRecord & {
   processorVersion: 'FOOD_USDA_ACTIVATION_V17_32B2';
 };
 
-const decisionBytes = readFileSync(new URL('./food-curation/data/food_usda_mapping_v17_32b1_decisions.json', import.meta.url));
-const queueBytes = readFileSync(new URL('./food-curation/data/food_usda_activation_queue_v17_32b2.json', import.meta.url));
+const loadFrozenArtifact = (filename: string): Buffer => {
+  const compiledUrl = new URL(`./food-curation/data/${filename}`, import.meta.url);
+  if (existsSync(compiledUrl)) return readFileSync(compiledUrl);
+  const sourcePath = join(process.cwd(), 'src/modules/nutrition/food-curation/data', filename);
+  if (existsSync(sourcePath)) return readFileSync(sourcePath);
+  throw new Error(`USDA_ACTIVATION_ARTIFACT_MISSING:${filename}`);
+};
+
+const decisionBytes = loadFrozenArtifact('food_usda_mapping_v17_32b1_decisions.json');
+const queueBytes = loadFrozenArtifact('food_usda_activation_queue_v17_32b2.json');
 const decisionsArtifact = JSON.parse(decisionBytes.toString('utf8')) as { decisions: DecisionRecord[] };
 const queueArtifact = JSON.parse(queueBytes.toString('utf8')) as { queueCount: number; records: QueueRecord[] };
 export const FOOD_USDA_ACTIVATION_V17_32B2_ARTIFACT_SHA256 = canonicalHash({
