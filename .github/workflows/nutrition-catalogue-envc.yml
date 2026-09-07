@@ -132,6 +132,19 @@ jobs:
           ../tests/backend/diet-plan-version-store-contract.test.ts
           ../tests/backend/published-nutrition-plan-contract.test.ts
 
+      - name: Reset ephemeral PostgreSQL before full regression
+        working-directory: backend
+        run: |
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+          const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+          await client.connect();
+          await client.query('drop schema public cascade');
+          await client.query('create schema public');
+          await client.end();
+          NODE
+          npm run db:migrate
+
       - name: Run full safe backend regression
         working-directory: backend
         run: node --import tsx --test --test-concurrency=1 ../tests/api/*.test.ts ../tests/backend/*.test.ts ../tests/database/*.test.ts
