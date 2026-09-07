@@ -12,7 +12,7 @@ const decisions = load<Decision>('food_india_resolution_v17_35.json') as Artifac
 const labQueue = load<LabRequest>('food_india_lab_queue_v17_35.json') as Artifact<LabRequest> & { records: LabRequest[] };
 
 const validate = () => {
-  if (sources.schemaVersion !== 'FITEATSY_FOOD_INDIA_SOURCE_ASSESSMENT_V17_35' || sources.assessmentCount !== 2 || sources.assessments?.length !== 2) throw new Error('V17_35_SOURCE_ASSESSMENT_INVALID');
+  if (sources.schemaVersion !== 'FITEATSY_FOOD_INDIA_SOURCE_ASSESSMENT_V17_35' || sources.assessmentCount !== 8 || sources.assessments?.length !== 8) throw new Error('V17_35_SOURCE_ASSESSMENT_INVALID');
   if (decisions.schemaVersion !== 'FITEATSY_FOOD_INDIA_RESOLUTION_V17_35' || decisions.cohortCount !== 123 || decisions.decisions?.length !== 123) throw new Error('V17_35_DECISIONS_INVALID');
   if (labQueue.schemaVersion !== 'FITEATSY_FOOD_INDIA_LAB_QUEUE_V17_35' || labQueue.queueCount !== 123 || labQueue.records?.length !== 123) throw new Error('V17_35_LAB_QUEUE_INVALID');
   if (decisions.decisions.some((item) => item.ifctNumericValuesIngested || item.activationEligible || item.finalDecision !== 'INDIA_LAB_VALIDATION_REQUIRED')) throw new Error('V17_35_RIGHTS_BOUNDARY_VIOLATION');
@@ -45,9 +45,9 @@ const main = async () => {
       client.query('select count(*)::int count from food_india_resolution_v17_35 where artifact_sha256=$1',[decisions.artifactSha256]),
       client.query('select count(*)::int count from food_india_lab_queue_v17_35 where artifact_sha256=$1',[labQueue.artifactSha256]),
     ]);
-    if (Number(counts[0].rows[0].count) !== 2 || Number(counts[1].rows[0].count) !== 123 || Number(counts[2].rows[0].count) !== 123) throw new Error('V17_35_PERSISTENCE_COUNT_MISMATCH');
+    if (Number(counts[0].rows[0].count) !== 8 || Number(counts[1].rows[0].count) !== 123 || Number(counts[2].rows[0].count) !== 123) throw new Error('V17_35_PERSISTENCE_COUNT_MISMATCH');
     await client.query('commit');
-    process.stdout.write(`${JSON.stringify({ sourceAssessments:2, decisions:123, labQueue:123, persisted, unchanged, activationQueue:0, ifctNumericValues:0, decisionArtifactSha256:decisions.artifactSha256 })}\n`);
+    process.stdout.write(`${JSON.stringify({ sourceAssessments:8, decisions:123, labQueue:123, persisted, unchanged, activationQueue:0, ifctNumericValues:0, decisionArtifactSha256:decisions.artifactSha256 })}\n`);
   } catch (error) {
     await client.query('rollback');
     throw error;

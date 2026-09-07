@@ -36,6 +36,17 @@ test('v17.35 records the reusable India-first alternative but rejects incomplete
   assert.equal(ogd?.numericValuesIngested, false);
   assert.equal(sources.activationEligibleAlternativeCount, 0);
   assert.equal(decisions.activationQueueCount, 0);
+  assert.equal(sources.assessmentCount, 8);
+  assert.deepEqual(sources.assessments.map((item) => item.sourceClass), [
+    'INDIA_AUTHORITATIVE',
+    'INDIA_AUTHORITATIVE_OPEN_DATA',
+    'INDIA_REGULATORY_IDENTITY',
+    'INDIA_AGRICULTURAL_SCIENCE',
+    'INDIA_PUBLIC_SCIENTIFIC_LITERATURE',
+    'INDIA_MARKET_PRODUCT_EVIDENCE',
+    'EXISTING_GOVERNED_EVIDENCE',
+    'APPROVED_GENERIC_FALLBACK',
+  ]);
 });
 
 test('v17.35 fails every unresolved identity closed into the India lab queue', () => {
@@ -47,6 +58,24 @@ test('v17.35 fails every unresolved identity closed into the India lab queue', (
     assert.equal(item.finalDecision, 'INDIA_LAB_VALIDATION_REQUIRED');
     assert.equal(item.activationEligible, false);
     assert.equal(item.selectedSource, null);
+    assert.ok(Array.isArray(item.aliases));
+    assert.equal(item.botanicalIdentity, null);
+    assert.equal(item.botanicalIdentityStatus, 'NOT_ESTABLISHED_BY_REUSABLE_EXACT_SOURCE');
+    assert.equal(item.cultivar, null);
+    assert.equal(item.ediblePortion, null);
+    assert.equal(item.sourceChecks.length, 8);
+    assert.deepEqual(Object.values(item.fallbackGateResults).every((result) => !String(result).includes('PASS')), true);
+    assert.deepEqual(item.blockerClasses, ['RIGHTS','IDENTITY','STATE','CULTIVAR','EDIBLE_PORTION','NUTRIENT_COMPLETENESS']);
+    assert.equal(item.dietClass, 'NOT_RUNTIME_ELIGIBLE');
+    assert.deepEqual(item.mealHeadEligibility, []);
+    assert.equal(item.runtimeVisibility, 'EVIDENCE_REGISTER_ONLY');
+    assert.equal(item.searchable, false);
+    assert.equal(item.generatorEligible, false);
+    assert.equal(item.componentEligible, false);
+    assert.equal(item.directAddEligible, false);
+    assert.match(item.provenanceHash, /^[a-f0-9]{64}$/);
+    assert.match(item.nutritionEvidenceHash, /^[a-f0-9]{64}$/);
+    assert.match(item.servingHash, /^[a-f0-9]{64}$/);
     assert.equal(commonFoodCatalogue.some((food) => food.id === item.referenceItemId), false, item.referenceItemId);
   }
   for (const item of labQueue.records) {
@@ -54,7 +83,22 @@ test('v17.35 fails every unresolved identity closed into the India lab queue', (
     assert.equal(item.preferredAccreditation, 'NABL_ISO_IEC_17025');
     assert.equal(item.requiredScope, 'FOOD_PROXIMATE_ANALYSIS');
     assert.deepEqual(item.requiredAnalytes, ['ENERGY_KCAL','PROTEIN_G','CARBOHYDRATE_G','FAT_G','FIBRE_G','MOISTURE_G','ASH_G']);
+    assert.equal(item.sourcesChecked.length, 8);
+    assert.equal(item.samplePreparationProtocol.prerequisite, 'QUALIFIED_TAXONOMIC_CULTIVAR_STATE_AND_EDIBLE_PORTION_SIGNOFF');
+    assert.equal(item.nablTestCategory, 'CHEMICAL_FOOD_AND_AGRICULTURAL_PRODUCTS_PROXIMATE_ANALYSIS');
+    assert.match(item.expectedEvidenceArtifact, /SIGNED_NABL_SCOPE_REPORT/);
+    assert.match(item.provenanceHash, /^[a-f0-9]{64}$/);
   }
+});
+
+test('v17.35 accounting has no generic blocked state and no silently inferred identity or nutrition', () => {
+  const counts = decisions.decisions.reduce<Record<string, number>>((result, item) => {
+    result[item.finalDecision] = (result[item.finalDecision] ?? 0) + 1;
+    return result;
+  }, {});
+  assert.equal((counts.NEW_MAPPING ?? 0) + (counts.ALIAS_EXISTING ?? 0) + (counts.GOVERNED_PARENT_MAPPING ?? 0) + counts.INDIA_LAB_VALIDATION_REQUIRED, 123);
+  assert.equal(counts.BLOCKED_EVIDENCE ?? 0, 0);
+  assert.ok(decisions.decisions.every((item) => item.nutritionVector === null && item.servingEvidence.semanticServing === null));
 });
 
 test('v17.35 migration and importer enforce idempotent fail-closed persistence', () => {

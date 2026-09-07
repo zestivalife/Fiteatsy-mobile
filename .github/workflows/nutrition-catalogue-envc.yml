@@ -7,6 +7,7 @@ on:
       - codex/usda-nutrition-catalogue-v1
       - codex/calorie-macro-allocation-v1
       - codex/unique-meal-options-repair
+      - codex/food-catalogue-v17.35
 
 permissions:
   contents: read
@@ -85,6 +86,14 @@ jobs:
           git diff --exit-code -- \
             backend/src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json \
             backend/src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.1.changes.json
+
+      - name: Verify v17.35 India evidence register is deterministic
+        run: |
+          npm --prefix backend run food-catalogue:v17-35:generate
+          git diff --exit-code -- \
+            backend/src/modules/nutrition/food-curation/data/food_india_source_assessment_v17_35.json \
+            backend/src/modules/nutrition/food-curation/data/food_india_resolution_v17_35.json \
+            backend/src/modules/nutrition/food-curation/data/food_india_lab_queue_v17_35.json
 
       - name: Apply production migrations to ephemeral PostgreSQL
         run: npm --prefix backend run db:migrate

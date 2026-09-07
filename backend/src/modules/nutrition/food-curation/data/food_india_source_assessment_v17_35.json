@@ -3,7 +3,7 @@
   "baselineSha": "6b90f3fe06cf6ff1402cc8852dda208076615ea7",
   "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35",
   "generatedAt": "2026-09-07T00:00:00.000Z",
-  "assessmentCount": 2,
+  "assessmentCount": 8,
   "ifctElectronicReuseCleared": false,
   "activationEligibleAlternativeCount": 0,
   "assessments": [
@@ -36,7 +36,91 @@
       "rationale": "The open dataset is reusable, but it does not establish exact identity and preparation state with the complete per-100g mandatory macro vector for the 123-item cohort.",
       "numericValuesIngested": false,
       "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35"
+    },
+    {
+      "assessmentId": "V1735_SOURCE_FSSAI_STANDARDS",
+      "sourceName": "Food Safety and Standards product standards and identity resources",
+      "sourceOrganisation": "Food Safety and Standards Authority of India",
+      "sourceCountry": "INDIA",
+      "sourceUrl": "https://www.fssai.gov.in/cms/compendium-fss-fps-fa.php",
+      "sourceClass": "INDIA_REGULATORY_IDENTITY",
+      "rightsStatus": "PUBLIC_REGULATORY_REFERENCE_ONLY",
+      "electronicProductReuse": "NOT_CLEARED",
+      "nutritionUseDecision": "PROHIBITED",
+      "rationale": "The standards support regulated product identity but do not provide a complete analytical per-100g nutrient vector for each exact catalogue identity; the FSSAI site also reserves rights.",
+      "numericValuesIngested": false,
+      "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35"
+    },
+    {
+      "assessmentId": "V1735_SOURCE_ICAR_PUBLICATIONS",
+      "sourceName": "ICAR publications and commodity research",
+      "sourceOrganisation": "Indian Council of Agricultural Research",
+      "sourceCountry": "INDIA",
+      "sourceUrl": "https://icar.gov.in/en/all-publications",
+      "sourceClass": "INDIA_AGRICULTURAL_SCIENCE",
+      "rightsStatus": "PUBLICATION_SPECIFIC_REUSE_REVIEW_REQUIRED",
+      "electronicProductReuse": "NOT_CLEARED",
+      "nutritionUseDecision": "PROHIBITED",
+      "rationale": "The reviewed commodity publications do not supply reusable, primary, complete, exact-state analytical records for the entire frozen cohort; derivative IFCT values do not bypass IFCT rights.",
+      "numericValuesIngested": false,
+      "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35"
+    },
+    {
+      "assessmentId": "V1735_SOURCE_INDIA_UNIVERSITY_PUBLICATIONS",
+      "sourceName": "Indian government and university scientific publications search",
+      "sourceOrganisation": "Multiple Indian public research institutions",
+      "sourceCountry": "INDIA",
+      "sourceUrl": "https://shodhganga.inflibnet.ac.in/",
+      "sourceClass": "INDIA_PUBLIC_SCIENTIFIC_LITERATURE",
+      "rightsStatus": "PUBLICATION_SPECIFIC_REUSE_REVIEW_REQUIRED",
+      "electronicProductReuse": "NOT_CLEARED",
+      "nutritionUseDecision": "PROHIBITED",
+      "rationale": "No cohort-wide set of exact identity, state, edible-portion, complete analytical nutrition records with explicit product reuse rights was established.",
+      "numericValuesIngested": false,
+      "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35"
+    },
+    {
+      "assessmentId": "V1735_SOURCE_INDIA_MARKET_MANUFACTURERS",
+      "sourceName": "India-market manufacturer and regulatory label evidence",
+      "sourceOrganisation": "Product-specific manufacturers",
+      "sourceCountry": "INDIA",
+      "sourceUrl": "https://www.fssai.gov.in/",
+      "sourceClass": "INDIA_MARKET_PRODUCT_EVIDENCE",
+      "rightsStatus": "PRODUCT_AND_LABEL_SPECIFIC",
+      "electronicProductReuse": "NOT_CLEARED",
+      "nutritionUseDecision": "PROHIBITED",
+      "rationale": "Manufacturer labels are product, formulation, lot, and serving specific and cannot be substituted for generic catalogue identities without an exact governed product mapping and retained label evidence.",
+      "numericValuesIngested": false,
+      "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35"
+    },
+    {
+      "assessmentId": "V1735_SOURCE_EXISTING_FITEATSY",
+      "sourceName": "Existing governed Fiteatsy food evidence",
+      "sourceOrganisation": "Fiteatsy",
+      "sourceCountry": "INDIA",
+      "sourceUrl": "repository://food-curation/v17.31-v17.34",
+      "sourceClass": "EXISTING_GOVERNED_EVIDENCE",
+      "rightsStatus": "INTERNAL_REUSE_CLEARED",
+      "electronicProductReuse": "CLEARED",
+      "nutritionUseDecision": "NOT_ACTIVATION_ELIGIBLE",
+      "rationale": "Exact alias and governed-parent reuse was evaluated in the prior immutable resolution chain; no exact reusable governed identity remained for this 123-item cohort.",
+      "numericValuesIngested": false,
+      "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35"
+    },
+    {
+      "assessmentId": "V1735_SOURCE_USDA_FDC",
+      "sourceName": "USDA FoodData Central pinned releases",
+      "sourceOrganisation": "United States Department of Agriculture",
+      "sourceCountry": "UNITED_STATES",
+      "sourceUrl": "https://fdc.nal.usda.gov/download-datasets/",
+      "sourceClass": "APPROVED_GENERIC_FALLBACK",
+      "rightsStatus": "US_FEDERAL_PUBLIC_DOMAIN",
+      "electronicProductReuse": "CLEARED",
+      "nutritionUseDecision": "NOT_ACTIVATION_ELIGIBLE",
+      "rationale": "The permitted generic-source passes in v17.32B and v17.33A did not establish an exact remaining identity/state/edible-portion match with the mandatory vector, alias, or governed parent.",
+      "numericValuesIngested": false,
+      "processorVersion": "FOOD_INDIA_EVIDENCE_RESOLUTION_V17_35"
     }
   ],
-  "artifactSha256": "19a465cdbbd31f0477df75e7ff7569b7c762a031b463daddb25012babfba9165"
+  "artifactSha256": "87ada4f0dd1320ad81eb7472f58ab842738b620b50288e85fffa5dca6252a7b7"
 }
