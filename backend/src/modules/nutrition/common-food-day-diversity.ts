@@ -1,8 +1,7 @@
-import { canonicalHash } from './food-curation/canonical-food-foundation.js';
 import { classifyFoodQuality } from './common-food-ranking.js';
-import type { CommonFood, GeneratedCombination, MealHead } from './common-food-engine.js';
+import { canonicalFoodIdentity, optionSemanticFingerprint, type CommonFood, type GeneratedCombination, type MealHead } from './common-food-engine.js';
 
-export const COMMON_FOOD_DAY_DIVERSITY_VERSION_V4='COMMON_FOOD_DAY_DIVERSITY_V4' as const;
+export const COMMON_FOOD_DAY_DIVERSITY_VERSION_V5='COMMON_FOOD_DAY_DIVERSITY_V5' as const;
 
 export type DiversityPenalty={exactFood:number;family:number;adjacentFood:number;adjacentFamily:number;rank:number;total:number};
 export type DayDiversityMealInput={mealHead:MealHead;options:GeneratedCombination[];required?:number};
@@ -18,7 +17,12 @@ const genericFamily=(food:CommonFood)=>{
   return role??food.category.toUpperCase();
 };
 
-const optionHash=(option:GeneratedCombination)=>canonicalHash(option.components.map(component=>[component.foodId,component.servingId,component.multiplier]).sort());
+const optionHash=(option:GeneratedCombination,foods:Map<string,CommonFood>)=>optionSemanticFingerprint(option.components,foods);
+const coreIdentity=(option:GeneratedCombination,foods:Map<string,CommonFood>)=>{
+  const component=option.components.find(item=>{const food=foods.get(item.foodId);return food?.roles.some(role=>['STARCH','GRAIN','BREAD','PULSE','PROTEIN'].includes(role));})??option.components[0];
+  const food=component&&foods.get(component.foodId);
+  return food?canonicalFoodIdentity(food):component?.foodId??'';
+};
 
 /**
  * Bounded, deterministic day authority. It only reorders/chooses V3 output and
@@ -35,40 +39,52 @@ export function selectDayDiverseOptions(input:{meals:DayDiversityMealInput[];foo
   const exactFoodCap=input.exactFoodCap??3;
   const results:DayDiversityMealResult[]=[];
 
-  for(const meal of input.meals){
+  for(let mealIndex=0;mealIndex<input.meals.length;mealIndex++){const meal=input.meals[mealIndex];const nextMeal=input.meals[mealIndex+1];
     const required=meal.required??5;
     const chosen:GeneratedCombination[]=[];
+    const mealCoreKeys=new Set<string>();
+    const currentMealIdentities=new Set<string>();
     const penalties:DayDiversityMealResult['penalties']=[];
     const remaining=meal.options.map((option,rank)=>({option,rank}));
     while(chosen.length<required&&remaining.length){
       const scored=remaining.map(entry=>{
-        const ids=[...new Set(entry.option.components.map(component=>component.foodId))];
-        const families=[...new Set(ids.flatMap(id=>{const food=foods.get(id);return food?[genericFamily(food)]:[]}))];
+        const ids=[...new Set(entry.option.components.map(component=>{const food=foods.get(component.foodId);return food?canonicalFoodIdentity(food):component.foodId}))];
+        const componentFoods=entry.option.components.flatMap(component=>{const food=foods.get(component.foodId);return food?[food]:[]});
+        const families=[...new Set(componentFoods.map(genericFamily))];
         const hardCap=ids.some(id=>(foodMealHeads.get(id)?.size??0)>=exactFoodCap);
         const exactFood=ids.reduce((sum,id)=>sum+(foodCounts.get(id)??0)*18,0);
         const family=families.reduce((sum,key)=>sum+(familyCounts.get(key)??0)*5,0);
         const adjacentFood=ids.reduce((sum,id)=>sum+(previousFoods.has(id)?28:0),0);
         const adjacentFamily=families.reduce((sum,key)=>sum+(previousFamilies.has(key)?10:0),0);
         const rank=entry.rank*.15;
-        const total=exactFood+family+adjacentFood+adjacentFamily+rank+(hardCap?10000:0);
-        return {...entry,ids,families,hash:optionHash(entry.option),hardCap,penalty:{exactFood,family,adjacentFood,adjacentFamily,rank,total}};
+        const core=coreIdentity(entry.option,foods);const repeatedCore=mealCoreKeys.has(core);
+        const projected=new Set([...currentMealIdentities,...ids]);
+        const nextRequired=nextMeal?.required??5;
+        const nextViable=nextMeal?nextMeal.options.filter(option=>option.components.every(component=>{const food=foods.get(component.foodId);return !projected.has(food?canonicalFoodIdentity(food):component.foodId);})).length:nextRequired;
+        const nextConstraint=Math.max(0,nextRequired-nextViable)*2000;
+        const total=exactFood+family+adjacentFood+adjacentFamily+rank+nextConstraint+(hardCap?10000:0)+(repeatedCore?5000:0);
+        return {...entry,ids,families,core,hash:optionHash(entry.option,foods),hardCap,repeatedCore,hasAdjacentFood:adjacentFood>0,penalty:{exactFood,family,adjacentFood,adjacentFamily,rank,total}};
       }).filter(entry=>!globalHashes.has(entry.hash));
       if(!scored.length)break;
-      const feasible=scored.filter(entry=>!entry.hardCap);
-      const pool=feasible.length?feasible:scored;
+      const strict=scored.filter(entry=>!entry.hardCap&&!entry.repeatedCore&&!entry.hasAdjacentFood);
+      const adjacencySafe=scored.filter(entry=>!entry.hardCap&&!entry.hasAdjacentFood);
+      const feasible=scored.filter(entry=>!entry.hardCap&&!entry.repeatedCore);
+      const pool=strict.length?strict:adjacencySafe.length?adjacencySafe:feasible.length?feasible:scored;
       pool.sort((a,b)=>a.penalty.total-b.penalty.total||b.option.overallScore-a.option.overallScore||a.option.combinationId.localeCompare(b.option.combinationId));
       const winner=pool[0];
-      chosen.push({...winner.option,rankingVersion:COMMON_FOOD_DAY_DIVERSITY_VERSION_V4,rankingFactors:{...(winner.option.rankingFactors??{}),dayExactFoodPenalty:winner.penalty.exactFood,dayFamilyPenalty:winner.penalty.family,dayAdjacentPenalty:winner.penalty.adjacentFood+winner.penalty.adjacentFamily,daySelectionPenalty:winner.penalty.total}});
+      chosen.push({...winner.option,rankingVersion:COMMON_FOOD_DAY_DIVERSITY_VERSION_V5,rankingFactors:{...(winner.option.rankingFactors??{}),dayExactFoodPenalty:winner.penalty.exactFood,dayFamilyPenalty:winner.penalty.family,dayAdjacentPenalty:winner.penalty.adjacentFood+winner.penalty.adjacentFamily,daySelectionPenalty:winner.penalty.total}});
       penalties.push({combinationId:winner.option.combinationId,penalty:winner.penalty});
       globalHashes.add(winner.hash);
+      mealCoreKeys.add(winner.core);
+      for(const id of winner.ids)currentMealIdentities.add(id);
+      for(const id of winner.ids){foodCounts.set(id,(foodCounts.get(id)??0)+1);const heads=foodMealHeads.get(id)??new Set<MealHead>();heads.add(meal.mealHead);foodMealHeads.set(id,heads);}
+      for(const family of winner.families)familyCounts.set(family,(familyCounts.get(family)??0)+1);
       remaining.splice(remaining.findIndex(entry=>entry.option===winner.option),1);
     }
     const mealFoods=new Set(chosen.flatMap(option=>option.components.map(component=>component.foodId)));
     const mealFamilies=new Set([...mealFoods].flatMap(id=>{const food=foods.get(id);return food?[genericFamily(food)]:[]}));
-    for(const id of mealFoods){foodCounts.set(id,(foodCounts.get(id)??0)+1);const heads=foodMealHeads.get(id)??new Set<MealHead>();heads.add(meal.mealHead);foodMealHeads.set(id,heads);}
-    for(const family of mealFamilies)familyCounts.set(family,(familyCounts.get(family)??0)+1);
-    previousFoods=mealFoods;previousFamilies=mealFamilies;
+    previousFoods=new Set([...mealFoods].map(id=>{const food=foods.get(id);return food?canonicalFoodIdentity(food):id;}));previousFamilies=mealFamilies;
     results.push({mealHead:meal.mealHead,options:chosen,shortage:chosen.length<required?{state:'SHORTAGE',available:chosen.length,required,missing:required-chosen.length,reason:'DIVERSITY_CONSTRAINED_POOL'}:null,penalties});
   }
-  return {version:COMMON_FOOD_DAY_DIVERSITY_VERSION_V4,meals:results,usage:{foodCounts:Object.fromEntries(foodCounts),familyCounts:Object.fromEntries(familyCounts)}};
+  return {version:COMMON_FOOD_DAY_DIVERSITY_VERSION_V5,meals:results,usage:{foodCounts:Object.fromEntries(foodCounts),familyCounts:Object.fromEntries(familyCounts)}};
 }
