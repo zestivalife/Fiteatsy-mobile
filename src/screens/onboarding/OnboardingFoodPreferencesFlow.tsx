@@ -31,6 +31,8 @@ export const OnboardingFoodPreferencesFlow = ({
   foodItems,
   foodLoading,
   foodError,
+  foodHasMore,
+  onLoadMoreFoods,
   saving,
   error,
   initialStep,
@@ -45,6 +47,8 @@ export const OnboardingFoodPreferencesFlow = ({
   foodItems: FoodCatalogueItem[];
   foodLoading: boolean;
   foodError: string | null;
+  foodHasMore: boolean;
+  onLoadMoreFoods: () => void;
   saving: boolean;
   error: string | null;
   initialStep: number;
@@ -125,6 +129,7 @@ export const OnboardingFoodPreferencesFlow = ({
         {foodLoading ? <Text style={styles.helper}>Searching verified foods...</Text> : null}
         {foodError ? <Text style={styles.error}>{foodError}</Text> : null}
         {!foodLoading && !foodError ? <View style={styles.chips}>{foodItems.map((item) => <Chip key={item.id} label={item.displayName} selected={selectedFoodIds.includes(item.id)} onPress={() => update(foodMode, toggle(selectedFoodIds, item.id))} accent={preferenceAccent} />)}</View> : null}
+        {foodHasMore ? <OnboardingAction title={foodLoading ? 'Loading...' : 'Load more foods'} onPress={onLoadMoreFoods} disabled={foodLoading} secondary /> : null}
         <Info text="Have an allergy or intolerance? Manage health restrictions separately." />
         <View style={styles.divider} />
         <View style={styles.summary}>

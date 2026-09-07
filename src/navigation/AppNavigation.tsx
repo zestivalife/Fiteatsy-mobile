@@ -6,6 +6,7 @@ import { getThemeColors } from '../design/tokens';
 import { RootStackParamList, MainTabParamList } from './types';
 import { SplashScreen } from '../screens/auth/SplashScreen';
 import { OnboardingBasicsScreen } from '../screens/onboarding/OnboardingBasicsScreen';
+import { OnboardingAnthropometricsScreen } from '../screens/onboarding/OnboardingAnthropometricsScreen';
 import { OnboardingCalendarScreen } from '../screens/onboarding/OnboardingCalendarScreen';
 import { OnboardingNotificationsScreen } from '../screens/onboarding/OnboardingNotificationsScreen';
 import { OnboardingAssessmentScreen } from '../screens/onboarding/OnboardingAssessmentScreen';
@@ -113,6 +114,7 @@ export const AppNavigation = () => {
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="OnboardingBasics" component={OnboardingBasicsScreen} />
+        <Stack.Screen name="OnboardingAnthropometrics" component={OnboardingAnthropometricsScreen} />
         <Stack.Screen name="OnboardingCalendar" component={OnboardingCalendarScreen} />
         <Stack.Screen name="OnboardingNotifications" component={OnboardingNotificationsScreen} />
         <Stack.Screen name="OnboardingAssessment" component={OnboardingAssessmentScreen} />

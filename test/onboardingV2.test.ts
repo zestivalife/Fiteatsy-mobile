@@ -24,7 +24,7 @@ describe('Onboarding V2 contract', () => {
     expect(assessment).toContain('heightCm, currentWeightKg: weightKg');
     expect(assessment).toContain('void submitCheckIn');
     expect(assessment).toContain("navigation.navigate('FoodPreferences'");
-    expect(basics).toContain("navigation.navigate('OnboardingAssessment'");
+    expect(basics).toContain("navigation.navigate('OnboardingAnthropometrics'");
   });
 
   it('captures nutrition preferences in the lifestyle phase through the canonical API', () => {

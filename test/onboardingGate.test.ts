@@ -29,8 +29,8 @@ test('completed backend profile goes Home even when optional fields are missing'
 
 test('incomplete backend profile resumes the first required step', () => {
   assert.deepEqual(deriveOnboardingGate(profile({ dateOfBirthISO: null })), { status: 'IN_PROGRESS', resumeStep: 'basics' });
-  assert.deepEqual(deriveOnboardingGate(profile({ heightCm: null })), { status: 'IN_PROGRESS', resumeStep: 'assessment' });
-  assert.deepEqual(deriveOnboardingGate(profile({ currentWeightKg: null })), { status: 'IN_PROGRESS', resumeStep: 'assessment' });
+  assert.deepEqual(deriveOnboardingGate(profile({ heightCm: null })), { status: 'IN_PROGRESS', resumeStep: 'anthropometrics' });
+  assert.deepEqual(deriveOnboardingGate(profile({ currentWeightKg: null })), { status: 'IN_PROGRESS', resumeStep: 'anthropometrics' });
 });
 
 test('PSS, medication, and wearable state are not part of the onboarding gate', () => {

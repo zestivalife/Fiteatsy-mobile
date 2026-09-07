@@ -41,6 +41,9 @@ export type HealthProfileRecord = AuditFields & {
   waistCm: number | null;
   hipCm: number | null;
   neckCm: number | null;
+  armCircumferenceCm: number | null;
+  thighCircumferenceCm: number | null;
+  calfCircumferenceCm: number | null;
   bodyFatPct: number | null;
   occupation: string | null;
   workingHoursLabel: string | null;
@@ -78,6 +81,7 @@ export type HealthProfileRecord = AuditFields & {
   previousConditions: string[];
   familyHistoryConditions: string[];
   wellnessGoals: string[];
+  wellnessGoalIds: string[];
   medicalNotes: string | null;
   pregnancyStatus: string | null;
   breastfeedingStatus: string | null;

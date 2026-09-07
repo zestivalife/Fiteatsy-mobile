@@ -56,6 +56,9 @@ const mapHealthProfile = (row: Record<string, unknown>): HealthProfileRecord => 
   waistCm: toNumberOrNull(row.waist_cm),
   hipCm: toNumberOrNull(row.hip_cm),
   neckCm: toNumberOrNull(row.neck_cm),
+  armCircumferenceCm: toNumberOrNull(row.arm_circumference_cm),
+  thighCircumferenceCm: toNumberOrNull(row.thigh_circumference_cm),
+  calfCircumferenceCm: toNumberOrNull(row.calf_circumference_cm),
   bodyFatPct: toNumberOrNull(row.body_fat_pct),
   occupation: row.occupation == null ? null : String(row.occupation),
   workingHoursLabel: row.working_hours_label == null ? null : String(row.working_hours_label),
@@ -93,6 +96,7 @@ const mapHealthProfile = (row: Record<string, unknown>): HealthProfileRecord => 
   previousConditions: toStringArray(row.previous_conditions),
   familyHistoryConditions: toStringArray(row.family_history_conditions),
   wellnessGoals: toStringArray(row.wellness_goals),
+  wellnessGoalIds: toStringArray(row.wellness_goal_ids),
   medicalNotes: row.medical_notes == null ? null : String(row.medical_notes),
   pregnancyStatus: row.pregnancy_status == null ? null : String(row.pregnancy_status),
   breastfeedingStatus: row.breastfeeding_status == null ? null : String(row.breastfeeding_status),
@@ -200,6 +204,9 @@ const buildHealthProfileDefaults = (owner: ClientOwnershipContext): HealthProfil
   waistCm: null,
   hipCm: null,
   neckCm: null,
+  armCircumferenceCm: null,
+  thighCircumferenceCm: null,
+  calfCircumferenceCm: null,
   bodyFatPct: null,
   occupation: null,
   workingHoursLabel: null,
@@ -237,6 +244,7 @@ const buildHealthProfileDefaults = (owner: ClientOwnershipContext): HealthProfil
   previousConditions: [],
   familyHistoryConditions: [],
   wellnessGoals: [],
+  wellnessGoalIds: [],
   medicalNotes: null,
   pregnancyStatus: null,
   breastfeedingStatus: null,
@@ -490,7 +498,11 @@ const saveHealthProfileProgressiveFields = async (
         cholesterol_status = $20,
         heart_condition_status = $21,
         previous_surgeries = $22::jsonb,
-        updated_at = $23
+        arm_circumference_cm = $23,
+        thigh_circumference_cm = $24,
+        calf_circumference_cm = $25,
+        wellness_goal_ids = $26::jsonb,
+        updated_at = $27
       where id = $1
         and client_id = $2
       returning *
@@ -518,6 +530,10 @@ const saveHealthProfileProgressiveFields = async (
       next.cholesterolStatus,
       next.heartConditionStatus,
       JSON.stringify(next.previousSurgeries),
+      next.armCircumferenceCm,
+      next.thighCircumferenceCm,
+      next.calfCircumferenceCm,
+      JSON.stringify(next.wellnessGoalIds),
       nowIso(),
     ]
   );

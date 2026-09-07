@@ -7,6 +7,7 @@ export type MedicationLogStatus = 'taken' | 'upcoming' | 'missed' | 'snoozed' | 
 export type ReminderSound = 'default' | 'soft' | 'bell' | 'medical_alert';
 export type FrequencyPreset =
   | 'every_day'
+  | 'twice_daily'
   | 'alternate_days'
   | 'specific_weekdays'
   | 'every_x_days'

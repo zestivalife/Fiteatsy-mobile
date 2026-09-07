@@ -41,7 +41,7 @@ const matchesFrequency = (medication, day) => {
     if (difference < 0)
         return false;
     const rule = medication.schedule.frequency;
-    if (rule.preset === 'every_day')
+    if (rule.preset === 'every_day' || rule.preset === 'twice_daily')
         return true;
     if (rule.preset === 'alternate_days')
         return difference % 2 === 0;

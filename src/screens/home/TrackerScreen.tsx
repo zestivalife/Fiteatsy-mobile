@@ -17,6 +17,7 @@ import {
 } from '../../services/trackerAnalysisService';
 import { toDayKey } from '../../utils/date';
 import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
+import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
 import type { WearableSyncPayload } from '../../types';
 
 type RangeMode = '7D' | '30D';
@@ -1164,7 +1165,8 @@ const MetricBarsCard = ({
 
 export const TrackerScreen = () => {
   const navigation = useNavigation<TrackerNavigation>();
-  const { themeMode, checkIns, onboarding, wearableSyncData, wellness } = useAppContext();
+  const { themeMode, checkIns, onboarding, wearableSyncData, wellness, authSession } = useAppContext();
+  const [pss10History, setPss10History] = useState<AssessmentResult[]>([]);
   const isLight = themeMode === 'light';
   const todayWeekIndex = new Date().getDay();
 
@@ -1187,6 +1189,15 @@ export const TrackerScreen = () => {
     model: 'fiteatsy-seed-v1'
   });
   const contentAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    let active = true;
+    if (!authSession) { setPss10History([]); return () => { active = false; }; }
+    getAssessmentHistory(authSession.sessionToken)
+      .then((response) => { if (active) setPss10History(response.items); })
+      .catch(() => { if (active) setPss10History([]); });
+    return () => { active = false; };
+  }, [authSession]);
 
   const days = useMemo<DayData[]>(() => {
     const base = new Date();
@@ -1232,9 +1243,10 @@ export const TrackerScreen = () => {
       checkIns,
       medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
       hasWearable: wearableSyncData.length > 0,
-      wearableSyncData
+      wearableSyncData,
+      pss10Results: pss10History
     });
-  }, [wellness, checkIns, wearableSyncData]);
+  }, [wellness, checkIns, wearableSyncData, pss10History]);
 
   useEffect(() => {
     contentAnim.setValue(0.86);
@@ -1410,7 +1422,7 @@ export const TrackerScreen = () => {
       compareValues: recoveryIntel.trendValues7d.map((v) => Math.max(0, Math.min(100, 100 - v))),
       signalState: trendState(recoveryIntel.trendValues7d.map((v) => 100 - v)),
       recoveryImpact: impactState(100 - (recoveryIntel.stressRecoveryScore ?? 0)),
-      freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Synced Recently',
+      freshness: recoveryIntel.questionnaireAvailable ? 'Synced Recently' : 'No Recent Data',
       confidence: confidenceState()
     },
     {

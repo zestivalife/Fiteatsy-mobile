@@ -40,7 +40,7 @@ export const pssAssessmentSchema = z.object({
       questionId: z.string().min(1),
       score: z.number().int().min(0).max(4)
     })
-  ).min(4).max(10)
+  ).length(10)
 });
 
 const PSS_10_QUESTION_BANK = [
@@ -84,14 +84,7 @@ const calcSlope = (values: number[]) => {
   return den === 0 ? 0 : num / den;
 };
 
-export const getRandomizedPss10Questions = (count = 4) => {
-  const normalizedCount = Math.max(4, Math.min(10, count));
-  const shuffled = [...PSS_10_QUESTION_BANK]
-    .map((question) => ({ question, sort: Math.random() }))
-    .sort((a, b) => a.sort - b.sort)
-    .map((item) => item.question);
-  return shuffled.slice(0, normalizedCount);
-};
+export const getRandomizedPss10Questions = (_count = 10) => [...PSS_10_QUESTION_BANK];
 
 export const computePss10Assessment = (input: z.infer<typeof pssAssessmentSchema>) => {
   const lookup = new Map<string, (typeof PSS_10_QUESTION_BANK)[number]>(PSS_10_QUESTION_BANK.map((question) => [question.id, question] as const));
@@ -106,7 +99,7 @@ export const computePss10Assessment = (input: z.infer<typeof pssAssessmentSchema
   const totalScore = normalizedAnswers.reduce((sum, answer) => sum + answer.normalizedScore, 0);
   const maxScore = normalizedAnswers.length * 4;
   const stressPercent = Math.round((totalScore / Math.max(1, maxScore)) * 100);
-  const stressBand = totalScore >= 20 ? 'high' : totalScore >= 14 ? 'moderate' : 'low';
+  const stressBand = totalScore >= 27 ? 'high' : totalScore >= 14 ? 'moderate' : 'low';
   const resilienceScore = Math.max(0, 100 - stressPercent);
 
   return {

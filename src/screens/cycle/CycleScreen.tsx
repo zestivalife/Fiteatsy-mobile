@@ -128,10 +128,15 @@ export const CycleScreen = () => {
         <Text style={[styles.statusTitle, { color: darkGraySurfaceText }]}>{statusTitle}</Text>
         <Text style={[styles.statusSubtitle, { color: darkGraySurfaceText }]}>{statusSubtitle}</Text>
         <View style={styles.phaseRow}>
-          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'menstrual' && styles.phaseActive]}><Text style={[styles.phaseText, { color: darkGraySurfaceText }]}>Menstrual</Text></View>
-          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'follicular' && styles.phaseActive]}><Text style={[styles.phaseText, { color: darkGraySurfaceText }]}>Follicular</Text></View>
-          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'ovulation_window' && styles.phaseActiveBlue]}><Text style={[styles.phaseText, { color: darkGraySurfaceText }]}>Ovulation</Text></View>
-          <View style={[styles.phasePill, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, snapshot.phase === 'luteal' && styles.phaseActivePurple]}><Text style={[styles.phaseText, { color: darkGraySurfaceText }]}>Luteal</Text></View>
+          {([
+            ['menstrual', 'Period'],
+            ['follicular', 'Post-Period'],
+            ['ovulation_window', 'Ovulation'],
+            ['luteal', 'Pre-Period']
+          ] as const).map(([phase, label]) => {
+            const selected = snapshot.phase === phase;
+            return <View key={phase} accessibilityLabel={`${label} phase`} accessibilityState={{ selected }} style={[styles.phasePill, { borderColor: selected ? colors.success : palette.stroke, backgroundColor: selected ? colors.success : (isLight ? '#FFFFFF' : palette.card) }]}><Text style={[styles.phaseText, { color: selected ? '#FFFFFF' : darkGraySurfaceText }]}>{label}</Text></View>;
+          })}
         </View>
       </View>
 
@@ -152,14 +157,14 @@ export const CycleScreen = () => {
 
             <ScrollView contentContainerStyle={styles.sheetContent}>
               <View style={styles.row}>
-                <Pressable style={[styles.chip, periodStarted && styles.chipActive]} onPress={() => setPeriodStarted((v) => !v)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>Period Started</Text></Pressable>
-                <Pressable style={[styles.chip, periodEnded && styles.chipActive]} onPress={() => setPeriodEnded((v) => !v)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>Period Ended</Text></Pressable>
+                <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: periodStarted }} style={[styles.chip, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, periodStarted && styles.chipActive]} onPress={() => setPeriodStarted((v) => !v)}><Text style={[styles.chipText, { color: periodStarted ? '#FFFFFF' : darkGraySurfaceText }]}>Period Started</Text></Pressable>
+                <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: periodEnded }} style={[styles.chip, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, periodEnded && styles.chipActive]} onPress={() => setPeriodEnded((v) => !v)}><Text style={[styles.chipText, { color: periodEnded ? '#FFFFFF' : darkGraySurfaceText }]}>Period Ended</Text></Pressable>
               </View>
 
               <Text style={[styles.section, { color: darkGraySurfaceText }]}>Flow</Text>
               <View style={styles.row}>
                 {(['light', 'medium', 'heavy'] as CycleFlowIntensity[]).map((level) => (
-                  <Pressable key={level} style={[styles.chip, flow === level && styles.chipActive]} onPress={() => setFlow(level)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{level[0].toUpperCase() + level.slice(1)}</Text></Pressable>
+                  <Pressable key={level} accessibilityRole="radio" accessibilityState={{ selected: flow === level }} style={[styles.chip, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, flow === level && styles.chipActive]} onPress={() => setFlow(level)}><Text style={[styles.chipText, { color: flow === level ? '#FFFFFF' : darkGraySurfaceText }]}>{level[0].toUpperCase() + level.slice(1)}</Text></Pressable>
                 ))}
               </View>
 
@@ -172,21 +177,21 @@ export const CycleScreen = () => {
                   <Text style={[styles.section, { color: darkGraySurfaceText }]}>Symptoms</Text>
                   <View style={styles.wrapRow}>
                     {symptomOptions.map((item) => (
-                      <Pressable key={item.value} style={[styles.chip, symptoms.includes(item.value) && styles.chipActive]} onPress={() => toggleSymptom(item.value)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{item.label}</Text></Pressable>
+                      <Pressable key={item.value} accessibilityRole="checkbox" accessibilityState={{ checked: symptoms.includes(item.value) }} style={[styles.chip, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, symptoms.includes(item.value) && styles.chipActive]} onPress={() => toggleSymptom(item.value)}><Text style={[styles.chipText, { color: symptoms.includes(item.value) ? '#FFFFFF' : darkGraySurfaceText }]}>{item.label}</Text></Pressable>
                     ))}
                   </View>
 
                   <Text style={[styles.section, { color: darkGraySurfaceText }]}>Mood</Text>
                   <View style={styles.wrapRow}>
                     {moodOptions.map((item) => (
-                      <Pressable key={item.value} style={[styles.chip, mood === item.value && styles.chipActive]} onPress={() => setMood(item.value)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{item.emoji} {item.label}</Text></Pressable>
+                      <Pressable key={item.value} accessibilityRole="radio" accessibilityState={{ selected: mood === item.value }} style={[styles.chip, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, mood === item.value && styles.chipActive]} onPress={() => setMood(item.value)}><Text style={[styles.chipText, { color: mood === item.value ? '#FFFFFF' : darkGraySurfaceText }]}>{item.emoji} {item.label}</Text></Pressable>
                     ))}
                   </View>
 
                   <Text style={[styles.section, { color: darkGraySurfaceText }]}>Energy</Text>
                   <View style={styles.row}>
                     {(['high', 'medium', 'low'] as CycleEnergy[]).map((value) => (
-                      <Pressable key={value} style={[styles.chip, energy === value && styles.chipActive]} onPress={() => setEnergy(value)}><Text style={[styles.chipText, { color: darkGraySurfaceText }]}>{value[0].toUpperCase() + value.slice(1)}</Text></Pressable>
+                      <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: energy === value }} style={[styles.chip, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, energy === value && styles.chipActive]} onPress={() => setEnergy(value)}><Text style={[styles.chipText, { color: energy === value ? '#FFFFFF' : darkGraySurfaceText }]}>{value[0].toUpperCase() + value.slice(1)}</Text></Pressable>
                     ))}
                   </View>
 
@@ -407,8 +412,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   chipActive: {
-    borderColor: colors.blue,
-    backgroundColor: colors.blueSoft
+    borderColor: colors.success,
+    backgroundColor: colors.success
   },
   chipText: {
     ...typography.body,

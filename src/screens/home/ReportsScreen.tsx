@@ -68,6 +68,7 @@ type ReportItem = {
   score: number | null;
   categoryScores: Record<CategoryKey, number>;
   parametersData: ReportParameter[];
+  analysisSummary: string;
   uploadSource?: 'camera' | 'gallery' | 'pdf';
   uploadedAtISO?: string;
 };
@@ -189,6 +190,7 @@ const toReportItem = (
     score: analysis.score,
     categoryScores: analysis.categoryScores ?? buildCategoryScores(analysis.parameters),
     parametersData: analysis.parameters,
+    analysisSummary: analysis.summary?.trim() ?? '',
     uploadSource: fallback.source,
     uploadedAtISO: fallback.createdAtISO ?? new Date().toISOString()
   };
@@ -360,6 +362,8 @@ export const ReportsScreen = () => {
 
   const [nuetraSummary, setNuetraSummary] = useState('');
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summaryRetry, setSummaryRetry] = useState(0);
   const [parameterInsights, setParameterInsights] = useState<Record<string, string>>({});
   const [actionPlan, setActionPlan] = useState<NuetraActionItem[]>([]);
   const [crossInsights, setCrossInsights] = useState<NuetraCrossInsight[]>([]);
@@ -446,6 +450,7 @@ export const ReportsScreen = () => {
     setAnalysisReview(null);
     setShowAnalysisReview(false);
     setNuetraSummary('');
+    setSummaryError(null);
     setParameterInsights({});
     setActionPlan([]);
     setCrossInsights([]);
@@ -795,6 +800,8 @@ export const ReportsScreen = () => {
 
     const loadNuetra = async () => {
       setSummaryLoading(true);
+      setSummaryError(null);
+      setNuetraSummary(latestReport.analysisSummary);
 
       try {
         const summaryPromise = generateNuetraSummary(latestReport.id, clientName);
@@ -821,13 +828,18 @@ export const ReportsScreen = () => {
           return;
         }
 
-        setNuetraSummary(summary || buildSpecificFallbackSummary(latestReport.parametersData, clientName));
+        setNuetraSummary(summary?.trim() || latestReport.analysisSummary);
         setParameterInsights(Object.fromEntries(insightPairs));
         setActionPlan(actions);
         setCrossInsights(cross);
       } catch {
         if (!cancelled) {
-          setNuetraSummary(buildSpecificFallbackSummary(latestReport.parametersData, clientName));
+          if (latestReport.analysisSummary) {
+            setNuetraSummary(latestReport.analysisSummary);
+          } else {
+            setNuetraSummary('');
+            setSummaryError('We couldn’t load your health summary. Please try again.');
+          }
           setParameterInsights(
             Object.fromEntries(
               abnormalParameters.map((parameter) => [
@@ -851,7 +863,7 @@ export const ReportsScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [abnormalParameters, checkIns, clientName, latestReport]);
+  }, [abnormalParameters, checkIns, clientName, latestReport, summaryRetry]);
 
   useEffect(() => {
     if (!showProcessing || processingIntent !== 'upload') {
@@ -1207,10 +1219,17 @@ export const ReportsScreen = () => {
             ))}
             <Animated.View style={[styles.shimmerSweep, { transform: [{ translateX: shimmerTranslate }] }]} />
           </View>
-        ) : (
+        ) : summaryError ? (
+          <View accessibilityRole="alert">
+            <Text style={[styles.nuetraCopy, !isLight && styles.nuetraCopyDark]}>{summaryError}</Text>
+            <Pressable accessibilityRole="button" style={styles.retryBtn} onPress={() => setSummaryRetry((value) => value + 1)}><Text style={styles.retryBtnText}>Retry summary</Text></Pressable>
+          </View>
+        ) : nuetraSummary ? (
           <Text style={[styles.nuetraCopy, !isLight && styles.nuetraCopyDark]}>
-            {latestReport ? nuetraSummary : 'Upload a report to unlock a health summary based on your own extracted biomarkers.'}
+            {nuetraSummary}
           </Text>
+        ) : (
+          <Text style={[styles.nuetraCopy, !isLight && styles.nuetraCopyDark]}>This analysed report has no usable health summary yet.</Text>
         )}
 
         <Pressable

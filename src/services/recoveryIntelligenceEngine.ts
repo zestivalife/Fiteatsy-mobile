@@ -34,6 +34,8 @@ export type RecoveryOutput = {
   recoveryScore: number | null;
   calmScore: number | null;
   stressRecoveryScore: number | null;
+  pss10Score: number | null;
+  questionnaireAvailable: boolean;
   recoveryDrivers: RecoveryDriver[];
   highestImpactActions: string[];
   contextualInsights: string[];
@@ -74,6 +76,7 @@ type Input = {
   hasWearable: boolean;
   wearableSyncData: WearableSyncPayload[];
   sessionAntiManipulation?: SessionAntiManipulation;
+  pss10Results?: Array<{ rawScore: number; completedAtISO: string }>;
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -141,6 +144,9 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
     workouts: hasStatus(latestSync, 'workouts') && isRecent(latestSyncAt, freshnessWindows.workouts)
   };
   const coverageCount = Object.values(signalCoverage).filter(Boolean).length;
+  const pss10Results = [...(input.pss10Results ?? [])].sort((a, b) => +new Date(a.completedAtISO) - +new Date(b.completedAtISO));
+  const latestPss10 = pss10Results[pss10Results.length - 1] ?? null;
+  const pss10ResilienceScore = latestPss10 ? round(clamp(100 - (latestPss10.rawScore / 40) * 100, 0, 100)) : null;
 
   const hasSessionSignals = input.wellness.breathingMinutes > 0 || input.wellness.focusMinutes > 0 || input.wellness.moodScore > 0;
   const hasEnoughForCalibration = coverageCount >= 3 && hasSessionSignals;
@@ -250,7 +256,7 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
 
   const recoveryScore = hasEnoughForCalibration ? smoothScore(previousRecovery, rawRecoveryScore, 9) : null;
   const calmScore = hasEnoughForCalibration ? smoothScore(previousCalm, rawCalmScore, 8) : null;
-  const stressRecoveryScore = hasEnoughForCalibration ? smoothScore(previousStressRecovery, rawStressRecoveryScore, 8) : null;
+  const stressRecoveryScore = pss10ResilienceScore ?? (hasEnoughForCalibration ? smoothScore(previousStressRecovery, rawStressRecoveryScore, 8) : null);
 
   const prior7 = lastNDays(input.checkIns, 14).slice(7);
   const priorMood = prior7.length ? mean(prior7.map((item) => item.mood)) : 3;
@@ -321,12 +327,16 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
     recoveryScore,
     calmScore,
     stressRecoveryScore,
+    pss10Score: latestPss10?.rawScore ?? null,
+    questionnaireAvailable: latestPss10 !== null,
     recoveryDrivers: drivers,
     highestImpactActions,
     contextualInsights,
     whyChanged,
     blockers,
-    trendValues7d: buildTrend(input.checkIns),
+    trendValues7d: pss10Results.length > 0
+      ? pss10Results.slice(-7).map((result) => round(clamp(100 - (result.rawScore / 40) * 100, 0, 100)))
+      : buildTrend(input.checkIns),
     debug: {
       rawRecoveryScore,
       smoothedRecoveryScore: recoveryScore,

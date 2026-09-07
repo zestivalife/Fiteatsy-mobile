@@ -81,8 +81,16 @@ export const listVerifiedFoodCatalogue = async (query: string, limit = 30, offse
   const result = await pool.query(
     `select id, canonical_name, display_name, food_category, dietary_classification,
             cuisine_tags, allergen_tags
-       from nutrition_foods
+      from nutrition_foods
       where deleted_at is null and status = 'active' and verification_status = 'verified'
+        and exists (
+          select 1 from food_knowledge_food_profiles governed
+          where governed.food_id = nutrition_foods.id
+            and governed.lifecycle_status = 'active'
+            and governed.production_eligible = true
+            and governed.client_consumable = true
+            and governed.food_type <> 'INGREDIENT_ONLY'
+        )
         and ($1 = '' or lower(display_name) like '%' || lower($1) || '%'
           or lower(canonical_name) like '%' || lower($1) || '%'
           or exists (select 1 from jsonb_array_elements_text(aliases) alias where lower(alias) like '%' || lower($1) || '%'))

@@ -94,6 +94,10 @@ export const SplashScreen = ({ navigation }: Props) => {
       transitionTo(() => navigation.replace('OnboardingAssessment', { startPhase: 'lifestyle' }));
       return;
     }
+    if (onboardingStatus === 'IN_PROGRESS' && onboardingResumeStep === 'anthropometrics') {
+      transitionTo(() => navigation.replace('OnboardingAnthropometrics'));
+      return;
+    }
     transitionTo(() => navigation.replace('Main'));
   }, [
     authSession?.client.fiteatsyClientId,

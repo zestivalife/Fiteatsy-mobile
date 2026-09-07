@@ -9,9 +9,9 @@ import { RootStackParamList } from '../../navigation/types';
 import { AssessmentGender, HealthCondition, HealthGoal, OnboardingProfile } from '../../types';
 import { useAppContext } from '../../state/AppContext';
 import { normalizeOnboardingProfile } from '../../utils/healthProfile';
+import { WELLNESS_GOALS, wellnessGoalIdForLabel } from '../../services/wellnessGoalService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingBasics'>;
-const goals: HealthGoal[] = ['Better Energy', 'Better Sleep', 'Weight Loss', 'Sugar Control', 'Hormone Balance'];
 const genders: AssessmentGender[] = ['Male', 'Female', 'Prefer not to say'];
 const conditions: HealthCondition[] = ['Diabetes', 'Prediabetes', 'Hypertension', 'PCOS', 'Thyroid', 'Obesity', 'High Cholesterol', 'Gut Health'];
 
@@ -53,10 +53,11 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
       ...seed, name: seed.name.trim() || 'Member', dateOfBirthISO: dob.toISOString(), gender,
       primaryConditions: selectedConditions, healthGoals: selectedGoals, primaryGoal: primaryGoal ?? undefined,
       secondaryGoals: primaryGoal ? selectedGoals.slice(1) : [], wellnessGoal: primaryGoal ?? seed.wellnessGoal,
+      wellnessGoalIds: selectedGoals.map(wellnessGoalIdForLabel).filter((id): id is string => Boolean(id)),
       careTrack: deriveCareTrack(selectedConditions, primaryGoal), createdAtISO: seed.createdAtISO || new Date().toISOString()
     }));
     setWearableSetupCompleted(false);
-    navigation.navigate('OnboardingAssessment', { startPhase: 'lifestyle' });
+    navigation.navigate('OnboardingAnthropometrics');
   };
   const onDob = (event: DateTimePickerEvent, date?: Date) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
@@ -72,7 +73,7 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
         {showDatePicker ? <DateTimePicker value={dob} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} maximumDate={new Date()} onChange={onDob} /> : null}
         <Text style={styles.label}>GENDER</Text><View style={styles.list}>{genders.map((item) => <ChoiceCard key={item} label={item} selected={gender === item} onPress={() => setGender(item)} />)}</View>
       </View> : null}
-      {step === 3 ? <View><QuestionHeader title="What are your wellness goals?" description="Select all that apply. Your first choice becomes your primary focus." /><View style={styles.list}>{goals.map((item) => <ChoiceCard key={item} label={item === 'Weight Loss' ? 'Weight Management' : item} description={selectedGoals[0] === item ? 'Primary' : undefined} selected={selectedGoals.includes(item)} accent="#FFBE25" onPress={() => setSelectedGoals((current) => current.includes(item) ? current.filter((goal) => goal !== item) : [...current, item])} />)}</View></View> : null}
+      {step === 3 ? <View><QuestionHeader title="What are your wellness goals?" description="Select all that apply. Your first choice becomes your primary focus." /><View style={styles.list}>{WELLNESS_GOALS.map((goal) => <ChoiceCard key={goal.id} label={goal.label === 'Weight Loss' ? 'Weight Management' : goal.label} description={selectedGoals[0] === goal.label ? 'Primary' : undefined} selected={selectedGoals.includes(goal.label)} accent="#FFBE25" onPress={() => setSelectedGoals((current) => current.includes(goal.label) ? current.filter((item) => item !== goal.label) : [...current, goal.label])} />)}</View></View> : null}
       {step === 4 ? <View><QuestionHeader title="Existing health conditions" description="Helps us keep recommendations safe and relevant for you." /><View style={styles.list}>{conditions.map((item) => <ChoiceCard key={item} label={item} selected={selectedConditions.includes(item)} onPress={() => setSelectedConditions((current) => current.includes(item) ? current.filter((condition) => condition !== item) : [...current, item])} />)}</View></View> : null}
     </OnboardingShell>
   );

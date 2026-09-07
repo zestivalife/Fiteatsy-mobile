@@ -111,6 +111,9 @@ export type OnboardingProfile = {
   waistCm?: number;
   hipCm?: number;
   neckCm?: number;
+  armCircumferenceCm?: number;
+  thighCircumferenceCm?: number;
+  calfCircumferenceCm?: number;
   bodyFatPct?: number;
   occupation?: string;
   workingHoursLabel?: string;
@@ -148,6 +151,7 @@ export type OnboardingProfile = {
   exerciseFrequency?: string;
   stressLevelLabel?: string;
   wellnessGoal?: HealthGoal;
+  wellnessGoalIds?: string[];
   ageBracket: AgeBracket;
   primaryConditions: HealthCondition[];
   previousConditions?: HealthCondition[];
@@ -362,6 +366,7 @@ export type ReminderSound = 'default' | 'soft' | 'bell' | 'medical_alert';
 
 export type FrequencyPreset =
   | 'every_day'
+  | 'twice_daily'
   | 'alternate_days'
   | 'specific_weekdays'
   | 'every_x_days'

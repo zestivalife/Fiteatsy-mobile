@@ -7,6 +7,8 @@ import { radius, spacing } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { MealRelation, Medication, MedicationType, ReminderSound } from '../../types';
 import { useAppContext } from '../../state/AppContext';
+import { NumericWheelPicker } from '../../components/NumericWheelPicker';
+import { hasDuplicateReminderTimes, normalizeMedicationStrength, strengthFromDosage, strengthUnitFromDosage, time12hTo24h, time24hTo12h } from '../../services/medicationFormService';
 
 const font = {
   regular: 'Exo_400Regular',
@@ -40,11 +42,11 @@ const medicationTypes: Array<{ type: MedicationType; label: string; unit: string
   { type: 'powder', label: 'Powder', unit: 'scoop', icon: '△' }
 ];
 
-const strengthOptions = ['250 mg', '500 mg', '850 mg', '1000 mg', '10 mg', '1000 IU'];
 const quantityOptions = [0.5, 1, 1.5, 2, 3];
 
 const frequencyOptions = [
   { key: 'every_day', label: 'Once daily' },
+  { key: 'twice_daily', label: 'Twice a day' },
   { key: 'alternate_days', label: 'Alternate days' },
   { key: 'specific_weekdays', label: 'Selected days' },
   { key: 'every_x_days', label: 'Every X days' },
@@ -65,21 +67,6 @@ const soundOptions: Array<{ key: ReminderSound; label: string }> = [
   { key: 'soft', label: 'Soft tone' },
   { key: 'bell', label: 'Bell tone' },
   { key: 'medical_alert', label: 'Medical alert tone' }
-];
-
-const timeOptions = [
-  '06:00',
-  '07:00',
-  '08:00',
-  '09:00',
-  '10:00',
-  '12:00',
-  '13:00',
-  '14:00',
-  '18:00',
-  '20:00',
-  '21:00',
-  '22:00'
 ];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MedicationForm'>;
@@ -123,12 +110,12 @@ const sameDate = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 const parseExistingDosage = (dosage: string, fallbackType: MedicationType) => {
-  const strength = strengthOptions.find((option) => dosage.includes(option)) ?? '500 mg';
+  const strength = strengthFromDosage(dosage) ?? '500';
   const quantitySource = dosage.includes('·') ? dosage.split('·')[1] : dosage;
   const quantityMatch = quantitySource.match(/(\d+(?:\.\d+)?)/);
   const quantity = quantityMatch ? Number(quantityMatch[1]) : 1;
   const typeOption = medicationTypes.find((option) => option.type === fallbackType) ?? medicationTypes[0];
-  return { strength, quantity: quantityOptions.includes(quantity) ? quantity : 1, unit: typeOption.unit };
+  return { strength, strengthUnit: strengthUnitFromDosage(dosage), quantity: quantityOptions.includes(quantity) ? quantity : 1, unit: typeOption.unit };
 };
 
 export const MedicationFormScreen = ({ route, navigation }: Props) => {
@@ -139,13 +126,19 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
   const [name, setName] = useState(editing?.name ?? '');
   const [type, setType] = useState<MedicationType>(editing?.type ?? 'tablet');
   const [strength, setStrength] = useState(parsedDosage.strength);
+  const [strengthUnit] = useState<'mg' | 'IU'>(parsedDosage.strengthUnit);
   const [doseQuantity, setDoseQuantity] = useState(parsedDosage.quantity);
   const [purpose, setPurpose] = useState('');
   const [frequencyPreset, setFrequencyPreset] = useState<Medication['schedule']['frequency']['preset']>(editing?.schedule.frequency.preset ?? 'every_day');
   const [intervalDays, setIntervalDays] = useState(String(editing?.schedule.frequency.intervalDays ?? 2));
   const [weekdays, setWeekdays] = useState<number[]>(editing?.schedule.frequency.weekdays ?? [1, 3, 5]);
   const [times, setTimes] = useState<Array<{ id: string; time24h: string; mealRelation: MealRelation }>>(
-    editing?.schedule.timeSlots ?? [{ id: `slot-${Date.now()}`, time24h: '08:00', mealRelation: 'after_meal' }]
+    editing?.schedule.frequency.preset === 'twice_daily'
+      ? (editing.schedule.timeSlots.length === 2 ? editing.schedule.timeSlots : [
+          editing.schedule.timeSlots[0] ?? { id: `slot-${Date.now()}-0`, time24h: '08:00', mealRelation: 'after_meal' },
+          { id: `slot-${Date.now()}-1`, time24h: '20:00', mealRelation: 'after_meal' }
+        ])
+      : editing?.schedule.timeSlots ?? [{ id: `slot-${Date.now()}`, time24h: '08:00', mealRelation: 'after_meal' }]
   );
   const [startDate, setStartDate] = useState(toInputDate(editing?.schedule.duration.startDateISO ?? new Date().toISOString()));
   const [endDate, setEndDate] = useState(editing?.schedule.duration.endDateISO ? toInputDate(editing.schedule.duration.endDateISO) : '');
@@ -154,8 +147,11 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
   const [pickerSheet, setPickerSheet] = useState<PickerSheet>(null);
 
   const currentType = medicationTypes.find((option) => option.type === type) ?? medicationTypes[0];
-  const dosage = `${strength} · ${doseQuantity} ${currentType.unit}${doseQuantity === 1 ? '' : 's'}`;
-  const canSave = name.trim().length > 1 && strength.trim().length > 0 && times.length > 0;
+  const normalizedStrength = normalizeMedicationStrength(strength);
+  const dosage = `${normalizedStrength ?? strength.trim()} ${strengthUnit} · ${doseQuantity} ${currentType.unit}${doseQuantity === 1 ? '' : 's'}`;
+  const duplicateTimes = hasDuplicateReminderTimes(times);
+  const requiredTimeCountValid = frequencyPreset !== 'twice_daily' || times.length === 2;
+  const canSave = name.trim().length > 1 && normalizedStrength !== null && times.length > 0 && requiredTimeCountValid && !duplicateTimes;
 
   const frequencyPayload = useMemo(() => {
     if (frequencyPreset === 'every_x_days') {
@@ -187,6 +183,17 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
 
   const updateTimeSlot = (slotId: string, patch: Partial<{ time24h: string; mealRelation: MealRelation }>) => {
     setTimes((previous) => previous.map((slot) => (slot.id === slotId ? { ...slot, ...patch } : slot)));
+  };
+
+  const selectFrequency = (preset: Medication['schedule']['frequency']['preset']) => {
+    setFrequencyPreset(preset);
+    if (preset === 'twice_daily') {
+      setTimes((previous) => {
+        const first = previous[0] ?? { id: `slot-${Date.now()}-0`, time24h: '08:00', mealRelation: 'after_meal' as MealRelation };
+        const second = previous.find((slot) => slot.time24h !== first.time24h) ?? { id: `slot-${Date.now()}-1`, time24h: '20:00', mealRelation: 'after_meal' as MealRelation };
+        return [first, second];
+      });
+    }
   };
 
   const removeTimeSlot = (slotId: string) => {
@@ -288,25 +295,24 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
 
   const renderTimeSheet = (sheet: Extract<PickerSheet, { type: 'time' }>) => {
     const current = times.find((slot) => slot.id === sheet.slotId)?.time24h ?? '08:00';
+    const selected = time24hTo12h(current);
+    const commit = (patch: Partial<typeof selected>) => {
+      const next = { ...selected, ...patch };
+      updateTimeSlot(sheet.slotId, { time24h: time12hTo24h(next.hour, next.minute, next.meridiem) });
+    };
     return (
       <View style={styles.sheet}>
         <View style={styles.sheetHandle} />
         <Text style={styles.sheetTitle}>Select reminder time</Text>
-        <Text style={styles.sheetSubtitle}>Choose a time. No typing needed.</Text>
-        <View style={styles.timeGrid}>
-          {timeOptions.map((time) => (
-            <Pressable
-              key={time}
-              style={[styles.timeOption, current === time && styles.timeOptionActive]}
-              onPress={() => {
-                updateTimeSlot(sheet.slotId, { time24h: time });
-                setPickerSheet(null);
-              }}
-            >
-              <Text style={[styles.timeOptionText, current === time && styles.timeOptionTextActive]}>{formatTime(time)}</Text>
-            </Pressable>
-          ))}
+        <Text style={styles.sheetSubtitle}>Scroll hour and minute, then choose AM or PM.</Text>
+        <View style={styles.timeWheelRow}>
+          <NumericWheelPicker label="Reminder hour" value={selected.hour} min={1} max={12} visibleRows={5} textColor={medicationTheme.text} mutedTextColor={medicationTheme.muted} borderColor={medicationTheme.border} backgroundColor={medicationTheme.surfaceRaised} highlightColor="#60AF00" onChange={(hour) => commit({ hour })} style={styles.timeWheel} />
+          <NumericWheelPicker label="Reminder minute" value={selected.minute} min={0} max={59} visibleRows={5} textColor={medicationTheme.text} mutedTextColor={medicationTheme.muted} borderColor={medicationTheme.border} backgroundColor={medicationTheme.surfaceRaised} highlightColor="#60AF00" onChange={(minute) => commit({ minute })} style={styles.timeWheel} />
+          <View accessibilityRole="radiogroup" style={styles.meridiemColumn}>
+            {(['AM', 'PM'] as const).map((meridiem) => <Pressable key={meridiem} accessibilityRole="radio" accessibilityState={{ selected: selected.meridiem === meridiem }} style={[styles.meridiemOption, selected.meridiem === meridiem && styles.meridiemOptionActive]} onPress={() => commit({ meridiem })}><Text style={[styles.meridiemText, selected.meridiem === meridiem && styles.meridiemTextActive]}>{meridiem}</Text></Pressable>)}
+          </View>
         </View>
+        <Pressable style={styles.primaryCta} onPress={() => setPickerSheet(null)}><Text style={styles.primaryCtaText}>Set time</Text></Pressable>
       </View>
     );
   };
@@ -342,11 +348,11 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
 
         <View style={styles.field}>
           <Text style={styles.label}>Strength</Text>
-          <View style={styles.rowWrap}>
-            {strengthOptions.map((option) => (
-              <React.Fragment key={option}>{renderChoice(option, strength === option, () => setStrength(option))}</React.Fragment>
-            ))}
+          <View style={styles.strengthInputRow}>
+            <TextInput accessibilityLabel={`Medicine strength in ${strengthUnit === 'IU' ? 'international units' : 'milligrams'}`} value={strength} onChangeText={setStrength} style={[styles.input, styles.strengthInput]} keyboardType="decimal-pad" inputMode="decimal" placeholder="e.g. 12.5" placeholderTextColor={medicationTheme.muted} />
+            <Text style={styles.strengthUnit}>{strengthUnit}</Text>
           </View>
+          {strength.length > 0 && normalizedStrength === null ? <Text style={styles.validationError}>Enter a positive number with up to 3 decimal places.</Text> : null}
         </View>
 
         <View style={styles.field}>
@@ -376,7 +382,7 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
           <View style={styles.stack}>
             {frequencyOptions.map((option) => (
               <React.Fragment key={option.key}>
-                {renderChoice(option.label, frequencyPreset === option.key, () => setFrequencyPreset(option.key), styles.fullWidthChoice)}
+                {renderChoice(option.label, frequencyPreset === option.key, () => selectFrequency(option.key), styles.fullWidthChoice)}
               </React.Fragment>
             ))}
           </View>
@@ -397,7 +403,7 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
         <View style={styles.field}>
           <View style={styles.inlineHeader}>
             <Text style={styles.label}>Scheduled times</Text>
-            <Pressable onPress={addTimeSlot}><Text style={styles.link}>+ Add another time</Text></Pressable>
+            {frequencyPreset !== 'twice_daily' ? <Pressable onPress={addTimeSlot}><Text style={styles.link}>+ Add another time</Text></Pressable> : null}
           </View>
           <View style={styles.stack}>
             {times.map((slot) => (
@@ -414,10 +420,11 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
                     </Pressable>
                   ))}
                 </View>
-                <Pressable onPress={() => removeTimeSlot(slot.id)}><Text style={styles.delete}>Remove</Text></Pressable>
+                {frequencyPreset !== 'twice_daily' ? <Pressable onPress={() => removeTimeSlot(slot.id)}><Text style={styles.delete}>Remove</Text></Pressable> : null}
               </View>
             ))}
           </View>
+          {duplicateTimes ? <Text style={styles.validationError}>Choose a different time for each reminder.</Text> : null}
         </View>
 
         <View style={styles.field}>
@@ -519,6 +526,26 @@ const styles = StyleSheet.create({
     color: medicationTheme.text,
     fontFamily: font.medium,
     fontSize: 16
+  },
+  strengthInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  strengthInput: {
+    flex: 1
+  },
+  strengthUnit: {
+    minWidth: 42,
+    fontFamily: font.bold,
+    fontSize: 17,
+    color: medicationTheme.text
+  },
+  validationError: {
+    fontFamily: font.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    color: medicationTheme.danger
   },
   inputInline: {
     borderWidth: 1,
@@ -849,31 +876,37 @@ const styles = StyleSheet.create({
   calendarDayTextActive: {
     color: medicationTheme.text
   },
-  timeGrid: {
+  timeWheelRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8
+  },
+  timeWheel: {
+    flex: 1
+  },
+  meridiemColumn: {
+    width: 68,
     gap: 10
   },
-  timeOption: {
-    width: '30%',
-    minHeight: 50,
-    borderRadius: 16,
+  meridiemOption: {
+    minHeight: 52,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: medicationTheme.border,
-    backgroundColor: medicationTheme.surface,
+    backgroundColor: medicationTheme.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center'
   },
-  timeOptionActive: {
-    borderColor: medicationTheme.borderStrong,
-    backgroundColor: medicationTheme.surfaceRaised
+  meridiemOptionActive: {
+    borderColor: '#60AF00',
+    backgroundColor: 'rgba(96,175,0,0.18)'
   },
-  timeOptionText: {
+  meridiemText: {
     fontFamily: font.semiBold,
     fontSize: 15,
     color: medicationTheme.secondary
   },
-  timeOptionTextActive: {
+  meridiemTextActive: {
     color: medicationTheme.text
   }
 });

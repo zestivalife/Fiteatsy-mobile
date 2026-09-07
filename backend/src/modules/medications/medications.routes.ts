@@ -5,7 +5,7 @@ import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/au
 import { syncClientMedicationSnapshot } from './medications.service.js';
 
 const frequencySchema = z.object({
-  preset: z.enum(['every_day', 'alternate_days', 'specific_weekdays', 'every_x_days', 'weekly', 'monthly', 'custom']),
+  preset: z.enum(['every_day', 'twice_daily', 'alternate_days', 'specific_weekdays', 'every_x_days', 'weekly', 'monthly', 'custom']),
   intervalDays: z.number().int().positive().optional(),
   weekdays: z.array(z.number().int().min(0).max(6)).optional(),
   monthlyDays: z.array(z.number().int().min(1).max(31)).optional(),
@@ -23,7 +23,10 @@ const medicationSchema = z.object({
       id: z.string().min(1),
       time24h: z.string().regex(/^\d{2}:\d{2}$/),
       mealRelation: z.enum(['before_meal', 'after_meal', 'with_meal', 'empty_stomach'])
-    })),
+    })).min(1).max(24).superRefine((slots, context) => {
+      const times = slots.map((slot) => slot.time24h);
+      if (new Set(times).size !== times.length) context.addIssue({ code: z.ZodIssueCode.custom, message: 'Reminder times must be unique.' });
+    }),
     duration: z.object({
       startDateISO: z.string().datetime(),
       endDateISO: z.string().datetime().nullable(),

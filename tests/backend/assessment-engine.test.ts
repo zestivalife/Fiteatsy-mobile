@@ -6,6 +6,18 @@ import { scorePss10 } from '../../backend/src/modules/assessments/assessment-sco
 const answerAll = (selectedValue: 0 | 1 | 2 | 3 | 4) =>
   pss10Items.map((item) => ({ itemId: item.id, selectedValue }));
 
+const answersForRawScore = (target: number) => {
+  let remaining = target;
+  return pss10Items.map((item) => {
+    const normalized = Math.min(4, remaining);
+    remaining -= normalized;
+    return {
+      itemId: item.id,
+      selectedValue: (item.reverseScored ? 4 - normalized : normalized) as 0 | 1 | 2 | 3 | 4
+    };
+  });
+};
+
 test('PSS-10 scoring handles all zero responses with reverse-scored items', () => {
   const result = scorePss10(answerAll(0));
   assert.equal(result.rawScore, 16);
@@ -60,6 +72,12 @@ test('PSS-10 interpretation uses exact product boundaries', () => {
   assert.equal(getPss10Interpretation(40).label, 'High perceived stress');
   assert.throws(() => getPss10Interpretation(-1), /outside the expected/);
   assert.throws(() => getPss10Interpretation(41), /outside the expected/);
+});
+
+test('PSS-10 scoring reaches every required classification boundary', () => {
+  for (const expected of [0, 13, 14, 26, 27, 40]) {
+    assert.equal(scorePss10(answersForRawScore(expected)).rawScore, expected);
+  }
 });
 
 test('PSS-10 response values stay within the five-level scale', () => {

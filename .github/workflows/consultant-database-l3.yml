@@ -12,6 +12,7 @@ on:
       - codex/diet-module-unified-option-model-v17.9
       - codex/governed-qa-handoff-v17.12
       - codex/consultant-meal-templates-v17.25
+      - codex/application-review-v17.37
 
 permissions:
   contents: read
@@ -56,6 +57,15 @@ jobs:
 
       - name: Install locked backend dependencies
         run: npm ci --prefix backend
+
+      - name: Install locked mobile dependencies
+        run: npm ci
+
+      - name: Validate mobile application review candidate
+        run: |
+          npx tsc --noEmit
+          npm test -- --runInBand
+          npx expo export --platform all --output-dir /tmp/fiteatsy-v17.37-export
 
       - name: Apply production migrations to ephemeral PostgreSQL
         run: npm --prefix backend run db:migrate

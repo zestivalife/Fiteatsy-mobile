@@ -54,20 +54,20 @@ test('PSS-10 assessment definition exposes the approved product content', async 
   assert.equal(definition.response.status, 200);
   assert.equal(definition.body.assessmentType, 'PSS10');
   assert.equal(definition.body.itemCount, 10);
-  assert.equal(definition.body.instrumentVersion, 'pss10-fiteatsy-v2');
-  assert.equal(definition.body.recallPeriod, 'the last 30 days');
+  assert.equal(definition.body.instrumentVersion, 'pss10-nuetra-v17.37');
+  assert.equal(definition.body.recallPeriod, 'the last week');
   assert.equal(definition.body.licensedItemWordingPresent, true);
   assert.deepEqual(definition.body.items.map((item: { label: string }) => item.label), [
-    'Upset by unexpected events.',
-    'Unable to control important things.',
-    'Nervous and stressed.',
-    'Confident in handling personal problems.',
-    'Things were going your way.',
-    'Unable to cope with tasks.',
-    'Able to control irritations.',
-    'On top of things.',
-    'Angered by uncontrollable events.',
-    'Difficulties were piling up.'
+    'In the last week, how often have you felt upset because something happened unexpectedly?',
+    'In the last week, how often have you felt unable to control the important things in your life?',
+    'In the last week, how often have you felt nervous or stressed?',
+    'In the last week, how often have you felt confident about your ability to handle personal problems?',
+    'In the last week, how often have you felt that things were going your way?',
+    'In the last week, how often have you found that you could not cope with all the things you had to do?',
+    'In the last week, how often have you been able to control irritations in your life?',
+    'In the last week, how often have you felt that you were on top of things?',
+    'In the last week, how often have you been angered because of things that were outside of your control?',
+    'In the last week, how often have you felt difficulties were piling up so high that you could not overcome them?'
   ]);
   assert.deepEqual(definition.body.responseOptions.map((option: { label: string }) => option.label), [
     'Never', 'Almost never', 'Sometimes', 'Fairly often', 'Very often'

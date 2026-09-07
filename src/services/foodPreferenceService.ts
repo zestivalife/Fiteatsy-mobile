@@ -51,8 +51,8 @@ export type FoodCatalogueItem = {
   allergenTags: string[];
 };
 
-export const searchFoodCatalogue = (query: string) =>
-  apiFetch<{ items: FoodCatalogueItem[]; hasMore: boolean }>(`/v1/platform/food-catalogue?q=${encodeURIComponent(query)}&limit=30`);
+export const searchFoodCatalogue = (query: string, offset = 0, limit = 30) =>
+  apiFetch<{ items: FoodCatalogueItem[]; hasMore: boolean; offset: number; limit: number }>(`/v1/platform/food-catalogue?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`);
 
 export const saveFoodPreferences = (profile: FoodPreferenceProfile) =>
   putJson<FoodPreferenceResponse>('/v1/platform/food-preferences', profile);

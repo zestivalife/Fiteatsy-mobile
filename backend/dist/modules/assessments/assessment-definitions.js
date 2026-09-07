@@ -1,19 +1,19 @@
 import { z } from 'zod';
 export const ASSESSMENT_TYPE_PSS10 = 'PSS10';
-export const PSS10_INSTRUMENT_VERSION = 'pss10-fiteatsy-v2';
+export const PSS10_INSTRUMENT_VERSION = 'pss10-nuetra-v17.37';
 export const PSS10_SCORING_VERSION = 'pss10-scoring-v1';
 export const PSS10_INTERPRETATION_VERSION = 'pss10-interpretation-v1';
 export const pss10Items = [
-    { id: 'PSS10_Q01', label: 'Upset by unexpected events.', reverseScored: false },
-    { id: 'PSS10_Q02', label: 'Unable to control important things.', reverseScored: false },
-    { id: 'PSS10_Q03', label: 'Nervous and stressed.', reverseScored: false },
-    { id: 'PSS10_Q04', label: 'Confident in handling personal problems.', reverseScored: true },
-    { id: 'PSS10_Q05', label: 'Things were going your way.', reverseScored: true },
-    { id: 'PSS10_Q06', label: 'Unable to cope with tasks.', reverseScored: false },
-    { id: 'PSS10_Q07', label: 'Able to control irritations.', reverseScored: true },
-    { id: 'PSS10_Q08', label: 'On top of things.', reverseScored: true },
-    { id: 'PSS10_Q09', label: 'Angered by uncontrollable events.', reverseScored: false },
-    { id: 'PSS10_Q10', label: 'Difficulties were piling up.', reverseScored: false }
+    { id: 'PSS10_Q01', label: 'In the last week, how often have you felt upset because something happened unexpectedly?', reverseScored: false },
+    { id: 'PSS10_Q02', label: 'In the last week, how often have you felt unable to control the important things in your life?', reverseScored: false },
+    { id: 'PSS10_Q03', label: 'In the last week, how often have you felt nervous or stressed?', reverseScored: false },
+    { id: 'PSS10_Q04', label: 'In the last week, how often have you felt confident about your ability to handle personal problems?', reverseScored: true },
+    { id: 'PSS10_Q05', label: 'In the last week, how often have you felt that things were going your way?', reverseScored: true },
+    { id: 'PSS10_Q06', label: 'In the last week, how often have you found that you could not cope with all the things you had to do?', reverseScored: false },
+    { id: 'PSS10_Q07', label: 'In the last week, how often have you been able to control irritations in your life?', reverseScored: true },
+    { id: 'PSS10_Q08', label: 'In the last week, how often have you felt that you were on top of things?', reverseScored: true },
+    { id: 'PSS10_Q09', label: 'In the last week, how often have you been angered because of things that were outside of your control?', reverseScored: false },
+    { id: 'PSS10_Q10', label: 'In the last week, how often have you felt difficulties were piling up so high that you could not overcome them?', reverseScored: false }
 ];
 export const pss10ResponseOptions = [
     { value: 0, label: 'Never' },
@@ -47,8 +47,8 @@ export const getAssessmentDefinition = (assessmentType) => {
         instrumentVersion: PSS10_INSTRUMENT_VERSION,
         scoringVersion: PSS10_SCORING_VERSION,
         title: 'Perceived Stress Assessment',
-        subtitle: 'Thinking about the last 30 days, select how often each of the following applied to you.',
-        recallPeriod: 'the last 30 days',
+        subtitle: 'Thinking about the last week, select how often each of the following applied to you.',
+        recallPeriod: 'the last week',
         itemCount: pss10Items.length,
         maxScore: 40,
         licensedItemWordingPresent: true,

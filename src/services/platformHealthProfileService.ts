@@ -17,6 +17,9 @@ export type PlatformHealthProfile = {
   waistCm: number | null;
   hipCm: number | null;
   neckCm: number | null;
+  armCircumferenceCm?: number | null;
+  thighCircumferenceCm?: number | null;
+  calfCircumferenceCm?: number | null;
   bodyFatPct: number | null;
   occupation: string | null;
   workingHoursLabel: string | null;
@@ -54,6 +57,7 @@ export type PlatformHealthProfile = {
   previousConditions: string[];
   familyHistoryConditions: string[];
   wellnessGoals: string[];
+  wellnessGoalIds?: string[];
   medicalNotes: string | null;
   pregnancyStatus: string | null;
   breastfeedingStatus: string | null;
@@ -118,6 +122,9 @@ export const buildPlatformHealthProfilePayload = (
     waistCm: positiveNumber(onboarding.waistCm),
     hipCm: positiveNumber(onboarding.hipCm),
     neckCm: positiveNumber(onboarding.neckCm),
+    armCircumferenceCm: positiveNumber(onboarding.armCircumferenceCm),
+    thighCircumferenceCm: positiveNumber(onboarding.thighCircumferenceCm),
+    calfCircumferenceCm: positiveNumber(onboarding.calfCircumferenceCm),
     bodyFatPct: positiveNumber(onboarding.bodyFatPct),
     occupation: onboarding.occupation,
     workingHoursLabel: onboarding.workingHoursLabel ?? onboarding.workHours,
@@ -155,6 +162,7 @@ export const buildPlatformHealthProfilePayload = (
     previousConditions: nonEmptyArray(onboarding.previousConditions),
     familyHistoryConditions: nonEmptyArray(onboarding.familyHistoryConditions),
     wellnessGoals: goalList(onboarding),
+    wellnessGoalIds: nonEmptyArray(onboarding.wellnessGoalIds),
     medicalNotes: onboarding.medicalNotes,
     pregnancyStatus: onboarding.pregnancyStatus,
     breastfeedingStatus: onboarding.breastfeedingStatus,
@@ -393,6 +401,9 @@ export const mergePlatformProfileIntoOnboarding = (
     waistCm: profile.waistCm ?? onboarding.waistCm,
     hipCm: profile.hipCm ?? onboarding.hipCm,
     neckCm: profile.neckCm ?? onboarding.neckCm,
+    armCircumferenceCm: profile.armCircumferenceCm ?? onboarding.armCircumferenceCm,
+    thighCircumferenceCm: profile.thighCircumferenceCm ?? onboarding.thighCircumferenceCm,
+    calfCircumferenceCm: profile.calfCircumferenceCm ?? onboarding.calfCircumferenceCm,
     bodyFatPct: profile.bodyFatPct ?? onboarding.bodyFatPct,
     occupation: profile.occupation ?? onboarding.occupation,
     workingHoursLabel: profile.workingHoursLabel ?? onboarding.workingHoursLabel,
@@ -430,6 +441,7 @@ export const mergePlatformProfileIntoOnboarding = (
     previousConditions: profile.previousConditions.length > 0 ? profile.previousConditions as OnboardingProfile['previousConditions'] : onboarding.previousConditions,
     familyHistoryConditions: profile.familyHistoryConditions.length > 0 ? profile.familyHistoryConditions as OnboardingProfile['familyHistoryConditions'] : onboarding.familyHistoryConditions,
     healthGoals: profile.wellnessGoals.length > 0 ? profile.wellnessGoals as OnboardingProfile['healthGoals'] : onboarding.healthGoals,
+    wellnessGoalIds: (profile.wellnessGoalIds?.length ?? 0) > 0 ? profile.wellnessGoalIds : onboarding.wellnessGoalIds,
     primaryGoal,
     wellnessGoal: primaryGoal,
     medicalNotes: profile.medicalNotes ?? onboarding.medicalNotes,

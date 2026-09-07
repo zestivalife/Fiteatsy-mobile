@@ -49,6 +49,7 @@ const matchesFrequency = (rule: MedicationFrequencyRule, dayKey: string, startKe
 
   switch (rule.preset) {
     case 'every_day':
+    case 'twice_daily':
       return true;
     case 'alternate_days':
       return diffDays % 2 === 0;

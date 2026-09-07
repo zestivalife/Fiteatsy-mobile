@@ -4,6 +4,7 @@ import { ReportParameter } from '../services/nuetraService';
 export type RootStackParamList = {
   Splash: undefined;
   OnboardingBasics: undefined;
+  OnboardingAnthropometrics: undefined;
   OnboardingCalendar: undefined;
   OnboardingNotifications: undefined;
   OnboardingAssessment: {

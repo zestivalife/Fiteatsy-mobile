@@ -96,4 +96,22 @@ describe('recoveryIntelligenceEngine', () => {
     expect(output.blockers.length).toBeGreaterThan(0);
     expect(output.contextualInsights[0]).toContain('Recovery insights improve');
   });
+
+  it('hydrates approved PSS-10 questionnaire results into stress recovery and trend values', () => {
+    const output = buildRecoveryIntelligence({
+      wellness: baseWellness,
+      checkIns: [],
+      medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
+      hasWearable: false,
+      wearableSyncData: [],
+      pss10Results: [
+        { rawScore: 20, completedAtISO: '2026-09-05T10:00:00.000Z' },
+        { rawScore: 10, completedAtISO: '2026-09-06T10:00:00.000Z' }
+      ]
+    });
+    expect(output.questionnaireAvailable).toBe(true);
+    expect(output.pss10Score).toBe(10);
+    expect(output.stressRecoveryScore).toBe(75);
+    expect(output.trendValues7d).toEqual([50, 75]);
+  });
 });

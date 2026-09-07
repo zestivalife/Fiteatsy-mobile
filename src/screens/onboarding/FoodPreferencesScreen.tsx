@@ -53,6 +53,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const [foodItems, setFoodItems] = useState<FoodCatalogueItem[]>([]);
   const [foodLoading, setFoodLoading] = useState(false);
   const [foodError, setFoodError] = useState<string | null>(null);
+  const [foodHasMore, setFoodHasMore] = useState(false);
   const [initialOnboardingStep, setInitialOnboardingStep] = useState(1);
   const clientId = authSession?.client.fiteatsyClientId;
   const completionStarted = useRef(false);
@@ -76,13 +77,25 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
     const timer = setTimeout(() => {
       setFoodLoading(true);
       setFoodError(null);
-      searchFoodCatalogue(foodQuery)
-        .then((response) => setFoodItems(response.items))
+      searchFoodCatalogue(foodQuery, 0)
+        .then((response) => { setFoodItems(response.items); setFoodHasMore(response.hasMore); })
         .catch((requestError) => setFoodError(requestError instanceof Error ? requestError.message : 'Unable to load foods.'))
         .finally(() => setFoodLoading(false));
     }, 250);
     return () => clearTimeout(timer);
   }, [foodQuery]);
+
+  const loadMoreFoods = () => {
+    if (foodLoading || !foodHasMore) return;
+    setFoodLoading(true);
+    searchFoodCatalogue(foodQuery, foodItems.length)
+      .then((response) => {
+        setFoodItems((current) => Array.from(new Map([...current, ...response.items].map((item) => [item.id, item])).values()));
+        setFoodHasMore(response.hasMore);
+      })
+      .catch((requestError) => setFoodError(requestError instanceof Error ? requestError.message : 'Unable to load more foods.'))
+      .finally(() => setFoodLoading(false));
+  };
 
   const proteinVisible = profile.dietType === 'eggetarian' || profile.dietType === 'non_vegetarian';
   const selectedDietLabel = useMemo(() => diets.find((item) => item.value === profile.dietType)?.label ?? 'Not selected', [profile.dietType]);
@@ -132,6 +145,8 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       foodItems={foodItems}
       foodLoading={foodLoading}
       foodError={foodError}
+      foodHasMore={foodHasMore}
+      onLoadMoreFoods={loadMoreFoods}
       saving={saving}
       error={error}
       onSave={save}
@@ -173,9 +188,9 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
         <Text style={[styles.helper, { color: palette.textSecondary }]}>Medical intolerances are kept in your Health Profile.</Text>
       </Card>
 
-      <FoodPicker title="Foods you enjoy" helper="Choose verified foods you'd like us to consider more often." mode="likedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.likedFoodIds} onToggle={(id) => update('likedFoodIds', toggle(profile.likedFoodIds, id))} palette={palette} />
-      <FoodPicker title="Foods you don't enjoy" helper="Dislikes are different from allergies." mode="dislikedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.dislikedFoodIds} onToggle={(id) => update('dislikedFoodIds', toggle(profile.dislikedFoodIds, id))} palette={palette} />
-      <FoodPicker title="Anything you specifically avoid?" helper="Avoided foods are not treated as medical allergies." mode="avoidedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} selected={profile.avoidedFoodIds} onToggle={(id) => update('avoidedFoodIds', toggle(profile.avoidedFoodIds, id))} palette={palette} />
+      <FoodPicker title="Foods you enjoy" helper="Choose verified foods you'd like us to consider more often." mode="likedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} hasMore={foodHasMore} onLoadMore={loadMoreFoods} selected={profile.likedFoodIds} onToggle={(id) => update('likedFoodIds', toggle(profile.likedFoodIds, id))} palette={palette} />
+      <FoodPicker title="Foods you don't enjoy" helper="Dislikes are different from allergies." mode="dislikedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} hasMore={foodHasMore} onLoadMore={loadMoreFoods} selected={profile.dislikedFoodIds} onToggle={(id) => update('dislikedFoodIds', toggle(profile.dislikedFoodIds, id))} palette={palette} />
+      <FoodPicker title="Anything you specifically avoid?" helper="Avoided foods are not treated as medical allergies." mode="avoidedFoodIds" activeMode={foodMode} setMode={setFoodMode} query={foodQuery} setQuery={setFoodQuery} items={foodItems} loading={foodLoading} error={foodError} hasMore={foodHasMore} onLoadMore={loadMoreFoods} selected={profile.avoidedFoodIds} onToggle={(id) => update('avoidedFoodIds', toggle(profile.avoidedFoodIds, id))} palette={palette} />
 
       <Card>
         <SectionTitle title="What works for your routine?" color={palette.textPrimary} />
@@ -205,7 +220,7 @@ const ChoiceGrid = ({ choices, selected, onToggle, palette }: { choices: Choice[
   </View>
 );
 
-const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery, items, loading, error, selected, onToggle, palette }: {
+const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery, items, loading, error, hasMore, onLoadMore, selected, onToggle, palette }: {
   title: string;
   helper: string;
   mode: 'likedFoodIds' | 'dislikedFoodIds' | 'avoidedFoodIds';
@@ -216,6 +231,8 @@ const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery,
   items: FoodCatalogueItem[];
   loading: boolean;
   error: string | null;
+  hasMore: boolean;
+  onLoadMore: () => void;
   selected: string[];
   onToggle: (id: string) => void;
   palette: ReturnType<typeof getThemeColors>;
@@ -231,6 +248,7 @@ const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery,
       const active = selected.includes(item.id);
       return <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => onToggle(item.id)} style={[styles.choice, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }, active && { backgroundColor: palette.blue, borderColor: palette.blue }]}><Text style={[styles.choiceText, { color: active ? '#FFFFFF' : palette.textPrimary }]}>{item.displayName}</Text></Pressable>;
     })}</View>
+    {activeMode === mode && hasMore ? <Pressable accessibilityRole="button" onPress={onLoadMore} disabled={loading} style={[styles.loadMore, { borderColor: palette.stroke }]}><Text style={[styles.choiceText, { color: palette.textPrimary }]}>{loading ? 'Loading...' : 'Load more foods'}</Text></Pressable> : null}
     {selected.length ? <Text style={[styles.selectedCount, { color: palette.textSecondary }]}>{selected.length} selected</Text> : null}
   </Card>;
 };
@@ -247,6 +265,7 @@ const styles = StyleSheet.create({
   choiceText: { ...typography.caption },
   searchInput: { minHeight: 46, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 12, marginBottom: 10, ...typography.body },
   selectedCount: { ...typography.caption, marginTop: 10 },
+  loadMore: { minHeight: 44, marginTop: 12, borderWidth: 1, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   saved: { ...typography.caption, textAlign: 'center', marginVertical: 12 },
   error: { ...typography.caption, textAlign: 'center', marginVertical: 12 }
 });
