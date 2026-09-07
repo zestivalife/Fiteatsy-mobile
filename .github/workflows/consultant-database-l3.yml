@@ -203,7 +203,22 @@ jobs:
             -name '*.test.ts' \
             ! -name 'diet-lifecycle-quality.database.test.ts' \
             -print | sort)
-          node --import tsx --test --test-concurrency=1 "${regression_tests[@]}"
+          set +e
+          node --import tsx --test --test-concurrency=1 "${regression_tests[@]}" > full-regression.log 2>&1
+          status=$?
+          cat full-regression.log
+          if [ "$status" -ne 0 ]; then
+            failure_block="$(awk '
+              /^not ok / { capture = 1 }
+              capture { print }
+              capture && /^  \.\.\.$/ { exit }
+            ' full-regression.log | tail -n 100)"
+            escaped="${failure_block//'%'/'%25'}"
+            escaped="${escaped//$'\r'/'%0D'}"
+            escaped="${escaped//$'\n'/'%0A'}"
+            echo "::error title=Full safe backend regression::$escaped"
+          fi
+          exit "$status"
 
       - name: Build backend
         run: npm --prefix backend run build
