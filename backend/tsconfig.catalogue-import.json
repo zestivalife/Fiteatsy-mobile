@@ -10,6 +10,7 @@
     "scripts/import-p0-food-verification-v17-29.ts",
     "scripts/import-food-catalogue-closure-v17-34.ts",
     "scripts/import-food-india-resolution-v17-35.ts",
+    "scripts/import-food-reference-reconciliation-v17-36.ts",
     "src/db/**/*.ts",
     "src/modules/nutrition/catalogue/**/*.ts",
     "src/test-support/destructive-reset-guard.ts"
