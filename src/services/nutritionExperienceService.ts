@@ -39,6 +39,8 @@ export type NutritionOption = {
   fibreGrams?: number | null;
   recommendationReason?: string | null;
   rankingReasons?: string[];
+  components?: Array<{ id?: string; name?: string; serving?: string; grams?: number | null; millilitres?: number | null }>;
+  publishedOptionHash?: string | null;
 };
 
 export type NutritionMeal = {
@@ -49,6 +51,7 @@ export type NutritionMeal = {
   state: 'PENDING' | 'CONSUMED_APPROVED' | 'CONSUMED_OUT_OF_PLAN' | 'SKIPPED';
   consumedAtISO: string | null;
   consumed: Record<string, unknown> | null;
+  selectedOptionId: string | null;
 };
 
 export type NutritionExperience = {

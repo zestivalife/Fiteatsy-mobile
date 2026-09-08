@@ -2784,7 +2784,6 @@ export const getDietPlanDeliveryStatusForClient = async (owner: ClientOwnershipC
   };
 };
 type NutritionConsumptionState = 'PENDING' | 'CONSUMED_APPROVED' | 'CONSUMED_OUT_OF_PLAN' | 'SKIPPED';
-type NutritionReasonCode = 'HIGHER_PROTEIN' | 'HIGHER_FIBRE' | 'LOWER_FAT' | 'CALORIE_FIT' | 'BALANCED_OPTION';
 
 const nutritionMealOrder = NUTRITION_MEAL_SEQUENCE;
 
@@ -2871,15 +2870,48 @@ const parseNutritionEvent = (event: Awaited<ReturnType<typeof listHealthEvents>>
   return event.payload as Record<string, unknown>;
 };
 
-const scoreApprovedOption = (option: NutritionPlanContent['mealPlan'][keyof NutritionPlanContent['mealPlan']]['options'][number], remaining: { calories: number | null; protein: number | null; fibre: number | null; fat: number | null }) => {
-  let score = 0;
-  const reasons: NutritionReasonCode[] = [];
-  if (remaining.protein != null && remaining.protein > 0 && (option.proteinGrams ?? 0) >= 15) { score += 3; reasons.push('HIGHER_PROTEIN'); }
-  if (remaining.fibre != null && remaining.fibre > 0 && (option.fibreGrams ?? 0) >= 5) { score += 2; reasons.push('HIGHER_FIBRE'); }
-  if (remaining.fat != null && remaining.fat <= 12 && (option.fatGrams ?? 0) <= 15) { score += 2; reasons.push('LOWER_FAT'); }
-  if (remaining.calories == null || option.approxKcal == null || option.approxKcal <= remaining.calories) { score += 2; reasons.push('CALORIE_FIT'); }
-  if (reasons.length === 0) reasons.push('BALANCED_OPTION');
-  return { score, reasons };
+const commonFoodMealKey: Record<string, keyof NutritionPlanContent['mealPlan']> = {
+  EARLY_MORNING: 'earlyMorning', BREAKFAST: 'breakfast', MID_MORNING: 'midMorningSnack',
+  LUNCH: 'lunch', EVENING_SNACK: 'eveningSnack', DINNER: 'dinner', BEDTIME: 'bedtimeNutrition',
+};
+
+export const projectPublishedMealOptions = (version: { content: NutritionPlanContent; commonFoodOptions: unknown[] }) => {
+  const frozen = version.commonFoodOptions as Array<Record<string, unknown>>;
+  const completeFrozenSnapshot = frozen.length === 35 && Object.keys(commonFoodMealKey).every((head) => frozen.filter((option) => option.mealHead === head).length === 5);
+  if (!completeFrozenSnapshot) {
+    return Object.fromEntries(NUTRITION_MEAL_SEQUENCE.map((key) => [key, version.content.mealPlan[key].options]));
+  }
+  const projected = NUTRITION_MEAL_SEQUENCE.reduce((result, key) => {
+    result[key] = [];
+    return result;
+  }, {} as Record<keyof NutritionPlanContent['mealPlan'], Array<Record<string, unknown>>>);
+  for (const option of frozen) {
+    const mealKey = commonFoodMealKey[String(option.mealHead ?? '')];
+    if (!mealKey) continue;
+    const components = Array.isArray(option.components) ? option.components as Array<Record<string, unknown>> : [];
+    const nutrition = option.nutrition as Record<string, unknown> | undefined;
+    const componentTitle = components.map((component) => String(component.foodDisplayNameSnapshot ?? '')).filter(Boolean).join(' + ');
+    projected[mealKey].push({
+      id: String(option.combinationId),
+      slot: projected[mealKey].length + 1,
+      meal: String(option.clientTitle || componentTitle || 'Consultant-approved meal'),
+      portion: String(option.humanServingSummary || '1 portion'),
+      approxKcal: nutrition?.kcal ?? null,
+      proteinGrams: nutrition?.protein ?? null,
+      carbsGrams: nutrition?.carbohydrate ?? null,
+      fatGrams: nutrition?.fat ?? null,
+      fibreGrams: nutrition?.fibre ?? null,
+      components: components.map((component) => ({
+        id: component.componentId,
+        name: component.foodDisplayNameSnapshot,
+        serving: component.label || component.servingDisplayNameSnapshot,
+        grams: component.grams,
+        millilitres: component.millilitres,
+      })),
+      publishedOptionHash: option.optionHash ?? null,
+    });
+  }
+  return projected;
 };
 
 const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays = 1, selectedDateISO?: string) => {
@@ -2925,14 +2957,16 @@ const buildNutritionProjection = async (owner: ClientOwnershipContext, rangeDays
     fat: targets.fat == null ? null : Math.max(0, targets.fat - totals.fat),
     fibre: targets.fibre == null ? null : Math.max(0, targets.fibre - totals.fibre),
   };
+  const publishedMealOptions = projectPublishedMealOptions(published.version);
   const meals = NUTRITION_MEAL_SEQUENCE.map((key) => {
     const section = published.version.content.mealPlan[key];
-    const ranking = section.options.map((option) => ({ option, rank: scoreApprovedOption(option, remaining) })).sort((a, b) => b.rank.score - a.rank.score);
     const current = latestByMeal.get(key);
+    const options = publishedMealOptions[key];
     return {
-      key, label: nutritionMealLabels[key], window: section.window, options: ranking.map(({ option, rank }) => ({ ...option, rankingReasons: rank.reasons })),
+      key, label: nutritionMealLabels[key], window: section.window, options,
       state: current?.state ?? 'PENDING', consumedAtISO: current?.eventTimeISO ?? null,
       consumed: current?.payload ?? null,
+      selectedOptionId: typeof current?.payload.optionId === 'string' ? current.payload.optionId : null,
     };
   });
   const waterMl = relevant.filter((event) => {
@@ -3047,7 +3081,7 @@ export const logClientNutritionEvent = async (owner: ClientOwnershipContext, inp
     (!input.optionId && input.mealName && option.meal === input.mealName),
   );
   const selectedCombination = published.version.commonFoodOptions.find((option) => (option as Record<string,unknown>).combinationId === input.optionId) as Record<string,unknown>|undefined;
-  if (input.state === 'CONSUMED_APPROVED' && !selectedOption && !selectedCombination) {
+  if ((input.state === 'PENDING' || input.state === 'CONSUMED_APPROVED') && !selectedOption && !selectedCombination) {
     throw new NutritionPlanWorkflowError('OPTION_NOT_FOUND', 'Choose an approved option from the published plan.', 400);
   }
   const eventType = input.litres != null ? 'water_logged' : 'meal_logged';
