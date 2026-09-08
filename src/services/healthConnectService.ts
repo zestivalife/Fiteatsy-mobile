@@ -4,6 +4,7 @@ import {
   getGrantedPermissions,
   getSdkStatus,
   initialize,
+  getChanges,
   readRecords,
   requestPermission,
   type Permission
@@ -14,6 +15,7 @@ import { runHealthConnectOperation } from './healthConnectOperationCoordinator';
 type HealthConnectMetricStatus = 'synced' | 'no_permission' | 'no_recent_data' | 'read_failed' | 'unsupported' | 'unavailable';
 
 const DAY = 24 * 60 * 60 * 1000;
+const INITIAL_BACKFILL_DAYS = 90;
 export const HEALTH_CONNECT_OPERATION_TIMEOUT_MS = 30_000;
 const now = () => Date.now();
 
@@ -71,12 +73,24 @@ const safeReadRecords = async <TRecord>(
   options: Parameters<typeof readRecords>[1]
 ): Promise<Array<TRecord>> => {
   try {
-    const response = await withHealthConnectTimeout(readRecords(recordType, options));
-    return (response?.records ?? []) as Array<TRecord>;
+    const records: TRecord[] = [];
+    let pageToken: string | undefined;
+    do {
+      const response = await withHealthConnectTimeout(readRecords(recordType, { ...options, pageSize: 500, pageToken }));
+      records.push(...((response?.records ?? []) as Array<TRecord>));
+      pageToken = response?.pageToken || undefined;
+    } while (pageToken);
+    return records;
   } catch (error) {
     console.warn('[HealthConnect] readRecords_failed', recordType, error instanceof Error ? error.message : 'unknown_error');
     throw new Error(`health_connect_read_failed_${recordType}`);
   }
+};
+
+export const readHealthConnectChanges = async (recordTypes: string[], changesToken?: string) => {
+  if (typeof getChanges !== 'function') throw new Error('health_connect_change_tracking_unavailable');
+  const result = await withHealthConnectTimeout(getChanges({ recordTypes: recordTypes as Parameters<typeof getChanges>[0]['recordTypes'], changesToken }));
+  return result;
 };
 
 export type HealthConnectRuntimeDiagnostics = {
@@ -244,6 +258,7 @@ const getHealthConnectRuntimeDiagnosticsInternal = async (): Promise<HealthConne
   };
 
   const end = toIso(now());
+  const backfillWindow = DAY * INITIAL_BACKFILL_DAYS;
   const diagnostics: HealthConnectRuntimeDiagnostics = {
     ...base,
     sdkStatus: String(sdkStatus),
@@ -255,7 +270,7 @@ const getHealthConnectRuntimeDiagnosticsInternal = async (): Promise<HealthConne
 
   if (permissionStates.Steps) {
     const records = await safeReadRecords<{ endTime: string } & { count?: number }>('Steps', {
-      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY), endTime: end }
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
     });
     const freshRecords = records.filter((record) => within(record.endTime, DAY));
     const last = freshRecords.at(-1)?.endTime ?? null;
@@ -324,7 +339,61 @@ const getHealthConnectRuntimeDiagnosticsInternal = async (): Promise<HealthConne
 export const getHealthConnectRuntimeDiagnostics = () =>
   runHealthConnectOperation('CHECKING', getHealthConnectRuntimeDiagnosticsInternal);
 
-const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => {
+const HEALTH_CONNECT_RECORD_TYPES = permissionList.map((permission) => permission.recordType);
+
+const incrementalObservation = (record: Record<string, any>): HealthObservationDraft | null => {
+  const recordType = String(record.recordType ?? '');
+  const measuredAtISO = String(record.endTime ?? record.time ?? new Date().toISOString());
+  const intervalMinutes = record.startTime && record.endTime
+    ? Math.max(0, (Date.parse(record.endTime) - Date.parse(record.startTime)) / 60_000)
+    : null;
+  const values: Record<string, { metricType: string; value: number | null; unit: string }> = {
+    Steps: { metricType: 'steps', value: record.count, unit: 'count' },
+    SleepSession: { metricType: 'sleep_minutes', value: intervalMinutes, unit: 'min' },
+    RestingHeartRate: { metricType: 'resting_heart_rate', value: record.beatsPerMinute, unit: 'bpm' },
+    HeartRateVariabilityRmssd: { metricType: 'hrv_ms', value: record.heartRateVariabilityMillis, unit: 'ms' },
+    ExerciseSession: { metricType: 'workout_minutes', value: intervalMinutes, unit: 'min' },
+    ActiveCaloriesBurned: { metricType: 'active_energy', value: record.energy?.inKilocalories, unit: 'kcal' },
+    Weight: { metricType: 'weight', value: record.weight?.inKilograms, unit: 'kg' },
+    Distance: { metricType: 'distance', value: record.distance?.inMeters, unit: 'm' }
+  };
+  const mapped = values[recordType];
+  const value = Number(mapped?.value);
+  const sourceRecordId = String(record.metadata?.id ?? record.metadata?.clientRecordId ?? '').trim();
+  if (!mapped || !sourceRecordId || !Number.isFinite(value) || value <= 0 || !Number.isFinite(Date.parse(measuredAtISO))) return null;
+  return {
+    metricType: mapped.metricType, value: Number(value.toFixed(mapped.metricType === 'sleep_minutes' ? 0 : 2)),
+    unit: mapped.unit, measuredAtISO, startAtISO: record.startTime ?? null, endAtISO: record.endTime ?? record.time ?? null,
+    timezoneOffsetMinutes: -new Date(measuredAtISO).getTimezoneOffset(),
+    providerUpdatedAtISO: record.metadata?.lastModifiedTime ?? null,
+    providerVersion: record.metadata?.clientRecordVersion == null ? null : String(record.metadata.clientRecordVersion),
+    sourceProvider: 'health_connect', sourceRecordId, syncKey: `health_connect:${recordType}:${sourceRecordId}`,
+    qualityStatus: 'accepted', sourceMetadata: { recordType, sourceApplication: record.metadata?.dataOrigin,
+      device: record.metadata?.device, recordingMethod: record.metadata?.recordingMethod }
+  };
+};
+
+const readIncrementalHealthConnectChanges = async (changesToken: string) => {
+  const observations: HealthObservationDraft[] = [];
+  let token = changesToken;
+  let hasMore = true;
+  while (hasMore) {
+    const page = await readHealthConnectChanges(HEALTH_CONNECT_RECORD_TYPES, token);
+    if (page.changesTokenExpired) throw new Error('health_connect_changes_token_expired');
+    page.upsertionChanges.forEach(({ record }) => {
+      const observation = incrementalObservation(record as Record<string, any>);
+      if (observation) observations.push(observation);
+    });
+    page.deletionChanges.forEach(({ recordId }) => observations.push({ metricType: 'provider_record_deletion',
+      value: 0, unit: 'deleted', measuredAtISO: new Date().toISOString(), sourceProvider: 'health_connect',
+      sourceRecordId: recordId, syncKey: `health_connect:deleted:${recordId}`, deleted: true }));
+    token = page.nextChangesToken;
+    hasMore = page.hasMore;
+  }
+  return { observations, nextChangesToken: token };
+};
+
+const syncFromHealthConnectInternal = async (changesToken?: string): Promise<WearableSyncPayload & { anchors?: Record<string,string> }> => {
   if (Platform.OS !== 'android') {
     console.warn('[HealthConnect] Unsupported platform:', Platform.OS);
     throw new Error('health_connect_unsupported_platform');
@@ -363,6 +432,15 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
     throw new Error('health_connect_permission_required');
   }
 
+  if (changesToken) {
+    const incremental = await readIncrementalHealthConnectChanges(changesToken);
+    return { deviceId:'hc-local-device',brand:'Other',model:'Health Connect',provider:'Health Connect',
+      syncedAtISO:new Date().toISOString(),source:'api',metrics:{heartRateAvg:null,sleepHours:null,hydrationLiters:null,
+        focusMinutes:null,breathingMinutes:null,movementMinutes:null},dataQuality:{confidence:incremental.observations.length ? 0.96 : 1,
+        isEstimated:false,warnings:[],connectedMetrics:{}},observations:incremental.observations,
+      anchors:{__changes__:incremental.nextChangesToken} };
+  }
+
   const connectedMetrics: NonNullable<WearableSyncPayload['dataQuality']['connectedMetrics']> = {
     sleep: hasPermission(grantedSet, metricPermissionMap.sleep) ? 'no_recent_data' : 'no_permission',
     steps: hasPermission(grantedSet, 'Steps') ? 'no_recent_data' : 'no_permission',
@@ -395,6 +473,7 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   const end = toIso(now());
   const observations: HealthObservationDraft[] = [];
+  const backfillWindow = DAY * INITIAL_BACKFILL_DAYS;
   const addObservation = (
     metricType: string,
     value: number | null,
@@ -468,9 +547,9 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   if (hasPermission(grantedSet, 'Steps')) {
     const stepRecords = await readMetric<{ startTime: string; endTime: string; count?: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('steps', 'Steps', {
-      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY), endTime: end }
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
     });
-    const valid = stepRecords.filter((record) => within(record.endTime, DAY));
+    const valid = stepRecords.filter((record) => within(record.endTime, backfillWindow));
     stepCount = sum(valid.map((record) => record.count ?? 0));
     if (stepCount > 0) {
       connectedMetrics.steps = 'synced';
@@ -484,18 +563,18 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   const sleepRecords = hasPermission(grantedSet, 'SleepSession')
     ? await readMetric<{ startTime: string; endTime: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('sleep', 'SleepSession', {
-        timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 2), endTime: end }
+        timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
       })
     : ([] as Array<{ startTime: string; endTime: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>);
 
   const sleepMinutes = sum(
     sleepRecords
-      .filter((record) => within(record.endTime, DAY * 2))
+      .filter((record) => within(record.endTime, backfillWindow))
       .map((record) => Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000))
   );
   if (hasPermission(grantedSet, 'SleepSession')) {
     if (connectedMetrics.sleep !== 'read_failed') connectedMetrics.sleep = sleepMinutes > 0 ? 'synced' : 'no_recent_data';
-    sleepRecords.filter((record) => within(record.endTime, DAY * 2)).forEach((record) => {
+    sleepRecords.filter((record) => within(record.endTime, backfillWindow)).forEach((record) => {
       const minutes = Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000);
       addObservation('sleep_minutes', minutes, 'min', record.endTime, 'SleepSession', record);
     });
@@ -504,14 +583,14 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   const hrRecords = hasPermission(grantedSet, 'RestingHeartRate')
     ? await readMetric<{ time: string; beatsPerMinute: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('heart_rate', 'RestingHeartRate', {
-        timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
+        timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
       })
     : ([] as Array<{ time: string; beatsPerMinute: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>);
-  const hrValues = hrRecords.filter((record) => within(record.time, DAY * 7)).map((record) => record.beatsPerMinute ?? 0).filter((v) => v > 0);
+  const hrValues = hrRecords.filter((record) => within(record.time, backfillWindow)).map((record) => record.beatsPerMinute ?? 0).filter((v) => v > 0);
   const heartRateAvg = avg(hrValues);
   if (hasPermission(grantedSet, 'RestingHeartRate')) {
     if (connectedMetrics.heart_rate !== 'read_failed') connectedMetrics.heart_rate = heartRateAvg ? 'synced' : 'no_recent_data';
-    hrRecords.filter((record) => within(record.time, DAY * 7)).forEach((record) =>
+    hrRecords.filter((record) => within(record.time, backfillWindow)).forEach((record) =>
       addObservation('resting_heart_rate', record.beatsPerMinute, 'bpm', record.time, 'RestingHeartRate', record)
     );
     console.info('[HealthConnect] RestingHeartRate read', connectedMetrics.heart_rate, heartRateAvg ?? null);
@@ -519,14 +598,14 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   const hrvRecords = hasPermission(grantedSet, 'HeartRateVariabilityRmssd')
     ? await readMetric<{ time: string; heartRateVariabilityMillis: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('hrv', 'HeartRateVariabilityRmssd', {
-        timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
+        timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
       })
     : ([] as Array<{ time: string; heartRateVariabilityMillis: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>);
-  const hrvValues = hrvRecords.filter((record) => within(record.time, DAY * 7)).map((record) => record.heartRateVariabilityMillis ?? 0).filter((v) => v > 0);
+  const hrvValues = hrvRecords.filter((record) => within(record.time, backfillWindow)).map((record) => record.heartRateVariabilityMillis ?? 0).filter((v) => v > 0);
   const hrvAvg = avg(hrvValues);
   if (hasPermission(grantedSet, 'HeartRateVariabilityRmssd')) {
     if (connectedMetrics.hrv !== 'read_failed') connectedMetrics.hrv = hrvAvg ? 'synced' : 'no_recent_data';
-    hrvRecords.filter((record) => within(record.time, DAY * 7)).forEach((record) =>
+    hrvRecords.filter((record) => within(record.time, backfillWindow)).forEach((record) =>
       addObservation('hrv_ms', record.heartRateVariabilityMillis, 'ms', record.time, 'HeartRateVariabilityRmssd', record)
     );
     console.info('[HealthConnect] HRV read', connectedMetrics.hrv, hrvAvg ?? null);
@@ -534,19 +613,19 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   const workoutRecords = hasPermission(grantedSet, 'ExerciseSession')
     ? await readMetric<{ startTime: string; endTime: string; title?: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('workouts', 'ExerciseSession', {
-        timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
+        timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
       })
     : ([] as Array<{ startTime: string; endTime: string; title?: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>);
 
   const workoutMinutes = sum(
     workoutRecords
-      .filter((record) => within(record.endTime, DAY * 7))
+      .filter((record) => within(record.endTime, backfillWindow))
       .map((record) => Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000))
   );
 
   if (hasPermission(grantedSet, 'ExerciseSession')) {
     if (connectedMetrics.workouts !== 'read_failed') connectedMetrics.workouts = workoutMinutes > 0 ? 'synced' : 'no_recent_data';
-    workoutRecords.filter((record) => within(record.endTime, DAY * 7)).forEach((record) => {
+    workoutRecords.filter((record) => within(record.endTime, backfillWindow)).forEach((record) => {
       const minutes = Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000);
       addObservation('workout_minutes', minutes, 'min', record.endTime, 'ExerciseSession', record);
     });
@@ -556,9 +635,9 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
   let caloriesKcal: number | null = null;
   if (hasPermission(grantedSet, 'ActiveCaloriesBurned')) {
     const records = await readMetric<{ startTime: string; endTime: string; energy: { inKilocalories: number }; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('calories', 'ActiveCaloriesBurned', {
-      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
     });
-    const valid = records.filter((record) => within(record.endTime, DAY * 7));
+    const valid = records.filter((record) => within(record.endTime, backfillWindow));
     const values = valid.map((record) => record.energy.inKilocalories).filter((value) => value > 0);
     caloriesKcal = values.length ? sum(values) : null;
     valid.forEach((record) => addObservation('active_energy', record.energy.inKilocalories, 'kcal', record.endTime, 'ActiveCaloriesBurned', record));
@@ -567,9 +646,9 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   if (hasPermission(grantedSet, 'Weight')) {
     const records = await readMetric<{ time: string; weight: { inKilograms: number }; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('weight', 'Weight', {
-      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
     });
-    records.filter((record) => within(record.time, DAY * 7)).forEach((record) =>
+    records.filter((record) => within(record.time, backfillWindow)).forEach((record) =>
       addObservation('weight', record.weight.inKilograms, 'kg', record.time, 'Weight', record)
     );
     if (connectedMetrics.weight !== 'read_failed') connectedMetrics.weight = records.length ? 'synced' : 'no_recent_data';
@@ -577,9 +656,9 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   if (hasPermission(grantedSet, 'Distance')) {
     const records = await readMetric<{ startTime: string; endTime: string; distance: { inMeters: number }; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('distance', 'Distance', {
-      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
     });
-    records.filter((record) => within(record.endTime, DAY * 7)).forEach((record) =>
+    records.filter((record) => within(record.endTime, backfillWindow)).forEach((record) =>
       addObservation('distance', record.distance.inMeters, 'm', record.endTime, 'Distance', record)
     );
     if (connectedMetrics.distance !== 'read_failed') connectedMetrics.distance = records.length ? 'synced' : 'no_recent_data';
@@ -632,12 +711,14 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
     observations
   };
 
-  return payload;
+  const baselineToken = await readHealthConnectChanges(HEALTH_CONNECT_RECORD_TYPES)
+    .then((result) => result.nextChangesToken).catch(() => null);
+  return baselineToken ? { ...payload, anchors: { __changes__: baselineToken } } : payload;
 };
 
-export const syncFromHealthConnect = () =>
+export const syncFromHealthConnect = (changesToken?: string) =>
   runHealthConnectOperation(
     'SYNCING',
-    syncFromHealthConnectInternal,
+    () => syncFromHealthConnectInternal(changesToken),
     (payload) => Object.values(payload.dataQuality.connectedMetrics ?? {}).includes('read_failed') ? 'PARTIAL_SUCCESS' : 'SUCCESS'
   );

@@ -100,7 +100,8 @@ describe('Health Connect D2 production contracts', () => {
     expect(service).toContain('withHealthConnectTimeout');
     expect(service).toMatch(/runHealthConnectOperation\(\s*'SYNCING'/);
     expect(screen).not.toContain('getSdkStatus');
-    expect(screen).toContain("withHealthConnectTimeout(runHealthSync('health-connect', wellness))");
+    expect(screen).toContain("runHealthSync(Platform.OS === 'ios' ? 'apple-health' : 'health-connect'");
+    expect(screen).toContain('acceptWearableConsent(provider, requested)');
     expect(screen).not.toContain('route.params?.autoSync');
     expect(screen).toMatch(/requestHealthPermission[\s\S]*if \(inFlightRef\.current\) \{\s*return;\s*\}/);
     expect(home).toContain("navigation.navigate('SyncWearable')");

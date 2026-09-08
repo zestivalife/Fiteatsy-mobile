@@ -14,6 +14,7 @@ import {
 import { AppNavigation } from './src/navigation/AppNavigation';
 import { AppProvider, useAppContext } from './src/state/AppContext';
 import { getThemeColors } from './src/design/tokens';
+import './src/services/wearableBackgroundSync';
 
 let hasConfiguredGlobalFont = false;
 
