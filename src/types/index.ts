@@ -323,6 +323,12 @@ export type HealthObservationDraft = {
   sourceRecordId?: string;
   syncKey?: string;
   qualityStatus?: 'accepted' | 'estimated';
+  startAtISO?: string | null;
+  endAtISO?: string | null;
+  timezoneOffsetMinutes?: number | null;
+  providerUpdatedAtISO?: string | null;
+  providerVersion?: string | null;
+  deleted?: boolean;
   sourceMetadata?: {
     recordType?: string;
     sourceApplication?: string;
@@ -336,6 +342,8 @@ export type HealthObservationDraft = {
       type?: number;
     };
     recordingMethod?: number;
+    sleepStage?: string;
+    measurementMethod?: string;
   };
 };
 

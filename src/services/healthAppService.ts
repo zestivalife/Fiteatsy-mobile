@@ -2,6 +2,7 @@ import { Linking, Platform } from 'react-native';
 import { WearableSyncPayload } from '../types';
 import { apiFetch, postJson } from './apiClient';
 import { syncFromHealthConnect } from './healthConnectService';
+import { inspectAppleHealthAvailability, syncFromAppleHealth } from './appleHealthService';
 
 export type HealthAppId = 'apple-health' | 'health-connect' | 'google-fit' | 'samsung-health' | 'fitbit';
 export type RecoveryConnectionState =
@@ -29,6 +30,7 @@ export const getAvailableHealthApps = async (): Promise<HealthAppOption[]> => {
   }
 
   try {
+    if (Platform.OS === 'ios' && !(await inspectAppleHealthAvailability())) return [];
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
     const payload = await apiFetch<{ apps?: HealthAppOption[] }>(`/v1/wearables/health-apps?platform=${platform}`);
     if (Array.isArray(payload.apps) && payload.apps.length > 0) {
@@ -36,7 +38,7 @@ export const getAvailableHealthApps = async (): Promise<HealthAppOption[]> => {
     }
     return fallbackApps;
   } catch {
-    return fallbackApps;
+    return Platform.OS === 'ios' ? [] : fallbackApps;
   }
 };
 
@@ -58,15 +60,17 @@ export const connectHealthApp = async (appId: HealthAppId) => {
   });
 };
 
-export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<WearableSyncPayload> => {
+export const syncConnectedHealthApp = async (appId: HealthAppId, checkpoints: Record<string,string> = {}): Promise<WearableSyncPayload> => {
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
   // Android: source-of-truth sync must read directly from Health Connect.
   if (platform === 'android' && ['health-connect', 'google-fit', 'samsung-health'].includes(appId)) {
-    return syncFromHealthConnect();
+    return syncFromHealthConnect(checkpoints.__changes__);
   }
 
-  throw new Error('apple_health_native_reader_not_available');
+  if (platform === 'ios' && appId === 'apple-health') return syncFromAppleHealth(checkpoints);
+
+  throw new Error('health_provider_not_available');
 };
 
 export const openHealthConnectPlayStore = async () => {

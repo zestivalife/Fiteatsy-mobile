@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { openHealthConnectSettings } from 'react-native-health-connect';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -22,6 +23,9 @@ import {
 } from '../../services/healthConnectService';
 import { HealthSyncResult, runHealthSync } from '../../services/healthSyncManager';
 import { markHealthConnectAwaitingPermissionReturn } from '../../services/healthConnectOperationCoordinator';
+import { APPLE_HEALTH_SCOPES, requestAppleHealthPermissions } from '../../services/appleHealthService';
+import { acceptWearableConsent, reconcileWearableConnection, withdrawWearableConsent } from '../../services/wearablePlatformService';
+import { registerWearableBackgroundSync, unregisterWearableBackgroundSync } from '../../services/wearableBackgroundSync';
 import { WearableSyncPayload } from '../../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SyncWearable'>;
@@ -210,6 +214,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   const [lastResult, setLastResult] = useState<HealthSyncResult | null>(null);
   const [lastSyncAttemptISO, setLastSyncAttemptISO] = useState<string | null>(null);
   const [permissionReviewRequired, setPermissionReviewRequired] = useState(false);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
   const [statusTitle, setStatusTitle] = useState('Connect Your Recovery');
   const [statusBody, setStatusBody] = useState(
     'Fiteatsy securely connects your sleep, activity, and wellness signals automatically.'
@@ -282,7 +287,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
 
   const openCanonicalHealthSettings = useCallback(() => {
     if (Platform.OS !== 'android') {
-      setError('Health Connect settings are available only on supported Android devices.');
+      void Linking.openURL('x-apple-health://').catch(() => Linking.openSettings());
       return;
     }
     try {
@@ -311,14 +316,6 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   }, [completeOnboardingFlow]);
 
   const requestHealthPermission = useCallback(async () => {
-    if (Platform.OS !== 'android') {
-      setStage('not_supported');
-      setStatusTitle('Health connection unavailable');
-      setStatusBody('Health connection is not available on this device.');
-      setError('You can continue without connecting health data.');
-      return;
-    }
-
     if (inFlightRef.current) {
       return;
     }
@@ -330,7 +327,22 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     setStatusTitle('Opening Health Connect');
     setStatusBody('Requesting read-only access for steps, sleep, heart rate, HRV, and exercise.');
     try {
-      const permission = await requestHealthConnectPermissionsOnly();
+      const provider = Platform.OS === 'ios' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT';
+      const requested = Platform.OS === 'ios' ? APPLE_HEALTH_SCOPES : Object.keys((await inspectHealthConnectPermissions()).permissionStates);
+      await acceptWearableConsent(provider, requested);
+      const permission = Platform.OS === 'ios'
+        ? await requestAppleHealthPermissions().then((result) => ({ grantedCount: result.grantedScopes.length,
+            requestedCount: APPLE_HEALTH_SCOPES.length, permissionStates: Object.fromEntries(APPLE_HEALTH_SCOPES.map((scope) => [scope, result.grantedScopes.includes(scope)])) }))
+        : await requestHealthConnectPermissionsOnly();
+      let installationId = await AsyncStorage.getItem('@fiteatsy/wearable-installation-id');
+      if (!installationId) { installationId = `install-${Date.now()}-${Math.random().toString(36).slice(2)}`; await AsyncStorage.setItem('@fiteatsy/wearable-installation-id', installationId); }
+      const grantedScopes = Object.entries(permission.permissionStates).filter(([, granted]) => granted).map(([scope]) => scope);
+      const connection = await reconcileWearableConnection({ provider, platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
+        installationId, status: grantedScopes.length === permission.requestedCount ? 'CONNECTED' : grantedScopes.length ? 'PARTIAL' : 'PERMISSION_REQUIRED',
+        grantedScopes, backgroundSyncEnabled: grantedScopes.length > 0 });
+      setConnectionId(connection.id);
+      if (grantedScopes.length > 0) await registerWearableBackgroundSync({ connectionId:connection.id,provider,
+        appId:Platform.OS === 'ios' ? 'apple-health' : 'health-connect' });
       applyPermissionState(permission);
     } catch (permissionError) {
       const message = permissionError instanceof Error ? permissionError.message : 'health_connect_permission_failed';
@@ -358,18 +370,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     }
     inFlightRef.current = true;
 
-    if (Platform.OS !== 'android') {
-      inFlightRef.current = false;
-      if (isMountedRef.current) {
-        setStage('not_supported');
-        setConnectionState(null);
-        setStatusTitle('Health connection unavailable');
-        setStatusBody('Health connection is not available on this device.');
-        setError('You can continue without connecting health data.');
-      }
-      return;
-    }
-    if (typeof Platform.Version === 'number' && Platform.Version < 26) {
+    if (Platform.OS === 'android' && typeof Platform.Version === 'number' && Platform.Version < 26) {
       if (isMountedRef.current) {
         setStage('not_supported');
         setConnectionState('no_signals');
@@ -398,7 +399,8 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         setStatusBody('Reading sleep, activity, and heart recovery data securely from your device.');
       }
 
-      const result = await withHealthConnectTimeout(runHealthSync('health-connect', wellness));
+      const result = await withHealthConnectTimeout(runHealthSync(Platform.OS === 'ios' ? 'apple-health' : 'health-connect', wellness,
+        connectionId ? { connectionId, provider: Platform.OS === 'ios' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', trigger: 'INITIAL_CONNECT' } : undefined));
       addWearableSyncData(result.payload);
       setSelectedDeviceId('health-connect');
       setLastResult(result);
@@ -472,7 +474,18 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         setIsRunning(false);
       }
     }
-  }, [addWearableSyncData, setSelectedDeviceId, setWellness, wellness]);
+  }, [addWearableSyncData, connectionId, setSelectedDeviceId, setWellness, wellness]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active' || !connectionId || awaitingSettingsReturnRef.current || inFlightRef.current) return;
+      void AsyncStorage.getItem('@fiteatsy/wearable-last-foreground-sync').then((last) => {
+        if (last && Date.now() - Number(last) < 15 * 60_000) return;
+        return AsyncStorage.setItem('@fiteatsy/wearable-last-foreground-sync', String(Date.now())).then(runRecoveryConnection);
+      });
+    });
+    return () => subscription.remove();
+  }, [connectionId, runRecoveryConnection]);
 
   const skipForNow = () => {
     if (onboarding) {
@@ -484,6 +497,19 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     setWearableSetupCompleted(true);
     navigation.navigate('OnboardingCalendar');
   };
+
+  const disconnectHealthData = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true; setIsRunning(true); setError(null);
+    try {
+      await withdrawWearableConsent(Platform.OS === 'ios' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT');
+      await unregisterWearableBackgroundSync();
+      setConnectionId(null); setLastResult(null); setConnectionState(null); setStage('intro');
+      setStatusTitle('Health data disconnected');
+      setStatusBody('Fiteatsy product consent was withdrawn. Change OS access separately in system Health settings.');
+    } catch { setError('Health data could not be disconnected. Please retry.'); }
+    finally { inFlightRef.current = false; setIsRunning(false); }
+  }, []);
 
   const metrics = lastResult?.payload.dataQuality.connectedMetrics;
   const completedDomains = domainRows.filter((domain) => summarizeDomain(domain, metrics, false) === 'Synced').map((domain) => domain.key);
@@ -548,7 +574,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
             return <View key={domain.key} style={[styles.onboardingDomain, isSynced && styles.onboardingDomainSynced]}><View style={styles.domainLeft}><Ionicons name={domain.icon} size={20} color={isSynced ? colors.success : palette.textSecondary} /><Text style={[styles.domainTitle, { color: palette.textPrimary }]}>{domain.key}</Text></View><Text style={[styles.domainStatus, { color: isSynced ? colors.success : palette.textSecondary }]}>{label}</Text></View>;
           })}
         </View>
-        <View style={styles.platformTruth}><Text style={[styles.supportText, { color: palette.textSecondary }]}>{Platform.OS === 'android' ? 'Android Health Connect · read-only access' : 'Apple Health is not available in this build · continue without connecting'}</Text></View>
+            <View style={styles.platformTruth}><Text style={[styles.supportText, { color: palette.textSecondary }]}>{Platform.OS === 'android' ? 'Android Health Connect · read-only access' : 'Apple Health · read-only access'}</Text></View>
         {error ? <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text> : null}
       </OnboardingShell>
     );
@@ -557,7 +583,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   return (
     <Screen scroll contentStyle={styles.screenContent}>
       <View style={styles.container}>
-        <PageHeader title="Health Connect" onBack={() => navigation.goBack()} />
+        <PageHeader title="Health Sync" onBack={() => navigation.goBack()} />
         <View style={[styles.heroCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }]}>
           <View style={[styles.heroIcon, { backgroundColor: isLight ? '#EAF8F5' : '#143532' }]}>
             <Ionicons name={stageIcon[stage]} size={26} color={isLight ? '#087B6C' : '#66FCF1'} />
@@ -570,7 +596,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         <View style={[styles.infoCard, { borderColor: palette.stroke, backgroundColor: isLight ? '#F8FAFC' : palette.cardMuted }]}>
           <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>What Fiteatsy reads</Text>
           <Text style={[styles.supportText, { color: palette.textSecondary }]}>
-            Read-only health signals from Health Connect compatible wellness apps.
+            Read-only health signals from {Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect'}. You stay in control and can revoke access at any time.
           </Text>
         </View>
 
@@ -631,11 +657,11 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         {stage === 'permission_denied' || stage === 'failed' ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open Health Connect settings for health permissions"
+            accessibilityLabel={`Open ${Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect'} settings for health permissions`}
             style={[styles.secondaryButton, { borderColor: palette.stroke }]}
             onPress={openCanonicalHealthSettings}
           >
-            <Text style={[styles.secondaryButtonText, { color: palette.textPrimary }]}>Open Health Connect settings</Text>
+            <Text style={[styles.secondaryButtonText, { color: palette.textPrimary }]}>Open {Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect'} settings</Text>
           </Pressable>
         ) : null}
 
@@ -644,6 +670,11 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
           onPress={handlePrimary}
           disabled={isRunning}
         />
+
+        {connectionId ? <Pressable accessibilityRole="button" accessibilityLabel="Disconnect health data"
+          style={[styles.secondaryButton, { borderColor: palette.stroke }]} onPress={() => void disconnectHealthData()} disabled={isRunning}>
+          <Text style={[styles.secondaryButtonText, { color: palette.textPrimary }]}>Disconnect health data</Text>
+        </Pressable> : null}
 
         <Pressable style={styles.skipInline} onPress={skipForNow}>
           <Text style={[styles.skipInlineText, { color: palette.textSecondary }]}>

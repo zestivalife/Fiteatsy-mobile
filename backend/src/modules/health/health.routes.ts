@@ -9,6 +9,11 @@ import {
 } from './health-observations.repository.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
+import {
+  acceptWearableConsent, commitWearableCheckpoint, completeWearableSyncRun,
+  getActiveWearableConsent, listWearableConnections, listWearableCheckpoints, startWearableSyncRun,
+  upsertWearableConnection, withdrawWearableConsent, type WearableProvider
+} from './wearable-platform.repository.js';
 
 const observationSchema = z.object({
   metricType: z.string().trim().min(1).max(80),
@@ -31,8 +36,16 @@ const observationSchema = z.object({
       model: z.string().trim().max(120).optional(),
       type: z.number().int().optional()
     }).optional(),
-    recordingMethod: z.number().int().optional()
+    recordingMethod: z.number().int().optional(),
+    sleepStage: z.string().trim().max(40).optional(),
+    measurementMethod: z.string().trim().max(40).optional()
   }).strict().optional()
+  ,startAtISO: z.string().datetime().nullable().optional()
+  ,endAtISO: z.string().datetime().nullable().optional()
+  ,timezoneOffsetMinutes: z.number().int().min(-840).max(840).nullable().optional()
+  ,providerUpdatedAtISO: z.string().datetime().nullable().optional()
+  ,providerVersion: z.string().trim().max(120).nullable().optional()
+  ,deleted: z.boolean().optional()
 });
 
 const metricUnits: Record<string, ReadonlySet<string>> = {
@@ -48,11 +61,17 @@ const metricUnits: Record<string, ReadonlySet<string>> = {
   hydration_ml: new Set(['ml']),
   stress_score: new Set(['score']),
   mindfulness_minutes: new Set(['min'])
+  ,sleep_stage: new Set(['min'])
+  ,heart_rate: new Set(['bpm'])
+  ,spo2: new Set(['pct'])
+  ,respiratory_rate: new Set(['brpm'])
+  ,provider_record_deletion: new Set(['deleted'])
 };
 
 const validateObservation = (observation: z.infer<typeof observationSchema>) => {
   const allowedUnits = metricUnits[observation.metricType];
   if (!allowedUnits) return 'UNSUPPORTED_METRIC';
+  if (observation.deleted) return observation.sourceRecordId ? null : 'DELETION_REQUIRES_SOURCE_RECORD_ID';
   if (!allowedUnits.has(observation.unit)) return 'INVALID_UNIT';
   if (observation.value <= 0) return 'INVALID_VALUE';
   const measuredAt = Date.parse(observation.measuredAtISO);
@@ -87,9 +106,95 @@ const toObservationDto = (observation: HealthObservationRecord, fiteatsyClientId
   qualityStatus: observation.qualityStatus,
   createdAtISO: observation.createdAtISO,
   sourceMetadata: observation.sourceMetadata
+  ,startAtISO: observation.startAtISO
+  ,endAtISO: observation.endAtISO
+  ,timezoneOffsetMinutes: observation.timezoneOffsetMinutes
+  ,providerUpdatedAtISO: observation.providerUpdatedAtISO
+  ,providerVersion: observation.providerVersion
 });
 
+const freshness = (iso: string | null) => {
+  if (!iso) return 'NO_DATA';
+  const age = Date.now() - Date.parse(iso);
+  return age <= 36 * 60 * 60_000 ? 'FRESH' : age <= 7 * 86_400_000 ? 'STALE' : 'VERY_STALE';
+};
+
 healthRouter.use(requireAuthenticatedAccount);
+
+const providerSchema = z.enum(['APPLE_HEALTH', 'HEALTH_CONNECT']);
+const connectionSchema = z.object({
+  provider: providerSchema,
+  platform: z.enum(['IOS', 'ANDROID']),
+  installationId: z.string().trim().min(8).max(180),
+  status: z.enum(['CONNECTED','PARTIAL','PERMISSION_REQUIRED','REVOKED','UNAVAILABLE','ERROR']),
+  grantedScopes: z.array(z.string().trim().min(1).max(100)).max(40),
+  backgroundSyncEnabled: z.boolean().optional()
+});
+
+healthRouter.post('/wearable-consents', async (req, res) => {
+  const parsed = z.object({ provider: providerSchema, consentVersion: z.string().min(1).max(40),
+    purposeVersion: z.string().min(1).max(40), requestedScopes: z.array(z.string()).max(40),
+    acknowledgedPurposes: z.array(z.string()).min(1).max(20) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_WEARABLE_CONSENT', details: parsed.error.flatten() });
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const consent = await acceptWearableConsent(owner, { ...parsed.data, purposes: parsed.data.acknowledgedPurposes });
+  return res.status(201).json({ id: consent.id, provider: consent.provider, status: consent.status, acceptedAt: consent.accepted_at });
+});
+
+healthRouter.put('/wearable-connection', async (req, res) => {
+  const parsed = connectionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_WEARABLE_CONNECTION', details: parsed.error.flatten() });
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const consent = await getActiveWearableConsent(owner, parsed.data.provider);
+  if (!consent) return res.status(403).json({ error: 'ACTIVE_WEARABLE_CONSENT_REQUIRED' });
+  const connection = await upsertWearableConnection(owner, { consentId: consent.id, ...parsed.data });
+  return res.status(200).json({ id: connection.id, provider: connection.provider, status: connection.status,
+    grantedScopes: connection.granted_scopes, lastPermissionCheckAt: connection.last_permission_check_at });
+});
+
+healthRouter.post('/sync-runs', async (req, res) => {
+  const parsed = z.object({ connectionId: z.string().min(1), provider: providerSchema,
+    trigger: z.enum(['INITIAL_CONNECT','MANUAL','FOREGROUND_RESUME','BACKGROUND','RETRY']) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_SYNC_RUN', details: parsed.error.flatten() });
+  const run = await startWearableSyncRun(currentOwner(getAuthenticatedAccount(req)), parsed.data.connectionId,
+    parsed.data.provider, parsed.data.trigger);
+  return run ? res.status(201).json({ id: run.id, status: run.status, startedAt: run.started_at })
+    : res.status(403).json({ error: 'ACTIVE_CONSENT_AND_CONNECTION_REQUIRED' });
+});
+
+healthRouter.patch('/sync-runs/:runId', async (req, res) => {
+  const parsed = z.object({ status: z.enum(['SUCCESS','PARTIAL','FAILED']), recordsRead: z.number().int().nonnegative(),
+    recordsUploaded: z.number().int().nonnegative(), recordsInserted: z.number().int().nonnegative(),
+    recordsDuplicates: z.number().int().nonnegative(), recordsUpdated: z.number().int().nonnegative(),
+    recordsDeleted: z.number().int().nonnegative(), errorStage: z.string().max(80).optional(),
+    errorCode: z.string().max(100).optional(), safeErrorSummary: z.string().max(300).optional(), checkpointAfter: z.unknown().optional() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_SYNC_RUN_RESULT', details: parsed.error.flatten() });
+  const run = await completeWearableSyncRun(currentOwner(getAuthenticatedAccount(req)), req.params.runId, parsed.data);
+  return run ? res.status(200).json({ id: run.id, status: run.status, completedAt: run.completed_at })
+    : res.status(404).json({ error: 'SYNC_RUN_NOT_FOUND' });
+});
+
+healthRouter.put('/sync-checkpoints', async (req, res) => {
+  const parsed = z.object({ connectionId: z.string().min(1), provider: providerSchema, metricScope: z.string().min(1).max(100),
+    cursorValue: z.string().max(8000).optional(), anchorValue: z.string().max(8000).optional(), backfillComplete: z.boolean().optional() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_SYNC_CHECKPOINT', details: parsed.error.flatten() });
+  const checkpoint = await commitWearableCheckpoint(currentOwner(getAuthenticatedAccount(req)), parsed.data);
+  return checkpoint ? res.status(200).json({ metricScope: checkpoint.metric_scope, committedAt: checkpoint.committed_at })
+    : res.status(404).json({ error: 'CONNECTION_NOT_FOUND' });
+});
+
+healthRouter.get('/sync-checkpoints/:connectionId', async (req, res) => {
+  const items = await listWearableCheckpoints(currentOwner(getAuthenticatedAccount(req)), req.params.connectionId);
+  return res.status(200).json({ items: items.map((item) => ({ metricScope:item.metric_scope,cursorValue:item.cursor_value,
+    anchorValue:item.anchor_value,backfillCompletedAt:item.backfill_completed_at,committedAt:item.committed_at })) });
+});
+
+healthRouter.delete('/wearable-consents/:provider', async (req, res) => {
+  const provider = providerSchema.safeParse(req.params.provider);
+  if (!provider.success) return res.status(400).json({ error: 'INVALID_PROVIDER' });
+  await withdrawWearableConsent(currentOwner(getAuthenticatedAccount(req)), provider.data);
+  return res.status(204).end();
+});
 
 healthRouter.post('/observations:batch', async (req, res) => {
   const parsed = batchSchema.safeParse(req.body);
@@ -108,12 +213,21 @@ healthRouter.post('/observations:batch', async (req, res) => {
   if (invalid.length) {
     return res.status(400).json({ error: 'INVALID_HEALTH_OBSERVATION', details: invalid });
   }
+  const providers = [...new Set(parsed.data.observations.map((item) => item.sourceProvider))];
+  for (const provider of providers) {
+    const governed = provider === 'apple_health' ? 'APPLE_HEALTH' : provider === 'health_connect' ? 'HEALTH_CONNECT' : null;
+    if (governed && !(await getActiveWearableConsent(owner, governed))) {
+      return res.status(403).json({ error: 'ACTIVE_WEARABLE_CONSENT_REQUIRED', provider: governed });
+    }
+  }
   const result = await ingestHealthObservations(owner, parsed.data.observations);
   const scores = await calculateHealthScores(owner);
   return res.status(200).json({
     accepted: result.accepted.length,
     duplicate: result.duplicate.length,
     rejected: result.rejected.length,
+    updated: result.updated,
+    deleted: result.deleted,
     items: result.accepted.map((item) => toObservationDto(item, account.client.fiteatsyClientId)),
     duplicates: result.duplicate,
     rejections: result.rejected,
@@ -155,11 +269,13 @@ healthRouter.get('/sync/status', async (req, res) => {
     return acc;
   }, {});
 
-  const statusFor = (...sources: string[]) => {
+  const connections = await listWearableConnections(owner);
+  const statusFor = (provider: WearableProvider, ...sources: string[]) => {
+    const connection = connections.find((item) => item.provider === provider);
     const sourceStatus = sources
       .map((source) => bySource[source])
       .find((candidate) => candidate != null);
-    if (!sourceStatus) {
+    if (!connection) {
       return {
         status: 'NOT_CONNECTED',
         lastSyncISO: null,
@@ -168,21 +284,29 @@ healthRouter.get('/sync/status', async (req, res) => {
       };
     }
     return {
-      status: 'CONNECTED',
-      ...sourceStatus
+      connectionId: connection.id,
+      status: connection.consent_status === 'ACTIVE' ? connection.status : 'REVOKED',
+      consentStatus: connection.consent_status,
+      grantedScopes: connection.granted_scopes,
+      lastAttemptISO: connection.last_sync_attempt_at,
+      lastSuccessISO: connection.last_successful_sync_at,
+      backgroundSyncEnabled: connection.background_sync_enabled,
+      lastErrorCode: connection.last_error_code,
+      freshness: freshness(sourceStatus?.latestMeasurementISO ?? null),
+      ...(sourceStatus ?? { lastSyncISO: null, latestMeasurementISO: null, recordsSynced: 0 })
     };
   };
 
   return res.status(200).json({
     fiteatsyClientId: account.client.fiteatsyClientId,
-    overallStatus: observations.length > 0 ? 'CONNECTED' : 'NOT_CONNECTED',
+    overallStatus: connections.some((item) => item.consent_status === 'ACTIVE' && ['CONNECTED','PARTIAL'].includes(item.status)) ? 'CONNECTED' : 'NOT_CONNECTED',
     lastSyncISO: observations.reduce<string | null>((latest, observation) => (
       latest == null || observation.createdAtISO > latest ? observation.createdAtISO : latest
     ), null),
     latestMeasurementISO: observations[0]?.measuredAtISO ?? null,
     recordsSynced: observations.length,
-    appleHealth: statusFor('apple_health', 'apple-health'),
-    healthConnect: statusFor('health_connect', 'health-connect'),
+    appleHealth: statusFor('APPLE_HEALTH','apple_health', 'apple-health'),
+    healthConnect: statusFor('HEALTH_CONNECT','health_connect', 'health-connect'),
     sources: bySource
   });
 });
@@ -203,4 +327,21 @@ healthRouter.get('/observations', async (req, res) => {
     offset,
     items: items.map((item) => toObservationDto(item, account.client.fiteatsyClientId))
   });
+});
+
+healthRouter.get('/aggregates', async (req, res) => {
+  const account = getAuthenticatedAccount(req); const owner = currentOwner(account);
+  const days = Math.max(1, Math.min(90, Number(req.query.days || 30)));
+  const result = await (await import('../../db/pool.js')).pool.query(
+    `select metric_type,
+      date(measured_at + make_interval(mins => coalesce(timezone_offset_minutes,0))) as local_day,
+      case when metric_type in ('steps','sleep_minutes','workout_minutes','active_minutes','active_energy','distance','hydration_ml')
+        then sum(value) else avg(value) end as value,
+      min(unit) as unit,max(measured_at) as latest_measurement,array_agg(distinct source_provider) as sources
+     from health_observations where user_id=$1 and client_id=$2 and deleted_at is null
+       and quality_status in ('accepted','estimated') and measured_at >= now() - make_interval(days => $3)
+     group by metric_type,local_day order by local_day desc,metric_type`, [owner.accountId,owner.clientId,days]);
+  return res.status(200).json({ days, items: result.rows.map((row) => ({ metricType:row.metric_type,
+    localDay:String(row.local_day).slice(0,10),value:Number(row.value),unit:row.unit,
+    latestMeasurementISO:new Date(row.latest_measurement).toISOString(),sources:row.sources })) });
 });

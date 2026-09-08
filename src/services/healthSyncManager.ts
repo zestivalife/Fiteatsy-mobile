@@ -3,6 +3,7 @@ import { recalculateWellness } from '../utils/wellness';
 import { apiFetch, postJson } from './apiClient';
 import { HealthAppId, syncConnectedHealthApp } from './healthAppService';
 import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceService';
+import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, getWearableCheckpoints, type GovernedProvider } from './wearablePlatformService';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -105,36 +106,40 @@ export const getLatestHealthObservations = (limit = 10) =>
 
 export const runHealthSync = async (
   appId: HealthAppId,
-  previousWellness: WellnessSnapshot
+  previousWellness: WellnessSnapshot,
+  governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY' }
 ): Promise<HealthSyncResult> => {
-  const payload = await syncConnectedHealthApp(appId);
-  const observations = deriveObservations(payload);
+  const run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger) : null;
+  try {
+    const checkpoints = governed ? await getWearableCheckpoints(governed.connectionId) : { items: [] };
+    const providerCursors = Object.fromEntries(checkpoints.items.map((item) => [item.metricScope, item.anchorValue ?? item.cursorValue ?? '']));
+    const payload = await syncConnectedHealthApp(appId, providerCursors);
+    const observations = deriveObservations(payload);
 
-  if (observations.length === 0) {
-    throw new Error('INSUFFICIENT_DATA');
+    if (observations.length === 0 && !Object.keys(providerCursors).length) throw new Error('INSUFFICIENT_DATA');
+
+    let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
+    for (let offset = 0; offset < observations.length; offset += 500) {
+      const ingest = await postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
+        '/v1/health/observations:batch', { observations: observations.slice(offset, offset + 500) });
+      accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
+      updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
+    }
+    if (run) await finishWearableSyncRun(run.id, { status: rejected ? 'PARTIAL' : 'SUCCESS', recordsRead: observations.length,
+      recordsUploaded: observations.length, recordsInserted: accepted, recordsDuplicates: duplicate, recordsUpdated: updated, recordsDeleted: deleted });
+    const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors;
+    if (governed && anchors) await Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
+      commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
+        ...(governed.provider === 'HEALTH_CONNECT' ? { cursorValue: checkpoint } : { anchorValue: checkpoint }),
+        backfillComplete:true })));
+
+    const [scores, status] = await Promise.all([getHealthScoreSummary(), getHealthSyncStatus()]);
+    return { payload, observations, accepted, duplicate, rejected, scores, status,
+      wellness: wellnessFromHealthScores(previousWellness, payload, scores) };
+  } catch (error) {
+    if (run) await finishWearableSyncRun(run.id, { status:'FAILED',recordsRead:0,recordsUploaded:0,recordsInserted:0,
+      recordsDuplicates:0,recordsUpdated:0,recordsDeleted:0,errorStage:'SYNC',errorCode:error instanceof Error ? error.message.slice(0,100) : 'UNKNOWN',
+      safeErrorSummary:'Wearable synchronization could not complete.' }).catch(() => undefined);
+    throw error;
   }
-
-  const ingest = await postJson<{
-    accepted: number;
-    duplicate: number;
-    rejected: number;
-  }>('/v1/health/observations:batch', {
-    observations
-  });
-
-  const [scores, status] = await Promise.all([
-    getHealthScoreSummary(),
-    getHealthSyncStatus()
-  ]);
-
-  return {
-    payload,
-    observations,
-    accepted: ingest.accepted,
-    duplicate: ingest.duplicate,
-    rejected: ingest.rejected,
-    scores,
-    status,
-    wellness: wellnessFromHealthScores(previousWellness, payload, scores)
-  };
 };
