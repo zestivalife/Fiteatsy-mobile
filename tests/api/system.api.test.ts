@@ -75,7 +75,7 @@ test('GET /v1/version returns runtime metadata', async () => {
   await withEnv(
     {
       NODE_ENV: 'staging',
-      GIT_COMMIT: '94791be461c39ba41c6791955bdbf6d59bfc24a6'
+      RAILWAY_GIT_COMMIT_SHA: '94791be461c39ba41c6791955bdbf6d59bfc24a6'
     },
     async () => {
       const server = await startAppServer(createApp());
@@ -93,7 +93,7 @@ test('GET /v1/version returns runtime metadata', async () => {
   );
 });
 
-test('GET /v1/version prefers the explicit build identity for CLI-upload deployments', async () => {
+test('GET /v1/version ignores stale mutable identity in favour of Railway deployment identity', async () => {
   await withEnv(
     {
       NODE_ENV: 'production',
@@ -105,7 +105,11 @@ test('GET /v1/version prefers the explicit build identity for CLI-upload deploym
       const { response, body } = await getJson(server.baseUrl, '/v1/version');
       try {
         assert.equal(response.status, 200);
-        assert.equal(body.git_commit, '6e04e67899a4e187fe8e4032bc589f5a72fd88b8');
+        assert.equal(body.git_commit, '94c199585f48853bbd288874328229340d923ac1');
+        assert.equal(body.commitSha, '94c199585f48853bbd288874328229340d923ac1');
+        assert.equal(body.identityStatus, 'VERIFIED');
+        assert.equal(body.buildIdentityVersion, 1);
+        assert.equal(body.identitySource, 'RAILWAY_DEPLOYMENT');
       } finally {
         await server.close();
       }
