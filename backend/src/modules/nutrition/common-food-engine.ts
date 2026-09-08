@@ -32,7 +32,7 @@ export function eligibleCommonFoods(foods:CommonFood[],context:ClientFoodContext
 /** Manual Consultant authoring retains hard client safety and identity gates,
  * but intentionally does not apply generator, meal-template, or ranking rules. */
 export function authorableCommonFoods(foods:CommonFood[],context:ClientFoodContext) {
-  return dedupeCanonicalFoods(foods).filter(f=>f.active&&!f.allergens.some(x=>context.allergies.includes(x))&&!f.intolerances.some(x=>context.intolerances.includes(x))&&!f.avoidTags.some(x=>context.avoids.includes(x))&&!f.clinicalTags.some(x=>context.clinicalExclusions.includes(x))&&dietAllowed(f.vegetarianClass,context.diet)&&f.servings.some(s=>s.active&&s.grams>0));
+  return foods.filter(f=>f.active&&!f.allergens.some(x=>context.allergies.includes(x))&&!f.intolerances.some(x=>context.intolerances.includes(x))&&!f.avoidTags.some(x=>context.avoids.includes(x))&&!f.clinicalTags.some(x=>context.clinicalExclusions.includes(x))&&dietAllowed(f.vegetarianClass,context.diet)&&f.servings.some(s=>s.active&&s.grams>0));
 }
 const dietAllowed=(food:CommonFood['vegetarianClass'],diet:ClientFoodContext['diet'])=>diet==='NON_VEGETARIAN'||diet==='EGG'&&food!=='NON_VEGETARIAN'||diet==='VEGETARIAN'&&['VEGAN','VEGETARIAN'].includes(food)||diet==='VEGAN'&&food==='VEGAN';
 
