@@ -141,8 +141,19 @@ export const validateAllocatedDiet = (content: NutritionPlanContent): Allocation
   }
   const calorieTarget = content.dailyTargets.calories;
   if (calorieTarget != null) {
-    const lows = NUTRITION_MEAL_SEQUENCE.map((key) => Math.min(...content.mealPlan[key].options.map((item) => item.approxKcal ?? Number.POSITIVE_INFINITY)));
-    const highs = NUTRITION_MEAL_SEQUENCE.map((key) => Math.max(...content.mealPlan[key].options.map((item) => item.approxKcal ?? Number.NEGATIVE_INFINITY)));
+    const calorieOptions = NUTRITION_MEAL_SEQUENCE.map((key) => ({
+      key,
+      values: content.mealPlan[key].options
+        .map((item) => item.approxKcal)
+        .filter((value): value is number => typeof value === 'number' && Number.isFinite(value)),
+    }));
+    const incompleteMealKeys = calorieOptions.filter(({ values }) => values.length === 0).map(({ key }) => key);
+    if (incompleteMealKeys.length > 0) {
+      failures.push(`daily calorie choice envelope is incomplete for: ${incompleteMealKeys.join(', ')}`);
+      return { valid: false, code: 'CALORIE_ENVELOPE_INCOMPLETE', failures };
+    }
+    const lows = calorieOptions.map(({ values }) => Math.min(...values));
+    const highs = calorieOptions.map(({ values }) => Math.max(...values));
     const range = band(calorieTarget, CALORIE_MACRO_ALLOCATION_CONFIG.tolerance.dailyCaloriesFraction, 0);
     const minimum = lows.reduce((sum, value) => sum + value, 0);
     const maximum = highs.reduce((sum, value) => sum + value, 0);
@@ -153,13 +164,19 @@ export const validateAllocatedDiet = (content: NutritionPlanContent): Allocation
 
 export const analyseAllCalorieCombinations = (content: NutritionPlanContent) => {
   let count = 0; let sum = 0; let minimum = Number.POSITIVE_INFINITY; let maximum = Number.NEGATIVE_INFINITY; let outside = 0;
-  const values = NUTRITION_MEAL_SEQUENCE.map((key) => content.mealPlan[key].options.map((item) => item.approxKcal as number));
+  const values = NUTRITION_MEAL_SEQUENCE.map((key) => content.mealPlan[key].options
+    .map((item) => item.approxKcal)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value)));
   const target = content.dailyTargets.calories as number;
   const allowed = band(target, CALORIE_MACRO_ALLOCATION_CONFIG.tolerance.dailyCaloriesFraction, 0);
+  const incompleteMealHeads = NUTRITION_MEAL_SEQUENCE.filter((_, index) => values[index].length === 0);
+  if (incompleteMealHeads.length > 0) {
+    return { count: 0, minimum: null, maximum: null, mean: null, outside: 0, allowed, incompleteMealHeads };
+  }
   const visit = (depth: number, total: number) => {
     if (depth === values.length) { count += 1; sum += total; minimum = Math.min(minimum, total); maximum = Math.max(maximum, total); if (!inside(total, allowed)) outside += 1; return; }
     values[depth].forEach((value) => visit(depth + 1, total + value));
   };
   visit(0, 0);
-  return { count, minimum, maximum, mean: count ? round(sum / count, 2) : null, outside, allowed };
+  return { count, minimum, maximum, mean: count ? round(sum / count, 2) : null, outside, allowed, incompleteMealHeads: [] };
 };

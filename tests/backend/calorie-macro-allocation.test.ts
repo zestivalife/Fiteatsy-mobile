@@ -79,6 +79,22 @@ test('manual outlier and duplicate recipe family block review validation', () =>
   assert.match(validateAllocatedDiet(duplicate).failures.join(' '), /duplicate canonical recipe/);
 });
 
+test('incomplete calorie envelope fails closed without Infinity, -Infinity or NaN', () => {
+  const incomplete = content();
+  incomplete.mealPlan.lunch.options = [];
+  const validation = validateAllocatedDiet(incomplete);
+  assert.equal(validation.valid, false);
+  assert.equal(validation.code, 'CALORIE_ENVELOPE_INCOMPLETE');
+  assert.match(validation.failures.join(' '), /daily calorie choice envelope is incomplete for: lunch/);
+  assert.doesNotMatch(validation.failures.join(' '), /Infinity|NaN/);
+
+  const analysis = analyseAllCalorieCombinations(incomplete);
+  assert.deepEqual(
+    { count: analysis.count, minimum: analysis.minimum, maximum: analysis.maximum, incompleteMealHeads: analysis.incompleteMealHeads },
+    { count: 0, minimum: null, maximum: null, incompleteMealHeads: ['lunch'] },
+  );
+});
+
 test('legacy plans without allocation metadata remain backwards compatible', () => {
   const legacy = content();
   delete legacy.allocationSnapshot;
