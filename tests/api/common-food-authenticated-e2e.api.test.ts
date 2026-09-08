@@ -82,7 +82,9 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     assert.equal(allFoods.body.roleLabels.PULSE, 'Protein / Pulse');
     const referenceOnly = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=ALL&nutritionStatus=REFERENCE_ONLY&limit=100`, { headers: authHeaders(consultant.token) });
     assert.equal(referenceOnly.response.status, 200, JSON.stringify(referenceOnly.body));
-    assert.ok(referenceOnly.body.items.some((item: { nutritionStatus:string;addToMealEligible:boolean;addabilityStatus:string }) => item.nutritionStatus === 'REFERENCE_ONLY' && item.addToMealEligible === false && ['INGREDIENT_ONLY','SECONDARY_ONLY','PREPARATION_REQUIRED','NUTRITION_PENDING','REFERENCE_ONLY','BLOCKED'].includes(item.addabilityStatus)));
+    assert.ok(referenceOnly.body.total > 0);
+    assert.ok(referenceOnly.body.items.length > 0);
+    assert.ok(referenceOnly.body.items.every((item: { nutritionStatus:string;addToMealEligible:boolean }) => item.nutritionStatus === 'REFERENCE_ONLY' && item.addToMealEligible === false));
     const noBedtimePulse = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BEDTIME&componentRole=PULSE`, { headers: authHeaders(consultant.token) });
     assert.equal(noBedtimePulse.response.status, 200, JSON.stringify(noBedtimePulse.body));
     assert.equal(noBedtimePulse.body.total, 0);
