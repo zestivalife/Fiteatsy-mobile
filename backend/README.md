@@ -82,8 +82,10 @@ Server-side ownership comes from the authenticated account context and no longer
 - Staging and production startup fail fast if `DATABASE_URL` is missing.
 - `OTP_DEBUG_RESPONSE_ENABLED=true` only exposes `debugOtp` outside production. Production never returns `debugOtp`.
 - `GET /v1/version` returns deployment-specific build identity from Railway's
-  `RAILWAY_GIT_COMMIT_SHA`. Mutable `GIT_COMMIT` values are deliberately ignored;
-  a missing or malformed deployment identity is reported as `UNKNOWN` with a null SHA.
+  packaged `build-info.json`, then Railway's `RAILWAY_GIT_COMMIT_SHA` for Git-backed
+  deployments. Mutable `GIT_COMMIT` values are deliberately ignored. Conflicting or
+  missing identity fails closed as `UNKNOWN`; CLI uploads must run `npm run railway:package`
+  immediately before upload and restore the generated file afterwards.
 - `GET /ready` checks PostgreSQL readiness and returns `200` when ready or `503` when not ready.
 - Subscription checkout is backend-authoritative. Mobile receives plans from `GET /v1/subscriptions/plans`, starts Razorpay orders through `POST /v1/subscriptions/checkout`, and never activates entitlements until `POST /v1/payments/razorpay/verify` or a verified Razorpay webhook confirms payment.
 - Razorpay webhook URLs must point to `/v1/webhooks/razorpay`; webhook events are stored idempotently and raw-body signature verification must remain enabled.

@@ -141,7 +141,9 @@ export const createApp = (options: CreateAppOptions = {}) => {
       commitSha: buildIdentity.commitSha,
       identityStatus: buildIdentity.identityStatus,
       buildIdentityVersion: buildIdentity.buildIdentityVersion,
-      identitySource: buildIdentity.source
+      identitySource: buildIdentity.source,
+      builtAt: buildIdentity.builtAt,
+      identityError: buildIdentity.identityError
     });
   });
 

@@ -6,6 +6,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY tsconfig.json tsconfig.catalogue-import.json ./
+COPY build-info.json ./build-info.json
 COPY scripts ./scripts
 COPY src ./src
 
@@ -18,6 +19,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package*.json ./
+COPY --from=build /app/build-info.json ./build-info.json
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src/modules/nutrition/food-curation/data ./dist/modules/nutrition/food-curation/data

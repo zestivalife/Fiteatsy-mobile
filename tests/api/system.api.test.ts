@@ -107,9 +107,9 @@ test('GET /v1/version ignores stale mutable identity in favour of Railway deploy
         assert.equal(response.status, 200);
         assert.equal(body.git_commit, '94c199585f48853bbd288874328229340d923ac1');
         assert.equal(body.commitSha, '94c199585f48853bbd288874328229340d923ac1');
-        assert.equal(body.identityStatus, 'VERIFIED');
+        assert.equal(body.identityStatus, 'RAILWAY_GIT');
         assert.equal(body.buildIdentityVersion, 1);
-        assert.equal(body.identitySource, 'RAILWAY_DEPLOYMENT');
+        assert.equal(body.identitySource, 'RAILWAY_GIT');
       } finally {
         await server.close();
       }

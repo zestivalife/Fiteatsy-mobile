@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.catalogue-import.json && node ./scripts/copy-migrations.mjs",
+    "build-identity:generate": "node ./scripts/generate-build-info.mjs",
+    "build-identity:verify": "node ./scripts/verify-build-info.mjs",
+    "railway:package": "npm run build-identity:generate && npm run build && npm run build-identity:verify",
     "db:migrate": "tsx src/db/migrator.ts",
     "nutrition:catalogue:generate": "node ./scripts/generate-usda-catalogue.mjs",
     "nutrition:catalogue:expand-v1.1": "node ./scripts/expand-nutrition-catalogue-v1.1.mjs ./src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.json ./src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json ./src/modules/nutrition/catalogue/data/fiteatsy-nutrition-catalogue-v1.1.changes.json",
