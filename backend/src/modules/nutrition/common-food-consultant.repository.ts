@@ -62,7 +62,10 @@ export async function listCombinationOptions(planId:string,planVersionId:string)
     select logical_option_id,option_snapshot_id,meal_head,display_order from selected
     union all select logical_option_id,option_snapshot_id,meal_head,display_order from legacy where display_order<=5
     order by meal_head,display_order`,[planId,planVersionId]);
-  return Promise.all(result.rows.map((row)=>getCombinationOption(String(row.option_snapshot_id),planId,planVersionId)));
+  // A revision may intentionally retain an immutable snapshot selected on the
+  // predecessor version. The version-owned selection row is authoritative; the
+  // snapshot itself remains append-only and plan-scoped.
+  return Promise.all(result.rows.map((row)=>getCombinationOption(String(row.option_snapshot_id),planId)));
 }
 
 export async function replaceCombinationOptionSelection(input:{planId:string;planVersionId:string;expectedPlanVersionId:string;options:CombinationSnapshot[]}){

@@ -117,6 +117,11 @@ test('database preserves exact 35-option identity through review, revision, appr
   assert.equal(countOptions(persisted.content), 35);
   assert.deepEqual(optionIds(persisted.content), originalIds);
 
+  const regenerated = await createOrUpdateDietPlanDraft({ careCaseId: careCase.id, userId: clientUserId, consultantId, readinessScore: 100, templateVersion: 'diet-lifecycle-v1-test', sourceSnapshot: snapshot, content, contentSummary: { calories: 1800, protein: 80, hydration: 2.5, focusAreas: [] }, generatedBy: consultantId });
+  assert.equal(regenerated.version.id, persisted.id, 'regenerating an editable draft must preserve its authoritative version identity');
+  assert.equal(regenerated.version.versionNumber, persisted.versionNumber);
+  assert.equal(regenerated.plan.currentVersionId, persisted.id);
+
   const submitted = await updateDietPlanLifecycle({ dietPlanId: saved.plan.id, consultantId, lifecycle: 'submitted_for_review', currentVersionId: persisted.id, reviewEventType: 'submitted_for_review', sourceSnapshot: snapshot });
   assert.equal(countOptions(submitted!.version!.content), 35);
   const seniorQueue = await listDietPlanReviewQueue();

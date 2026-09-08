@@ -330,6 +330,89 @@ export const createOrUpdateDietPlanDraft = async (input: {
   const existingPlan = await getDietPlanByCareCaseId(input.careCaseId);
   const timestamp = nowIso();
 
+  // Regeneration of an editable draft must not advance the plan pointer. The
+  // explicit option selections are version-owned, so replacing the version here
+  // would make valid persisted selections appear to vanish from the new draft.
+  // Keep the authoritative version identity stable and only refresh its generated
+  // content/source snapshot. Generated common-food candidates remain unsaved until
+  // the dedicated atomic selection replacement endpoint is called.
+  if (existingPlan?.currentVersionId) {
+    const currentVersion = await getDietPlanVersionById(existingPlan.currentVersionId);
+    if (currentVersion && ['draft', 'changes_requested'].includes(currentVersion.lifecycleStatus)) {
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
+        const locked = await client.query(
+          `select current_version_id from diet_plans where id = $1 and deleted_at is null for update`,
+          [existingPlan.id],
+        );
+        if (String(locked.rows[0]?.current_version_id ?? '') !== currentVersion.id) {
+          throw Object.assign(new Error('STALE_PLAN_VERSION'), { code: 'STALE_PLAN_VERSION' });
+        }
+        const updatedVersion = await client.query(
+          `
+            update diet_plan_versions
+            set content = $3::jsonb,
+                content_summary = $4::jsonb,
+                source_snapshot = $5::jsonb,
+                generated_by = $6,
+                updated_at = $7
+            where id = $1 and diet_plan_id = $2 and deleted_at is null
+              and lifecycle_status in ('draft', 'changes_requested')
+            returning *
+          `,
+          [
+            currentVersion.id,
+            existingPlan.id,
+            JSON.stringify(input.content),
+            JSON.stringify(input.contentSummary),
+            JSON.stringify(input.sourceSnapshot),
+            input.generatedBy,
+            timestamp,
+          ],
+        );
+        if (updatedVersion.rowCount !== 1) {
+          throw Object.assign(new Error('DIET_PLAN_NOT_EDITABLE'), { code: 'DIET_PLAN_NOT_EDITABLE' });
+        }
+        const updatedPlan = await client.query(
+          `
+            update diet_plans
+            set consultant_id = $2,
+                readiness_score = $3,
+                template_version = $4,
+                source_snapshot = $5::jsonb,
+                updated_at = $6,
+                version = version + 1
+            where id = $1 and current_version_id = $7 and deleted_at is null
+            returning *
+          `,
+          [
+            existingPlan.id,
+            input.consultantId,
+            input.readinessScore,
+            input.templateVersion,
+            JSON.stringify(input.sourceSnapshot),
+            timestamp,
+            currentVersion.id,
+          ],
+        );
+        if (updatedPlan.rowCount !== 1) {
+          throw Object.assign(new Error('STALE_PLAN_VERSION'), { code: 'STALE_PLAN_VERSION' });
+        }
+        await client.query('commit');
+        return {
+          plan: mapDietPlan(updatedPlan.rows[0]),
+          version: mapDietPlanVersion(updatedVersion.rows[0]),
+        };
+      } catch (error) {
+        await client.query('rollback');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+  }
+
   let plan = existingPlan;
   if (!plan) {
     const insertedPlan = await pool.query(
@@ -472,7 +555,16 @@ export const createDietPlanDraftVersion = async (input: {
   reviewNotes?: string | null;
 }) => {
   const timestamp = nowIso();
-  const nextVersion = await pool.query(
+  const client = await pool.connect();
+  try {
+  await client.query('begin');
+  const lockedPlan = await client.query(
+    `select current_version_id from diet_plans where id = $1 and deleted_at is null for update`,
+    [input.dietPlanId],
+  );
+  if (!lockedPlan.rows[0]) throw Object.assign(new Error('DIET_PLAN_NOT_FOUND'), { code: 'DIET_PLAN_NOT_FOUND' });
+  const previousVersionId = lockedPlan.rows[0].current_version_id == null ? null : String(lockedPlan.rows[0].current_version_id);
+  const nextVersion = await client.query(
     `
       with next_number as (
         select coalesce(max(version_number), 0) + 1 as version_number
@@ -500,7 +592,7 @@ export const createDietPlanDraftVersion = async (input: {
       input.dietPlanId,
     ],
   );
-  const updatedPlan = await pool.query(
+  const updatedPlan = await client.query(
     `
       update diet_plans
       set current_version_id = $2,
@@ -517,11 +609,31 @@ export const createDietPlanDraftVersion = async (input: {
     `,
     [input.dietPlanId, nextVersion.rows[0].id, JSON.stringify(input.sourceSnapshot), timestamp],
   );
-  if (updatedPlan.rowCount === 0) return null;
+  if (updatedPlan.rowCount === 0) throw Object.assign(new Error('DIET_PLAN_NOT_FOUND'), { code: 'DIET_PLAN_NOT_FOUND' });
+  if (previousVersionId) {
+    await client.query(
+      `
+        insert into diet_plan_option_selections
+          (diet_plan_id, diet_plan_version_id, logical_option_id, option_snapshot_id, meal_head, display_order, selected_at)
+        select diet_plan_id, $2, logical_option_id, option_snapshot_id, meal_head, display_order, selected_at
+        from diet_plan_option_selections
+        where diet_plan_id = $1 and diet_plan_version_id = $3
+        on conflict do nothing
+      `,
+      [input.dietPlanId, nextVersion.rows[0].id, previousVersionId],
+    );
+  }
+  await client.query('commit');
   return {
     plan: mapDietPlan(updatedPlan.rows[0]),
     version: mapDietPlanVersion(nextVersion.rows[0]),
   };
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 export const updateDietPlanLifecycle = async (input: {
