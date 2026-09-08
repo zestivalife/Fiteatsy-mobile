@@ -2,6 +2,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveBuildIdentity } from './build-identity.js';
 
 const LOCAL_DATABASE_FALLBACK = 'postgres://postgres:postgres@localhost:5432/nuetra';
 const SERVICE_NAME = 'fiteatsy-backend';
@@ -57,11 +58,6 @@ const resolvePort = () => {
 
 const resolveEnvironment = () => readNodeEnv() || readEnvironmentName() || 'development';
 
-const resolveGitCommit = () =>
-  process.env.GIT_COMMIT?.trim() ||
-  process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
-  'unknown';
-
 export const env = {
   get serviceName() {
     return SERVICE_NAME;
@@ -73,7 +69,10 @@ export const env = {
     return resolveEnvironment();
   },
   get gitCommit() {
-    return resolveGitCommit();
+    return resolveBuildIdentity().commitSha;
+  },
+  get buildIdentity() {
+    return resolveBuildIdentity();
   },
   get port() {
     return resolvePort();

@@ -132,11 +132,16 @@ export const createApp = (options: CreateAppOptions = {}) => {
   });
 
   app.get('/v1/version', (_req, res) => {
+    const buildIdentity = env.buildIdentity;
     res.json({
       service: env.serviceName,
       version: env.version,
       environment: env.environment,
-      git_commit: env.gitCommit
+      git_commit: buildIdentity.commitSha,
+      commitSha: buildIdentity.commitSha,
+      identityStatus: buildIdentity.identityStatus,
+      buildIdentityVersion: buildIdentity.buildIdentityVersion,
+      identitySource: buildIdentity.source
     });
   });
 
