@@ -46,6 +46,7 @@ import { buildRecommendationSets, calculateMealNutritionTotals, classifyMealMatc
 import { isDietaryPatternCompatible, listMealLibrarySlotsForTarget, listVerifiedFoodMasterRecords } from './nutrition.library.store.js';
 import { getFoodPreferenceProfile, type FoodPreferenceProfile } from './food-preferences.service.js';
 import { OptionalGuidanceContractError, validateOptionalGuidanceV2 } from './optional-guidance-contract.js';
+import { hasExplicitCuisineMapping, hasExplicitGuidanceMapping, resolveGuidanceCuisine } from './guidance-taxonomy.js';
 import { CALORIE_MACRO_ALLOCATION_CONFIG, CALORIE_MACRO_ALLOCATION_METHODOLOGY_VERSION, optimiseMealOptionPortion, validateAllocatedDiet } from './calorie-macro-allocation.js';
 import { freezeCombinationOptionsForLifecycle, listCombinationOptions } from './common-food-consultant.repository.js';
 import { MEAL_HEADS as COMMON_FOOD_MEAL_HEADS } from './common-food-engine.js';
@@ -2165,6 +2166,11 @@ const guidanceNutritionComplete = (slot: NutritionMealSlot) =>
   [slot.approxKcal, slot.proteinGrams, slot.carbsGrams, slot.fatGrams, slot.fibreGrams]
     .every((value) => typeof value === 'number' && Number.isFinite(value));
 
+const hasExplicitGuidanceTag = (slot: NutritionMealSlot, tag: string) =>
+  hasExplicitGuidanceMapping(slot.guidanceTags, tag);
+const hasExplicitCuisineTag = (slot: NutritionMealSlot, cuisine: string) =>
+  hasExplicitCuisineMapping(slot.cuisineTags, cuisine);
+
 const guidanceItemFromSlot = (input: {
   slot: NutritionMealSlot;
   category: NutritionGuidanceItem['category'];
@@ -2201,7 +2207,7 @@ const guidanceItemFromSlot = (input: {
     planMembership: input.slot.id != null && input.planOptionIds.has(input.slot.id),
     clinicallyReviewed: false,
     displayOrder: input.displayOrder,
-    enabled: true,
+    enabled: false,
     source: input.slot.id != null && input.planOptionIds.has(input.slot.id) ? 'published_plan' : 'verified_catalogue',
   };
 };
@@ -2277,24 +2283,24 @@ export const generateConsultantOptionalGuidance = async (
   const databaseCatalogue = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target: undefined, includeOutsideTarget: true, limit: 160 })).filter(guidanceNutritionComplete);
   const uniqueSlots = (slots: NutritionMealSlot[]) => Array.from(new Map(slots.map((slot) => [slot.id ?? slot.meal, slot])).values());
   const broadCatalogue = uniqueSlots([...databaseCatalogue, ...verifiedDraftCandidates.map(({ slot }) => slot)]);
-  const whatSlots = uniqueSlots([
-    ...planOptions.map(({ slot }) => slot).filter(guidanceNutritionComplete),
-    ...broadCatalogue,
-  ]).slice(0, OPTIONAL_GUIDANCE_WHAT_DISPLAY_LIMIT);
+  const whatSlots = broadCatalogue
+    .filter((slot) => hasExplicitGuidanceTag(slot, 'QUICK_BITE'))
+    .slice(0, OPTIONAL_GUIDANCE_WHAT_DISPLAY_LIMIT);
 
   const cuisineDefinitions = {
-    northIndian: 'north indian', southIndian: 'south indian', chinese: 'chinese', continental: 'continental', fastFood: 'fast food',
+    northIndian: 'north indian', southIndian: 'south indian', chinese: 'chinese', continental: 'continental',
+    indianFastFood: 'indian fast food', streetFood: 'street food', cafeBakery: 'cafe bakery', other: 'other',
   } as const;
   const usedCuisineIds = new Set<string>();
   const eatingOutEntries: Array<[string, NutritionGuidanceItem[]]> = [];
   for (const [key, cuisine] of Object.entries(cuisineDefinitions)) {
     const databaseCandidates = (await listMealLibrarySlotsForTarget({ ...catalogueInput, target, includeOutsideTarget: false, preferredCuisines: [cuisine], limit: 40 }))
       .filter(guidanceNutritionComplete)
+      .filter((slot) => hasExplicitCuisineTag(slot, cuisine))
       .filter((slot) => withinCalorieBand(slot, target));
-    const cuisineKey = cuisine.replace(/[^a-z]/g, '');
     const candidates = uniqueSlots([
       ...databaseCandidates,
-      ...broadCatalogue.filter((slot) => withinCalorieBand(slot, target) && (slot.cuisineTags ?? []).some((tag) => lower(tag).replace(/[^a-z]/g, '') === cuisineKey)),
+      ...broadCatalogue.filter((slot) => withinCalorieBand(slot, target) && hasExplicitCuisineTag(slot, cuisine)),
     ])
       .filter((slot) => !usedCuisineIds.has(slot.id ?? slot.meal))
       .slice(0, OPTIONAL_GUIDANCE_CUISINE_DISPLAY_LIMIT);
@@ -2307,9 +2313,9 @@ export const generateConsultantOptionalGuidance = async (
     sweet: resolveCravingKeywords('sweet'), salty: resolveCravingKeywords('salty'), crunchy: resolveCravingKeywords('crunchy'), spicy: resolveCravingKeywords('spicy'),
   } as const;
   const usedCravingIds = new Set<string>();
-  const cravings = Object.fromEntries(Object.entries(cravingDefinitions).map(([key, keywords]) => {
+  const cravings = Object.fromEntries(Object.keys(cravingDefinitions).map((key) => {
     const candidates = broadCatalogue
-      .filter((slot) => filterByTextMatch(slot, [...keywords]))
+      .filter((slot) => hasExplicitGuidanceTag(slot, key))
       .filter((slot) => withinCalorieBand(slot, snackTarget))
       .filter((slot) => !usedCravingIds.has(slot.id ?? slot.meal))
       .slice(0, OPTIONAL_GUIDANCE_CRAVING_DISPLAY_LIMIT);
@@ -2327,21 +2333,27 @@ export const generateConsultantOptionalGuidance = async (
     eatingOut, cravings,
   };
   const mergeGuidanceItems = (existing: NutritionGuidanceItem[] | undefined, generated: NutritionGuidanceItem[], maximum: number) =>
-    Array.from(new Map([...generated, ...(existing ?? [])].map((item) => [item.id || `${item.name}:${item.servingLabel}`, item])).values())
+    Array.from(new Map([...(existing ?? []), ...generated].map((item) => [item.id || `${item.name}:${item.servingLabel}`, item])).values())
       .slice(0, maximum)
       .map((item, index) => ({ ...item, displayOrder: index + 1 }));
+  const slotsById = new Map(broadCatalogue.flatMap((slot) => slot.id ? [[slot.id, slot] as const] : []));
+  const explicitlyTagged = (items: NutritionGuidanceItem[] | undefined, tag: string, kind: 'cuisine' | 'guidance') =>
+    (items ?? []).filter((item) => {
+      const slot = slotsById.get(item.id);
+      return slot != null && (kind === 'cuisine' ? hasExplicitCuisineTag(slot, tag) : hasExplicitGuidanceTag(slot, tag));
+    });
   const existingGuidance = version.content.optionalGuidance;
   const optionalGuidance: OptionalNutritionGuidance = existingGuidance ? {
     ...generatedGuidance,
     generatedAtISO: existingGuidance.generatedAtISO,
-    whatCanIEatNow: mergeGuidanceItems(existingGuidance.whatCanIEatNow, generatedGuidance.whatCanIEatNow, OPTIONAL_GUIDANCE_WHAT_DISPLAY_LIMIT),
+    whatCanIEatNow: mergeGuidanceItems(explicitlyTagged(existingGuidance.whatCanIEatNow, 'QUICK_BITE', 'guidance'), generatedGuidance.whatCanIEatNow, OPTIONAL_GUIDANCE_WHAT_DISPLAY_LIMIT),
     eatingOut: Object.fromEntries(Object.keys(cuisineDefinitions).map((key) => [
       key,
-      mergeGuidanceItems(existingGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']], generatedGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']], OPTIONAL_GUIDANCE_CUISINE_DISPLAY_LIMIT),
+      mergeGuidanceItems(explicitlyTagged(existingGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']], cuisineDefinitions[key as keyof typeof cuisineDefinitions], 'cuisine'), generatedGuidance.eatingOut[key as keyof OptionalNutritionGuidance['eatingOut']] ?? [], OPTIONAL_GUIDANCE_CUISINE_DISPLAY_LIMIT),
     ])) as OptionalNutritionGuidance['eatingOut'],
     cravings: Object.fromEntries(Object.keys(cravingDefinitions).map((key) => [
       key,
-      mergeGuidanceItems(existingGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], generatedGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], OPTIONAL_GUIDANCE_CRAVING_DISPLAY_LIMIT),
+      mergeGuidanceItems(explicitlyTagged(existingGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], key, 'guidance'), generatedGuidance.cravings[key as keyof OptionalNutritionGuidance['cravings']], OPTIONAL_GUIDANCE_CRAVING_DISPLAY_LIMIT),
     ])) as OptionalNutritionGuidance['cravings'],
   } : generatedGuidance;
   return updateConsultantDietPlanDraft(publicClientId, account, dietPlanId, {
@@ -2368,6 +2380,8 @@ export const searchConsultantOptionalGuidanceCandidates = async (
   const planOptionIds = new Set(planEntries.flatMap(({ item }) => item.id ? [item.id] : []));
   const contextKey = lower(input.context);
   const cuisine = input.category === 'eating_out' ? resolveCuisineLabel(contextKey) : 'general';
+  if (input.category === 'eating_out' && cuisine === 'general') return { candidates: [] };
+  const requiredGuidanceTag = input.category === 'what_can_i_eat_now' ? 'QUICK_BITE' : input.category === 'craving' ? contextKey : null;
   const candidates = (await listMealLibrarySlotsForTarget({
     mealKey: '', target: undefined, consultantId: account.accountId,
     dietPreference: preferences.dietPreference, allergyTags: preferences.allergyTags,
@@ -2375,8 +2389,9 @@ export const searchConsultantOptionalGuidanceCandidates = async (
     preferredCuisines: cuisine === 'general' ? [] : [cuisine], includeOutsideTarget: true, limit: 120,
   }))
     .filter(guidanceNutritionComplete)
+    .filter((slot) => input.category !== 'eating_out' || hasExplicitCuisineTag(slot, cuisine))
+    .filter((slot) => requiredGuidanceTag == null || hasExplicitGuidanceTag(slot, requiredGuidanceTag))
     .filter((slot) => !input.query || filterByTextMatch(slot, [lower(input.query)]))
-    .filter((slot) => input.category !== 'craving' || filterByTextMatch(slot, resolveCravingKeywords(contextKey)))
     .slice(0, 30);
   return {
     candidates: candidates.map((slot, index) => guidanceItemFromSlot({
@@ -2840,10 +2855,7 @@ const resolveCravingKeywords = (craving: string) => {
 };
 
 const resolveCuisineLabel = (cuisine: string) => {
-  const candidate = lower(cuisine).trim();
-  const allowed = ['north indian', 'south indian', 'chinese', 'continental', 'fast food'];
-  const match = allowed.find((item) => candidate.includes(item) || item.includes(candidate));
-  return match ?? 'general';
+  return resolveGuidanceCuisine(cuisine) ?? 'general';
 };
 
 const eventNutritionDate = (event: Awaited<ReturnType<typeof listHealthEvents>>[number]) => {
@@ -3329,7 +3341,10 @@ export const getNutritionEatingOutSuggestions = async (
   const requestedCuisine = resolveCuisineLabel(input.cuisine ?? '');
   const guidance = experience.version.content.optionalGuidance;
   if (!guidance) return buildRecommendationResponse(context, [], 'preparing');
-  const cuisineKey = ({ 'north indian': 'northIndian', 'south indian': 'southIndian', chinese: 'chinese', continental: 'continental', 'fast food': 'fastFood' } as const)[requestedCuisine as Exclude<typeof requestedCuisine, 'general'>];
+  const cuisineKey = ({
+    'north indian': 'northIndian', 'south indian': 'southIndian', chinese: 'chinese', continental: 'continental',
+    'indian fast food': 'indianFastFood', 'street food': 'streetFood', 'cafe bakery': 'cafeBakery', other: 'other',
+  } as const)[requestedCuisine as Exclude<typeof requestedCuisine, 'general'>];
   const items = cuisineKey ? guidance.eatingOut[cuisineKey].filter((item) => !item.mealTags.length || item.mealTags.includes(context.meal.key)) : [];
   return buildRecommendationResponse(context, rankReviewedGuidance(items, context.remaining));
 };

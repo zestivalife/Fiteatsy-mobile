@@ -145,7 +145,11 @@ const guidanceItemSchema = z.object({
 const optionalGuidanceSchema = z.object({
   schemaVersion: z.literal(1), generatedBy: z.string(), generatedAtISO: z.string().datetime(), updatedBy: z.string(), updatedAtISO: z.string().datetime(),
   reviewedBy: z.string().nullable(), reviewedAtISO: z.string().datetime().nullable(), whatCanIEatNow: z.array(guidanceItemSchema),
-  eatingOut: z.object({ northIndian: z.array(guidanceItemSchema), southIndian: z.array(guidanceItemSchema), chinese: z.array(guidanceItemSchema), continental: z.array(guidanceItemSchema), fastFood: z.array(guidanceItemSchema) }),
+  eatingOut: z.object({
+    northIndian: z.array(guidanceItemSchema), southIndian: z.array(guidanceItemSchema), chinese: z.array(guidanceItemSchema), continental: z.array(guidanceItemSchema),
+    indianFastFood: z.array(guidanceItemSchema).default([]), streetFood: z.array(guidanceItemSchema).default([]), cafeBakery: z.array(guidanceItemSchema).default([]), other: z.array(guidanceItemSchema).default([]),
+    fastFood: z.array(guidanceItemSchema).optional(),
+  }),
   cravings: z.object({ sweet: z.array(guidanceItemSchema), salty: z.array(guidanceItemSchema), crunchy: z.array(guidanceItemSchema), spicy: z.array(guidanceItemSchema) }),
 });
 

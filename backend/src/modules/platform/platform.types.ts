@@ -264,6 +264,7 @@ export type NutritionMealSlot = {
   sourceType?: 'verified_library' | 'consultant_custom' | 'template_variant' | 'generated_template';
   recommendationReason?: string | null;
   cuisineTags?: string[];
+  guidanceTags?: string[];
   dietaryTags?: string[];
   isApproved?: boolean;
   components?: NutritionMealComponent[];
@@ -391,7 +392,11 @@ export type OptionalNutritionGuidance = {
     southIndian: NutritionGuidanceItem[];
     chinese: NutritionGuidanceItem[];
     continental: NutritionGuidanceItem[];
-    fastFood: NutritionGuidanceItem[];
+    indianFastFood: NutritionGuidanceItem[];
+    streetFood: NutritionGuidanceItem[];
+    cafeBakery: NutritionGuidanceItem[];
+    other: NutritionGuidanceItem[];
+    fastFood?: NutritionGuidanceItem[];
   };
   cravings: {
     sweet: NutritionGuidanceItem[];

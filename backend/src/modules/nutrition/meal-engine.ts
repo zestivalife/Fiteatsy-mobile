@@ -207,6 +207,9 @@ export const mealVariantToSlot = (
     matchClassification: classifyMealMatch(target, totals),
     sourceType: variant.sourceType,
     cuisineTags: variant.cuisineTags ?? [],
+    guidanceTags: Array.isArray(variant.sourceMetadata?.guidanceTags)
+      ? variant.sourceMetadata.guidanceTags.map((tag) => String(tag)).filter(Boolean)
+      : [],
     dietaryTags: variant.dietaryTags ?? [],
     recommendationReason: target
       ? `Matched against ${target.calories ?? 'open'} kcal / ${target.proteinGrams ?? 'open'} g protein target.`
