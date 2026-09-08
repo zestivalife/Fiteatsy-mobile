@@ -8,18 +8,17 @@ import { AppBackButton } from '../../components/AppBackButton';
 import { getThemeColors, spacing, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
-import { markNutritionMealConsumed } from '../../services/nutritionPlanService';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const mealOrder = [
   { key: 'earlyMorning', label: 'Early Morning' },
   { key: 'breakfast', label: 'Breakfast' },
-  { key: 'midMorningSnack', label: 'Mid Morning Snack' },
+  { key: 'midMorningSnack', label: 'Mid-Morning' },
   { key: 'lunch', label: 'Lunch' },
   { key: 'eveningSnack', label: 'Evening Snack' },
   { key: 'dinner', label: 'Dinner' },
-  { key: 'bedtimeNutrition', label: 'Bedtime Nourishment' },
+  { key: 'bedtimeNutrition', label: 'Bedtime' },
 ] as const;
 
 export const NutritionPlanScreen = () => {
@@ -27,8 +26,7 @@ export const NutritionPlanScreen = () => {
   const { themeMode, publishedNutritionPlan } = useAppContext();
   const palette = getThemeColors(themeMode);
   const content = publishedNutritionPlan?.version.content;
-  const [mealLogState, setMealLogState] = React.useState<Record<string, 'idle' | 'saving' | 'saved'>>({});
-  const [mealLogError, setMealLogError] = React.useState<string | null>(null);
+  const snapshotHeads: Record<string, string> = { earlyMorning: 'EARLY_MORNING', breakfast: 'BREAKFAST', midMorningSnack: 'MID_MORNING', lunch: 'LUNCH', eveningSnack: 'EVENING_SNACK', dinner: 'DINNER', bedtimeNutrition: 'BEDTIME' };
 
   if (!publishedNutritionPlan || !content) {
     return (
@@ -76,6 +74,8 @@ export const NutritionPlanScreen = () => {
         <SectionTitle title="Today’s meals" color={palette.textPrimary} />
         {mealOrder.map(({ key, label }) => {
           const section = content.mealPlan[key];
+          const snapshotOptions = publishedNutritionPlan.version.commonFoodOptions?.filter((option) => option.mealHead === snapshotHeads[key]);
+          const options = snapshotOptions?.length === 5 ? snapshotOptions.map((option, index) => ({ slot: index + 1, meal: option.title, portion: option.serving, prepNote: '', approxKcal: option.nutrition.kcal, proteinGrams: option.nutrition.protein })) : section.options;
           return (
             <View key={key} style={[styles.sectionCard, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
               <View style={styles.sectionHead}>
@@ -85,7 +85,7 @@ export const NutritionPlanScreen = () => {
                 </View>
                 <Text style={[styles.sectionFocus, { color: palette.blue }]}>{section.focus}</Text>
               </View>
-              {section.options.map((option) => (
+              {options.map((option) => (
                 <View key={`${key}-${option.slot}-${option.meal}`} style={[styles.optionCard, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]}>
                   <Text style={[styles.optionMeal, { color: palette.textPrimary }]}>{option.meal}</Text>
                   <Text style={[styles.optionPortion, { color: palette.textMuted }]}>{option.portion}</Text>
@@ -94,65 +94,12 @@ export const NutritionPlanScreen = () => {
                     <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.approxKcal != null ? `${option.approxKcal} kcal` : 'Calories flexible'}</Text>
                     <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.proteinGrams != null ? `${option.proteinGrams} g protein` : 'Protein flexible'}</Text>
                   </View>
-                  {option.slot === 1 ? (
-                    <Pressable
-                      onPress={async () => {
-                        if (!publishedNutritionPlan) return;
-                        const actionKey = `${key}-${option.slot}`;
-                        setMealLogError(null);
-                        setMealLogState((current) => ({ ...current, [actionKey]: 'saving' }));
-                        try {
-                          await markNutritionMealConsumed({
-                            planId: publishedNutritionPlan.plan.id,
-                            versionId: publishedNutritionPlan.version.id,
-                            mealKey: key,
-                            mealLabel: label,
-                            mealName: option.meal,
-                            quantityLabel: option.portion,
-                          });
-                          setMealLogState((current) => ({ ...current, [actionKey]: 'saved' }));
-                        } catch (error) {
-                          setMealLogState((current) => ({ ...current, [actionKey]: 'idle' }));
-                          setMealLogError(error instanceof Error ? error.message : 'Unable to save this meal check right now.');
-                        }
-                      }}
-                      style={[
-                        styles.consumeButton,
-                        {
-                          backgroundColor: mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.successSoft : palette.card,
-                          borderColor: mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.success : palette.stroke,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={mealLogState[`${key}-${option.slot}`] === 'saved' ? 'checkmark-circle' : 'restaurant-outline'}
-                        size={16}
-                        color={mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.success : palette.textPrimary}
-                      />
-                      <Text
-                        style={[
-                          styles.consumeButtonText,
-                          { color: mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.success : palette.textPrimary },
-                        ]}
-                      >
-                        {mealLogState[`${key}-${option.slot}`] === 'saving'
-                          ? 'Saving...'
-                          : mealLogState[`${key}-${option.slot}`] === 'saved'
-                            ? 'Marked consumed'
-                            : 'Mark consumed'}
-                      </Text>
-                    </Pressable>
-                  ) : null}
                 </View>
               ))}
+              <Text style={[styles.optionNote, { color: palette.textSecondary }]}>Choose, change, log or skip this meal from Today&apos;s Plan.</Text>
             </View>
           );
         })}
-        {mealLogError ? (
-          <View style={[styles.inlineMessage, { backgroundColor: '#FDE8EC', borderColor: '#D94F63' }]}>
-            <Text style={[styles.inlineMessageText, { color: '#D94F63' }]}>{mealLogError}</Text>
-          </View>
-        ) : null}
 
         <SectionTitle title="Hydration rhythm" color={palette.textPrimary} />
         <View style={[styles.sectionCard, { backgroundColor: palette.card, borderColor: palette.stroke }]}>

@@ -2703,7 +2703,8 @@ export const getPublishedDietPlanForClient = async (owner: ClientOwnershipContex
       commonFoodOptions: payload.version.commonFoodOptions.map((option) => {
         const item=option as Record<string,unknown>;
         const components=Array.isArray(item.components)?item.components.map((component)=>{const c=component as Record<string,unknown>;return {id:c.componentId,name:c.foodDisplayNameSnapshot,serving:c.servingDisplayNameSnapshot,multiplier:c.multiplier,grams:c.grams,millilitres:c.millilitres,nutrition:c.nutrition};}):[];
-        return {type:'COMBINATION',id:item.combinationId,summary:components.map((c)=>`${c.multiplier} × ${c.serving} ${c.name}`).join(' + '),components,nutrition:item.nutrition,optionHash:item.optionHash,version:item.snapshotVersion};
+        const componentTitle=components.map((c)=>c.name).filter(Boolean).join(' + ');
+        return {type:'COMBINATION',id:item.combinationId,mealHead:item.mealHead,title:item.clientTitle||componentTitle,serving:item.humanServingSummary||'1 portion',summary:item.clientTitle||componentTitle,components,nutrition:item.nutrition,optionHash:item.optionHash,version:item.snapshotVersion};
       }),
     },
   };

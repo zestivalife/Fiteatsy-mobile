@@ -712,6 +712,12 @@ export type PublishedNutritionPlan = {
       focusAreas: string[];
     };
     content: NutritionPlanContent;
+    commonFoodOptions: Array<{
+      type: 'COMBINATION'; id: string; mealHead: string; title: string; serving: string; summary: string;
+      components: Array<{ id: string; name: string; serving: string; multiplier: number; grams: number; millilitres: number | null; nutrition: Record<string, number | null> }>;
+      nutrition: { kcal: number | null; protein: number | null; carbohydrate: number | null; fat: number | null; fibre: number | null };
+      optionHash: string; version: number;
+    }>;
   };
   today: {
     todaysMeals: Array<{
