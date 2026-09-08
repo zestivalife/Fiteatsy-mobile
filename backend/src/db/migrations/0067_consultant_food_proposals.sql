@@ -9,11 +9,11 @@ create table consultant_food_proposals (
   nutrients jsonb not null,
   notes text,
   preparation_notes text,
-  proposed_by uuid not null references users(id),
+  proposed_by text not null references users(id),
   status text not null check (status in ('DRAFT','PENDING_REVIEW','CHANGE_REQUESTED','APPROVED','REJECTED')),
   revision integer not null default 1,
   submitted_at timestamptz,
-  reviewed_by uuid references users(id),
+  reviewed_by text references users(id),
   reviewed_at timestamptz,
   review_decision text,
   review_reason text,
@@ -37,8 +37,8 @@ create table consultant_approved_foods (
   version integer not null default 1,
   source_type text not null check(source_type='CONSULTANT_PROPOSAL'),
   source_proposal_id uuid not null unique references consultant_food_proposals(id),
-  proposed_by uuid not null references users(id),
-  approved_by uuid not null references users(id),
+  proposed_by text not null references users(id),
+  approved_by text not null references users(id),
   approved_at timestamptz not null,
   active boolean not null default true,
   created_at timestamptz not null default now()
@@ -51,7 +51,7 @@ create table consultant_food_aliases (
   alias text not null,
   normalized_alias text not null,
   source_proposal_id uuid not null unique references consultant_food_proposals(id),
-  approved_by uuid not null references users(id),
+  approved_by text not null references users(id),
   approved_at timestamptz not null default now(),
   unique(existing_food_id,normalized_alias)
 );
@@ -60,7 +60,7 @@ create table consultant_food_proposal_audit (
   id uuid primary key,
   proposal_id uuid not null references consultant_food_proposals(id),
   event_type text not null,
-  actor_id uuid not null references users(id),
+  actor_id text not null references users(id),
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
