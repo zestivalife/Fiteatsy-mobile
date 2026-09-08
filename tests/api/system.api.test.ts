@@ -93,7 +93,7 @@ test('GET /v1/version returns runtime metadata', async () => {
   );
 });
 
-test('GET /v1/version prefers Railway deployment identity over a stale configured fallback', async () => {
+test('GET /v1/version prefers the explicit build identity for CLI-upload deployments', async () => {
   await withEnv(
     {
       NODE_ENV: 'production',
@@ -105,7 +105,7 @@ test('GET /v1/version prefers Railway deployment identity over a stale configure
       const { response, body } = await getJson(server.baseUrl, '/v1/version');
       try {
         assert.equal(response.status, 200);
-        assert.equal(body.git_commit, '94c199585f48853bbd288874328229340d923ac1');
+        assert.equal(body.git_commit, '6e04e67899a4e187fe8e4032bc589f5a72fd88b8');
       } finally {
         await server.close();
       }
