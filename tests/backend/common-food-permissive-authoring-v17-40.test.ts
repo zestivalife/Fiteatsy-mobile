@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { commonFoodCatalogue, dailyCalorieTargetState } from '../../backend/src/modules/nutrition/common-food-consultant.service.js';
+import { authorableCommonFoods, scaleNutrition, validateManualCombination, type ClientFoodContext } from '../../backend/src/modules/nutrition/common-food-engine.js';
+
+const vegetarian:ClientFoodContext={diet:'VEGETARIAN',allergies:[],intolerances:[],avoids:[],clinicalExclusions:[],dislikes:[],preferences:[]};
+const target={kcal:560,protein:34,kcalTolerance:140,proteinTolerance:18};
+
+test('manual authoring admits a safe governed food outside generator meal suitability',()=>{const food=authorableCommonFoods(commonFoodCatalogue,vegetarian).find(item=>!item.mealHeads.includes('LUNCH'));assert.ok(food);const serving=food.servings.find(item=>item.active)!;const result=validateManualCombination({foods:commonFoodCatalogue,context:vegetarian,mealHead:'LUNCH',target,authoring:true,components:[{foodId:food.id,servingId:serving.id,multiplier:1}]});assert.equal(result.components.length,1);assert.equal(result.components[0]!.foodId,food.id);});
+
+test('quantity-first calculation accepts an interpretable in-range multiplier and remains authoritative',()=>{const food=authorableCommonFoods(commonFoodCatalogue,vegetarian).find(item=>item.servings.some(serving=>serving.minMultiplier<=1.25&&serving.maxMultiplier>=1.25))!;const serving=food.servings.find(item=>item.active&&item.minMultiplier<=1.25&&item.maxMultiplier>=1.25)!;const result=validateManualCombination({foods:commonFoodCatalogue,context:vegetarian,mealHead:'LUNCH',target,authoring:true,components:[{foodId:food.id,servingId:serving.id,multiplier:1.25}]});assert.deepEqual(result.components[0]!.nutrition,scaleNutrition(food.nutrientsPer100g,serving.grams*1.25));});
+
+test('hard allergy safety remains fail-closed in permissive authoring',()=>{const food=commonFoodCatalogue.find(item=>item.allergens.length>0)!;assert.ok(food);const serving=food.servings.find(item=>item.active)!;assert.throws(()=>validateManualCombination({foods:commonFoodCatalogue,context:{...vegetarian,diet:'NON_VEGETARIAN',allergies:[...food.allergens]},mealHead:'LUNCH',target,authoring:true,components:[{foodId:food.id,servingId:serving.id,multiplier:1}]}),/UNSAFE_OR_INELIGIBLE_FOOD/);});
+
+test('daily calorie target states are exact and advisory',()=>{assert.deepEqual(dailyCalorieTargetState(2000,1850),{targetKcal:2000,plannedKcal:1850,differenceKcal:-150,percentage:92.5,status:'APPROACHING_TARGET'});assert.deepEqual(dailyCalorieTargetState(2000,2000),{targetKcal:2000,plannedKcal:2000,differenceKcal:0,percentage:100,status:'TARGET_REACHED'});assert.deepEqual(dailyCalorieTargetState(2000,2150),{targetKcal:2000,plannedKcal:2150,differenceKcal:150,percentage:107.5,status:'TARGET_EXCEEDED'});});
