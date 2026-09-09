@@ -1,1 +1,1 @@
-{"platforms":["ios"],"ios":{"modules":["FiteatsyHealthKitModule"]}}
+{"platforms":["apple"],"apple":{"modules":["FiteatsyHealthKitModule"],"podspecPath":"FiteatsyHealthKit.podspec"}}

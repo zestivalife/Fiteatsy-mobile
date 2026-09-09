@@ -35,10 +35,17 @@ describe('governed wearable health platform', () => {
   it('ships real read-only HealthKit capability and anchored reads', () => {
     const entitlement = read('ios/Fiteatsy/Fiteatsy.entitlements');
     const native = read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift');
+    const moduleConfig = read('modules/fiteatsy-healthkit/expo-module.config.json');
+    const bridge = read('modules/fiteatsy-healthkit/index.ts');
     expect(entitlement).toContain('com.apple.developer.healthkit');
     expect(native).toContain('HKAnchoredObjectQuery');
     expect(native).toContain('requestAuthorization(toShare: [], read: types)');
     expect(native).toContain('enableBackgroundDelivery');
+    expect(native).toContain('Name("FiteatsyHealthKit")');
+    expect(moduleConfig).toContain('"platforms":["apple"]');
+    expect(moduleConfig).toContain('"podspecPath":"FiteatsyHealthKit.podspec"');
+    expect(bridge).toContain("requireOptionalNativeModule<FiteatsyHealthKitNativeModule>('FiteatsyHealthKit')");
+    expect(bridge).not.toContain("requireNativeModule('FiteatsyHealthKit')");
   });
 
   it('blocks Consultant wearable projection after consent withdrawal', () => {
