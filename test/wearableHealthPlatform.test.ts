@@ -43,6 +43,7 @@ describe('governed wearable health platform', () => {
 
   it('blocks Consultant wearable projection after consent withdrawal', () => {
     const repository = read('backend/src/modules/consultants/consultants.repository.ts');
+    expect(repository).toContain('not exists (select 1 from wearable_consents');
     expect(repository).toContain("wc.status='ACTIVE'");
     expect(repository).toContain('deleted_at is null');
   });
