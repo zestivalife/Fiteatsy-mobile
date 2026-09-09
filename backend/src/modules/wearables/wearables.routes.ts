@@ -7,6 +7,7 @@ import {
 } from './wearables.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { ingestHealthObservations, listHealthObservations } from '../health/health-observations.repository.js';
+import { getActiveWearableConsent, type WearableProvider } from '../health/wearable-platform.repository.js';
 
 const wearableSyncSchema = z.object({
   deviceId: z.string().min(1),
@@ -62,7 +63,10 @@ wearablesRouter.get('/health-apps', (req, res) => {
 
 wearablesRouter.use(requireAuthenticatedAccount);
 
-wearablesRouter.post('/connect-app', (req, res) => {
+const governedProviderForApp = (appId: string): WearableProvider | null => appId === 'apple-health'
+  ? 'APPLE_HEALTH' : appId === 'health-connect' ? 'HEALTH_CONNECT' : null;
+
+wearablesRouter.post('/connect-app', async (req, res) => {
   const parse = healthAppConnectSchema.safeParse(req.body);
   if (!parse.success) {
     return res.status(400).json({
@@ -72,9 +76,14 @@ wearablesRouter.post('/connect-app', (req, res) => {
   }
 
   try {
+    const account = getAuthenticatedAccount(req);
+    const governedProvider = governedProviderForApp(parse.data.appId);
+    if (governedProvider && !(await getActiveWearableConsent({ accountId:account.accountId, clientId:account.client.id }, governedProvider))) {
+      return res.status(403).json({ error:'ACTIVE_WEARABLE_CONSENT_REQUIRED', provider:governedProvider });
+    }
     const connection = connectHealthApp({
       ...parse.data,
-      userId: getAuthenticatedAccount(req).accountId
+      userId: account.accountId
     });
     return res.status(200).json({
       connected: true,
@@ -129,6 +138,10 @@ wearablesRouter.post('/records/ingest', async (req, res) => {
   }
 
   const account = getAuthenticatedAccount(req);
+  const governedProvider = governedProviderForApp(parse.data.appId);
+  if (governedProvider && !(await getActiveWearableConsent({ accountId:account.accountId, clientId:account.client.id }, governedProvider))) {
+    return res.status(403).json({ error:'ACTIVE_WEARABLE_CONSENT_REQUIRED', provider:governedProvider });
+  }
   const durable = await ingestHealthObservations({
     accountId: account.accountId,
     clientId: account.client.id

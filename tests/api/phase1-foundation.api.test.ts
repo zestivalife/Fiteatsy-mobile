@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
-import { getJson, postJson } from '../helpers/http.js';
+import { deleteRequest, getJson, postJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 import {
   createBiomarkerObservation,
   upsertBiomarker
 } from '../../backend/src/modules/biomarkers/biomarkers.repository.js';
 import { getClientByAccountUserId } from '../../backend/src/modules/client/client.repository.js';
+import { ingestHealthObservations } from '../../backend/src/modules/health/health-observations.repository.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
@@ -23,8 +24,53 @@ test.beforeEach(async () => {
   await resetTestState();
 });
 
+const grantHealthConnectConsent = async (token: string) => {
+  const consent = await postJson(server.baseUrl, '/v1/health/wearable-consents', {
+    provider: 'HEALTH_CONNECT',
+    consentVersion: 'wearable-consent-v1',
+    purposeVersion: 'wearable-purpose-v1',
+    requestedScopes: ['steps', 'sleep', 'heart_rate', 'hrv'],
+    acknowledgedPurposes: ['wellness_insights', 'consultant_care']
+  }, { headers: authHeaders(token) });
+  assert.equal(consent.response.status, 201);
+};
+
+test('new wearable ingestion requires explicit product consent', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const response = await postJson(server.baseUrl, '/v1/health/observations:batch', { observations: [{
+    metricType:'steps', value:1000, unit:'count', measuredAtISO:new Date().toISOString(),
+    sourceProvider:'health_connect', sourceRecordId:'unconsented-new-record'
+  }] }, { headers:authHeaders(session.token) });
+  assert.equal(response.response.status, 403);
+  assert.equal(response.body.error, 'ACTIVE_WEARABLE_CONSENT_REQUIRED');
+});
+
+test('explicit withdrawal overrides historical-observation compatibility', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const client = await getClientByAccountUserId(session.current.body.accountId);
+  assert.ok(client);
+  await ingestHealthObservations({ accountId:session.current.body.accountId, clientId:client.id }, [{
+    metricType:'steps', value:1200, unit:'count', measuredAtISO:new Date().toISOString(),
+    sourceProvider:'health_connect', sourceRecordId:'legacy-before-withdrawal'
+  }]);
+  await grantHealthConnectConsent(session.token);
+  const withdrawn = await deleteRequest(server.baseUrl, '/v1/health/wearable-consents/HEALTH_CONNECT', {
+    headers:authHeaders(session.token)
+  });
+  assert.equal(withdrawn.response.status, 204);
+  const rejected = await postJson(server.baseUrl, '/v1/health/observations:batch', { observations: [{
+    metricType:'steps', value:1300, unit:'count', measuredAtISO:new Date().toISOString(),
+    sourceProvider:'health_connect', sourceRecordId:'after-withdrawal'
+  }] }, { headers:authHeaders(session.token) });
+  assert.equal(rejected.response.status, 403);
+  const status = await getJson(server.baseUrl, '/v1/health/sync/status', { headers:authHeaders(session.token) });
+  assert.equal(status.body.overallStatus, 'NOT_CONNECTED');
+  assert.equal(status.body.healthConnect.status, 'REVOKED');
+});
+
 test('POST /v1/health/observations:batch persists client-owned observations and deduplicates sync keys', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
+  await grantHealthConnectConsent(session.token);
   const payload = {
     observations: [
       {
@@ -68,6 +114,7 @@ test('POST /v1/health/observations:batch persists client-owned observations and 
 
 test('health ingestion preserves Health Connect provenance and rejects unsafe observations atomically', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
+  await grantHealthConnectConsent(session.token);
   const measuredAtISO = new Date(Date.now() - 60_000).toISOString();
   const valid = await postJson(server.baseUrl, '/v1/health/observations:batch', {
     observations: [{
@@ -159,6 +206,7 @@ test('GET /v1/biomarkers and /v1/biomarkers/history return client-owned biomarke
 
 test('GET /v1/intelligence/scores calculates traceable scores from validated client data', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
+  await grantHealthConnectConsent(session.token);
   const controlledNowMs = Date.now();
   const recentMeasuredAtISO = new Date(controlledNowMs - 60_000).toISOString();
   const recentTestDate = new Date(controlledNowMs - 60_000).toISOString().slice(0, 10);
@@ -241,21 +289,12 @@ test('GET /v1/health/sync/status reports durable sync state without internal own
   assert.equal(empty.body.overallStatus, 'NOT_CONNECTED');
   assert.equal(empty.body.recordsSynced, 0);
 
-  await postJson(server.baseUrl, '/v1/health/observations:batch', {
-    observations: [
-      {
-        metricType: 'steps',
-        value: 7400,
-        unit: 'count',
-        measuredAtISO: '2026-08-05T06:00:00.000Z',
-        sourceProvider: 'health_connect',
-        sourceRecordId: 'hc-status-steps-1',
-        syncKey: 'hc-status-steps-1'
-      }
-    ]
-  }, {
-    headers: authHeaders(session.token)
-  });
+  const client = await getClientByAccountUserId(session.current.body.accountId);
+  assert.ok(client);
+  await ingestHealthObservations({ accountId:session.current.body.accountId, clientId:client.id }, [{
+    metricType:'steps', value:7400, unit:'count', measuredAtISO:'2026-08-05T06:00:00.000Z',
+    sourceProvider:'health_connect', sourceRecordId:'hc-status-steps-1', syncKey:'hc-status-steps-1'
+  }]);
 
   const status = await getJson(server.baseUrl, '/v1/health/sync/status', {
     headers: authHeaders(session.token)
@@ -263,6 +302,8 @@ test('GET /v1/health/sync/status reports durable sync state without internal own
   assert.equal(status.response.status, 200);
   assert.equal(status.body.overallStatus, 'CONNECTED');
   assert.equal(status.body.healthConnect.status, 'CONNECTED');
+  assert.equal(status.body.healthConnect.connectionAuthority, 'LEGACY_OBSERVATION_INFERRED');
+  assert.equal(status.body.healthConnect.currentOsPermissionVerified, false);
   assert.equal(status.body.recordsSynced, 1);
   assert.equal(status.body.clientId, undefined);
   assert.equal(status.body.userId, undefined);
