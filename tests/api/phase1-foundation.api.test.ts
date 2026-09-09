@@ -148,6 +148,9 @@ test('health ingestion preserves Health Connect provenance and rejects unsafe ob
   assert.equal(syncStatus.body.latestMeasurementISO, valid.body.items[0].measuredAtISO);
   assert.equal(syncStatus.body.healthConnect.lastSyncISO, valid.body.items[0].createdAtISO);
   assert.equal(syncStatus.body.healthConnect.latestMeasurementISO, valid.body.items[0].measuredAtISO);
+  assert.equal(syncStatus.body.healthConnect.connectionAuthority, 'OBSERVATION_INFERRED');
+  assert.equal(syncStatus.body.healthConnect.consentStatus, 'ACTIVE');
+  assert.equal(syncStatus.body.healthConnect.currentOsPermissionVerified, false);
 
   for (const observation of [
     { metricType: 'unknown_metric', value: 1, unit: 'count', measuredAtISO },
@@ -302,7 +305,8 @@ test('GET /v1/health/sync/status reports durable sync state without internal own
   assert.equal(status.response.status, 200);
   assert.equal(status.body.overallStatus, 'CONNECTED');
   assert.equal(status.body.healthConnect.status, 'CONNECTED');
-  assert.equal(status.body.healthConnect.connectionAuthority, 'LEGACY_OBSERVATION_INFERRED');
+  assert.equal(status.body.healthConnect.connectionAuthority, 'OBSERVATION_INFERRED');
+  assert.equal(status.body.healthConnect.consentStatus, 'UNKNOWN_LEGACY');
   assert.equal(status.body.healthConnect.currentOsPermissionVerified, false);
   assert.equal(status.body.recordsSynced, 1);
   assert.equal(status.body.clientId, undefined);
