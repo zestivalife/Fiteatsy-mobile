@@ -5,6 +5,12 @@ import { ClientOwnershipContext } from '../platform/platform.types.js';
 export type WearableProvider = 'APPLE_HEALTH' | 'HEALTH_CONNECT';
 export type WearableTrigger = 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY';
 
+export type WearableProviderAuthority = {
+  decision: 'ACTIVE_CONSENT' | 'WITHDRAWN' | 'LEGACY_OBSERVATION_INFERRED' | 'CONSENT_REQUIRED';
+  consentStatus: 'ACTIVE' | 'WITHDRAWN' | 'UNKNOWN_LEGACY' | 'NOT_ESTABLISHED';
+  hasHistoricalObservations: boolean;
+};
+
 const id = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
 
 export const acceptWearableConsent = async (
@@ -44,6 +50,35 @@ export const getActiveWearableConsent = async (owner: ClientOwnershipContext, pr
     [owner.clientId, owner.accountId, provider]
   );
   return result.rows[0] ?? null;
+};
+
+const providerSources: Record<WearableProvider, string[]> = {
+  APPLE_HEALTH: ['apple_health', 'apple-health'],
+  HEALTH_CONNECT: ['health_connect', 'health-connect', 'google_health_connect']
+};
+
+export const resolveWearableProviderAuthority = async (
+  owner: ClientOwnershipContext,
+  provider: WearableProvider
+): Promise<WearableProviderAuthority> => {
+  const [consent, observations] = await Promise.all([
+    pool.query(
+      `select status from wearable_consents where client_id=$1 and account_id=$2 and provider=$3
+       order by accepted_at desc, created_at desc limit 1`,
+      [owner.clientId, owner.accountId, provider]
+    ),
+    pool.query(
+      `select exists(select 1 from health_observations where client_id=$1 and user_id=$2
+       and source_provider=any($3::text[]) and deleted_at is null) as present`,
+      [owner.clientId, owner.accountId, providerSources[provider]]
+    )
+  ]);
+  const status = consent.rows[0]?.status as 'ACTIVE' | 'WITHDRAWN' | undefined;
+  const hasHistoricalObservations = observations.rows[0]?.present === true;
+  if (status === 'ACTIVE') return { decision:'ACTIVE_CONSENT', consentStatus:'ACTIVE', hasHistoricalObservations };
+  if (status === 'WITHDRAWN') return { decision:'WITHDRAWN', consentStatus:'WITHDRAWN', hasHistoricalObservations };
+  if (hasHistoricalObservations) return { decision:'LEGACY_OBSERVATION_INFERRED', consentStatus:'UNKNOWN_LEGACY', hasHistoricalObservations };
+  return { decision:'CONSENT_REQUIRED', consentStatus:'NOT_ESTABLISHED', hasHistoricalObservations };
 };
 
 export const upsertWearableConnection = async (

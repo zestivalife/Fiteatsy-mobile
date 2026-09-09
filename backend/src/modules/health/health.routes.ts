@@ -12,7 +12,7 @@ import { calculateHealthScores } from '../intelligence/health-calculation-engine
 import {
   acceptWearableConsent, commitWearableCheckpoint, completeWearableSyncRun,
   getActiveWearableConsent, listWearableConnections, listWearableCheckpoints, startWearableSyncRun,
-  upsertWearableConnection, withdrawWearableConsent, type WearableProvider
+  resolveWearableProviderAuthority, upsertWearableConnection, withdrawWearableConsent, type WearableProvider
 } from './wearable-platform.repository.js';
 
 const observationSchema = z.object({
@@ -215,7 +215,8 @@ healthRouter.post('/observations:batch', async (req, res) => {
   }
   const providers = [...new Set(parsed.data.observations.map((item) => item.sourceProvider))];
   for (const provider of providers) {
-    const governed = provider === 'apple_health' ? 'APPLE_HEALTH' : provider === 'health_connect' ? 'HEALTH_CONNECT' : null;
+    const governed = ['apple_health','apple-health'].includes(provider) ? 'APPLE_HEALTH'
+      : ['health_connect','health-connect','google_health_connect'].includes(provider) ? 'HEALTH_CONNECT' : null;
     if (governed && !(await getActiveWearableConsent(owner, governed))) {
       return res.status(403).json({ error: 'ACTIVE_WEARABLE_CONSENT_REQUIRED', provider: governed });
     }
@@ -270,14 +271,24 @@ healthRouter.get('/sync/status', async (req, res) => {
   }, {});
 
   const connections = await listWearableConnections(owner);
+  const authorities = Object.fromEntries(await Promise.all((['APPLE_HEALTH','HEALTH_CONNECT'] as WearableProvider[])
+    .map(async (provider) => [provider, await resolveWearableProviderAuthority(owner, provider)])));
   const statusFor = (provider: WearableProvider, ...sources: string[]) => {
     const connection = connections.find((item) => item.provider === provider);
+    const authority = authorities[provider];
     const sourceStatus = sources
       .map((source) => bySource[source])
       .find((candidate) => candidate != null);
     if (!connection) {
+      if (authority.decision === 'LEGACY_OBSERVATION_INFERRED' && sourceStatus) {
+        return { status:'CONNECTED', connectionAuthority:'LEGACY_OBSERVATION_INFERRED', consentStatus:'UNKNOWN_LEGACY',
+          currentOsPermissionVerified:false, freshness:freshness(sourceStatus.latestMeasurementISO), ...sourceStatus };
+      }
       return {
-        status: 'NOT_CONNECTED',
+        status: authority.decision === 'WITHDRAWN' ? 'REVOKED' : 'NOT_CONNECTED',
+        connectionAuthority: authority.decision,
+        consentStatus: authority.consentStatus,
+        currentOsPermissionVerified: false,
         lastSyncISO: null,
         latestMeasurementISO: null,
         recordsSynced: 0
@@ -286,6 +297,8 @@ healthRouter.get('/sync/status', async (req, res) => {
     return {
       connectionId: connection.id,
       status: connection.consent_status === 'ACTIVE' ? connection.status : 'REVOKED',
+      connectionAuthority: 'DURABLE_CONNECTION',
+      currentOsPermissionVerified: connection.status === 'CONNECTED' || connection.status === 'PARTIAL',
       consentStatus: connection.consent_status,
       grantedScopes: connection.granted_scopes,
       lastAttemptISO: connection.last_sync_attempt_at,
@@ -299,7 +312,9 @@ healthRouter.get('/sync/status', async (req, res) => {
 
   return res.status(200).json({
     fiteatsyClientId: account.client.fiteatsyClientId,
-    overallStatus: connections.some((item) => item.consent_status === 'ACTIVE' && ['CONNECTED','PARTIAL'].includes(item.status)) ? 'CONNECTED' : 'NOT_CONNECTED',
+    overallStatus: connections.some((item) => item.consent_status === 'ACTIVE' && ['CONNECTED','PARTIAL'].includes(item.status))
+      || authorities.APPLE_HEALTH.decision === 'LEGACY_OBSERVATION_INFERRED'
+      || authorities.HEALTH_CONNECT.decision === 'LEGACY_OBSERVATION_INFERRED' ? 'CONNECTED' : 'NOT_CONNECTED',
     lastSyncISO: observations.reduce<string | null>((latest, observation) => (
       latest == null || observation.createdAtISO > latest ? observation.createdAtISO : latest
     ), null),

@@ -18,8 +18,17 @@ test.beforeEach(async () => {
   await resetTestState();
 });
 
+const grantAppleHealthConsent = async (token: string) => {
+  const consent = await postJson(server.baseUrl, '/v1/health/wearable-consents', {
+    provider:'APPLE_HEALTH', consentVersion:'wearable-consent-v1', purposeVersion:'wearable-purpose-v1',
+    requestedScopes:['sleep', 'heart_rate'], acknowledgedPurposes:['wellness_insights', 'consultant_care']
+  }, { headers:authHeaders(token) });
+  assert.equal(consent.response.status, 201);
+};
+
 test('wearables endpoints support app discovery, connect, ingest, live sync, and legacy sync', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
+  await grantAppleHealthConsent(session.token);
   const controlledNowMs = Date.now();
   const recentRecordedAtISO = new Date(controlledNowMs - 60_000).toISOString();
   const apps = await getJson(server.baseUrl, '/v1/wearables/health-apps?platform=ios');
@@ -110,6 +119,7 @@ test('wearables endpoints return validation errors and insufficient-data status 
 
 test('live sync does not synthesize health values when a connection has no ingested records', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
+  await grantAppleHealthConsent(session.token);
   await postJson(server.baseUrl, '/v1/wearables/connect-app', {
     appId: 'apple-health',
     platform: 'ios'
@@ -142,6 +152,7 @@ test('wearables routes reject missing tokens and deny cross-account connection r
     email: 'wear-intruder@example.com',
     mobileNumber: '+919876543251'
   });
+  await grantAppleHealthConsent(owner.token);
   await postJson(server.baseUrl, '/v1/wearables/connect-app', {
     appId: 'apple-health',
     platform: 'ios'
