@@ -280,8 +280,8 @@ healthRouter.get('/sync/status', async (req, res) => {
       .map((source) => bySource[source])
       .find((candidate) => candidate != null);
     if (!connection) {
-      if (authority.decision === 'LEGACY_OBSERVATION_INFERRED' && sourceStatus) {
-        return { status:'CONNECTED', connectionAuthority:'LEGACY_OBSERVATION_INFERRED', consentStatus:'UNKNOWN_LEGACY',
+      if (authority.decision !== 'WITHDRAWN' && sourceStatus) {
+        return { status:'CONNECTED', connectionAuthority:'OBSERVATION_INFERRED', consentStatus:authority.consentStatus,
           currentOsPermissionVerified:false, freshness:freshness(sourceStatus.latestMeasurementISO), ...sourceStatus };
       }
       return {
@@ -310,18 +310,20 @@ healthRouter.get('/sync/status', async (req, res) => {
     };
   };
 
+  const appleHealth = statusFor('APPLE_HEALTH','apple_health', 'apple-health');
+  const healthConnect = statusFor('HEALTH_CONNECT','health_connect', 'health-connect', 'google_health_connect');
+
   return res.status(200).json({
     fiteatsyClientId: account.client.fiteatsyClientId,
-    overallStatus: connections.some((item) => item.consent_status === 'ACTIVE' && ['CONNECTED','PARTIAL'].includes(item.status))
-      || authorities.APPLE_HEALTH.decision === 'LEGACY_OBSERVATION_INFERRED'
-      || authorities.HEALTH_CONNECT.decision === 'LEGACY_OBSERVATION_INFERRED' ? 'CONNECTED' : 'NOT_CONNECTED',
+    overallStatus: [appleHealth.status, healthConnect.status].some((status) => status === 'CONNECTED' || status === 'PARTIAL')
+      ? 'CONNECTED' : 'NOT_CONNECTED',
     lastSyncISO: observations.reduce<string | null>((latest, observation) => (
       latest == null || observation.createdAtISO > latest ? observation.createdAtISO : latest
     ), null),
     latestMeasurementISO: observations[0]?.measuredAtISO ?? null,
     recordsSynced: observations.length,
-    appleHealth: statusFor('APPLE_HEALTH','apple_health', 'apple-health'),
-    healthConnect: statusFor('HEALTH_CONNECT','health_connect', 'health-connect'),
+    appleHealth,
+    healthConnect,
     sources: bySource
   });
 });
