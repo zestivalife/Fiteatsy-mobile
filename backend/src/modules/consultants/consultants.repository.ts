@@ -1018,8 +1018,12 @@ export const getConsultantWearableSummaryForClient = async (
         and user_id = $2
         and deleted_at is null
         and quality_status in ('accepted', 'estimated')
-        and exists (select 1 from wearable_consents wc where wc.client_id=$1 and wc.account_id=$2
-          and wc.status='ACTIVE' and wc.provider=case when source_provider in ('apple_health','apple-health') then 'APPLE_HEALTH' else 'HEALTH_CONNECT' end)
+        and (
+          not exists (select 1 from wearable_consents wc where wc.client_id=$1 and wc.account_id=$2
+            and wc.provider=case when source_provider in ('apple_health','apple-health') then 'APPLE_HEALTH' else 'HEALTH_CONNECT' end)
+          or exists (select 1 from wearable_consents wc where wc.client_id=$1 and wc.account_id=$2
+            and wc.status='ACTIVE' and wc.provider=case when source_provider in ('apple_health','apple-health') then 'APPLE_HEALTH' else 'HEALTH_CONNECT' end)
+        )
     `,
     [internalClientId, accountId]
   );
@@ -1039,8 +1043,12 @@ export const getConsultantWearableSummaryForClient = async (
           and user_id = $2
           and deleted_at is null
           and quality_status in ('accepted', 'estimated')
-          and exists (select 1 from wearable_consents wc where wc.client_id=$1 and wc.account_id=$2
-            and wc.status='ACTIVE' and wc.provider=case when source_provider in ('apple_health','apple-health') then 'APPLE_HEALTH' else 'HEALTH_CONNECT' end)
+          and (
+            not exists (select 1 from wearable_consents wc where wc.client_id=$1 and wc.account_id=$2
+              and wc.provider=case when source_provider in ('apple_health','apple-health') then 'APPLE_HEALTH' else 'HEALTH_CONNECT' end)
+            or exists (select 1 from wearable_consents wc where wc.client_id=$1 and wc.account_id=$2
+              and wc.status='ACTIVE' and wc.provider=case when source_provider in ('apple_health','apple-health') then 'APPLE_HEALTH' else 'HEALTH_CONNECT' end)
+          )
       )
       select *
       from ranked
