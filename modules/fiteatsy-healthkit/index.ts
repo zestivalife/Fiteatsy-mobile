@@ -10,9 +10,17 @@ export type HealthKitSample = {
 export type HealthKitReadResult = { samples: HealthKitSample[]; deletedIds: string[]; anchor: string };
 type FiteatsyHealthKitNativeModule = {
   isAvailable(): Promise<boolean>;
-  requestAuthorization(metrics: string[]): Promise<{ grantedScopes: string[] }>;
+  requestAuthorization(metrics: string[]): Promise<HealthKitAuthorizationResult>;
   readChanges(metric: string, anchor: string | null, startAtISO: string | null): Promise<HealthKitReadResult>;
   enableBackgroundDelivery(metrics: string[]): Promise<boolean>;
+};
+
+export type HealthKitAuthorizationResult = {
+  requestCompleted: boolean;
+  requestedScopes: string[];
+  supportedScopes: string[];
+  unsupportedScopes: string[];
+  requestStatus: 'should_request' | 'unnecessary' | 'unknown';
 };
 
 const nativeModule = (): FiteatsyHealthKitNativeModule | null =>
@@ -26,7 +34,7 @@ export const isHealthKitAvailable = async (): Promise<boolean> => {
   try { return await native.isAvailable(); } catch { return false; }
 };
 
-export const requestHealthKitAuthorization = async (metrics: string[]): Promise<{ grantedScopes: string[] }> => {
+export const requestHealthKitAuthorization = async (metrics: string[]): Promise<HealthKitAuthorizationResult> => {
   const native = nativeModule();
   if (!native) throw new Error('FITEATSY_HEALTHKIT_NATIVE_MODULE_MISSING');
   return native.requestAuthorization(metrics);

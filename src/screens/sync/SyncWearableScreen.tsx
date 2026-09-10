@@ -30,9 +30,11 @@ import { WearableSyncPayload } from '../../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SyncWearable'>;
 
+const healthProviderName = Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect';
+
 const stateCopy: Record<RecoveryConnectionState, { title: string; description: string; tone: 'ok' | 'warn' | 'calm' }> = {
   connected: {
-    title: 'Connected to Health Connect',
+    title: `Connected to ${healthProviderName}`,
     description: 'Your permitted recent health records were synced.',
     tone: 'ok'
   },
@@ -114,7 +116,7 @@ const stageContent: Record<SyncStage, { title: string; body: string; eyebrow: st
   },
   requesting_permission: {
     eyebrow: 'Permission request',
-    title: 'Opening Health Connect',
+    title: `Opening ${healthProviderName}`,
     body: 'Approve the health signals you want Fiteatsy to use. We will return here and prepare your first sync.'
   },
   connected_ready: {
@@ -129,7 +131,7 @@ const stageContent: Record<SyncStage, { title: string; body: string; eyebrow: st
   },
   completed: {
     eyebrow: 'Sync complete',
-    title: 'Connected to Health Connect',
+    title: `Connected to ${healthProviderName}`,
     body: 'Your permitted recent health records were synced successfully.'
   },
   partial: {
@@ -140,7 +142,7 @@ const stageContent: Record<SyncStage, { title: string; body: string; eyebrow: st
   insufficient_data: {
     eyebrow: 'Connected',
     title: 'Connected — no recent health data found',
-    body: 'Health Connect did not return supported recent records. You can try again later.'
+    body: `${healthProviderName} did not return supported recent records. You can try again later.`
   },
   permission_denied: {
     eyebrow: 'Permission needed',
@@ -149,7 +151,7 @@ const stageContent: Record<SyncStage, { title: string; body: string; eyebrow: st
   },
   not_supported: {
     eyebrow: 'Platform unavailable',
-    title: 'Health Connect is not available here',
+    title: `${healthProviderName} is not available here`,
     body: 'Health connection is not available on this device.'
   },
   failed: {
@@ -224,6 +226,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   const isMountedRef = useRef(true);
   const inFlightRef = useRef(false);
   const awaitingSettingsReturnRef = useRef(false);
+  const shouldStartInitialSyncRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -240,7 +243,9 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       setConnectionState('calibrating');
       setStage('connected_ready');
       setStatusTitle('Health Data Connected');
-      setStatusBody(`${permission.grantedCount}/${permission.requestedCount} Health Connect permissions are ready. Start your first sync when you are ready.`);
+      setStatusBody(Platform.OS === 'ios'
+        ? 'Apple Health authorization completed. Reading the health categories you chose now.'
+        : `${permission.grantedCount}/${permission.requestedCount} Health Connect permissions are ready. Start your first sync when you are ready.`);
       return;
     }
     if (permission.grantedCount > 0) {
@@ -255,8 +260,8 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     setConnectionState('permission_missing');
     setStage('permission_denied');
     setStatusTitle('Permission Needed');
-    setStatusBody('No supported Health Connect permissions were granted.');
-    setError('Open Health Connect settings or try again to allow at least one supported signal.');
+    setStatusBody(`No supported ${healthProviderName} access is available.`);
+    setError(`Open ${healthProviderName} settings or try again to allow at least one supported signal.`);
   }, []);
 
   const recheckPermissionAfterSettings = useCallback(async () => {
@@ -287,7 +292,9 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
 
   const openCanonicalHealthSettings = useCallback(() => {
     if (Platform.OS !== 'android') {
-      void Linking.openURL('x-apple-health://').catch(() => Linking.openSettings());
+      void Linking.openSettings().catch(() => {
+        setError('iPhone Settings could not be opened. Open Settings, then review Fiteatsy health access.');
+      });
       return;
     }
     try {
@@ -324,38 +331,43 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     setIsRunning(true);
     setError(null);
     setStage('requesting_permission');
-    setStatusTitle('Opening Health Connect');
+    setStatusTitle(`Opening ${healthProviderName}`);
     setStatusBody('Requesting read-only access for steps, sleep, heart rate, HRV, and exercise.');
     try {
       const provider = Platform.OS === 'ios' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT';
       const requested = Platform.OS === 'ios' ? APPLE_HEALTH_SCOPES : Object.keys((await inspectHealthConnectPermissions()).permissionStates);
       await acceptWearableConsent(provider, requested);
       const permission = Platform.OS === 'ios'
-        ? await requestAppleHealthPermissions().then((result) => ({ grantedCount: result.grantedScopes.length,
-            requestedCount: APPLE_HEALTH_SCOPES.length, permissionStates: Object.fromEntries(APPLE_HEALTH_SCOPES.map((scope) => [scope, result.grantedScopes.includes(scope)])) }))
+        ? await requestAppleHealthPermissions().then((result) => ({ grantedCount: result.supportedScopes.length,
+            requestedCount: result.supportedScopes.length,
+            permissionStates: Object.fromEntries(result.supportedScopes.map((scope) => [scope, true])) }))
         : await requestHealthConnectPermissionsOnly();
       let installationId = await AsyncStorage.getItem('@fiteatsy/wearable-installation-id');
       if (!installationId) { installationId = `install-${Date.now()}-${Math.random().toString(36).slice(2)}`; await AsyncStorage.setItem('@fiteatsy/wearable-installation-id', installationId); }
       const grantedScopes = Object.entries(permission.permissionStates).filter(([, granted]) => granted).map(([scope]) => scope);
+      // Apple deliberately does not disclose per-type read authorization. Persist no
+      // fabricated read grants; bounded reads below establish data availability.
+      const persistedGrantedScopes = Platform.OS === 'ios' ? [] : grantedScopes;
       const connection = await reconcileWearableConnection({ provider, platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
-        installationId, status: grantedScopes.length === permission.requestedCount ? 'CONNECTED' : grantedScopes.length ? 'PARTIAL' : 'PERMISSION_REQUIRED',
-        grantedScopes, backgroundSyncEnabled: grantedScopes.length > 0 });
+        installationId, status: Platform.OS === 'ios' ? 'PARTIAL' : grantedScopes.length === permission.requestedCount ? 'CONNECTED' : grantedScopes.length ? 'PARTIAL' : 'PERMISSION_REQUIRED',
+        grantedScopes: persistedGrantedScopes, backgroundSyncEnabled: grantedScopes.length > 0 });
       setConnectionId(connection.id);
+      shouldStartInitialSyncRef.current = Platform.OS === 'ios' && grantedScopes.length > 0;
       if (grantedScopes.length > 0) await registerWearableBackgroundSync({ connectionId:connection.id,provider,
         appId:Platform.OS === 'ios' ? 'apple-health' : 'health-connect' });
       applyPermissionState(permission);
     } catch (permissionError) {
-      const message = permissionError instanceof Error ? permissionError.message : 'health_connect_permission_failed';
+      const message = permissionError instanceof Error ? permissionError.message : 'health_permission_failed';
       if (message.includes('unavailable')) {
         setStage('not_supported');
         setPendingInstall(true);
-        setStatusTitle('Health Connect is unavailable');
-        setStatusBody('This device does not currently provide the Health Connect settings required for health sync.');
+        setStatusTitle(`${healthProviderName} is unavailable`);
+        setStatusBody(`This device does not currently provide ${healthProviderName} access required for health sync.`);
       } else {
         setStage('permission_denied');
         setConnectionState('permission_missing');
         setStatusTitle('Permission Needed');
-        setStatusBody('Health Connect permission could not be completed.');
+        setStatusBody(`${healthProviderName} access could not be completed.`);
       }
       setError(message.includes('unavailable') ? 'You can continue without connecting health data.' : 'Health access could not be completed. Please try again.');
     } finally {
@@ -402,7 +414,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       const result = await withHealthConnectTimeout(runHealthSync(Platform.OS === 'ios' ? 'apple-health' : 'health-connect', wellness,
         connectionId ? { connectionId, provider: Platform.OS === 'ios' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', trigger: 'INITIAL_CONNECT' } : undefined));
       addWearableSyncData(result.payload);
-      setSelectedDeviceId('health-connect');
+      setSelectedDeviceId(Platform.OS === 'ios' ? 'apple-health' : 'health-connect');
       setLastResult(result);
 
       const state = classifyRecoveryConnectionState(result.payload);
@@ -449,14 +461,14 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
           setStage('permission_denied');
           setConnectionState('permission_missing');
           setStatusTitle('Permission Needed');
-          setStatusBody('Open Health Connect permissions and allow at least one supported signal to sync.');
+          setStatusBody(`Open ${healthProviderName} permissions and allow at least one supported signal to sync.`);
         }
       } else if (message.includes('INSUFFICIENT_DATA')) {
         if (isMountedRef.current) {
           setStage('insufficient_data');
           setConnectionState('no_recent_data');
           setStatusTitle('No Recent Recovery Signals');
-          setStatusBody('Permissions are connected, but no recent Health Connect records were available to sync.');
+          setStatusBody(`Access is connected, but no recent ${healthProviderName} records were available to sync.`);
         }
       } else {
         if (isMountedRef.current) {
@@ -477,6 +489,12 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   }, [addWearableSyncData, connectionId, setSelectedDeviceId, setWellness, wellness]);
 
   useEffect(() => {
+    if (!connectionId || !shouldStartInitialSyncRef.current || inFlightRef.current) return;
+    shouldStartInitialSyncRef.current = false;
+    void runRecoveryConnection();
+  }, [connectionId, isRunning, runRecoveryConnection]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active' || !connectionId || awaitingSettingsReturnRef.current || inFlightRef.current) return;
       void AsyncStorage.getItem('@fiteatsy/wearable-last-foreground-sync').then((last) => {
@@ -485,7 +503,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       });
     });
     return () => subscription.remove();
-  }, [connectionId, runRecoveryConnection]);
+  }, [connectionId, isRunning, runRecoveryConnection]);
 
   const skipForNow = () => {
     if (onboarding) {
