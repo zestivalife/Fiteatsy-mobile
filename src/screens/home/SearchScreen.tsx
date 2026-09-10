@@ -59,6 +59,8 @@ export const SearchScreen = () => {
       </View>
 
       <FlatList
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         data={results}
         keyExtractor={(item) => item.route}
         contentContainerStyle={styles.list}

@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -11,7 +9,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Screen } from '../../components/Screen';
+import { KeyboardAwareFormScreen } from '../../components/KeyboardAwareFormScreen';
 import { TextField } from '../../components/TextField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { CountryPicker } from '../../components/CountryPicker';
@@ -56,6 +54,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hiddenOtpRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
   const [nowMs, setNowMs] = useState(Date.now());
   const appState = useRef(AppState.currentState);
 
@@ -261,27 +261,34 @@ export const SignUpScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
+    <KeyboardAwareFormScreen contentStyle={styles.container}>
         {phase === 'collect' ? (
           <>
-            <TextField label="Name" placeholder="Enter your full name" value={name} onChangeText={setName} />
+            <TextField label="Name" placeholder="Enter your full name" value={name} onChangeText={setName}
+              returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => emailRef.current?.focus()} />
             <TextField
+              ref={emailRef}
               label="Email Address"
               placeholder="Enter your email"
               autoCapitalize="none"
               keyboardType="email-address"
               value={email}
               onChangeText={setEmail}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => phoneRef.current?.focus()}
             />
             <CountryPicker selectedCountry={selectedCountry} onSelect={setSelectedCountry} />
             <TextField
+              ref={phoneRef}
               label="Phone Number"
               placeholder={selectedCountry.iso2 === 'IN' ? '9876543210' : 'National phone number'}
               keyboardType="phone-pad"
               value={nationalNumber}
               onChangeText={(value) => setNationalNumber(getPhoneDigits(value))}
               maxLength={14}
+              returnKeyType="done"
+              onSubmitEditing={() => { if (canRequestOtp) void requestOtp(); }}
             />
             <PrimaryButton
               title={
@@ -367,8 +374,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
             <Text style={[styles.link, { color: themeColors.blue }]}>Use the same OTP flow</Text>
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
-    </Screen>
+    </KeyboardAwareFormScreen>
   );
 };
 

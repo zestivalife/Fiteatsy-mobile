@@ -1506,7 +1506,7 @@ export const ReportsScreen = () => {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScrollContent}>
+            <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScrollContent}>
               <View style={styles.uploadMethodList}>
                 {[
                   { key: 'camera', icon: 'camera-outline', title: 'Take Photo', copy: 'Photograph your report' },

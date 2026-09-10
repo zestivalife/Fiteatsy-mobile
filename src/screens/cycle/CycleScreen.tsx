@@ -155,7 +155,7 @@ export const CycleScreen = () => {
             <View style={styles.sheetHandle} />
             <Text style={[styles.sheetTitle, { color: darkGraySurfaceText }]}>Quick Log</Text>
 
-            <ScrollView contentContainerStyle={styles.sheetContent}>
+            <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" nestedScrollEnabled contentContainerStyle={styles.sheetContent}>
               <View style={styles.row}>
                 <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: periodStarted }} style={[styles.chip, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, periodStarted && styles.chipActive]} onPress={() => setPeriodStarted((v) => !v)}><Text style={[styles.chipText, { color: periodStarted ? '#FFFFFF' : darkGraySurfaceText }]}>Period Started</Text></Pressable>
                 <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: periodEnded }} style={[styles.chip, { borderColor: palette.stroke, backgroundColor: isLight ? '#FFFFFF' : palette.card }, periodEnded && styles.chipActive]} onPress={() => setPeriodEnded((v) => !v)}><Text style={[styles.chipText, { color: periodEnded ? '#FFFFFF' : darkGraySurfaceText }]}>Period Ended</Text></Pressable>

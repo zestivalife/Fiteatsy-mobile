@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppBackButton } from '../../components/AppBackButton';
@@ -126,7 +126,8 @@ export const FamilyDashboardScreen = () => {
       <Modal visible={connectOpen} transparent animationType="slide" onRequestClose={() => setConnectOpen(false)}>
         <View style={[styles.overlay, { backgroundColor: ui.modalOverlay }]}>
           <Pressable style={styles.backdrop} onPress={() => setConnectOpen(false)} />
-          <View style={[styles.sheet, { backgroundColor: ui.cardRaised, borderColor: ui.border }]}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardSheet}>
+          <ScrollView automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'} keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} keyboardShouldPersistTaps="handled" nestedScrollEnabled contentContainerStyle={[styles.sheet, { backgroundColor: ui.cardRaised, borderColor: ui.border }]}>
             <View style={[styles.handle, { backgroundColor: ui.textSecondary }]} />
             <Text style={[styles.sheetTitle, { color: ui.textPrimary }]}>Add Trusted Support</Text>
 
@@ -149,7 +150,8 @@ export const FamilyDashboardScreen = () => {
 
             {errorText ? <Text style={styles.error}>{errorText}</Text> : null}
             <Pressable style={[styles.sendBtn, { backgroundColor: ui.ctaBg }]} onPress={onSendRequest}><Text style={[styles.sendBtnText, { color: ui.ctaText }]}>Send Connection Request</Text></Pressable>
-          </View>
+          </ScrollView>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </Screen>
@@ -179,6 +181,7 @@ const styles = StyleSheet.create({
   disconnect: { ...typography.caption, color: colors.danger },
   overlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   backdrop: { flex: 1 },
+  keyboardSheet: { maxHeight: '86%', width: '100%' },
   sheet: { maxHeight: '86%', borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: colors.cardRaised, borderWidth: 1, borderColor: colors.stroke, padding: spacing.md, gap: 8 },
   handle: { alignSelf: 'center', width: 48, height: 4, borderRadius: radius.pill, backgroundColor: colors.textMuted, marginBottom: 6 },
   sheetTitle: { ...typography.bodyStrong, fontSize: 16 },

@@ -7,7 +7,7 @@ type Props = TextInputProps & {
   label: string;
 };
 
-export const TextField = ({ label, ...props }: Props) => {
+export const TextField = React.forwardRef<TextInput, Props>(({ label, ...props }, ref) => {
   const { themeMode } = useAppContext();
   const themeColors = getThemeColors(themeMode);
 
@@ -15,6 +15,7 @@ export const TextField = ({ label, ...props }: Props) => {
     <View style={styles.wrapper}>
       <Text style={[styles.label, { color: themeColors.textPrimary }]}>{label}</Text>
       <TextInput
+        ref={ref}
         accessibilityLabel={label}
         placeholderTextColor={themeColors.textMuted}
         style={[
@@ -29,7 +30,9 @@ export const TextField = ({ label, ...props }: Props) => {
       />
     </View>
   );
-};
+});
+
+TextField.displayName = 'TextField';
 
 const styles = StyleSheet.create({
   wrapper: {

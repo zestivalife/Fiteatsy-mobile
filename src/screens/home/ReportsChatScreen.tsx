@@ -119,7 +119,7 @@ export const ReportsChatScreen = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
       >
-        <ScrollView style={styles.chatScroll} contentContainerStyle={styles.chatContent} keyboardShouldPersistTaps="handled">
+        <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={styles.chatScroll} contentContainerStyle={styles.chatContent} keyboardShouldPersistTaps="handled">
           {messages.map((item, index) => {
             const isUser = item.role === 'user';
             return (

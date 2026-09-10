@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Screen } from '../../components/Screen';
+import { KeyboardAwareFormScreen } from '../../components/KeyboardAwareFormScreen';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { TextField } from '../../components/TextField';
 import { CountryPicker } from '../../components/CountryPicker';
@@ -30,6 +30,8 @@ export const SignInScreen = ({ navigation }: Props) => {
   const [error, setError] = useState<string | null>(null);
   const [lockUntilMs, setLockUntilMs] = useState(0);
   const [nowMs, setNowMs] = useState(Date.now());
+  const phoneRef = useRef<TextInput>(null);
+  const pinRef = useRef<TextInput>(null);
   const lockRemainingSec = Math.max(0, Math.ceil((lockUntilMs - nowMs) / 1000));
 
   const normalizedPhone = useMemo(() => {
@@ -85,7 +87,7 @@ export const SignInScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen>
+    <KeyboardAwareFormScreen contentStyle={styles.formContent}>
       <View style={styles.container}>
         <View style={[styles.heroCard, { backgroundColor: themeColors.card, borderColor: themeColors.stroke }]}>
           <Text style={[styles.kicker, { color: themeColors.blue }]}>Existing User Login</Text>
@@ -96,21 +98,28 @@ export const SignInScreen = ({ navigation }: Props) => {
 
           <CountryPicker selectedCountry={selectedCountry} onSelect={setSelectedCountry} />
           <TextField
+            ref={phoneRef}
             label="Mobile Number"
             placeholder={selectedCountry.iso2 === 'IN' ? '9876543210' : 'National phone number'}
             keyboardType="phone-pad"
             value={nationalNumber}
             onChangeText={(value) => setNationalNumber(getPhoneDigits(value))}
             maxLength={14}
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => pinRef.current?.focus()}
           />
           <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>6 digit PIN</Text>
           <TextInput
+            ref={pinRef}
             value={pin}
             onChangeText={(value) => setPin(value.replace(/\D/g, '').slice(0, PIN_LENGTH))}
             keyboardType="number-pad"
             secureTextEntry
             maxLength={PIN_LENGTH}
             placeholder="123456"
+            returnKeyType="done"
+            onSubmitEditing={() => { if (canLogin) void submitPinLogin(); }}
             placeholderTextColor={themeColors.textMuted}
             style={[
               styles.pinInput,
@@ -136,11 +145,12 @@ export const SignInScreen = ({ navigation }: Props) => {
           </Pressable>
         </View>
       </View>
-    </Screen>
+    </KeyboardAwareFormScreen>
   );
 };
 
 const styles = StyleSheet.create({
+  formContent: { justifyContent: 'center' },
   container: {
     flex: 1,
     justifyContent: 'center'

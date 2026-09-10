@@ -98,9 +98,10 @@ export const CountryPicker = ({ selectedCountry, onSelect }: Props) => {
             />
 
             <FlatList
+              keyboardDismissMode="on-drag"
+              keyboardShouldPersistTaps="handled"
               data={filteredCountries}
               keyExtractor={(item) => item.iso2}
-              keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.countryList}
               renderItem={({ item }) => {
                 const selected = item.iso2 === selectedCountry.iso2;

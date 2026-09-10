@@ -1,7 +1,7 @@
 import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Platform, ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { colors, getThemeGradients, spacing } from '../design/tokens';
 import { useAppContext } from '../state/AppContext';
 
@@ -22,7 +22,14 @@ export const Screen = ({
     <LinearGradient colors={[...backgroundGradient]} style={styles.gradient}>
       <SafeAreaView style={styles.safe}>
         {scroll ? (
-          <ScrollView contentContainerStyle={[styles.content, contentStyle]} showsVerticalScrollIndicator={false}>{children}</ScrollView>
+          <ScrollView
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            contentContainerStyle={[styles.content, contentStyle]}
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+          >{children}</ScrollView>
         ) : (
           <View style={[styles.content, contentStyle]}>{children}</View>
         )}

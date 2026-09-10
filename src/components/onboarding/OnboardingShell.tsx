@@ -83,7 +83,14 @@ export const OnboardingShell = ({ phase, phaseLabel, step, total, onBack, childr
             </View>
           </View>
         </View>
-        {scroll ? <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>{content}</ScrollView> : content}
+        {scroll ? <ScrollView
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+        >{content}</ScrollView> : content}
         {action ? <View style={[styles.action, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>{action}</View> : null}
       </KeyboardAvoidingView>
     </SafeAreaView>

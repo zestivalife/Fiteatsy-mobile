@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Screen } from '../../components/Screen';
+import { KeyboardAwareFormScreen } from '../../components/KeyboardAwareFormScreen';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { getThemeColors, radius, shadows, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
@@ -22,6 +22,9 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const currentPinRef = useRef<TextInput>(null);
+  const newPinRef = useRef<TextInput>(null);
+  const confirmPinRef = useRef<TextInput>(null);
 
   const valid =
     currentPin.length === PIN_LENGTH &&
@@ -71,16 +74,22 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
     value: string,
     onChangeText: (value: string) => void,
     placeholder: string
+    , ref: React.RefObject<TextInput | null>
+    , nextRef?: React.RefObject<TextInput | null>
   ) => (
     <View style={styles.inputGroup}>
       <Text style={[styles.inputLabel, { color: palette.textSecondary }]}>{label}</Text>
       <TextInput
+        ref={ref}
         value={value}
         onChangeText={(next) => onChangeText(normalizePin(next))}
         keyboardType="number-pad"
         secureTextEntry
         maxLength={PIN_LENGTH}
         placeholder={placeholder}
+        returnKeyType={nextRef ? 'next' : 'done'}
+        blurOnSubmit={!nextRef}
+        onSubmitEditing={() => nextRef ? nextRef.current?.focus() : valid && void submit()}
         placeholderTextColor={palette.textMuted}
         style={[
           styles.pinInput,
@@ -95,7 +104,7 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
   );
 
   return (
-    <Screen>
+    <KeyboardAwareFormScreen contentStyle={styles.formContent}>
       <View style={styles.container}>
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
           <Text style={[styles.kicker, { color: palette.blue }]}>Security</Text>
@@ -106,9 +115,9 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
             Use exactly 6 digits. Do not reuse the temporary default PIN.
           </Text>
 
-          {renderPinInput('Current PIN', currentPin, setCurrentPin, force ? '123456' : 'Current PIN')}
-          {renderPinInput('New PIN', newPin, setNewPin, 'New 6 digit PIN')}
-          {renderPinInput('Confirm New PIN', confirmNewPin, setConfirmNewPin, 'Confirm PIN')}
+          {renderPinInput('Current PIN', currentPin, setCurrentPin, force ? '123456' : 'Current PIN', currentPinRef, newPinRef)}
+          {renderPinInput('New PIN', newPin, setNewPin, 'New 6 digit PIN', newPinRef, confirmPinRef)}
+          {renderPinInput('Confirm New PIN', confirmNewPin, setConfirmNewPin, 'Confirm PIN', confirmPinRef)}
 
           {error ? <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text> : null}
           {success ? <Text style={[styles.successText, { color: palette.success }]}>{success}</Text> : null}
@@ -121,11 +130,12 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
           ) : null}
         </View>
       </View>
-    </Screen>
+    </KeyboardAwareFormScreen>
   );
 };
 
 const styles = StyleSheet.create({
+  formContent: { justifyContent: 'center' },
   container: {
     flex: 1,
     justifyContent: 'center'

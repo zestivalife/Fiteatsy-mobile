@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppBackButton } from '../../components/AppBackButton';
-import { Screen } from '../../components/Screen';
+import { KeyboardAwareFormScreen } from '../../components/KeyboardAwareFormScreen';
 import { radius, spacing } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { MealRelation, Medication, MedicationType, ReminderSound } from '../../types';
@@ -318,8 +318,7 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
   };
 
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <KeyboardAwareFormScreen contentStyle={styles.content}>
         <View style={styles.header}>
           <AppBackButton onPress={() => navigation.goBack()} iconOnly />
           <View>
@@ -471,8 +470,6 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
             {editing ? 'Save Changes' : 'Save Medication'}
           </Text>
         </Pressable>
-      </ScrollView>
-
       <Modal visible={pickerSheet !== null} transparent animationType="slide" onRequestClose={() => setPickerSheet(null)}>
         <Pressable style={styles.sheetOverlay} onPress={() => setPickerSheet(null)} />
         {pickerSheet?.type === 'startDate' || pickerSheet?.type === 'endDate'
@@ -481,7 +478,7 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
             ? renderTimeSheet(pickerSheet)
             : null}
       </Modal>
-    </Screen>
+    </KeyboardAwareFormScreen>
   );
 };
 
