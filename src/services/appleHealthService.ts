@@ -5,6 +5,11 @@ import type { HealthObservationDraft, WearableSyncPayload } from '../types';
 
 export const APPLE_HEALTH_SCOPES = ['steps','sleep_minutes','resting_heart_rate','heart_rate','hrv_ms',
   'workout_minutes','active_energy','distance','weight','hydration_ml','spo2','respiratory_rate'];
+const APPLE_HEALTH_STATUS_KEYS: Record<string, string> = {
+  steps: 'steps', sleep_minutes: 'sleep', resting_heart_rate: 'heart_rate', heart_rate: 'heart_rate',
+  hrv_ms: 'hrv', workout_minutes: 'workouts', active_energy: 'calories', distance: 'distance',
+  weight: 'weight', hydration_ml: 'hydration', spo2: 'spo2', respiratory_rate: 'respiratory_rate'
+};
 export const inspectAppleHealthAvailability = async () => Platform.OS === 'ios' && isHealthKitAvailable();
 export const requestAppleHealthPermissions = async () => requestHealthKitAuthorization(APPLE_HEALTH_SCOPES);
 
@@ -13,6 +18,7 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
   const start = new Date(Date.now() - 90 * 86400000).toISOString();
   const observations: HealthObservationDraft[] = []; const nextAnchors: Record<string,string> = {};
   const statuses: Record<string,string> = {};
+  console.info('[AppleHealth] bounded read started', { metricCount: APPLE_HEALTH_SCOPES.length });
   for (const metric of APPLE_HEALTH_SCOPES) {
     try {
       const result = await readHealthKitChanges(metric, anchors[metric], anchors[metric] ? undefined : start);
@@ -26,8 +32,15 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
           measurementMethod:sample.measurementMethod} }));
       result.deletedIds.forEach((id) => observations.push({metricType:metric,value:0,unit:'deleted',measuredAtISO:new Date().toISOString(),
         sourceProvider:'apple_health',sourceRecordId:id,syncKey:`apple_health:${metric}:${id}`,deleted:true}));
-      statuses[metric] = result.samples.length ? 'synced' : 'no_recent_data';
-    } catch { statuses[metric] = 'read_failed'; }
+      const statusKey = APPLE_HEALTH_STATUS_KEYS[metric] ?? metric;
+      const nextStatus = result.samples.length ? 'synced' : 'no_recent_data';
+      statuses[statusKey] = statuses[statusKey] === 'synced' ? 'synced' : nextStatus;
+      console.info('[AppleHealth] metric read completed', { metric, status: nextStatus, recordCount: result.samples.length });
+    } catch {
+      const statusKey = APPLE_HEALTH_STATUS_KEYS[metric] ?? metric;
+      if (statuses[statusKey] !== 'synced') statuses[statusKey] = 'unavailable';
+      console.info('[AppleHealth] metric read unavailable', { metric });
+    }
   }
   void enableHealthKitBackgroundDelivery(APPLE_HEALTH_SCOPES);
   return {deviceId:'ios-healthkit',brand:'Apple',model:'Apple Health',provider:'Apple Health',syncedAtISO:new Date().toISOString(),source:'api',

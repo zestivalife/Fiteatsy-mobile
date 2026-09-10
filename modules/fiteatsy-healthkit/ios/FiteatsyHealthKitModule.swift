@@ -1,11 +1,13 @@
 import ExpoModulesCore
 import HealthKit
+import OSLog
 
 public final class FiteatsyHealthKitModule: Module {
   private let store = HKHealthStore()
   private let iso = ISO8601DateFormatter()
   private var observerQueries: [HKObserverQuery] = []
   private let metricsKey = "fiteatsy.healthkit.observerMetrics"
+  private let logger = Logger(subsystem: "com.fiteatsy.health", category: "HealthKit")
 
   public func definition() -> ModuleDefinition {
     Name("FiteatsyHealthKit")
@@ -13,14 +15,54 @@ public final class FiteatsyHealthKitModule: Module {
     OnCreate { self.restoreObservers() }
     OnDestroy { self.observerQueries.forEach(self.store.stop); self.observerQueries.removeAll() }
 
-    AsyncFunction("isAvailable") { HKHealthStore.isHealthDataAvailable() }
+    AsyncFunction("isAvailable") {
+      let available = HKHealthStore.isHealthDataAvailable()
+      self.logger.info("HealthKit availability checked: \(available, privacy: .public)")
+      return available
+    }
 
     AsyncFunction("requestAuthorization") { (metrics: [String], promise: Promise) in
-      guard HKHealthStore.isHealthDataAvailable() else { promise.reject("HEALTHKIT_UNAVAILABLE", "HealthKit is unavailable"); return }
-      let types = Set(metrics.compactMap { self.sampleType($0) })
-      self.store.requestAuthorization(toShare: [], read: types) { success, error in
-        if let error { promise.reject("HEALTHKIT_AUTHORIZATION_FAILED", error.localizedDescription); return }
-        promise.resolve(["grantedScopes": success ? metrics : []])
+      guard HKHealthStore.isHealthDataAvailable() else {
+        self.logger.error("HealthKit authorization rejected because HealthKit is unavailable")
+        promise.reject("HEALTHKIT_UNAVAILABLE", "Apple Health is unavailable")
+        return
+      }
+      let supported = metrics.filter { self.sampleType($0) != nil }
+      let unsupported = metrics.filter { self.sampleType($0) == nil }
+      let types = Set(supported.compactMap { self.sampleType($0) })
+      guard !types.isEmpty else {
+        self.logger.error("HealthKit authorization rejected because no requested metric maps to a supported type")
+        promise.reject("HEALTHKIT_NO_SUPPORTED_TYPES", "No supported Apple Health data types were requested")
+        return
+      }
+      self.logger.info("HealthKit authorization invoked; requested=\(metrics.count, privacy: .public), supported=\(supported.count, privacy: .public), omitted=\(unsupported.count, privacy: .public)")
+      self.store.getRequestStatusForAuthorization(toShare: [], read: types) { status, statusError in
+        if let statusError = statusError as NSError? {
+          self.logger.error("HealthKit request-status check failed; domain=\(statusError.domain, privacy: .public), code=\(statusError.code, privacy: .public)")
+        } else {
+          self.logger.info("HealthKit request status before prompt: \(self.requestStatusName(status), privacy: .public)")
+        }
+        DispatchQueue.main.async {
+          self.store.requestAuthorization(toShare: [], read: types) { success, error in
+            if let error = error as NSError? {
+              self.logger.error("HealthKit authorization failed; domain=\(error.domain, privacy: .public), code=\(error.code, privacy: .public)")
+              promise.reject("HEALTHKIT_AUTHORIZATION_FAILED", "Apple Health authorization could not be completed", error)
+              return
+            }
+            self.logger.info("HealthKit authorization completed: \(success, privacy: .public)")
+            guard success else {
+              promise.reject("HEALTHKIT_AUTHORIZATION_NOT_COMPLETED", "Apple Health authorization did not complete")
+              return
+            }
+            promise.resolve([
+              "requestCompleted": true,
+              "requestedScopes": metrics,
+              "supportedScopes": supported,
+              "unsupportedScopes": unsupported,
+              "requestStatus": self.requestStatusName(status)
+            ])
+          }
+        }
       }
     }
 
@@ -31,10 +73,15 @@ public final class FiteatsyHealthKitModule: Module {
       let predicate = start.map { HKQuery.predicateForSamples(withStart: $0, end: nil, options: []) }
       let query = HKAnchoredObjectQuery(type: type, predicate: predicate, anchor: anchor, limit: HKObjectQueryNoLimit) {
         _, samples, deleted, newAnchor, error in
-        if let error { promise.reject("HEALTHKIT_READ_FAILED", error.localizedDescription); return }
+        if let error = error as NSError? {
+          self.logger.error("HealthKit read failed for \(metric, privacy: .public); domain=\(error.domain, privacy: .public), code=\(error.code, privacy: .public)")
+          promise.reject("HEALTHKIT_READ_FAILED", "Apple Health could not read \(metric)", error)
+          return
+        }
         let rows = (samples ?? []).compactMap { self.serialize($0, metric: metric) }
         let deletedIds = (deleted ?? []).map { $0.uuid.uuidString }
         let anchorData = newAnchor.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
+        self.logger.info("HealthKit read completed for \(metric, privacy: .public); records=\(rows.count, privacy: .public)")
         promise.resolve(["samples": rows, "deletedIds": deletedIds, "anchor": anchorData?.base64EncodedString() ?? ""])
       }
       self.store.execute(query)
@@ -48,6 +95,15 @@ public final class FiteatsyHealthKitModule: Module {
         group.enter(); self.store.enableBackgroundDelivery(for: metric, frequency: .hourly) { success, _ in ok = ok && success; group.leave() }
       }
       group.notify(queue: .main) { promise.resolve(ok) }
+    }
+  }
+
+  private func requestStatusName(_ status: HKAuthorizationRequestStatus) -> String {
+    switch status {
+    case .shouldRequest: return "should_request"
+    case .unnecessary: return "unnecessary"
+    case .unknown: fallthrough
+    @unknown default: return "unknown"
     }
   }
 

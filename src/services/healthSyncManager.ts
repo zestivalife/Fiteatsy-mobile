@@ -116,8 +116,6 @@ export const runHealthSync = async (
     const payload = await syncConnectedHealthApp(appId, providerCursors);
     const observations = deriveObservations(payload);
 
-    if (observations.length === 0 && !Object.keys(providerCursors).length) throw new Error('INSUFFICIENT_DATA');
-
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
     for (let offset = 0; offset < observations.length; offset += 500) {
       const ingest = await postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
