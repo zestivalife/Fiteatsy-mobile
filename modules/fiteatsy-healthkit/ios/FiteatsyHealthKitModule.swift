@@ -46,7 +46,7 @@ public final class FiteatsyHealthKitModule: Module {
           self.store.requestAuthorization(toShare: [], read: types) { success, error in
             if let error = error as NSError? {
               self.logger.error("HealthKit authorization failed; domain=\(error.domain, privacy: .public), code=\(error.code, privacy: .public)")
-              promise.reject("HEALTHKIT_AUTHORIZATION_FAILED", "Apple Health authorization could not be completed", error)
+              promise.reject("HEALTHKIT_AUTHORIZATION_FAILED", "Apple Health authorization could not be completed")
               return
             }
             self.logger.info("HealthKit authorization completed: \(success, privacy: .public)")
@@ -75,7 +75,7 @@ public final class FiteatsyHealthKitModule: Module {
         _, samples, deleted, newAnchor, error in
         if let error = error as NSError? {
           self.logger.error("HealthKit read failed for \(metric, privacy: .public); domain=\(error.domain, privacy: .public), code=\(error.code, privacy: .public)")
-          promise.reject("HEALTHKIT_READ_FAILED", "Apple Health could not read \(metric)", error)
+          promise.reject("HEALTHKIT_READ_FAILED", "Apple Health could not read \(metric)")
           return
         }
         let rows = (samples ?? []).compactMap { self.serialize($0, metric: metric) }
