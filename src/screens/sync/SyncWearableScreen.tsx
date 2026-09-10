@@ -27,6 +27,7 @@ import { APPLE_HEALTH_SCOPES, requestAppleHealthPermissions } from '../../servic
 import { acceptWearableConsent, reconcileWearableConnection, withdrawWearableConsent } from '../../services/wearablePlatformService';
 import { registerWearableBackgroundSync, unregisterWearableBackgroundSync } from '../../services/wearableBackgroundSync';
 import { WearableSyncPayload } from '../../types';
+import { clearOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SyncWearable'>;
 
@@ -203,6 +204,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     setSelectedDeviceId,
     onboarding,
     setOnboarding,
+    authSession,
     addWearableSyncData,
     wellness,
     setWellness
@@ -307,20 +309,22 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     }
   }, []);
 
-  const completeOnboardingFlow = useCallback(() => {
+  const exitWearableFlow = useCallback(async (wearablePreference: 'sync' | 'later') => {
     if (onboarding) {
       setOnboarding({
         ...onboarding,
-        wearablePreference: connectionState === 'connected' || connectionState === 'partial' ? 'sync' : 'later'
+        wearablePreference
       });
     }
     setWearableSetupCompleted(true);
-    navigation.navigate('OnboardingCalendar');
-  }, [connectionState, navigation, onboarding, setOnboarding, setWearableSetupCompleted]);
+    await clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
+    if (wearableSetupCompleted && navigation.canGoBack()) navigation.goBack();
+    else navigation.reset({ index:0, routes:[{ name:'Main' }] });
+  }, [authSession?.client.fiteatsyClientId, navigation, onboarding, setOnboarding, setWearableSetupCompleted, wearableSetupCompleted]);
 
   const finishOnboardingFlow = useCallback(() => {
-    completeOnboardingFlow();
-  }, [completeOnboardingFlow]);
+    void exitWearableFlow(connectionState === 'connected' || connectionState === 'partial' || connectionState === 'calibrating' ? 'sync' : 'later');
+  }, [connectionState, exitWearableFlow]);
 
   const requestHealthPermission = useCallback(async () => {
     if (inFlightRef.current) {
@@ -418,6 +422,15 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       setLastResult(result);
 
       const state = classifyRecoveryConnectionState(result.payload);
+      if (Platform.OS === 'ios' && connectionId) {
+        const installationId = await AsyncStorage.getItem('@fiteatsy/wearable-installation-id');
+        if (installationId) {
+          const readableScopes = [...new Set(result.observations.map((item) => item.metricType))];
+          await reconcileWearableConnection({provider:'APPLE_HEALTH',platform:'IOS',installationId,
+            status:readableScopes.length ? (state === 'connected' ? 'CONNECTED' : 'PARTIAL') : 'PARTIAL',
+            grantedScopes:readableScopes,backgroundSyncEnabled:true});
+        }
+      }
       if (isMountedRef.current) {
         setConnectionState(state);
         setStage(state === 'connected' ? 'completed' : state === 'partial' || state === 'calibrating' ? 'partial' : 'insufficient_data');
@@ -505,16 +518,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     return () => subscription.remove();
   }, [connectionId, isRunning, runRecoveryConnection]);
 
-  const skipForNow = () => {
-    if (onboarding) {
-      setOnboarding({
-        ...onboarding,
-        wearablePreference: 'later'
-      });
-    }
-    setWearableSetupCompleted(true);
-    navigation.navigate('OnboardingCalendar');
-  };
+  const skipForNow = () => { void exitWearableFlow('later'); };
 
   const disconnectHealthData = useCallback(async () => {
     if (inFlightRef.current) return;

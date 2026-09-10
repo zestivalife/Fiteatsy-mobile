@@ -128,7 +128,8 @@ public final class FiteatsyHealthKitModule: Module {
       "steps": .stepCount, "resting_heart_rate": .restingHeartRate, "heart_rate": .heartRate,
       "hrv_ms": .heartRateVariabilitySDNN, "active_energy": .activeEnergyBurned,
       "distance": .distanceWalkingRunning, "weight": .bodyMass, "hydration_ml": .dietaryWater,
-      "spo2": .oxygenSaturation, "respiratory_rate": .respiratoryRate
+      "spo2": .oxygenSaturation, "respiratory_rate": .respiratoryRate,
+      "exercise_minutes": .appleExerciseTime
     ]
     if metric == "sleep_minutes" { return HKObjectType.categoryType(forIdentifier: .sleepAnalysis) }
     if metric == "workout_minutes" { return HKObjectType.workoutType() }
@@ -141,10 +142,12 @@ public final class FiteatsyHealthKitModule: Module {
       let units: [String: HKUnit] = ["steps": .count(),"resting_heart_rate": HKUnit.count().unitDivided(by: .minute()),
         "heart_rate": HKUnit.count().unitDivided(by: .minute()),"hrv_ms": .secondUnit(with: .milli),
         "active_energy": .kilocalorie(),"distance": .meter(),"weight": .gramUnit(with: .kilo),
-        "hydration_ml": .literUnit(with: .milli),"spo2": .percent(),"respiratory_rate": HKUnit.count().unitDivided(by: .minute())]
+        "hydration_ml": .literUnit(with: .milli),"spo2": .percent(),"respiratory_rate": HKUnit.count().unitDivided(by: .minute()),
+        "exercise_minutes": .minute()]
       guard let target = units[metric] else { return nil }; value = quantity.quantity.doubleValue(for: target)
       unit = ["steps":"count","resting_heart_rate":"bpm","heart_rate":"bpm","hrv_ms":"ms","active_energy":"kcal",
-              "distance":"m","weight":"kg","hydration_ml":"ml","spo2":"pct","respiratory_rate":"brpm"][metric] ?? ""
+              "distance":"m","weight":"kg","hydration_ml":"ml","spo2":"pct","respiratory_rate":"brpm",
+              "exercise_minutes":"min"][metric] ?? ""
       if metric == "spo2" { value *= 100 }
     }
     var row: [String: Any] = ["id":sample.uuid.uuidString,"metric":metric,"value":value,"unit":unit,
@@ -158,6 +161,7 @@ public final class FiteatsyHealthKitModule: Module {
   private func sleepStage(_ value: Int) -> String {
     if #available(iOS 16.0, *) {
       switch value {
+      case HKCategoryValueSleepAnalysis.inBed.rawValue: return "IN_BED"
       case HKCategoryValueSleepAnalysis.asleepREM.rawValue: return "REM"
       case HKCategoryValueSleepAnalysis.asleepDeep.rawValue: return "DEEP"
       case HKCategoryValueSleepAnalysis.asleepCore.rawValue: return "CORE"
