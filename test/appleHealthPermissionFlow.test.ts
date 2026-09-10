@@ -40,6 +40,30 @@ describe('Apple Health physical-device permission flow', () => {
     expect(apple).toContain("hrv_ms: 'hrv'");
     expect(apple).toContain("workout_minutes: 'workouts'");
     expect(apple).toContain("active_energy: 'calories'");
+    expect(apple).toContain("exercise_minutes: 'workouts'");
+    expect(apple).toContain("sample.metric === 'exercise_minutes' ? 'active_minutes'");
+  });
+
+  it('derives local tracker summaries from real Apple samples without inventing values', () => {
+    expect(apple).toContain('const steps = sum(validValues(metricValues.steps ?? []))');
+    expect(apple).toContain('const sleepMinutes = sum(validValues(metricValues.sleep_minutes ?? []))');
+    expect(apple).toContain('heartRateAvg:restingHeartRate');
+    expect(apple).toContain('hrvMs');
+    expect(apple).toContain("['AWAKE', 'IN_BED'].includes(sample.sleepStage ?? '')");
+  });
+
+  it('preserves Apple Watch/source provenance without filtering valid sources', () => {
+    expect(apple).toContain("device: { manufacturer:'Apple', model:sample.device }");
+    expect(apple).toContain('sourceApplication:sample.sourceApplication');
+    expect(apple).not.toContain('com.apple.health');
+    expect(apple).not.toContain('sourceApplication ===');
+  });
+
+  it('exits the optional wearable flow instead of chaining calendar/reminder onboarding', () => {
+    expect(screen).toContain("clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId)");
+    expect(screen).toContain("navigation.reset({ index:0, routes:[{ name:'Main' }] })");
+    expect(screen).toContain("const skipForNow = () => { void exitWearableFlow('later'); };");
+    expect(screen).not.toContain("navigation.navigate('OnboardingCalendar')");
   });
 
   it('uses platform-correct copy and no unsupported Apple Health URL scheme', () => {
