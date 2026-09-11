@@ -11,6 +11,8 @@ export type HealthMetricRecord = {
     | 'active_minutes'
     | 'mindfulness_minutes'
     | 'hrv_ms'
+    | 'hrv_sdnn_ms'
+    | 'hrv_rmssd_ms'
     | 'calories_kcal'
     | 'workout_minutes'
     | 'stress_score'
@@ -171,7 +173,9 @@ const aggregateLiveMetrics = (records: HealthMetricRecord[]): WearableSyncPayloa
   const activeMinutes = sum(values('active_minutes'));
   const focusMinutes = sum(values('steps')) > 0 ? Math.round(sum(values('steps')) / 120) : null;
   const breathingMinutes = sum(values('mindfulness_minutes'));
-  const hrv = avg(values('hrv_ms'));
+  // Preserve the two standards independently. Prefer the platform-native
+  // series for the connected source; retain hrv_ms only for legacy records.
+  const hrv = avg(values('hrv_sdnn_ms')) ?? avg(values('hrv_rmssd_ms')) ?? avg(values('hrv_ms'));
   const calories = sum(values('calories_kcal'));
   const workoutMinutes = sum(values('workout_minutes'));
   const stress = avg(values('stress_score'));
@@ -230,7 +234,7 @@ export const buildLiveSyncPayload = (params: {
     sleep: !supported.has('sleep') ? 'unsupported' : has('sleep_minutes') ? 'synced' : 'missing',
     steps: !supported.has('workouts') ? (supported.has('calories') ? 'missing' : 'unsupported') : has('steps') ? 'synced' : 'missing',
     heart_rate: !supported.has('heart_rate') ? 'unsupported' : has('resting_heart_rate') ? 'synced' : 'missing',
-    hrv: !supported.has('hrv') ? 'unsupported' : has('hrv_ms') ? 'synced' : 'missing',
+    hrv: !supported.has('hrv') ? 'unsupported' : (has('hrv_sdnn_ms') || has('hrv_rmssd_ms') || has('hrv_ms')) ? 'synced' : 'missing',
     calories: !supported.has('calories') ? 'unsupported' : has('calories_kcal') ? 'synced' : 'missing',
     workouts: !supported.has('workouts') ? 'unsupported' : has('workout_minutes') ? 'synced' : 'missing',
     stress: !supported.has('stress') ? 'unsupported' : has('stress_score') ? 'synced' : 'missing',

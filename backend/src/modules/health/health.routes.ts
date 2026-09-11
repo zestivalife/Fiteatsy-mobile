@@ -53,6 +53,8 @@ const metricUnits: Record<string, ReadonlySet<string>> = {
   sleep_minutes: new Set(['min']),
   resting_heart_rate: new Set(['bpm']),
   hrv_ms: new Set(['ms']),
+  hrv_sdnn_ms: new Set(['ms']),
+  hrv_rmssd_ms: new Set(['ms']),
   workout_minutes: new Set(['min']),
   active_minutes: new Set(['min']),
   active_energy: new Set(['kcal']),

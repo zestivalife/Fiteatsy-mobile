@@ -81,7 +81,8 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
       const observationCountBefore = observations.length;
       result.samples.forEach((sample) => {
         if (sample.metric === 'sleep_minutes' && ['AWAKE', 'IN_BED'].includes(sample.sleepStage ?? '')) return;
-        const canonicalMetric = sample.metric === 'exercise_minutes' ? 'active_minutes' : sample.metric;
+        const canonicalMetric = sample.metric === 'exercise_minutes' ? 'active_minutes'
+          : sample.metric === 'hrv_ms' ? 'hrv_sdnn_ms' : sample.metric;
         metricValues[canonicalMetric] = [...(metricValues[canonicalMetric] ?? []), sample.value];
         observations.push({ metricType:canonicalMetric,value:sample.value,unit:sample.unit,
           measuredAtISO:sample.endAtISO,startAtISO:sample.startAtISO,endAtISO:sample.endAtISO,
@@ -92,7 +93,8 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
             measurementMethod:sample.measurementMethod,
             ...(sample.device ? { device: { manufacturer:'Apple', model:sample.device } } : {})} });
       });
-      const canonicalDeletionMetric = metric === 'exercise_minutes' ? 'active_minutes' : metric;
+      const canonicalDeletionMetric = metric === 'exercise_minutes' ? 'active_minutes'
+        : metric === 'hrv_ms' ? 'hrv_sdnn_ms' : metric;
       result.deletedIds.forEach((id) => observations.push({metricType:canonicalDeletionMetric,value:0,unit:'deleted',measuredAtISO:new Date().toISOString(),
         sourceProvider:'apple_health',sourceRecordId:id,syncKey:`apple_health:${metric}:${id}`,deleted:true}));
       const statusKey = APPLE_HEALTH_STATUS_KEYS[metric] ?? metric;
@@ -110,10 +112,11 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
   const sleepMinutes = sum(validValues(metricValues.sleep_minutes ?? []));
   const restingHeartRate = average(validValues(metricValues.resting_heart_rate ?? []))
     ?? average(validValues(metricValues.heart_rate ?? []));
-  const hrvMs = average(validValues(metricValues.hrv_ms ?? []));
+  const hrvMs = average(validValues(metricValues.hrv_sdnn_ms ?? []));
   const workoutMinutes = Math.max(sum(validValues(metricValues.workout_minutes ?? [])), sum(validValues(metricValues.active_minutes ?? [])));
   const activeEnergy = sum(validValues(metricValues.active_energy ?? []));
   diagnostic('HEALTH_SYNC_COMPLETE', { durationMs: 0, status: observations.length ? 'SUCCESS' : 'NO_DATA' });
+  const metricStatuses = Object.values(statuses);
   return {deviceId:'ios-healthkit',brand:'Apple',model:'Apple Health',provider:'Apple Health',syncedAtISO:new Date().toISOString(),source:'api',
     metrics:{heartRateAvg:restingHeartRate,sleepHours:sleepMinutes > 0 ? sleepMinutes / 60 : null,
       hydrationLiters:sum(validValues(metricValues.hydration_ml ?? [])) / 1000 || null,focusMinutes:null,breathingMinutes:null,
@@ -121,7 +124,12 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
       spo2Pct:average(validValues(metricValues.spo2 ?? [])),respiratoryRateBrpm:average(validValues(metricValues.respiratory_rate ?? []))},
     dataQuality:{confidence:observations.length ? 0.96 : 0,isEstimated:false,
       warnings:observations.length ? [] : ['No recent Apple Health records were found for the requested metrics.'],
-      connectedMetrics:statuses as never,
+      connectedMetrics:statuses as never,syncCounts:{requestedMetricCount:APPLE_HEALTH_SCOPES.length,
+        metricsWithData:metricStatuses.filter((status)=>status==='synced').length,
+        metricsNoData:metricStatuses.filter((status)=>status==='no_recent_data').length,
+        metricsErrored:metricStatuses.filter((status)=>status==='unavailable').length,
+        sourceRecordCount:observations.filter((item)=>!item.deleted).length,
+        normalizedRecordCount:observations.length},
       normalizedDomains:{Activity:steps > 0 || workoutMinutes > 0 ? Math.max(steps / 100, workoutMinutes) : null,
         Sleep:sleepMinutes > 0 ? sleepMinutes / 60 : null,Recovery:hrvMs,Calm:null,Cycle:null,Nutrition:null}},observations,anchors:nextAnchors};
 };

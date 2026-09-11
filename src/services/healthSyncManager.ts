@@ -56,6 +56,14 @@ export type HealthSyncResult = {
   wellness: WellnessSnapshot;
 };
 
+export const HEALTH_SYNC_PIPELINE_TIMEOUT_MS = 45_000;
+export const withHealthSyncPipelineTimeout = <T>(operation: Promise<T>, code: string): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(code)), HEALTH_SYNC_PIPELINE_TIMEOUT_MS);
+    operation.then((value) => { clearTimeout(timeout); resolve(value); },
+      (error) => { clearTimeout(timeout); reject(error); });
+  });
+
 export type HealthObservationDto = HealthObservationDraft & {
   id: string;
   fiteatsyClientId: string;
@@ -133,25 +141,31 @@ export const runHealthSync = async (
 ): Promise<HealthSyncResult> => {
   const run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger) : null;
   try {
-    const checkpoints = governed ? await getWearableCheckpoints(governed.connectionId) : { items: [] };
+    const checkpoints = governed ? await withHealthSyncPipelineTimeout(getWearableCheckpoints(governed.connectionId), 'health_sync_checkpoint_read_timeout') : { items: [] };
     const providerCursors = Object.fromEntries(checkpoints.items.map((item) => [item.metricScope, item.anchorValue ?? item.cursorValue ?? '']));
-    const payload = await syncConnectedHealthApp(appId, providerCursors);
+    const payload = await withHealthSyncPipelineTimeout(syncConnectedHealthApp(appId, providerCursors), 'health_sync_native_read_timeout');
     const observations = deriveObservations(payload);
 
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
     for (let offset = 0; offset < observations.length; offset += 500) {
-      const ingest = await postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
-        '/v1/health/observations:batch', { observations: observations.slice(offset, offset + 500) });
+      const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
+        '/v1/health/observations:batch', { observations: observations.slice(offset, offset + 500) }), 'health_sync_upload_timeout');
       accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
       updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
     }
-    if (run) await finishWearableSyncRun(run.id, { status: rejected ? 'PARTIAL' : 'SUCCESS', recordsRead: observations.length,
-      recordsUploaded: observations.length, recordsInserted: accepted, recordsDuplicates: duplicate, recordsUpdated: updated, recordsDeleted: deleted });
     const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors;
-    if (governed && anchors) await Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
+    if (governed && anchors && rejected === 0) await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
       commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
         ...(governed.provider === 'HEALTH_CONNECT' ? { cursorValue: checkpoint } : { anchorValue: checkpoint }),
-        backfillComplete:true })));
+        backfillComplete:true }))), 'health_sync_checkpoint_commit_timeout');
+    if (run) await finishWearableSyncRun(run.id, { status: rejected ? 'PARTIAL' : 'SUCCESS', recordsRead: observations.length,
+      recordsUploaded: observations.length, recordsInserted: accepted, recordsDuplicates: duplicate, recordsUpdated: updated, recordsDeleted: deleted,
+      checkpointAfter: rejected === 0 ? anchors : undefined });
+
+    if (payload.dataQuality.syncCounts) {
+      payload.dataQuality.syncCounts.uploadRecordCount = observations.length;
+      payload.dataQuality.syncCounts.persistedRecordCount = accepted + duplicate + updated;
+    }
 
     const [scores, status] = await Promise.all([getHealthScoreSummary(), getHealthSyncStatus()]);
     return { payload, observations, accepted, duplicate, rejected, scores, status,

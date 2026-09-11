@@ -88,6 +88,8 @@ const scoreObservation = (metricType: string, value: number): number | null => {
     case 'sleep_minutes':
       return clamp(Math.round(100 - Math.abs(value - 450) / 3));
     case 'hrv_ms':
+    case 'hrv_sdnn_ms':
+    case 'hrv_rmssd_ms':
       return clamp(Math.round((value / 70) * 100));
     case 'resting_heart_rate':
       return clamp(Math.round(100 - Math.abs(value - 62) * 2));
@@ -140,9 +142,9 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
 
   const sleepObservations = recentObservations.filter((item) => item.metricType === 'sleep_minutes');
   const activityObservations = recentObservations.filter((item) => ['steps', 'active_minutes', 'workout_minutes'].includes(item.metricType));
-  const recoveryObservations = recentObservations.filter((item) => ['sleep_minutes', 'hrv_ms', 'resting_heart_rate', 'active_minutes', 'workout_minutes', 'mindfulness_minutes'].includes(item.metricType));
+  const recoveryObservations = recentObservations.filter((item) => ['sleep_minutes', 'hrv_ms', 'hrv_sdnn_ms', 'hrv_rmssd_ms', 'resting_heart_rate', 'active_minutes', 'workout_minutes', 'mindfulness_minutes'].includes(item.metricType));
   const hydrationObservations = recentObservations.filter((item) => item.metricType === 'hydration_ml');
-  const stressObservations = recentObservations.filter((item) => ['stress_score', 'hrv_ms', 'resting_heart_rate', 'mindfulness_minutes', 'sleep_minutes'].includes(item.metricType));
+  const stressObservations = recentObservations.filter((item) => ['stress_score', 'hrv_ms', 'hrv_sdnn_ms', 'hrv_rmssd_ms', 'resting_heart_rate', 'mindfulness_minutes', 'sleep_minutes'].includes(item.metricType));
 
   const nourishmentInputs = scored([
     ...nutritionBiomarkers.map((item) => scoreFromReferenceRange(item.value, item.referenceRange)),

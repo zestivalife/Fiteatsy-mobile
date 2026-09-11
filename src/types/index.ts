@@ -310,6 +310,16 @@ export type WearableSyncPayload = {
       Cycle: number | null;
       Nutrition: number | null;
     };
+    syncCounts?: {
+      requestedMetricCount: number;
+      metricsWithData: number;
+      metricsNoData: number;
+      metricsErrored: number;
+      sourceRecordCount: number;
+      normalizedRecordCount: number;
+      uploadRecordCount?: number;
+      persistedRecordCount?: number;
+    };
   };
   observations?: HealthObservationDraft[];
 };

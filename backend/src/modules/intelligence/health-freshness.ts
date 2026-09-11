@@ -7,6 +7,8 @@ export const HEALTH_OBSERVATION_FRESHNESS_MS: Record<string, number> = {
   sleep_minutes: 48 * 60 * 60 * 1000,
   resting_heart_rate: 7 * 24 * 60 * 60 * 1000,
   hrv_ms: 7 * 24 * 60 * 60 * 1000,
+  hrv_sdnn_ms: 7 * 24 * 60 * 60 * 1000,
+  hrv_rmssd_ms: 7 * 24 * 60 * 60 * 1000,
   workout_minutes: 7 * 24 * 60 * 60 * 1000
 };
 

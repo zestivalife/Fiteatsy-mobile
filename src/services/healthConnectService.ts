@@ -351,7 +351,7 @@ const incrementalObservation = (record: Record<string, any>): HealthObservationD
     Steps: { metricType: 'steps', value: record.count, unit: 'count' },
     SleepSession: { metricType: 'sleep_minutes', value: intervalMinutes, unit: 'min' },
     RestingHeartRate: { metricType: 'resting_heart_rate', value: record.beatsPerMinute, unit: 'bpm' },
-    HeartRateVariabilityRmssd: { metricType: 'hrv_ms', value: record.heartRateVariabilityMillis, unit: 'ms' },
+    HeartRateVariabilityRmssd: { metricType: 'hrv_rmssd_ms', value: record.heartRateVariabilityMillis, unit: 'ms' },
     ExerciseSession: { metricType: 'workout_minutes', value: intervalMinutes, unit: 'min' },
     ActiveCaloriesBurned: { metricType: 'active_energy', value: record.energy?.inKilocalories, unit: 'kcal' },
     Weight: { metricType: 'weight', value: record.weight?.inKilograms, unit: 'kg' },
@@ -606,7 +606,7 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
   if (hasPermission(grantedSet, 'HeartRateVariabilityRmssd')) {
     if (connectedMetrics.hrv !== 'read_failed') connectedMetrics.hrv = hrvAvg ? 'synced' : 'no_recent_data';
     hrvRecords.filter((record) => within(record.time, backfillWindow)).forEach((record) =>
-      addObservation('hrv_ms', record.heartRateVariabilityMillis, 'ms', record.time, 'HeartRateVariabilityRmssd', record)
+      addObservation('hrv_rmssd_ms', record.heartRateVariabilityMillis, 'ms', record.time, 'HeartRateVariabilityRmssd', record)
     );
     console.info('[HealthConnect] HRV read', connectedMetrics.hrv, hrvAvg ?? null);
   }
@@ -706,6 +706,14 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
         Calm: null,
         Cycle: null,
         Nutrition: null
+      },
+      syncCounts: {
+        requestedMetricCount: permissionList.length,
+        metricsWithData: Object.values(connectedMetrics).filter((status) => status === 'synced').length,
+        metricsNoData: Object.values(connectedMetrics).filter((status) => status === 'no_recent_data').length,
+        metricsErrored: Object.values(connectedMetrics).filter((status) => status === 'read_failed').length,
+        sourceRecordCount: observations.filter((item) => !item.deleted).length,
+        normalizedRecordCount: observations.length
       }
     },
     observations
