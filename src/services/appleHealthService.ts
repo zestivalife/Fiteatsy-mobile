@@ -2,9 +2,9 @@ import { Platform } from 'react-native';
 import { enableHealthKitBackgroundDelivery, inspectHealthKitAuthorization, isHealthKitAvailable, readHealthKitChanges,
   requestHealthKitAuthorization } from '../../modules/fiteatsy-healthkit';
 import type { HealthObservationDraft, WearableSyncPayload } from '../types';
+import { APPLE_HEALTH_READ_TYPES } from './healthMetricRegistry';
 
-export const APPLE_HEALTH_SCOPES = ['steps','sleep_minutes','resting_heart_rate','heart_rate','hrv_ms',
-  'workout_minutes','exercise_minutes','active_energy','distance','weight','hydration_ml','spo2','respiratory_rate'];
+export const APPLE_HEALTH_SCOPES = APPLE_HEALTH_READ_TYPES;
 export const APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS = 5_000;
 export const APPLE_HEALTH_PERMISSION_TIMEOUT_MS = 20_000;
 export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 8_000;

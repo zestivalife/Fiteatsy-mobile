@@ -50,10 +50,28 @@ describe('end-to-end health data capture recovery contracts', () => {
   test('source identity and Apple HRV method remain explicit', () => {
     const apple = read('src/services/appleHealthService.ts');
     const android = read('src/services/healthConnectService.ts');
+    const metricRegistry = read('src/services/healthMetricRegistry.ts');
     expect(apple).toContain("providerVersion:sample.measurementMethod ? `APPLE_${sample.measurementMethod}`");
     expect(apple).toContain("sample.metric === 'hrv_ms' ? 'hrv_sdnn_ms'");
     expect(android).toContain("metricType: 'hrv_rmssd_ms'");
-    expect(android).toContain("recordType: 'HeartRateVariabilityRmssd'");
+    expect(android).toContain("hrv: 'HeartRateVariabilityRmssd'");
+    expect(metricRegistry).toContain("healthConnectRecord:'HeartRateVariabilityRmssd'");
     expect(apple).toContain("measurementMethod:sample.measurementMethod");
+  });
+
+  test('uses one mobile metric registry with explicit aggregation and least privilege', () => {
+    const registry = read('src/services/healthMetricRegistry.ts');
+    const apple = read('src/services/appleHealthService.ts');
+    const android = read('src/services/healthConnectService.ts');
+    const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    for (const aggregation of ["'SUM'", "'LATEST'", "'AVERAGE'", "'INTERVAL'", "'SAMPLE_SERIES'"]) {
+      expect(registry).toContain(aggregation);
+    }
+    expect(apple).toContain('APPLE_HEALTH_READ_TYPES');
+    expect(android).toContain('HEALTH_CONNECT_READ_RECORDS');
+    expect(screen).toContain('HEALTH_METRIC_REGISTRY.map');
+    expect(android).toContain("accessType: 'read'");
+    expect(android).not.toContain("accessType: 'write'");
+    expect(read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift')).toContain('requestAuthorization(toShare: [], read: types)');
   });
 });

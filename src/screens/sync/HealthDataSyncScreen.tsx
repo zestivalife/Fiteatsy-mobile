@@ -19,27 +19,19 @@ import {
 } from '../../services/healthSyncManager';
 import { useAppContext } from '../../state/AppContext';
 import { inspectAppleHealthPermissionState } from '../../services/appleHealthService';
+import { HEALTH_METRIC_REGISTRY } from '../../services/healthMetricRegistry';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthDataSync'>;
 type UiState = 'idle'|'syncing'|'success'|'partial'|'error';
 type MetricDefinition = { type:string; label:string; icon:keyof typeof Ionicons.glyphMap };
 type PermissionRefreshState = 'idle'|'checking'|'available'|'action_needed'|'error';
 
-const definitions:MetricDefinition[] = [
-  {type:'steps',label:'Steps',icon:'footsteps-outline'},
-  {type:'distance',label:'Distance',icon:'navigate-outline'},
-  {type:'sleep_minutes',label:'Sleep',icon:'moon-outline'},
-  {type:'heart_rate',label:'Heart Rate',icon:'heart-outline'},
-  {type:'resting_heart_rate',label:'Resting Heart Rate',icon:'heart-circle-outline'},
-  {type:'hrv_sdnn_ms',label:'HRV (SDNN)',icon:'pulse-outline'},
-  {type:'hrv_rmssd_ms',label:'HRV (RMSSD)',icon:'pulse-outline'},
-  {type:'active_energy',label:'Active Energy',icon:'flame-outline'},
-  {type:'workout_minutes',label:'Exercise',icon:'fitness-outline'},
-  {type:'workout',label:'Workouts',icon:'barbell-outline'},
-  {type:'weight',label:'Weight',icon:'scale-outline'},
-  {type:'respiratory_rate',label:'Respiratory Rate',icon:'cloud-outline'},
-  {type:'blood_oxygen',label:'Blood Oxygen',icon:'water-outline'}
-];
+const metricIcons:Record<string,keyof typeof Ionicons.glyphMap>={steps:'footsteps-outline',distance:'navigate-outline',sleep:'moon-outline',
+  heart_rate:'heart-outline',resting_heart_rate:'heart-circle-outline',hrv_sdnn:'pulse-outline',hrv_rmssd:'pulse-outline',
+  active_energy:'flame-outline',exercise:'fitness-outline',workout:'barbell-outline',weight:'scale-outline',hydration:'water-outline',
+  spo2:'water-outline',respiratory_rate:'cloud-outline'};
+const definitions:MetricDefinition[]=HEALTH_METRIC_REGISTRY.map((metric)=>({type:metric.backendCanonicalType,label:metric.displayName,
+  icon:metricIcons[metric.metricKey]??'analytics-outline'}));
 
 const providerName=(provider?:string|null)=>provider==='APPLE_HEALTH'||Platform.OS==='ios'?'Apple Health':'Health Connect';
 const formatWhen=(iso?:string|null)=>{

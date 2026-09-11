@@ -11,6 +11,7 @@ import {
 } from 'react-native-health-connect';
 import { HealthObservationDraft, WearableSyncPayload } from '../types';
 import { runHealthConnectOperation } from './healthConnectOperationCoordinator';
+import { HEALTH_CONNECT_READ_RECORDS } from './healthMetricRegistry';
 
 type HealthConnectMetricStatus = 'synced' | 'no_permission' | 'no_recent_data' | 'read_failed' | 'unsupported' | 'unavailable';
 
@@ -30,16 +31,9 @@ export const withHealthConnectTimeout = <T>(operation: Promise<T>, timeoutMs = H
 
 const toIso = (ms: number) => new Date(ms).toISOString();
 
-const permissionList: Permission[] = [
-  { accessType: 'read', recordType: 'Steps' },
-  { accessType: 'read', recordType: 'SleepSession' },
-  { accessType: 'read', recordType: 'RestingHeartRate' },
-  { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
-  { accessType: 'read', recordType: 'ExerciseSession' },
-  { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
-  { accessType: 'read', recordType: 'Weight' },
-  { accessType: 'read', recordType: 'Distance' }
-];
+const permissionList: Permission[] = HEALTH_CONNECT_READ_RECORDS.map((recordType) => ({
+  accessType: 'read', recordType: recordType as Permission['recordType']
+}));
 
 const metricPermissionMap = {
   sleep: 'SleepSession',
