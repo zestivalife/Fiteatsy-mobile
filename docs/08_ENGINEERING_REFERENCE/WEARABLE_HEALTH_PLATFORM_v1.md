@@ -84,6 +84,19 @@ All backend records, connections, checkpoints and runs are authenticated and cli
 
 Native builds are repository-reproducible through committed `package-lock.json`, `ios/Podfile.lock`, Expo configuration, local Expo module metadata, iOS entitlements, Android permissions and Gradle configuration. The only runtime environment input is the documented API base URL (`EXPO_PUBLIC_API_BASE_URL`) with the committed non-loopback Expo fallback. No ignored local native patch is part of the build contract.
 
+## Connection identity and routing
+
+| Status field | Meaning | Connection identity | Sync outcome | Transient |
+|---|---|---:|---:|---:|
+| Provider `connectionId` | Durable governed provider relationship | Yes | No | No |
+| Provider `connectionAuthority` | Durable or observation-inferred relationship provenance | Yes | No | No |
+| Provider `consentStatus` | Active or explicitly withdrawn product consent | Yes | No | No |
+| Provider `status` | Current permission/sync condition | No | Yes | May be |
+| Provider `freshness` / `lastErrorCode` | Recency and latest operational failure | No | Yes | Yes |
+| Aggregate `overallStatus` | Convenience projection of provider outcomes | No | Yes | Yes |
+
+Home navigation is resolved from persisted provider identity. Only an authoritative response with no durable or observation-inferred relationship opens first-time connection onboarding. An unresolved request remains disabled. An existing connection routes to Health Data Sync for connected, partial, stale, no-data, action-required and error outcomes.
+
 ## Physical source-parity checklist
 
 For every supported metric capture: source-app displayed value, source record count, FitEatsy raw count, normalized count, deduplicated/persisted count, aggregate value and UI value. Acceptance requires logical-value parity, not merely receipt of records. Repeat the same sync to prove zero duplicate observations; then test offline upload/retry, force-close/restart, logout/account switch, one metric timeout, partial permission, Setup Later and Back.

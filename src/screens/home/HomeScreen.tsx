@@ -31,7 +31,8 @@ import {
   getHealthScoreSummary,
   type HealthScoreSummary
 } from '../../services/healthIntelligenceService';
-import { getHealthSyncStatus } from '../../services/healthSyncManager';
+import { getHealthSyncStatus, type HealthSyncStatus } from '../../services/healthSyncManager';
+import { resolveHealthSyncRoute } from '../../services/healthSyncRouting';
 import type { Medication, MedicationLogStatus } from '../../types';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import { resolveClientFirstName } from '../../utils/clientIdentity';
@@ -132,7 +133,7 @@ export const HomeScreen = () => {
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
   const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
   const [healthSummary, setHealthSummary] = useState<HealthScoreSummary | null>(null);
-  const [healthSyncConnected, setHealthSyncConnected] = useState(false);
+  const [healthSyncStatus, setHealthSyncStatus] = useState<HealthSyncStatus | null>(null);
   const [recoveryTrend, setRecoveryTrend] = useState<number[]>([]);
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
@@ -236,12 +237,12 @@ export const HomeScreen = () => {
 
   const refreshHealthConnection = useCallback(async () => {
     if (!hasAuthSession) {
-      setHealthSyncConnected(false);
+      setHealthSyncStatus(null);
       return;
     }
     try {
       const status = await getHealthSyncStatus();
-      setHealthSyncConnected(status.overallStatus === 'CONNECTED');
+      setHealthSyncStatus(status);
     } catch {
       // Keep the previous connection state when the status endpoint is temporarily unavailable.
     }
@@ -321,6 +322,7 @@ export const HomeScreen = () => {
     : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D' };
   const selectedState = stateFromScore(selected.score);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
+  const healthSyncRoute = resolveHealthSyncRoute(healthSyncStatus);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -354,15 +356,12 @@ export const HomeScreen = () => {
                 onPress={() => { void openAssist(); }}
               />
               <ActionPill
-                label={healthSyncConnected ? 'Sync' : 'Connect'}
+                label={healthSyncRoute.ctaLabel}
                 Icon={WearableSyncIcon}
                 onPress={() => {
-                  if (healthSyncConnected) {
-                    navigation.navigate('HealthDataSync');
-                  } else {
-                    navigation.navigate('SyncWearable');
-                  }
+                  if (healthSyncRoute.destination) navigation.navigate(healthSyncRoute.destination);
                 }}
+                disabled={healthSyncRoute.connectionState === 'UNKNOWN'}
               />
               <ActionPill label="Health Reports" Icon={ReportsActionIcon} onPress={() => navigation.navigate('Reports')} />
               <ActionPill label="Cycle" Icon={CycleActionIcon} onPress={() => navigation.navigate('Cycle')} />
@@ -448,8 +447,8 @@ const CycleActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
   <Ionicons name="calendar-outline" size={Math.min(Number(width), Number(height))} color="#FFFFFF" />
 );
 
-const ActionPill = ({ label, Icon, onPress }: { label: string; Icon: SvgAsset; onPress: () => void }) => (
-  <Pressable onPress={onPress} style={styles.actionPill} accessibilityRole="button">
+const ActionPill = ({ label, Icon, onPress, disabled = false }: { label: string; Icon: SvgAsset; onPress: () => void; disabled?: boolean }) => (
+  <Pressable onPress={onPress} disabled={disabled} style={[styles.actionPill, disabled && { opacity:0.65 }]} accessibilityRole="button">
     <Icon width={18} height={18} />
     <Text style={styles.actionText}>{label}</Text>
   </Pressable>

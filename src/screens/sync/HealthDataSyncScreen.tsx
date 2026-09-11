@@ -20,6 +20,7 @@ import {
 import { useAppContext } from '../../state/AppContext';
 import { inspectAppleHealthPermissionState } from '../../services/appleHealthService';
 import { HEALTH_METRIC_REGISTRY } from '../../services/healthMetricRegistry';
+import { resolveHealthSyncRoute } from '../../services/healthSyncRouting';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthDataSync'>;
 type UiState = 'idle'|'syncing'|'success'|'partial'|'error';
@@ -45,11 +46,11 @@ const displayValue=(item:HealthObservationDto)=>{
   if(item.metricType==='sleep_minutes')return {value:(item.value/60).toFixed(1),unit:'hr'};
   return {value:new Intl.NumberFormat().format(item.value),unit:item.unit};
 };
-const metricStatus=(item:HealthObservationDto|undefined,status:HealthSyncStatus|null,permissionRefresh:PermissionRefreshState)=>{
+const metricStatus=(item:HealthObservationDto|undefined,connected:boolean,permissionRefresh:PermissionRefreshState)=>{
   if(permissionRefresh==='checking')return 'Checking';
-  if(!item)return status?.overallStatus==='CONNECTED'?'No recent data':'Action needed';
+  if(!item)return connected?'No recent data':'Action needed';
   const age=Date.now()-new Date(item.measuredAtISO).getTime();
-  if(status?.overallStatus==='NOT_CONNECTED')return 'Action needed';
+  if(!connected)return 'Action needed';
   if(age>36*60*60*1000)return 'Last updated earlier';
   return 'Synced';
 };
@@ -82,7 +83,7 @@ export const HealthDataSyncScreen=({navigation}:Props)=>{
     return map;
   },[observations]);
   const metrics=definitions.map(definition=>({definition,item:latestByMetric.get(definition.type)}));
-  const connected=status?.overallStatus==='CONNECTED';
+  const connected=resolveHealthSyncRoute(status).connectionState==='CONNECTED';
   const platformStatus=Platform.OS==='ios'?status?.appleHealth:status?.healthConnect;
   const source=providerName(Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT');
 
@@ -155,7 +156,7 @@ export const HealthDataSyncScreen=({navigation}:Props)=>{
       </Card>
 
       <Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Your Health Data</Text>
-      {metrics.map(({definition,item})=>{const shown=item?displayValue(item):null;const label=metricStatus(item,status,permissionRefresh);return <Pressable key={definition.type} disabled={!item} accessibilityRole="button" accessibilityLabel={`${definition.label}, ${shown?`${shown.value} ${shown.unit}`:'no recent data'}, ${label}`} onPress={()=>item&&setSelected(item)}><Card style={styles.metricCard}><View style={[styles.metricIcon,{backgroundColor:palette.surfaceTint}]}><Ionicons name={definition.icon} size={20} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.cardTitle,{color:palette.textPrimary}]}>{definition.label}</Text>{shown?<Text style={[styles.metricValue,{color:palette.textPrimary}]}>{shown.value} <Text style={styles.metricUnit}>{shown.unit}</Text></Text>:null}<Text style={[styles.caption,{color:palette.textMuted}]}>{item?`${source} · Updated ${formatWhen(item.measuredAtISO).toLowerCase()}`:`${source} · No recent data`}</Text></View><Text style={[styles.chipText,{color:label==='Synced'?palette.success:palette.warning}]}>{label}</Text></Card></Pressable>;})}
+      {metrics.map(({definition,item})=>{const shown=item?displayValue(item):null;const label=metricStatus(item,connected,permissionRefresh);return <Pressable key={definition.type} disabled={!item} accessibilityRole="button" accessibilityLabel={`${definition.label}, ${shown?`${shown.value} ${shown.unit}`:'no recent data'}, ${label}`} onPress={()=>item&&setSelected(item)}><Card style={styles.metricCard}><View style={[styles.metricIcon,{backgroundColor:palette.surfaceTint}]}><Ionicons name={definition.icon} size={20} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.cardTitle,{color:palette.textPrimary}]}>{definition.label}</Text>{shown?<Text style={[styles.metricValue,{color:palette.textPrimary}]}>{shown.value} <Text style={styles.metricUnit}>{shown.unit}</Text></Text>:null}<Text style={[styles.caption,{color:palette.textMuted}]}>{item?`${source} · Updated ${formatWhen(item.measuredAtISO).toLowerCase()}`:`${source} · No recent data`}</Text></View><Text style={[styles.chipText,{color:label==='Synced'?palette.success:palette.warning}]}>{label}</Text></Card></Pressable>;})}
 
       <Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Sync Activity</Text>
       <Card>{activity.length?activity.map((item,index)=><View key={item.id} style={[styles.activityRow,index>0&&{borderTopColor:palette.stroke,borderTopWidth:1}]}><View style={styles.grow}><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(item.completedAtISO??item.startedAtISO)}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.status==='SUCCESS'?`${item.metricsUpdated} records updated`:item.status==='PARTIAL'?'Some health data updated':item.status==='RUNNING'?'Syncing health data':'Health data could not be updated'}</Text></View><Text style={[styles.chipText,{color:item.status==='FAILED'?palette.danger:item.status==='PARTIAL'?palette.warning:palette.success}]}>{item.status==='SUCCESS'?'Successful':item.status==='PARTIAL'?'Partial':item.status==='RUNNING'?'Updating':'Couldn’t sync'}</Text></View>):<Text style={[styles.body,{color:palette.textSecondary}]}>Your recent sync activity will appear here.</Text>}</Card>

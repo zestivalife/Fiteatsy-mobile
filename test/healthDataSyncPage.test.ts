@@ -8,9 +8,10 @@ describe('Health Data Sync control-centre contracts', () => {
   test('routes connected users to the control centre and disconnected users to permission onboarding', () => {
     const home = read('src/screens/home/HomeScreen.tsx');
     expect(home).toContain('getHealthSyncStatus');
-    expect(home).toContain("status.overallStatus === 'CONNECTED'");
-    expect(home).toContain("navigation.navigate('HealthDataSync')");
-    expect(home).toContain("navigation.navigate('SyncWearable')");
+    expect(home).toContain('resolveHealthSyncRoute(healthSyncStatus)');
+    expect(home).toContain('navigation.navigate(healthSyncRoute.destination)');
+    expect(home).toContain("healthSyncRoute.connectionState === 'UNKNOWN'");
+    expect(home).not.toContain("status.overallStatus === 'CONNECTED'");
     expect(read('src/navigation/types.ts')).toContain('HealthDataSync: undefined');
     expect(read('src/navigation/AppNavigation.tsx')).toContain('<Stack.Screen name="HealthDataSync"');
   });
@@ -56,7 +57,7 @@ describe('Health Data Sync control-centre contracts', () => {
   test('fails gracefully and uses truthful zero-data language', () => {
     const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
     expect(screen).toContain("Alert.alert('Unable to open Apple Health settings'");
-    expect(screen).toContain("status?.overallStatus==='CONNECTED'?'No recent data':'Action needed'");
+    expect(screen).toContain("connected?'No recent data':'Action needed'");
     expect(screen).not.toContain('Permission denied');
   });
 });

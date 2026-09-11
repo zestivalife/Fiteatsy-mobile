@@ -22,6 +22,8 @@ import {
   withHealthConnectTimeout
 } from '../../services/healthConnectService';
 import { HealthSyncResult, runHealthSync } from '../../services/healthSyncManager';
+import { getHealthSyncStatus } from '../../services/healthSyncManager';
+import { resolveHealthSyncRoute } from '../../services/healthSyncRouting';
 import { markHealthConnectAwaitingPermissionReturn } from '../../services/healthConnectOperationCoordinator';
 import { APPLE_HEALTH_SCOPES, requestAppleHealthPermissions } from '../../services/appleHealthService';
 import { acceptWearableConsent, reconcileWearableConnection, withdrawWearableConsent } from '../../services/wearablePlatformService';
@@ -237,6 +239,16 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       isMountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void getHealthSyncStatus().then((status) => {
+      if (active && resolveHealthSyncRoute(status).connectionState === 'CONNECTED') {
+        navigation.replace('HealthDataSync');
+      }
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [navigation]);
 
   const applyPermissionState = useCallback((permission: HealthConnectPermissionPreparation) => {
     setPendingInstall(false);

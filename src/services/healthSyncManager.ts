@@ -9,6 +9,11 @@ export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
   | 'REQUESTING_PERMISSION'
   | 'CONNECTED'
+  | 'PARTIAL'
+  | 'NO_DATA'
+  | 'ACTION_REQUIRED'
+  | 'STALE'
+  | 'REVOKED'
   | 'DENIED'
   | 'ERROR'
   | 'NOT_SUPPORTED'
@@ -22,6 +27,8 @@ export type HealthSyncStatus = {
   recordsSynced: number;
   appleHealth: {
     connectionId?: string;
+    connectionAuthority?: string;
+    consentStatus?: string | null;
     status: HealthSyncConnectionState;
     freshness?: string;
     lastSuccessISO?: string | null;
@@ -31,6 +38,8 @@ export type HealthSyncStatus = {
   };
   healthConnect: {
     connectionId?: string;
+    connectionAuthority?: string;
+    consentStatus?: string | null;
     status: HealthSyncConnectionState;
     freshness?: string;
     lastSuccessISO?: string | null;

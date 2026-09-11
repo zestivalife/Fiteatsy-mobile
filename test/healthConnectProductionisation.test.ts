@@ -104,7 +104,8 @@ describe('Health Connect D2 production contracts', () => {
     expect(screen).toContain('acceptWearableConsent(provider, requested)');
     expect(screen).not.toContain('route.params?.autoSync');
     expect(screen).toMatch(/requestHealthPermission[\s\S]*if \(inFlightRef\.current\) \{\s*return;\s*\}/);
-    expect(home).toContain("navigation.navigate('SyncWearable')");
+    expect(home).toContain('navigation.navigate(healthSyncRoute.destination)');
+    expect(home).toContain('resolveHealthSyncRoute(healthSyncStatus)');
     expect(home).not.toContain("navigation.navigate('SyncWearable', { autoSync: true })");
   });
 
