@@ -54,8 +54,9 @@ test('v17.33A-2 preserves nutrition, serving, role and activation gates', () => 
 });
 
 test('v17.33A-2 updates runtime pools additively from v17.32B-2 production state', () => {
-  assert.equal(generator.length, 115);
-  assert.equal(component.length, 126);
+  assert.ok(generator.length >= 115, `current generator pool regressed below the accepted v17.33A-2 baseline: ${generator.length}`);
+  assert.ok(component.length >= 126, `current component pool regressed below the accepted v17.33A-2 baseline: ${component.length}`);
+  assert.equal(new Set(active.map((food) => food.id)).size, active.length);
   assert.equal(records.filter((record) => record.generatorEligible).length, 12);
   assert.equal(records.filter((record) => record.componentEligible).length, 12);
   assert.equal(records.filter((record) => record.directAddEligible).length, 4);

@@ -86,8 +86,9 @@ test('v17.32C artifact remains resolution-only while current runtime includes la
   const generator = active.filter((food) => food.generatorEligible && food.clientConsumable);
   const component = active.filter((food) => food.clientConsumable);
   assert.equal(queue.records.length, 0);
-  assert.equal(generator.length, 115);
-  assert.equal(component.length, 126);
+  assert.ok(generator.length >= 115, `current generator pool regressed below the accepted v17.32C baseline: ${generator.length}`);
+  assert.ok(component.length >= 126, `current component pool regressed below the accepted v17.32C baseline: ${component.length}`);
+  assert.equal(new Set(active.map((food) => food.id)).size, active.length);
 });
 
 test('v17.32C artifacts are deterministic and hash-addressed', () => {

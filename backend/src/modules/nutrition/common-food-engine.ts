@@ -48,6 +48,14 @@ export const canonicalFoodIdentity=(food:Pick<CommonFood,'canonicalCode'|'canoni
   return governed?`${food.foodType}:CODE:${governed}`:`${food.foodType}:NAME:${normalizedIdentity(food.canonicalName||food.displayName)}`;
 };
 const aliasIdentitySet=(food:Pick<CommonFood,'canonicalName'|'displayName'|'aliases'>)=>new Set([food.canonicalName,food.displayName,...food.aliases].map(normalizedIdentity).filter(Boolean));
+const identityStateTokens=(food:Pick<CommonFood,'canonicalName'|'displayName'>)=>{
+  const value=normalizedIdentity(`${food.canonicalName} ${food.displayName}`);
+  return new Set(['raw','ripe','unripe','cooked','boiled','fried','roasted','sprouted','dried','flour','powder'].filter(token=>new RegExp(`\\b${token}\\b`).test(value)));
+};
+const compatibleIdentityState=(left:Pick<CommonFood,'canonicalName'|'displayName'>,right:Pick<CommonFood,'canonicalName'|'displayName'>)=>{
+  const leftStates=identityStateTokens(left);const rightStates=identityStateTokens(right);
+  return leftStates.size===0||rightStates.size===0||[...leftStates].some(state=>rightStates.has(state));
+};
 // Batch-0 IDs are the stable, audited activation identities exposed by the
 // Consultant API.  Earlier catalogue projections can carry the same aliases,
 // but must not win merely because they were concatenated first.
@@ -57,9 +65,12 @@ export const dedupeCanonicalFoods=(input:CommonFood[])=>{
   const accepted:CommonFood[]=[];
   for(const food of input){
     const aliases=aliasIdentitySet(food);
-    const duplicateIndex=accepted.findIndex(existing=>existing.foodType===food.foodType&&(canonicalFoodIdentity(existing)===canonicalFoodIdentity(food)||[...aliasIdentitySet(existing)].some(alias=>aliases.has(alias))));
+    const duplicateIndex=accepted.findIndex(existing=>existing.foodType===food.foodType&&compatibleIdentityState(existing,food)&&(canonicalFoodIdentity(existing)===canonicalFoodIdentity(food)||[...aliasIdentitySet(existing)].some(alias=>aliases.has(alias))));
     if(duplicateIndex<0)accepted.push(food);
-    else if(canonicalRepresentativePriority(food)>canonicalRepresentativePriority(accepted[duplicateIndex]!))accepted[duplicateIndex]=food;
+    else {
+      const existing=accepted[duplicateIndex]!;const mergedAliases=[...new Set([...existing.aliases,...food.aliases])];
+      accepted[duplicateIndex]=canonicalRepresentativePriority(food)>canonicalRepresentativePriority(existing)?{...food,aliases:mergedAliases}:{...existing,aliases:mergedAliases};
+    }
   }
   return accepted;
 };

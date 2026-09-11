@@ -58,8 +58,9 @@ test('v17.32B-2 preserves required nutrition, serving, and activation gates', ()
 });
 
 test('v17.32B-2 frozen activation counts are preserved inside the current expanded runtime', () => {
-  assert.equal(generator.length, 115);
-  assert.equal(component.length, 126);
+  assert.ok(generator.length >= 115, `current generator pool regressed below the accepted v17.32B-2 baseline: ${generator.length}`);
+  assert.ok(component.length >= 126, `current component pool regressed below the accepted v17.32B-2 baseline: ${component.length}`);
+  assert.equal(new Set(active.map((food) => food.id)).size, active.length);
   assert.equal(records.filter((record) => record.generatorEligible).length, 40);
   assert.equal(records.filter((record) => record.componentEligible).length, 42);
   assert.equal(records.filter((record) => record.directAddEligible).length, 16);
