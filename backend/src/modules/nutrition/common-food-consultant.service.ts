@@ -91,11 +91,23 @@ const dedupeExplorerItems=(items:any[])=>{const accepted:any[]=[];const identity
 const countsBy=(items:any[],key:string)=>Object.entries(items.reduce((out,item)=>{const values=Array.isArray(item[key])?item[key]:[item[key]];for(const value of values.filter(Boolean))out[value]=(out[value]??0)+1;return out;},{} as Record<string,number>)).map(([value,count])=>({value,count})).sort((a,b)=>Number(b.count)-Number(a.count)||a.value.localeCompare(b.value));
 const explorerResponseCache=new Map<string,{expiresAt:number;payload:any}>();
 const EXPLORER_RESPONSE_CACHE_TTL_MS=2_000;
+type ExplorerSupportData={approvedAliases:Awaited<ReturnType<typeof listApprovedFoodAliases>>;approvedProposalFoods:Awaited<ReturnType<typeof listApprovedProposalFoods>>;reference:Awaited<ReturnType<typeof listReferenceCatalogueFoods>>};
+const explorerContextCache=new Map<string,{expiresAt:number;value:Promise<Awaited<ReturnType<typeof resolveClientMealGenerationContext>>>}>();
+let explorerSupportCache:{expiresAt:number;value:Promise<ExplorerSupportData>}|null=null;
+const cachedExplorerContext=(account:AuthenticatedAccount,clientId:string,mealHead?:MealHead)=>{
+ const key=`${account.accountId}:${clientId}:${mealHead??''}`;const now=Date.now();const cached=explorerContextCache.get(key);if(cached&&cached.expiresAt>now)return cached.value;if(cached)explorerContextCache.delete(key);
+ const value=resolveClientMealGenerationContext({account,clientId,mealHead}).catch(error=>{explorerContextCache.delete(key);throw error;});
+ if(explorerContextCache.size>=100)explorerContextCache.delete(explorerContextCache.keys().next().value!);explorerContextCache.set(key,{expiresAt:now+EXPLORER_RESPONSE_CACHE_TTL_MS,value});return value;
+};
+const cachedExplorerSupportData=()=>{const now=Date.now();if(explorerSupportCache&&explorerSupportCache.expiresAt>now)return explorerSupportCache.value;
+ const value=Promise.all([listApprovedFoodAliases(),listApprovedProposalFoods(),listReferenceCatalogueFoods({limit:1000,offset:0})]).then(([approvedAliases,approvedProposalFoods,reference])=>({approvedAliases,approvedProposalFoods,reference})).catch(error=>{explorerSupportCache=null;throw error;});
+ explorerSupportCache={expiresAt:now+EXPLORER_RESPONSE_CACHE_TTL_MS,value};return value;
+};
 export async function searchCommonFoods(account:AuthenticatedAccount,clientId:string,q:FoodSearchQuery){
  if(!roleAllowed(account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
  if(!await canAccessConsultantNutritionClient(clientId,account,{allowSeniorAuthority:true}))throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);
  const cacheKey=`${account.accountId}:${clientId}:${JSON.stringify(q)}`;const cached=explorerResponseCache.get(cacheKey);if(cached&&cached.expiresAt>Date.now())return cached.payload;if(cached)explorerResponseCache.delete(cacheKey);
- const [resolved,approvedAliases,approvedProposalFoods,reference]=await Promise.all([resolveClientMealGenerationContext({account,clientId,mealHead:q.mealHead}),listApprovedFoodAliases(),listApprovedProposalFoods(),listReferenceCatalogueFoods({limit:1000,offset:0})]); const term=(q.search??'').toLowerCase();
+ const [resolved,support]=await Promise.all([cachedExplorerContext(account,clientId,q.mealHead),cachedExplorerSupportData()]);const {approvedAliases,approvedProposalFoods,reference}=support; const term=(q.search??'').toLowerCase();
  const aliasesByFoodId=new Map<string,string[]>();for(const item of approvedAliases){const current=aliasesByFoodId.get(item.existing_food_id)??[];current.push(item.alias);aliasesByFoodId.set(item.existing_food_id,current);}const baseWithAliases=foods.map(food=>({...food,aliases:[...new Set([...food.aliases,...(aliasesByFoodId.get(food.id)??[])])]}));const canonicalFoods=dedupeCanonicalFoods([...baseWithAliases,...approvedProposalFoods]);const eligibleIds=q.mealHead?new Set(eligibleCommonFoods(canonicalFoods,resolved.context,q.mealHead).map(food=>food.id)):null;
  const safe=(f:CommonFood)=>f.active&&!f.allergens.some(x=>resolved.context.allergies.includes(x))&&!f.intolerances.some(x=>resolved.context.intolerances.includes(x))&&!f.avoidTags.some(x=>resolved.context.avoids.includes(x))&&!f.clinicalTags.some(x=>resolved.context.clinicalExclusions.includes(x));
  const recommended=(f:CommonFood)=>safe(f)&&f.generatorEligible&&f.clientConsumable&&(!eligibleIds||eligibleIds.has(f.id));
