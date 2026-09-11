@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import closure from '../../backend/src/modules/nutrition/food-curation/data/food_catalogue_closure_v17_34.json' with { type: 'json' };
 import { commonFoodCatalogue } from '../../backend/src/modules/nutrition/common-food-consultant.service.js';
+import { isPracticalReferenceFood } from '../../backend/src/modules/nutrition/practical-indian-food-master.js';
 
 test('v17.34 closes every P0 identity exactly once', () => {
   assert.equal(closure.schemaVersion, 'FITEATSY_FOOD_CATALOGUE_CLOSURE_V17_34');
@@ -27,7 +28,11 @@ test('v17.34 preserves evidence provenance and fails blocked foods closed', () =
     if (item.terminalState === 'BLOCKED_EVIDENCE') {
       assert.equal(item.governedFoodId, null, item.referenceItemId);
       assert.equal(item.sourceMappingId, null, item.referenceItemId);
-      assert.equal(commonFoodCatalogue.some((food) => food.id === item.referenceItemId), false, item.referenceItemId);
+      const laterReference = commonFoodCatalogue.find((food) => food.id === item.referenceItemId);
+      if (laterReference) {
+        assert.equal(isPracticalReferenceFood(laterReference), true, item.referenceItemId);
+        assert.notEqual(laterReference.sourceMappingId, item.sourceMappingId, item.referenceItemId);
+      }
     }
     if (item.terminalState === 'ACTIVATED_GOVERNED') {
       const food = commonFoodCatalogue.find((candidate) => candidate.id === item.governedFoodId);

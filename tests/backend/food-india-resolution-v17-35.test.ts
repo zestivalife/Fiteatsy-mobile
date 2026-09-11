@@ -6,6 +6,7 @@ import decisions from '../../backend/src/modules/nutrition/food-curation/data/fo
 import labQueue from '../../backend/src/modules/nutrition/food-curation/data/food_india_lab_queue_v17_35.json' with { type: 'json' };
 import closure from '../../backend/src/modules/nutrition/food-curation/data/food_catalogue_closure_v17_34.json' with { type: 'json' };
 import { commonFoodCatalogue } from '../../backend/src/modules/nutrition/common-food-consultant.service.js';
+import { isPracticalReferenceFood } from '../../backend/src/modules/nutrition/practical-indian-food-master.js';
 
 test('v17.35 processes exactly the frozen 123-item blocked cohort', () => {
   const blocked = closure.records.filter((item) => item.terminalState === 'BLOCKED_EVIDENCE');
@@ -76,7 +77,8 @@ test('v17.35 fails every unresolved identity closed into the India lab queue', (
     assert.match(item.provenanceHash, /^[a-f0-9]{64}$/);
     assert.match(item.nutritionEvidenceHash, /^[a-f0-9]{64}$/);
     assert.match(item.servingHash, /^[a-f0-9]{64}$/);
-    assert.equal(commonFoodCatalogue.some((food) => food.id === item.referenceItemId), false, item.referenceItemId);
+    const laterReference = commonFoodCatalogue.find((food) => food.id === item.referenceItemId);
+    if (laterReference) assert.equal(isPracticalReferenceFood(laterReference), true, item.referenceItemId);
   }
   for (const item of labQueue.records) {
     assert.equal(item.sampleCountry, 'INDIA');

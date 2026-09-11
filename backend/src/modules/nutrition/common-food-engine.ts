@@ -56,11 +56,10 @@ const compatibleIdentityState=(left:Pick<CommonFood,'canonicalName'|'displayName
   const leftStates=identityStateTokens(left);const rightStates=identityStateTokens(right);
   return leftStates.size===0||rightStates.size===0||[...leftStates].some(state=>rightStates.has(state));
 };
-// Batch-0 IDs are the stable, audited activation identities exposed by the
-// Consultant API.  Earlier catalogue projections can carry the same aliases,
-// but must not win merely because they were concatenated first.
+// Strong governed nutrition always outranks a reference-only projection. Within
+// the same authority tier, Batch-0 IDs remain the stable audited identities.
 const canonicalRepresentativePriority=(food:CommonFood)=>
-  (food.id.startsWith('BATCH0_')?100:0)+(food.generatorEligible?10:0)+(food.active?1:0);
+  (food.sourcePolicyClass==='REFERENCE_CATALOGUE'?0:1000)+(food.id.startsWith('BATCH0_')?100:0)+(food.generatorEligible?10:0)+(food.active?1:0);
 export const dedupeCanonicalFoods=(input:CommonFood[])=>{
   const accepted:CommonFood[]=[];
   for(const food of input){

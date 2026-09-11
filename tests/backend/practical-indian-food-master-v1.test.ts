@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createPracticalReferenceFoods, practicalFoodMasterRows } from '../../backend/src/modules/nutrition/practical-indian-food-master.js';
 import { generateMealCombinations, MEAL_HEADS, scaleNutrition, type ClientFoodContext, type MealHead, type MealTarget } from '../../backend/src/modules/nutrition/common-food-engine.js';
-import { commonFoodCatalogue } from '../../backend/src/modules/nutrition/common-food-consultant.service.js';
+import { commonFoodCatalogue, commonFoodCatalogueMergeReport, governedCommonFoodCatalogue } from '../../backend/src/modules/nutrition/common-food-consultant.service.js';
 import { selectDayDiverseOptions } from '../../backend/src/modules/nutrition/common-food-day-diversity.js';
 
 const status=JSON.parse(readFileSync(new URL('../../backend/src/modules/nutrition/food-master/data/fiteatsy-food-reference-status-v1.json',import.meta.url),'utf8'));
@@ -25,6 +25,15 @@ test('aliases and governed-wins consolidation preserve one canonical runtime ide
   assert.ok(aliases.aliases.some((row:any)=>/bhindi/i.test(row.alias)&&/okra/i.test(row.canonicalName)));
   assert.equal(new Set(commonFoodCatalogue.map(food=>food.id)).size,commonFoodCatalogue.length);
   assert.equal(commonFoodCatalogue.filter(food=>food.id==='BATCH0_1').length,1);
+});
+
+test('combined catalogue is additive and preserves every governed representative',()=>{
+  assert.equal(commonFoodCatalogueMergeReport.finalCanonicalTotal,commonFoodCatalogue.length);
+  assert.equal(commonFoodCatalogueMergeReport.newReferenceInputTotal,createPracticalReferenceFoods().length);
+  assert.equal(commonFoodCatalogueMergeReport.oldGovernedTotal+commonFoodCatalogueMergeReport.newNonDuplicateAdded,commonFoodCatalogue.length);
+  assert.equal(commonFoodCatalogueMergeReport.duplicatesConsolidated+commonFoodCatalogueMergeReport.newNonDuplicateAdded,commonFoodCatalogueMergeReport.newReferenceInputTotal);
+  const finalById=new Map(commonFoodCatalogue.map(food=>[food.id,food]));
+  for(const governed of governedCommonFoodCatalogue){const retained=finalById.get(governed.id);assert.ok(retained,governed.id);assert.deepEqual(retained.nutrientsPer100g,governed.nutrientsPer100g,governed.id);assert.equal(retained.sourceMappingId,governed.sourceMappingId,governed.id);}
 });
 
 test('per-100-g values scale without approximation or fabricated nutrients',()=>{
