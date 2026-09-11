@@ -62,7 +62,7 @@ describe('Apple Health physical-device permission flow', () => {
   it('exits the optional wearable flow instead of chaining calendar/reminder onboarding', () => {
     expect(screen).toContain("clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId)");
     expect(screen).toContain("navigation.reset({ index:0, routes:[{ name:'Main' }] })");
-    expect(screen).toContain("const skipForNow = () => { void exitWearableFlow('later'); };");
+    expect(screen).toContain("const skipForNow = () => { exitWearableFlow('later'); };");
     expect(screen).not.toContain("navigation.navigate('OnboardingCalendar')");
   });
 

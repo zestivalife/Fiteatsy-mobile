@@ -229,6 +229,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   const inFlightRef = useRef(false);
   const awaitingSettingsReturnRef = useRef(false);
   const shouldStartInitialSyncRef = useRef(false);
+  const operationIdRef = useRef(0);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -309,7 +310,11 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     }
   }, []);
 
-  const exitWearableFlow = useCallback(async (wearablePreference: 'sync' | 'later') => {
+  const exitWearableFlow = useCallback((wearablePreference: 'sync' | 'later') => {
+    operationIdRef.current += 1;
+    inFlightRef.current = false;
+    shouldStartInitialSyncRef.current = false;
+    setIsRunning(false);
     if (onboarding) {
       setOnboarding({
         ...onboarding,
@@ -317,7 +322,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       });
     }
     setWearableSetupCompleted(true);
-    await clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
+    void clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
     if (wearableSetupCompleted && navigation.canGoBack()) navigation.goBack();
     else navigation.reset({ index:0, routes:[{ name:'Main' }] });
   }, [authSession?.client.fiteatsyClientId, navigation, onboarding, setOnboarding, setWearableSetupCompleted, wearableSetupCompleted]);
@@ -331,6 +336,8 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       return;
     }
     inFlightRef.current = true;
+    const operationId = ++operationIdRef.current;
+    const isCurrentOperation = () => isMountedRef.current && operationIdRef.current === operationId;
 
     setIsRunning(true);
     setError(null);
@@ -355,12 +362,15 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       const connection = await reconcileWearableConnection({ provider, platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
         installationId, status: Platform.OS === 'ios' ? 'PARTIAL' : grantedScopes.length === permission.requestedCount ? 'CONNECTED' : grantedScopes.length ? 'PARTIAL' : 'PERMISSION_REQUIRED',
         grantedScopes: persistedGrantedScopes, backgroundSyncEnabled: grantedScopes.length > 0 });
+      if (!isCurrentOperation()) return;
       setConnectionId(connection.id);
       shouldStartInitialSyncRef.current = Platform.OS === 'ios' && grantedScopes.length > 0;
       if (grantedScopes.length > 0) await registerWearableBackgroundSync({ connectionId:connection.id,provider,
         appId:Platform.OS === 'ios' ? 'apple-health' : 'health-connect' });
+      if (!isCurrentOperation()) return;
       applyPermissionState(permission);
     } catch (permissionError) {
+      if (!isCurrentOperation()) return;
       const message = permissionError instanceof Error ? permissionError.message : 'health_permission_failed';
       if (message.includes('unavailable')) {
         setStage('not_supported');
@@ -375,8 +385,10 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       }
       setError(message.includes('unavailable') ? 'You can continue without connecting health data.' : 'Health access could not be completed. Please try again.');
     } finally {
-      inFlightRef.current = false;
-      setIsRunning(false);
+      if (operationIdRef.current === operationId) {
+        inFlightRef.current = false;
+        if (isMountedRef.current) setIsRunning(false);
+      }
     }
   }, [applyPermissionState]);
 
@@ -385,6 +397,8 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       return;
     }
     inFlightRef.current = true;
+    const operationId = ++operationIdRef.current;
+    const isCurrentOperation = () => isMountedRef.current && operationIdRef.current === operationId;
 
     if (Platform.OS === 'android' && typeof Platform.Version === 'number' && Platform.Version < 26) {
       if (isMountedRef.current) {
@@ -417,6 +431,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
 
       const result = await withHealthConnectTimeout(runHealthSync(Platform.OS === 'ios' ? 'apple-health' : 'health-connect', wellness,
         connectionId ? { connectionId, provider: Platform.OS === 'ios' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', trigger: 'INITIAL_CONNECT' } : undefined));
+      if (!isCurrentOperation()) return;
       addWearableSyncData(result.payload);
       setSelectedDeviceId(Platform.OS === 'ios' ? 'apple-health' : 'health-connect');
       setLastResult(result);
@@ -454,6 +469,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         setWellness(result.wellness);
       }
     } catch (syncError) {
+      if (!isCurrentOperation()) return;
       const message = syncError instanceof Error ? syncError.message : 'sync_failed';
       if (message === 'health_connect_operation_in_progress') return;
       if (message.includes('health_connect_unavailable')) {
@@ -494,9 +510,11 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         setError('Recovery sync could not be completed right now.');
       }
     } finally {
-      inFlightRef.current = false;
-      if (isMountedRef.current) {
-        setIsRunning(false);
+      if (operationIdRef.current === operationId) {
+        inFlightRef.current = false;
+        if (isMountedRef.current) {
+          setIsRunning(false);
+        }
       }
     }
   }, [addWearableSyncData, connectionId, setSelectedDeviceId, setWellness, wellness]);
@@ -518,7 +536,16 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     return () => subscription.remove();
   }, [connectionId, isRunning, runRecoveryConnection]);
 
-  const skipForNow = () => { void exitWearableFlow('later'); };
+  const skipForNow = () => { exitWearableFlow('later'); };
+
+  const cancelAndGoBack = useCallback(() => {
+    operationIdRef.current += 1;
+    inFlightRef.current = false;
+    shouldStartInitialSyncRef.current = false;
+    setIsRunning(false);
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.reset({ index:0, routes:[{ name:'Main' }] });
+  }, [navigation]);
 
   const disconnectHealthData = useCallback(async () => {
     if (inFlightRef.current) return;
@@ -585,7 +612,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         phase="CONNECT"
         step={1}
         total={3}
-        onBack={() => navigation.goBack()}
+        onBack={cancelAndGoBack}
         action={<View><OnboardingAction title={primaryTitle === 'Continue' ? 'Connect Health Data' : primaryTitle} onPress={handlePrimary} disabled={isRunning} /><OnboardingAction title="Set up later" secondary onPress={skipForNow} /></View>}
       >
         <QuestionHeader title="Connect your health data" description="Fiteatsy can automatically understand your activity, sleep, heart and recovery patterns." />

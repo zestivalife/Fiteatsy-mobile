@@ -60,6 +60,7 @@ const metricStatus=(item:HealthObservationDto,status:HealthSyncStatus|null)=>{
 export const HealthDataSyncScreen=({navigation}:Props)=>{
   const {themeMode,wellness,setWellness,addWearableSyncData,setSelectedDeviceId}=useAppContext();
   const palette=getThemeColors(themeMode);const running=useRef(false);
+  const mounted=useRef(true);const operationId=useRef(0);
   const [status,setStatus]=useState<HealthSyncStatus|null>(null);
   const [observations,setObservations]=useState<HealthObservationDto[]>([]);
   const [activity,setActivity]=useState<HealthSyncActivity[]>([]);
@@ -72,7 +73,7 @@ export const HealthDataSyncScreen=({navigation}:Props)=>{
     ]);
     setStatus(nextStatus);setObservations(nextObservations.items);setActivity(nextActivity.items);
   },[]);
-  useEffect(()=>{let mounted=true;void refresh().catch(()=>mounted&&setMessage('Health sync status is temporarily unavailable.')).finally(()=>mounted&&setLoading(false));return()=>{mounted=false};},[refresh]);
+  useEffect(()=>{mounted.current=true;void refresh().catch(()=>mounted.current&&setMessage('Health sync status is temporarily unavailable.')).finally(()=>mounted.current&&setLoading(false));return()=>{mounted.current=false;operationId.current+=1;running.current=false;};},[refresh]);
 
   const latestByMetric=useMemo(()=>{
     const map=new Map<string,HealthObservationDto>();
@@ -85,17 +86,21 @@ export const HealthDataSyncScreen=({navigation}:Props)=>{
   const source=providerName(Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT');
 
   const syncNow=useCallback(async()=>{
-    if(running.current)return;running.current=true;setUiState('syncing');setMessage(`Connecting to ${source}…`);
+    if(running.current)return;running.current=true;let reachedTerminalState=false;const currentOperation=++operationId.current;
+    const isCurrent=()=>mounted.current&&operationId.current===currentOperation;
+    setUiState('syncing');setMessage(`Connecting to ${source}…`);
     try{
       const connection=Platform.OS==='ios'?status?.appleHealth:status?.healthConnect;
       const result=await runHealthSync(Platform.OS==='ios'?'apple-health':'health-connect',wellness,
         connection?.connectionId?{connectionId:connection.connectionId,provider:Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT',trigger:'MANUAL'}:undefined);
+      if(!isCurrent())return;
       addWearableSyncData(result.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setWellness(result.wellness);
       const partial=result.rejected>0;setUiState(partial?'partial':'success');
+      reachedTerminalState=true;
       setMessage(partial?`Health data partially updated · ${result.accepted} records updated`:`Health data updated · ${result.accepted} records updated`);
       await refresh();
-    }catch{setUiState('error');setMessage('We couldn’t update your health data. Your previous data is safe.');}
-    finally{running.current=false;}
+    }catch{if(isCurrent()){reachedTerminalState=true;setUiState('error');setMessage('We couldn’t update your health data. Your previous data is safe.');}}
+    finally{if(operationId.current===currentOperation){running.current=false;if(mounted.current&&!reachedTerminalState)setUiState('error');}}
   },[addWearableSyncData,refresh,setSelectedDeviceId,setWellness,source,status,wellness]);
 
   if(loading)return <Screen><PageHeader title="Health Data Sync" onBack={()=>navigation.goBack()}/><View style={styles.loading}><ActivityIndicator color={palette.blue}/><Text style={[styles.body,{color:palette.textSecondary}]}>Checking your health connection…</Text></View></Screen>;
