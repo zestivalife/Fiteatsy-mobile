@@ -43,6 +43,7 @@ import { NotificationsScreen } from '../screens/home/NotificationsScreen';
 import { ProfileScreen } from '../screens/home/ProfileScreen';
 import { ConnectedMetricsScreen } from '../screens/sync/ConnectedMetricsScreen';
 import { HealthSyncDebugScreen } from '../screens/sync/HealthSyncDebugScreen';
+import { HealthDataSyncScreen } from '../screens/sync/HealthDataSyncScreen';
 import { ReportsChatScreen } from '../screens/home/ReportsChatScreen';
 import { NutritionPlanScreen } from '../screens/home/NutritionPlanScreen';
 import { NutritionExperienceScreen } from '../screens/home/NutritionExperienceScreen';
@@ -124,6 +125,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="ChangePin" component={ChangePinScreen} />
         <Stack.Screen name="SyncWearable" component={SyncWearableScreen} />
+        <Stack.Screen name="HealthDataSync" component={HealthDataSyncScreen} />
         <Stack.Screen name="SyncSuccess" component={SyncSuccessScreen} />
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="TrackerDetail" component={TrackerDetailScreen} />

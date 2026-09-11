@@ -182,6 +182,18 @@ export const listWearableCheckpoints = async (owner: ClientOwnershipContext, con
   return result.rows;
 };
 
+export const listWearableSyncRuns = async (owner: ClientOwnershipContext, limit = 10) => {
+  const result = await pool.query(
+    `select r.id,r.provider,r.trigger,r.status,r.started_at,r.completed_at,r.records_inserted,
+      r.records_duplicates,r.records_updated,r.records_deleted,r.safe_error_summary
+     from wearable_sync_runs r join wearable_connections wc on wc.id=r.connection_id
+     where r.client_id=$1 and wc.account_id=$2
+     order by r.started_at desc,r.id desc limit $3`,
+    [owner.clientId,owner.accountId,Math.max(1,Math.min(25,limit))]
+  );
+  return result.rows;
+};
+
 export const withdrawWearableConsent = async (owner: ClientOwnershipContext, provider: WearableProvider) => {
   const client = await pool.connect();
   try {

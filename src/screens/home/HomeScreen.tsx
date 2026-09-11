@@ -31,6 +31,7 @@ import {
   getHealthScoreSummary,
   type HealthScoreSummary
 } from '../../services/healthIntelligenceService';
+import { getHealthSyncStatus } from '../../services/healthSyncManager';
 import type { Medication, MedicationLogStatus } from '../../types';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import { resolveClientFirstName } from '../../utils/clientIdentity';
@@ -131,6 +132,7 @@ export const HomeScreen = () => {
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
   const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
   const [healthSummary, setHealthSummary] = useState<HealthScoreSummary | null>(null);
+  const [healthSyncConnected, setHealthSyncConnected] = useState(false);
   const [recoveryTrend, setRecoveryTrend] = useState<number[]>([]);
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
@@ -232,12 +234,26 @@ export const HomeScreen = () => {
     }
   }, [hasAuthSession]);
 
+  const refreshHealthConnection = useCallback(async () => {
+    if (!hasAuthSession) {
+      setHealthSyncConnected(false);
+      return;
+    }
+    try {
+      const status = await getHealthSyncStatus();
+      setHealthSyncConnected(status.overallStatus === 'CONNECTED');
+    } catch {
+      // Keep the previous connection state when the status endpoint is temporarily unavailable.
+    }
+  }, [hasAuthSession]);
+
   useFocusEffect(
     useCallback(() => {
       void refreshPss10Context();
       void refreshDailyNutrition();
       void refreshHealthScores();
-    }, [refreshDailyNutrition, refreshHealthScores, refreshPss10Context])
+      void refreshHealthConnection();
+    }, [refreshDailyNutrition, refreshHealthConnection, refreshHealthScores, refreshPss10Context])
   );
   useEffect(
     () => subscribeToNutritionDay(() => {
@@ -337,7 +353,17 @@ export const HomeScreen = () => {
                 Icon={AssistIcon}
                 onPress={() => { void openAssist(); }}
               />
-              <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable')} />
+              <ActionPill
+                label={healthSyncConnected ? 'Sync' : 'Connect'}
+                Icon={WearableSyncIcon}
+                onPress={() => {
+                  if (healthSyncConnected) {
+                    navigation.navigate('HealthDataSync');
+                  } else {
+                    navigation.navigate('SyncWearable');
+                  }
+                }}
+              />
               <ActionPill label="Health Reports" Icon={ReportsActionIcon} onPress={() => navigation.navigate('Reports')} />
               <ActionPill label="Cycle" Icon={CycleActionIcon} onPress={() => navigation.navigate('Cycle')} />
             </View>

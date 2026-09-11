@@ -21,13 +21,19 @@ export type HealthSyncStatus = {
   latestMeasurementISO: string | null;
   recordsSynced: number;
   appleHealth: {
+    connectionId?: string;
     status: HealthSyncConnectionState;
+    freshness?: string;
+    lastSuccessISO?: string | null;
     lastSyncISO: string | null;
     latestMeasurementISO: string | null;
     recordsSynced: number;
   };
   healthConnect: {
+    connectionId?: string;
     status: HealthSyncConnectionState;
+    freshness?: string;
+    lastSuccessISO?: string | null;
     lastSyncISO: string | null;
     latestMeasurementISO: string | null;
     recordsSynced: number;
@@ -103,6 +109,22 @@ export const getLatestHealthObservations = (limit = 10) =>
   apiFetch<{ total: number; limit: number; offset: number; items: HealthObservationDto[] }>(
     `/v1/health/observations?limit=${encodeURIComponent(String(limit))}`
   );
+
+export type HealthSyncActivity = {
+  id:string;
+  provider:'APPLE_HEALTH'|'HEALTH_CONNECT';
+  trigger:string;
+  status:'RUNNING'|'SUCCESS'|'PARTIAL'|'FAILED';
+  startedAtISO:string;
+  completedAtISO:string|null;
+  metricsUpdated:number;
+  duplicatesSkipped:number;
+  recordsDeleted:number;
+  message:string|null;
+};
+
+export const getHealthSyncActivity = (limit = 10) =>
+  apiFetch<{items:HealthSyncActivity[]}>(`/v1/health/sync-runs?limit=${encodeURIComponent(String(limit))}`);
 
 export const runHealthSync = async (
   appId: HealthAppId,

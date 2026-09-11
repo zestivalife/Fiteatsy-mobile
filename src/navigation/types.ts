@@ -20,6 +20,7 @@ export type RootStackParamList = {
   SignUp: undefined;
   ChangePin: { force?: boolean } | undefined;
   SyncWearable: { autoSync?: boolean } | undefined;
+  HealthDataSync: undefined;
   SyncSuccess: { deviceName: string };
   Main: undefined;
   FocusSession: undefined;

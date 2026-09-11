@@ -11,7 +11,7 @@ import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
 import {
   acceptWearableConsent, commitWearableCheckpoint, completeWearableSyncRun,
-  getActiveWearableConsent, listWearableConnections, listWearableCheckpoints, startWearableSyncRun,
+  getActiveWearableConsent, listWearableConnections, listWearableCheckpoints, listWearableSyncRuns, startWearableSyncRun,
   resolveWearableProviderAuthority, upsertWearableConnection, withdrawWearableConsent, type WearableProvider
 } from './wearable-platform.repository.js';
 
@@ -187,6 +187,19 @@ healthRouter.get('/sync-checkpoints/:connectionId', async (req, res) => {
   const items = await listWearableCheckpoints(currentOwner(getAuthenticatedAccount(req)), req.params.connectionId);
   return res.status(200).json({ items: items.map((item) => ({ metricScope:item.metric_scope,cursorValue:item.cursor_value,
     anchorValue:item.anchor_value,backfillCompletedAt:item.backfill_completed_at,committedAt:item.committed_at })) });
+});
+
+healthRouter.get('/sync-runs', async (req, res) => {
+  const limit = Math.max(1, Math.min(25, Number(req.query.limit || 10)));
+  const items = await listWearableSyncRuns(currentOwner(getAuthenticatedAccount(req)), limit);
+  return res.status(200).json({ items: items.map((item) => ({
+    id:item.id,provider:item.provider,trigger:item.trigger,status:item.status,
+    startedAtISO:new Date(item.started_at).toISOString(),
+    completedAtISO:item.completed_at ? new Date(item.completed_at).toISOString() : null,
+    metricsUpdated:Number(item.records_inserted ?? 0)+Number(item.records_updated ?? 0),
+    duplicatesSkipped:Number(item.records_duplicates ?? 0),recordsDeleted:Number(item.records_deleted ?? 0),
+    message:item.safe_error_summary ?? null
+  })) });
 });
 
 healthRouter.delete('/wearable-consents/:provider', async (req, res) => {
