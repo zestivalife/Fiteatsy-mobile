@@ -1,0 +1,2424 @@
+{
+  "schemaVersion": "FITEATSY_INDIAN_FOOD_ALIASES_V1",
+  "count": 403,
+  "aliases": [
+    {
+      "alias": "Palak",
+      "canonicalId": "BATCH0_1",
+      "canonicalName": "Spinach",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Methi",
+      "canonicalId": "BATCH0_2",
+      "canonicalName": "Fenugreek leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sarson",
+      "canonicalId": "BATCH0_3",
+      "canonicalName": "Mustard greens",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chaulai",
+      "canonicalId": "BATCH0_4",
+      "canonicalName": "Amaranth leaves, green",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Math",
+      "canonicalId": "BATCH0_4",
+      "canonicalName": "Amaranth leaves, green",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Keerai",
+      "canonicalId": "BATCH0_4",
+      "canonicalName": "Amaranth leaves, green",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Lal math",
+      "canonicalId": "BATCH0_5",
+      "canonicalName": "Amaranth leaves, red",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Lal saag",
+      "canonicalId": "BATCH0_5",
+      "canonicalName": "Amaranth leaves, red",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Bathua",
+      "canonicalId": "BATCH0_6",
+      "canonicalName": "Bathua leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Shepu",
+      "canonicalId": "BATCH0_7",
+      "canonicalName": "Dill leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Suva",
+      "canonicalId": "BATCH0_7",
+      "canonicalName": "Dill leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Dhania",
+      "canonicalId": "BATCH0_8",
+      "canonicalName": "Coriander leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Pudina",
+      "canonicalId": "BATCH0_9",
+      "canonicalName": "Mint leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kadi patta",
+      "canonicalId": "BATCH0_10",
+      "canonicalName": "Curry leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Moringa leaves",
+      "canonicalId": "BATCH0_11",
+      "canonicalName": "Drumstick leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Murungai keerai",
+      "canonicalId": "BATCH0_11",
+      "canonicalName": "Drumstick leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Arbi ke patte",
+      "canonicalId": "BATCH0_12",
+      "canonicalName": "Colocasia leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Alu leaves",
+      "canonicalId": "BATCH0_12",
+      "canonicalName": "Colocasia leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Poi",
+      "canonicalId": "BATCH0_13",
+      "canonicalName": "Malabar spinach",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Basale",
+      "canonicalId": "BATCH0_13",
+      "canonicalName": "Malabar spinach",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Mayalu",
+      "canonicalId": "BATCH0_13",
+      "canonicalName": "Malabar spinach",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Roselle leaves",
+      "canonicalId": "BATCH0_14",
+      "canonicalName": "Gongura",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Ambadi",
+      "canonicalId": "BATCH0_14",
+      "canonicalName": "Gongura",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kulfa",
+      "canonicalId": "BATCH0_15",
+      "canonicalName": "Purslane",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kalmi saag",
+      "canonicalId": "BATCH0_16",
+      "canonicalName": "Water spinach",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chuka",
+      "canonicalId": "BATCH0_17",
+      "canonicalName": "Sorrel leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Khatta palak",
+      "canonicalId": "BATCH0_17",
+      "canonicalName": "Sorrel leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Mooli ke patte",
+      "canonicalId": "BATCH0_18",
+      "canonicalName": "Radish leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Beetroot leaves",
+      "canonicalId": "BATCH0_19",
+      "canonicalName": "Beet greens",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Shalgam ke patte",
+      "canonicalId": "BATCH0_20",
+      "canonicalName": "Turnip greens",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Hara pyaz patta",
+      "canonicalId": "BATCH0_21",
+      "canonicalName": "Spring onion greens",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Iceberg lettuce",
+      "canonicalId": "BATCH0_22",
+      "canonicalName": "Lettuce, iceberg",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Romaine lettuce",
+      "canonicalId": "BATCH0_23",
+      "canonicalName": "Lettuce, romaine",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kale",
+      "canonicalId": "BATCH0_24",
+      "canonicalName": "Kale",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Pak choi",
+      "canonicalId": "BATCH0_25",
+      "canonicalName": "Bok choy",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Celery stalk",
+      "canonicalId": "BATCH0_26",
+      "canonicalName": "Celery",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "leaves",
+      "canonicalId": "BATCH0_26",
+      "canonicalName": "Celery",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Agathi keerai",
+      "canonicalId": "BATCH0_27",
+      "canonicalName": "Agathi leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Black nightshade greens",
+      "canonicalId": "BATCH0_28",
+      "canonicalName": "Manathakkali leaves",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sessile joyweed",
+      "canonicalId": "BATCH0_29",
+      "canonicalName": "Ponnanganni greens",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Lauki",
+      "canonicalId": "BATCH0_30",
+      "canonicalName": "Bottle gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Doodhi",
+      "canonicalId": "BATCH0_30",
+      "canonicalName": "Bottle gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Ghiya",
+      "canonicalId": "BATCH0_30",
+      "canonicalName": "Bottle gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Turai",
+      "canonicalId": "BATCH0_31",
+      "canonicalName": "Ridge gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Dodka",
+      "canonicalId": "BATCH0_31",
+      "canonicalName": "Ridge gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Gilki",
+      "canonicalId": "BATCH0_32",
+      "canonicalName": "Sponge gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Ghosale",
+      "canonicalId": "BATCH0_32",
+      "canonicalName": "Sponge gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Karela",
+      "canonicalId": "BATCH0_33",
+      "canonicalName": "Bitter gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Padwal",
+      "canonicalId": "BATCH0_34",
+      "canonicalName": "Snake gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chichinda",
+      "canonicalId": "BATCH0_34",
+      "canonicalName": "Snake gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Petha",
+      "canonicalId": "BATCH0_35",
+      "canonicalName": "Ash gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Winter melon",
+      "canonicalId": "BATCH0_35",
+      "canonicalName": "Ash gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kaddu",
+      "canonicalId": "BATCH0_36",
+      "canonicalName": "Pumpkin",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Bhopla",
+      "canonicalId": "BATCH0_36",
+      "canonicalName": "Pumpkin",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Parwal",
+      "canonicalId": "BATCH0_37",
+      "canonicalName": "Pointed gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Potol",
+      "canonicalId": "BATCH0_37",
+      "canonicalName": "Pointed gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tindora",
+      "canonicalId": "BATCH0_38",
+      "canonicalName": "Ivy gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kundru",
+      "canonicalId": "BATCH0_38",
+      "canonicalName": "Ivy gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tendli",
+      "canonicalId": "BATCH0_38",
+      "canonicalName": "Ivy gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tinda",
+      "canonicalId": "BATCH0_39",
+      "canonicalName": "Round gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kantola",
+      "canonicalId": "BATCH0_40",
+      "canonicalName": "Spine gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kakora",
+      "canonicalId": "BATCH0_40",
+      "canonicalName": "Spine gourd",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chow chow",
+      "canonicalId": "BATCH0_41",
+      "canonicalName": "Chayote",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kheera",
+      "canonicalId": "BATCH0_42",
+      "canonicalName": "Cucumber",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Dosakaya",
+      "canonicalId": "BATCH0_43",
+      "canonicalName": "Yellow cucumber",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Courgette",
+      "canonicalId": "BATCH0_44",
+      "canonicalName": "Zucchini",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tamatar",
+      "canonicalId": "CF_699ec058-eb2c-4942-9bc4-7d851745a299",
+      "canonicalName": "Tomato",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Cherry tomato",
+      "canonicalId": "CF_699ec058-eb2c-4942-9bc4-7d851745a299",
+      "canonicalName": "Cherry tomato",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Baingan",
+      "canonicalId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "canonicalName": "Brinjal, purple",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Vangi",
+      "canonicalId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "canonicalName": "Brinjal, purple",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Long eggplant",
+      "canonicalId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "canonicalName": "Brinjal, long",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Green brinjal",
+      "canonicalId": "CF_b2708c84-9a70-4d12-b757-80c14bc8e396",
+      "canonicalName": "Brinjal, green",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Bhindi",
+      "canonicalId": "BATCH0_50",
+      "canonicalName": "Okra",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Lady finger",
+      "canonicalId": "BATCH0_50",
+      "canonicalName": "Okra",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Shimla mirch",
+      "canonicalId": "BATCH0_51",
+      "canonicalName": "Capsicum, green",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Red bell pepper",
+      "canonicalId": "BATCH0_52",
+      "canonicalName": "Capsicum, red",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Yellow bell pepper",
+      "canonicalId": "BATCH0_53",
+      "canonicalName": "Capsicum, yellow",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Hari mirch",
+      "canonicalId": "BATCH0_54",
+      "canonicalName": "Green chilli",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kaccha papita",
+      "canonicalId": "BATCH0_55",
+      "canonicalName": "Raw papaya",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kaccha kela",
+      "canonicalId": "BATCH0_56",
+      "canonicalName": "Raw banana",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Plantain",
+      "canonicalId": "BATCH0_56",
+      "canonicalName": "Raw banana",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kathal",
+      "canonicalId": "BATCH0_57",
+      "canonicalName": "Raw jackfruit",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Breadfruit",
+      "canonicalId": "BATCH0_58",
+      "canonicalName": "Breadfruit",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Moringa",
+      "canonicalId": "BATCH0_59",
+      "canonicalName": "Drumstick pods",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sahjan",
+      "canonicalId": "BATCH0_59",
+      "canonicalName": "Drumstick pods",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Aloo",
+      "canonicalId": "BATCH0_60",
+      "canonicalName": "Potato",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Shakarkand",
+      "canonicalId": "BATCH0_61",
+      "canonicalName": "Sweet potato",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Gajar",
+      "canonicalId": "BATCH0_62",
+      "canonicalName": "Carrot",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Mooli",
+      "canonicalId": "BATCH0_63",
+      "canonicalName": "Radish",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chukandar",
+      "canonicalId": "BATCH0_64",
+      "canonicalName": "Beetroot",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Shalgam",
+      "canonicalId": "BATCH0_65",
+      "canonicalName": "Turnip",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Suran",
+      "canonicalId": "BATCH0_66",
+      "canonicalName": "Elephant foot yam",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Jimikand",
+      "canonicalId": "BATCH0_66",
+      "canonicalName": "Elephant foot yam",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Arbi",
+      "canonicalId": "BATCH0_67",
+      "canonicalName": "Colocasia root",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Taro",
+      "canonicalId": "BATCH0_67",
+      "canonicalName": "Colocasia root",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Ratalu",
+      "canonicalId": "BATCH0_68",
+      "canonicalName": "Purple yam",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kand",
+      "canonicalId": "BATCH0_68",
+      "canonicalName": "Purple yam",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tapioca",
+      "canonicalId": "BATCH0_69",
+      "canonicalName": "Cassava",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kappa",
+      "canonicalId": "BATCH0_69",
+      "canonicalName": "Cassava",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Koorka",
+      "canonicalId": "BATCH0_70",
+      "canonicalName": "Chinese potato",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kamal kakdi",
+      "canonicalId": "BATCH0_71",
+      "canonicalName": "Lotus root",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Pyaz",
+      "canonicalId": "BATCH0_72",
+      "canonicalName": "Onion, red",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "White onion",
+      "canonicalId": "BATCH0_73",
+      "canonicalName": "Onion, white",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Small onion",
+      "canonicalId": "BATCH0_74",
+      "canonicalName": "Shallots",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sambar onion",
+      "canonicalId": "BATCH0_74",
+      "canonicalName": "Shallots",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Lahsun",
+      "canonicalId": "BATCH0_75",
+      "canonicalName": "Garlic",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Adrak",
+      "canonicalId": "BATCH0_76",
+      "canonicalName": "Ginger",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kacchi haldi",
+      "canonicalId": "BATCH0_77",
+      "canonicalName": "Fresh turmeric",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Ganth gobhi",
+      "canonicalId": "BATCH0_78",
+      "canonicalName": "Kohlrabi",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Knol-khol",
+      "canonicalId": "BATCH0_78",
+      "canonicalName": "Kohlrabi",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Phool gobhi",
+      "canonicalId": "BATCH0_79",
+      "canonicalName": "Cauliflower",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Patta gobhi",
+      "canonicalId": "CF_31c4731b-d789-41d4-9cbd-c9614dd328b3",
+      "canonicalName": "Cabbage, green",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Red cabbage",
+      "canonicalId": "BATCH0_81",
+      "canonicalName": "Cabbage, red",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Broccoli",
+      "canonicalId": "BATCH0_82",
+      "canonicalName": "Broccoli",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Brussels sprouts",
+      "canonicalId": "BATCH0_83",
+      "canonicalName": "Brussels sprouts",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Matar",
+      "canonicalId": "BATCH0_84",
+      "canonicalName": "Green peas",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Green beans",
+      "canonicalId": "BATCH0_85",
+      "canonicalName": "French beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Gawar",
+      "canonicalId": "BATCH0_86",
+      "canonicalName": "Cluster beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Guar",
+      "canonicalId": "BATCH0_86",
+      "canonicalName": "Cluster beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chawli pods",
+      "canonicalId": "BATCH0_87",
+      "canonicalName": "Yardlong beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Borboti",
+      "canonicalId": "BATCH0_87",
+      "canonicalName": "Yardlong beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sem",
+      "canonicalId": "BATCH0_88",
+      "canonicalName": "Hyacinth beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Valor",
+      "canonicalId": "BATCH0_88",
+      "canonicalName": "Hyacinth beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Avarekalu",
+      "canonicalId": "BATCH0_88",
+      "canonicalName": "Hyacinth beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Fava beans",
+      "canonicalId": "BATCH0_89",
+      "canonicalName": "Broad beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "fresh",
+      "canonicalId": "BATCH0_89",
+      "canonicalName": "Broad beans",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chawli green pods",
+      "canonicalId": "BATCH0_90",
+      "canonicalName": "Cowpea pods",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Snow peas",
+      "canonicalId": "BATCH0_91",
+      "canonicalName": "Snow peas",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tuvar lilva",
+      "canonicalId": "BATCH0_92",
+      "canonicalName": "Fresh pigeon peas",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Hara chana",
+      "canonicalId": "BATCH0_93",
+      "canonicalName": "Fresh chickpeas",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kele ka phool",
+      "canonicalId": "BATCH0_94",
+      "canonicalName": "Banana flower",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kele ka tana",
+      "canonicalId": "BATCH0_95",
+      "canonicalName": "Banana stem",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Bans ke kope",
+      "canonicalId": "BATCH0_96",
+      "canonicalName": "Bamboo shoots",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Asparagus",
+      "canonicalId": "BATCH0_97",
+      "canonicalName": "Asparagus",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Mushroom",
+      "canonicalId": "BATCH0_98",
+      "canonicalName": "Button mushroom",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Dhingri",
+      "canonicalId": "BATCH0_99",
+      "canonicalName": "Oyster mushroom",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Milky mushroom",
+      "canonicalId": "BATCH0_100",
+      "canonicalName": "Milky mushroom",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Shiitake",
+      "canonicalId": "BATCH0_101",
+      "canonicalName": "Shiitake mushroom",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Seb",
+      "canonicalId": "BATCH0_102",
+      "canonicalName": "Apple",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kela",
+      "canonicalId": "BATCH0_103",
+      "canonicalName": "Banana",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Aam",
+      "canonicalId": "BATCH0_104",
+      "canonicalName": "Mango",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Santra",
+      "canonicalId": "BATCH0_105",
+      "canonicalName": "Orange",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sweet lime",
+      "canonicalId": "BATCH0_106",
+      "canonicalName": "Mosambi",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Papita",
+      "canonicalId": "BATCH0_107",
+      "canonicalName": "Papaya",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Amrood",
+      "canonicalId": "BATCH0_108",
+      "canonicalName": "Guava",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Peru",
+      "canonicalId": "BATCH0_108",
+      "canonicalName": "Guava",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Anar",
+      "canonicalId": "BATCH0_109",
+      "canonicalName": "Pomegranate",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tarbooz",
+      "canonicalId": "BATCH0_110",
+      "canonicalName": "Watermelon",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kharbooja",
+      "canonicalId": "BATCH0_111",
+      "canonicalName": "Muskmelon",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Ananas",
+      "canonicalId": "BATCH0_112",
+      "canonicalName": "Pineapple",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Angoor",
+      "canonicalId": "BATCH0_113",
+      "canonicalName": "Grapes",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Nashpati",
+      "canonicalId": "BATCH0_114",
+      "canonicalName": "Pear",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sapota",
+      "canonicalId": "BATCH0_115",
+      "canonicalName": "Chikoo",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sapodilla",
+      "canonicalId": "BATCH0_115",
+      "canonicalName": "Chikoo",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sitaphal",
+      "canonicalId": "BATCH0_116",
+      "canonicalName": "Custard apple",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Indian blackberry",
+      "canonicalId": "BATCH0_117",
+      "canonicalName": "Jamun",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Lychee",
+      "canonicalId": "BATCH0_118",
+      "canonicalName": "Litchi",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Pitaya",
+      "canonicalId": "BATCH0_119",
+      "canonicalName": "Dragon fruit",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kiwi",
+      "canonicalId": "BATCH0_120",
+      "canonicalName": "Kiwi",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Strawberry",
+      "canonicalId": "BATCH0_121",
+      "canonicalName": "Strawberry",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Blueberry",
+      "canonicalId": "BATCH0_122",
+      "canonicalName": "Blueberry",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Aadoo",
+      "canonicalId": "BATCH0_123",
+      "canonicalName": "Peach",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Aloo bukhara",
+      "canonicalId": "BATCH0_124",
+      "canonicalName": "Plum",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Khubani",
+      "canonicalId": "BATCH0_125",
+      "canonicalName": "Apricot",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Anjeer",
+      "canonicalId": "BATCH0_126",
+      "canonicalName": "Fig, fresh",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Khajur",
+      "canonicalId": "CF_6b712331-f71c-4885-b970-5c7f959b5b38",
+      "canonicalName": "Dates, dried",
+      "referenceState": "DRIED"
+    },
+    {
+      "alias": "Kishmish",
+      "canonicalId": "BATCH0_128",
+      "canonicalName": "Raisins",
+      "referenceState": "DRIED"
+    },
+    {
+      "alias": "Nariyal",
+      "canonicalId": "BATCH0_129",
+      "canonicalName": "Coconut meat",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Nariyal pani",
+      "canonicalId": "BATCH0_130",
+      "canonicalName": "Tender coconut water",
+      "referenceState": "READY_TO_DRINK"
+    },
+    {
+      "alias": "Indian gooseberry",
+      "canonicalId": "BATCH0_131",
+      "canonicalName": "Amla",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kamrakh",
+      "canonicalId": "BATCH0_132",
+      "canonicalName": "Star fruit",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kathal",
+      "canonicalId": "BATCH0_133",
+      "canonicalName": "Jackfruit, ripe",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Butter fruit",
+      "canonicalId": "BATCH0_134",
+      "canonicalName": "Avocado",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chawal",
+      "canonicalId": "BATCH0_135",
+      "canonicalName": "Rice, white",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Brown rice",
+      "canonicalId": "BATCH0_136",
+      "canonicalName": "Rice, brown",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Basmati",
+      "canonicalId": "BATCH0_137",
+      "canonicalName": "Basmati rice",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Ukda rice",
+      "canonicalId": "BATCH0_138",
+      "canonicalName": "Parboiled rice",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Lal chawal",
+      "canonicalId": "BATCH0_139",
+      "canonicalName": "Red rice",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Black rice",
+      "canonicalId": "BATCH0_140",
+      "canonicalName": "Black rice",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Poha",
+      "canonicalId": "BATCH0_141",
+      "canonicalName": "Flattened rice",
+      "referenceState": "DRY_UNCOOKED"
+    },
+    {
+      "alias": "Aval",
+      "canonicalId": "BATCH0_141",
+      "canonicalName": "Flattened rice",
+      "referenceState": "DRY_UNCOOKED"
+    },
+    {
+      "alias": "Chivda",
+      "canonicalId": "BATCH0_141",
+      "canonicalName": "Flattened rice",
+      "referenceState": "DRY_UNCOOKED"
+    },
+    {
+      "alias": "Murmura",
+      "canonicalId": "BATCH0_142",
+      "canonicalName": "Puffed rice",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Kurmura",
+      "canonicalId": "BATCH0_142",
+      "canonicalName": "Puffed rice",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Gehu",
+      "canonicalId": "BATCH0_143",
+      "canonicalName": "Wheat whole grain",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Atta",
+      "canonicalId": "BATCH0_144",
+      "canonicalName": "Whole wheat flour",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Maida",
+      "canonicalId": "BATCH0_145",
+      "canonicalName": "Refined wheat flour",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Sooji",
+      "canonicalId": "BATCH0_146",
+      "canonicalName": "Semolina",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Rava",
+      "canonicalId": "BATCH0_146",
+      "canonicalName": "Semolina",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Dalia",
+      "canonicalId": "BATCH0_147",
+      "canonicalName": "Broken wheat",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Jau",
+      "canonicalId": "BATCH0_148",
+      "canonicalName": "Barley",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Bajra",
+      "canonicalId": "BATCH0_149",
+      "canonicalName": "Pearl millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Jowar",
+      "canonicalId": "BATCH0_150",
+      "canonicalName": "Sorghum",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Ragi",
+      "canonicalId": "BATCH0_151",
+      "canonicalName": "Finger millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Nachni",
+      "canonicalId": "BATCH0_151",
+      "canonicalName": "Finger millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Kangni",
+      "canonicalId": "BATCH0_152",
+      "canonicalName": "Foxtail millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Thinai",
+      "canonicalId": "BATCH0_152",
+      "canonicalName": "Foxtail millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Kutki",
+      "canonicalId": "BATCH0_153",
+      "canonicalName": "Little millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Samai",
+      "canonicalId": "BATCH0_153",
+      "canonicalName": "Little millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Kodo",
+      "canonicalId": "BATCH0_154",
+      "canonicalName": "Kodo millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Sama",
+      "canonicalId": "BATCH0_155",
+      "canonicalName": "Barnyard millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Sanwa",
+      "canonicalId": "BATCH0_155",
+      "canonicalName": "Barnyard millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Jhangora",
+      "canonicalId": "BATCH0_155",
+      "canonicalName": "Barnyard millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Cheena",
+      "canonicalId": "BATCH0_156",
+      "canonicalName": "Proso millet",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Rajgira",
+      "canonicalId": "BATCH0_157",
+      "canonicalName": "Amaranth grain",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Quinoa",
+      "canonicalId": "BATCH0_158",
+      "canonicalName": "Quinoa",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Oats",
+      "canonicalId": "BATCH0_159",
+      "canonicalName": "Oats",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Makka",
+      "canonicalId": "BATCH0_160",
+      "canonicalName": "Corn maize",
+      "referenceState": "RAW_DRY"
+    },
+    {
+      "alias": "Makka atta",
+      "canonicalId": "BATCH0_161",
+      "canonicalName": "Cornmeal",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Kabuli chana",
+      "canonicalId": "BATCH0_162",
+      "canonicalName": "Chickpeas, kabuli",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Kala chana",
+      "canonicalId": "BATCH0_163",
+      "canonicalName": "Chickpeas, desi",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Sabut moong",
+      "canonicalId": "BATCH0_164",
+      "canonicalName": "Green gram, whole",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Moong dal",
+      "canonicalId": "BATCH0_165",
+      "canonicalName": "Moong dal, split hulled yellow",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Sabut urad",
+      "canonicalId": "BATCH0_166",
+      "canonicalName": "Black gram, whole",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Urad dal",
+      "canonicalId": "BATCH0_167",
+      "canonicalName": "Urad dal, split",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Toor",
+      "canonicalId": "BATCH0_168",
+      "canonicalName": "Pigeon pea",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Arhar dal",
+      "canonicalId": "BATCH0_168",
+      "canonicalName": "Pigeon pea",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Red lentil",
+      "canonicalId": "BATCH0_169",
+      "canonicalName": "Masoor dal, red",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Whole lentil",
+      "canonicalId": "BATCH0_170",
+      "canonicalName": "Masoor, whole",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Chana dal",
+      "canonicalId": "BATCH0_171",
+      "canonicalName": "Bengal gram dal",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Matki",
+      "canonicalId": "BATCH0_172",
+      "canonicalName": "Moth beans",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Lobia",
+      "canonicalId": "BATCH0_173",
+      "canonicalName": "Cowpeas",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Chawli",
+      "canonicalId": "BATCH0_173",
+      "canonicalName": "Cowpeas",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Rajma",
+      "canonicalId": "BATCH0_174",
+      "canonicalName": "Kidney beans, red",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Chitra rajma",
+      "canonicalId": "BATCH0_175",
+      "canonicalName": "Kidney beans, light",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Lobia",
+      "canonicalId": "BATCH0_176",
+      "canonicalName": "Black-eyed peas",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Kulthi",
+      "canonicalId": "BATCH0_177",
+      "canonicalName": "Horse gram",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Val",
+      "canonicalId": "BATCH0_178",
+      "canonicalName": "Field beans",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Avarekalu",
+      "canonicalId": "BATCH0_178",
+      "canonicalName": "Field beans",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "dry",
+      "canonicalId": "BATCH0_178",
+      "canonicalName": "Field beans",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Sukha matar",
+      "canonicalId": "BATCH0_179",
+      "canonicalName": "Dry peas, green",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Yellow peas",
+      "canonicalId": "BATCH0_180",
+      "canonicalName": "Dry peas, yellow",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Soyabean",
+      "canonicalId": "BATCH0_181",
+      "canonicalName": "Soybeans",
+      "referenceState": "DRY_RAW"
+    },
+    {
+      "alias": "Green soybean",
+      "canonicalId": "BATCH0_182",
+      "canonicalName": "Edamame",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Roti",
+      "canonicalId": "BATCH0_183",
+      "canonicalName": "Chapati / roti, whole wheat",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Phulka",
+      "canonicalId": "BATCH0_183",
+      "canonicalName": "Chapati / roti, whole wheat",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Plain paratha",
+      "canonicalId": "BATCH0_184",
+      "canonicalName": "Paratha, plain",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Naan",
+      "canonicalId": "BATCH0_185",
+      "canonicalName": "Naan, plain",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Tandoori roti",
+      "canonicalId": "BATCH0_186",
+      "canonicalName": "Tandoori roti",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Rumali roti",
+      "canonicalId": "BATCH0_187",
+      "canonicalName": "Roomali roti",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Jowar bhakri",
+      "canonicalId": "BATCH0_188",
+      "canonicalName": "Bhakri, jowar",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Bajra bhakri",
+      "canonicalId": "BATCH0_189",
+      "canonicalName": "Bhakri, bajra",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Nachni roti",
+      "canonicalId": "BATCH0_190",
+      "canonicalName": "Ragi roti",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Bread",
+      "canonicalId": "BATCH0_191",
+      "canonicalName": "White bread",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Brown bread",
+      "canonicalId": "BATCH0_192",
+      "canonicalName": "Whole wheat bread",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Multigrain bread",
+      "canonicalId": "BATCH0_193",
+      "canonicalName": "Multigrain bread",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Ladi pav",
+      "canonicalId": "BATCH0_194",
+      "canonicalName": "Pav",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Burger bun",
+      "canonicalId": "BATCH0_195",
+      "canonicalName": "Bread bun",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Pita",
+      "canonicalId": "BATCH0_196",
+      "canonicalName": "Pita bread",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Khakhra",
+      "canonicalId": "BATCH0_197",
+      "canonicalName": "Khakhra, plain",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Doodh",
+      "canonicalId": "BATCH0_198",
+      "canonicalName": "Cow milk, whole",
+      "referenceState": "LIQUID"
+    },
+    {
+      "alias": "Bhains ka doodh",
+      "canonicalId": "BATCH0_199",
+      "canonicalName": "Buffalo milk",
+      "referenceState": "LIQUID"
+    },
+    {
+      "alias": "Toned milk",
+      "canonicalId": "BATCH0_200",
+      "canonicalName": "Toned milk",
+      "referenceState": "LIQUID"
+    },
+    {
+      "alias": "Double toned milk",
+      "canonicalId": "BATCH0_201",
+      "canonicalName": "Double toned milk",
+      "referenceState": "LIQUID"
+    },
+    {
+      "alias": "Skimmed milk",
+      "canonicalId": "BATCH0_202",
+      "canonicalName": "Skim milk",
+      "referenceState": "LIQUID"
+    },
+    {
+      "alias": "Dahi",
+      "canonicalId": "BATCH0_203",
+      "canonicalName": "Curd, whole milk",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Chakka",
+      "canonicalId": "BATCH0_204",
+      "canonicalName": "Hung curd",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Greek-style curd",
+      "canonicalId": "BATCH0_204",
+      "canonicalName": "Hung curd",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Chaas",
+      "canonicalId": "BATCH0_205",
+      "canonicalName": "Buttermilk",
+      "referenceState": "READY_TO_DRINK"
+    },
+    {
+      "alias": "Cottage cheese",
+      "canonicalId": "BATCH0_206",
+      "canonicalName": "Paneer",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Low-fat cottage cheese",
+      "canonicalId": "BATCH0_207",
+      "canonicalName": "Low-fat paneer",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Cheddar",
+      "canonicalId": "BATCH0_208",
+      "canonicalName": "Cheddar cheese",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Mozzarella",
+      "canonicalId": "BATCH0_209",
+      "canonicalName": "Mozzarella",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Cheese slice",
+      "canonicalId": "BATCH0_210",
+      "canonicalName": "Processed cheese",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "block",
+      "canonicalId": "BATCH0_210",
+      "canonicalName": "Processed cheese",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Mawa",
+      "canonicalId": "BATCH0_211",
+      "canonicalName": "Khoya",
+      "referenceState": "READY_TO_USE"
+    },
+    {
+      "alias": "Whole milk powder",
+      "canonicalId": "BATCH0_212",
+      "canonicalName": "Milk powder, whole",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Skim milk powder",
+      "canonicalId": "BATCH0_213",
+      "canonicalName": "Milk powder, skim",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Anda",
+      "canonicalId": "BATCH0_214",
+      "canonicalName": "Chicken egg, whole",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Egg white",
+      "canonicalId": "BATCH0_215",
+      "canonicalName": "Chicken egg white",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Egg yolk",
+      "canonicalId": "BATCH0_216",
+      "canonicalName": "Chicken egg yolk",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Batakh anda",
+      "canonicalId": "BATCH0_217",
+      "canonicalName": "Duck egg",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Soy paneer",
+      "canonicalId": "BATCH0_218",
+      "canonicalName": "Tofu, firm",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Tempeh",
+      "canonicalId": "BATCH0_219",
+      "canonicalName": "Tempeh",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Soya nuggets",
+      "canonicalId": "BATCH0_220",
+      "canonicalName": "Soy chunks, dry",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Soya granules",
+      "canonicalId": "BATCH0_221",
+      "canonicalName": "Soy granules, dry",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Wheat gluten",
+      "canonicalId": "BATCH0_222",
+      "canonicalName": "Seitan",
+      "referenceState": "READY_TO_EAT"
+    },
+    {
+      "alias": "Chicken breast",
+      "canonicalId": "BATCH0_223",
+      "canonicalName": "Chicken breast, skinless",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chicken thigh",
+      "canonicalId": "BATCH0_224",
+      "canonicalName": "Chicken thigh, skinless",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chicken",
+      "canonicalId": "BATCH0_225",
+      "canonicalName": "Chicken, whole meat with skin",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chicken kaleji",
+      "canonicalId": "BATCH0_226",
+      "canonicalName": "Chicken liver",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Bakra mutton",
+      "canonicalId": "BATCH0_227",
+      "canonicalName": "Mutton, goat lean",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Goat meat",
+      "canonicalId": "BATCH0_228",
+      "canonicalName": "Mutton, goat mixed cut",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Lamb",
+      "canonicalId": "BATCH0_229",
+      "canonicalName": "Lamb, lean",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sheep meat",
+      "canonicalId": "BATCH0_230",
+      "canonicalName": "Sheep mutton",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Pork",
+      "canonicalId": "BATCH0_231",
+      "canonicalName": "Pork, lean loin",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Pork belly",
+      "canonicalId": "BATCH0_232",
+      "canonicalName": "Pork belly",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Carabeef",
+      "canonicalId": "BATCH0_233",
+      "canonicalName": "Buffalo meat, lean",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Turkey",
+      "canonicalId": "BATCH0_234",
+      "canonicalName": "Turkey breast",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Duck",
+      "canonicalId": "BATCH0_235",
+      "canonicalName": "Duck meat",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Rui",
+      "canonicalId": "BATCH0_236",
+      "canonicalName": "Rohu",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Rohu",
+      "canonicalId": "BATCH0_236",
+      "canonicalName": "Rohu",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Catla",
+      "canonicalId": "BATCH0_237",
+      "canonicalName": "Katla",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Ilish",
+      "canonicalId": "BATCH0_238",
+      "canonicalName": "Hilsa",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Paplet",
+      "canonicalId": "BATCH0_239",
+      "canonicalName": "Pomfret, white",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Halwa",
+      "canonicalId": "BATCH0_240",
+      "canonicalName": "Pomfret, black",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Surmai",
+      "canonicalId": "BATCH0_241",
+      "canonicalName": "Kingfish / Seer",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Vanjaram",
+      "canonicalId": "BATCH0_241",
+      "canonicalName": "Kingfish / Seer",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Bangda",
+      "canonicalId": "BATCH0_242",
+      "canonicalName": "Indian mackerel",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Ayala",
+      "canonicalId": "BATCH0_242",
+      "canonicalName": "Indian mackerel",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Rawas",
+      "canonicalId": "BATCH0_243",
+      "canonicalName": "Indian salmon",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Bombil",
+      "canonicalId": "BATCH0_244",
+      "canonicalName": "Bombay duck",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Mathi",
+      "canonicalId": "BATCH0_245",
+      "canonicalName": "Sardine",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tarli",
+      "canonicalId": "BATCH0_245",
+      "canonicalName": "Sardine",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Nethili",
+      "canonicalId": "BATCH0_246",
+      "canonicalName": "Anchovy",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Mandeli",
+      "canonicalId": "BATCH0_246",
+      "canonicalName": "Anchovy",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tuna",
+      "canonicalId": "BATCH0_247",
+      "canonicalName": "Tuna, yellowfin",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tuna",
+      "canonicalId": "BATCH0_248",
+      "canonicalName": "Tuna, skipjack",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Salmon",
+      "canonicalId": "BATCH0_249",
+      "canonicalName": "Salmon, Atlantic",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Pangasius",
+      "canonicalId": "BATCH0_250",
+      "canonicalName": "Basa",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tilapia",
+      "canonicalId": "BATCH0_251",
+      "canonicalName": "Tilapia",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Singhi",
+      "canonicalId": "BATCH0_252",
+      "canonicalName": "Singhara fish",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Catfish",
+      "canonicalId": "BATCH0_252",
+      "canonicalName": "Singhara fish",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Walking catfish",
+      "canonicalId": "BATCH0_253",
+      "canonicalName": "Magur",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Snakehead",
+      "canonicalId": "BATCH0_254",
+      "canonicalName": "Murrel",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Korameenu",
+      "canonicalId": "BATCH0_254",
+      "canonicalName": "Murrel",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Karimeen",
+      "canonicalId": "BATCH0_255",
+      "canonicalName": "Pearl spot",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Grey mullet",
+      "canonicalId": "BATCH0_256",
+      "canonicalName": "Mullet",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Vam",
+      "canonicalId": "BATCH0_257",
+      "canonicalName": "Ribbonfish",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Beltfish",
+      "canonicalId": "BATCH0_257",
+      "canonicalName": "Ribbonfish",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Snapper",
+      "canonicalId": "BATCH0_258",
+      "canonicalName": "Red snapper",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Bhetki",
+      "canonicalId": "BATCH0_259",
+      "canonicalName": "Sea bass",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Barramundi",
+      "canonicalId": "BATCH0_259",
+      "canonicalName": "Sea bass",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Asian sea bass",
+      "canonicalId": "BATCH0_260",
+      "canonicalName": "Barramundi",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Trout",
+      "canonicalId": "BATCH0_261",
+      "canonicalName": "Trout",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Eel",
+      "canonicalId": "BATCH0_262",
+      "canonicalName": "Eel",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Jhinga",
+      "canonicalId": "BATCH0_263",
+      "canonicalName": "Prawns",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Shrimp",
+      "canonicalId": "BATCH0_264",
+      "canonicalName": "Shrimp",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kekda",
+      "canonicalId": "BATCH0_265",
+      "canonicalName": "Crab",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Lobster",
+      "canonicalId": "BATCH0_266",
+      "canonicalName": "Lobster",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Calamari",
+      "canonicalId": "BATCH0_267",
+      "canonicalName": "Squid",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Octopus",
+      "canonicalId": "BATCH0_268",
+      "canonicalName": "Octopus",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Mussels",
+      "canonicalId": "BATCH0_269",
+      "canonicalName": "Mussels",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Clams",
+      "canonicalId": "BATCH0_270",
+      "canonicalName": "Clams",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Oysters",
+      "canonicalId": "BATCH0_271",
+      "canonicalName": "Oysters",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Groundnut",
+      "canonicalId": "CF_2da71afd-ac94-4932-8612-507de402c64f",
+      "canonicalName": "Peanuts",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Moongfali",
+      "canonicalId": "CF_2da71afd-ac94-4932-8612-507de402c64f",
+      "canonicalName": "Peanuts",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Badam",
+      "canonicalId": "BATCH0_273",
+      "canonicalName": "Almonds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kaju",
+      "canonicalId": "BATCH0_274",
+      "canonicalName": "Cashews",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Akhrot",
+      "canonicalId": "BATCH0_275",
+      "canonicalName": "Walnuts",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Pista",
+      "canonicalId": "BATCH0_276",
+      "canonicalName": "Pistachios",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Hazelnut",
+      "canonicalId": "BATCH0_277",
+      "canonicalName": "Hazelnuts",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Brazil nut",
+      "canonicalId": "BATCH0_278",
+      "canonicalName": "Brazil nuts",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chilgoza",
+      "canonicalId": "BATCH0_279",
+      "canonicalName": "Pine nuts",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Kaddu ke beej",
+      "canonicalId": "BATCH0_280",
+      "canonicalName": "Pumpkin seeds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Surajmukhi ke beej",
+      "canonicalId": "BATCH0_281",
+      "canonicalName": "Sunflower seeds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Til",
+      "canonicalId": "CF_0494984a-3f93-4805-9913-da562b736962",
+      "canonicalName": "Sesame seeds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Alsi",
+      "canonicalId": "BATCH0_283",
+      "canonicalName": "Flax seeds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Chia",
+      "canonicalId": "BATCH0_284",
+      "canonicalName": "Chia seeds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sabja",
+      "canonicalId": "BATCH0_285",
+      "canonicalName": "Basil seeds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Tukmaria",
+      "canonicalId": "BATCH0_285",
+      "canonicalName": "Basil seeds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Magaz",
+      "canonicalId": "BATCH0_286",
+      "canonicalName": "Watermelon seeds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Khus khus",
+      "canonicalId": "BATCH0_287",
+      "canonicalName": "Poppy seeds",
+      "referenceState": "RAW"
+    },
+    {
+      "alias": "Sukha nariyal",
+      "canonicalId": "BATCH0_288",
+      "canonicalName": "Coconut, desiccated",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Desi ghee",
+      "canonicalId": "BATCH0_289",
+      "canonicalName": "Ghee",
+      "referenceState": "FAT"
+    },
+    {
+      "alias": "Makkhan",
+      "canonicalId": "BATCH0_290",
+      "canonicalName": "Butter, salted",
+      "referenceState": "FAT"
+    },
+    {
+      "alias": "Unsalted butter",
+      "canonicalId": "BATCH0_291",
+      "canonicalName": "Butter, unsalted",
+      "referenceState": "FAT"
+    },
+    {
+      "alias": "Peanut oil",
+      "canonicalId": "BATCH0_292",
+      "canonicalName": "Groundnut oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Sunflower oil",
+      "canonicalId": "BATCH0_293",
+      "canonicalName": "Sunflower oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Sarson oil",
+      "canonicalId": "BATCH0_294",
+      "canonicalName": "Mustard oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Rice bran oil",
+      "canonicalId": "BATCH0_295",
+      "canonicalName": "Rice bran oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Soy oil",
+      "canonicalId": "BATCH0_296",
+      "canonicalName": "Soybean oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Til",
+      "canonicalId": "BATCH0_297",
+      "canonicalName": "Sesame oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Gingelly oil",
+      "canonicalId": "BATCH0_297",
+      "canonicalName": "Sesame oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Nariyal tel",
+      "canonicalId": "CF_633440dd-6006-4819-b3cb-6b0368dadb84",
+      "canonicalName": "Coconut oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Olive oil",
+      "canonicalId": "CF_82651692-4d4b-495c-8039-aea3a16f4744",
+      "canonicalName": "Olive oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Canola oil",
+      "canonicalId": "CF_29a4f428-649e-4c67-a709-804069dff411",
+      "canonicalName": "Canola oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Cottonseed oil",
+      "canonicalId": "BATCH0_301",
+      "canonicalName": "Cottonseed oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Palm oil",
+      "canonicalId": "BATCH0_302",
+      "canonicalName": "Palm oil",
+      "referenceState": "OIL"
+    },
+    {
+      "alias": "Hydrogenated vegetable fat",
+      "canonicalId": "BATCH0_303",
+      "canonicalName": "Vanaspati",
+      "referenceState": "FAT"
+    },
+    {
+      "alias": "Malai",
+      "canonicalId": "BATCH0_304",
+      "canonicalName": "Fresh cream",
+      "referenceState": "READY_TO_USE"
+    },
+    {
+      "alias": "Cream",
+      "canonicalId": "BATCH0_304",
+      "canonicalName": "Fresh cream",
+      "referenceState": "READY_TO_USE"
+    },
+    {
+      "alias": "Cheeni",
+      "canonicalId": "BATCH0_305",
+      "canonicalName": "White sugar",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Brown sugar",
+      "canonicalId": "BATCH0_306",
+      "canonicalName": "Brown sugar",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Gur",
+      "canonicalId": "BATCH0_307",
+      "canonicalName": "Jaggery",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Shahad",
+      "canonicalId": "BATCH0_308",
+      "canonicalName": "Honey",
+      "referenceState": "LIQUID"
+    },
+    {
+      "alias": "Khajur syrup",
+      "canonicalId": "BATCH0_309",
+      "canonicalName": "Date syrup",
+      "referenceState": "LIQUID"
+    },
+    {
+      "alias": "Haldi",
+      "canonicalId": "BATCH0_310",
+      "canonicalName": "Turmeric powder",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Jeera",
+      "canonicalId": "CF_81006a8a-4b17-480d-88ae-0a821af43334",
+      "canonicalName": "Cumin seeds",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Dhania seeds",
+      "canonicalId": "CF_cea559b9-4def-4aa8-b2e1-89c8832d1375",
+      "canonicalName": "Coriander seeds",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Rai",
+      "canonicalId": "BATCH0_313",
+      "canonicalName": "Mustard seeds",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Methi dana",
+      "canonicalId": "BATCH0_314",
+      "canonicalName": "Fenugreek seeds",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Kali mirch",
+      "canonicalId": "BATCH0_315",
+      "canonicalName": "Black pepper",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Lal mirch powder",
+      "canonicalId": "BATCH0_316",
+      "canonicalName": "Red chilli powder",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Elaichi",
+      "canonicalId": "BATCH0_317",
+      "canonicalName": "Cardamom",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Dalchini",
+      "canonicalId": "BATCH0_318",
+      "canonicalName": "Cinnamon",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Laung",
+      "canonicalId": "BATCH0_319",
+      "canonicalName": "Cloves",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Saunf",
+      "canonicalId": "BATCH0_320",
+      "canonicalName": "Fennel seeds",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Carom seeds",
+      "canonicalId": "BATCH0_321",
+      "canonicalName": "Ajwain",
+      "referenceState": "DRY"
+    },
+    {
+      "alias": "Imli",
+      "canonicalId": "BATCH0_322",
+      "canonicalName": "Tamarind pulp",
+      "referenceState": "RAW_PULP"
+    },
+    {
+      "alias": "Cooked chawal",
+      "canonicalId": "BATCH0_323",
+      "canonicalName": "Rice, white cooked",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Cooked brown rice",
+      "canonicalId": "BATCH0_324",
+      "canonicalName": "Rice, brown cooked",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Oatmeal",
+      "canonicalId": "BATCH0_325",
+      "canonicalName": "Oats cooked in water",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Cooked moong",
+      "canonicalId": "BATCH0_326",
+      "canonicalName": "Green gram cooked",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Cooked chana",
+      "canonicalId": "BATCH0_327",
+      "canonicalName": "Chickpeas cooked",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Cooked rajma",
+      "canonicalId": "BATCH0_328",
+      "canonicalName": "Kidney beans cooked",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Cooked masoor",
+      "canonicalId": "BATCH0_329",
+      "canonicalName": "Lentils cooked",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Cooked arhar dal",
+      "canonicalId": "BATCH0_330",
+      "canonicalName": "Toor dal cooked",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Uble aloo",
+      "canonicalId": "BATCH0_331",
+      "canonicalName": "Potato boiled",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Boiled shakarkand",
+      "canonicalId": "BATCH0_332",
+      "canonicalName": "Sweet potato boiled",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Cooked chicken breast",
+      "canonicalId": "CF_37d271f9-fac6-4e7f-9ff6-18001997a6a6",
+      "canonicalName": "Chicken breast cooked",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Boiled egg",
+      "canonicalId": "BATCH0_334",
+      "canonicalName": "Egg whole boiled",
+      "referenceState": "COOKED"
+    },
+    {
+      "alias": "Cooked lean fish",
+      "canonicalId": "BATCH0_335",
+      "canonicalName": "Fish, generic lean cooked",
+      "referenceState": "COOKED"
+    }
+  ]
+}

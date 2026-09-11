@@ -1,0 +1,72 @@
+import crypto from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import XLSX from 'xlsx';
+
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../src/modules/nutrition');
+const workbookPath=path.join(root,'catalogue/data/PAN_India_Food_Master_Per_100g.xlsx');
+const reconciliation=JSON.parse(readFileSync(path.join(root,'food-curation/data/food_reference_catalogue_335_v17_36.json'),'utf8'));
+const outputDirectory=path.join(root,'food-master/data');
+const sourceNote='Reference only — verify authoritative source before production';
+const normalize=value=>String(value??'').trim().replace(/\s+/g,' ');
+const slug=value=>normalize(value).normalize('NFKD').replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_|_$/g,'').toUpperCase();
+const aliases=value=>[...new Set(normalize(value).split(/[,;/|]+/).map(normalize).filter(Boolean))];
+const finite=value=>value!==''&&value!=null&&Number.isFinite(Number(value))&&Number(value)>=0?Number(value):null;
+const escapeCsv=value=>`"${String(value??'').replaceAll('"','""')}"`;
+const state=value=>normalize(value).toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'');
+const rows=XLSX.utils.sheet_to_json(XLSX.readFile(workbookPath,{raw:true}).Sheets['Food Master'],{defval:null});
+const decisions=new Map(reconciliation.rows.map(row=>[row.referenceItemId,row]));
+
+const rolePolicy=category=>{
+  const value=category.toLowerCase();
+  if(value.includes('vegetable'))return ['VEGETABLE'];
+  if(value.includes('pulse'))return ['PULSE','PROTEIN'];
+  if(value.includes('grain'))return ['GRAIN','STARCH'];
+  if(value.includes('bread'))return ['BREAD','STARCH'];
+  if(value.includes('fruit'))return ['FRUIT'];
+  if(value.includes('dairy'))return ['DAIRY','PROTEIN','BEVERAGE'];
+  if(value.includes('nut'))return ['NUT_SEED','PROTEIN'];
+  if(value.includes('protein')||value.includes('non-veg'))return ['PROTEIN'];
+  if(value.includes('cooked basics'))return ['STARCH','GRAIN'];
+  if(value.includes('oil'))return ['FAT'];
+  if(value.includes('spice'))return ['ACCOMPANIMENT'];
+  return [];
+};
+const mealPolicy=(category,referenceState)=>{
+  const value=category.toLowerCase(),prepared=/COOKED|READY_TO_EAT|READY_TO_DRINK|READY_TO_USE/.test(referenceState);
+  if(value.includes('fruit'))return ['EARLY_MORNING','BREAKFAST','MID_MORNING','EVENING_SNACK'];
+  if(value.includes('dairy'))return ['EARLY_MORNING','BREAKFAST','MID_MORNING','EVENING_SNACK','BEDTIME'];
+  if(value.includes('nut'))return ['EARLY_MORNING','BREAKFAST','MID_MORNING','EVENING_SNACK','BEDTIME'];
+  if(value.includes('bread')||value.includes('cooked basics'))return ['BREAKFAST','LUNCH','EVENING_SNACK','DINNER'];
+  if(value.includes('vegetable')||value.includes('pulse')||value.includes('grain')||value.includes('protein')||value.includes('non-veg'))return prepared?['BREAKFAST','LUNCH','EVENING_SNACK','DINNER']:['LUNCH','DINNER'];
+  return [];
+};
+const vegetarianClass=(category,name)=>category==='Non-Veg'?'NON_VEGETARIAN':/\begg\b/i.test(name)?'EGG':/milk|curd|yoghurt|yogurt|paneer|cheese|ghee|butter/i.test(name)?'VEGETARIAN':'VEGAN';
+const categoryKey=value=>{const category=value.toLowerCase();if(category.includes('vegetable'))return 'vegetable';if(category.includes('pulse'))return 'pulse';if(category.includes('grain'))return 'grain';if(category.includes('bread'))return 'bread';if(category.includes('fruit'))return 'fruit';if(category.includes('dairy'))return 'dairy';if(category.includes('nut'))return 'nuts';if(category.includes('protein'))return 'protein';if(category.includes('non-veg'))return 'non-veg';if(category.includes('cooked basics'))return 'staple';if(category.includes('oil'))return 'oil';if(category.includes('spice'))return 'spice';if(category.includes('sweetener'))return 'sweetener';return slug(value).toLowerCase();};
+
+const masterRows=rows.map((row,index)=>{
+  const sourceId=normalize(row.ID),id=`BATCH0_${sourceId}`,decision=decisions.get(id);
+  const nutrition={kcal:finite(row['Energy (kcal)']),protein:finite(row['Protein (g)']),carbohydrate:finite(row['Carbohydrate (g)']),fat:finite(row['Fat (g)']),fibre:finite(row['Fibre (g)'])};
+  const complete=['kcal','protein','carbohydrate','fat'].every(key=>nutrition[key]!==null);
+  const referenceState=state(row['Reference State']);
+  const governed=Boolean(decision?.runtimeFoodId);
+  const roles=rolePolicy(normalize(row.Category)),mealHeads=mealPolicy(normalize(row.Category),referenceState);
+  const dataStatus=governed?'GOVERNED':complete?'REFERENCE':'INCOMPLETE';
+  return {id,sourceRow:index+2,sourceRecordId:sourceId,canonicalCode:`PRACTICAL_INDIAN_FOOD_${slug(sourceId)}`,canonicalName:normalize(row['Food Name']),displayName:normalize(row['Food Name']),aliases:aliases(row['Common / Indian Names']),category:categoryKey(normalize(row.Category)),sourceCategory:normalize(row.Category),subcategory:normalize(row.Subcategory)||null,referenceState,nutritionPer100g:nutrition,nutrientBasis:'PER_100_G',dataStatus,referencePreparation:referenceState.includes('COOKED')||referenceState.includes('READY')?'REFERENCE_STANDARD_PREPARATION':null,verificationStatus:normalize(row['Verification Status'])||sourceNote,sourceNote:normalize(row.Notes)||sourceNote,sourceMappingId:`BATCH_0_PAN_INDIA_FOOD_SEED:${sourceId}`,sourceVersion:'PRACTICAL_INDIAN_FOOD_MASTER_V1',roles,mealHeads,vegetarianClass:vegetarianClass(normalize(row.Category),normalize(row['Food Name'])),generatorEligible:!governed&&complete&&roles.length>0&&mealHeads.length>0,manualAddable:!governed&&complete,clientConsumable:!governed&&complete,governedRuntimeFoodId:decision?.runtimeFoodId??null};
+});
+if(masterRows.length!==335)throw new Error(`EXPECTED_335_ROWS:${masterRows.length}`);
+const invalid=masterRows.filter(row=>Object.values(row.nutritionPer100g).some(value=>value!==null&&(!Number.isFinite(value)||value<0)));
+if(invalid.length)throw new Error(`INVALID_NUMERIC_ROWS:${invalid.map(row=>row.id).join(',')}`);
+const referenceRows=masterRows.filter(row=>row.dataStatus!=='GOVERNED');
+const aliasRows=masterRows.flatMap(row=>row.aliases.map(alias=>({alias,canonicalId:row.governedRuntimeFoodId??row.id,canonicalName:row.canonicalName,referenceState:row.referenceState})));
+const statusRows=masterRows.map(({id,canonicalName,dataStatus,generatorEligible,manualAddable,clientConsumable,verificationStatus,sourceNote,governedRuntimeFoodId})=>({id,canonicalName,dataStatus,generatorEligible,manualAddable,clientConsumable,verificationStatus,sourceNote,governedRuntimeFoodId}));
+const payload={schemaVersion:'FITEATSY_PRACTICAL_INDIAN_FOOD_MASTER_V1',generatedFrom:'PAN_India_Food_Master_Per_100g.xlsx',sourceSha256:crypto.createHash('sha256').update(readFileSync(workbookPath)).digest('hex'),policy:{statuses:['GOVERNED','REFERENCE','INCOMPLETE'],referenceLabel:'Reference data',formalApprovalRequired:false,standardCalculation:'per100g × selectedGrams / 100'},counts:{workbook:masterRows.length,governed:masterRows.filter(row=>row.dataStatus==='GOVERNED').length,reference:masterRows.filter(row=>row.dataStatus==='REFERENCE').length,incomplete:masterRows.filter(row=>row.dataStatus==='INCOMPLETE').length,generatorEligible:referenceRows.filter(row=>row.generatorEligible).length,manualAddable:referenceRows.filter(row=>row.manualAddable).length,clientConsumable:referenceRows.filter(row=>row.clientConsumable).length,aliases:aliasRows.length},rows:referenceRows};
+mkdirSync(outputDirectory,{recursive:true});
+writeFileSync(path.join(outputDirectory,'fiteatsy-indian-food-master-v1.json'),`${JSON.stringify(payload,null,2)}\n`);
+const csvHeaders=['id','canonicalName','aliases','category','subcategory','referenceState','kcal','protein','carbohydrate','fat','fibre','dataStatus','generatorEligible','manualAddable','clientConsumable','verificationStatus'];
+const csv=[csvHeaders.join(','),...masterRows.map(row=>[row.id,row.canonicalName,row.aliases.join('|'),row.category,row.subcategory,row.referenceState,row.nutritionPer100g.kcal,row.nutritionPer100g.protein,row.nutritionPer100g.carbohydrate,row.nutritionPer100g.fat,row.nutritionPer100g.fibre,row.dataStatus,row.generatorEligible,row.manualAddable,row.clientConsumable,row.verificationStatus].map(escapeCsv).join(','))].join('\n');
+writeFileSync(path.join(outputDirectory,'fiteatsy-indian-food-master-v1.csv'),`${csv}\n`);
+writeFileSync(path.join(outputDirectory,'fiteatsy-indian-food-aliases-v1.json'),`${JSON.stringify({schemaVersion:'FITEATSY_INDIAN_FOOD_ALIASES_V1',count:aliasRows.length,aliases:aliasRows},null,2)}\n`);
+writeFileSync(path.join(outputDirectory,'fiteatsy-food-reference-status-v1.json'),`${JSON.stringify({schemaVersion:'FITEATSY_FOOD_REFERENCE_STATUS_V1',counts:payload.counts,foods:statusRows},null,2)}\n`);
+process.stdout.write(`${JSON.stringify(payload.counts)}\n`);

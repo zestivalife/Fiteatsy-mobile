@@ -15,6 +15,8 @@ const catalogueImportDataTargetDir = path.join(backendRoot, 'dist', 'catalogue-i
 const foodCurationDataSourceDir = path.join(nutritionModuleSourceDir, 'food-curation', 'data');
 const foodCurationDataTargetDir = path.join(nutritionModuleTargetDir, 'food-curation', 'data');
 const catalogueImportFoodCurationDataTargetDir = path.join(backendRoot, 'dist', 'catalogue-import', 'src', 'modules', 'nutrition', 'food-curation', 'data');
+const foodMasterDataSourceDir = path.join(nutritionModuleSourceDir, 'food-master', 'data');
+const foodMasterDataTargetDir = path.join(nutritionModuleTargetDir, 'food-master', 'data');
 
 const copyMigrations = async () => {
   const entries = await fs.readdir(sourceDir, { withFileTypes: true });
@@ -107,7 +109,13 @@ const copyGovernedRuntimeAssets = async () => {
   console.log(`Copied ${runtimeAssets.length} governed Food runtime asset(s) to ${foodCurationDataTargetDir} and ${catalogueImportFoodCurationDataTargetDir}`);
 };
 
+const copyPracticalFoodMaster = async () => {
+  await fs.cp(foodMasterDataSourceDir, foodMasterDataTargetDir, { recursive: true, force: true });
+  console.log(`Copied practical Food Master data directory to ${foodMasterDataTargetDir}`);
+};
+
 await copyMigrations();
 await copyNutritionAssets();
 await copyApprovedCatalogue();
 await copyGovernedRuntimeAssets();
+await copyPracticalFoodMaster();
