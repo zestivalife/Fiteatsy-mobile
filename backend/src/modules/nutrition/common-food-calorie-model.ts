@@ -22,7 +22,7 @@ export const optionCalorieStatus = (mealHead: MealHead, mealTargetKcal: number |
 
 export const dailyPlanCalorieModel = (input: {
   dailyTargetKcal: number | null;
-  mealTargets: Record<MealHead, MealTarget>;
+  mealTargets: Record<MealHead, Pick<MealTarget, 'kcal'> & { kcal: number | null }>;
   options: CalorieOption[];
   authoritativeOptionIds?: string[];
 }) => {
