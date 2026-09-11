@@ -1,11 +1,12 @@
 import { pool } from '../../db/pool.js';
 
-export async function listReferenceCatalogueFoods(input:{search?:string;category?:string;referenceState?:string;limit:number;offset:number}){
+export async function listReferenceCatalogueFoods(input:{search?:string;category?:string;referenceState?:string;excludeIds?:string[];limit:number;offset:number}){
   const values:unknown[]=['BATCH_0_PAN_INDIA_FOOD_SEED']; const where=['batch_id=$1'];
   const bind=(value:unknown)=>{values.push(value);return `$${values.length}`;};
   if(input.search){const p=bind(input.search);where.push(`(lower(canonical_name) like '%'||lower(${p})||'%' or lower(common_names::text) like '%'||lower(${p})||'%')`);}
   if(input.category)where.push(`category=${bind(input.category)}`);
   if(input.referenceState)where.push(`reference_state=${bind(input.referenceState)}`);
+  if(input.excludeIds?.length)where.push(`not (id = any(${bind(input.excludeIds)}::text[]))`);
   values.push(input.limit,input.offset);
   const result=await pool.query(`select reference.id,reference.canonical_name,reference.canonical_name display_name,reference.subcategory,reference.common_names,reference.category food_category,reference.reference_state,
     reference.reference_nutrition_per_100g nutrition_per_100g,'CATALOGUED_REFERENCE' catalogue_status,'REFERENCE_ONLY' nutrition_status,reference.verification_status,reference.batch_id source_batch_id,

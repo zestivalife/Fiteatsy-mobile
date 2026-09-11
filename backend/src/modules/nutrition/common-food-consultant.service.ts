@@ -97,7 +97,7 @@ const EXPLORER_SHARED_READ_CACHE_TTL_MS=30_000;
 type ExplorerSupportData={approvedAliases:Awaited<ReturnType<typeof listApprovedFoodAliases>>;approvedProposalFoods:Awaited<ReturnType<typeof listApprovedProposalFoods>>;reference:Awaited<ReturnType<typeof listReferenceCatalogueFoods>>};
 let explorerSupportCache:{expiresAt:number;value:Promise<ExplorerSupportData>}|null=null;
 const cachedExplorerSupportData=()=>{const now=Date.now();if(explorerSupportCache&&explorerSupportCache.expiresAt>now)return explorerSupportCache.value;
- const value=Promise.all([listApprovedFoodAliases(),listApprovedProposalFoods(),listReferenceCatalogueFoods({limit:1000,offset:0})]).then(([approvedAliases,approvedProposalFoods,reference])=>({approvedAliases,approvedProposalFoods,reference})).catch(error=>{explorerSupportCache=null;throw error;});
+ const value=Promise.all([listApprovedFoodAliases(),listApprovedProposalFoods(),listReferenceCatalogueFoods({excludeIds:practicalFoodMasterRows.map(food=>food.id),limit:1000,offset:0})]).then(([approvedAliases,approvedProposalFoods,reference])=>({approvedAliases,approvedProposalFoods,reference})).catch(error=>{explorerSupportCache=null;throw error;});
  explorerSupportCache={expiresAt:now+EXPLORER_SHARED_READ_CACHE_TTL_MS,value};return value;
 };
 export async function searchCommonFoods(account:AuthenticatedAccount,clientId:string,q:FoodSearchQuery){
