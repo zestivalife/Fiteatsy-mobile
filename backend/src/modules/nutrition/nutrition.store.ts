@@ -287,6 +287,26 @@ export const getCurrentDietPlanVersion = async (dietPlanId: string) => {
   return mapDietPlanVersion(result.rows[0]);
 };
 
+export const getCurrentDietPlanForClient = async (internalClientId: string, accountId: string) => {
+  const result = await pool.query(
+    `select row_to_json(dp) as plan, row_to_json(dpv) as version
+       from care_cases cc
+       join diet_plans dp on dp.care_case_id = cc.id
+         and dp.deleted_at is null
+         and dp.status = 'active'
+       join diet_plan_versions dpv on dpv.id = dp.current_version_id
+         and dpv.deleted_at is null
+      where cc.client_id = $1
+        and cc.user_id = $2
+        and cc.deleted_at is null
+      order by dp.updated_at desc
+      limit 1`,
+    [internalClientId, accountId],
+  );
+  const row = result.rows[0];
+  return row ? { plan: mapDietPlan(row.plan), version: mapDietPlanVersion(row.version) } : null;
+};
+
 export const getLatestPublishedDietPlanByClientId = async (owner: ClientOwnershipContext) => {
   const result = await pool.query(
     `

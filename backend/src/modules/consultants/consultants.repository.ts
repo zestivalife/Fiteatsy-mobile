@@ -677,6 +677,50 @@ export const getRegisteredConsultantClientProfile = async (
   return context?.profile ?? null;
 };
 
+export const getRegisteredConsultantClientAccessContext = async (
+  publicClientId: string,
+  consultantAccountId?: string,
+  professionalType = 'CONSULTANT',
+): Promise<{ accountId: string; internalClientId: string } | null> => {
+  const values: unknown[] = [publicClientId, ...AUTHENTICATED_USER_EXCLUSION_ROLES];
+  const assignment = consultantAccountId
+    ? `and exists (
+        select 1 from consultant_client_assignments assignment
+        where assignment.client_user_id = u.id
+          and assignment.consultant_user_id = $${values.push(consultantAccountId)}
+          and assignment.product = 'FITEATSY'
+          and assignment.professional_type = $${values.push(professionalType)}
+          and assignment.status = 'active'
+      )`
+    : '';
+  const exclusionPlaceholders = AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 2}`).join(', ');
+  const result = await pool.query(
+    `select u.id as account_user_id, c.id as internal_client_id
+       from fiteatsy_clients c
+       join users u on u.id = c.account_user_id
+      where c.fiteatsy_client_id = $1
+        and c.deleted_at is null
+        and lower(coalesce(c.status, '')) = 'active'
+        and u.deleted_at is null
+        and lower(coalesce(u.status, '')) = 'active'
+        and (
+          lower(coalesce(u.role, 'user')) not in (${exclusionPlaceholders})
+          or exists (
+            select 1 from consultant_client_assignments visible_assignment
+            where visible_assignment.client_user_id = u.id
+              and visible_assignment.product = 'FITEATSY'
+              and visible_assignment.professional_type = 'CONSULTANT'
+              and visible_assignment.status = 'active'
+          )
+        )
+        ${assignment}
+      limit 1`,
+    values,
+  );
+  const row = result.rows[0];
+  return row ? { accountId: String(row.account_user_id), internalClientId: String(row.internal_client_id) } : null;
+};
+
 export const getRegisteredConsultantClientProfileContext = async (
   publicClientId: string,
   consultantAccountId?: string,

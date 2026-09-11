@@ -1,6 +1,7 @@
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import {
   getRegisteredConsultantClientProfileContext,
+  getRegisteredConsultantClientAccessContext,
   getConsultantWearableSummaryForClient,
   listConsultantReportSummariesForClient,
   listConsultantTimelineForClient,
@@ -1690,7 +1691,7 @@ export const canAccessConsultantNutritionClient = async (
 ) => {
   if (!isConsultantRole(account)) return false;
   const useSeniorAuthority = options.allowSeniorAuthority === true && canApproveOrPublishDietPlan(account);
-  const context = await getRegisteredConsultantClientProfileContext(
+  const context = await getRegisteredConsultantClientAccessContext(
     publicClientId,
     useSeniorAuthority ? undefined : account.accountId,
     professionalTypeForNutritionAccount(account),

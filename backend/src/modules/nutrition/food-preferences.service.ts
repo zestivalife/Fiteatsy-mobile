@@ -58,8 +58,8 @@ export const normalizeFoodPreferenceProfile = (input: Partial<FoodPreferenceProf
 
 const getContext = async (publicClientId: string) => getRegisteredConsultantClientProfileContext(publicClientId);
 
-export const getFoodPreferenceProfile = async (publicClientId: string) => {
-  const context = await getContext(publicClientId);
+export const getFoodPreferenceProfile = async (publicClientId: string, knownInternalClientId?: string) => {
+  const context = knownInternalClientId ? { internalClientId: knownInternalClientId } : await getContext(publicClientId);
   if (!context) return null;
   const result = await pool.query(
     `select id, food_preference_profile, food_preference_updated_by, food_preference_updated_at
