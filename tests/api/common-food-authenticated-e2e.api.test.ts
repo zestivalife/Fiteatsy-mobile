@@ -94,6 +94,12 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     const recommendedFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST`, { headers: authHeaders(consultant.token) });
     assert.equal(recommendedFoods.response.status, 200, JSON.stringify(recommendedFoods.body));
     assert.ok(recommendedFoods.body.items.every((item: { nutritionStatus:string;generatorEligibility:string;mealEligibility:string }) => item.nutritionStatus === 'NUTRITION_VERIFIED' && item.generatorEligibility === 'ELIGIBLE' && item.mealEligibility === 'RECOMMENDED'));
+    const completeReference = recommendedFoods.body.items.find((item: { dataStatus?: string }) => item.dataStatus === 'REFERENCE');
+    assert.ok(completeReference, JSON.stringify(recommendedFoods.body.items));
+    assert.equal(completeReference.referenceLabel, 'Reference data');
+    assert.equal(completeReference.nutritionStatus, 'NUTRITION_VERIFIED');
+    assert.equal(completeReference.generatorEligibility, 'ELIGIBLE');
+    assert.equal(completeReference.addToMealEligible, true);
     if (index === 0) {
       const activatedP0 = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST&search=cucumber`, { headers: authHeaders(consultant.token) });
       assert.equal(activatedP0.response.status, 200, JSON.stringify(activatedP0.body));
