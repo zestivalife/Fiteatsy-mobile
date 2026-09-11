@@ -20,8 +20,8 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(screen).toContain('runHealthSync');
     expect(screen).toContain('getLatestHealthObservations');
     expect(screen).toContain('getHealthSyncActivity');
-    expect(screen).toContain('.filter(row=>row.item)');
-    expect(screen).toContain('No recent health data found');
+    expect(screen).toContain('definitions.map(definition=>({definition,item:latestByMetric.get(definition.type)}))');
+    expect(screen).toContain('No recent data');
     expect(screen).not.toMatch(/value:\s*['"](?:--|0)['"]/);
   });
 
@@ -40,5 +40,23 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(routes).toContain("healthRouter.get('/sync-runs'");
     expect(routes).toContain('currentOwner(getAuthenticatedAccount(req))');
     expect(repository).toContain('where r.client_id=$1 and wc.account_id=$2');
+  });
+
+  test('opens supported iOS app settings and refreshes once when returning', () => {
+    const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    expect(screen).toContain('await Linking.openSettings()');
+    expect(screen).toContain("AppState.addEventListener('change'");
+    expect(screen).toContain("nextState!=='active'||!awaitingPermissionReturn.current");
+    expect(screen).toContain('permissionRefreshRunning.current');
+    expect(screen).toContain('inspectAppleHealthPermissionState');
+    expect(screen).toContain('await refresh()');
+    expect(screen).not.toContain('x-apple-health://');
+  });
+
+  test('fails gracefully and uses truthful zero-data language', () => {
+    const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    expect(screen).toContain("Alert.alert('Unable to open Apple Health settings'");
+    expect(screen).toContain("status?.overallStatus==='CONNECTED'?'No recent data':'Action needed'");
+    expect(screen).not.toContain('Permission denied');
   });
 });

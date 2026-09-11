@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { enableHealthKitBackgroundDelivery, isHealthKitAvailable, readHealthKitChanges,
+import { enableHealthKitBackgroundDelivery, inspectHealthKitAuthorization, isHealthKitAvailable, readHealthKitChanges,
   requestHealthKitAuthorization } from '../../modules/fiteatsy-healthkit';
 import type { HealthObservationDraft, WearableSyncPayload } from '../types';
 
@@ -31,6 +31,10 @@ export const inspectAppleHealthAvailability = async () => Platform.OS === 'ios' 
 );
 export const requestAppleHealthPermissions = async () => withAppleHealthTimeout(
   requestHealthKitAuthorization(APPLE_HEALTH_SCOPES), APPLE_HEALTH_PERMISSION_TIMEOUT_MS, 'apple_health_permission_timeout'
+);
+export const inspectAppleHealthPermissionState = async () => withAppleHealthTimeout(
+  inspectHealthKitAuthorization(APPLE_HEALTH_SCOPES), APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS,
+  'apple_health_permission_status_timeout'
 );
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);

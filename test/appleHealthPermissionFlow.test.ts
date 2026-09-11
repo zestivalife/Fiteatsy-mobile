@@ -28,6 +28,13 @@ describe('Apple Health physical-device permission flow', () => {
     expect(screen).toContain("const persistedGrantedScopes = Platform.OS === 'ios' ? [] : grantedScopes");
   });
 
+  it('supports a lightweight return-to-app request-status inspection', () => {
+    expect(native).toContain('AsyncFunction("getAuthorizationRequestStatus")');
+    expect(native).toContain('getRequestStatusForAuthorization(toShare: [], read: types)');
+    expect(bridge).toContain('inspectHealthKitAuthorization');
+    expect(apple).toContain('inspectAppleHealthPermissionState');
+  });
+
   it('keeps no-data distinct from permission failure and starts initial sync', () => {
     expect(manager).not.toContain("throw new Error('INSUFFICIENT_DATA')");
     expect(apple).toContain("'no_recent_data'");

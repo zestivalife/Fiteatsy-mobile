@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Card } from '../../components/Card';
@@ -18,10 +18,12 @@ import {
   runHealthSync
 } from '../../services/healthSyncManager';
 import { useAppContext } from '../../state/AppContext';
+import { inspectAppleHealthPermissionState } from '../../services/appleHealthService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthDataSync'>;
 type UiState = 'idle'|'syncing'|'success'|'partial'|'error';
 type MetricDefinition = { type:string; label:string; icon:keyof typeof Ionicons.glyphMap };
+type PermissionRefreshState = 'idle'|'checking'|'available'|'action_needed'|'error';
 
 const definitions:MetricDefinition[] = [
   {type:'steps',label:'Steps',icon:'footsteps-outline'},
@@ -50,9 +52,11 @@ const displayValue=(item:HealthObservationDto)=>{
   if(item.metricType==='sleep_minutes')return {value:(item.value/60).toFixed(1),unit:'hr'};
   return {value:new Intl.NumberFormat().format(item.value),unit:item.unit};
 };
-const metricStatus=(item:HealthObservationDto,status:HealthSyncStatus|null)=>{
+const metricStatus=(item:HealthObservationDto|undefined,status:HealthSyncStatus|null,permissionRefresh:PermissionRefreshState)=>{
+  if(permissionRefresh==='checking')return 'Checking';
+  if(!item)return status?.overallStatus==='CONNECTED'?'No recent data':'Action needed';
   const age=Date.now()-new Date(item.measuredAtISO).getTime();
-  if(status?.overallStatus==='NOT_CONNECTED')return 'Permission needed';
+  if(status?.overallStatus==='NOT_CONNECTED')return 'Action needed';
   if(age>36*60*60*1000)return 'Last updated earlier';
   return 'Synced';
 };
@@ -61,29 +65,70 @@ export const HealthDataSyncScreen=({navigation}:Props)=>{
   const {themeMode,wellness,setWellness,addWearableSyncData,setSelectedDeviceId}=useAppContext();
   const palette=getThemeColors(themeMode);const running=useRef(false);
   const mounted=useRef(true);const operationId=useRef(0);
+  const awaitingPermissionReturn=useRef(false);const permissionRefreshRunning=useRef(false);
+  const permissionOperationId=useRef(0);
   const [status,setStatus]=useState<HealthSyncStatus|null>(null);
   const [observations,setObservations]=useState<HealthObservationDto[]>([]);
   const [activity,setActivity]=useState<HealthSyncActivity[]>([]);
   const [loading,setLoading]=useState(true);const [uiState,setUiState]=useState<UiState>('idle');
   const [message,setMessage]=useState<string|null>(null);const [selected,setSelected]=useState<HealthObservationDto|null>(null);
+  const [permissionRefresh,setPermissionRefresh]=useState<PermissionRefreshState>('idle');
 
   const refresh=useCallback(async()=>{
     const [nextStatus,nextObservations,nextActivity]=await Promise.all([
       getHealthSyncStatus(),getLatestHealthObservations(200),getHealthSyncActivity(8)
     ]);
+    if(!mounted.current)return;
     setStatus(nextStatus);setObservations(nextObservations.items);setActivity(nextActivity.items);
   },[]);
-  useEffect(()=>{mounted.current=true;void refresh().catch(()=>mounted.current&&setMessage('Health sync status is temporarily unavailable.')).finally(()=>mounted.current&&setLoading(false));return()=>{mounted.current=false;operationId.current+=1;running.current=false;};},[refresh]);
+  useEffect(()=>{mounted.current=true;void refresh().catch(()=>mounted.current&&setMessage('Health sync status is temporarily unavailable.')).finally(()=>mounted.current&&setLoading(false));return()=>{mounted.current=false;operationId.current+=1;permissionOperationId.current+=1;running.current=false;permissionRefreshRunning.current=false;};},[refresh]);
 
   const latestByMetric=useMemo(()=>{
     const map=new Map<string,HealthObservationDto>();
     for(const item of observations){const current=map.get(item.metricType);if(!current||item.measuredAtISO>current.measuredAtISO)map.set(item.metricType,item);}
     return map;
   },[observations]);
-  const metrics=definitions.map(definition=>({definition,item:latestByMetric.get(definition.type)})).filter(row=>row.item);
+  const metrics=definitions.map(definition=>({definition,item:latestByMetric.get(definition.type)}));
   const connected=status?.overallStatus==='CONNECTED';
   const platformStatus=Platform.OS==='ios'?status?.appleHealth:status?.healthConnect;
   const source=providerName(Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT');
+
+  const refreshAfterPermissionReview=useCallback(async()=>{
+    if(Platform.OS!=='ios'||permissionRefreshRunning.current)return;
+    permissionRefreshRunning.current=true;const currentOperation=++permissionOperationId.current;
+    setPermissionRefresh('checking');
+    try{
+      const inspection=await inspectAppleHealthPermissionState();
+      if(!mounted.current||permissionOperationId.current!==currentOperation)return;
+      await refresh();
+      if(!mounted.current||permissionOperationId.current!==currentOperation)return;
+      setPermissionRefresh(!inspection.available||inspection.requestStatus==='should_request'?'action_needed':'available');
+      setMessage(inspection.available?'Apple Health access status refreshed.':'Apple Health is not available on this device.');
+    }catch{
+      if(mounted.current&&permissionOperationId.current===currentOperation){setPermissionRefresh('error');setMessage('Apple Health access could not be refreshed. Your previous health data is safe.');}
+    }finally{permissionRefreshRunning.current=false;}
+  },[refresh]);
+
+  useEffect(()=>{
+    if(Platform.OS!=='ios')return;
+    const subscription=AppState.addEventListener('change',(nextState)=>{
+      if(nextState!=='active'||!awaitingPermissionReturn.current)return;
+      awaitingPermissionReturn.current=false;
+      void refreshAfterPermissionReview();
+    });
+    return()=>subscription.remove();
+  },[refreshAfterPermissionReview]);
+
+  const reviewPermissions=useCallback(async()=>{
+    if(Platform.OS!=='ios'){navigation.navigate('SyncWearable');return;}
+    try{
+      awaitingPermissionReturn.current=true;
+      await Linking.openSettings();
+    }catch{
+      awaitingPermissionReturn.current=false;
+      Alert.alert('Unable to open Apple Health settings','Manage Fiteatsy’s health access from your iPhone’s Settings or Health privacy controls.');
+    }
+  },[navigation]);
 
   const syncNow=useCallback(async()=>{
     if(running.current)return;running.current=true;let reachedTerminalState=false;const currentOperation=++operationId.current;
@@ -112,12 +157,12 @@ export const HealthDataSyncScreen=({navigation}:Props)=>{
         <View style={styles.connectionHeader}><View style={[styles.sourceIcon,{backgroundColor:palette.blueSoft}]}><Ionicons name={Platform.OS==='ios'?'heart':'fitness'} size={24} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.cardTitle,{color:palette.textPrimary}]}>{source}</Text><Text style={[styles.body,{color:connected?palette.success:palette.warning}]}>{connected?'Connected':'Connection needed'}</Text></View><View style={[styles.chip,{backgroundColor:connected?palette.successSoft:palette.warningSoft}]}><Text style={[styles.chipText,{color:connected?palette.success:palette.warning}]}>{platformStatus?.freshness==='CURRENT'?'Up to date':connected?'Connected':'Action needed'}</Text></View></View>
         <View style={styles.summaryRow}><View><Text style={[styles.caption,{color:palette.textMuted}]}>Last synced</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(platformStatus?.lastSuccessISO??status?.lastSyncISO)}</Text></View><View><Text style={[styles.caption,{color:palette.textMuted}]}>Records available</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{status?.recordsSynced??0}</Text></View></View>
         <PrimaryButton title={uiState==='syncing'?'Syncing…':uiState==='partial'?'Sync Again':uiState==='error'?'Try Again':uiState==='success'?'Synced':'Sync Now'} loading={uiState==='syncing'} disabled={!connected} onPress={()=>void syncNow()}/>
-        {!connected?<PrimaryButton title="Review Permissions" variant="secondary" onPress={()=>navigation.navigate('SyncWearable')}/>:null}
+        {Platform.OS==='ios'&&(!connected||platformStatus?.freshness!=='CURRENT')?<PrimaryButton title={permissionRefresh==='checking'?'Checking permissions…':'Review Permissions'} variant="secondary" disabled={permissionRefresh==='checking'} onPress={()=>void reviewPermissions()}/>:null}
         {message?<Text accessibilityLiveRegion="polite" style={[styles.message,{color:uiState==='error'?palette.danger:palette.textSecondary}]}>{message}</Text>:null}
       </Card>
 
       <Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Your Health Data</Text>
-      {metrics.length?metrics.map(({definition,item})=>{const shown=displayValue(item!);const label=metricStatus(item!,status);return <Pressable key={definition.type} accessibilityRole="button" accessibilityLabel={`${definition.label}, ${shown.value} ${shown.unit}, ${label}`} onPress={()=>setSelected(item!)}><Card style={styles.metricCard}><View style={[styles.metricIcon,{backgroundColor:palette.surfaceTint}]}><Ionicons name={definition.icon} size={20} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.cardTitle,{color:palette.textPrimary}]}>{definition.label}</Text><Text style={[styles.metricValue,{color:palette.textPrimary}]}>{shown.value} <Text style={styles.metricUnit}>{shown.unit}</Text></Text><Text style={[styles.caption,{color:palette.textMuted}]}>{source} · Updated {formatWhen(item!.measuredAtISO).toLowerCase()}</Text></View><Text style={[styles.chipText,{color:label==='Synced'?palette.success:palette.warning}]}>{label}</Text></Card></Pressable>;}):<Card><Text style={[styles.cardTitle,{color:palette.textPrimary}]}>No recent health data found</Text><Text style={[styles.body,{color:palette.textSecondary}]}>Your connected health app has not provided recent data for the supported metrics.</Text></Card>}
+      {metrics.map(({definition,item})=>{const shown=item?displayValue(item):null;const label=metricStatus(item,status,permissionRefresh);return <Pressable key={definition.type} disabled={!item} accessibilityRole="button" accessibilityLabel={`${definition.label}, ${shown?`${shown.value} ${shown.unit}`:'no recent data'}, ${label}`} onPress={()=>item&&setSelected(item)}><Card style={styles.metricCard}><View style={[styles.metricIcon,{backgroundColor:palette.surfaceTint}]}><Ionicons name={definition.icon} size={20} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.cardTitle,{color:palette.textPrimary}]}>{definition.label}</Text>{shown?<Text style={[styles.metricValue,{color:palette.textPrimary}]}>{shown.value} <Text style={styles.metricUnit}>{shown.unit}</Text></Text>:null}<Text style={[styles.caption,{color:palette.textMuted}]}>{item?`${source} · Updated ${formatWhen(item.measuredAtISO).toLowerCase()}`:`${source} · No recent data`}</Text></View><Text style={[styles.chipText,{color:label==='Synced'?palette.success:palette.warning}]}>{label}</Text></Card></Pressable>;})}
 
       <Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Sync Activity</Text>
       <Card>{activity.length?activity.map((item,index)=><View key={item.id} style={[styles.activityRow,index>0&&{borderTopColor:palette.stroke,borderTopWidth:1}]}><View style={styles.grow}><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(item.completedAtISO??item.startedAtISO)}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.status==='SUCCESS'?`${item.metricsUpdated} records updated`:item.status==='PARTIAL'?'Some health data updated':item.status==='RUNNING'?'Syncing health data':'Health data could not be updated'}</Text></View><Text style={[styles.chipText,{color:item.status==='FAILED'?palette.danger:item.status==='PARTIAL'?palette.warning:palette.success}]}>{item.status==='SUCCESS'?'Successful':item.status==='PARTIAL'?'Partial':item.status==='RUNNING'?'Updating':'Couldn’t sync'}</Text></View>):<Text style={[styles.body,{color:palette.textSecondary}]}>Your recent sync activity will appear here.</Text>}</Card>

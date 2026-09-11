@@ -21,6 +21,46 @@ public final class FiteatsyHealthKitModule: Module {
       return available
     }
 
+    AsyncFunction("getAuthorizationRequestStatus") { (metrics: [String], promise: Promise) in
+      guard HKHealthStore.isHealthDataAvailable() else {
+        promise.resolve([
+          "available": false,
+          "requestedScopes": metrics,
+          "supportedScopes": [],
+          "unsupportedScopes": metrics,
+          "requestStatus": "unknown"
+        ])
+        return
+      }
+      let supported = metrics.filter { self.sampleType($0) != nil }
+      let unsupported = metrics.filter { self.sampleType($0) == nil }
+      let types = Set(supported.compactMap { self.sampleType($0) })
+      guard !types.isEmpty else {
+        promise.resolve([
+          "available": true,
+          "requestedScopes": metrics,
+          "supportedScopes": supported,
+          "unsupportedScopes": unsupported,
+          "requestStatus": "unknown"
+        ])
+        return
+      }
+      self.store.getRequestStatusForAuthorization(toShare: [], read: types) { status, error in
+        if let error = error as NSError? {
+          self.logger.error("HealthKit request-status refresh failed; domain=\(error.domain, privacy: .public), code=\(error.code, privacy: .public)")
+          promise.reject("HEALTHKIT_REQUEST_STATUS_FAILED", "Apple Health access status could not be refreshed")
+          return
+        }
+        promise.resolve([
+          "available": true,
+          "requestedScopes": metrics,
+          "supportedScopes": supported,
+          "unsupportedScopes": unsupported,
+          "requestStatus": self.requestStatusName(status)
+        ])
+      }
+    }
+
     AsyncFunction("requestAuthorization") { (metrics: [String], promise: Promise) in
       guard HKHealthStore.isHealthDataAvailable() else {
         self.logger.error("HealthKit authorization rejected because HealthKit is unavailable")
