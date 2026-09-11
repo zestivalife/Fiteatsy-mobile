@@ -91,17 +91,18 @@ const dedupeExplorerItems=(items:any[])=>{const accepted:any[]=[];const identity
 const countsBy=(items:any[],key:string)=>Object.entries(items.reduce((out,item)=>{const values=Array.isArray(item[key])?item[key]:[item[key]];for(const value of values.filter(Boolean))out[value]=(out[value]??0)+1;return out;},{} as Record<string,number>)).map(([value,count])=>({value,count})).sort((a,b)=>Number(b.count)-Number(a.count)||a.value.localeCompare(b.value));
 const explorerResponseCache=new Map<string,{expiresAt:number;payload:any}>();
 const EXPLORER_RESPONSE_CACHE_TTL_MS=2_000;
+const EXPLORER_SHARED_READ_CACHE_TTL_MS=30_000;
 type ExplorerSupportData={approvedAliases:Awaited<ReturnType<typeof listApprovedFoodAliases>>;approvedProposalFoods:Awaited<ReturnType<typeof listApprovedProposalFoods>>;reference:Awaited<ReturnType<typeof listReferenceCatalogueFoods>>};
 const explorerContextCache=new Map<string,{expiresAt:number;value:Promise<Awaited<ReturnType<typeof resolveClientMealGenerationContext>>>}>();
 let explorerSupportCache:{expiresAt:number;value:Promise<ExplorerSupportData>}|null=null;
 const cachedExplorerContext=(account:AuthenticatedAccount,clientId:string,mealHead?:MealHead)=>{
  const key=`${account.accountId}:${clientId}:${mealHead??''}`;const now=Date.now();const cached=explorerContextCache.get(key);if(cached&&cached.expiresAt>now)return cached.value;if(cached)explorerContextCache.delete(key);
  const value=resolveClientMealGenerationContext({account,clientId,mealHead}).catch(error=>{explorerContextCache.delete(key);throw error;});
- if(explorerContextCache.size>=100)explorerContextCache.delete(explorerContextCache.keys().next().value!);explorerContextCache.set(key,{expiresAt:now+EXPLORER_RESPONSE_CACHE_TTL_MS,value});return value;
+ if(explorerContextCache.size>=100)explorerContextCache.delete(explorerContextCache.keys().next().value!);explorerContextCache.set(key,{expiresAt:now+EXPLORER_SHARED_READ_CACHE_TTL_MS,value});return value;
 };
 const cachedExplorerSupportData=()=>{const now=Date.now();if(explorerSupportCache&&explorerSupportCache.expiresAt>now)return explorerSupportCache.value;
  const value=Promise.all([listApprovedFoodAliases(),listApprovedProposalFoods(),listReferenceCatalogueFoods({limit:1000,offset:0})]).then(([approvedAliases,approvedProposalFoods,reference])=>({approvedAliases,approvedProposalFoods,reference})).catch(error=>{explorerSupportCache=null;throw error;});
- explorerSupportCache={expiresAt:now+EXPLORER_RESPONSE_CACHE_TTL_MS,value};return value;
+ explorerSupportCache={expiresAt:now+EXPLORER_SHARED_READ_CACHE_TTL_MS,value};return value;
 };
 export async function searchCommonFoods(account:AuthenticatedAccount,clientId:string,q:FoodSearchQuery){
  if(!roleAllowed(account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);

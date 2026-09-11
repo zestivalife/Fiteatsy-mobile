@@ -22,4 +22,6 @@ test('Food Explorer evicts rejected shared-read promises and keeps caches bounde
   assert.match(source, /\.catch\(error=>\{explorerSupportCache=null;throw error;\}\)/);
   assert.match(source, /if\(explorerContextCache\.size>=100\)/);
   assert.match(source, /EXPLORER_RESPONSE_CACHE_TTL_MS=2_000/);
+  assert.match(source, /EXPLORER_SHARED_READ_CACHE_TTL_MS=30_000/);
+  assert.match(source, /expiresAt:now\+EXPLORER_SHARED_READ_CACHE_TTL_MS/);
 });
