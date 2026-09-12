@@ -9,7 +9,7 @@ const packaged = (commitSha: string) => ({ commitSha, builtAt: '2026-09-08T18:30
 test('Railway deployment SHA is the canonical runtime build identity', () => {
   assert.deepEqual(resolveBuildIdentity({ RAILWAY_GIT_COMMIT_SHA: SHA_A }, null), {
     commitSha: SHA_A,
-    identityStatus: 'RAILWAY_GIT',
+    identityStatus: 'VERIFIED',
     buildIdentityVersion: 1,
     source: 'RAILWAY_GIT',
     builtAt: null,
@@ -20,7 +20,7 @@ test('Railway deployment SHA is the canonical runtime build identity', () => {
 test('CLI upload resolves immutable packaged identity without Railway Git metadata', () => {
   const identity = resolveBuildIdentity({}, packaged(SHA_A));
   assert.equal(identity.commitSha, SHA_A);
-  assert.equal(identity.identityStatus, 'PACKAGED_BUILD');
+  assert.equal(identity.identityStatus, 'VERIFIED');
   assert.equal(identity.builtAt, '2026-09-08T18:30:00.000Z');
 });
 
@@ -47,8 +47,21 @@ test('missing or malformed deployment identity fails closed', () => {
 test('packaged and Railway identity conflict fails closed', () => {
   const identity = resolveBuildIdentity({ RAILWAY_GIT_COMMIT_SHA: SHA_B }, packaged(SHA_A));
   assert.equal(identity.commitSha, null);
-  assert.equal(identity.identityStatus, 'UNKNOWN');
+  assert.equal(identity.identityStatus, 'INVALID');
   assert.equal(identity.identityError, 'BUILD_IDENTITY_MISMATCH');
+});
+
+test('canonical FITEATSY_COMMIT_SHA is verified and returned exactly', () => {
+  const identity = resolveBuildIdentity({ FITEATSY_COMMIT_SHA: SHA_A }, null);
+  assert.equal(identity.commitSha, SHA_A);
+  assert.equal(identity.identityStatus, 'VERIFIED');
+  assert.equal(identity.source, 'FITEATSY_COMMIT_SHA');
+});
+
+test('malformed canonical identity is explicitly invalid', () => {
+  const identity = resolveBuildIdentity({ FITEATSY_COMMIT_SHA: 'not-a-sha' }, null);
+  assert.equal(identity.commitSha, null);
+  assert.equal(identity.identityStatus, 'INVALID');
 });
 
 test('successive deployment environments cannot retain the previous SHA', () => {

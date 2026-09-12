@@ -13,9 +13,9 @@ export type PackagedBuildIdentity = {
 
 export type BuildIdentity = {
   commitSha: string | null;
-  identityStatus: 'PACKAGED_BUILD' | 'RAILWAY_GIT' | 'UNKNOWN';
+  identityStatus: 'VERIFIED' | 'INVALID' | 'UNKNOWN';
   buildIdentityVersion: 1;
-  source: 'PACKAGED_BUILD' | 'RAILWAY_GIT' | null;
+  source: 'FITEATSY_COMMIT_SHA' | 'PACKAGED_BUILD' | 'RAILWAY_GIT' | null;
   builtAt: string | null;
   identityError: 'BUILD_IDENTITY_MISMATCH' | null;
 };
@@ -32,6 +32,7 @@ export const resolveBuildIdentity = (
   runtimeEnvironment: NodeJS.ProcessEnv = process.env,
   packaged: PackagedBuildIdentity | null = readPackagedBuildIdentity()
 ): BuildIdentity => {
+  const canonicalCommitSha = runtimeEnvironment.FITEATSY_COMMIT_SHA?.trim() ?? '';
   const railwayCommitSha = runtimeEnvironment.RAILWAY_GIT_COMMIT_SHA?.trim() ?? '';
   const packagedCommitSha = typeof packaged?.commitSha === 'string' ? packaged.commitSha.trim() : '';
   const packagedBuiltAt = typeof packaged?.builtAt === 'string' ? packaged.builtAt.trim() : '';
@@ -40,10 +41,17 @@ export const resolveBuildIdentity = (
     packaged?.identitySource === 'PACKAGED_BUILD' &&
     !Number.isNaN(Date.parse(packagedBuiltAt));
 
+  if (canonicalCommitSha) {
+    if (!FULL_SHA.test(canonicalCommitSha) || canonicalCommitSha !== canonicalCommitSha.toLowerCase()) {
+      return { commitSha: null, identityStatus: 'INVALID', buildIdentityVersion: 1, source: null, builtAt: null, identityError: null };
+    }
+    return { commitSha: canonicalCommitSha, identityStatus: 'VERIFIED', buildIdentityVersion: 1, source: 'FITEATSY_COMMIT_SHA', builtAt: packagedBuiltAt && !Number.isNaN(Date.parse(packagedBuiltAt)) ? packagedBuiltAt : null, identityError: null };
+  }
+
   if (hasPackagedIdentity && FULL_SHA.test(railwayCommitSha) && packagedCommitSha.toLowerCase() !== railwayCommitSha.toLowerCase()) {
     return {
       commitSha: null,
-      identityStatus: 'UNKNOWN',
+      identityStatus: 'INVALID',
       buildIdentityVersion: 1,
       source: null,
       builtAt: null,
@@ -54,7 +62,7 @@ export const resolveBuildIdentity = (
   if (hasPackagedIdentity) {
     return {
       commitSha: packagedCommitSha.toLowerCase(),
-      identityStatus: 'PACKAGED_BUILD',
+      identityStatus: 'VERIFIED',
       buildIdentityVersion: 1,
       source: 'PACKAGED_BUILD',
       builtAt: packagedBuiltAt,
@@ -65,7 +73,7 @@ export const resolveBuildIdentity = (
   if (FULL_SHA.test(railwayCommitSha)) {
     return {
       commitSha: railwayCommitSha.toLowerCase(),
-      identityStatus: 'RAILWAY_GIT',
+      identityStatus: 'VERIFIED',
       buildIdentityVersion: 1,
       source: 'RAILWAY_GIT',
       builtAt: null,

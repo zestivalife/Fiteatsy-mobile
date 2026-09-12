@@ -107,9 +107,32 @@ test('GET /v1/version ignores stale mutable identity in favour of Railway deploy
         assert.equal(response.status, 200);
         assert.equal(body.git_commit, '94c199585f48853bbd288874328229340d923ac1');
         assert.equal(body.commitSha, '94c199585f48853bbd288874328229340d923ac1');
-        assert.equal(body.identityStatus, 'RAILWAY_GIT');
+        assert.equal(body.identityStatus, 'VERIFIED');
         assert.equal(body.buildIdentityVersion, 1);
         assert.equal(body.identitySource, 'RAILWAY_GIT');
+      } finally {
+        await server.close();
+      }
+    }
+  );
+});
+
+test('GET /v1/version exposes canonical identity without leaking environment secrets', async () => {
+  await withEnv(
+    {
+      NODE_ENV: 'production',
+      FITEATSY_COMMIT_SHA: 'd689f54b63358bf0ea86e2fc37ae38f5cd0d4973',
+      QA_BROWSER_BOOTSTRAP_SHARED_SECRET: 'must-not-appear'
+    },
+    async () => {
+      const server = await startAppServer(createApp());
+      const { response, body } = await getJson(server.baseUrl, '/v1/version');
+      try {
+        assert.equal(response.status, 200);
+        assert.equal(body.commitSha, 'd689f54b63358bf0ea86e2fc37ae38f5cd0d4973');
+        assert.equal(body.identityStatus, 'VERIFIED');
+        assert.equal(body.identitySource, 'FITEATSY_COMMIT_SHA');
+        assert.equal(JSON.stringify(body).includes('must-not-appear'), false);
       } finally {
         await server.close();
       }
