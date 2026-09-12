@@ -59,18 +59,23 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const completionStarted = useRef(false);
 
   useEffect(() => {
-    Promise.all([
-      getFoodPreferences(),
-      mode === 'onboarding' ? getOnboardingRuntimeProgress(clientId) : Promise.resolve(null)
-    ])
-      .then(([response, progress]) => {
+    const load = async () => {
+      const progress = mode === 'onboarding' ? await getOnboardingRuntimeProgress(clientId) : null;
+      try {
+        const response = await getFoodPreferences();
         const source = progress?.phase === 'food' && progress.foodDraft ? progress.foodDraft : response.profile;
         setProfile({ ...emptyFoodPreferenceProfile(), ...source, likedFoodIds: source.likedFoodIds ?? [], dislikedFoodIds: source.dislikedFoodIds ?? [], avoidedFoodIds: source.avoidedFoodIds ?? [] });
         if (progress?.phase === 'food') setInitialOnboardingStep(Math.max(1, Math.min(4, progress.step)));
         setSavedAt(response.updatedAtISO);
-      })
-      .catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'Unable to load food preferences.'))
-      .finally(() => setLoading(false));
+      } catch {
+        if (progress?.phase === 'food' && progress.foodDraft) setProfile(progress.foodDraft);
+        if (progress?.phase === 'food') setInitialOnboardingStep(Math.max(1, Math.min(4, progress.step)));
+        setError('Food preferences are temporarily unavailable. You can skip this step and update them later from Profile.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
   }, [clientId, mode]);
 
   useEffect(() => {
@@ -79,7 +84,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       setFoodError(null);
       searchFoodCatalogue(foodQuery, 0)
         .then((response) => { setFoodItems(response.items); setFoodHasMore(response.hasMore); })
-        .catch((requestError) => setFoodError(requestError instanceof Error ? requestError.message : 'Unable to load foods.'))
+        .catch(() => setFoodError('Food search is temporarily unavailable. You can skip this step and update preferences later from Profile.'))
         .finally(() => setFoodLoading(false));
     }, 250);
     return () => clearTimeout(timer);
@@ -93,7 +98,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
         setFoodItems((current) => Array.from(new Map([...current, ...response.items].map((item) => [item.id, item])).values()));
         setFoodHasMore(response.hasMore);
       })
-      .catch((requestError) => setFoodError(requestError instanceof Error ? requestError.message : 'Unable to load more foods.'))
+      .catch(() => setFoodError('Food search is temporarily unavailable. You can skip this step and update preferences later from Profile.'))
       .finally(() => setFoodLoading(false));
   };
 
@@ -130,6 +135,15 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
     }
   };
 
+  const skipOptionalPreferences = async () => {
+    completionStarted.current = true;
+    try {
+      await setOnboardingRuntimeProgress(clientId, { phase: 'recovery', step: 1, lifestyle: route.params?.lifestyle, foodDraft: profile });
+    } finally {
+      navigation.push('OnboardingAssessment', { startPhase: 'recovery', lifestyle: route.params?.lifestyle });
+    }
+  };
+
   if (loading) {
     return <Screen><View style={styles.center}><Text style={[styles.body, { color: palette.textSecondary }]}>Loading your food preferences...</Text></View></Screen>;
   }
@@ -150,6 +164,7 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
       saving={saving}
       error={error}
       onSave={save}
+      onSkip={skipOptionalPreferences}
       onExit={() => navigation.goBack()}
     />;
   }

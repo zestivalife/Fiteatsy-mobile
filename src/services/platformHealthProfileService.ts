@@ -8,6 +8,8 @@ export type PlatformHealthProfile = {
   userId: string;
   createdAtISO: string;
   updatedAtISO: string;
+  onboardingComplete?: boolean | null;
+  onboarding_complete?: boolean | null;
   dateOfBirthISO: string | null;
   calculatedAge: number | null;
   gender: OnboardingProfile['gender'] | null;

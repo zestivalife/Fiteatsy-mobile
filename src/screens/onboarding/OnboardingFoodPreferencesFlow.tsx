@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { OnboardingAction, OnboardingShell, QuestionHeader } from '../../components/onboarding/OnboardingShell';
 import { colors, radius, spacing, typography } from '../../design/tokens';
 import type { FoodCatalogueItem, FoodPreferenceProfile } from '../../services/foodPreferenceService';
@@ -38,6 +38,7 @@ export const OnboardingFoodPreferencesFlow = ({
   initialStep,
   onProgress,
   onSave,
+  onSkip,
   onExit
 }: {
   profile: FoodPreferenceProfile;
@@ -54,6 +55,7 @@ export const OnboardingFoodPreferencesFlow = ({
   initialStep: number;
   onProgress: (step: number, profile: FoodPreferenceProfile) => void;
   onSave: () => void;
+  onSkip: () => void;
   onExit: () => void;
 }) => {
   const [step, setStep] = useState(initialStep);
@@ -72,17 +74,18 @@ export const OnboardingFoodPreferencesFlow = ({
     setDirection(next >= step ? 'forward' : 'back');
     setStep(next);
   };
-  const back = () => step === 1 ? onExit() : go(step - 1);
-  const skip = () => go(step + 1);
+  const back = () => { Keyboard.dismiss(); step === 1 ? onExit() : go(step - 1); };
+  const skip = () => { Keyboard.dismiss(); go(step + 1); };
 
   const action = step === 4 ? (
     <>
-      <OnboardingAction title={saving ? 'Saving...' : 'Looks good'} onPress={onSave} disabled={saving || !profile.dietType} />
+      <OnboardingAction title={saving ? 'Saving...' : 'Continue'} onPress={() => { Keyboard.dismiss(); onSave(); }} disabled={saving || !profile.dietType} />
+      <OnboardingAction title="Skip for now" onPress={() => { Keyboard.dismiss(); onSkip(); }} secondary />
       <OnboardingAction title="Edit preferences" onPress={() => go(1)} secondary />
     </>
   ) : (
     <>
-      <OnboardingAction title="Continue" onPress={() => go(step + 1)} disabled={step === 1 && !profile.dietType} />
+      <OnboardingAction title="Continue" onPress={() => { Keyboard.dismiss(); go(step + 1); }} disabled={step === 1 && !profile.dietType} />
       {step > 1 ? <OnboardingAction title="Skip for now" onPress={skip} secondary /> : null}
     </>
   );

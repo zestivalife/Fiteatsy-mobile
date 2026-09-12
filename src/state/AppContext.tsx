@@ -440,6 +440,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const completeAuthentication = useCallback(async (session: AuthSessionResponse) => {
     const fallback = buildSessionFromAuthResponse(session);
     if (fallback) {
+      setOnboardingStatus('UNKNOWN');
+      setOnboardingResumeStep(null);
       persistAuthSession({
         ...fallback,
         sessionToken: session.sessionToken
@@ -640,11 +642,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           if (parsed && typeof parsed === 'object') {
             const normalized = normalizeOnboardingProfile(parsed);
             setOnboardingState(normalized);
-            if (!cachedCanonicalProfile) {
-              const legacyGate = deriveOnboardingGate(normalized);
-              setOnboardingStatus(legacyGate.status);
-              setOnboardingResumeStep(legacyGate.resumeStep);
-            }
             const scopedKey = getSessionScopedKey(STORAGE_KEYS.onboarding, sessionForStorage);
             if (scopedKey) {
               AsyncStorage.setItem(scopedKey, JSON.stringify(normalized));
@@ -710,7 +707,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
               errorCode: resourceErrorCode(error)
             });
             setClientBootstrap((previous) => ({ ...previous, profile: { status: 'ERROR', errorCode: resourceErrorCode(error) } }));
-            if (!cachedCanonicalProfile && !storedOnboarding) {
+            if (!cachedCanonicalProfile) {
               setOnboardingStatus('UNKNOWN');
               setOnboardingResumeStep(null);
             }

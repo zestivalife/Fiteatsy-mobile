@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveOnboardingGate } from '../src/utils/onboardingGate';
+import { deriveOnboardingGate, resolveOnboardingState } from '../src/utils/onboardingGate';
 import type { PlatformHealthProfile } from '../src/services/platformHealthProfileService';
 
 const profile = (overrides: Partial<PlatformHealthProfile> = {}): PlatformHealthProfile => ({
@@ -19,6 +19,26 @@ const profile = (overrides: Partial<PlatformHealthProfile> = {}): PlatformHealth
 
 test('new users start onboarding', () => {
   assert.deepEqual(deriveOnboardingGate(null), { status: 'NOT_STARTED', resumeStep: 'basics' });
+});
+
+test('canonical resolver never interprets an unresolved profile as incomplete', () => {
+  assert.equal(resolveOnboardingState(undefined), 'UNKNOWN');
+  assert.equal(resolveOnboardingState(null), 'INCOMPLETE');
+});
+
+test('explicit canonical completion and legacy required fields both resolve complete', () => {
+  assert.equal(resolveOnboardingState({ onboardingComplete: true }), 'COMPLETE');
+  assert.equal(resolveOnboardingState(profile()), 'COMPLETE');
+});
+
+test('optional food, lifestyle and wearable fields never gate onboarding', () => {
+  assert.equal(resolveOnboardingState(profile({
+    dietType: null,
+    preferredCuisines: [],
+    foodsLiked: [],
+    foodsDisliked: [],
+    sleepHours: null
+  })), 'COMPLETE');
 });
 
 test('completed backend profile goes Home even when optional fields are missing', () => {

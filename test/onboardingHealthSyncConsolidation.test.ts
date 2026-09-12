@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { deriveOnboardingGate } from '../src/utils/onboardingGate';
+import { deriveOnboardingGate, resolveOnboardingState } from '../src/utils/onboardingGate';
 
 const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), 'utf8');
 
@@ -16,6 +16,24 @@ describe('returning-user bootstrap and canonical Health Data Sync', () => {
     expect(deriveOnboardingGate({
       dateOfBirthISO: '1990-01-01', gender: 'Female', heightCm: null, currentWeightKg: 62
     })).toEqual({ status: 'IN_PROGRESS', resumeStep: 'anthropometrics' });
+  });
+
+  test('unknown canonical state remains unknown instead of reopening onboarding', () => {
+    expect(resolveOnboardingState(undefined)).toBe('UNKNOWN');
+    const context = read('src/state/AppContext.tsx');
+    expect(context).not.toContain('const legacyGate = deriveOnboardingGate(normalized)');
+    expect(context).toContain("setOnboardingStatus('UNKNOWN')");
+    expect(context).toMatch(/const completeAuthentication[\s\S]*setOnboardingStatus\('UNKNOWN'\)/);
+  });
+
+  test('food preference failure remains optional and escapable', () => {
+    const screen = read('src/screens/onboarding/FoodPreferencesScreen.tsx');
+    const flow = read('src/screens/onboarding/OnboardingFoodPreferencesFlow.tsx');
+    expect(screen).toContain('Food preferences are temporarily unavailable. You can skip this step');
+    expect(screen).toContain('Food search is temporarily unavailable. You can skip this step');
+    expect(screen).toContain('skipOptionalPreferences');
+    expect(flow).toContain('title="Skip for now"');
+    expect(flow).toContain('Keyboard.dismiss()');
   });
 
   test('completed users ignore stale onboarding runtime progress', () => {
