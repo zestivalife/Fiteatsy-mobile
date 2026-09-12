@@ -14,7 +14,7 @@ describe('health sync routing', () => {
   });
 
   test('only confirmed absence routes to connection onboarding', () => {
-    expect(resolveHealthSyncRoute(status('NOT_CONNECTED',false))).toEqual({connectionState:'NEVER_CONNECTED',destination:'SyncWearable',ctaLabel:'Connect'});
+    expect(resolveHealthSyncRoute(status('NOT_CONNECTED',false))).toEqual({connectionState:'NEVER_CONNECTED',destination:'HealthDataSync',ctaLabel:'Connect'});
   });
 
   test.each(['CONNECTED','ERROR','INSUFFICIENT_DATA','PARTIAL','NO_DATA','ACTION_REQUIRED','STALE'] as HealthSyncConnectionState[])(
@@ -32,6 +32,6 @@ describe('health sync routing', () => {
   test('explicit withdrawal cannot preserve connected routing', () => {
     const withdrawn=status('ERROR');
     withdrawn.appleHealth.consentStatus='WITHDRAWN';
-    expect(resolveHealthSyncRoute(withdrawn).destination).toBe('SyncWearable');
+    expect(resolveHealthSyncRoute(withdrawn).destination).toBe('HealthDataSync');
   });
 });

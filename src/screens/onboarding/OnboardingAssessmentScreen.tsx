@@ -95,7 +95,7 @@ export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
     void submitCheckIn({ mood: moodScore as 1 | 2 | 3 | 4 | 5, energy: Math.max(1, 6 - stress) as 1 | 2 | 3 | 4 | 5, sleepQuality: sleepScore as 1 | 2 | 3 | 4 | 5, stressLevel: stress });
     setMood(moodScore >= 4 ? '🙂' : moodScore === 3 ? '😐' : '☹️');
     void setOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId, { phase: 'connect', step: 1, lifestyle });
-    navigation.navigate('SyncWearable');
+    navigation.navigate('HealthDataSync', { entryContext: 'ONBOARDING' });
   };
 
   return <OnboardingShell key={step} phase={phase} step={phaseStep} total={4} onBack={back} direction={direction} action={<OnboardingAction title="Continue" onPress={next} />}>

@@ -14,7 +14,7 @@ const searchableItems: Array<{ label: string; route: keyof RootStackParamList; k
   { label: 'Breathing Session', route: 'BreathingSession', keywords: 'calm stress recovery' },
   { label: 'Movement Routine', route: 'MovementSession', keywords: 'activity exercise workout' },
   { label: 'Hydration Tracker', route: 'HydrationSession', keywords: 'water drink' },
-  { label: 'Wearable Sync', route: 'SyncWearable', keywords: 'health connect watch device' },
+  { label: 'Wearable Sync', route: 'HealthDataSync', keywords: 'health connect watch device' },
   { label: 'Health Reports', route: 'Reports', keywords: 'wellness biomarker pdf analysis' },
   { label: 'Nutrition Plan', route: 'NutritionPlan', keywords: 'diet meals food' },
   { label: 'Medication Tracker', route: 'MedicationCalendar', keywords: 'medicine reminder adherence' },

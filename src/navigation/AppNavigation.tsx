@@ -15,7 +15,6 @@ import { FoodPreferencesScreen } from '../screens/onboarding/FoodPreferencesScre
 import { SignInScreen } from '../screens/auth/SignInScreen';
 import { SignUpScreen } from '../screens/auth/SignUpScreen';
 import { ChangePinScreen } from '../screens/auth/ChangePinScreen';
-import { SyncWearableScreen } from '../screens/sync/SyncWearableScreen';
 import { SyncSuccessScreen } from '../screens/sync/SyncSuccessScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { TrackerScreen } from '../screens/home/TrackerScreen';
@@ -124,7 +123,6 @@ export const AppNavigation = () => {
         <Stack.Screen name="SignIn" component={SignInScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="ChangePin" component={ChangePinScreen} />
-        <Stack.Screen name="SyncWearable" component={SyncWearableScreen} />
         <Stack.Screen name="HealthDataSync" component={HealthDataSyncScreen} />
         <Stack.Screen name="SyncSuccess" component={SyncSuccessScreen} />
         <Stack.Screen name="Main" component={MainTabs} />

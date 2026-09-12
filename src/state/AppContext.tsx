@@ -286,7 +286,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [bootstrapped, setBootstrapped] = useState(false);
   const [clientBootstrap, setClientBootstrap] = useState<ClientBootstrapState>(createClientBootstrapState);
   const [canonicalProfile, setCanonicalProfile] = useState<PlatformHealthProfileBundle | null>(null);
-  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus>('NOT_STARTED');
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus>('UNKNOWN');
   const [onboardingResumeStep, setOnboardingResumeStep] = useState<OnboardingResumeStep>('basics');
   const [devices, setDevicesState] = useState<WearableDevice[]>([]);
   const [wellness, setWellnessState] = useState<WellnessSnapshot>(emptyWellness);
@@ -623,6 +623,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const cachedPublishedPlan = safeParse<PublishedNutritionPlan | null>(storedPublishedNutritionPlan, null);
         if (cachedCanonicalProfile?.profile.userId === identity.userId) {
           setCanonicalProfile(cachedCanonicalProfile);
+          const cachedGate = deriveOnboardingGate(cachedCanonicalProfile.profile);
+          setOnboardingStatus(cachedGate.status);
+          setOnboardingResumeStep(cachedGate.resumeStep);
         }
         if (cachedPublishedPlan) setPublishedNutritionPlan(cachedPublishedPlan);
         setClientBootstrap({
@@ -637,6 +640,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           if (parsed && typeof parsed === 'object') {
             const normalized = normalizeOnboardingProfile(parsed);
             setOnboardingState(normalized);
+            if (!cachedCanonicalProfile) {
+              const legacyGate = deriveOnboardingGate(normalized);
+              setOnboardingStatus(legacyGate.status);
+              setOnboardingResumeStep(legacyGate.resumeStep);
+            }
             const scopedKey = getSessionScopedKey(STORAGE_KEYS.onboarding, sessionForStorage);
             if (scopedKey) {
               AsyncStorage.setItem(scopedKey, JSON.stringify(normalized));
@@ -702,6 +710,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
               errorCode: resourceErrorCode(error)
             });
             setClientBootstrap((previous) => ({ ...previous, profile: { status: 'ERROR', errorCode: resourceErrorCode(error) } }));
+            if (!cachedCanonicalProfile && !storedOnboarding) {
+              setOnboardingStatus('UNKNOWN');
+              setOnboardingResumeStep(null);
+            }
           }
         }
         const diagnostics = await getPlatformHealthProfileSyncDiagnostics(toSessionStorageIdentity(sessionForStorage));

@@ -12,7 +12,7 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(home).toContain('navigation.navigate(healthSyncRoute.destination)');
     expect(home).toContain("healthSyncRoute.connectionState === 'UNKNOWN'");
     expect(home).not.toContain("status.overallStatus === 'CONNECTED'");
-    expect(read('src/navigation/types.ts')).toContain('HealthDataSync: undefined');
+    expect(read('src/navigation/types.ts')).toContain("HealthDataSync: { entryContext?: 'ONBOARDING' | 'HOME' | 'SETTINGS'");
     expect(read('src/navigation/AppNavigation.tsx')).toContain('<Stack.Screen name="HealthDataSync"');
   });
 

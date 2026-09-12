@@ -22,8 +22,6 @@ import {
   withHealthConnectTimeout
 } from '../../services/healthConnectService';
 import { HealthSyncResult, runHealthSync } from '../../services/healthSyncManager';
-import { getHealthSyncStatus } from '../../services/healthSyncManager';
-import { resolveHealthSyncRoute } from '../../services/healthSyncRouting';
 import { markHealthConnectAwaitingPermissionReturn } from '../../services/healthConnectOperationCoordinator';
 import { APPLE_HEALTH_SCOPES, requestAppleHealthPermissions } from '../../services/appleHealthService';
 import { acceptWearableConsent, reconcileWearableConnection, withdrawWearableConsent } from '../../services/wearablePlatformService';
@@ -31,7 +29,7 @@ import { registerWearableBackgroundSync, unregisterWearableBackgroundSync } from
 import { WearableSyncPayload } from '../../types';
 import { clearOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'SyncWearable'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'HealthDataSync'>;
 
 const healthProviderName = Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect';
 
@@ -198,10 +196,9 @@ const formatSyncTime = (iso?: string | null) => {
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
 };
 
-export const SyncWearableScreen = ({ navigation }: Props) => {
+export const HealthDataSyncExperience = ({ navigation, route }: Props) => {
   const {
     themeMode,
-    wearableSetupCompleted,
     setWearableSetupCompleted,
     setSelectedDeviceId,
     onboarding,
@@ -240,15 +237,8 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    void getHealthSyncStatus().then((status) => {
-      if (active && resolveHealthSyncRoute(status).connectionState === 'CONNECTED') {
-        navigation.replace('HealthDataSync');
-      }
-    }).catch(() => undefined);
-    return () => { active = false; };
-  }, [navigation]);
+  const entryContext = route.params?.entryContext ?? 'HOME';
+  const isOnboardingEntry = entryContext === 'ONBOARDING';
 
   const applyPermissionState = useCallback((permission: HealthConnectPermissionPreparation) => {
     setPendingInstall(false);
@@ -335,9 +325,9 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     }
     setWearableSetupCompleted(true);
     void clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
-    if (wearableSetupCompleted && navigation.canGoBack()) navigation.goBack();
+    if (!isOnboardingEntry && navigation.canGoBack()) navigation.goBack();
     else navigation.reset({ index:0, routes:[{ name:'Main' }] });
-  }, [authSession?.client.fiteatsyClientId, navigation, onboarding, setOnboarding, setWearableSetupCompleted, wearableSetupCompleted]);
+  }, [authSession?.client.fiteatsyClientId, isOnboardingEntry, navigation, onboarding, setOnboarding, setWearableSetupCompleted]);
 
   const finishOnboardingFlow = useCallback(() => {
     void exitWearableFlow(connectionState === 'connected' || connectionState === 'partial' || connectionState === 'calibrating' ? 'sync' : 'later');
@@ -618,7 +608,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
     void runRecoveryConnection();
   };
 
-  if (!wearableSetupCompleted) {
+  if (isOnboardingEntry) {
     return (
       <OnboardingShell
         phase="CONNECT"

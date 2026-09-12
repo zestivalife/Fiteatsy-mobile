@@ -1,7 +1,7 @@
 import type { HealthSyncStatus } from './healthSyncManager';
 
 export type HealthConnectionState = 'UNKNOWN' | 'NEVER_CONNECTED' | 'CONNECTED';
-export type HealthSyncDestination = 'SyncWearable' | 'HealthDataSync' | null;
+export type HealthSyncDestination = 'HealthDataSync' | null;
 
 export type HealthSyncRouteResolution = {
   connectionState: HealthConnectionState;
@@ -22,5 +22,5 @@ export const resolveHealthSyncRoute = (status: HealthSyncStatus | null | undefin
   if (hasPersistedProviderIdentity(status.appleHealth) || hasPersistedProviderIdentity(status.healthConnect)) {
     return { connectionState:'CONNECTED',destination:'HealthDataSync',ctaLabel:'Sync' };
   }
-  return { connectionState:'NEVER_CONNECTED',destination:'SyncWearable',ctaLabel:'Connect' };
+  return { connectionState:'NEVER_CONNECTED',destination:'HealthDataSync',ctaLabel:'Connect' };
 };

@@ -21,6 +21,7 @@ import { useAppContext } from '../../state/AppContext';
 import { inspectAppleHealthPermissionState } from '../../services/appleHealthService';
 import { HEALTH_METRIC_REGISTRY } from '../../services/healthMetricRegistry';
 import { resolveHealthSyncRoute } from '../../services/healthSyncRouting';
+import { HealthDataSyncExperience } from './SyncWearableScreen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthDataSync'>;
 type UiState = 'idle'|'syncing'|'success'|'partial'|'error';
@@ -55,7 +56,7 @@ const metricStatus=(item:HealthObservationDto|undefined,connected:boolean,permis
   return 'Synced';
 };
 
-export const HealthDataSyncScreen=({navigation}:Props)=>{
+export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   const {themeMode,wellness,setWellness,addWearableSyncData,setSelectedDeviceId}=useAppContext();
   const palette=getThemeColors(themeMode);const running=useRef(false);
   const mounted=useRef(true);const operationId=useRef(0);
@@ -84,6 +85,7 @@ export const HealthDataSyncScreen=({navigation}:Props)=>{
   },[observations]);
   const metrics=definitions.map(definition=>({definition,item:latestByMetric.get(definition.type)}));
   const connected=resolveHealthSyncRoute(status).connectionState==='CONNECTED';
+  const entryContext = route.params?.entryContext ?? 'HOME';
   const platformStatus=Platform.OS==='ios'?status?.appleHealth:status?.healthConnect;
   const source=providerName(Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT');
 
@@ -114,7 +116,7 @@ export const HealthDataSyncScreen=({navigation}:Props)=>{
   },[refreshAfterPermissionReview]);
 
   const reviewPermissions=useCallback(async()=>{
-    if(Platform.OS!=='ios'){navigation.navigate('SyncWearable');return;}
+    if(Platform.OS!=='ios'){void Linking.openSettings();return;}
     try{
       awaitingPermissionReturn.current=true;
       await Linking.openSettings();
@@ -142,6 +144,7 @@ export const HealthDataSyncScreen=({navigation}:Props)=>{
     finally{if(operationId.current===currentOperation){running.current=false;if(mounted.current&&!reachedTerminalState)setUiState('error');}}
   },[addWearableSyncData,refresh,setSelectedDeviceId,setWellness,source,status,wellness]);
 
+  if(entryContext==='ONBOARDING'||(!loading&&!connected)) return <HealthDataSyncExperience navigation={navigation} route={route}/>;
   if(loading)return <Screen><PageHeader title="Health Data Sync" onBack={()=>navigation.goBack()}/><View style={styles.loading}><ActivityIndicator color={palette.blue}/><Text style={[styles.body,{color:palette.textSecondary}]}>Checking your health connection…</Text></View></Screen>;
 
   return <>

@@ -73,7 +73,9 @@ export const SplashScreen = ({ navigation }: Props) => {
       return;
     }
 
-    const progress = await getOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
+    const progress = onboardingStatus === 'COMPLETED'
+      ? null
+      : await getOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
     if (onboardingStatus !== 'COMPLETED' && progress?.phase === 'food') {
       transitionTo(() => navigation.replace('FoodPreferences', { mode: 'onboarding', lifestyle: progress.lifestyle }));
       return;
@@ -82,8 +84,8 @@ export const SplashScreen = ({ navigation }: Props) => {
       transitionTo(() => navigation.replace('OnboardingAssessment', { startPhase: 'recovery', lifestyle: progress.lifestyle }));
       return;
     }
-    if (progress?.phase === 'connect') {
-      transitionTo(() => navigation.replace('SyncWearable'));
+    if (onboardingStatus !== 'COMPLETED' && progress?.phase === 'connect') {
+      transitionTo(() => navigation.replace('HealthDataSync', { entryContext: 'ONBOARDING' }));
       return;
     }
     if (onboardingStatus === 'NOT_STARTED' || onboardingResumeStep === 'basics') {
@@ -154,9 +156,10 @@ export const SplashScreen = ({ navigation }: Props) => {
 
   useEffect(() => {
     if (!exitRequested || navigated.current || (!bootstrapped && !forceExit)) return;
+    if (isAuthenticated && onboardingStatus === 'UNKNOWN') return;
     navigated.current = true;
     void resolveAndNavigate();
-  }, [bootstrapped, exitRequested, forceExit, resolveAndNavigate]);
+  }, [bootstrapped, exitRequested, forceExit, isAuthenticated, onboardingStatus, resolveAndNavigate]);
 
   const logoWidth = Math.min(width * 0.72, 480);
   const logoTop = Math.max(height * 0.16, 96);
