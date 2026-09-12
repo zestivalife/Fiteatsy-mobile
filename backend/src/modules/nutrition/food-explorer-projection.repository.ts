@@ -4,7 +4,7 @@ import { pool } from '../../db/pool.js';
 export type FoodExplorerProjectionRecord={
  projectionId:string;canonicalIdentityKey:string;sourceType:'GOVERNED'|'REFERENCE'|'APPROVED_PROPOSAL';sourceRecordId:string;
  sourceTrace:Array<{sourceType:string;sourceRecordId:string}>;canonicalName:string;normalizedName:string;aliases:string[];normalizedSearchText:string;
- category:string;family:string|null;foodState:string|null;nutritionStatus:string;generatorEligibility:string;entityType:string;operationalUseState:string;
+ category:string;family:string|null;foodState:string|null;authorizationStatus:'PENDING'|'AUTHORISED'|'NOT_AUTHORISED';nutritionStatus:string;generatorEligibility:string;entityType:string;operationalUseState:string;
  roles:string[];mealHeads:string[];vegetarianClass:string|null;active:boolean;searchable:boolean;manualAddable:boolean;generatorEligible:boolean;
  clientConsumable:boolean;pendingVerification:boolean;kcalPer100g:number|null;proteinPer100g:number|null;stableSortKey:string;displayPayload:Record<string,unknown>;
 };
@@ -26,7 +26,7 @@ export async function replaceFoodExplorerProjection(records:FoodExplorerProjecti
  const projectionHash=hash(ordered);const projectionVersion=`FOOD_EXPLORER_${projectionHash.slice(0,16)}`;
  const client=await pool.connect();
  try{await client.query('begin');await client.query('select pg_advisory_xact_lock($1)',[REFRESH_ADVISORY_LOCK_KEY]);await client.query('create temporary table next_food_explorer_projection (like food_explorer_search_projection including defaults) on commit drop');
-  const refreshedAt=new Date().toISOString();const rows=ordered.map(r=>({projection_id:r.projectionId,canonical_identity_key:r.canonicalIdentityKey,source_type:r.sourceType,source_record_id:r.sourceRecordId,source_trace:r.sourceTrace,canonical_name:r.canonicalName,normalized_name:r.normalizedName,aliases:r.aliases,normalized_search_text:r.normalizedSearchText,category:r.category,family:r.family,food_state:r.foodState,nutrition_status:r.nutritionStatus,generator_eligibility:r.generatorEligibility,entity_type:r.entityType,operational_use_state:r.operationalUseState,roles:r.roles,meal_heads:r.mealHeads,vegetarian_class:r.vegetarianClass,active:r.active,searchable:r.searchable,manual_addable:r.manualAddable,generator_eligible:r.generatorEligible,client_consumable:r.clientConsumable,pending_verification:r.pendingVerification,kcal_per_100g:r.kcalPer100g,protein_per_100g:r.proteinPer100g,stable_sort_key:r.stableSortKey,source_priority:r.sourceType==='GOVERNED'?300:r.sourceType==='REFERENCE'?200:100,display_payload:r.displayPayload,projection_version:projectionVersion,projection_hash:hash(r),updated_at:refreshedAt}));
+  const refreshedAt=new Date().toISOString();const rows=ordered.map(r=>({projection_id:r.projectionId,canonical_identity_key:r.canonicalIdentityKey,source_type:r.sourceType,source_record_id:r.sourceRecordId,source_trace:r.sourceTrace,canonical_name:r.canonicalName,normalized_name:r.normalizedName,aliases:r.aliases,normalized_search_text:r.normalizedSearchText,category:r.category,family:r.family,food_state:r.foodState,authorization_status:r.authorizationStatus,nutrition_status:r.nutritionStatus,generator_eligibility:r.generatorEligibility,entity_type:r.entityType,operational_use_state:r.operationalUseState,roles:r.roles,meal_heads:r.mealHeads,vegetarian_class:r.vegetarianClass,active:r.active,searchable:r.searchable,manual_addable:r.manualAddable,generator_eligible:r.generatorEligible,client_consumable:r.clientConsumable,pending_verification:r.pendingVerification,kcal_per_100g:r.kcalPer100g,protein_per_100g:r.proteinPer100g,stable_sort_key:r.stableSortKey,source_priority:r.sourceType==='GOVERNED'?300:r.sourceType==='REFERENCE'?200:100,display_payload:r.displayPayload,projection_version:projectionVersion,projection_hash:hash(r),updated_at:refreshedAt}));
   await client.query(`insert into next_food_explorer_projection select * from jsonb_populate_recordset(null::food_explorer_search_projection,$1::jsonb)`,[JSON.stringify(rows)]);
   await client.query('delete from food_explorer_search_projection');
   await client.query('insert into food_explorer_search_projection select * from next_food_explorer_projection');
@@ -40,7 +40,7 @@ export async function replaceFoodExplorerProjection(records:FoodExplorerProjecti
 export type ProjectionSearch={scope?:'ALL'|'RECOMMENDED';search?:string;category?:string;family?:string;referenceState?:string;nutritionStatus?:string;generatorEligibility?:string;entityType?:string;componentRole?:string;dietClass?:string;mealHead?:string;proteinMin?:number;proteinMax?:number;caloriesMin?:number;caloriesMax?:number;limit:number;offset:number;allowedIds?:string[]};
 const filters=(input:ProjectionSearch)=>{const values:unknown[]=[];const where=['active','searchable'];const bind=(v:unknown)=>{values.push(v);return `$${values.length}`;};
  if(input.scope!=='ALL'){
-  where.push('generator_eligible','client_consumable');
+  where.push("authorization_status='AUTHORISED'",'generator_eligible','client_consumable');
   if(input.allowedIds){
    const allowed=bind(input.allowedIds);
    // allowedIds are canonical catalogue/source IDs. projection_id is an
