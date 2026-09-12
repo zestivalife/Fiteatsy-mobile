@@ -1,5 +1,5 @@
 import { ReportParameter } from './nuetraService';
-import { apiBaseUrl, buildAuthorizationHeaders } from './apiClient';
+import { apiBaseUrl, apiFetch, buildAuthorizationHeaders } from './apiClient';
 
 type CategoryScores = Record<'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins', number>;
 
@@ -340,19 +340,8 @@ export const waitForReportAnalysis = async (params: {
 };
 
 export const listAnalyzedReports = async (): Promise<ReportDto[]> => {
-  let lastError = 'network_error';
-  logReportDebug('history:start', { baseUrls: getBaseUrls() });
-  for (const baseUrl of getBaseUrls()) {
-    try {
-      const payload = await requestJson<{ items: ReportDto[] }>(baseUrl, '/v1/reports?limit=50');
-      return payload.items ?? [];
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : 'network_error';
-      logReportDebug('history:failure', { baseUrl, error: lastError });
-      if (isTerminalHttpError(error)) throw error;
-    }
-  }
-  throw new Error(lastError);
+  const payload = await apiFetch<{ items: ReportDto[] }>('/v1/reports?limit=50');
+  return payload.items ?? [];
 };
 
 export const getCurrentReportComparison = async (): Promise<ReportComparisonProjection | null> => {

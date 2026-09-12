@@ -65,6 +65,17 @@ export type HealthSyncResult = {
   wellness: WellnessSnapshot;
 };
 
+export class HealthSyncUploadPendingError extends Error {
+  payload: WearableSyncPayload;
+  observations: HealthObservationDraft[];
+
+  constructor(payload: WearableSyncPayload, observations: HealthObservationDraft[]) {
+    super('health_sync_upload_pending');
+    this.payload = payload;
+    this.observations = observations;
+  }
+}
+
 export const HEALTH_SYNC_PIPELINE_TIMEOUT_MS = 45_000;
 export const withHealthSyncPipelineTimeout = <T>(operation: Promise<T>, code: string): Promise<T> =>
   new Promise<T>((resolve, reject) => {
@@ -148,12 +159,18 @@ export const runHealthSync = async (
   previousWellness: WellnessSnapshot,
   governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY' }
 ): Promise<HealthSyncResult> => {
-  const run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger) : null;
+  let run: Awaited<ReturnType<typeof beginWearableSyncRun>> | null = null;
+  let payload: WearableSyncPayload | null = null;
+  let observations: HealthObservationDraft[] = [];
   try {
-    const checkpoints = governed ? await withHealthSyncPipelineTimeout(getWearableCheckpoints(governed.connectionId), 'health_sync_checkpoint_read_timeout') : { items: [] };
+    // A backend outage must never prevent a local HealthKit/Health Connect read.
+    const checkpoints = governed
+      ? await withHealthSyncPipelineTimeout(getWearableCheckpoints(governed.connectionId), 'health_sync_checkpoint_read_timeout').catch(() => ({ items: [] }))
+      : { items: [] };
     const providerCursors = Object.fromEntries(checkpoints.items.map((item) => [item.metricScope, item.anchorValue ?? item.cursorValue ?? '']));
-    const payload = await withHealthSyncPipelineTimeout(syncConnectedHealthApp(appId, providerCursors), 'health_sync_native_read_timeout');
-    const observations = deriveObservations(payload);
+    payload = await withHealthSyncPipelineTimeout(syncConnectedHealthApp(appId, providerCursors), 'health_sync_native_read_timeout');
+    observations = deriveObservations(payload);
+    run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger) : null;
 
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
     for (let offset = 0; offset < observations.length; offset += 500) {
@@ -183,6 +200,10 @@ export const runHealthSync = async (
     if (run) await finishWearableSyncRun(run.id, { status:'FAILED',recordsRead:0,recordsUploaded:0,recordsInserted:0,
       recordsDuplicates:0,recordsUpdated:0,recordsDeleted:0,errorStage:'SYNC',errorCode:error instanceof Error ? error.message.slice(0,100) : 'UNKNOWN',
       safeErrorSummary:'Wearable synchronization could not complete.' }).catch(() => undefined);
+    if (payload && error && typeof error === 'object' && 'code' in error) {
+      const code = String((error as { code?: unknown }).code);
+      if (code === 'NETWORK_ERROR' || code === 'TIMEOUT') throw new HealthSyncUploadPendingError(payload, observations);
+    }
     throw error;
   }
 };

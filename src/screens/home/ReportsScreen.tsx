@@ -478,6 +478,16 @@ export const ReportsScreen = () => {
     }
   };
 
+  const reportHistoryErrorMessage = (error: unknown) => {
+    if (error && typeof error === 'object' && 'code' in error) {
+      const code = String((error as { code?: unknown }).code);
+      if (code === 'NETWORK_ERROR') return 'You appear to be offline. Report history will refresh when your connection returns.';
+      if (code === 'TIMEOUT') return 'Report history took too long to load. Please try again.';
+      if (code === 'UNAUTHORIZED') return 'Your session needs to be refreshed. Please sign in again.';
+    }
+    return 'Report history is temporarily unavailable. Please try again.';
+  };
+
   const reloadReportsAfterDelete = async () => {
     clearReportDerivedState();
     setReportsLoading(true);
@@ -556,7 +566,7 @@ export const ReportsScreen = () => {
     refreshReportData()
       .catch((error) => {
         if (!active) return;
-        setReportsLoadError(error instanceof Error ? error.message : 'Unable to load report history.');
+        setReportsLoadError(reportHistoryErrorMessage(error));
       })
       .finally(() => {
         if (active) setReportsLoading(false);

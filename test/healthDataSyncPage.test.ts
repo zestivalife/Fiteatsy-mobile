@@ -43,9 +43,13 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(repository).toContain('where r.client_id=$1 and wc.account_id=$2');
   });
 
-  test('opens supported iOS app settings and refreshes once when returning', () => {
+  test('uses the native HealthKit request and never misdirects iOS users to generic app settings', () => {
     const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
-    expect(screen).toContain('await Linking.openSettings()');
+    expect(screen).toContain('requestAppleHealthPermissions');
+    expect(screen).toContain('Request Health Access');
+    expect(screen).toContain('Apps and Services → Fiteatsy');
+    expect(screen).toContain("if(Platform.OS!=='ios'){void Linking.openSettings();return;}");
+    expect(screen).not.toContain('await Linking.openSettings()');
     expect(screen).toContain("AppState.addEventListener('change'");
     expect(screen).toContain("nextState!=='active'||!awaitingPermissionReturn.current");
     expect(screen).toContain('permissionRefreshRunning.current');
@@ -56,8 +60,16 @@ describe('Health Data Sync control-centre contracts', () => {
 
   test('fails gracefully and uses truthful zero-data language', () => {
     const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
-    expect(screen).toContain("Alert.alert('Unable to open Apple Health settings'");
+    expect(screen).toContain('Apple Health access could not be requested');
     expect(screen).toContain("connected?'No recent data':'Action needed'");
     expect(screen).not.toContain('Permission denied');
+  });
+
+  test('keeps local health reads independent from backend upload availability', () => {
+    const manager = read('src/services/healthSyncManager.ts');
+    const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    expect(manager.indexOf('syncConnectedHealthApp(appId, providerCursors)')).toBeLessThan(manager.indexOf('beginWearableSyncRun(governed.connectionId'));
+    expect(manager).toContain('HealthSyncUploadPendingError');
+    expect(screen).toContain('Upload is pending until the connection returns.');
   });
 });

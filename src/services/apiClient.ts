@@ -23,6 +23,26 @@ export class ApiClientError extends Error {
   }
 }
 
+export type ApiRequestDiagnostic = {
+  hostname: string;
+  route: string;
+  method: string;
+  networkType: string;
+  authenticated: boolean;
+  tokenRefreshAttempted: boolean;
+  durationMs: number;
+  outcome: ApiClientErrorCode | 'SUCCESS';
+};
+
+let diagnosticSink: ((event: ApiRequestDiagnostic) => void) | null = null;
+let networkTypeProvider: (() => string | null | undefined) | null = null;
+export const registerApiDiagnosticSink = (sink: ((event: ApiRequestDiagnostic) => void) | null) => {
+  diagnosticSink = sink;
+};
+export const registerNetworkTypeProvider = (provider: (() => string | null | undefined) | null) => {
+  networkTypeProvider = provider;
+};
+
 export const getApiBaseUrl = () => {
   const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
   if (fromEnv) {
@@ -93,6 +113,17 @@ export const API_REQUEST_TIMEOUT_MS = 15_000;
 type ApiRequestInit = RequestInit & { timeoutMs?: number };
 
 export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Promise<T> => {
+  const startedAt = Date.now();
+  const method = init.method ?? 'GET';
+  const hostname = new URL(apiBaseUrl).hostname;
+  const authenticated = Boolean(accessTokenProvider?.());
+  const emit = (outcome: ApiRequestDiagnostic['outcome']) => {
+    const event = { hostname, route: path.split('?')[0], method,
+      networkType: networkTypeProvider?.() ?? 'UNKNOWN', authenticated, tokenRefreshAttempted: false,
+      durationMs: Date.now() - startedAt, outcome };
+    diagnosticSink?.(event);
+    console.info('[ApiRequest]', event);
+  };
   const controller = new AbortController();
   const callerSignal = init.signal;
   const abortFromCaller = () => controller.abort();
@@ -109,8 +140,10 @@ export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Prom
     });
   } catch (error) {
     if (controller.signal.aborted && !callerSignal?.aborted) {
+      emit('TIMEOUT');
       throw new ApiClientError('TIMEOUT', 'The platform request timed out. Please try again.');
     }
+    emit('NETWORK_ERROR');
     throw new ApiClientError('NETWORK_ERROR', 'Unable to reach the platform backend.');
   } finally {
     clearTimeout(timeout);
@@ -125,9 +158,12 @@ export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Prom
       payload = null;
     }
     if (response.status === 401 && accessTokenProvider?.()) unauthorizedHandler?.();
-    throw new ApiClientError(toErrorCode(response.status), payload?.message ?? 'Platform request failed.', response.status, payload?.error);
+    const code = toErrorCode(response.status);
+    emit(code);
+    throw new ApiClientError(code, payload?.message ?? 'Platform request failed.', response.status, payload?.error);
   }
 
+  emit('SUCCESS');
   return (await response.json()) as T;
 };
 

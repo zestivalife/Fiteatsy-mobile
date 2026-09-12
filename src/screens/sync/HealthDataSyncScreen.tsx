@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Card } from '../../components/Card';
@@ -15,10 +15,11 @@ import {
   HealthObservationDto,
   HealthSyncActivity,
   HealthSyncStatus,
+  HealthSyncUploadPendingError,
   runHealthSync
 } from '../../services/healthSyncManager';
 import { useAppContext } from '../../state/AppContext';
-import { inspectAppleHealthPermissionState } from '../../services/appleHealthService';
+import { inspectAppleHealthPermissionState, requestAppleHealthPermissions } from '../../services/appleHealthService';
 import { HEALTH_METRIC_REGISTRY } from '../../services/healthMetricRegistry';
 import { resolveHealthSyncRoute } from '../../services/healthSyncRouting';
 import { HealthDataSyncExperience } from './SyncWearableScreen';
@@ -68,6 +69,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   const [loading,setLoading]=useState(true);const [uiState,setUiState]=useState<UiState>('idle');
   const [message,setMessage]=useState<string|null>(null);const [selected,setSelected]=useState<HealthObservationDto|null>(null);
   const [permissionRefresh,setPermissionRefresh]=useState<PermissionRefreshState>('idle');
+  const [showPermissionHelp,setShowPermissionHelp]=useState(false);
 
   const refresh=useCallback(async()=>{
     const [nextStatus,nextObservations,nextActivity]=await Promise.all([
@@ -117,14 +119,21 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
 
   const reviewPermissions=useCallback(async()=>{
     if(Platform.OS!=='ios'){void Linking.openSettings();return;}
+    awaitingPermissionReturn.current=true;
+    setShowPermissionHelp(true);
+  },[]);
+
+  const requestHealthAccess=useCallback(async()=>{
+    setPermissionRefresh('checking');
     try{
-      awaitingPermissionReturn.current=true;
-      await Linking.openSettings();
+      await requestAppleHealthPermissions();
+      setShowPermissionHelp(false);
+      await refreshAfterPermissionReview();
     }catch{
-      awaitingPermissionReturn.current=false;
-      Alert.alert('Unable to open Apple Health settings','Manage Fiteatsy’s health access from your iPhone’s Settings or Health privacy controls.');
+      setPermissionRefresh('error');
+      setMessage('Apple Health access could not be requested. Your previous health data is safe.');
     }
-  },[navigation]);
+  },[refreshAfterPermissionReview]);
 
   const syncNow=useCallback(async()=>{
     if(running.current)return;running.current=true;let reachedTerminalState=false;const currentOperation=++operationId.current;
@@ -140,7 +149,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
       reachedTerminalState=true;
       setMessage(partial?`Health data partially updated · ${result.accepted} records updated`:`Health data updated · ${result.accepted} records updated`);
       await refresh();
-    }catch{if(isCurrent()){reachedTerminalState=true;setUiState('error');setMessage('We couldn’t update your health data. Your previous data is safe.');}}
+    }catch(error){if(isCurrent()){reachedTerminalState=true;if(error instanceof HealthSyncUploadPendingError){addWearableSyncData(error.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setUiState('partial');setMessage(`Health data was read from ${source}. Upload is pending until the connection returns.`);}else{setUiState('error');setMessage('We couldn’t update your health data. Your previous data is safe.');}}}
     finally{if(operationId.current===currentOperation){running.current=false;if(mounted.current&&!reachedTerminalState)setUiState('error');}}
   },[addWearableSyncData,refresh,setSelectedDeviceId,setWellness,source,status,wellness]);
 
@@ -165,6 +174,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
       <Card>{activity.length?activity.map((item,index)=><View key={item.id} style={[styles.activityRow,index>0&&{borderTopColor:palette.stroke,borderTopWidth:1}]}><View style={styles.grow}><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(item.completedAtISO??item.startedAtISO)}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.status==='SUCCESS'?`${item.metricsUpdated} records updated`:item.status==='PARTIAL'?'Some health data updated':item.status==='RUNNING'?'Syncing health data':'Health data could not be updated'}</Text></View><Text style={[styles.chipText,{color:item.status==='FAILED'?palette.danger:item.status==='PARTIAL'?palette.warning:palette.success}]}>{item.status==='SUCCESS'?'Successful':item.status==='PARTIAL'?'Partial':item.status==='RUNNING'?'Updating':'Couldn’t sync'}</Text></View>):<Text style={[styles.body,{color:palette.textSecondary}]}>Your recent sync activity will appear here.</Text>}</Card>
     </Screen>
     <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={()=>setSelected(null)}><Pressable style={[styles.overlay,{backgroundColor:palette.overlay}]} onPress={()=>setSelected(null)}><Pressable style={[styles.sheet,{backgroundColor:palette.card}]} onPress={()=>undefined}>{selected?<><View style={styles.sheetHandle}/><Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>{definitions.find(item=>item.type===selected.metricType)?.label??selected.metricType}</Text><Text style={[styles.detailValue,{color:palette.textPrimary}]}>{displayValue(selected).value} {displayValue(selected).unit}</Text><View style={styles.detailRow}><Text style={[styles.body,{color:palette.textMuted}]}>Source</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{providerName(selected.sourceProvider.toUpperCase())}</Text></View><View style={styles.detailRow}><Text style={[styles.body,{color:palette.textMuted}]}>Last updated</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(selected.measuredAtISO)}</Text></View><View style={styles.detailRow}><Text style={[styles.body,{color:palette.textMuted}]}>Sync status</Text><Text style={[styles.valueText,{color:palette.success}]}>Successful</Text></View><PrimaryButton title="Done" onPress={()=>setSelected(null)}/></>:null}</Pressable></Pressable></Modal>
+    <Modal visible={showPermissionHelp} transparent animationType="slide" onRequestClose={()=>setShowPermissionHelp(false)}><Pressable style={[styles.overlay,{backgroundColor:palette.overlay}]} onPress={()=>setShowPermissionHelp(false)}><Pressable style={[styles.sheet,{backgroundColor:palette.card}]} onPress={()=>undefined}><View style={styles.sheetHandle}/><Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Apple Health access</Text><Text style={[styles.body,{color:palette.textSecondary}]}>To review existing access, open the Health app, tap your profile picture, then Apps and Services → Fiteatsy. iOS does not provide a supported direct link to that screen.</Text><PrimaryButton title="Request Health Access" loading={permissionRefresh==='checking'} onPress={()=>void requestHealthAccess()}/><PrimaryButton title="Done" variant="secondary" onPress={()=>setShowPermissionHelp(false)}/></Pressable></Pressable></Modal>
   </>;
 };
 

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as Notifications from 'expo-notifications';
 import { emptyWellness } from './emptyWellness';
 import {
@@ -72,7 +72,7 @@ import {
   type AuthSessionResponse,
   type CurrentAuthSession
 } from '../services/authService';
-import { registerAccessTokenProvider, registerUnauthorizedHandler } from '../services/apiClient';
+import { registerAccessTokenProvider, registerNetworkTypeProvider, registerUnauthorizedHandler } from '../services/apiClient';
 import { queueHealthEvent } from '../services/platformEventService';
 import {
   getPlatformHealthProfile,
@@ -515,6 +515,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     registerAccessTokenProvider(() => authSession?.sessionToken ?? null);
   }, [authSession]);
+
+  const networkTypeRef = useRef('UNKNOWN');
+  useEffect(() => {
+    registerNetworkTypeProvider(() => networkTypeRef.current);
+    return () => registerNetworkTypeProvider(null);
+  }, []);
 
   useEffect(() => {
     registerUnauthorizedHandler(() => clearPersistedAuth(authSession));
@@ -1706,6 +1712,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!authSession) return undefined;
     const unsubscribe = NetInfo.addEventListener((state) => {
+      networkTypeRef.current = state.type?.toUpperCase() ?? 'UNKNOWN';
       if (state.isConnected) {
         void retryPendingHealthProfileSync();
       }
