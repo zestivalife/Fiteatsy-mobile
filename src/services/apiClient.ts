@@ -112,7 +112,7 @@ export const API_REQUEST_TIMEOUT_MS = 15_000;
 
 type ApiRequestInit = RequestInit & { timeoutMs?: number };
 
-export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Promise<T> => {
+export const apiResponse = async (path: string, init: ApiRequestInit = {}): Promise<Response> => {
   const startedAt = Date.now();
   const method = init.method ?? 'GET';
   const hostname = new URL(apiBaseUrl).hostname;
@@ -133,10 +133,11 @@ export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Prom
   let response: Response;
   try {
     const { timeoutMs: _timeoutMs, ...requestInit } = init;
+    const isMultipart = typeof FormData !== 'undefined' && init.body instanceof FormData;
     response = await fetch(`${apiBaseUrl}${path}`, {
       ...requestInit,
       signal: controller.signal,
-      headers: buildHeaders(init.headers)
+      headers: isMultipart ? { ...buildAuthorizationHeaders(), ...init.headers } : buildHeaders(init.headers)
     });
   } catch (error) {
     if (controller.signal.aborted && !callerSignal?.aborted) {
@@ -164,8 +165,11 @@ export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Prom
   }
 
   emit('SUCCESS');
-  return (await response.json()) as T;
+  return response;
 };
+
+export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Promise<T> =>
+  (await apiResponse(path, init)).json() as Promise<T>;
 
 export const postJson = async <T>(path: string, body: unknown, headers?: HeadersInit) =>
   apiFetch<T>(path, {

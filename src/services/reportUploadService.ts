@@ -1,5 +1,5 @@
 import { ReportParameter } from './nuetraService';
-import { apiBaseUrl, apiFetch, buildAuthorizationHeaders } from './apiClient';
+import { apiBaseUrl, apiFetch, apiResponse } from './apiClient';
 
 type CategoryScores = Record<'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins', number>;
 
@@ -214,25 +214,13 @@ const parseJson = async <T>(response: Response): Promise<T> => {
 
 const requestJson = async <T>(baseUrl: string, path: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> => {
   const { timeoutMs, signal, ...fetchOptions } = options ?? {};
-  const authHeaders = buildAuthorizationHeaders();
-  const controller = new AbortController();
-  const abortFromCaller = () => controller.abort();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs ?? STATUS_REQUEST_TIMEOUT_MS);
-  signal?.addEventListener('abort', abortFromCaller, { once: true });
   logReportDebug('request:start', {
     url: `${baseUrl}${path}`,
     method: fetchOptions.method ?? 'GET',
-    headers: safeHeaderSummary(authHeaders)
+    headers: safeHeaderSummary({})
   });
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...fetchOptions,
-      signal: controller.signal,
-      headers: {
-        ...authHeaders,
-        ...(fetchOptions.headers ?? {})
-      }
-    });
+    const response = await apiResponse(path, { ...fetchOptions, signal, timeoutMs: timeoutMs ?? STATUS_REQUEST_TIMEOUT_MS });
     const payload = await parseJson<T & { message?: string; error?: string }>(response).catch(() => ({} as T & { message?: string; error?: string }));
     logReportDebug('request:response', {
       url: `${baseUrl}${path}`,
@@ -248,9 +236,6 @@ const requestJson = async <T>(baseUrl: string, path: string, options?: RequestIn
       throw new Error(signal?.aborted ? 'REQUEST_CANCELLED' : 'REQUEST_TIMEOUT');
     }
     throw error;
-  } finally {
-    clearTimeout(timeout);
-    signal?.removeEventListener('abort', abortFromCaller);
   }
 };
 
@@ -441,11 +426,10 @@ export const uploadAndAnalyzeReport = async (params: {
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     params.onProgress?.({ stage: 'uploading', message: 'Uploading report', status: 'UPLOADING' });
     try {
-      const authHeaders = buildAuthorizationHeaders();
       logReportDebug('upload:request', {
         url: `${baseUrl}/v1/reports/analyze/start`,
         method: 'POST',
-        headers: safeHeaderSummary(authHeaders),
+        headers: safeHeaderSummary({}),
         payload: {
           mimeType: params.mimeType,
           source: params.source,
@@ -454,11 +438,11 @@ export const uploadAndAnalyzeReport = async (params: {
           hasLabName: Boolean(params.labName)
         }
       });
-      const response = await fetch(`${baseUrl}/v1/reports/analyze/start`, {
+      const response = await apiResponse('/v1/reports/analyze/start', {
         method: 'POST',
-        headers: authHeaders,
         body: form,
-        signal: controller.signal
+        signal: controller.signal,
+        timeoutMs: REQUEST_TIMEOUT_MS
       });
       clearTimeout(timeout);
       const startPayload = await parseJson<{ reportId?: string; status?: string; message?: string; error?: string }>(response).catch(

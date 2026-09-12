@@ -14,6 +14,7 @@ import {
   getLatestHealthObservations,
   HealthObservationDto,
   HealthSyncActivity,
+  type HealthSyncResult,
   HealthSyncStatus,
   HealthSyncUploadPendingError,
   runHealthSync
@@ -70,6 +71,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   const [message,setMessage]=useState<string|null>(null);const [selected,setSelected]=useState<HealthObservationDto|null>(null);
   const [permissionRefresh,setPermissionRefresh]=useState<PermissionRefreshState>('idle');
   const [showPermissionHelp,setShowPermissionHelp]=useState(false);
+  const [sourceDiagnostics,setSourceDiagnostics]=useState<HealthSyncResult['diagnostics']>([]);
 
   const refresh=useCallback(async()=>{
     const [nextStatus,nextObservations,nextActivity]=await Promise.all([
@@ -87,6 +89,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   },[observations]);
   const metrics=definitions.map(definition=>({definition,item:latestByMetric.get(definition.type)}));
   const connected=resolveHealthSyncRoute(status).connectionState==='CONNECTED';
+  const canReadLocalSource=connected||status===null;
   const entryContext = route.params?.entryContext ?? 'HOME';
   const platformStatus=Platform.OS==='ios'?status?.appleHealth:status?.healthConnect;
   const source=providerName(Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT');
@@ -144,16 +147,16 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
       const result=await runHealthSync(Platform.OS==='ios'?'apple-health':'health-connect',wellness,
         connection?.connectionId?{connectionId:connection.connectionId,provider:Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT',trigger:'MANUAL'}:undefined);
       if(!isCurrent())return;
-      addWearableSyncData(result.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setWellness(result.wellness);
+      addWearableSyncData(result.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setWellness(result.wellness);setSourceDiagnostics(result.diagnostics);
       const partial=result.rejected>0;setUiState(partial?'partial':'success');
       reachedTerminalState=true;
       setMessage(partial?`Health data partially updated · ${result.accepted} records updated`:`Health data updated · ${result.accepted} records updated`);
       await refresh();
-    }catch(error){if(isCurrent()){reachedTerminalState=true;if(error instanceof HealthSyncUploadPendingError){addWearableSyncData(error.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setUiState('partial');setMessage(`Health data was read from ${source}. Upload is pending until the connection returns.`);}else{setUiState('error');setMessage('We couldn’t update your health data. Your previous data is safe.');}}}
+    }catch(error){if(isCurrent()){reachedTerminalState=true;if(error instanceof HealthSyncUploadPendingError){addWearableSyncData(error.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setSourceDiagnostics(error.diagnostics);setUiState('partial');setMessage(`Health data was read from ${source}. Upload is pending until the connection returns.`);}else{setUiState('error');setMessage('We couldn’t update your health data. Your previous data is safe.');}}}
     finally{if(operationId.current===currentOperation){running.current=false;if(mounted.current&&!reachedTerminalState)setUiState('error');}}
   },[addWearableSyncData,refresh,setSelectedDeviceId,setWellness,source,status,wellness]);
 
-  if(entryContext==='ONBOARDING'||(!loading&&!connected)) return <HealthDataSyncExperience navigation={navigation} route={route}/>;
+  if(entryContext==='ONBOARDING'||(!loading&&status!==null&&!connected)) return <HealthDataSyncExperience navigation={navigation} route={route}/>;
   if(loading)return <Screen><PageHeader title="Health Data Sync" onBack={()=>navigation.goBack()}/><View style={styles.loading}><ActivityIndicator color={palette.blue}/><Text style={[styles.body,{color:palette.textSecondary}]}>Checking your health connection…</Text></View></Screen>;
 
   return <>
@@ -162,7 +165,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
       <Card style={styles.connectionCard}>
         <View style={styles.connectionHeader}><View style={[styles.sourceIcon,{backgroundColor:palette.blueSoft}]}><Ionicons name={Platform.OS==='ios'?'heart':'fitness'} size={24} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.cardTitle,{color:palette.textPrimary}]}>{source}</Text><Text style={[styles.body,{color:connected?palette.success:palette.warning}]}>{connected?'Connected':'Connection needed'}</Text></View><View style={[styles.chip,{backgroundColor:connected?palette.successSoft:palette.warningSoft}]}><Text style={[styles.chipText,{color:connected?palette.success:palette.warning}]}>{platformStatus?.freshness==='CURRENT'?'Up to date':connected?'Connected':'Action needed'}</Text></View></View>
         <View style={styles.summaryRow}><View><Text style={[styles.caption,{color:palette.textMuted}]}>Last synced</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(platformStatus?.lastSuccessISO??status?.lastSyncISO)}</Text></View><View><Text style={[styles.caption,{color:palette.textMuted}]}>Records available</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{status?.recordsSynced??0}</Text></View></View>
-        <PrimaryButton title={uiState==='syncing'?'Syncing…':uiState==='partial'?'Sync Again':uiState==='error'?'Try Again':uiState==='success'?'Synced':'Sync Now'} loading={uiState==='syncing'} disabled={!connected} onPress={()=>void syncNow()}/>
+        <PrimaryButton title={uiState==='syncing'?'Syncing…':uiState==='partial'?'Sync Again':uiState==='error'?'Try Again':uiState==='success'?'Synced':'Sync Now'} loading={uiState==='syncing'} disabled={!canReadLocalSource} onPress={()=>void syncNow()}/>
         {Platform.OS==='ios'&&(!connected||platformStatus?.freshness!=='CURRENT')?<PrimaryButton title={permissionRefresh==='checking'?'Checking permissions…':'Review Permissions'} variant="secondary" disabled={permissionRefresh==='checking'} onPress={()=>void reviewPermissions()}/>:null}
         {message?<Text accessibilityLiveRegion="polite" style={[styles.message,{color:uiState==='error'?palette.danger:palette.textSecondary}]}>{message}</Text>:null}
       </Card>
@@ -172,6 +175,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
 
       <Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Sync Activity</Text>
       <Card>{activity.length?activity.map((item,index)=><View key={item.id} style={[styles.activityRow,index>0&&{borderTopColor:palette.stroke,borderTopWidth:1}]}><View style={styles.grow}><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(item.completedAtISO??item.startedAtISO)}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.status==='SUCCESS'?`${item.metricsUpdated} records updated`:item.status==='PARTIAL'?'Some health data updated':item.status==='RUNNING'?'Syncing health data':'Health data could not be updated'}</Text></View><Text style={[styles.chipText,{color:item.status==='FAILED'?palette.danger:item.status==='PARTIAL'?palette.warning:palette.success}]}>{item.status==='SUCCESS'?'Successful':item.status==='PARTIAL'?'Partial':item.status==='RUNNING'?'Updating':'Couldn’t sync'}</Text></View>):<Text style={[styles.body,{color:palette.textSecondary}]}>Your recent sync activity will appear here.</Text>}</Card>
+      {__DEV__&&sourceDiagnostics.length?<><Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Source diagnostics</Text><Card>{sourceDiagnostics.map(item=><View key={`${item.sourcePlatform}:${item.metricKey}`} style={styles.activityRow}><View style={styles.grow}><Text style={[styles.valueText,{color:palette.textPrimary}]}>{item.metricKey}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.localQueryState} · {item.localRecordCount} records · upload {item.uploadState}</Text></View></View>)}</Card></>:null}
     </Screen>
     <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={()=>setSelected(null)}><Pressable style={[styles.overlay,{backgroundColor:palette.overlay}]} onPress={()=>setSelected(null)}><Pressable style={[styles.sheet,{backgroundColor:palette.card}]} onPress={()=>undefined}>{selected?<><View style={styles.sheetHandle}/><Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>{definitions.find(item=>item.type===selected.metricType)?.label??selected.metricType}</Text><Text style={[styles.detailValue,{color:palette.textPrimary}]}>{displayValue(selected).value} {displayValue(selected).unit}</Text><View style={styles.detailRow}><Text style={[styles.body,{color:palette.textMuted}]}>Source</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{providerName(selected.sourceProvider.toUpperCase())}</Text></View><View style={styles.detailRow}><Text style={[styles.body,{color:palette.textMuted}]}>Last updated</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(selected.measuredAtISO)}</Text></View><View style={styles.detailRow}><Text style={[styles.body,{color:palette.textMuted}]}>Sync status</Text><Text style={[styles.valueText,{color:palette.success}]}>Successful</Text></View><PrimaryButton title="Done" onPress={()=>setSelected(null)}/></>:null}</Pressable></Pressable></Modal>
     <Modal visible={showPermissionHelp} transparent animationType="slide" onRequestClose={()=>setShowPermissionHelp(false)}><Pressable style={[styles.overlay,{backgroundColor:palette.overlay}]} onPress={()=>setShowPermissionHelp(false)}><Pressable style={[styles.sheet,{backgroundColor:palette.card}]} onPress={()=>undefined}><View style={styles.sheetHandle}/><Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Apple Health access</Text><Text style={[styles.body,{color:palette.textSecondary}]}>To review existing access, open the Health app, tap your profile picture, then Apps and Services → Fiteatsy. iOS does not provide a supported direct link to that screen.</Text><PrimaryButton title="Request Health Access" loading={permissionRefresh==='checking'} onPress={()=>void requestHealthAccess()}/><PrimaryButton title="Done" variant="secondary" onPress={()=>setShowPermissionHelp(false)}/></Pressable></Pressable></Modal>

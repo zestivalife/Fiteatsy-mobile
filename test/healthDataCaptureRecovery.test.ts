@@ -15,7 +15,7 @@ describe('end-to-end health data capture recovery contracts', () => {
 
   test('first Apple sync uses bounded backfill and incremental sync uses only valid anchors', () => {
     const apple = read('src/services/appleHealthService.ts');
-    expect(apple).toContain('Date.now() - 90 * 86400000');
+    expect(apple).toContain('definition?.syncWindowDays');
     expect(apple).toContain('anchors[metric] ? undefined : start');
     expect(apple).not.toContain('new Date(null)');
   });
@@ -30,11 +30,30 @@ describe('end-to-end health data capture recovery contracts', () => {
   test('native read, upload, and checkpoint stages are all bounded', () => {
     const manager = read('src/services/healthSyncManager.ts');
     for (const code of [
-      'health_sync_checkpoint_read_timeout',
       'health_sync_native_read_timeout',
       'health_sync_upload_timeout',
       'health_sync_checkpoint_commit_timeout'
     ]) expect(manager).toContain(code);
+  });
+
+  test('local source read precedes every backend operation and checkpoints are device-local', () => {
+    const manager = read('src/services/healthSyncManager.ts');
+    const localRead = manager.indexOf('syncConnectedHealthApp(appId, localCursors)');
+    const backendRun = manager.indexOf('beginWearableSyncRun', localRead);
+    const upload = manager.indexOf("'/v1/health/observations:batch'", localRead);
+    expect(localRead).toBeGreaterThan(0);
+    expect(backendRun).toBeGreaterThan(localRead);
+    expect(upload).toBeGreaterThan(localRead);
+    expect(manager).toContain('health-sync-checkpoints:');
+    expect(manager).not.toContain('getWearableCheckpoints');
+  });
+
+  test('QA diagnostics are safe, metric-specific, and development-gated', () => {
+    const diagnostics = read('src/services/healthSourceDiagnostics.ts');
+    const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    for (const field of ['sourcePlatform','metricKey','localQueryState','localRecordCount','normalisationState','dedupState','uploadState','backendPersistenceState','dailyAggregateState','calculationState','trackerState','orbState','lastErrorClass','lastErrorMessageSafe']) expect(diagnostics).toContain(field);
+    expect(screen).toContain('__DEV__&&sourceDiagnostics.length');
+    expect(diagnostics).not.toContain('Authorization');
   });
 
   test('both providers expose non-sensitive count diagnostics', () => {

@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { enableHealthKitBackgroundDelivery, inspectHealthKitAuthorization, isHealthKitAvailable, readHealthKitChanges,
   requestHealthKitAuthorization } from '../../modules/fiteatsy-healthkit';
 import type { HealthObservationDraft, WearableSyncPayload } from '../types';
-import { APPLE_HEALTH_READ_TYPES } from './healthMetricRegistry';
+import { APPLE_HEALTH_QUERYABLE_METRICS, APPLE_HEALTH_READ_TYPES } from './healthMetricRegistry';
 
 export const APPLE_HEALTH_SCOPES = APPLE_HEALTH_READ_TYPES;
 export const APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS = 5_000;
@@ -45,12 +45,13 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
   const availabilityStartedAt = Date.now();
   if (Platform.OS !== 'ios' || !(await inspectAppleHealthAvailability())) throw new Error('apple_health_unavailable');
   diagnostic('HEALTHKIT_AVAILABLE', { durationMs: Date.now() - availabilityStartedAt, status: 'SUCCESS' });
-  const start = new Date(Date.now() - 90 * 86400000).toISOString();
   const observations: HealthObservationDraft[] = []; const nextAnchors: Record<string,string> = {};
   const statuses: Record<string,string> = {};
   const metricValues: Record<string, number[]> = {};
   diagnostic('HEALTH_SYNC_START', { metricCount: APPLE_HEALTH_SCOPES.length, status: 'STARTED' });
   const settledReads = await Promise.allSettled(APPLE_HEALTH_SCOPES.map(async (metric) => {
+    const definition = APPLE_HEALTH_QUERYABLE_METRICS.find((item) => item.appleHealthType === metric);
+    const start = new Date(Date.now() - (definition?.syncWindowDays ?? 30) * 86400000).toISOString();
     const startedAt = Date.now();
     diagnostic('METRIC_QUERY_START', { metric, durationMs: 0, status: 'CHECKING' });
     try {

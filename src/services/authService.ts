@@ -164,6 +164,9 @@ const requestJson = async <T>(
   const method = init.method ?? 'GET';
   authLogger.log(`${AUTH_LOG_PREFIX} REQUEST`, { apiBaseUrl, url, method });
   try {
+    // Authentication bootstrap intentionally precedes creation of an access
+    // token, so it cannot use the authenticated API client. Keep this as the
+    // sole direct-fetch exception and retain redacted auth-specific logging.
     response = await fetch(url, {
       ...init,
       headers: {

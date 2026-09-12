@@ -29,8 +29,5 @@ export const finishWearableSyncRun = (runId: string, result: Record<string, unkn
 export const commitWearableCheckpoint = (checkpoint: Record<string, unknown>) =>
   apiFetch('/v1/health/sync-checkpoints', { method: 'PUT', body: JSON.stringify(checkpoint) });
 
-export const getWearableCheckpoints = (connectionId: string) => apiFetch<{ items: Array<{ metricScope:string;cursorValue?:string;anchorValue?:string }> }>(
-  `/v1/health/sync-checkpoints/${encodeURIComponent(connectionId)}`);
-
 export const withdrawWearableConsent = (provider: GovernedProvider) =>
   apiFetch(`/v1/health/wearable-consents/${provider}`, { method: 'DELETE' });

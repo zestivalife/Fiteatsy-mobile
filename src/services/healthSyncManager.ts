@@ -1,9 +1,11 @@
 import { HealthObservationDraft, WearableSyncPayload, WellnessSnapshot } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { recalculateWellness } from '../utils/wellness';
 import { apiFetch, postJson } from './apiClient';
 import { HealthAppId, syncConnectedHealthApp } from './healthAppService';
 import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceService';
-import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, getWearableCheckpoints, type GovernedProvider } from './wearablePlatformService';
+import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
+import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -63,16 +65,19 @@ export type HealthSyncResult = {
   scores: HealthScoreSummary;
   status: HealthSyncStatus;
   wellness: WellnessSnapshot;
+  diagnostics: HealthSourceMetricDiagnostic[];
 };
 
 export class HealthSyncUploadPendingError extends Error {
   payload: WearableSyncPayload;
   observations: HealthObservationDraft[];
+  diagnostics: HealthSourceMetricDiagnostic[];
 
   constructor(payload: WearableSyncPayload, observations: HealthObservationDraft[]) {
     super('health_sync_upload_pending');
     this.payload = payload;
     this.observations = observations;
+    this.diagnostics = buildHealthSourceDiagnostics(payload.provider === 'Apple Health' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', payload, { state: 'PENDING', errorClass: 'NETWORK_ERROR' });
   }
 }
 
@@ -91,6 +96,19 @@ export type HealthObservationDto = HealthObservationDraft & {
 };
 
 const deriveObservations = (payload: WearableSyncPayload): HealthObservationDraft[] => payload.observations ?? [];
+const localCheckpointKey = (connectionId: string) => `health-sync-checkpoints:${connectionId}`;
+const readLocalCheckpoints = async (connectionId?: string) => {
+  if (!connectionId) return {} as Record<string, string>;
+  try {
+    const raw = await AsyncStorage.getItem(localCheckpointKey(connectionId));
+    return raw ? JSON.parse(raw) as Record<string, string> : {};
+  } catch {
+    return {};
+  }
+};
+const writeLocalCheckpoints = async (connectionId: string, anchors: Record<string, string>) => {
+  await AsyncStorage.setItem(localCheckpointKey(connectionId), JSON.stringify(anchors));
+};
 
 const scoreOrExisting = (value: number | null | undefined, existing: number) =>
   typeof value === 'number' && Number.isFinite(value) ? value : existing;
@@ -163,12 +181,10 @@ export const runHealthSync = async (
   let payload: WearableSyncPayload | null = null;
   let observations: HealthObservationDraft[] = [];
   try {
-    // A backend outage must never prevent a local HealthKit/Health Connect read.
-    const checkpoints = governed
-      ? await withHealthSyncPipelineTimeout(getWearableCheckpoints(governed.connectionId), 'health_sync_checkpoint_read_timeout').catch(() => ({ items: [] }))
-      : { items: [] };
-    const providerCursors = Object.fromEntries(checkpoints.items.map((item) => [item.metricScope, item.anchorValue ?? item.cursorValue ?? '']));
-    payload = await withHealthSyncPipelineTimeout(syncConnectedHealthApp(appId, providerCursors), 'health_sync_native_read_timeout');
+    // Local source access is the first I/O boundary. A backend checkpoint lookup
+    // must never delay or prevent HealthKit / Health Connect from returning data.
+    const localCursors = await readLocalCheckpoints(governed?.connectionId);
+    payload = await withHealthSyncPipelineTimeout(syncConnectedHealthApp(appId, localCursors), 'health_sync_native_read_timeout');
     observations = deriveObservations(payload);
     run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger) : null;
 
@@ -180,10 +196,15 @@ export const runHealthSync = async (
       updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
     }
     const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors;
-    if (governed && anchors && rejected === 0) await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
-      commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
-        ...(governed.provider === 'HEALTH_CONNECT' ? { cursorValue: checkpoint } : { anchorValue: checkpoint }),
-        backfillComplete:true }))), 'health_sync_checkpoint_commit_timeout');
+    if (governed && anchors && rejected === 0) {
+      // A device-cache write is an optimisation, not an upload-success gate.
+      // The backend checkpoint remains the governed persistence boundary.
+      await writeLocalCheckpoints(governed.connectionId, anchors).catch(() => undefined);
+      await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
+        commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
+          ...(governed.provider === 'HEALTH_CONNECT' ? { cursorValue: checkpoint } : { anchorValue: checkpoint }),
+          backfillComplete:true }))), 'health_sync_checkpoint_commit_timeout');
+    }
     if (run) await finishWearableSyncRun(run.id, { status: rejected ? 'PARTIAL' : 'SUCCESS', recordsRead: observations.length,
       recordsUploaded: observations.length, recordsInserted: accepted, recordsDuplicates: duplicate, recordsUpdated: updated, recordsDeleted: deleted,
       checkpointAfter: rejected === 0 ? anchors : undefined });
@@ -195,6 +216,7 @@ export const runHealthSync = async (
 
     const [scores, status] = await Promise.all([getHealthScoreSummary(), getHealthSyncStatus()]);
     return { payload, observations, accepted, duplicate, rejected, scores, status,
+      diagnostics: buildHealthSourceDiagnostics(appId === 'apple-health' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', payload, { state: 'SUCCESS' }),
       wellness: wellnessFromHealthScores(previousWellness, payload, scores) };
   } catch (error) {
     if (run) await finishWearableSyncRun(run.id, { status:'FAILED',recordsRead:0,recordsUploaded:0,recordsInserted:0,

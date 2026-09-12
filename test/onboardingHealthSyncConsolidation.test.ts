@@ -53,7 +53,8 @@ describe('returning-user bootstrap and canonical Health Data Sync', () => {
     expect(assessment).toContain("navigation.navigate('HealthDataSync', { entryContext: 'ONBOARDING' })");
     expect(routing).not.toContain("'SyncWearable'");
     expect(canonical).toContain("import { HealthDataSyncExperience } from './SyncWearableScreen'");
-    expect(canonical).toContain("entryContext==='ONBOARDING'||(!loading&&!connected)");
+    expect(canonical).toContain("entryContext==='ONBOARDING'||(!loading&&status!==null&&!connected)");
+    expect(canonical).toContain('canReadLocalSource=connected||status===null');
   });
 
   test('setup later is governed by entry context, not connection state', () => {

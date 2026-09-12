@@ -1,6 +1,6 @@
 jest.mock('../src/services/apiClient', () => ({
   apiBaseUrl: 'http://localhost:4000',
-  buildAuthorizationHeaders: jest.fn(() => ({ Authorization: 'Bearer test-token' }))
+  apiResponse: jest.fn((path: string, init: RequestInit) => global.fetch(`http://localhost:4000${path}`, init))
 }));
 
 import { uploadAndAnalyzeReport } from '../src/services/reportUploadService';
