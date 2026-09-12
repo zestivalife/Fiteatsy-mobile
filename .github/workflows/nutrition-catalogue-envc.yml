@@ -153,6 +153,9 @@ jobs:
           await client.end();
           NODE
           npm run db:migrate
+          npm run build
+          npm run food-catalogue:batch0:import
+          npm run food-explorer:projection:refresh
 
       - name: Run full safe backend regression
         working-directory: backend

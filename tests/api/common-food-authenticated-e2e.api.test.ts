@@ -95,8 +95,13 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     const recommendedFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST`, { headers: authHeaders(consultant.token) });
     assert.equal(recommendedFoods.response.status, 200, JSON.stringify(recommendedFoods.body));
     assert.ok(recommendedFoods.body.items.every((item: { nutritionStatus:string;generatorEligibility:string;mealEligibility:string }) => item.nutritionStatus === 'NUTRITION_VERIFIED' && item.generatorEligibility === 'ELIGIBLE' && item.mealEligibility === 'RECOMMENDED'));
-    const completeReference = recommendedFoods.body.items.find((item: { dataStatus?: string }) => item.dataStatus === 'REFERENCE');
-    assert.ok(completeReference, JSON.stringify(recommendedFoods.body.items));
+    // Reference provenance is a catalogue invariant, not a first-page ordering
+    // invariant. Query a deterministic reference identity explicitly so changes
+    // to ranking or catalogue size cannot make this assertion order-dependent.
+    const referenceFood = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=RECOMMENDED&mealHead=BREAKFAST&search=mosambi&limit=10&offset=0`, { headers: authHeaders(consultant.token) });
+    assert.equal(referenceFood.response.status, 200, JSON.stringify(referenceFood.body));
+    const completeReference = referenceFood.body.items.find((item: { dataStatus?: string }) => item.dataStatus === 'REFERENCE');
+    assert.ok(completeReference, JSON.stringify(referenceFood.body.items));
     assert.equal(completeReference.referenceLabel, 'Reference data');
     assert.equal(completeReference.nutritionStatus, 'NUTRITION_VERIFIED');
     assert.equal(completeReference.generatorEligibility, 'ELIGIBLE');

@@ -114,6 +114,8 @@ jobs:
         working-directory: backend
         shell: bash
         run: |
+          npm run food-catalogue:batch0:import
+          npm run food-explorer:projection:refresh
           set +e
           node --import tsx --test --test-concurrency=1 \
             ../tests/api/common-food-authenticated-e2e.api.test.ts \
@@ -200,6 +202,7 @@ jobs:
           # Recreate the same governed reference catalogue that existed before
           # this destructive, CI-only schema reset.
           npm run food-catalogue:batch0:import
+          npm run food-explorer:projection:refresh
 
       - name: Run full safe backend regression against ephemeral PostgreSQL
         working-directory: backend
