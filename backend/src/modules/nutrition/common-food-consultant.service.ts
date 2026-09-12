@@ -41,13 +41,19 @@ const debugRoleAllowed=(account:AuthenticatedAccount)=>['admin','super_admin','p
 
 export async function resolveClientMealGenerationContext(input:{account:AuthenticatedAccount;clientId:string;planId?:string;mealHead?:MealHead}){
   if(!roleAllowed(input.account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
-  if(!await canAccessConsultantNutritionClient(input.clientId,input.account,{allowSeniorAuthority:true}))throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);
-  const registered=await getRegisteredConsultantClientProfileContext(input.clientId);
+  const [canAccess,registered]=await Promise.all([
+    canAccessConsultantNutritionClient(input.clientId,input.account,{allowSeniorAuthority:true}),
+    getRegisteredConsultantClientProfileContext(input.clientId),
+  ]);
+  if(!canAccess)throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);
   if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404);
-  const [prefs,latest]=await Promise.all([getFoodPreferenceProfile(input.clientId,registered.internalClientId),getCurrentDietPlanForClient(registered.internalClientId,registered.accountId)]);
+  const [prefs,latest,biomarkers]=await Promise.all([
+    getFoodPreferenceProfile(input.clientId,registered.internalClientId),
+    getCurrentDietPlanForClient(registered.internalClientId,registered.accountId),
+    listValidatedBiomarkerSummaryForClient(registered.internalClientId,registered.accountId),
+  ]);
   if(!latest)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
   if(input.planId&&latest.plan.id!==input.planId)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
-  const biomarkers=await listValidatedBiomarkerSummaryForClient(registered.internalClientId,registered.accountId);
   const biomarkerGeneration=resolveBiomarkerGeneration(biomarkers);
   const p=prefs?.profile; const diet=p?.dietType?dietMap[p.dietType]:'VEGETARIAN';
   const content=latest.version.content; const daily=content.dailyTargets;

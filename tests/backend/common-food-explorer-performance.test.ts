@@ -11,7 +11,7 @@ const nutritionStore = readFileSync(new URL('../../backend/src/modules/nutrition
 const catalogueRepository = readFileSync(new URL('../../backend/src/modules/nutrition/food-catalogue.repository.ts', import.meta.url), 'utf8');
 
 test('Food Explorer coalesces static reads without caching the authorization boundary', () => {
-  const authorization = source.indexOf('await canAccessConsultantNutritionClient(input.clientId,input.account');
+  const authorization = source.indexOf('canAccessConsultantNutritionClient(input.clientId,input.account');
   const contextResolution = source.indexOf('resolveClientMealGenerationContext({account,clientId,mealHead:q.mealHead})');
 
   assert.ok(authorization >= 0, 'the assignment authorization check must remain present');
@@ -35,6 +35,8 @@ test('Food Explorer does not transfer reference identities already embedded in t
 test('Food Explorer cold context avoids the full Nutrition workspace projection', () => {
   assert.match(source, /getCurrentDietPlanForClient\(registered\.internalClientId,registered\.accountId\)/);
   assert.match(source, /getFoodPreferenceProfile\(input\.clientId,registered\.internalClientId\)/);
+  assert.match(source, /const \[canAccess,registered\]=await Promise\.all/);
+  assert.match(source, /const \[prefs,latest,biomarkers\]=await Promise\.all/);
   assert.match(nutritionService, /const context = await getRegisteredConsultantClientAccessContext\(/);
   assert.match(nutritionStore, /select row_to_json\(dp\) as plan, row_to_json\(dpv\) as version/);
 });
