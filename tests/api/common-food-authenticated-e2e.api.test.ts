@@ -5,12 +5,13 @@ import { pool } from '../../backend/src/db/pool.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson, patchJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
+import { refreshFoodExplorerProjection } from '../../backend/src/modules/nutrition/common-food-consultant.service.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
 test.before(async () => { server = await startTestServer(); });
 test.after(async () => { await server?.close(); });
-test.beforeEach(async () => { await resetTestState(); });
+test.beforeEach(async () => { await resetTestState(); await refreshFoodExplorerProjection(); });
 
 const provision = async (adminToken: string, role: 'user' | 'consultant' | 'senior_consultant', marker: string) => {
   const created = await postJson(server.baseUrl, '/v1/admin/qa-identities', {

@@ -35,6 +35,8 @@
     "food-catalogue:v17-36:generate": "node scripts/generate-food-reference-reconciliation-v17-36.mjs",
     "food-catalogue:v17-36:import": "tsx scripts/import-food-reference-reconciliation-v17-36.ts",
     "food-master:v1:generate": "node scripts/generate-practical-indian-food-master-v1.mjs",
+    "food-explorer:projection:refresh": "tsx scripts/refresh-food-explorer-projection.ts",
+    "food-explorer:projection:production": "node dist/jobs/refresh-food-explorer-projection.js",
     "food-catalogue:v17-36:production": "node dist/catalogue-import/scripts/import-food-reference-reconciliation-v17-36.js",
     "food-curation:test": "node --import tsx --test ../tests/backend/controlled-food-curation.test.ts ../tests/backend/food-resolution-v17-32c.test.ts ../tests/backend/food-usda-adjudication-v17-33a.test.ts ../tests/backend/food-usda-activation-v17-33a2.test.ts",
     "food-catalogue:test": "node --import tsx --test ../tests/backend/pan-india-food-seed.test.ts ../tests/backend/consultant-meal-template-domain.test.ts",
