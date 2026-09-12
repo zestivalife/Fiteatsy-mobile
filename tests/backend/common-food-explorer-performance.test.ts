@@ -11,6 +11,7 @@ const nutritionStore = readFileSync(new URL('../../backend/src/modules/nutrition
 const catalogueRepository = readFileSync(new URL('../../backend/src/modules/nutrition/food-catalogue.repository.ts', import.meta.url), 'utf8');
 const projectionRepository = readFileSync(new URL('../../backend/src/modules/nutrition/food-explorer-projection.repository.ts', import.meta.url), 'utf8');
 const projectionMigration = readFileSync(new URL('../../backend/src/db/migrations/0069_food_explorer_search_projection.sql', import.meta.url), 'utf8');
+const projectionIdentityMigration = readFileSync(new URL('../../backend/src/db/migrations/0070_food_explorer_projection_source_identity.sql', import.meta.url), 'utf8');
 
 test('Food Explorer reads a prepared projection without caching the authorization boundary', () => {
   const authorization = source.indexOf('canAccessConsultantNutritionClient(input.clientId,input.account');
@@ -37,11 +38,21 @@ test('Food Explorer does not transfer reference identities already embedded in t
 
 test('projection refresh is transactional, idempotent and search-indexed', () => {
   assert.match(projectionRepository, /create temporary table next_food_explorer_projection/);
+  assert.match(projectionRepository, /pg_advisory_xact_lock/);
+  assert.match(projectionRepository, /validateFoodExplorerProjectionRecords/);
   assert.match(projectionRepository, /delete from food_explorer_search_projection/);
   assert.match(projectionRepository, /insert into food_explorer_search_projection select \* from next_food_explorer_projection/);
   assert.match(projectionMigration, /gin_trgm_ops/);
   assert.match(projectionMigration, /canonical_identity_key text not null unique/);
   assert.match(projectionRepository, /sourceType==='GOVERNED'\?300:r\.sourceType==='REFERENCE'\?200:100/);
+});
+
+test('projection physical identity is source-aware and independent from semantic identity', () => {
+  assert.match(source, /foodExplorerProjectionId/);
+  assert.ok(source.includes('`${sourceType}\\0${sourceRecordId}\\0${canonicalIdentityKey}`'));
+  assert.match(source, /sourceRecordId=String\(item\.id\)/);
+  assert.match(projectionRepository, /FOOD_EXPLORER_PROJECTION_DUPLICATE_\$\{kind\}/);
+  assert.match(projectionIdentityMigration, /food_explorer_projection_source_key_uq/);
 });
 
 test('Food Explorer cold context avoids the full Nutrition workspace projection', () => {

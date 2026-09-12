@@ -18,6 +18,13 @@ test('projection is canonical, governed-wins, searchable, paginated and idempote
  const governedOverlap=await pool.query("select count(*)::int count from food_explorer_search_projection where source_type<>'GOVERNED' and source_trace @> '[{\"sourceType\":\"GOVERNED\"}]'::jsonb");assert.equal(governedOverlap.rows[0].count,0);
 });
 
+test('overlapping projection refreshes serialize and converge without duplicate keys',async()=>{
+ const [left,right]=await Promise.all([refreshFoodExplorerProjection(),refreshFoodExplorerProjection()]);
+ assert.equal(left.projectionVersion,right.projectionVersion);assert.equal(left.projectionHash,right.projectionHash);assert.equal(left.rowCount,right.rowCount);
+ const uniqueness=await pool.query('select count(*)::int rows,count(distinct projection_id)::int projection_ids,count(distinct canonical_identity_key)::int identities,count(distinct (source_type,source_record_id))::int source_keys from food_explorer_search_projection');
+ assert.deepEqual(uniqueness.rows[0],{rows:left.rowCount,projection_ids:left.rowCount,identities:left.rowCount,source_keys:left.rowCount});
+});
+
 test('aliases, facets, counts and approved proposals are projection-backed',async()=>{
  const alias=await searchFoodExplorerProjection({scope:'ALL',search:'winter melon',limit:20,offset:0});assert.ok(alias.items.some((item:any)=>String(item.displayName).toLowerCase()==='ash gourd'));
  assert.ok(Array.isArray(alias.summary.categories));assert.equal(typeof alias.summary.total,'number');

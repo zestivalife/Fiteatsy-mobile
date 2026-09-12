@@ -10,12 +10,22 @@ export type FoodExplorerProjectionRecord={
 };
 
 const hash=(value:unknown)=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const REFRESH_ADVISORY_LOCK_KEY=704_170_069;
+
+export function validateFoodExplorerProjectionRecords(records:FoodExplorerProjectionRecord[]){
+ const projectionIds=new Map<string,FoodExplorerProjectionRecord>();const sourceKeys=new Map<string,FoodExplorerProjectionRecord>();const canonicalKeys=new Map<string,FoodExplorerProjectionRecord>();
+ for(const record of records){
+  if(!record.projectionId||!record.sourceType||!record.sourceRecordId||!record.canonicalIdentityKey)throw new Error(`FOOD_EXPLORER_PROJECTION_INVALID_IDENTITY:${JSON.stringify({projectionId:record.projectionId,sourceType:record.sourceType,sourceRecordId:record.sourceRecordId,canonicalIdentityKey:record.canonicalIdentityKey})}`);
+  for(const [kind,key,index] of [['PROJECTION_ID',record.projectionId,projectionIds],['SOURCE_KEY',`${record.sourceType}:${record.sourceRecordId}`,sourceKeys],['CANONICAL_IDENTITY',record.canonicalIdentityKey,canonicalKeys]] as const){const prior=index.get(key);if(prior)throw new Error(`FOOD_EXPLORER_PROJECTION_DUPLICATE_${kind}:${JSON.stringify({key,first:{sourceType:prior.sourceType,sourceRecordId:prior.sourceRecordId,canonicalIdentityKey:prior.canonicalIdentityKey,projectionId:prior.projectionId},second:{sourceType:record.sourceType,sourceRecordId:record.sourceRecordId,canonicalIdentityKey:record.canonicalIdentityKey,projectionId:record.projectionId}})}`);index.set(key,record);}
+ }
+}
 
 export async function replaceFoodExplorerProjection(records:FoodExplorerProjectionRecord[]){
  const ordered=[...records].sort((a,b)=>a.canonicalIdentityKey.localeCompare(b.canonicalIdentityKey));
+ validateFoodExplorerProjectionRecords(ordered);
  const projectionHash=hash(ordered);const projectionVersion=`FOOD_EXPLORER_${projectionHash.slice(0,16)}`;
  const client=await pool.connect();
- try{await client.query('begin');await client.query('create temporary table next_food_explorer_projection (like food_explorer_search_projection including defaults) on commit drop');
+ try{await client.query('begin');await client.query('select pg_advisory_xact_lock($1)',[REFRESH_ADVISORY_LOCK_KEY]);await client.query('create temporary table next_food_explorer_projection (like food_explorer_search_projection including defaults) on commit drop');
   const refreshedAt=new Date().toISOString();const rows=ordered.map(r=>({projection_id:r.projectionId,canonical_identity_key:r.canonicalIdentityKey,source_type:r.sourceType,source_record_id:r.sourceRecordId,source_trace:r.sourceTrace,canonical_name:r.canonicalName,normalized_name:r.normalizedName,aliases:r.aliases,normalized_search_text:r.normalizedSearchText,category:r.category,family:r.family,food_state:r.foodState,nutrition_status:r.nutritionStatus,generator_eligibility:r.generatorEligibility,entity_type:r.entityType,operational_use_state:r.operationalUseState,roles:r.roles,meal_heads:r.mealHeads,vegetarian_class:r.vegetarianClass,active:r.active,searchable:r.searchable,manual_addable:r.manualAddable,generator_eligible:r.generatorEligible,client_consumable:r.clientConsumable,pending_verification:r.pendingVerification,kcal_per_100g:r.kcalPer100g,protein_per_100g:r.proteinPer100g,stable_sort_key:r.stableSortKey,source_priority:r.sourceType==='GOVERNED'?300:r.sourceType==='REFERENCE'?200:100,display_payload:r.displayPayload,projection_version:projectionVersion,projection_hash:hash(r),updated_at:refreshedAt}));
   await client.query(`insert into next_food_explorer_projection select * from jsonb_populate_recordset(null::food_explorer_search_projection,$1::jsonb)`,[JSON.stringify(rows)]);
   await client.query('delete from food_explorer_search_projection');
