@@ -55,6 +55,12 @@ test('projection physical identity is source-aware and independent from semantic
   assert.match(projectionIdentityMigration, /food_explorer_projection_source_key_uq/);
 });
 
+test('recommended eligibility joins catalogue IDs through source identity rather than opaque projection IDs', () => {
+  assert.match(projectionRepository, /source_record_id=any/);
+  assert.match(projectionRepository, /jsonb_array_elements\(source_trace\)/);
+  assert.doesNotMatch(projectionRepository, /projection_id=any/);
+});
+
 test('Food Explorer cold context avoids the full Nutrition workspace projection', () => {
   assert.match(source, /getCurrentDietPlanForClient\(registered\.internalClientId,registered\.accountId\)/);
   assert.match(source, /getFoodPreferenceProfile\(input\.clientId,registered\.internalClientId\)/);

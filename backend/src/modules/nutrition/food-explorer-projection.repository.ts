@@ -39,7 +39,17 @@ export async function replaceFoodExplorerProjection(records:FoodExplorerProjecti
 
 export type ProjectionSearch={scope?:'ALL'|'RECOMMENDED';search?:string;category?:string;family?:string;referenceState?:string;nutritionStatus?:string;generatorEligibility?:string;entityType?:string;componentRole?:string;dietClass?:string;mealHead?:string;proteinMin?:number;proteinMax?:number;caloriesMin?:number;caloriesMax?:number;limit:number;offset:number;allowedIds?:string[]};
 const filters=(input:ProjectionSearch)=>{const values:unknown[]=[];const where=['active','searchable'];const bind=(v:unknown)=>{values.push(v);return `$${values.length}`;};
- if(input.scope!=='ALL'){where.push('generator_eligible','client_consumable');if(input.allowedIds)where.push(`projection_id=any(${bind(input.allowedIds)}::text[])`);}
+ if(input.scope!=='ALL'){
+  where.push('generator_eligible','client_consumable');
+  if(input.allowedIds){
+   const allowed=bind(input.allowedIds);
+   // allowedIds are canonical catalogue/source IDs. projection_id is an
+   // intentionally opaque physical row identity and must never be used for
+   // eligibility joins. source_trace also preserves eligibility when a
+   // governed-wins merge selects a different source row as the projection.
+   where.push(`(source_record_id=any(${allowed}::text[]) or exists (select 1 from jsonb_array_elements(source_trace) trace where trace->>'sourceRecordId'=any(${allowed}::text[])))`);
+  }
+ }
  if(input.search)where.push(`normalized_search_text like '%'||${bind(input.search.toLowerCase())}||'%'`);
  if(input.category)where.push(`category=${bind(input.category)}`);if(input.family)where.push(`family=${bind(input.family)}`);if(input.referenceState)where.push(`food_state=${bind(input.referenceState)}`);
  if(input.nutritionStatus)where.push(input.nutritionStatus==='NUTRITION_PENDING'?`(nutrition_status=${bind(input.nutritionStatus)} or pending_verification)`: `nutrition_status=${bind(input.nutritionStatus)}`);
