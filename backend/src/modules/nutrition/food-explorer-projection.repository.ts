@@ -21,7 +21,9 @@ export function validateFoodExplorerProjectionRecords(records:FoodExplorerProjec
 }
 
 export async function replaceFoodExplorerProjection(records:FoodExplorerProjectionRecord[]){
- const ordered=[...records].sort((a,b)=>a.canonicalIdentityKey.localeCompare(b.canonicalIdentityKey));
+ const decisions=await pool.query(`select source_type,source_record_id,authorization_status from food_master_authorisation_decisions`);
+ const overrides=new Map(decisions.rows.map(row=>[`${row.source_type}:${row.source_record_id}`,row.authorization_status]));
+ const ordered=records.map(record=>{const authorizationStatus=overrides.get(`${record.sourceType}:${record.sourceRecordId}`) as FoodExplorerProjectionRecord['authorizationStatus']|undefined;if(!authorizationStatus)return record;return {...record,authorizationStatus,manualAddable:record.manualAddable&&authorizationStatus==='AUTHORISED',generatorEligible:record.generatorEligible&&authorizationStatus==='AUTHORISED',displayPayload:{...record.displayPayload,authorizationStatus}};}).sort((a,b)=>a.canonicalIdentityKey.localeCompare(b.canonicalIdentityKey));
  validateFoodExplorerProjectionRecords(ordered);
  const projectionHash=hash(ordered);const projectionVersion=`FOOD_EXPLORER_${projectionHash.slice(0,16)}`;
  const client=await pool.connect();
