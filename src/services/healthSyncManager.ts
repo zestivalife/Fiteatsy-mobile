@@ -1,11 +1,12 @@
 import { HealthObservationDraft, WearableSyncPayload, WellnessSnapshot } from '../types';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { recalculateWellness } from '../utils/wellness';
 import { apiFetch, postJson } from './apiClient';
 import { HealthAppId, syncConnectedHealthApp } from './healthAppService';
 import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceService';
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
+import { acknowledgeLocalObservations, persistLocalSyncBatch, readLocalSyncCursors,
+  readPendingLocalObservations } from './healthSyncLocalStore';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -96,20 +97,6 @@ export type HealthObservationDto = HealthObservationDraft & {
 };
 
 const deriveObservations = (payload: WearableSyncPayload): HealthObservationDraft[] => payload.observations ?? [];
-const localCheckpointKey = (connectionId: string) => `health-sync-checkpoints:${connectionId}`;
-const readLocalCheckpoints = async (connectionId?: string) => {
-  if (!connectionId) return {} as Record<string, string>;
-  try {
-    const raw = await AsyncStorage.getItem(localCheckpointKey(connectionId));
-    return raw ? JSON.parse(raw) as Record<string, string> : {};
-  } catch {
-    return {};
-  }
-};
-const writeLocalCheckpoints = async (connectionId: string, anchors: Record<string, string>) => {
-  await AsyncStorage.setItem(localCheckpointKey(connectionId), JSON.stringify(anchors));
-};
-
 const scoreOrExisting = (value: number | null | undefined, existing: number) =>
   typeof value === 'number' && Number.isFinite(value) ? value : existing;
 
@@ -183,23 +170,28 @@ export const runHealthSync = async (
   try {
     // Local source access is the first I/O boundary. A backend checkpoint lookup
     // must never delay or prevent HealthKit / Health Connect from returning data.
-    const localCursors = await readLocalCheckpoints(governed?.connectionId);
+    const localScope = governed?.connectionId ?? `ungoverned:${appId}`;
+    const localCursors = await readLocalSyncCursors(localScope);
     payload = await withHealthSyncPipelineTimeout(syncConnectedHealthApp(appId, localCursors), 'health_sync_native_read_timeout');
     observations = deriveObservations(payload);
+    const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors ?? {};
+    // Cursor advancement and normalized/tombstone persistence are one durable
+    // local transaction and always precede every backend operation.
+    await persistLocalSyncBatch(localScope, observations, anchors);
     run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger) : null;
 
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
-    for (let offset = 0; offset < observations.length; offset += 500) {
+    let pending = await readPendingLocalObservations(localScope, 250);
+    while (pending.length) {
       const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
-        '/v1/health/observations:batch', { observations: observations.slice(offset, offset + 500) }), 'health_sync_upload_timeout');
+        '/v1/health/observations:batch', { observations: pending.map((item) => item.observation) }), 'health_sync_upload_timeout');
       accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
       updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
+      if (ingest.rejected > 0) break;
+      await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
+      pending = await readPendingLocalObservations(localScope, 250);
     }
-    const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors;
-    if (governed && anchors && rejected === 0) {
-      // A device-cache write is an optimisation, not an upload-success gate.
-      // The backend checkpoint remains the governed persistence boundary.
-      await writeLocalCheckpoints(governed.connectionId, anchors).catch(() => undefined);
+    if (governed && Object.keys(anchors).length && rejected === 0) {
       await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
         commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
           ...(governed.provider === 'HEALTH_CONNECT' ? { cursorValue: checkpoint } : { anchorValue: checkpoint }),

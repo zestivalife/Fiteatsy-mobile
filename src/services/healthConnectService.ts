@@ -361,7 +361,8 @@ const incrementalObservation = (record: Record<string, any>): HealthObservationD
     timezoneOffsetMinutes: -new Date(measuredAtISO).getTimezoneOffset(),
     providerUpdatedAtISO: record.metadata?.lastModifiedTime ?? null,
     providerVersion: record.metadata?.clientRecordVersion == null ? null : String(record.metadata.clientRecordVersion),
-    sourceProvider: 'health_connect', sourceRecordId, syncKey: `health_connect:${recordType}:${sourceRecordId}`,
+    sourceProvider: 'health_connect', sourceRecordId,
+    syncKey: `health_connect:${recordType}:${record.metadata?.dataOrigin ?? 'unknown_origin'}:${sourceRecordId}`,
     qualityStatus: 'accepted', sourceMetadata: { recordType, sourceApplication: record.metadata?.dataOrigin,
       device: record.metadata?.device, recordingMethod: record.metadata?.recordingMethod }
   };

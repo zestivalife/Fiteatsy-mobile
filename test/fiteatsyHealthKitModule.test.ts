@@ -12,6 +12,7 @@ const availableNative = () => ({
   isAvailable: jest.fn().mockResolvedValue(true),
   requestAuthorization: jest.fn().mockResolvedValue({ grantedScopes: ['steps'] }),
   readChanges: jest.fn().mockResolvedValue({ samples: [], deletedIds: [], anchor: '' }),
+  readCumulativeStatistics: jest.fn().mockResolvedValue({ value: 0, startAtISO: '', endAtISO: '' }),
   enableBackgroundDelivery: jest.fn().mockResolvedValue(true),
 });
 

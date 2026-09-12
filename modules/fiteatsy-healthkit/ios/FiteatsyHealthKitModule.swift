@@ -127,6 +127,29 @@ public final class FiteatsyHealthKitModule: Module {
       self.store.execute(query)
     }
 
+    AsyncFunction("readCumulativeStatistics") { (metric: String, startText: String, endText: String, promise: Promise) in
+      guard let type = self.sampleType(metric) as? HKQuantityType,
+            ["steps", "active_energy", "distance", "exercise_minutes"].contains(metric),
+            let start = self.iso.date(from: startText), let end = self.iso.date(from: endText) else {
+        promise.reject("HEALTHKIT_UNSUPPORTED_STATISTIC", metric)
+        return
+      }
+      let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+      let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) {
+        _, statistics, error in
+        if let error = error as NSError? {
+          self.logger.error("HealthKit statistics failed for \(metric, privacy: .public); domain=\(error.domain, privacy: .public), code=\(error.code, privacy: .public)")
+          promise.reject("HEALTHKIT_STATISTICS_FAILED", "Apple Health could not aggregate \(metric)")
+          return
+        }
+        let units: [String: HKUnit] = ["steps": .count(), "active_energy": .kilocalorie(),
+          "distance": .meter(), "exercise_minutes": .minute()]
+        let value = units[metric].flatMap { statistics?.sumQuantity()?.doubleValue(for: $0) }
+        promise.resolve(["value": value ?? 0, "startAtISO": startText, "endAtISO": endText])
+      }
+      self.store.execute(query)
+    }
+
     AsyncFunction("enableBackgroundDelivery") { (metrics: [String], promise: Promise) in
       UserDefaults.standard.set(metrics, forKey: self.metricsKey)
       self.registerObservers(metrics)
@@ -192,7 +215,10 @@ public final class FiteatsyHealthKitModule: Module {
     }
     var row: [String: Any] = ["id":sample.uuid.uuidString,"metric":metric,"value":value,"unit":unit,
       "startAtISO":iso.string(from: sample.startDate),"endAtISO":iso.string(from: sample.endDate),
-      "sourceApplication":sample.sourceRevision.source.bundleIdentifier,"device":sample.device?.name ?? ""]
+      "sourceApplication":sample.sourceRevision.source.bundleIdentifier,
+      "sourceVersion":sample.sourceRevision.version ?? "",
+      "sourceProductType":sample.sourceRevision.productType ?? "",
+      "device":sample.device?.name ?? ""]
     if let category = sample as? HKCategorySample, metric == "sleep_minutes" { row["sleepStage"] = sleepStage(category.value) }
     if metric == "hrv_ms" { row["measurementMethod"] = "SDNN" }
     return row

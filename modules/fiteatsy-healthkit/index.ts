@@ -3,16 +3,19 @@ import { Platform } from 'react-native';
 
 export type HealthKitSample = {
   id: string; metric: string; value: number; unit: string; startAtISO: string; endAtISO: string;
-  sourceApplication?: string; device?: string; sleepStage?: string; measurementMethod?: string;
+  sourceApplication?: string; sourceVersion?: string; sourceProductType?: string;
+  device?: string; sleepStage?: string; measurementMethod?: string;
   metadata?: Record<string, unknown>;
 };
 
 export type HealthKitReadResult = { samples: HealthKitSample[]; deletedIds: string[]; anchor: string };
+export type HealthKitStatisticsResult = { value: number; startAtISO: string; endAtISO: string };
 type FiteatsyHealthKitNativeModule = {
   isAvailable(): Promise<boolean>;
   getAuthorizationRequestStatus(metrics: string[]): Promise<HealthKitAuthorizationInspection>;
   requestAuthorization(metrics: string[]): Promise<HealthKitAuthorizationResult>;
   readChanges(metric: string, anchor: string | null, startAtISO: string | null): Promise<HealthKitReadResult>;
+  readCumulativeStatistics(metric: string, startAtISO: string, endAtISO: string): Promise<HealthKitStatisticsResult>;
   enableBackgroundDelivery(metrics: string[]): Promise<boolean>;
 };
 
@@ -56,5 +59,10 @@ export const inspectHealthKitAuthorization = async (metrics: string[]): Promise<
 export const readHealthKitChanges = (metric: string, anchor?: string, startAtISO?: string): Promise<HealthKitReadResult> =>
   nativeModule()?.readChanges(metric, anchor ?? null, startAtISO ?? null)
     ?? Promise.reject(new Error('FITEATSY_HEALTHKIT_NATIVE_MODULE_MISSING'));
+export const readHealthKitCumulativeStatistics = (metric: string, startAtISO: string, endAtISO: string): Promise<HealthKitStatisticsResult> => {
+  const native = nativeModule();
+  if (!native?.readCumulativeStatistics) return Promise.reject(new Error('FITEATSY_HEALTHKIT_STATISTICS_UNAVAILABLE'));
+  return native.readCumulativeStatistics(metric, startAtISO, endAtISO);
+};
 export const enableHealthKitBackgroundDelivery = (metrics: string[]): Promise<boolean> =>
   nativeModule()?.enableBackgroundDelivery(metrics) ?? Promise.resolve(false);

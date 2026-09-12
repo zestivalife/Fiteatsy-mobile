@@ -342,6 +342,9 @@ export type HealthObservationDraft = {
   sourceMetadata?: {
     recordType?: string;
     sourceApplication?: string;
+    sourceVersion?: string;
+    sourceProductType?: string;
+    canonicalFingerprint?: string;
     startAtISO?: string;
     endAtISO?: string;
     originalValue?: number;

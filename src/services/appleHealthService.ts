@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { enableHealthKitBackgroundDelivery, inspectHealthKitAuthorization, isHealthKitAvailable, readHealthKitChanges,
-  requestHealthKitAuthorization } from '../../modules/fiteatsy-healthkit';
+  readHealthKitCumulativeStatistics, requestHealthKitAuthorization } from '../../modules/fiteatsy-healthkit';
 import type { HealthObservationDraft, WearableSyncPayload } from '../types';
 import { APPLE_HEALTH_QUERYABLE_METRICS, APPLE_HEALTH_READ_TYPES } from './healthMetricRegistry';
 
@@ -88,10 +88,14 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
         observations.push({ metricType:canonicalMetric,value:sample.value,unit:sample.unit,
           measuredAtISO:sample.endAtISO,startAtISO:sample.startAtISO,endAtISO:sample.endAtISO,
           timezoneOffsetMinutes:-new Date(sample.endAtISO).getTimezoneOffset(),sourceProvider:'apple_health',sourceRecordId:sample.id,
-          syncKey:`apple_health:${sample.metric}:${sample.id}`,qualityStatus:'accepted',
+          syncKey:`apple_health:${sample.metric}:${sample.sourceApplication ?? 'unknown_source'}:${sample.id}`,qualityStatus:'accepted',
           providerVersion:sample.measurementMethod ? `APPLE_${sample.measurementMethod}` : null,
           sourceMetadata:{recordType:sample.metric,sourceApplication:sample.sourceApplication,sleepStage:sample.sleepStage,
             measurementMethod:sample.measurementMethod,
+            sourceVersion:sample.sourceVersion,sourceProductType:sample.sourceProductType,
+            canonicalFingerprint:sample.metric==='workout_minutes'
+              ? [Math.round(Date.parse(sample.startAtISO)/60_000),Math.round(Date.parse(sample.endAtISO)/60_000),Number(sample.value.toFixed(1))].join(':')
+              : undefined,
             ...(sample.device ? { device: { manufacturer:'Apple', model:sample.device } } : {})} });
       });
       const canonicalDeletionMetric = metric === 'exercise_minutes' ? 'active_minutes'
@@ -107,6 +111,20 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
       if (statuses[statusKey] !== 'synced') statuses[statusKey] = 'unavailable';
     }
   });
+  // HealthKit statistics apply Apple's source-priority policy for cumulative
+  // product totals while anchored source rows remain available for audit.
+  await Promise.all(['steps', 'active_energy', 'distance', 'exercise_minutes'].map(async (metric) => {
+    const definition = APPLE_HEALTH_QUERYABLE_METRICS.find((item) => item.appleHealthType === metric);
+    const start = new Date(Date.now() - (definition?.syncWindowDays ?? 30) * 86400000).toISOString();
+    try {
+      const statistic = await withAppleHealthTimeout(readHealthKitCumulativeStatistics(metric, start, new Date().toISOString()),
+        APPLE_HEALTH_METRIC_TIMEOUT_MS, `apple_health_statistics_timeout:${metric}`);
+      metricValues[metric] = statistic.value > 0 ? [statistic.value] : [];
+    } catch {
+      // Older installed native builds may not expose statistics yet. Anchored
+      // values remain truthful fallback data until the next native build.
+    }
+  }));
   void withAppleHealthTimeout(enableHealthKitBackgroundDelivery(APPLE_HEALTH_SCOPES), 5_000,
     'apple_health_background_delivery_timeout').catch(() => undefined);
   const steps = sum(validValues(metricValues.steps ?? []));

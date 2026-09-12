@@ -22,7 +22,7 @@ describe('end-to-end health data capture recovery contracts', () => {
 
   test('failed or partially rejected persistence cannot advance checkpoints', () => {
     const manager = read('src/services/healthSyncManager.ts');
-    expect(manager).toContain('anchors && rejected === 0');
+    expect(manager).toContain('Object.keys(anchors).length && rejected === 0');
     expect(manager).toContain("'health_sync_checkpoint_commit_timeout'");
     expect(manager).toContain('checkpointAfter: rejected === 0 ? anchors : undefined');
   });
@@ -44,8 +44,28 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(localRead).toBeGreaterThan(0);
     expect(backendRun).toBeGreaterThan(localRead);
     expect(upload).toBeGreaterThan(localRead);
-    expect(manager).toContain('health-sync-checkpoints:');
+    expect(manager).toContain('persistLocalSyncBatch(localScope, observations, anchors)');
+    expect(manager).toContain('readPendingLocalObservations(localScope, 250)');
+    expect(manager).toContain('acknowledgeLocalObservations');
     expect(manager).not.toContain('getWearableCheckpoints');
+  });
+
+  test('durable local queue stores records and tombstones before bounded upload acknowledgement', () => {
+    const store = read('src/services/healthSyncLocalStore.ts');
+    expect(store).toContain('records: Record<string, StoredRecord>');
+    expect(store).toContain('cursors: Record<string, string>');
+    expect(store).toContain('unchanged ? previous.uploaded : false');
+    expect(store).toContain('slice(0, limit)');
+    expect(store).toContain('uploaded: true');
+  });
+
+  test('Apple cumulative totals use HealthKit statistics without losing anchored audit rows', () => {
+    const native = read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift');
+    const apple = read('src/services/appleHealthService.ts');
+    expect(native).toContain('HKStatisticsQuery');
+    expect(native).toContain('options: .cumulativeSum');
+    expect(apple).toContain('readHealthKitCumulativeStatistics');
+    expect(apple).toContain('anchored source rows remain available for audit');
   });
 
   test('QA diagnostics are safe, metric-specific, and development-gated', () => {
@@ -76,6 +96,11 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(android).toContain("hrv: 'HeartRateVariabilityRmssd'");
     expect(metricRegistry).toContain("healthConnectRecord:'HeartRateVariabilityRmssd'");
     expect(apple).toContain("measurementMethod:sample.measurementMethod");
+    expect(apple).toContain('sourceVersion:sample.sourceVersion');
+    expect(read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift')).toContain('sourceRevision.productType');
+    expect(apple).toContain("sample.sourceApplication ?? 'unknown_source'");
+    expect(android).toContain("record.metadata?.dataOrigin ?? 'unknown_origin'");
+    expect(apple).toContain('canonicalFingerprint');
   });
 
   test('uses one mobile metric registry with explicit aggregation and least privilege', () => {
