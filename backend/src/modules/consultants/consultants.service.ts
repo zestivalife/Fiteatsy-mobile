@@ -2,6 +2,7 @@ import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { persistHealthCalculations } from '../health/health-calculations.repository.js';
 import { type HealthMetrics, calculateHealthMetrics } from '../health/health-calculations.service.js';
 import { listLatestHealthScores } from '../intelligence/health-scores.repository.js';
+import { listDailyAggregates } from '../intelligence/health-aggregates.repository.js';
 import {
   acknowledgeMedicationExceptionForConsultant,
   getActiveMedicationExceptionsForOwner,
@@ -757,7 +758,7 @@ export const getConsultantClientWorkspace = async (
   if (!context) return null;
 
   const owner = { accountId: context.accountId, clientId: context.internalClientId };
-  const [healthProfile, nutritionProfile, careCase, reports, biomarkers, wearableSummary, timeline, healthScores, medicationMonitoring, foodPreferences] = await Promise.all([
+  const [healthProfile, nutritionProfile, careCase, reports, biomarkers, wearableSummary, timeline, healthScores, healthAggregates, medicationMonitoring, foodPreferences] = await Promise.all([
     getHealthProfileByClientId(context.internalClientId),
     getNutritionProfileByClientId(context.internalClientId),
     getCareCaseByClientId(context.internalClientId),
@@ -766,6 +767,7 @@ export const getConsultantClientWorkspace = async (
     getConsultantWearableSummaryForClient(context.internalClientId, context.accountId),
     listConsultantTimelineForClient(context.internalClientId, context.accountId),
     listLatestHealthScores(owner),
+    listDailyAggregates(owner, 28),
     getMedicationMonitoringForOwner(owner),
     getFoodPreferenceProfile(publicClientId)
   ]);
@@ -774,7 +776,7 @@ export const getConsultantClientWorkspace = async (
 
   const tdee = availableValue(healthMetrics, 'tdee');
   const macroTargets = buildMacroTargets(tdee);
-  const overallScore = healthScores.find((score) => score.scoreType === 'overall') ?? null;
+  const overallScore = healthScores.find((score) => score.scoreType === 'health_intelligence') ?? healthScores.find((score) => score.scoreType === 'overall') ?? null;
   const scoreByType = new Map(healthScores.map((score) => [score.scoreType, score]));
   const completeness = buildCompleteness(nutritionProfile);
   const lastSyncedCandidates = [
@@ -897,14 +899,29 @@ export const getConsultantClientWorkspace = async (
     stressAssessment,
     wearableSummary,
     recoveryMetrics: {
-      activityScore: scoreByType.get('active_performance') ?? scoreByType.get('activity') ?? null,
-      sleepScore: scoreByType.get('energy_balance') ?? scoreByType.get('sleep') ?? null,
-      calmScore: scoreByType.get('stress_resilience') ?? scoreByType.get('calm') ?? null,
+      calculationVersion: 'HEALTH_INTELLIGENCE_V1',
+      clinicalValidationStatus: 'PENDING',
+      activityScore: scoreByType.get('activity') ?? null,
+      sleepScore: scoreByType.get('sleep') ?? null,
+      calmScore: scoreByType.get('calm') ?? null,
       recoveryScore: scoreByType.get('recovery') ?? null,
-      nourishmentScore: scoreByType.get('nourishment') ?? scoreByType.get('nutrition') ?? null,
+      stressRecoveryScore: scoreByType.get('stress_recovery') ?? null,
+      cycleScore: scoreByType.get('cycle') ?? null,
+      nourishmentScore: scoreByType.get('nutrition') ?? null,
       bodySupportScore: scoreByType.get('body_support') ?? scoreByType.get('clinical') ?? null,
       physicalWellnessIndex: scoreByType.get('physical_wellness_index') ?? overallScore,
-      overallScore
+      overallScore,
+      mindScore: { scoreValue: null, scoreStatus: 'methodology_pending', calculationVersion: 'HEALTH_INTELLIGENCE_V1' }
+    },
+    healthIntelligence: {
+      calculationVersion: 'HEALTH_INTELLIGENCE_V1',
+      clinicalValidationStatus: 'PENDING',
+      scores: Object.fromEntries(
+        healthScores
+          .filter((score) => ['activity', 'sleep', 'calm', 'nutrition', 'stress_recovery', 'cycle', 'recovery', 'health_intelligence'].includes(score.scoreType))
+          .map((score) => [score.scoreType, score])
+      ),
+      dailyAggregates: healthAggregates
     },
     nutritionProtocol: {
       readinessScore: nutritionProfile?.readinessScore ?? 0,

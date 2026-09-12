@@ -4,6 +4,8 @@ import { getHealthProfileByClientId } from '../platform/platform.store.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { HealthScoreInput, clearHealthScoresForOwner, createHealthScores } from './health-scores.repository.js';
 import { HEALTH_OBSERVATION_FRESHNESS_MS, isCurrentHealthObservation } from './health-freshness.js';
+import {buildHealthIntelligenceV1} from './health-intelligence-projection.js';
+import {replaceDailyAggregates} from './health-aggregates.repository.js';
 
 export const CALCULATION_VERSION = 'FIT-WELLNESS-200.v1';
 
@@ -299,6 +301,10 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
     );
   }
 
+  const v1=buildHealthIntelligenceV1(eligibleObservations);
+  await replaceDailyAggregates(owner,v1.aggregates);
+  const canonicalTypes=new Set(['recovery','activity','sleep','calm','nutrition','overall','stress_recovery','cycle','health_intelligence']);
+  const canonicalScores:HealthScoreInput[]=Object.entries({recovery:v1.scores.recovery,activity:v1.scores.activity,sleep:v1.scores.sleep,calm:v1.scores.calm,nutrition:v1.scores.nutrition,stress_recovery:v1.scores.stressRecovery,cycle:v1.scores.cycle,overall:v1.scores.healthIntelligence,health_intelligence:v1.scores.healthIntelligence}).map(([scoreType,value])=>({scoreType:scoreType as HealthScoreInput['scoreType'],scoreValue:value.score,scoreStatus:value.score==null?'insufficient_data':'calculated',confidence:value.confidence==='HIGH'?1:value.confidence==='MODERATE'?0.67:0,inputSummary:value,calculationVersion:'HEALTH_INTELLIGENCE_V1'}));
   await clearHealthScoresForOwner(owner);
-  return createHealthScores(owner, scores);
+  return createHealthScores(owner,[...scores.filter(s=>!canonicalTypes.has(s.scoreType)),...canonicalScores]);
 };

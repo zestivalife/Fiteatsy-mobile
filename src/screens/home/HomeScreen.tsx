@@ -269,7 +269,7 @@ export const HomeScreen = () => {
     {
       key: 'calm',
       label: 'Calm',
-      score: normalizeScore(healthSummary?.stressResilienceScore ?? healthSummary?.calmScore),
+      score: normalizeScore(healthSummary?.calmScore),
       color: '#FF1717',
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
@@ -278,7 +278,7 @@ export const HomeScreen = () => {
     {
       key: 'activity',
       label: 'Activity',
-      score: normalizeScore(healthSummary?.activePerformanceScore ?? healthSummary?.activityScore),
+      score: normalizeScore(healthSummary?.activityScore),
       color: '#F27A1A',
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
@@ -296,7 +296,7 @@ export const HomeScreen = () => {
     {
       key: 'mind',
       label: 'Mind',
-      score: normalizeScore(healthSummary?.stressResilienceScore),
+      score: null,
       color: '#763CEF',
       position: 'bottomLeft',
       DefaultIcon: MindDefaultIcon,
@@ -305,7 +305,7 @@ export const HomeScreen = () => {
     {
       key: 'sleep',
       label: 'Sleep',
-      score: normalizeScore(healthSummary?.energyBalanceScore ?? healthSummary?.sleepScore),
+      score: normalizeScore(healthSummary?.sleepScore),
       color: '#0F80FF',
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,

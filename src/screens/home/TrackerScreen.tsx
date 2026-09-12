@@ -19,6 +19,7 @@ import { toDayKey } from '../../utils/date';
 import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
 import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
 import type { WearableSyncPayload } from '../../types';
+import {getHealthIntelligenceV1,type HealthIntelligenceV1} from '../../services/healthIntelligenceService';
 
 type RangeMode = '7D' | '30D';
 type HealthSubTab = 'overview' | 'activity' | 'heart' | 'sleep';
@@ -1167,6 +1168,7 @@ export const TrackerScreen = () => {
   const navigation = useNavigation<TrackerNavigation>();
   const { themeMode, checkIns, onboarding, wearableSyncData, wellness, authSession } = useAppContext();
   const [pss10History, setPss10History] = useState<AssessmentResult[]>([]);
+  const [canonicalIntelligence,setCanonicalIntelligence]=useState<HealthIntelligenceV1|null>(null);
   const isLight = themeMode === 'light';
   const todayWeekIndex = new Date().getDay();
 
@@ -1198,6 +1200,7 @@ export const TrackerScreen = () => {
       .catch(() => { if (active) setPss10History([]); });
     return () => { active = false; };
   }, [authSession]);
+  useEffect(()=>{let active=true;if(!authSession){setCanonicalIntelligence(null);return()=>{active=false;};}getHealthIntelligenceV1().then(value=>{if(active)setCanonicalIntelligence(value);}).catch(()=>{if(active)setCanonicalIntelligence(null);});return()=>{active=false;};},[authSession]);
 
   const days = useMemo<DayData[]>(() => {
     const base = new Date();
@@ -1305,11 +1308,11 @@ export const TrackerScreen = () => {
   const stepsValue = latestObservationValue(latestObservations, 'steps');
   const caloriesValue = latestSync?.metrics.caloriesKcal ?? latestObservationValue(latestObservations, 'calories_kcal');
   const workoutMinutesValue = latestSync?.metrics.workoutMinutes ?? latestSync?.metrics.movementMinutes ?? null;
-  const activityScoreValue = recoveryIntel.signalCoverage.workouts ? driverMap['Movement / Workouts']?.score ?? null : null;
+  const activityScoreValue = canonicalIntelligence?.scores.activity.score ?? null;
   const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? latestSync?.metrics.heartRateAvg ?? null : null;
   const hrvValue = recoveryIntel.signalCoverage.hrv ? latestSync?.metrics.hrvMs ?? null : null;
   const sleepHoursValue = recoveryIntel.signalCoverage.sleep ? latestSync?.metrics.sleepHours ?? null : null;
-  const sleepScoreValue = recoveryIntel.signalCoverage.sleep ? driverMap.Sleep?.score ?? null : null;
+  const sleepScoreValue = canonicalIntelligence?.scores.sleep.score ?? null;
   const bedtimeValue = toClockMinutes(onboarding?.sleepTime);
   const wakeTimeValue = toClockMinutes(onboarding?.wakeTime);
   const sleepDurationMinutes = calculateSleepMinutes(bedtimeValue, wakeTimeValue, sleepHoursValue);
@@ -1324,6 +1327,18 @@ export const TrackerScreen = () => {
   const hydrationValue = wellness.hydrationLiters > 0 ? wellness.hydrationLiters : null;
   const activeMinutesValue = wellness.movementMinutes > 0 ? wellness.movementMinutes : workoutMinutesValue;
   const recommendationText = recoveryIntel.highestImpactActions[0] ?? recoveryIntel.insufficientReason ?? 'Sync health data to unlock personalized guidance.';
+  const canonicalScoreRows: Array<[string, HealthIntelligenceV1['scores']['activity']]> = canonicalIntelligence ? [
+    ['Health Intelligence', canonicalIntelligence.scores.healthIntelligence],
+    ['Recovery', canonicalIntelligence.scores.recovery],
+    ['Activity', canonicalIntelligence.scores.activity],
+    ['Sleep', canonicalIntelligence.scores.sleep],
+    ['Calm', canonicalIntelligence.scores.calm],
+    ['Stress Recovery', canonicalIntelligence.scores.stressRecovery],
+    ['Nutrition', canonicalIntelligence.scores.nutrition]
+  ] : [];
+  if (canonicalIntelligence?.scores.cycle.status !== 'NOT_APPLICABLE' && canonicalIntelligence) {
+    canonicalScoreRows.push(['Cycle', canonicalIntelligence.scores.cycle]);
+  }
 
   const healthMetrics: MetricConfig[] = [
     {
@@ -1595,6 +1610,19 @@ export const TrackerScreen = () => {
   const renderHealthOverview = () => (
     <View style={styles.healthContentStack}>
       <RecoveryParticleMetric value={recoveryIntel.recoveryScore} label={statusLabel(recoveryIntel.recoveryScore)} />
+      <Card style={styles.healthPanel}>
+        <Text style={styles.healthPanelTitle}>Health Intelligence</Text>
+        {canonicalScoreRows.map(([label, result]) => (
+          <View key={label} style={styles.healthMetricLabelWrap}>
+            <Text style={styles.healthMetricLabel}>{label}</Text>
+            <Text style={styles.healthMuted}>
+              {scoreLabel(result.score)} · {result.status.replaceAll('_', ' ')} · {result.confidence} confidence · {result.freshness.toLowerCase()}
+            </Text>
+          </View>
+        ))}
+        {canonicalIntelligence?.performanceReport.keyTrends.slice(0, 2).map((trend) => <Text key={trend} style={styles.healthMuted}>{trend}</Text>)}
+        {canonicalIntelligence?.performanceReport.recommendedActions.slice(0, 2).map((action) => <Text key={action} style={styles.healthMuted}>{action}</Text>)}
+      </Card>
       {renderTrend()}
       <View style={styles.healthMiniGrid}>
         {renderMiniStat('Steps', numberLabel(stepsValue), 'walk-outline', recoveryIntel.signalCoverage.steps ? 'Synced' : 'Sync health data')}
@@ -1606,9 +1634,6 @@ export const TrackerScreen = () => {
   );
 
   const renderActivityTab = () => {
-    const stepTarget = 5000;
-    const workoutTarget = 30;
-    const calorieTarget = 2100;
     return (
       <View style={styles.healthContentStack}>
         <Card style={styles.activityCard}>
@@ -1619,9 +1644,10 @@ export const TrackerScreen = () => {
             </View>
             <ProgressRing value={activityScoreValue} label="Activity" />
           </View>
-          {renderMetricRow('Steps', numberLabel(stepsValue), stepsValue ? stepTarget.toLocaleString() : '', stepsValue ? (stepsValue / stepTarget) * 100 : null)}
-          {renderMetricRow('Workout', numberLabel(workoutMinutesValue, ' min'), workoutMinutesValue ? `${workoutTarget} min` : '', workoutMinutesValue ? (workoutMinutesValue / workoutTarget) * 100 : null, '#BFFFA9')}
-          {renderMetricRow('Calories', numberLabel(caloriesValue, ' kcal'), caloriesValue ? `${calorieTarget} kcal` : '', caloriesValue ? (caloriesValue / calorieTarget) * 100 : null, '#FF8188')}
+          {renderMetricRow('Steps', numberLabel(stepsValue), '', null)}
+          {renderMetricRow('Workout', numberLabel(workoutMinutesValue, ' min'), '', null, '#BFFFA9')}
+          {renderMetricRow('Calories', numberLabel(caloriesValue, ' kcal'), '', null, '#FF8188')}
+          <Text style={styles.healthMuted}>7-day steps average: {numberLabel(canonicalIntelligence?.baselines.steps?.sevenDayAverage ?? null)} · 28-day baseline: {numberLabel(canonicalIntelligence?.baselines.steps?.twentyEightDayBaseline ?? null)}</Text>
         </Card>
         <Card style={styles.recommendationCard}>
           <Text style={styles.recommendationTitle}>Activity Recommendation</Text>
@@ -1636,7 +1662,7 @@ export const TrackerScreen = () => {
       <HeartParticleMetric restingHeartRate={restingHeartRateValue} hrv={hrvValue} />
       <Card style={styles.healthPanel}>
         <Text style={styles.healthPanelTitle}>Cardiovascular Stability</Text>
-        {renderMetricRow('Cardio Efficiency', scoreLabel(driverMap['Resting heart load']?.score ?? null), '', driverMap['Resting heart load']?.score ?? null, '#BFFFA9')}
+        <Text style={styles.healthMuted}>Heart performance is shown from canonical measurements; Cardio Efficiency methodology is pending.</Text>
         {renderMetricRow('Recovery Signal', scoreLabel(driverMap['HRV / Recovery balance']?.score ?? null), '', driverMap['HRV / Recovery balance']?.score ?? null, '#FF8188')}
         {renderMetricRow('Heart Recovery Score', scoreLabel(recoveryIntel.recoveryScore), '', recoveryIntel.recoveryScore, '#6FD3FF')}
       </Card>
@@ -1656,6 +1682,9 @@ export const TrackerScreen = () => {
         sleepScore={sleepScoreValue}
         stages={sleepStages}
       />
+      <Card style={styles.healthPanel}>
+        <Text style={styles.healthMuted}>7-day sleep average: {numberLabel(canonicalIntelligence?.baselines.sleep_minutes?.sevenDayAverage ?? null, ' min')} · 28-day baseline: {numberLabel(canonicalIntelligence?.baselines.sleep_minutes?.twentyEightDayBaseline ?? null, ' min')}</Text>
+      </Card>
       <Card style={styles.recommendationCard}>
         <Text style={[styles.recommendationTitle, { color: '#6FD3FF' }]}>Sleep Recommendation</Text>
         <Text style={styles.recommendationCopy}>{sleepScoreValue == null ? 'Sync sleep data to unlock sleep recommendations.' : recommendationText}</Text>

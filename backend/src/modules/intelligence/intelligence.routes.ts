@@ -29,12 +29,20 @@ import {
 import { calculateHealthScores } from './health-calculation-engine.js';
 import { ingestHealthObservations } from '../health/health-observations.repository.js';
 import { getReport } from '../reports/reports.store.js';
+import { listHealthObservations } from '../health/health-observations.repository.js';
+import { buildHealthIntelligenceV1 } from './health-intelligence-projection.js';
 
 export const intelligenceRouter = Router();
 
 const currentOwner = (account: ReturnType<typeof getAuthenticatedAccount>): ClientOwnershipContext => ({
   accountId: account.accountId,
   clientId: account.client.id
+});
+
+intelligenceRouter.get('/v1', requireAuthenticatedAccount, async (req, res) => {
+  const owner = currentOwner(getAuthenticatedAccount(req));
+  const observations = await listHealthObservations(owner, { limit: 5000, offset: 0 });
+  return res.status(200).json(buildHealthIntelligenceV1(observations));
 });
 
 const toScoreDto = (score: Awaited<ReturnType<typeof listLatestHealthScores>>[number], fiteatsyClientId: string) => ({
@@ -173,7 +181,7 @@ intelligenceRouter.get('/scores/history', requireAuthenticatedAccount, async (re
   const offset = Math.max(0, Number(req.query.offset || 0));
   const scoreType =
     typeof req.query.scoreType === 'string' &&
-    ['energy_balance', 'body_support', 'nourishment', 'recovery', 'physical_wellness_index', 'active_performance', 'stress_resilience', 'nutrition', 'clinical', 'activity', 'sleep', 'calm', 'overall'].includes(req.query.scoreType)
+    ['energy_balance', 'body_support', 'nourishment', 'recovery', 'physical_wellness_index', 'active_performance', 'stress_resilience', 'nutrition', 'clinical', 'activity', 'sleep', 'calm', 'overall','stress_recovery','cycle','health_intelligence'].includes(req.query.scoreType)
       ? (req.query.scoreType as HealthScoreType)
       : undefined;
   const items = await listHealthScoreHistory(owner, { scoreType, limit, offset });
@@ -206,6 +214,9 @@ intelligenceRouter.get('/summary', requireAuthenticatedAccount, async (req, res)
     sleepScore: getScoreValue(scores, 'sleep'),
     calmScore: getScoreValue(scores, 'calm'),
     overallScore: getScoreValue(scores, 'overall'),
+    healthIntelligenceScore: getScoreValue(scores, 'health_intelligence'),
+    stressRecoveryFrameworkScore: getScoreValue(scores, 'stress_recovery'),
+    cycleScore: getScoreValue(scores, 'cycle'),
     confidence: getAggregateConfidence(scores),
     status: scores.some((score) => score.scoreStatus === 'calculated') ? 'calculated' : 'insufficient_data',
     calculatedAtISO: scores[0]?.calculatedAtISO ?? null

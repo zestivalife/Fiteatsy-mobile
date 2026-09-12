@@ -14,7 +14,7 @@ export type HealthScoreType =
   | 'activity'
   | 'sleep'
   | 'calm'
-  | 'overall';
+  | 'overall'|'stress_recovery'|'cycle'|'health_intelligence';
 
 export type HealthScore = {
   id: string;
@@ -42,6 +42,9 @@ export type HealthScoreSummary = {
   sleepScore: number | null;
   calmScore: number | null;
   overallScore: number | null;
+  healthIntelligenceScore: number | null;
+  stressRecoveryFrameworkScore: number | null;
+  cycleScore: number | null;
   confidence: number;
   status: HealthScoreStatus;
   calculatedAtISO: string | null;
@@ -84,6 +87,10 @@ export const getHealthScoreHistory = (scoreType?: HealthScoreType) =>
   );
 
 export const getHealthScoreSummary = () => apiFetch<HealthScoreSummary>('/v1/intelligence/summary');
+
+export type FrameworkScore={key:string;score:number|null;status:'CALCULATED'|'PARTIAL'|'INSUFFICIENT_DATA'|'METHODOLOGY_PENDING'|'NOT_APPLICABLE'|'STALE';confidence:'HIGH'|'MODERATE'|'LOW';trend:number|null;inputsUsed:string[];inputsMissing:string[];inputsNotApplicable:string[];methodologyPending:string[];contributingFactors:string[];recommendedActions:string[];explanation:string;freshness:'CURRENT'|'STALE'|'UNKNOWN';calculationVersion:'HEALTH_INTELLIGENCE_V1';calculatedAt:string};
+export type HealthIntelligenceV1={calculationVersion:'HEALTH_INTELLIGENCE_V1';engineeringStatus:'IMPLEMENTED';clinicalValidationStatus:'PENDING';latestSourceReadAt:string|null;latestCalculationAt:string;baselines:Record<string,{today:number|null;sevenDayAverage:number|null;twentyEightDayBaseline:number|null;trend:number|null;deviation:number|null}>;scores:{activity:FrameworkScore;sleep:FrameworkScore;nutrition:FrameworkScore;calm:FrameworkScore;stressRecovery:FrameworkScore;cycle:FrameworkScore;recovery:FrameworkScore;mind:FrameworkScore;healthIntelligence:FrameworkScore};performanceReport:{sections:string[];keyTrends:string[];recommendedActions:string[];confidence:string};sourceSemantics:{hrv:string}};
+export const getHealthIntelligenceV1=()=>apiFetch<HealthIntelligenceV1>('/v1/intelligence/v1');
 
 export const getPssQuestions = (count = 4) =>
   apiFetch<{ scale: 'PSS-10'; items: PssQuestion[] }>(`/v1/intelligence/stress/questions?count=${encodeURIComponent(String(count))}`);

@@ -15,7 +15,7 @@ export type HealthScoreType =
   | 'activity'
   | 'sleep'
   | 'calm'
-  | 'overall';
+  | 'overall'|'stress_recovery'|'cycle'|'health_intelligence';
 export type HealthScoreStatus = 'calculated' | 'insufficient_data';
 
 export type HealthScoreRecord = {
