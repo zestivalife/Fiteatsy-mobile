@@ -16,7 +16,7 @@ describe('end-to-end health data capture recovery contracts', () => {
   test('first Apple sync uses bounded backfill and incremental sync uses only valid anchors', () => {
     const apple = read('src/services/appleHealthService.ts');
     expect(apple).toContain('definition?.syncWindowDays');
-    expect(apple).toContain('options.forceBackfill || !anchors[metric] ? start : undefined');
+    expect(apple).toContain('options.forceBackfill || !pageAnchor ? start : undefined');
     expect(apple).toContain('options.forceBackfill ? undefined : anchors[metric]');
     expect(apple).toContain('result.samples.length > 0 || result.deletedIds.length > 0');
     expect(apple).not.toContain('new Date(null)');
@@ -85,7 +85,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain('readHealthKitCumulativeStatistics');
     expect(apple).toContain('anchored source rows remain available for audit');
     expect(apple).toContain('startDate.setHours(0, 0, 0, 0)');
-    expect(apple).toContain("dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_SLEEP_STAGE']");
+    expect(apple).toContain("dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_OR_NON_POSITIVE_SAMPLE']");
   });
 
   test('backend accepts the complete Apple Health provenance contract and a bounded backfill body', () => {
@@ -99,6 +99,20 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(routes).toContain('recalculateIntelligence: z.boolean().optional().default(true)');
     expect(routes).toContain('parsed.data.recalculateIntelligence ? await calculateHealthScores(owner) : null');
     expect(read('src/services/healthSyncManager.ts')).toContain('recalculateIntelligence: false');
+  });
+
+  test('HealthKit pagination, poison-sample filtering, queue serialization, and observer refresh are wired', () => {
+    const apple = read('src/services/appleHealthService.ts');
+    const bridge = read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift');
+    const store = read('src/services/healthSyncLocalStore.ts');
+    const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
+    expect(bridge).toContain('"hasMore": rows.count + deletedIds.count >= self.anchoredReadLimit');
+    expect(apple).toContain('APPLE_HEALTH_MAX_PAGES_PER_METRIC = 8');
+    expect(apple).toContain('while (hasMore && pagesRead < APPLE_HEALTH_MAX_PAGES_PER_METRIC)');
+    expect(apple).toContain('sample.value <= 0');
+    expect(store).toContain('serializeScopeOperation');
+    expect(coordinator).toContain('subscribeToHealthKitChanges');
+    expect(coordinator).toContain('subscription?.remove()');
   });
 
   test('authorization and foreground return immediately execute local query and retain local UI rows', () => {

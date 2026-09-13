@@ -11,6 +11,15 @@ const identity = (item: HealthObservationDraft) => item.syncKey
 type StoredRecord = { observation: HealthObservationDraft; uploaded: boolean; updatedAtISO: string };
 type LocalSyncState = { records: Record<string, StoredRecord>; cursors: Record<string, string> };
 const emptyState = (): LocalSyncState => ({ records: {}, cursors: {} });
+const scopeOperations = new Map<string, Promise<unknown>>();
+const serializeScopeOperation = <T>(scope: string, operation: () => Promise<T>): Promise<T> => {
+  const previous = scopeOperations.get(scope) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  scopeOperations.set(scope, current);
+  return current.finally(() => {
+    if (scopeOperations.get(scope) === current) scopeOperations.delete(scope);
+  });
+};
 
 const readState = async (scope: string): Promise<LocalSyncState> => {
   try {
@@ -26,7 +35,8 @@ const readState = async (scope: string): Promise<LocalSyncState> => {
 const writeState = (scope: string, state: LocalSyncState) =>
   AsyncStorage.setItem(keyFor(scope), JSON.stringify(state));
 
-export const readLocalSyncCursors = async (scope: string) => (await readState(scope)).cursors;
+export const readLocalSyncCursors = (scope: string) =>
+  serializeScopeOperation(scope, async () => (await readState(scope)).cursors);
 
 export const getOrCreateHealthInstallationId = async () => {
   const existing = await AsyncStorage.getItem(INSTALLATION_KEY);
@@ -52,11 +62,11 @@ export const migrateLegacyHealthInstallationId = async () => {
 };
 
 /** Atomically persists normalized records/tombstones and their resulting cursors. */
-export const persistLocalSyncBatch = async (
+export const persistLocalSyncBatch = (
   scope: string,
   observations: HealthObservationDraft[],
   cursors: Record<string, string>
-) => {
+) => serializeScopeOperation(scope, async () => {
   const state = await readState(scope);
   const updatedAtISO = new Date().toISOString();
   for (const observation of observations) {
@@ -67,22 +77,22 @@ export const persistLocalSyncBatch = async (
   }
   state.cursors = { ...state.cursors, ...cursors };
   await writeState(scope, state);
-};
+});
 
-export const readPendingLocalObservations = async (scope: string, limit = 250) => {
+export const readPendingLocalObservations = (scope: string, limit = 250) => serializeScopeOperation(scope, async () => {
   const state = await readState(scope);
   return Object.entries(state.records)
     .filter(([, record]) => !record.uploaded)
     .sort(([, left], [, right]) => left.updatedAtISO.localeCompare(right.updatedAtISO))
     .slice(0, limit)
     .map(([recordKey, record]) => ({ recordKey, observation: record.observation }));
-};
+});
 
-export const acknowledgeLocalObservations = async (scope: string, recordKeys: string[]) => {
+export const acknowledgeLocalObservations = (scope: string, recordKeys: string[]) => serializeScopeOperation(scope, async () => {
   const state = await readState(scope);
   for (const recordKey of recordKeys) {
     const record = state.records[recordKey];
     if (record) state.records[recordKey] = { ...record, uploaded: true };
   }
   await writeState(scope, state);
-};
+});

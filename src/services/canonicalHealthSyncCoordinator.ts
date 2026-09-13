@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
+import { subscribeToHealthKitChanges } from '../../modules/fiteatsy-healthkit';
 import { useAppContext } from '../state/AppContext';
 import type { HealthObservationDraft } from '../types';
 import { HEALTH_METRIC_REGISTRY, type HealthMetricDefinition } from './healthMetricRegistry';
@@ -54,6 +55,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const awaitingPermissionReturn = useRef(false);
   const foregroundRefreshAt = useRef(0);
   const forceBackfill = useRef(false);
+  const healthChangeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionIdOverride = useRef<string | null>(null);
   const [providerState, setProviderState] = useState<HealthProviderState>('AVAILABLE');
   const [uploadState, setUploadState] = useState<HealthUploadState>('IDLE');
@@ -233,6 +235,19 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     });
     return () => subscription.remove();
   }, [providerState, syncLocalMetrics]);
+
+  useEffect(() => {
+    if (adapter.platform !== 'APPLE_HEALTH' || providerState !== 'CONNECTED') return;
+    const subscription = subscribeToHealthKitChanges(() => {
+      if (healthChangeDebounce.current) clearTimeout(healthChangeDebounce.current);
+      healthChangeDebounce.current = setTimeout(() => void syncLocalMetrics(), 1_000);
+    });
+    return () => {
+      if (healthChangeDebounce.current) clearTimeout(healthChangeDebounce.current);
+      healthChangeDebounce.current = null;
+      subscription?.remove();
+    };
+  }, [adapter.platform, providerState, syncLocalMetrics]);
 
   const latestByMetric = useMemo(() => {
     const latest = new Map<string, HealthObservationDto>();

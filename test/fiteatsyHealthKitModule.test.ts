@@ -14,6 +14,7 @@ const availableNative = () => ({
   readChanges: jest.fn().mockResolvedValue({ samples: [], deletedIds: [], anchor: '' }),
   readCumulativeStatistics: jest.fn().mockResolvedValue({ value: 0, startAtISO: '', endAtISO: '' }),
   enableBackgroundDelivery: jest.fn().mockResolvedValue(true),
+  addListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
 });
 
 describe('FiteatsyHealthKit bridge startup safety', () => {
@@ -47,5 +48,14 @@ describe('FiteatsyHealthKit bridge startup safety', () => {
     const { bridge } = loadBridge('ios', null);
     await expect(bridge.requestHealthKitAuthorization(['steps']))
       .rejects.toThrow('FITEATSY_HEALTHKIT_NATIVE_MODULE_MISSING');
+  });
+
+  it('subscribes to native HealthKit change events through the Expo module', () => {
+    const native = availableNative();
+    const { bridge } = loadBridge('ios', native);
+    const listener = jest.fn();
+    const subscription = bridge.subscribeToHealthKitChanges(listener);
+    expect(native.addListener).toHaveBeenCalledWith('onHealthDataChanged', listener);
+    expect(subscription).not.toBeNull();
   });
 });

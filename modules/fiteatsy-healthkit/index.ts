@@ -1,4 +1,4 @@
-import { requireOptionalNativeModule } from 'expo-modules-core';
+import { requireOptionalNativeModule, type EventSubscription } from 'expo-modules-core';
 import { Platform } from 'react-native';
 
 export type HealthKitSample = {
@@ -8,7 +8,7 @@ export type HealthKitSample = {
   metadata?: Record<string, unknown>;
 };
 
-export type HealthKitReadResult = { samples: HealthKitSample[]; deletedIds: string[]; anchor: string };
+export type HealthKitReadResult = { samples: HealthKitSample[]; deletedIds: string[]; anchor: string; hasMore: boolean };
 export type HealthKitStatisticsResult = { value: number; startAtISO: string; endAtISO: string };
 type FiteatsyHealthKitNativeModule = {
   isAvailable(): Promise<boolean>;
@@ -17,6 +17,7 @@ type FiteatsyHealthKitNativeModule = {
   readChanges(metric: string, anchor: string | null, startAtISO: string | null): Promise<HealthKitReadResult>;
   readCumulativeStatistics(metric: string, startAtISO: string, endAtISO: string): Promise<HealthKitStatisticsResult>;
   enableBackgroundDelivery(metrics: string[]): Promise<boolean>;
+  addListener(eventName: 'onHealthDataChanged', listener: (event: { metric?: string }) => void): EventSubscription;
 };
 
 export type HealthKitAuthorizationResult = {
@@ -66,3 +67,6 @@ export const readHealthKitCumulativeStatistics = (metric: string, startAtISO: st
 };
 export const enableHealthKitBackgroundDelivery = (metrics: string[]): Promise<boolean> =>
   nativeModule()?.enableBackgroundDelivery(metrics) ?? Promise.resolve(false);
+
+export const subscribeToHealthKitChanges = (listener: (event: { metric?: string }) => void): EventSubscription | null =>
+  nativeModule()?.addListener('onHealthDataChanged', listener) ?? null;

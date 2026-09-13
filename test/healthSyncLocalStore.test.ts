@@ -10,10 +10,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import { acknowledgeLocalObservations, persistLocalSyncBatch, readLocalSyncCursors,
   readPendingLocalObservations } from '../src/services/healthSyncLocalStore';
 
-const observation = (value: number, deleted = false) => ({
+const observation = (value: number, deleted = false, recordId = 'record-1') => ({
   metricType: 'steps', value, unit: deleted ? 'deleted' : 'count',
   measuredAtISO: '2026-09-13T00:00:00.000Z', sourceProvider: 'apple_health',
-  sourceRecordId: 'record-1', syncKey: 'apple_health:steps:source:record-1', deleted
+  sourceRecordId: recordId, syncKey: `apple_health:steps:source:${recordId}`, deleted
 });
 
 describe('durable local health sync store', () => {
@@ -43,5 +43,15 @@ describe('durable local health sync store', () => {
     await acknowledgeLocalObservations('connection-1', [pending.recordKey]);
     await persistLocalSyncBatch('connection-1', [observation(0, true)], { steps: 'anchor-2' });
     expect((await readPendingLocalObservations('connection-1'))[0].observation.deleted).toBe(true);
+  });
+
+  it('serializes concurrent queue mutations without losing either observation', async () => {
+    await Promise.all([
+      persistLocalSyncBatch('connection-1', [observation(100, false, 'record-1')], { steps: 'anchor-1' }),
+      persistLocalSyncBatch('connection-1', [observation(200, false, 'record-2')], { steps: 'anchor-2' })
+    ]);
+    const pending = await readPendingLocalObservations('connection-1');
+    expect(pending.map((item) => item.observation.sourceRecordId).sort()).toEqual(['record-1', 'record-2']);
+    expect(await readLocalSyncCursors('connection-1')).toEqual({ steps: 'anchor-2' });
   });
 });

@@ -125,7 +125,8 @@ public final class FiteatsyHealthKitModule: Module {
         let deletedIds = (deleted ?? []).map { $0.uuid.uuidString }
         let anchorData = newAnchor.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
         self.logger.info("HealthKit read completed for \(metric, privacy: .public); records=\(rows.count, privacy: .public)")
-        promise.resolve(["samples": rows, "deletedIds": deletedIds, "anchor": anchorData?.base64EncodedString() ?? ""])
+        promise.resolve(["samples": rows, "deletedIds": deletedIds, "anchor": anchorData?.base64EncodedString() ?? "",
+          "hasMore": rows.count + deletedIds.count >= self.anchoredReadLimit])
       }
       self.store.execute(query)
     }

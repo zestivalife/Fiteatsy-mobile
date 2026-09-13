@@ -11,6 +11,7 @@ export const APPLE_HEALTH_PERMISSION_TIMEOUT_MS = 20_000;
 // below HEALTH_SYNC_PIPELINE_TIMEOUT_MS even when every native query times out.
 export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 6_000;
 export const APPLE_HEALTH_QUERY_CONCURRENCY = 3;
+export const APPLE_HEALTH_MAX_PAGES_PER_METRIC = 8;
 const APPLE_HEALTH_STATUS_KEYS: Record<string, string> = {
   steps: 'steps', sleep_minutes: 'sleep', resting_heart_rate: 'heart_rate', heart_rate: 'heart_rate',
   hrv_ms: 'hrv', workout_minutes: 'workouts', exercise_minutes: 'workouts', active_energy: 'calories', distance: 'distance',
@@ -96,12 +97,20 @@ export const syncFromAppleHealth = async (
     const startedAt = Date.now();
     diagnostic('METRIC_QUERY_START', { metric, durationMs: 0, status: 'CHECKING' });
     try {
-      const result = await withAppleHealthTimeout(
-        readHealthKitChanges(metric, options.forceBackfill ? undefined : anchors[metric],
-          options.forceBackfill || !anchors[metric] ? start : undefined),
-        APPLE_HEALTH_METRIC_TIMEOUT_MS,
-        `apple_health_metric_timeout:${metric}`
-      );
+      let pageAnchor = options.forceBackfill ? undefined : anchors[metric];
+      const samples = []; const deletedIds:string[] = [];
+      let hasMore = false; let pagesRead = 0;
+      do {
+        const page = await withAppleHealthTimeout(
+          readHealthKitChanges(metric, pageAnchor,
+            options.forceBackfill || !pageAnchor ? start : undefined),
+          APPLE_HEALTH_METRIC_TIMEOUT_MS,
+          `apple_health_metric_timeout:${metric}`
+        );
+        samples.push(...page.samples); deletedIds.push(...page.deletedIds);
+        pageAnchor = page.anchor; hasMore = page.hasMore; pagesRead += 1;
+      } while (hasMore && pagesRead < APPLE_HEALTH_MAX_PAGES_PER_METRIC);
+      const result = { samples, deletedIds, anchor: pageAnchor ?? '', hasMore };
       const status = result.samples.length ? 'SUCCESS' : 'NO_DATA';
       diagnostic(status === 'SUCCESS' ? 'METRIC_QUERY_SUCCESS' : 'METRIC_QUERY_NO_DATA', {
         metric, durationMs: Date.now() - startedAt, status
@@ -133,6 +142,11 @@ export const syncFromAppleHealth = async (
         const canonicalMetric = sample.metric === 'exercise_minutes' ? 'active_minutes'
           : sample.metric === 'hrv_ms' ? 'hrv_sdnn_ms' : sample.metric;
         metricValues[canonicalMetric] = [...(metricValues[canonicalMetric] ?? []), sample.value];
+        // Zero/negative quantity samples do not contribute to Fiteatsy health
+        // aggregates and are invalid under the backend observation contract.
+        // Drop them locally so one empty HealthKit sample cannot poison a
+        // complete upload batch. Deletion tombstones remain handled below.
+        if (!Number.isFinite(sample.value) || sample.value <= 0) return;
         observations.push({ metricType:canonicalMetric,value:sample.value,unit:sample.unit,
           measuredAtISO:sample.endAtISO,startAtISO:sample.startAtISO,endAtISO:sample.endAtISO,
           timezoneOffsetMinutes:-new Date(sample.endAtISO).getTimezoneOffset(),sourceProvider:'apple_health',sourceRecordId:sample.id,
@@ -154,7 +168,7 @@ export const syncFromAppleHealth = async (
       const acceptedSampleCount = observations.length - observationCountBefore - result.deletedIds.length;
       metricDiagnostics[metric]={nativeRecordCount:result.samples.length,normalizedRecordCount:acceptedSampleCount,
         droppedRecordCount:result.samples.length-acceptedSampleCount,
-        dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_SLEEP_STAGE']};
+        dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_OR_NON_POSITIVE_SAMPLE']};
       const nextStatus = acceptedSampleCount > 0 ? 'synced' : 'no_recent_data';
       statuses[statusKey] = statuses[statusKey] === 'synced' ? 'synced' : nextStatus;
     } else {
