@@ -276,14 +276,14 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
       : insufficient('physical_wellness_index', 'No calculated master wellness dimension scores are available.')
   );
 
-  const byType = new Map(scores.map((score) => [score.scoreType, score]));
+  const masterByType = new Map(scores.map((score) => [score.scoreType, score]));
   const aliasTargets = [
-    ['nutrition', byType.get('nourishment'), 'Nourishment score is not available.'],
-    ['clinical', byType.get('body_support'), 'Body support score is not available.'],
-    ['activity', byType.get('active_performance'), 'Active performance score is not available.'],
-    ['sleep', byType.get('energy_balance'), 'Energy balance score is not available.'],
-    ['calm', byType.get('stress_resilience'), 'Stress resilience score is not available.'],
-    ['overall', byType.get('physical_wellness_index'), 'Physical wellness index is not available.']
+    ['nutrition', masterByType.get('nourishment'), 'Nourishment score is not available.'],
+    ['clinical', masterByType.get('body_support'), 'Body support score is not available.'],
+    ['activity', masterByType.get('active_performance'), 'Active performance score is not available.'],
+    ['sleep', masterByType.get('energy_balance'), 'Energy balance score is not available.'],
+    ['calm', masterByType.get('stress_resilience'), 'Stress resilience score is not available.'],
+    ['overall', masterByType.get('physical_wellness_index'), 'Physical wellness index is not available.']
   ] as const;
 
   for (const [scoreType, source, reason] of aliasTargets) {
@@ -304,9 +304,13 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
   const v1=buildHealthIntelligenceV1(eligibleObservations);
   await replaceDailyAggregates(owner,v1.aggregates);
   const canonicalTypes=new Set(['recovery','activity','sleep','calm','nutrition','overall','stress_recovery','cycle','health_intelligence']);
+  // Alias scores are appended after the master dimensions above. Build the
+  // compatibility map only after that step so a methodology-pending V1 score
+  // can retain an already calculated governed legacy projection.
+  const canonicalFallbackByType = new Map(scores.map((score) => [score.scoreType, score]));
   const canonicalScores:HealthScoreInput[]=Object.entries({recovery:v1.scores.recovery,activity:v1.scores.activity,sleep:v1.scores.sleep,calm:v1.scores.calm,nutrition:v1.scores.nutrition,stress_recovery:v1.scores.stressRecovery,cycle:v1.scores.cycle,overall:v1.scores.healthIntelligence,health_intelligence:v1.scores.healthIntelligence}).map(([scoreType,value])=>{
     const typedScoreType=scoreType as HealthScoreInput['scoreType'];
-    const legacyFallback=byType.get(typedScoreType);
+    const legacyFallback=canonicalFallbackByType.get(typedScoreType);
     if(value.score==null&&legacyFallback?.scoreStatus==='calculated'&&legacyFallback.scoreValue!=null){
       return legacyFallback;
     }
