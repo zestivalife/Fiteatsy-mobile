@@ -54,7 +54,7 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(screen).toContain("nextState!=='active'||!awaitingPermissionReturn.current");
     expect(screen).toContain('permissionRefreshRunning.current');
     expect(screen).toContain('inspectAppleHealthPermissionState');
-    expect(screen).toContain('await syncNow()');
+    expect(screen).toContain('await syncNow({forceSourceBackfill:true})');
     expect(screen).toContain('POST_AUTH_QUERY_STARTED');
     expect(screen).not.toContain('x-apple-health://');
   });

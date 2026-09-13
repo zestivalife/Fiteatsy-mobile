@@ -8,6 +8,7 @@ export const APPLE_HEALTH_SCOPES = APPLE_HEALTH_READ_TYPES;
 export const APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS = 5_000;
 export const APPLE_HEALTH_PERMISSION_TIMEOUT_MS = 20_000;
 export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 8_000;
+export const APPLE_HEALTH_QUERY_CONCURRENCY = 3;
 const APPLE_HEALTH_STATUS_KEYS: Record<string, string> = {
   steps: 'steps', sleep_minutes: 'sleep', resting_heart_rate: 'heart_rate', heart_rate: 'heart_rate',
   hrv_ms: 'hrv', workout_minutes: 'workouts', exercise_minutes: 'workouts', active_energy: 'calories', distance: 'distance',
@@ -41,7 +42,31 @@ const sum = (values: number[]) => values.reduce((total, value) => total + value,
 const average = (values: number[]) => values.length ? sum(values) / values.length : null;
 const validValues = (values: number[]) => values.filter((value) => Number.isFinite(value) && value > 0);
 
-export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): Promise<WearableSyncPayload & { anchors: Record<string,string> }> => {
+export const settleWithConcurrency = async <T, R>(
+  items: T[],
+  concurrency: number,
+  task: (item: T, index: number) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> => {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      try {
+        results[index] = { status: 'fulfilled', value: await task(items[index], index) };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, worker));
+  return results;
+};
+
+export const syncFromAppleHealth = async (
+  anchors: Record<string,string> = {},
+  options: { forceBackfill?: boolean } = {}
+): Promise<WearableSyncPayload & { anchors: Record<string,string> }> => {
   const availabilityStartedAt = Date.now();
   if (Platform.OS !== 'ios' || !(await inspectAppleHealthAvailability())) throw new Error('apple_health_unavailable');
   diagnostic('HEALTHKIT_AVAILABLE', { durationMs: Date.now() - availabilityStartedAt, status: 'SUCCESS' });
@@ -50,14 +75,15 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
   const metricValues: Record<string, number[]> = {};
   const metricDiagnostics:NonNullable<WearableSyncPayload['dataQuality']['metricDiagnostics']>={};
   diagnostic('HEALTH_SYNC_START', { metricCount: APPLE_HEALTH_SCOPES.length, status: 'STARTED' });
-  const settledReads = await Promise.allSettled(APPLE_HEALTH_SCOPES.map(async (metric) => {
+  const settledReads = await settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY, async (metric) => {
     const definition = APPLE_HEALTH_QUERYABLE_METRICS.find((item) => item.appleHealthType === metric);
     const start = new Date(Date.now() - (definition?.syncWindowDays ?? 30) * 86400000).toISOString();
     const startedAt = Date.now();
     diagnostic('METRIC_QUERY_START', { metric, durationMs: 0, status: 'CHECKING' });
     try {
       const result = await withAppleHealthTimeout(
-        readHealthKitChanges(metric, anchors[metric], anchors[metric] ? undefined : start),
+        readHealthKitChanges(metric, options.forceBackfill ? undefined : anchors[metric],
+          options.forceBackfill || !anchors[metric] ? start : undefined),
         APPLE_HEALTH_METRIC_TIMEOUT_MS,
         `apple_health_metric_timeout:${metric}`
       );
@@ -73,13 +99,19 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
       });
       throw { metric, timeout, error };
     }
-  }));
+  });
 
   settledReads.forEach((settled, index) => {
     const metric = APPLE_HEALTH_SCOPES[index];
     if (settled.status === 'fulfilled') {
       const { result } = settled.value;
-      nextAnchors[metric] = result.anchor;
+      // An empty pre-authorisation query can still return an anchor. Persisting
+      // it would make the first authorised read skip existing history forever.
+      // Retain an existing cursor on a genuine incremental no-op, but only
+      // advance/create it when HealthKit returned a change.
+      if (result.samples.length > 0 || result.deletedIds.length > 0) {
+        nextAnchors[metric] = result.anchor;
+      }
       const observationCountBefore = observations.length;
       result.samples.forEach((sample) => {
         if (sample.metric === 'sleep_minutes' && ['AWAKE', 'IN_BED'].includes(sample.sleepStage ?? '')) return;

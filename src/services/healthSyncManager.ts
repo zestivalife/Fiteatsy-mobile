@@ -162,7 +162,8 @@ export const getHealthSyncActivity = (limit = 10) =>
 export const runHealthSync = async (
   appId: HealthAppId,
   previousWellness: WellnessSnapshot,
-  governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY' }
+  governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY' },
+  options: { forceSourceBackfill?: boolean } = {}
 ): Promise<HealthSyncResult> => {
   let run: Awaited<ReturnType<typeof beginWearableSyncRun>> | null = null;
   let payload: WearableSyncPayload | null = null;
@@ -172,7 +173,10 @@ export const runHealthSync = async (
     // must never delay or prevent HealthKit / Health Connect from returning data.
     const localScope = governed?.connectionId ?? `ungoverned:${appId}`;
     const localCursors = await readLocalSyncCursors(localScope);
-    payload = await withHealthSyncPipelineTimeout(syncConnectedHealthApp(appId, localCursors), 'health_sync_native_read_timeout');
+    payload = await withHealthSyncPipelineTimeout(
+      syncConnectedHealthApp(appId, localCursors, options),
+      'health_sync_native_read_timeout'
+    );
     observations = deriveObservations(payload);
     const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors ?? {};
     // Cursor advancement and normalized/tombstone persistence are one durable

@@ -60,7 +60,11 @@ export const connectHealthApp = async (appId: HealthAppId) => {
   });
 };
 
-export const syncConnectedHealthApp = async (appId: HealthAppId, checkpoints: Record<string,string> = {}): Promise<WearableSyncPayload> => {
+export const syncConnectedHealthApp = async (
+  appId: HealthAppId,
+  checkpoints: Record<string,string> = {},
+  options: { forceSourceBackfill?: boolean } = {}
+): Promise<WearableSyncPayload> => {
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
   // Android: source-of-truth sync must read directly from Health Connect.
@@ -68,7 +72,9 @@ export const syncConnectedHealthApp = async (appId: HealthAppId, checkpoints: Re
     return syncFromHealthConnect(checkpoints.__changes__);
   }
 
-  if (platform === 'ios' && appId === 'apple-health') return syncFromAppleHealth(checkpoints);
+  if (platform === 'ios' && appId === 'apple-health') {
+    return syncFromAppleHealth(checkpoints, { forceBackfill: options.forceSourceBackfill });
+  }
 
   throw new Error('health_provider_not_available');
 };

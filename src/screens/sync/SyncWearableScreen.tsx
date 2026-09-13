@@ -228,6 +228,7 @@ export const HealthDataSyncExperience = ({ navigation, route }: Props) => {
   const inFlightRef = useRef(false);
   const awaitingSettingsReturnRef = useRef(false);
   const shouldStartInitialSyncRef = useRef(false);
+  const forceAppleBackfillOnNextSyncRef = useRef(false);
   const operationIdRef = useRef(0);
 
   useEffect(() => {
@@ -367,6 +368,7 @@ export const HealthDataSyncExperience = ({ navigation, route }: Props) => {
       if (!isCurrentOperation()) return;
       setConnectionId(connection.id);
       shouldStartInitialSyncRef.current = Platform.OS === 'ios' && grantedScopes.length > 0;
+      forceAppleBackfillOnNextSyncRef.current = Platform.OS === 'ios' && grantedScopes.length > 0;
       if (grantedScopes.length > 0) await registerWearableBackgroundSync({ connectionId:connection.id,provider,
         appId:Platform.OS === 'ios' ? 'apple-health' : 'health-connect' });
       if (!isCurrentOperation()) return;
@@ -431,9 +433,12 @@ export const HealthDataSyncExperience = ({ navigation, route }: Props) => {
         setStatusBody('Reading sleep, activity, and heart recovery data securely from your device.');
       }
 
+      const forceSourceBackfill = Platform.OS === 'ios' && forceAppleBackfillOnNextSyncRef.current;
       const result = await withHealthConnectTimeout(runHealthSync(Platform.OS === 'ios' ? 'apple-health' : 'health-connect', wellness,
-        connectionId ? { connectionId, provider: Platform.OS === 'ios' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', trigger: 'INITIAL_CONNECT' } : undefined));
+        connectionId ? { connectionId, provider: Platform.OS === 'ios' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', trigger: 'INITIAL_CONNECT' } : undefined,
+        { forceSourceBackfill }));
       if (!isCurrentOperation()) return;
+      if (forceSourceBackfill) forceAppleBackfillOnNextSyncRef.current = false;
       addWearableSyncData(result.payload);
       setSelectedDeviceId(Platform.OS === 'ios' ? 'apple-health' : 'health-connect');
       setLastResult(result);

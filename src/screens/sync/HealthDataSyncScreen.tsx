@@ -111,14 +111,15 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
     });
   },[status?.fiteatsyClientId]);
 
-  const syncNow=useCallback(async()=>{
+  const syncNow=useCallback(async(options:{forceSourceBackfill?:boolean}={})=>{
     if(running.current)return;running.current=true;let reachedTerminalState=false;const currentOperation=++operationId.current;
     const isCurrent=()=>mounted.current&&operationId.current===currentOperation;
     setUiState('syncing');setMessage(`Connecting to ${source}…`);
     try{
       const connection=Platform.OS==='ios'?status?.appleHealth:status?.healthConnect;
       const result=await runHealthSync(Platform.OS==='ios'?'apple-health':'health-connect',wellness,
-        connection?.connectionId?{connectionId:connection.connectionId,provider:Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT',trigger:'MANUAL'}:undefined);
+        connection?.connectionId?{connectionId:connection.connectionId,provider:Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT',trigger:'MANUAL'}:undefined,
+        options);
       if(!isCurrent())return;
       applyLocalObservations(result.observations);addWearableSyncData(result.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setWellness(result.wellness);setSourceDiagnostics(result.diagnostics);
       const localCount=result.observations.filter(item=>!item.deleted).length;const partial=result.rejected>0;
@@ -137,7 +138,10 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
       const inspection=await inspectAppleHealthPermissionState();
       if(!mounted.current||permissionOperationId.current!==currentOperation)return;
       if(__DEV__)console.info('[HealthSync] POST_AUTH_QUERY_STARTED',{source:'APPLE_HEALTH'});
-      await syncNow();
+      // Always re-read the bounded history after the HealthKit sheet closes.
+      // A cursor created while read access was unavailable must not suppress
+      // records that became readable through the new authorisation decision.
+      await syncNow({forceSourceBackfill:true});
       if(!mounted.current||permissionOperationId.current!==currentOperation)return;
       setPermissionRefresh(!inspection.available||inspection.requestStatus==='should_request'?'action_needed':'available');
       setMessage(inspection.available?'Apple Health access status refreshed.':'Apple Health is not available on this device.');

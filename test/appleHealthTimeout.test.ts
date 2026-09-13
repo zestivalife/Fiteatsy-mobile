@@ -6,7 +6,7 @@ jest.mock('../modules/fiteatsy-healthkit', () => ({
   requestHealthKitAuthorization: jest.fn()
 }));
 
-import { withAppleHealthTimeout } from '../src/services/appleHealthService';
+import { settleWithConcurrency, withAppleHealthTimeout } from '../src/services/appleHealthService';
 
 describe('Apple Health native deadline', () => {
   beforeEach(() => jest.useFakeTimers());
@@ -20,5 +20,23 @@ describe('Apple Health native deadline', () => {
 
   test('preserves a native result that resolves before the deadline', async () => {
     await expect(withAppleHealthTimeout(Promise.resolve('ok'), 25, 'native_timeout')).resolves.toBe('ok');
+  });
+
+  test('settles every metric while respecting the native-query concurrency limit', async () => {
+    let active = 0;
+    let maximumActive = 0;
+    const result = await settleWithConcurrency([1, 2, 3, 4, 5], 2, async (value) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await Promise.resolve();
+      active -= 1;
+      if (value === 3) throw new Error('metric_failed');
+      return value * 2;
+    });
+
+    expect(maximumActive).toBe(2);
+    expect(result.map((item) => item.status)).toEqual([
+      'fulfilled', 'fulfilled', 'rejected', 'fulfilled', 'fulfilled'
+    ]);
   });
 });

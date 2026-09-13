@@ -18,7 +18,7 @@ describe('Apple Health sync hang repair', () => {
   });
 
   test('settles metric reads independently so one unresolved native callback cannot block all metrics', () => {
-    expect(apple).toContain('Promise.allSettled');
+    expect(apple).toContain('settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY');
     expect(apple).toContain('METRIC_QUERY_TIMEOUT');
     expect(apple).toContain('METRIC_QUERY_NO_DATA');
     expect(apple).toContain("acceptedSampleCount > 0 ? 'synced' : 'no_recent_data'");

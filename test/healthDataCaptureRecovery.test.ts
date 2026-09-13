@@ -5,9 +5,9 @@ const root = path.resolve(__dirname, '..');
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 
 describe('end-to-end health data capture recovery contracts', () => {
-  test('Apple queries every supported metric independently with bounded all-settled reads', () => {
+  test('Apple queries every supported metric independently with bounded concurrent settled reads', () => {
     const apple = read('src/services/appleHealthService.ts');
-    expect(apple).toContain('Promise.allSettled(APPLE_HEALTH_SCOPES.map');
+    expect(apple).toContain('settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY');
     expect(apple).toContain('APPLE_HEALTH_METRIC_TIMEOUT_MS');
     expect(apple).toContain("result.samples.length ? 'SUCCESS' : 'NO_DATA'");
     expect(apple).toContain("statuses[statusKey] !== 'synced'");
@@ -16,7 +16,9 @@ describe('end-to-end health data capture recovery contracts', () => {
   test('first Apple sync uses bounded backfill and incremental sync uses only valid anchors', () => {
     const apple = read('src/services/appleHealthService.ts');
     expect(apple).toContain('definition?.syncWindowDays');
-    expect(apple).toContain('anchors[metric] ? undefined : start');
+    expect(apple).toContain('options.forceBackfill || !anchors[metric] ? start : undefined');
+    expect(apple).toContain('options.forceBackfill ? undefined : anchors[metric]');
+    expect(apple).toContain('result.samples.length > 0 || result.deletedIds.length > 0');
     expect(apple).not.toContain('new Date(null)');
   });
 
@@ -38,7 +40,7 @@ describe('end-to-end health data capture recovery contracts', () => {
 
   test('local source read precedes every backend operation and checkpoints are device-local', () => {
     const manager = read('src/services/healthSyncManager.ts');
-    const localRead = manager.indexOf('syncConnectedHealthApp(appId, localCursors)');
+    const localRead = manager.indexOf('syncConnectedHealthApp(appId, localCursors, options)');
     const backendRun = manager.indexOf('beginWearableSyncRun', localRead);
     const upload = manager.indexOf("'/v1/health/observations:batch'", localRead);
     expect(localRead).toBeGreaterThan(0);
@@ -72,13 +74,16 @@ describe('end-to-end health data capture recovery contracts', () => {
 
   test('authorization and foreground return immediately execute local query and retain local UI rows', () => {
     const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    const onboarding = read('src/screens/sync/SyncWearableScreen.tsx');
     expect(screen).toContain('AUTH_REQUEST_STARTED');
     expect(screen).toContain('AUTH_REQUEST_COMPLETED');
     expect(screen).toContain('POST_AUTH_QUERY_STARTED');
-    expect(screen).toContain('await syncNow()');
+    expect(screen).toContain('await syncNow({forceSourceBackfill:true})');
     expect(screen).toContain('applyLocalObservations(result.observations)');
     expect(screen).toContain('Metrics available');
     expect(screen).toContain('No visible health data found');
+    expect(onboarding).toContain('forceAppleBackfillOnNextSyncRef.current = Platform.OS === \'ios\'');
+    expect(onboarding).toContain('{ forceSourceBackfill }');
   });
 
   test('QA diagnostics are safe, metric-specific, and development-gated', () => {
