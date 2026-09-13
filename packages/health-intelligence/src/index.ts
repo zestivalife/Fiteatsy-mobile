@@ -1,4 +1,4 @@
-export const HEALTH_INTELLIGENCE_VERSION='HEALTH_INTELLIGENCE_V1' as const;
+export const HEALTH_INTELLIGENCE_VERSION = 'HEALTH_INTELLIGENCE_V1' as const;
 export const HEALTH_INTELLIGENCE_CONFIG={version:HEALTH_INTELLIGENCE_VERSION,clinicalValidation:'PENDING' as const,
   targets:{sleepMinutes:null as number|null,steps:10_000,exerciseMinutes:30},
   weights:{sleep:{duration:.4,quality:.4,consistency:.2},activity:{steps:.4,exercise:.4,balance:.2},nutrition:{protein:.25,hydration:.2,foodQuality:.3,clinical:.25},calm:{hrv:.4,stress:.3,mindfulness:.3},stressRecovery:{hrv:.4,sleep:.3,adaptation:.3},recovery:{sleep:.4,body:.3,activityBalance:.2,lifestyle:.1},cycle:{phase:.4,symptoms:.3,energy:.3},overall:{activity:.15,sleep:.2,nutrition:.2,calm:.15,stressRecovery:.15,cycle:.15}}} as const;

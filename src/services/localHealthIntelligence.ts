@@ -10,7 +10,7 @@ import {
   sleepScore,
   stressRecoveryScore,
   type ScoreResult
-} from '../../backend/src/modules/intelligence/health-intelligence-v1';
+} from '@fiteatsy/health-intelligence';
 import type { HealthObservationDraft } from '../types';
 
 export type CanonicalHealthInputs = {

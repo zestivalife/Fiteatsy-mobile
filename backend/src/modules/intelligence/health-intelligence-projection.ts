@@ -1,6 +1,6 @@
 import type {HealthObservationRecord} from '../health/health-observations.repository.js';
 import {aggregateDaily,baseline} from './health-aggregation-v1.js';
-import {activityScore,calmScore,cycleScore,HEALTH_INTELLIGENCE_CONFIG,mindScore,nutritionScore,overallScore,recoveryScore,sleepScore,stressRecoveryScore} from './health-intelligence-v1.js';
+import {activityScore,calmScore,cycleScore,HEALTH_INTELLIGENCE_CONFIG,mindScore,nutritionScore,overallScore,recoveryScore,sleepScore,stressRecoveryScore} from '@fiteatsy/health-intelligence';
 const pct=(v:number|null,t:number)=>v==null?null:Math.min(100,v/t*100);
 const todayKey=()=>new Date(Date.now()+330*60000).toISOString().slice(0,10);
 export const buildHealthIntelligenceV1=(observations:HealthObservationRecord[])=>{const aggregates=aggregateDaily(observations),today=todayKey(),b=(m:string)=>baseline(aggregates,m,today);const steps=b('steps'),exercise=b('active_minutes'),sleepMinutes=b('sleep_minutes'),hydration=b('hydration_ml'),stress=b('stress_score'),mindfulness=b('mindfulness_minutes'),sdnn=b('hrv_sdnn_ms'),rmssd=b('hrv_rmssd_ms');const freshness=aggregates.some(r=>r.date===today&&r.freshness==='CURRENT')?'CURRENT' as const:'STALE' as const;
