@@ -1361,24 +1361,20 @@ export const TrackerScreen = () => {
   const activeMinutesValue = wellness.movementMinutes > 0 ? wellness.movementMinutes : workoutMinutesValue;
   const recommendationText = recoveryIntel.highestImpactActions[0] ?? recoveryIntel.insufficientReason ?? 'Sync health data to unlock personalized guidance.';
   const canonicalScoreRows: Array<[string, HealthIntelligenceV1['scores']['activity']]> = canonicalIntelligence ? [
-    ['Health Intelligence Score', canonicalIntelligence.scores.healthIntelligence],
+    ['Health Intelligence', canonicalIntelligence.scores.healthIntelligence],
     ['Recovery', canonicalIntelligence.scores.recovery],
-    ['Active Performance', canonicalIntelligence.scores.activity],
+    ['Activity', canonicalIntelligence.scores.activity],
     ['Sleep', canonicalIntelligence.scores.sleep],
     ['Calm', canonicalIntelligence.scores.calm],
     ['Stress Recovery', canonicalIntelligence.scores.stressRecovery],
     ['Nourishment', canonicalIntelligence.scores.nutrition]
   ] : [];
   if (canonicalIntelligence?.scores.cycle.status !== 'NOT_APPLICABLE' && canonicalIntelligence) {
-    canonicalScoreRows.push(['Cycle', canonicalIntelligence.scores.cycle]);
+    canonicalScoreRows.push(['Cycle Wellness', canonicalIntelligence.scores.cycle]);
   }
-  const masterScoreRows: Array<[string, number | null, string]> = [
-    ['Energy Balance', masterScoreSummary?.energyBalanceScore ?? null, 'Sleep quality, meal timing, hydration and daily energy response'],
-    ['Active Performance', masterScoreSummary?.activePerformanceScore ?? null, 'Physical ease, movement, exercise and fatigue'],
-    ['Nourishment', masterScoreSummary?.nourishmentScore ?? null, 'Protein adequacy, food quality, meal regularity and hydration'],
-    ['Recovery', masterScoreSummary?.recoveryScore ?? null, 'Sleep, body recovery, activity balance and lifestyle balance'],
-    ['Physical Wellness Index', masterScoreSummary?.physicalWellnessIndex ?? null, 'Body composition, stress and lifestyle context'],
-    ['Body Support', masterScoreSummary?.bodySupportScore ?? null, 'Validated body-support and biomarker inputs']
+  const supportingScoreRows: Array<[string, number | null, string]> = [
+    ['Energy Balance', masterScoreSummary?.energyBalanceScore ?? null, 'Secondary daily energy insight from approved inputs'],
+    ['Body & Biomarker Health', masterScoreSummary?.bodySupportScore ?? null, 'Secondary validated body and biomarker insight']
   ];
 
   const healthMetrics: MetricConfig[] = [
@@ -1653,25 +1649,17 @@ export const TrackerScreen = () => {
       <RecoveryParticleMetric value={masterScoreSummary?.recoveryScore ?? null} label={statusLabel(masterScoreSummary?.recoveryScore)} />
       <Card style={styles.healthPanel}>
         <Text style={styles.healthPanelTitle}>Health Intelligence Scores</Text>
-        {masterScoreRows.map(([label, value, basis]) => (
-          <View key={label} style={styles.healthMetricLabelWrap}>
-            <Text style={styles.healthMetricLabel}>{label}</Text>
-            <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{scoreLabel(value)}</Text><Pressable accessibilityRole="button" accessibilityLabel={`How ${label} is calculated`} hitSlop={10} onPress={() => Alert.alert(label, basis)}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
-          </View>
-        ))}
-        <View style={styles.healthMetricLabelWrap}>
-          <Text style={styles.healthMetricLabel}>Physical Ease</Text>
-          <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>Methodology pending</Text><Pressable accessibilityRole="button" accessibilityLabel="How Physical Ease is calculated" hitSlop={10} onPress={() => Alert.alert('Physical Ease', 'Requires pain, mobility, freshness, sedentary-load and recovery-behaviour inputs.')}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
-        </View>
-        <View style={styles.healthMetricLabelWrap}>
-          <Text style={styles.healthMetricLabel}>Stress Level</Text>
-          <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{pss10History[0] ? `${pss10History[0].rawScore}/40` : 'No data'}</Text><Pressable accessibilityRole="button" accessibilityLabel="How Stress Level is calculated" hitSlop={10} onPress={() => Alert.alert('Stress Level', 'Calculated from the perceived stress assessment.')}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
-        </View>
-        <Text style={styles.healthPanelTitle}>Supporting Intelligence</Text>
         {canonicalScoreRows.map(([label, result]) => (
           <View key={label} style={styles.healthMetricLabelWrap}>
             <Text style={styles.healthMetricLabel}>{label}</Text>
             <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{scoreLabel(result.score)}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Details for ${label}`} hitSlop={10} onPress={() => Alert.alert(label, `${result.status.replaceAll('_', ' ')} · ${result.confidence} confidence · ${result.freshness.toLowerCase()}`)}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
+          </View>
+        ))}
+        <Text style={styles.healthPanelTitle}>Supporting Intelligence</Text>
+        {supportingScoreRows.map(([label, value, basis]) => (
+          <View key={label} style={styles.healthMetricLabelWrap}>
+            <Text style={styles.healthMetricLabel}>{label}</Text>
+            <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{scoreLabel(value)}</Text><Pressable accessibilityRole="button" accessibilityLabel={`How ${label} is calculated`} hitSlop={10} onPress={() => Alert.alert(label, basis)}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
           </View>
         ))}
         {canonicalIntelligence?.performanceReport.keyTrends.slice(0, 2).map((trend) => <Text key={trend} style={styles.healthMuted}>{trend}</Text>)}
@@ -1694,7 +1682,7 @@ export const TrackerScreen = () => {
           <View style={styles.activityHeader}>
             <View>
               <Text style={styles.healthPanelTitle}>Today's Movement</Text>
-              <Text style={styles.healthMuted}>Active Performance: {scoreLabel(activityScoreValue)}</Text>
+              <Text style={styles.healthMuted}>Activity: {scoreLabel(activityScoreValue)}</Text>
             </View>
             <ProgressRing value={activityScoreValue} label="Activity" />
           </View>
@@ -1717,7 +1705,6 @@ export const TrackerScreen = () => {
       <Card style={styles.healthPanel}>
         <Text style={styles.healthPanelTitle}>Cardiovascular Stability</Text>
         <Text style={styles.healthMuted}>Heart performance is shown from canonical measurements; Cardio Efficiency methodology is pending.</Text>
-        {renderMetricRow('Recovery Signal', scoreLabel(driverMap['HRV / Recovery balance']?.score ?? null), '', driverMap['HRV / Recovery balance']?.score ?? null, '#FF8188')}
         {renderMetricRow('Recovery Signal', scoreLabel(recoveryIntel.recoveryScore), '', recoveryIntel.recoveryScore, '#6FD3FF')}
       </Card>
       <Card style={[styles.recommendationCard, styles.heartInsightCard]}>

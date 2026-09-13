@@ -66,14 +66,14 @@ type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Journey'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
-type MetricKey = 'recovery' | 'bodySupport' | 'activePerformance' | 'nourishment' | 'physicalWellness' | 'energyBalance';
+type MetricKey = 'healthIntelligence' | 'recovery' | 'sleep' | 'activity' | 'nourishment' | 'calm' | 'cycleWellness';
 type SvgAsset = React.FC<SvgProps>;
 type RecoveryMetric = {
-  key: Exclude<MetricKey, 'recovery'>;
+  key: Exclude<MetricKey, 'healthIntelligence'>;
   label: string;
   score: number | null;
   color: string;
-  position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
+  position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight' | 'bottomCenter';
   DefaultIcon: SvgAsset | ImageSourcePropType;
   ActiveIcon: SvgAsset | ImageSourcePropType;
   defaultIconType?: 'svg' | 'image';
@@ -103,16 +103,17 @@ const stateFromScore = (score: number | null) => {
 
 const arcGradientForMetric = (key: MetricKey) => {
   switch (key) {
-    case 'activePerformance':
+    case 'activity':
       return ['#FF8A1E', '#A74200'];
     case 'nourishment':
       return ['#96FF45', '#2F9400'];
-    case 'physicalWellness':
+    case 'calm':
       return ['#9B70FF', '#763CEF'];
-    case 'energyBalance':
+    case 'sleep':
       return ['#2E92FF', '#0643B5'];
-    case 'bodySupport':
+    case 'cycleWellness':
     case 'recovery':
+    case 'healthIntelligence':
     default:
       return ['#F4052D', '#8C071E'];
   }
@@ -130,7 +131,7 @@ export const HomeScreen = () => {
     authSession,
     getMedicationTimelineForDate
   } = useAppContext();
-  const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
+  const [selectedMetric, setSelectedMetric] = useState<MetricKey>('healthIntelligence');
   const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
   const [healthSummary, setHealthSummary] = useState<HealthScoreSummary | null>(null);
   const [recoveryTrend, setRecoveryTrend] = useState<number[]>([]);
@@ -252,21 +253,20 @@ export const HomeScreen = () => {
   // The Star Orb is projected exclusively from the canonical intelligence
   // summary. Daily nutrition is a separate product surface, not a fallback
   // score authority.
-  const nourishmentScore = normalizeScore(healthSummary?.nourishmentScore ?? null);
   const metrics: RecoveryMetric[] = [
     {
-      key: 'bodySupport',
-      label: 'Body Support',
-      score: normalizeScore(healthSummary?.bodySupportScore),
+      key: 'recovery',
+      label: 'Recovery',
+      score: normalizeScore(healthSummary?.recoveryScore),
       color: '#FF1717',
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
       ActiveIcon: CalmActiveIcon
     },
     {
-      key: 'activePerformance',
-      label: 'Active Performance',
-      score: normalizeScore(healthSummary?.activePerformanceScore),
+      key: 'activity',
+      label: 'Activity',
+      score: normalizeScore(healthSummary?.activityScore),
       color: '#F27A1A',
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
@@ -275,39 +275,48 @@ export const HomeScreen = () => {
     {
       key: 'nourishment',
       label: 'Nourishment',
-      score: nourishmentScore,
+      score: normalizeScore(healthSummary?.nutritionScore),
       color: '#77FF22',
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
       ActiveIcon: NutritionActiveIcon
     },
     {
-      key: 'physicalWellness',
-      label: 'Physical Wellness',
-      score: normalizeScore(healthSummary?.physicalWellnessIndex),
+      key: 'calm',
+      label: 'Calm',
+      score: normalizeScore(healthSummary?.calmScore),
       color: '#763CEF',
       position: 'bottomLeft',
       DefaultIcon: MindDefaultIcon,
       ActiveIcon: MindActiveIcon
     },
     {
-      key: 'energyBalance',
-      label: 'Energy Balance',
-      score: normalizeScore(healthSummary?.energyBalanceScore),
+      key: 'sleep',
+      label: 'Sleep',
+      score: normalizeScore(healthSummary?.sleepScore),
       color: '#0F80FF',
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
       ActiveIcon: SleepActiveIcon
+    },
+    {
+      key: 'cycleWellness',
+      label: 'Cycle Wellness',
+      score: normalizeScore(healthSummary?.cycleScore),
+      color: '#FF4FA3',
+      position: 'bottomCenter',
+      DefaultIcon: MindDefaultIcon,
+      ActiveIcon: MindActiveIcon
     }
   ];
   const displayMetrics = metrics;
   const trendValues = recoveryTrend;
   const hasTrendData = trendValues.length > 0;
-  const recoveryCoreScore = normalizeScore(healthSummary?.recoveryScore);
+  const healthIntelligenceScore = normalizeScore(healthSummary?.healthIntelligenceScore);
 
-  const selected = selectedMetric === 'recovery'
-    ? { label: 'Recovery', score: recoveryCoreScore, color: '#D5062D' }
-    : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery', score: recoveryCoreScore, color: '#D5062D' };
+  const selected = selectedMetric === 'healthIntelligence'
+    ? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' }
+    : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' };
   const selectedState = stateFromScore(selected.score);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
 
@@ -521,10 +530,10 @@ const RecoveryPanel = ({
         ))}
 
         <Pressable
-          onPress={() => onSelectMetric('recovery')}
+          onPress={() => onSelectMetric('healthIntelligence')}
           style={styles.coreCenter}
           accessibilityRole="button"
-          accessibilityLabel="View today's Recovery score"
+          accessibilityLabel="View today's Health Intelligence score"
         >
           <Text style={styles.coreScore}>{selectedScore == null ? '--/100' : `${selectedScore}/100`}</Text>
           <Text style={styles.coreLabel}>{selectedLabel}</Text>
@@ -556,8 +565,8 @@ const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; s
           resizeMode="contain"
           style={[
             styles.nodeImage,
-            metric.key === 'bodySupport' && selected ? styles.nodeImageCalmActive : null,
-            metric.key === 'bodySupport' && !selected ? styles.nodeImageCalmDefault : null
+            metric.key === 'calm' && selected ? styles.nodeImageCalmActive : null,
+            metric.key === 'calm' && !selected ? styles.nodeImageCalmDefault : null
           ]}
         />
       ) : (
@@ -672,6 +681,10 @@ const nodePositions = StyleSheet.create({
   bottomRight: {
     right: 52,
     bottom: 17
+  },
+  bottomCenter: {
+    left: 131,
+    bottom: -42
   }
 });
 
