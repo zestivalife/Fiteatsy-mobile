@@ -5,7 +5,7 @@ import { getHealthPlatformAdapter, type HealthAppId } from './healthPlatformAdap
 import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceService';
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
-import { acknowledgeLocalObservations, persistLocalSyncBatch, readLocalSyncCursors,
+import { acknowledgeLocalObservations, persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalSyncCursors,
   readPendingLocalObservations } from './healthSyncLocalStore';
 
 export type HealthSyncConnectionState =
@@ -179,8 +179,8 @@ export const getHealthSyncActivity = (limit = 10) =>
 export const runHealthSync = async (
   appId: HealthAppId,
   previousWellness: WellnessSnapshot,
-  governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY' },
-  options: { forceSourceBackfill?: boolean } = {}
+  governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY'; localScope?: string },
+  options: { forceSourceBackfill?: boolean; localScope?: string } = {}
 ): Promise<HealthSyncResult> => {
   let run: Awaited<ReturnType<typeof beginWearableSyncRun>> | null = null;
   let payload: WearableSyncPayload | null = null;
@@ -189,7 +189,7 @@ export const runHealthSync = async (
   try {
     // Local source access is the first I/O boundary. A backend checkpoint lookup
     // must never delay or prevent HealthKit / Health Connect from returning data.
-    const localScope = governed?.connectionId ?? `ungoverned:${appId}`;
+    const localScope = options.localScope ?? governed?.localScope ?? governed?.connectionId ?? `ungoverned:${appId}`;
     const localCursors = await readLocalSyncCursors(localScope);
     const adapter = getHealthPlatformAdapter();
     if (adapter.appId !== appId) throw new Error('health_provider_not_available');
@@ -202,6 +202,7 @@ export const runHealthSync = async (
     // Cursor advancement and normalized/tombstone persistence are one durable
     // local transaction and always precede every backend operation.
     await persistLocalSyncBatch(localScope, observations, anchors);
+    await persistLocalHealthPresentationObservations(localScope, payload.presentationObservations ?? []);
     // Sync-run telemetry must not become a prerequisite for ingestion. The
     // observation endpoint independently enforces authenticated ownership and
     // active provider consent.

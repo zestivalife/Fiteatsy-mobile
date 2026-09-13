@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -1656,24 +1656,22 @@ export const TrackerScreen = () => {
         {masterScoreRows.map(([label, value, basis]) => (
           <View key={label} style={styles.healthMetricLabelWrap}>
             <Text style={styles.healthMetricLabel}>{label}</Text>
-            <Text style={styles.healthMuted}>{scoreLabel(value)} · {basis}</Text>
+            <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{scoreLabel(value)}</Text><Pressable accessibilityRole="button" accessibilityLabel={`How ${label} is calculated`} hitSlop={10} onPress={() => Alert.alert(label, basis)}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
           </View>
         ))}
         <View style={styles.healthMetricLabelWrap}>
           <Text style={styles.healthMetricLabel}>Physical Ease</Text>
-          <Text style={styles.healthMuted}>Methodology pending · Requires pain, mobility, freshness, sedentary-load and recovery-behaviour inputs</Text>
+          <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>Methodology pending</Text><Pressable accessibilityRole="button" accessibilityLabel="How Physical Ease is calculated" hitSlop={10} onPress={() => Alert.alert('Physical Ease', 'Requires pain, mobility, freshness, sedentary-load and recovery-behaviour inputs.')}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
         </View>
         <View style={styles.healthMetricLabelWrap}>
           <Text style={styles.healthMetricLabel}>Stress Level</Text>
-          <Text style={styles.healthMuted}>{pss10History[0] ? `${pss10History[0].rawScore}/40 · Perceived stress assessment` : 'Complete the perceived stress assessment to calculate'}</Text>
+          <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{pss10History[0] ? `${pss10History[0].rawScore}/40` : 'No data'}</Text><Pressable accessibilityRole="button" accessibilityLabel="How Stress Level is calculated" hitSlop={10} onPress={() => Alert.alert('Stress Level', 'Calculated from the perceived stress assessment.')}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
         </View>
         <Text style={styles.healthPanelTitle}>Supporting Intelligence</Text>
         {canonicalScoreRows.map(([label, result]) => (
           <View key={label} style={styles.healthMetricLabelWrap}>
             <Text style={styles.healthMetricLabel}>{label}</Text>
-            <Text style={styles.healthMuted}>
-              {scoreLabel(result.score)} · {result.status.replaceAll('_', ' ')} · {result.confidence} confidence · {result.freshness.toLowerCase()}
-            </Text>
+            <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{scoreLabel(result.score)}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Details for ${label}`} hitSlop={10} onPress={() => Alert.alert(label, `${result.status.replaceAll('_', ' ')} · ${result.confidence} confidence · ${result.freshness.toLowerCase()}`)}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
           </View>
         ))}
         {canonicalIntelligence?.performanceReport.keyTrends.slice(0, 2).map((trend) => <Text key={trend} style={styles.healthMuted}>{trend}</Text>)}
@@ -2571,6 +2569,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: 'Exo_600SemiBold',
     color: TRACKER_MUTED
+  },
+  healthMetricCompactValue: {
+    maxWidth: '58%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 7
   },
   healthMetricValue: {
     ...typography.bodyStrong,

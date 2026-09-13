@@ -7,8 +7,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   }
 }));
 
-import { acknowledgeLocalObservations, persistLocalSyncBatch, readLocalSyncCursors,
-  readPendingLocalObservations } from '../src/services/healthSyncLocalStore';
+import { acknowledgeLocalObservations, countPendingLocalObservations, markLocalHealthProviderConnected,
+  persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalHealthObservations,
+  readLocalHealthPresentationObservations, readLocalHealthProviderConnected,
+  readLocalSyncCursors, readPendingLocalObservations } from '../src/services/healthSyncLocalStore';
 
 const observation = (value: number, deleted = false, recordId = 'record-1') => ({
   metricType: 'steps', value, unit: deleted ? 'deleted' : 'count',
@@ -53,5 +55,29 @@ describe('durable local health sync store', () => {
     const pending = await readPendingLocalObservations('connection-1');
     expect(pending.map((item) => item.observation.sourceRecordId).sort()).toEqual(['record-1', 'record-2']);
     expect(await readLocalSyncCursors('connection-1')).toEqual({ steps: 'anchor-2' });
+  });
+
+  it('hydrates account-scoped cached observations and pending upload state after restart', async () => {
+    const scope = 'account:user-1:apple-health';
+    await persistLocalSyncBatch(scope, [observation(100)], { steps: 'anchor-1' });
+    expect(await readLocalHealthObservations(scope)).toEqual([observation(100)]);
+    expect(await countPendingLocalObservations(scope)).toBe(1);
+    expect(await readLocalHealthObservations('account:user-2:apple-health')).toEqual([]);
+  });
+
+  it('persists provider connection independently from onboarding metadata', async () => {
+    const scope = 'account:user-1:apple-health';
+    expect(await readLocalHealthProviderConnected(scope)).toBe(false);
+    await markLocalHealthProviderConnected(scope);
+    expect(await readLocalHealthProviderConnected(scope)).toBe(true);
+    expect(await readLocalHealthProviderConnected('account:user-2:apple-health')).toBe(false);
+  });
+
+  it('persists presentation totals separately from uploadable source observations', async () => {
+    const scope = 'account:user-1:apple-health';
+    const total = { ...observation(750), sourceRecordId: 'daily-total', syncKey: 'steps:2026-09-13:total' };
+    await persistLocalHealthPresentationObservations(scope, [total]);
+    expect(await readLocalHealthPresentationObservations(scope)).toEqual([total]);
+    expect(await readPendingLocalObservations(scope)).toEqual([]);
   });
 });

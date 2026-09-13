@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { subscribeToHealthKitChanges } from '../../modules/fiteatsy-healthkit';
 import { useAppContext } from '../state/AppContext';
 import type { HealthObservationDraft } from '../types';
@@ -16,9 +17,13 @@ import {
   type HealthSyncStatus,
   HealthSyncPostUploadRefreshError,
   HealthSyncUploadPendingError,
-  runHealthSync
+  runHealthSync,
+  wellnessFromHealthScores
 } from './healthSyncManager';
-import { getOrCreateHealthInstallationId, migrateLegacyHealthInstallationId } from './healthSyncLocalStore';
+import type { HealthScoreSummary } from './healthIntelligenceService';
+import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLocalHealthProviderConnected,
+  migrateLegacyHealthInstallationId, readLocalHealthObservations, readLocalHealthPresentationObservations,
+  readLocalHealthProviderConnected } from './healthSyncLocalStore';
 import { buildPresentedHealthObservations } from './healthMetricPresentation';
 import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
@@ -48,11 +53,12 @@ export const countAvailableHealthMetrics = (metrics: CanonicalHealthMetricState[
   metrics.filter((metric) => metric.queryState === 'DATA_AVAILABLE').length;
 
 const useCreateCanonicalHealthSyncCoordinator = () => {
-  const { wellness, setWellness, setSelectedDeviceId } = useAppContext();
+  const { authSession, bootstrapped, wellness, setWellness, setSelectedDeviceId } = useAppContext();
   const adapter = useMemo(() => getHealthPlatformAdapter(), []);
   const sourceName = adapter.platform === 'APPLE_HEALTH' ? 'Apple Health' : 'Health Connect';
   const mounted = useRef(true);
   const inFlight = useRef(false);
+  const refreshQueued = useRef(false);
   const awaitingPermissionReturn = useRef(false);
   const foregroundRefreshAt = useRef(0);
   const forceBackfill = useRef(false);
@@ -69,6 +75,12 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<HealthSyncResult['diagnostics']>([]);
+  const [localHydrated, setLocalHydrated] = useState(false);
+  const [localProviderConnected, setLocalProviderConnected] = useState(false);
+  const [pendingUploadCount, setPendingUploadCount] = useState(0);
+  const localScope = useMemo(() => authSession
+    ? `account:${authSession.accountId}:${adapter.appId}`
+    : null, [adapter.appId, authSession]);
 
   const mergeLocalObservations = useCallback((items: HealthObservationDraft[]) => {
     const deletedIds = new Set(items.filter((item) => item.deleted).map((item) => item.sourceRecordId).filter(Boolean));
@@ -104,7 +116,11 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   }, [adapter]);
 
   const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean } = {}) => {
-    if (inFlight.current) return;
+    if (!authSession || !localScope) return;
+    if (inFlight.current) {
+      refreshQueued.current = true;
+      return;
+    }
     automaticInitialSyncStarted.current = true;
     inFlight.current = true;
     setUploadState('UPLOADING');
@@ -116,16 +132,20 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       const result = await runHealthSync(adapter.appId, wellness, connectionId ? {
         connectionId,
         provider: adapter.platform,
-        trigger: 'MANUAL'
-      } : undefined, options);
+        trigger: 'MANUAL',
+        localScope
+      } : undefined, { ...options, localScope });
       if (!mounted.current) return;
       mergeLocalObservations(result.observations);
       setPresentationObservations((result.payload.presentationObservations ?? [])
         .map((item,index)=>toDto(item,status?.fiteatsyClientId ?? 'local',index)));
       setSelectedDeviceId(adapter.appId);
       setWellness(result.wellness);
+      setPendingUploadCount(await countPendingLocalObservations(localScope));
       setDiagnostics(result.diagnostics);
       setProviderState('CONNECTED');
+      setLocalProviderConnected(true);
+      await markLocalHealthProviderConnected(localScope);
       setUploadState(result.rejected > 0 ? 'ERROR' : 'SYNCED');
       const nextQueries: Record<string, HealthMetricQueryState> = {};
       const nextErrors: Record<string, string | null> = {};
@@ -152,8 +172,12 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setPresentationObservations((error.payload.presentationObservations ?? [])
           .map((item,index)=>toDto(item,status?.fiteatsyClientId ?? 'local',index)));
         setSelectedDeviceId(adapter.appId);
+        setWellness((current) => wellnessFromHealthScores(current, error.payload, {} as HealthScoreSummary));
+        setPendingUploadCount(await countPendingLocalObservations(localScope));
         setDiagnostics(error.diagnostics);
         setProviderState('CONNECTED');
+        setLocalProviderConnected(true);
+        await markLocalHealthProviderConnected(localScope);
         setUploadState(error instanceof HealthSyncPostUploadRefreshError ? 'SYNCED' : 'PENDING');
         const locallyAvailableTypes = new Set(error.observations
           .filter((item) => !item.deleted)
@@ -175,8 +199,12 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       }
     } finally {
       inFlight.current = false;
+      if (refreshQueued.current) {
+        refreshQueued.current = false;
+        setTimeout(() => void syncLocalMetrics(), 0);
+      }
     }
-  }, [adapter, mergeLocalObservations, refreshRemoteSnapshot, setSelectedDeviceId, setWellness, sourceName, status, wellness]);
+  }, [adapter, authSession, localScope, mergeLocalObservations, refreshRemoteSnapshot, setSelectedDeviceId, setWellness, sourceName, status, wellness]);
 
   const requestAccess = useCallback(async () => {
     if (inFlight.current) return;
@@ -187,6 +215,10 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       // Native permission must remain available without a network connection.
       access = await adapter.requestAccess();
       setProviderState('CONNECTED');
+      if (localScope) {
+        setLocalProviderConnected(true);
+        await markLocalHealthProviderConnected(localScope);
+      }
       forceBackfill.current = true;
     } catch {
       setProviderState('ACTION_REQUIRED');
@@ -217,7 +249,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     inFlight.current = false;
     await syncLocalMetrics({ forceSourceBackfill: true });
     forceBackfill.current = false;
-  }, [adapter, sourceName, syncLocalMetrics]);
+  }, [adapter, localScope, sourceName, syncLocalMetrics]);
 
   const markPermissionReviewStarted = useCallback(() => {
     awaitingPermissionReturn.current = true;
@@ -231,10 +263,52 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   }, [refreshRemoteSnapshot]);
 
   useEffect(() => {
-    if (providerState !== 'CONNECTED' || automaticInitialSyncStarted.current) return;
+    automaticInitialSyncStarted.current = false;
+    connectionIdOverride.current = null;
+    setObservations([]);
+    setPresentationObservations([]);
+    setQueryStates({});
+    setErrors({});
+    setPendingUploadCount(0);
+    setLocalProviderConnected(false);
+    setLocalHydrated(false);
+    if (!bootstrapped || !localScope) return;
+    let active = true;
+    Promise.all([readLocalHealthObservations(localScope), readLocalHealthPresentationObservations(localScope),
+      countPendingLocalObservations(localScope),
+      readLocalHealthProviderConnected(localScope)])
+      .then(([cached, cachedPresentation, pending, connected]) => {
+        if (!active || !mounted.current) return;
+        mergeLocalObservations(cached);
+        setPresentationObservations(cachedPresentation.map((item, index) =>
+          toDto(item, authSession?.client.fiteatsyClientId ?? 'local', index)));
+        setPendingUploadCount(pending);
+        setLocalProviderConnected(connected || cached.length > 0);
+        if (connected || cached.length > 0) setProviderState('CONNECTED');
+        setLocalHydrated(true);
+      })
+      .catch(() => { if (active && mounted.current) setLocalHydrated(true); });
+    return () => { active = false; };
+  }, [authSession?.client.fiteatsyClientId, bootstrapped, localScope, mergeLocalObservations]);
+
+  useEffect(() => {
+    if (!authSession || !localHydrated || automaticInitialSyncStarted.current) return;
+    const previouslyConnected = providerState === 'CONNECTED' || localProviderConnected;
+    if (!previouslyConnected) return;
     automaticInitialSyncStarted.current = true;
     void syncLocalMetrics();
-  }, [providerState, syncLocalMetrics]);
+  }, [authSession, localHydrated, localProviderConnected, providerState, syncLocalMetrics]);
+
+  useEffect(() => {
+    if (!authSession || !localHydrated) return;
+    let wasReachable = false;
+    const unsubscribe = NetInfo.addEventListener((network) => {
+      const reachable = network.isConnected === true && network.isInternetReachable !== false;
+      if (reachable && !wasReachable && pendingUploadCount > 0) void syncLocalMetrics();
+      wasReachable = reachable;
+    });
+    return unsubscribe;
+  }, [authSession, localHydrated, pendingUploadCount, syncLocalMetrics]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -296,6 +370,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     activity,
     message,
     diagnostics,
+    localHydrated,
+    pendingUploadCount,
     syncLocalMetrics,
     requestAccess,
     markPermissionReviewStarted

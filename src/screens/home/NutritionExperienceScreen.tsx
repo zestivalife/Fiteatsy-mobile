@@ -1,4 +1,5 @@
 import React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SegmentedTabs } from '../../components/SegmentedTabs';
@@ -42,7 +43,7 @@ type PendingRecommendationEvent = {
 };
 
 export const NutritionExperienceScreen = () => {
-  useAppContext();
+  const { authSession } = useAppContext();
   const [data, setData] = React.useState<NutritionExperience | null>(null);
   const [pattern, setPattern] = React.useState<Awaited<ReturnType<typeof getNutritionPattern>> | null>(null);
   const [tab, setTab] = React.useState<'today' | 'pattern'>('today');
@@ -65,17 +66,28 @@ export const NutritionExperienceScreen = () => {
   const [showWater, setShowWater] = React.useState(false);
   const [waterAmount, setWaterAmount] = React.useState(.25);
   const [waterError, setWaterError] = React.useState<string | null>(null);
+  const cacheKey = React.useMemo(() => authSession
+    ? `@fiteatsy/nutrition-experience-v1:${authSession.accountId}:${selectedDate}`
+    : null, [authSession, selectedDate]);
   const refresh = React.useCallback(async () => {
     setError(null);
     setLoadState('LOADING');
+    if (cacheKey) {
+      const cached = await AsyncStorage.getItem(cacheKey).catch(() => null);
+      if (cached) {
+        try { setData(JSON.parse(cached) as NutritionExperience); } catch { /* Ignore malformed cache. */ }
+      }
+    }
     try {
-      setData(await getNutritionExperience(selectedDate));
+      const next = await getNutritionExperience(selectedDate);
+      setData(next);
+      if (cacheKey) await AsyncStorage.setItem(cacheKey, JSON.stringify(next));
       setLoadState('READY');
     } catch (e) {
       setLoadState(classifyNutritionLoadError(e));
       setError(e instanceof Error ? e.message : "Nutrition couldn't be loaded. Please try again.");
     }
-  }, [selectedDate]);
+  }, [cacheKey, selectedDate]);
   useFocusEffect(React.useCallback(() => {
     const today = nutritionDate();
     if (viewingToday.current && selectedDate !== today) setSelectedDate(today);
@@ -181,6 +193,7 @@ export const NutritionExperienceScreen = () => {
   };
 
   return <Screen scroll contentStyle={styles.screen}>
+    {error && data ? <View accessibilityLiveRegion="polite" style={styles.cachedBanner}><Ionicons name="cloud-offline-outline" size={18} color={C.yellow}/><Text style={[styles.muted, styles.flex]}>Showing saved Nutrition data. We’ll refresh it when the connection returns.</Text><Pressable accessibilityRole="button" onPress={() => void refresh()}><Text style={styles.blue}>Retry</Text></Pressable></View> : null}
     <View style={styles.topRow}><View style={styles.tabs}><SegmentedTabs tabs={[{ key: 'today', label: "Today's Plan" }, { key: 'pattern', label: 'My Pattern' }]} value={tab} onChange={(next) => { setTab(next); if (next === 'pattern' && !pattern) void getNutritionPattern(selectedDate).then(setPattern); }} /></View><Pressable accessibilityRole="button" accessibilityLabel="Select Nutrition date" onPress={() => { setDraftDate(new Date(`${selectedDate}T12:00:00`)); setShowCalendar(true); }} style={styles.calendar}><Ionicons name="calendar-outline" size={20} color={C.text} /></Pressable></View>
     <Text style={styles.date}>{selectedLabel}</Text>
     <Modal visible={showCalendar} transparent animationType="slide" onRequestClose={() => setShowCalendar(false)}><Pressable style={styles.backdrop} onPress={() => setShowCalendar(false)}><Pressable style={styles.pickerSheet} onPress={() => undefined}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Pressable onPress={() => setShowCalendar(false)}><Text style={styles.sheetCancel}>Cancel</Text></Pressable><Text style={styles.sheetTitle}>Select date</Text><Pressable onPress={() => { const nextDate = isoDay(draftDate); viewingToday.current = nextDate === nutritionDate(); setSelectedDate(nextDate); setPattern(null); setShowCalendar(false); }}><Text style={styles.sheetDone}>Done</Text></Pressable></View><DateTimePicker value={draftDate} mode="date" display="inline" maximumDate={new Date()} onChange={onDateChange} themeVariant="dark" /></Pressable></Pressable></Modal>
@@ -312,7 +325,7 @@ const PatternCard = ({ title, items, color }: { title: string; items: string[]; 
 const Metric = ({ label, value }: { label: string; value: string }) => <View style={[styles.card, styles.patternMetric]}><Text style={styles.muted}>{label}</Text><Text style={styles.patternValue}>{value}</Text></View>;
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: C.bg, gap: spacing.md, paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: 176 }, center: { backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }, flex: { flex: 1 }, title: { ...typography.title, color: C.text }, date: { ...typography.caption, color: C.muted, marginTop: -8 },
+  screen: { backgroundColor: C.bg, gap: spacing.md, paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: 176 }, center: { backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }, flex: { flex: 1 }, title: { ...typography.title, color: C.text }, date: { ...typography.caption, color: C.muted, marginTop: -8 }, cachedBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: '#6B5518', backgroundColor: '#201B0D', padding: spacing.sm },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs }, tabs: { flex: 1, flexDirection: 'row', borderRadius: radius.pill, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, padding: 4 }, tab: { flex: 1, borderRadius: radius.pill, paddingVertical: 10, alignItems: 'center' }, tabActive: { backgroundColor: C.raised }, tabText: { ...typography.bodyStrong, color: C.muted, fontSize: 14, fontFamily: 'Exo_700Bold' }, calendar: { width: 44, height: 44, borderRadius: radius.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }, body: { ...typography.body, color: C.text }, muted: { ...typography.caption, color: C.muted }, blue: { color: C.blue }, disabled: { opacity: .5 },
   consultant: { flexDirection: 'row', gap: spacing.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: '#20516F', backgroundColor: '#101722', padding: spacing.sm }, info: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: '#10293A', alignItems: 'center', justifyContent: 'center' }, consultantLabel: { ...typography.caption, color: C.blue, fontSize: 12, lineHeight: 16, fontFamily: 'Exo_600SemiBold', letterSpacing: .8 }, consultantText: { ...typography.caption, color: '#B6DEF3', fontSize: 12, lineHeight: 18, marginTop: 3 }, planStrip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs }, pill: { borderRadius: radius.pill, backgroundColor: '#0D1D16', borderWidth: 1, borderColor: '#205936', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs }, pillText: { ...typography.caption, color: C.green, fontFamily: 'Exo_500Medium' },
   card: { borderRadius: radius.lg, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, padding: spacing.md }, label: { ...typography.caption, color: C.muted, fontFamily: 'Exo_600SemiBold', letterSpacing: 1 }, between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.xs }, summary: { gap: spacing.md }, summaryBody: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }, ring: { width: 132, height: 132, alignItems: 'center', justifyContent: 'center', transform: [{ scale: .88 }] }, ringText: { position: 'absolute', alignItems: 'center' }, kcal: { ...typography.metric, color: C.text }, remaining: { ...typography.caption, color: C.green, fontFamily: 'Exo_500Medium', marginTop: spacing.xs }, macros: { flex: 1, gap: spacing.sm }, macro: { gap: spacing.xs }, macroLabel: { ...typography.caption, color: C.muted, fontSize: 11, lineHeight: 14 }, macroValue: { ...typography.caption, fontFamily: 'Exo_500Medium' }, track: { height: 7, borderRadius: radius.pill, backgroundColor: C.line, overflow: 'hidden' }, fill: { height: 7, borderRadius: radius.pill },

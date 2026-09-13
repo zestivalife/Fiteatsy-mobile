@@ -9,8 +9,9 @@ const identity = (item: HealthObservationDraft) => item.syncKey
   ?? `${item.sourceProvider}:${item.metricType}:${item.sourceRecordId ?? item.measuredAtISO}`;
 
 type StoredRecord = { observation: HealthObservationDraft; uploaded: boolean; updatedAtISO: string };
-type LocalSyncState = { records: Record<string, StoredRecord>; cursors: Record<string, string> };
-const emptyState = (): LocalSyncState => ({ records: {}, cursors: {} });
+type LocalSyncState = { records: Record<string, StoredRecord>; presentationRecords: Record<string, HealthObservationDraft>;
+  cursors: Record<string, string>; providerConnected: boolean };
+const emptyState = (): LocalSyncState => ({ records: {}, presentationRecords: {}, cursors: {}, providerConnected: false });
 const scopeOperations = new Map<string, Promise<unknown>>();
 const serializeScopeOperation = <T>(scope: string, operation: () => Promise<T>): Promise<T> => {
   const previous = scopeOperations.get(scope) ?? Promise.resolve();
@@ -26,7 +27,8 @@ const readState = async (scope: string): Promise<LocalSyncState> => {
     const raw = await AsyncStorage.getItem(keyFor(scope));
     if (!raw) return emptyState();
     const parsed = JSON.parse(raw) as Partial<LocalSyncState>;
-    return { records: parsed.records ?? {}, cursors: parsed.cursors ?? {} };
+    return { records: parsed.records ?? {}, presentationRecords: parsed.presentationRecords ?? {},
+      cursors: parsed.cursors ?? {}, providerConnected: parsed.providerConnected === true };
   } catch {
     return emptyState();
   }
@@ -37,6 +39,42 @@ const writeState = (scope: string, state: LocalSyncState) =>
 
 export const readLocalSyncCursors = (scope: string) =>
   serializeScopeOperation(scope, async () => (await readState(scope)).cursors);
+
+export const readLocalHealthObservations = (scope: string) =>
+  serializeScopeOperation(scope, async () => {
+    const state = await readState(scope);
+    return Object.values(state.records)
+      .sort((left, right) => left.updatedAtISO.localeCompare(right.updatedAtISO))
+      .map((record) => record.observation);
+  });
+
+export const readLocalHealthPresentationObservations = (scope: string) =>
+  serializeScopeOperation(scope, async () => Object.values((await readState(scope)).presentationRecords));
+
+export const persistLocalHealthPresentationObservations = (
+  scope: string,
+  observations: HealthObservationDraft[]
+) => serializeScopeOperation(scope, async () => {
+  const state = await readState(scope);
+  for (const observation of observations) state.presentationRecords[identity(observation)] = observation;
+  await writeState(scope, state);
+});
+
+export const countPendingLocalObservations = (scope: string) =>
+  serializeScopeOperation(scope, async () => {
+    const state = await readState(scope);
+    return Object.values(state.records).filter((record) => !record.uploaded).length;
+  });
+
+export const readLocalHealthProviderConnected = (scope: string) =>
+  serializeScopeOperation(scope, async () => (await readState(scope)).providerConnected);
+
+export const markLocalHealthProviderConnected = (scope: string) =>
+  serializeScopeOperation(scope, async () => {
+    const state = await readState(scope);
+    state.providerConnected = true;
+    await writeState(scope, state);
+  });
 
 export const getOrCreateHealthInstallationId = async () => {
   const existing = await AsyncStorage.getItem(INSTALLATION_KEY);

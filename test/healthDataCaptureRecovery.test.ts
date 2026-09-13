@@ -95,7 +95,9 @@ describe('end-to-end health data capture recovery contracts', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     expect(coordinator).toContain('buildPresentedHealthObservations');
     expect(coordinator).toContain('presentationObservations');
-    expect(coordinator).toContain("providerState !== 'CONNECTED' || automaticInitialSyncStarted.current");
+    expect(coordinator).toContain('localProviderConnected');
+    expect(coordinator).toContain('readLocalHealthObservations(localScope)');
+    expect(coordinator).toContain('refreshQueued.current = true');
     expect(coordinator).toContain('void syncLocalMetrics()');
     expect(screen).toContain('HEALTHKIT_DAILY_CUMULATIVE_STATISTIC');
     for (const color of ['#FF5E1A','#0A84FF','#5E5CE6','#FF375F','#32D74B','#BF5AF2','#64D2FF']) {

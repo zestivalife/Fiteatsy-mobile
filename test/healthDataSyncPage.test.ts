@@ -31,8 +31,11 @@ describe('Health Data Sync control-centre contracts', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     for (const copy of [
       'Sync Now', 'Reading health data…', 'Review Permissions',
-      'Upload pending', 'Your Health Data', 'Sync Activity', 'Last updated'
+      'Automatic sync enabled', 'awaiting secure upload', 'Your Health Data', 'Sync Activity', 'Last updated'
     ]) expect(screen).toContain(copy);
+    expect(screen).toContain('Restoring saved health data…');
+    expect(screen).toContain('health.localHydrated');
+    expect(screen).toContain('health.pendingUploadCount');
   });
 
   test('shows one canonical sync popup and surfaces connection/read failures', () => {
@@ -82,6 +85,6 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(manager.indexOf('adapter.queryAllSupportedMetrics(localCursors')).toBeLessThan(manager.indexOf('beginWearableSyncRun(governed.connectionId'));
     expect(manager).toContain('HealthSyncUploadPendingError');
     expect(coordinator).toContain('data is available locally. Upload is pending.');
-    expect(screen).toContain('Upload pending. Your health data remains available securely on this device.');
+    expect(screen).toContain('awaiting secure upload. Your health data remains available on this device.');
   });
 });
