@@ -29,6 +29,16 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(manager).toContain('checkpointAfter: rejected === 0 ? anchors : undefined');
   });
 
+  test('telemetry and post-upload refresh cannot block or misclassify authoritative ingestion', () => {
+    const manager = read('src/services/healthSyncManager.ts');
+    const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
+    expect(manager).toContain('beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger).catch(() => null)');
+    expect(manager).toContain("'health_sync_checkpoint_commit_timeout').catch(() => undefined)");
+    expect(manager).toContain('HealthSyncPostUploadRefreshError');
+    expect(manager).toContain('if (payload && uploadCompleted) throw new HealthSyncPostUploadRefreshError');
+    expect(coordinator).toContain("error instanceof HealthSyncPostUploadRefreshError ? 'SYNCED' : 'PENDING'");
+  });
+
   test('native read, upload, and checkpoint stages are all bounded', () => {
     const manager = read('src/services/healthSyncManager.ts');
     for (const code of [

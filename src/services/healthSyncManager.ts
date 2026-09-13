@@ -82,6 +82,19 @@ export class HealthSyncUploadPendingError extends Error {
   }
 }
 
+export class HealthSyncPostUploadRefreshError extends Error {
+  payload: WearableSyncPayload;
+  observations: HealthObservationDraft[];
+  diagnostics: HealthSourceMetricDiagnostic[];
+
+  constructor(payload: WearableSyncPayload, observations: HealthObservationDraft[]) {
+    super('health_sync_post_upload_refresh_pending');
+    this.payload = payload;
+    this.observations = observations;
+    this.diagnostics = buildHealthSourceDiagnostics(payload.provider === 'Apple Health' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', payload, { state: 'SUCCESS' });
+  }
+}
+
 export const HEALTH_SYNC_PIPELINE_TIMEOUT_MS = 45_000;
 // Keep rich observation payloads comfortably below Express' default 100 KB
 // JSON body limit. First-sync heart-rate samples carry source metadata and can
@@ -172,6 +185,7 @@ export const runHealthSync = async (
   let run: Awaited<ReturnType<typeof beginWearableSyncRun>> | null = null;
   let payload: WearableSyncPayload | null = null;
   let observations: HealthObservationDraft[] = [];
+  let uploadCompleted = false;
   try {
     // Local source access is the first I/O boundary. A backend checkpoint lookup
     // must never delay or prevent HealthKit / Health Connect from returning data.
@@ -188,7 +202,10 @@ export const runHealthSync = async (
     // Cursor advancement and normalized/tombstone persistence are one durable
     // local transaction and always precede every backend operation.
     await persistLocalSyncBatch(localScope, observations, anchors);
-    run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger) : null;
+    // Sync-run telemetry must not become a prerequisite for ingestion. The
+    // observation endpoint independently enforces authenticated ownership and
+    // active provider consent.
+    run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger).catch(() => null) : null;
 
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
     let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
@@ -204,15 +221,16 @@ export const runHealthSync = async (
       await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
       pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     }
+    uploadCompleted = rejected === 0 && pending.length === 0;
     if (governed && Object.keys(anchors).length && rejected === 0) {
       await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
         commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
           ...(governed.provider === 'HEALTH_CONNECT' ? { cursorValue: checkpoint } : { anchorValue: checkpoint }),
-          backfillComplete:true }))), 'health_sync_checkpoint_commit_timeout');
+          backfillComplete:true }))), 'health_sync_checkpoint_commit_timeout').catch(() => undefined);
     }
     if (run) await finishWearableSyncRun(run.id, { status: rejected ? 'PARTIAL' : 'SUCCESS', recordsRead: observations.length,
       recordsUploaded: observations.length, recordsInserted: accepted, recordsDuplicates: duplicate, recordsUpdated: updated, recordsDeleted: deleted,
-      checkpointAfter: rejected === 0 ? anchors : undefined });
+      checkpointAfter: rejected === 0 ? anchors : undefined }).catch(() => undefined);
 
     if (payload.dataQuality.syncCounts) {
       payload.dataQuality.syncCounts.uploadRecordCount = observations.length;
@@ -230,6 +248,7 @@ export const runHealthSync = async (
     // The native read and durable local write have already succeeded. Any later
     // failure belongs to the upload/backend plane and must not erase readable
     // device data or turn the provider into a disconnected state.
+    if (payload && uploadCompleted) throw new HealthSyncPostUploadRefreshError(payload, observations);
     if (payload) throw new HealthSyncUploadPendingError(payload, observations);
     throw error;
   }

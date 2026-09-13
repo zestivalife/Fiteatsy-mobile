@@ -13,6 +13,7 @@ import {
   type HealthSyncActivity,
   type HealthSyncResult,
   type HealthSyncStatus,
+  HealthSyncPostUploadRefreshError,
   HealthSyncUploadPendingError,
   runHealthSync
 } from './healthSyncManager';
@@ -138,12 +139,12 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       void refreshRemoteSnapshot();
     } catch (error) {
       if (!mounted.current) return;
-      if (error instanceof HealthSyncUploadPendingError) {
+      if (error instanceof HealthSyncUploadPendingError || error instanceof HealthSyncPostUploadRefreshError) {
         mergeLocalObservations(error.observations);
         setSelectedDeviceId(adapter.appId);
         setDiagnostics(error.diagnostics);
         setProviderState('CONNECTED');
-        setUploadState('PENDING');
+        setUploadState(error instanceof HealthSyncPostUploadRefreshError ? 'SYNCED' : 'PENDING');
         const locallyAvailableTypes = new Set(error.observations
           .filter((item) => !item.deleted)
           .map((item) => item.metricType));
@@ -151,7 +152,9 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
           definition.metricKey,
           locallyAvailableTypes.has(definition.backendCanonicalType) ? 'DATA_AVAILABLE' : 'NO_VISIBLE_DATA'
         ])));
-        setMessage(`${sourceName} data is available locally. Upload is pending.`);
+        setMessage(error instanceof HealthSyncPostUploadRefreshError
+          ? `${sourceName} data was uploaded. Account status will refresh automatically.`
+          : `${sourceName} data is available locally. Upload is pending.`);
       } else {
         const available = await adapter.isAvailable().catch(() => false);
         setProviderState(available ? 'ERROR' : 'UNAVAILABLE');
