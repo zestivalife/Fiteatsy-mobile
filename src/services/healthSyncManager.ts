@@ -83,6 +83,10 @@ export class HealthSyncUploadPendingError extends Error {
 }
 
 export const HEALTH_SYNC_PIPELINE_TIMEOUT_MS = 45_000;
+// Keep rich observation payloads comfortably below Express' default 100 KB
+// JSON body limit. First-sync heart-rate samples carry source metadata and can
+// exceed that boundary when the previous 250-record chunk is used.
+export const HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50;
 export const withHealthSyncPipelineTimeout = <T>(operation: Promise<T>, code: string): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(code)), HEALTH_SYNC_PIPELINE_TIMEOUT_MS);
@@ -187,7 +191,7 @@ export const runHealthSync = async (
     run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger) : null;
 
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
-    let pending = await readPendingLocalObservations(localScope, 250);
+    let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     while (pending.length) {
       const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
         '/v1/health/observations:batch', { observations: pending.map((item) => item.observation) }), 'health_sync_upload_timeout');
@@ -195,7 +199,7 @@ export const runHealthSync = async (
       updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
       if (ingest.rejected > 0) break;
       await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
-      pending = await readPendingLocalObservations(localScope, 250);
+      pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     }
     if (governed && Object.keys(anchors).length && rejected === 0) {
       await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>

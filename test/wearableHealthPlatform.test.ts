@@ -28,7 +28,7 @@ describe('governed wearable health platform', () => {
     const manager = read('src/services/healthSyncManager.ts');
     expect(healthConnect).toContain('while (pageToken)');
     expect(healthConnect).toContain('pageSize: 500');
-    expect(manager).toContain('readPendingLocalObservations(localScope, 250)');
+    expect(manager).toContain('readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE)');
     expect(manager).toContain("pending.map((item) => item.observation)");
   });
 

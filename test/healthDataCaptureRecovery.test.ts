@@ -47,18 +47,22 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(backendRun).toBeGreaterThan(localRead);
     expect(upload).toBeGreaterThan(localRead);
     expect(manager).toContain('persistLocalSyncBatch(localScope, observations, anchors)');
-    expect(manager).toContain('readPendingLocalObservations(localScope, 250)');
+    expect(manager).toContain('readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE)');
     expect(manager).toContain('acknowledgeLocalObservations');
     expect(manager).not.toContain('getWearableCheckpoints');
   });
 
   test('durable local queue stores records and tombstones before bounded upload acknowledgement', () => {
     const store = read('src/services/healthSyncLocalStore.ts');
+    const manager = read('src/services/healthSyncManager.ts');
     expect(store).toContain('records: Record<string, StoredRecord>');
     expect(store).toContain('cursors: Record<string, string>');
     expect(store).toContain('unchanged ? previous.uploaded : false');
     expect(store).toContain('slice(0, limit)');
     expect(store).toContain('uploaded: true');
+    expect(manager).toContain('HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50');
+    expect(manager).toContain('readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE)');
+    expect(manager).not.toContain('readPendingLocalObservations(localScope, 250)');
   });
 
   test('Apple cumulative totals use HealthKit statistics without losing anchored audit rows', () => {
