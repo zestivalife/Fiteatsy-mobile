@@ -63,7 +63,8 @@ describe('canonical health sync architecture',()=>{
   test('connected rendering cannot simultaneously show connecting or global checking',()=>{
     expect(screen).not.toContain('Connecting to Apple Health');
     expect(screen).not.toContain('Checking your health connection');
-    expect(screen).not.toContain('<ActivityIndicator');
+    expect(screen).toContain('<ActivityIndicator');
+    expect(screen.indexOf('visible={syncPopupVisible}')).toBeLessThan(screen.indexOf('<ActivityIndicator'));
   });
 
   test('one native module registration remains for iOS',()=>{

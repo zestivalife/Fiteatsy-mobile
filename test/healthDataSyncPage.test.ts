@@ -35,6 +35,17 @@ describe('Health Data Sync control-centre contracts', () => {
     ]) expect(screen).toContain(copy);
   });
 
+  test('shows one canonical sync popup and surfaces connection/read failures', () => {
+    const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
+    expect(screen).toContain('visible={syncPopupVisible}');
+    expect(screen).toContain("busy?'Syncing health data'");
+    expect(screen).toContain("uploadPending?'Connection interrupted':'Health sync unsuccessful'");
+    expect(screen).toContain('Synced values will appear automatically when ready.');
+    expect(screen).toContain('Try Again');
+    expect(screen).toContain("health.uploadState==='SYNCED')setSyncPopupVisible(false)");
+    expect(screen).not.toContain('useState<HealthMetricQueryState');
+  });
+
   test('keeps recent sync activity scoped to the authenticated owner', () => {
     const routes = read('backend/src/modules/health/health.routes.ts');
     const repository = read('backend/src/modules/health/wearable-platform.repository.ts');
