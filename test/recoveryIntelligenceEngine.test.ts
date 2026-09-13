@@ -43,8 +43,7 @@ describe('recoveryIntelligenceEngine', () => {
     expect(output.recoveryScore).toBeNull();
     expect(output.calmScore).toBeNull();
     expect(output.stressRecoveryScore).toBeNull();
-    expect(output.recoveryDrivers.length).toBeGreaterThanOrEqual(6);
-    expect(output.trendValues7d).toEqual([80, 73, 67]);
+    expect(output.trendValues7d).toEqual([]);
     expect(output.highestImpactActions.length).toBeGreaterThan(0);
     expect(output.whyChanged.length).toBeGreaterThan(0);
   });
@@ -77,6 +76,6 @@ describe('recoveryIntelligenceEngine', () => {
     expect(output.questionnaireAvailable).toBe(true);
     expect(output.pss10Score).toBe(10);
     expect(output.stressRecoveryScore).toBeNull();
-    expect(output.trendValues7d).toEqual([50, 75]);
+    expect(output.trendValues7d).toEqual([]);
   });
 });

@@ -2,24 +2,6 @@ import { DailyCheckIn, HealthObservationDraft, WellnessSnapshot } from '../types
 
 type RecoveryDirection = 'improving' | 'declining' | 'stable';
 
-export type RecoveryDriver = {
-  key:
-    | 'sleep'
-    | 'activity'
-    | 'medication_adherence'
-    | 'wellness_sessions'
-    | 'hydration'
-    | 'focus_consistency'
-    | 'stress_recovery'
-    | 'emotional_checkins';
-  label: string;
-  score: number;
-  weight: number;
-  contribution: number;
-  status: 'strong' | 'steady' | 'needs_attention';
-  reason: string;
-};
-
 export type RecoveryOutput = {
   isCalibrating: boolean;
   insufficientReason: string | null;
@@ -37,16 +19,12 @@ export type RecoveryOutput = {
   stressRecoveryScore: null;
   pss10Score: number | null;
   questionnaireAvailable: boolean;
-  recoveryDrivers: RecoveryDriver[];
   highestImpactActions: string[];
   contextualInsights: string[];
   whyChanged: string[];
   blockers: string[];
   trendValues7d: number[];
   debug: {
-    sessionInfluenceMultiplier: number;
-    recentCooldownPenalty: number;
-    effectiveSessionInfluence: number;
     signalCoverageCount: number;
     confidenceState: 'high' | 'moderate' | 'low';
   };
@@ -73,20 +51,12 @@ type Input = {
   pss10Results?: Array<{ rawScore: number; completedAtISO: string }>;
 };
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-const round = (value: number) => Math.round(value);
 const mean = (values: number[]) => (values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length);
 
 const lastNDays = (entries: DailyCheckIn[], n: number) =>
   [...entries]
     .sort((a, b) => (+new Date(b.dateISO)) - (+new Date(a.dateISO)))
     .slice(0, n);
-
-const toStatus = (score: number): RecoveryDriver['status'] => {
-  if (score >= 80) return 'strong';
-  if (score >= 60) return 'steady';
-  return 'needs_attention';
-};
 
 const freshnessWindows = {
   steps: 24 * 60 * 60 * 1000,
@@ -106,21 +76,6 @@ const isRecent = (iso: string | undefined, windowMs: number) => {
 const latestMetric = (observations: HealthObservationDraft[], metricTypes: string[]) =>
   observations.filter(item => !item.deleted && metricTypes.includes(item.metricType))
     .sort((left,right) => right.measuredAtISO.localeCompare(left.measuredAtISO))[0] ?? null;
-
-const buildTrend = (checkIns: DailyCheckIn[]) => {
-  const recent = lastNDays(checkIns, 7).reverse();
-  return recent.map((entry) => round(clamp(((entry.mood + entry.energy + entry.sleepQuality) / 15) * 100, 0, 100)));
-};
-
-const contextualInsight = (direction: RecoveryDirection, topDriver: string, blocker: string) => {
-  if (direction === 'improving') {
-    return `Recovery stabilizing after stronger ${topDriver.toLowerCase()} rhythm.`;
-  }
-  if (direction === 'declining') {
-    return `${blocker} is slowing recovery momentum today.`;
-  }
-  return `Recovery trend is steady with support from ${topDriver.toLowerCase()}.`;
-};
 
 export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
   const steps = latestMetric(input.healthObservations, ['steps']);
@@ -148,96 +103,6 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
       ? 'Recovery insights improve as more recovery signals become available.'
       : 'Recovery calibration adapting to your rhythm.';
 
-  const sleepHours = sleep ? sleep.value / 60 : 0;
-  const workoutsMinutes = workouts?.value ?? 0;
-  const restingHr = restingHeartRate?.value ?? 0;
-  const hrvDerived = hrv?.value ?? null;
-
-  const antiManip = input.sessionAntiManipulation ?? {
-    todaySessionCount: 0,
-    recentCooldownPenalty: 1,
-    sessionInfluenceMultiplier: 1
-  };
-  const sessionInfluence = clamp(antiManip.sessionInfluenceMultiplier * antiManip.recentCooldownPenalty, 0.15, 1);
-
-  const sleepScore = round(clamp((sleepHours / 8) * 100, 0, 100));
-  const activityScore = round(clamp((workoutsMinutes / 35) * 100, 0, 100));
-  const hrvScore = hrvDerived == null ? 0 : round(clamp((hrvDerived / 70) * 100, 0, 100));
-  const restingHrScore = restingHr > 0 ? round(clamp(100 - Math.abs(restingHr - 62) * 2.2, 0, 100)) : 0;
-  const rawSessionsScore = round(clamp((input.wellness.breathingMinutes / 14) * 55 + (input.wellness.focusMinutes / 45) * 45, 0, 100));
-  const sessionsScore = round(clamp(rawSessionsScore * sessionInfluence, 0, 100));
-  const emotionalScore = round(clamp(input.wellness.moodScore, 0, 100));
-  const stressRecoverySignal = round(clamp((sessionsScore * 0.4) + (sleepScore * 0.3) + (hrvScore * 0.3), 0, 100));
-
-  const drivers: RecoveryDriver[] = [
-    {
-      key: 'sleep',
-      label: 'Sleep',
-      score: sleepScore,
-      weight: 0.3,
-      contribution: sleepScore * 0.3,
-      status: toStatus(sleepScore),
-      reason: sleepHours > 0 ? `Sleep is ${sleepHours.toFixed(1)}h from recent health sync.` : 'No recent sleep signal available.'
-    },
-    {
-      key: 'activity',
-      label: 'Movement / Workouts',
-      score: activityScore,
-      weight: 0.15,
-      contribution: activityScore * 0.15,
-      status: toStatus(activityScore),
-      reason: workoutsMinutes > 0 ? `${Math.round(workoutsMinutes)} workout minutes from recent health sync.` : 'No recent workout signal available.'
-    },
-    {
-      key: 'wellness_sessions',
-      label: 'Calm sessions',
-      score: sessionsScore,
-      weight: 0.1,
-      contribution: sessionsScore * 0.1,
-      status: toStatus(sessionsScore),
-      reason:
-        antiManip.todaySessionCount > 1
-          ? `Session impact adjusted for continuity (${antiManip.todaySessionCount} sessions today).`
-          : 'Calm session signal is contributing at full influence.'
-    },
-    {
-      key: 'emotional_checkins',
-      label: 'Emotional stability',
-      score: emotionalScore,
-      weight: 0.05,
-      contribution: emotionalScore * 0.05,
-      status: toStatus(emotionalScore),
-      reason: 'Derived from mood and emotional session interactions.'
-    },
-    {
-      key: 'sleep',
-      label: 'HRV / Recovery balance',
-      score: hrvScore,
-      weight: 0.25,
-      contribution: hrvScore * 0.25,
-      status: toStatus(hrvScore),
-      reason: hrvDerived == null ? 'No recent HRV records found.' : `HRV is ${hrvDerived.toFixed(1)} ms from health sync.`
-    },
-    {
-      key: 'stress_recovery',
-      label: 'Resting heart load',
-      score: restingHrScore,
-      weight: 0.15,
-      contribution: restingHrScore * 0.15,
-      status: toStatus(restingHrScore),
-      reason: restingHr > 0 ? `Resting heart rate is ${Math.round(restingHr)} bpm from health sync.` : 'No recent resting heart rate records found.'
-    },
-    {
-      key: 'stress_recovery',
-      label: 'Stress recovery',
-      score: stressRecoverySignal,
-      weight: 0,
-      contribution: 0,
-      status: toStatus(stressRecoverySignal),
-      reason: 'Derived from sleep, HRV, and calm-session continuity.'
-    }
-  ];
-
   // This module supplies context and freshness only. HEALTH_INTELLIGENCE_V1 is
   // the sole authority allowed to produce Recovery, Calm, or Stress Recovery.
   const recoveryScore = null;
@@ -253,48 +118,14 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
   const direction: RecoveryDirection =
     moodDelta > 0.25 ? 'improving' : moodDelta < -0.25 ? 'declining' : 'stable';
 
-  const scored = drivers.filter((driver) => driver.weight > 0);
-  const sortedByScore = [...scored].sort((a, b) => a.score - b.score);
-  const lowest = sortedByScore.slice(0, 3);
-  const highest = [...scored].sort((a, b) => b.score - a.score);
-
-  const blockers = hasEnoughForCalibration
-    ? lowest.filter((item) => item.score < 60).map((item) => `${item.label} may improve with one small recovery step.`)
-    : ['Continue syncing recovery signals for deeper insights.'];
-
-  const actionMap: Record<RecoveryDriver['key'], string> = {
-    sleep: 'Protect a fixed sleep window tonight and aim for at least 7 hours.',
-    activity: 'Add a 12–20 minute low-intensity walk to improve recovery momentum.',
-    medication_adherence: 'Maintain medication consistency today to support recovery continuity.',
-    wellness_sessions: 'Complete one calm session and avoid repeating the same session back-to-back.',
-    hydration: 'Support recovery with consistent hydration habits.',
-    focus_consistency: 'Use one protected deep-work block and one decompression break.',
-    stress_recovery: 'Run a breathing reset before evening to lower recovery load.',
-    emotional_checkins: 'Log one emotional check-in and add one calming routine before sleep.'
-  };
-
+  const blockers = hasEnoughForCalibration ? [] : ['Continue syncing recovery signals for deeper insights.'];
   const highestImpactActions = hasEnoughForCalibration
-    ? lowest.map((item) => actionMap[item.key])
+    ? ['Keep your current sleep, movement, and recovery routine consistent.']
     : ['Recovery calibration adapting to your rhythm.', 'Continue syncing recovery signals and complete one calm session.'];
-
-  const whyChanged = hasEnoughForCalibration
-    ? [
-        `${highest[0]?.label ?? 'Sleep'} is currently supporting recovery continuity.`,
-        `${lowest[0]?.label ?? 'Recovery balance'} is currently limiting recovery momentum.`
-      ]
-    : ['Recovery interpretation is waiting for enough recent real signals.'];
-
+  const whyChanged = ['Score interpretation comes from the canonical Health Intelligence snapshot.'];
   const contextualInsights = hasEnoughForCalibration
-    ? [
-        contextualInsight(direction, highest[0]?.label ?? 'Sleep', lowest[0]?.label ?? 'Recovery balance'),
-        `Calm response is ${antiManip.todaySessionCount > 2 ? 'stabilizing with reduced repeat-session impact.' : 'responding to recent session consistency.'}`,
-        `Recovery confidence is based on ${coverageCount}/5 recent device signals.`
-      ]
-    : [
-        'Recovery insights improve as more recovery signals become available.',
-        'Continue syncing recovery signals for deeper insights.',
-        'Recovery calibration adapting to your rhythm.'
-    ];
+    ? [`Recovery context includes ${coverageCount}/5 recent device signals.`]
+    : ['Recovery insights improve as more recovery signals become available.'];
 
   const confidenceState: 'high' | 'moderate' | 'low' =
     coverageCount >= 4 && !hasEnoughForCalibration ? 'moderate' : coverageCount >= 4 ? 'high' : coverageCount >= 2 ? 'moderate' : 'low';
@@ -309,18 +140,12 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
     stressRecoveryScore,
     pss10Score: latestPss10?.rawScore ?? null,
     questionnaireAvailable: latestPss10 !== null,
-    recoveryDrivers: drivers,
     highestImpactActions,
     contextualInsights,
     whyChanged,
     blockers,
-    trendValues7d: pss10Results.length > 0
-      ? pss10Results.slice(-7).map((result) => round(clamp(100 - (result.rawScore / 40) * 100, 0, 100)))
-      : buildTrend(input.checkIns),
+    trendValues7d: [],
     debug: {
-      sessionInfluenceMultiplier: antiManip.sessionInfluenceMultiplier,
-      recentCooldownPenalty: antiManip.recentCooldownPenalty,
-      effectiveSessionInfluence: sessionInfluence,
       signalCoverageCount: coverageCount,
       confidenceState
     }
