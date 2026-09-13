@@ -4,6 +4,7 @@ import { HEALTH_METRIC_REGISTRY } from './healthMetricRegistry';
 export type HealthSourceDiagnosticState = 'NOT_STARTED'|'SUPPORTED'|'REQUESTABLE'|'QUERYING'|'DATA_AVAILABLE'|'NO_VISIBLE_DATA'|'PENDING'|'SUCCESS'|'PARTIAL'|'ERROR'|'TIMEOUT'|'NOT_APPLICABLE';
 export type HealthSourceMetricDiagnostic = {
   sourcePlatform:'APPLE_HEALTH'|'HEALTH_CONNECT';metricKey:string;supported:boolean;
+  healthSourceIdentifier:string|null;queryWindowDays:number;queryExecuted:boolean;nativeRecordCount:number;normalizedRecordCount:number;droppedRecordCount:number;
   permissionState:HealthSourceDiagnosticState;requestState:HealthSourceDiagnosticState;localQueryState:HealthSourceDiagnosticState;
   localRecordCount:number;latestLocalTimestamp:string|null;normalisationState:HealthSourceDiagnosticState;dedupState:HealthSourceDiagnosticState;
   uploadState:HealthSourceDiagnosticState;backendPersistenceState:HealthSourceDiagnosticState;dailyAggregateState:HealthSourceDiagnosticState;
@@ -17,7 +18,11 @@ export const buildHealthSourceDiagnostics=(sourcePlatform:HealthSourceMetricDiag
   const status=sourceStatus(payload,definition.metricKey);
   const localQueryState:HealthSourceDiagnosticState=!supported?'NOT_APPLICABLE':records.length?'DATA_AVAILABLE':status==='read_failed'||status==='unavailable'?'ERROR':'NO_VISIBLE_DATA';
   const uploaded=upload.state==='SUCCESS';
+  const counts=payload.dataQuality.metricDiagnostics?.[sourcePlatform==='APPLE_HEALTH'?(definition.appleHealthType??definition.metricKey):(definition.healthConnectRecord??definition.metricKey)];
   return {sourcePlatform,metricKey:definition.metricKey,supported,
+    healthSourceIdentifier:sourcePlatform==='APPLE_HEALTH'?definition.appleHealthType:definition.healthConnectRecord,
+    queryWindowDays:definition.syncWindowDays,queryExecuted:supported,nativeRecordCount:counts?.nativeRecordCount??records.length,
+    normalizedRecordCount:counts?.normalizedRecordCount??records.length,droppedRecordCount:counts?.droppedRecordCount??0,
     permissionState:!supported?'NOT_APPLICABLE':sourcePlatform==='APPLE_HEALTH'?'REQUESTABLE':status==='no_permission'?'PENDING':'SUPPORTED',
     requestState:!supported?'NOT_APPLICABLE':'SUCCESS',localQueryState,localRecordCount:records.length,
     latestLocalTimestamp:records.reduce<string|null>((latest,item)=>!latest||item.measuredAtISO>latest?item.measuredAtISO:latest,null),

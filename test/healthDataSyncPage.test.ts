@@ -54,7 +54,8 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(screen).toContain("nextState!=='active'||!awaitingPermissionReturn.current");
     expect(screen).toContain('permissionRefreshRunning.current');
     expect(screen).toContain('inspectAppleHealthPermissionState');
-    expect(screen).toContain('await refresh()');
+    expect(screen).toContain('await syncNow()');
+    expect(screen).toContain('POST_AUTH_QUERY_STARTED');
     expect(screen).not.toContain('x-apple-health://');
   });
 
@@ -68,7 +69,7 @@ describe('Health Data Sync control-centre contracts', () => {
   test('keeps local health reads independent from backend upload availability', () => {
     const manager = read('src/services/healthSyncManager.ts');
     const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
-    expect(manager.indexOf('syncConnectedHealthApp(appId, providerCursors)')).toBeLessThan(manager.indexOf('beginWearableSyncRun(governed.connectionId'));
+    expect(manager.indexOf('syncConnectedHealthApp(appId, localCursors)')).toBeLessThan(manager.indexOf('beginWearableSyncRun(governed.connectionId'));
     expect(manager).toContain('HealthSyncUploadPendingError');
     expect(screen).toContain('Upload is pending until the connection returns.');
   });

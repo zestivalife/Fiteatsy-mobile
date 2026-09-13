@@ -320,6 +320,12 @@ export type WearableSyncPayload = {
       uploadRecordCount?: number;
       persistedRecordCount?: number;
     };
+    metricDiagnostics?: Record<string, {
+      nativeRecordCount: number;
+      normalizedRecordCount: number;
+      droppedRecordCount: number;
+      dropReasons: string[];
+    }>;
   };
   observations?: HealthObservationDraft[];
 };

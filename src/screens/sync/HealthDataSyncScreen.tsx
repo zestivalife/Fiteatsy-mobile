@@ -26,7 +26,7 @@ import { resolveHealthSyncRoute } from '../../services/healthSyncRouting';
 import { HealthDataSyncExperience } from './SyncWearableScreen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthDataSync'>;
-type UiState = 'idle'|'syncing'|'success'|'partial'|'error';
+type UiState = 'idle'|'syncing'|'success'|'no_data'|'partial'|'error';
 type MetricDefinition = { type:string; label:string; icon:keyof typeof Ionicons.glyphMap };
 type PermissionRefreshState = 'idle'|'checking'|'available'|'action_needed'|'error';
 
@@ -78,7 +78,11 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
       getHealthSyncStatus(),getLatestHealthObservations(200),getHealthSyncActivity(8)
     ]);
     if(!mounted.current)return;
-    setStatus(nextStatus);setObservations(nextObservations.items);setActivity(nextActivity.items);
+    setStatus(nextStatus);setObservations(current=>{
+      const byIdentity=new Map(current.map(item=>[item.syncKey??item.id,item]));
+      nextObservations.items.forEach(item=>byIdentity.set(item.syncKey??item.id,item));
+      return [...byIdentity.values()];
+    });setActivity(nextActivity.items);
   },[]);
   useEffect(()=>{mounted.current=true;void refresh().catch(()=>mounted.current&&setMessage('Health sync status is temporarily unavailable.')).finally(()=>mounted.current&&setLoading(false));return()=>{mounted.current=false;operationId.current+=1;permissionOperationId.current+=1;running.current=false;permissionRefreshRunning.current=false;};},[refresh]);
 
@@ -94,6 +98,37 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   const platformStatus=Platform.OS==='ios'?status?.appleHealth:status?.healthConnect;
   const source=providerName(Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT');
 
+  const applyLocalObservations=useCallback((items:HealthSyncResult['observations'])=>{
+    const deletedIds=new Set(items.filter(item=>item.deleted).map(item=>item.sourceRecordId).filter(Boolean));
+    const localItems=items.filter(item=>!item.deleted).map((item,index):HealthObservationDto=>({
+      ...item,id:`local:${item.syncKey??item.sourceRecordId??index}`,fiteatsyClientId:status?.fiteatsyClientId??'local',
+      createdAtISO:new Date().toISOString()
+    }));
+    setObservations(current=>{
+      const byIdentity=new Map(current.filter(item=>!item.sourceRecordId||!deletedIds.has(item.sourceRecordId)).map(item=>[item.syncKey??item.id,item]));
+      localItems.forEach(item=>byIdentity.set(item.syncKey??item.id,item));
+      return [...byIdentity.values()];
+    });
+  },[status?.fiteatsyClientId]);
+
+  const syncNow=useCallback(async()=>{
+    if(running.current)return;running.current=true;let reachedTerminalState=false;const currentOperation=++operationId.current;
+    const isCurrent=()=>mounted.current&&operationId.current===currentOperation;
+    setUiState('syncing');setMessage(`Connecting to ${source}…`);
+    try{
+      const connection=Platform.OS==='ios'?status?.appleHealth:status?.healthConnect;
+      const result=await runHealthSync(Platform.OS==='ios'?'apple-health':'health-connect',wellness,
+        connection?.connectionId?{connectionId:connection.connectionId,provider:Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT',trigger:'MANUAL'}:undefined);
+      if(!isCurrent())return;
+      applyLocalObservations(result.observations);addWearableSyncData(result.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setWellness(result.wellness);setSourceDiagnostics(result.diagnostics);
+      const localCount=result.observations.filter(item=>!item.deleted).length;const partial=result.rejected>0;
+      setUiState(partial?'partial':localCount?'success':'no_data');reachedTerminalState=true;
+      setMessage(partial?`Health data partially updated · ${result.accepted} records updated`:localCount?`Health data updated · ${localCount} local records available`:`No visible ${source} data was found for the requested date ranges.`);
+      await refresh().catch(()=>undefined);
+    }catch(error){if(isCurrent()){reachedTerminalState=true;if(error instanceof HealthSyncUploadPendingError){applyLocalObservations(error.observations);addWearableSyncData(error.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setSourceDiagnostics(error.diagnostics);setUiState('partial');setMessage(`Health data was read from ${source}. Upload is pending until the connection returns.`);}else{setUiState('error');setMessage('We couldn’t update your health data. Your previous data is safe.');}}}
+    finally{if(operationId.current===currentOperation){running.current=false;if(mounted.current&&!reachedTerminalState)setUiState('error');}}
+  },[addWearableSyncData,applyLocalObservations,refresh,setSelectedDeviceId,setWellness,source,status,wellness]);
+
   const refreshAfterPermissionReview=useCallback(async()=>{
     if(Platform.OS!=='ios'||permissionRefreshRunning.current)return;
     permissionRefreshRunning.current=true;const currentOperation=++permissionOperationId.current;
@@ -101,14 +136,15 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
     try{
       const inspection=await inspectAppleHealthPermissionState();
       if(!mounted.current||permissionOperationId.current!==currentOperation)return;
-      await refresh();
+      if(__DEV__)console.info('[HealthSync] POST_AUTH_QUERY_STARTED',{source:'APPLE_HEALTH'});
+      await syncNow();
       if(!mounted.current||permissionOperationId.current!==currentOperation)return;
       setPermissionRefresh(!inspection.available||inspection.requestStatus==='should_request'?'action_needed':'available');
       setMessage(inspection.available?'Apple Health access status refreshed.':'Apple Health is not available on this device.');
     }catch{
       if(mounted.current&&permissionOperationId.current===currentOperation){setPermissionRefresh('error');setMessage('Apple Health access could not be refreshed. Your previous health data is safe.');}
     }finally{permissionRefreshRunning.current=false;}
-  },[refresh]);
+  },[syncNow]);
 
   useEffect(()=>{
     if(Platform.OS!=='ios')return;
@@ -129,32 +165,17 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   const requestHealthAccess=useCallback(async()=>{
     setPermissionRefresh('checking');
     try{
+      if(__DEV__)console.info('[HealthSync] AUTH_REQUEST_STARTED',{source:'APPLE_HEALTH'});
       await requestAppleHealthPermissions();
+      if(__DEV__)console.info('[HealthSync] AUTH_REQUEST_COMPLETED',{source:'APPLE_HEALTH'});
       setShowPermissionHelp(false);
       await refreshAfterPermissionReview();
     }catch{
+      if(__DEV__)console.info('[HealthSync] AUTH_REQUEST_ERROR',{source:'APPLE_HEALTH'});
       setPermissionRefresh('error');
       setMessage('Apple Health access could not be requested. Your previous health data is safe.');
     }
   },[refreshAfterPermissionReview]);
-
-  const syncNow=useCallback(async()=>{
-    if(running.current)return;running.current=true;let reachedTerminalState=false;const currentOperation=++operationId.current;
-    const isCurrent=()=>mounted.current&&operationId.current===currentOperation;
-    setUiState('syncing');setMessage(`Connecting to ${source}…`);
-    try{
-      const connection=Platform.OS==='ios'?status?.appleHealth:status?.healthConnect;
-      const result=await runHealthSync(Platform.OS==='ios'?'apple-health':'health-connect',wellness,
-        connection?.connectionId?{connectionId:connection.connectionId,provider:Platform.OS==='ios'?'APPLE_HEALTH':'HEALTH_CONNECT',trigger:'MANUAL'}:undefined);
-      if(!isCurrent())return;
-      addWearableSyncData(result.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setWellness(result.wellness);setSourceDiagnostics(result.diagnostics);
-      const partial=result.rejected>0;setUiState(partial?'partial':'success');
-      reachedTerminalState=true;
-      setMessage(partial?`Health data partially updated · ${result.accepted} records updated`:`Health data updated · ${result.accepted} records updated`);
-      await refresh();
-    }catch(error){if(isCurrent()){reachedTerminalState=true;if(error instanceof HealthSyncUploadPendingError){addWearableSyncData(error.payload);setSelectedDeviceId(Platform.OS==='ios'?'apple-health':'health-connect');setSourceDiagnostics(error.diagnostics);setUiState('partial');setMessage(`Health data was read from ${source}. Upload is pending until the connection returns.`);}else{setUiState('error');setMessage('We couldn’t update your health data. Your previous data is safe.');}}}
-    finally{if(operationId.current===currentOperation){running.current=false;if(mounted.current&&!reachedTerminalState)setUiState('error');}}
-  },[addWearableSyncData,refresh,setSelectedDeviceId,setWellness,source,status,wellness]);
 
   if(entryContext==='ONBOARDING'||(!loading&&status!==null&&!connected)) return <HealthDataSyncExperience navigation={navigation} route={route}/>;
   if(loading)return <Screen><PageHeader title="Health Data Sync" onBack={()=>navigation.goBack()}/><View style={styles.loading}><ActivityIndicator color={palette.blue}/><Text style={[styles.body,{color:palette.textSecondary}]}>Checking your health connection…</Text></View></Screen>;
@@ -164,8 +185,8 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
       <PageHeader title="Health Data Sync" onBack={()=>navigation.goBack()}/>
       <Card style={styles.connectionCard}>
         <View style={styles.connectionHeader}><View style={[styles.sourceIcon,{backgroundColor:palette.blueSoft}]}><Ionicons name={Platform.OS==='ios'?'heart':'fitness'} size={24} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.cardTitle,{color:palette.textPrimary}]}>{source}</Text><Text style={[styles.body,{color:connected?palette.success:palette.warning}]}>{connected?'Connected':'Connection needed'}</Text></View><View style={[styles.chip,{backgroundColor:connected?palette.successSoft:palette.warningSoft}]}><Text style={[styles.chipText,{color:connected?palette.success:palette.warning}]}>{platformStatus?.freshness==='CURRENT'?'Up to date':connected?'Connected':'Action needed'}</Text></View></View>
-        <View style={styles.summaryRow}><View><Text style={[styles.caption,{color:palette.textMuted}]}>Last synced</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(platformStatus?.lastSuccessISO??status?.lastSyncISO)}</Text></View><View><Text style={[styles.caption,{color:palette.textMuted}]}>Records available</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{status?.recordsSynced??0}</Text></View></View>
-        <PrimaryButton title={uiState==='syncing'?'Syncing…':uiState==='partial'?'Sync Again':uiState==='error'?'Try Again':uiState==='success'?'Synced':'Sync Now'} loading={uiState==='syncing'} disabled={!canReadLocalSource} onPress={()=>void syncNow()}/>
+        <View style={styles.summaryRow}><View><Text style={[styles.caption,{color:palette.textMuted}]}>Last synced</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(platformStatus?.lastSuccessISO??status?.lastSyncISO)}</Text></View><View><Text style={[styles.caption,{color:palette.textMuted}]}>Metrics available</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{latestByMetric.size}</Text></View></View>
+        <PrimaryButton title={uiState==='syncing'?'Syncing…':uiState==='partial'?'Sync Again':uiState==='error'?'Try Again':uiState==='success'?'Synced':uiState==='no_data'?'Check Again':'Sync Now'} loading={uiState==='syncing'} disabled={!canReadLocalSource} onPress={()=>void syncNow()}/>
         {Platform.OS==='ios'&&(!connected||platformStatus?.freshness!=='CURRENT')?<PrimaryButton title={permissionRefresh==='checking'?'Checking permissions…':'Review Permissions'} variant="secondary" disabled={permissionRefresh==='checking'} onPress={()=>void reviewPermissions()}/>:null}
         {message?<Text accessibilityLiveRegion="polite" style={[styles.message,{color:uiState==='error'?palette.danger:palette.textSecondary}]}>{message}</Text>:null}
       </Card>
@@ -174,8 +195,8 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
       {metrics.map(({definition,item})=>{const shown=item?displayValue(item):null;const label=metricStatus(item,connected,permissionRefresh);return <Pressable key={definition.type} disabled={!item} accessibilityRole="button" accessibilityLabel={`${definition.label}, ${shown?`${shown.value} ${shown.unit}`:'no recent data'}, ${label}`} onPress={()=>item&&setSelected(item)}><Card style={styles.metricCard}><View style={[styles.metricIcon,{backgroundColor:palette.surfaceTint}]}><Ionicons name={definition.icon} size={20} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.cardTitle,{color:palette.textPrimary}]}>{definition.label}</Text>{shown?<Text style={[styles.metricValue,{color:palette.textPrimary}]}>{shown.value} <Text style={styles.metricUnit}>{shown.unit}</Text></Text>:null}<Text style={[styles.caption,{color:palette.textMuted}]}>{item?`${source} · Updated ${formatWhen(item.measuredAtISO).toLowerCase()}`:`${source} · No recent data`}</Text></View><Text style={[styles.chipText,{color:label==='Synced'?palette.success:palette.warning}]}>{label}</Text></Card></Pressable>;})}
 
       <Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Sync Activity</Text>
-      <Card>{activity.length?activity.map((item,index)=><View key={item.id} style={[styles.activityRow,index>0&&{borderTopColor:palette.stroke,borderTopWidth:1}]}><View style={styles.grow}><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(item.completedAtISO??item.startedAtISO)}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.status==='SUCCESS'?`${item.metricsUpdated} records updated`:item.status==='PARTIAL'?'Some health data updated':item.status==='RUNNING'?'Syncing health data':'Health data could not be updated'}</Text></View><Text style={[styles.chipText,{color:item.status==='FAILED'?palette.danger:item.status==='PARTIAL'?palette.warning:palette.success}]}>{item.status==='SUCCESS'?'Successful':item.status==='PARTIAL'?'Partial':item.status==='RUNNING'?'Updating':'Couldn’t sync'}</Text></View>):<Text style={[styles.body,{color:palette.textSecondary}]}>Your recent sync activity will appear here.</Text>}</Card>
-      {__DEV__&&sourceDiagnostics.length?<><Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Source diagnostics</Text><Card>{sourceDiagnostics.map(item=><View key={`${item.sourcePlatform}:${item.metricKey}`} style={styles.activityRow}><View style={styles.grow}><Text style={[styles.valueText,{color:palette.textPrimary}]}>{item.metricKey}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.localQueryState} · {item.localRecordCount} records · upload {item.uploadState}</Text></View></View>)}</Card></>:null}
+      <Card>{activity.length?activity.map((item,index)=><View key={item.id} style={[styles.activityRow,index>0&&{borderTopColor:palette.stroke,borderTopWidth:1}]}><View style={styles.grow}><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(item.completedAtISO??item.startedAtISO)}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.status==='SUCCESS'&&item.metricsUpdated>0?`${item.metricsUpdated} records updated`:item.status==='SUCCESS'?'No visible health data found':item.status==='PARTIAL'?'Some health data updated':item.status==='RUNNING'?'Syncing health data':'Health data could not be updated'}</Text></View><Text style={[styles.chipText,{color:item.status==='FAILED'?palette.danger:item.status==='PARTIAL'?palette.warning:item.status==='SUCCESS'&&item.metricsUpdated===0?palette.warning:palette.success}]}>{item.status==='SUCCESS'&&item.metricsUpdated>0?'Synced':item.status==='SUCCESS'?'No data':item.status==='PARTIAL'?'Partial':item.status==='RUNNING'?'Updating':'Couldn’t sync'}</Text></View>):<Text style={[styles.body,{color:palette.textSecondary}]}>Your recent sync activity will appear here.</Text>}</Card>
+      {__DEV__&&sourceDiagnostics.length?<><Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Source diagnostics</Text><Card>{sourceDiagnostics.map(item=><View key={`${item.sourcePlatform}:${item.metricKey}`} style={styles.activityRow}><View style={styles.grow}><Text style={[styles.valueText,{color:palette.textPrimary}]}>{item.metricKey} · {item.healthSourceIdentifier}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.localQueryState} · native {item.nativeRecordCount} · normalized {item.normalizedRecordCount} · dropped {item.droppedRecordCount} · {item.queryWindowDays}d · upload {item.uploadState}</Text></View></View>)}</Card></>:null}
     </Screen>
     <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={()=>setSelected(null)}><Pressable style={[styles.overlay,{backgroundColor:palette.overlay}]} onPress={()=>setSelected(null)}><Pressable style={[styles.sheet,{backgroundColor:palette.card}]} onPress={()=>undefined}>{selected?<><View style={styles.sheetHandle}/><Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>{definitions.find(item=>item.type===selected.metricType)?.label??selected.metricType}</Text><Text style={[styles.detailValue,{color:palette.textPrimary}]}>{displayValue(selected).value} {displayValue(selected).unit}</Text><View style={styles.detailRow}><Text style={[styles.body,{color:palette.textMuted}]}>Source</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{providerName(selected.sourceProvider.toUpperCase())}</Text></View><View style={styles.detailRow}><Text style={[styles.body,{color:palette.textMuted}]}>Last updated</Text><Text style={[styles.valueText,{color:palette.textPrimary}]}>{formatWhen(selected.measuredAtISO)}</Text></View><View style={styles.detailRow}><Text style={[styles.body,{color:palette.textMuted}]}>Sync status</Text><Text style={[styles.valueText,{color:palette.success}]}>Successful</Text></View><PrimaryButton title="Done" onPress={()=>setSelected(null)}/></>:null}</Pressable></Pressable></Modal>
     <Modal visible={showPermissionHelp} transparent animationType="slide" onRequestClose={()=>setShowPermissionHelp(false)}><Pressable style={[styles.overlay,{backgroundColor:palette.overlay}]} onPress={()=>setShowPermissionHelp(false)}><Pressable style={[styles.sheet,{backgroundColor:palette.card}]} onPress={()=>undefined}><View style={styles.sheetHandle}/><Text style={[styles.sectionTitle,{color:palette.textPrimary}]}>Apple Health access</Text><Text style={[styles.body,{color:palette.textSecondary}]}>To review existing access, open the Health app, tap your profile picture, then Apps and Services → Fiteatsy. iOS does not provide a supported direct link to that screen.</Text><PrimaryButton title="Request Health Access" loading={permissionRefresh==='checking'} onPress={()=>void requestHealthAccess()}/><PrimaryButton title="Done" variant="secondary" onPress={()=>setShowPermissionHelp(false)}/></Pressable></Pressable></Modal>

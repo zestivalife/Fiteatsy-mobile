@@ -48,6 +48,7 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
   const observations: HealthObservationDraft[] = []; const nextAnchors: Record<string,string> = {};
   const statuses: Record<string,string> = {};
   const metricValues: Record<string, number[]> = {};
+  const metricDiagnostics:NonNullable<WearableSyncPayload['dataQuality']['metricDiagnostics']>={};
   diagnostic('HEALTH_SYNC_START', { metricCount: APPLE_HEALTH_SCOPES.length, status: 'STARTED' });
   const settledReads = await Promise.allSettled(APPLE_HEALTH_SCOPES.map(async (metric) => {
     const definition = APPLE_HEALTH_QUERYABLE_METRICS.find((item) => item.appleHealthType === metric);
@@ -104,6 +105,9 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
         sourceProvider:'apple_health',sourceRecordId:id,syncKey:`apple_health:${metric}:${id}`,deleted:true}));
       const statusKey = APPLE_HEALTH_STATUS_KEYS[metric] ?? metric;
       const acceptedSampleCount = observations.length - observationCountBefore - result.deletedIds.length;
+      metricDiagnostics[metric]={nativeRecordCount:result.samples.length,normalizedRecordCount:acceptedSampleCount,
+        droppedRecordCount:result.samples.length-acceptedSampleCount,
+        dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_SLEEP_STAGE']};
       const nextStatus = acceptedSampleCount > 0 ? 'synced' : 'no_recent_data';
       statuses[statusKey] = statuses[statusKey] === 'synced' ? 'synced' : nextStatus;
     } else {
@@ -114,8 +118,8 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
   // HealthKit statistics apply Apple's source-priority policy for cumulative
   // product totals while anchored source rows remain available for audit.
   await Promise.all(['steps', 'active_energy', 'distance', 'exercise_minutes'].map(async (metric) => {
-    const definition = APPLE_HEALTH_QUERYABLE_METRICS.find((item) => item.appleHealthType === metric);
-    const start = new Date(Date.now() - (definition?.syncWindowDays ?? 30) * 86400000).toISOString();
+    const startDate = new Date(); startDate.setHours(0, 0, 0, 0);
+    const start = startDate.toISOString();
     try {
       const statistic = await withAppleHealthTimeout(readHealthKitCumulativeStatistics(metric, start, new Date().toISOString()),
         APPLE_HEALTH_METRIC_TIMEOUT_MS, `apple_health_statistics_timeout:${metric}`);
@@ -148,7 +152,7 @@ export const syncFromAppleHealth = async (anchors: Record<string,string> = {}): 
         metricsNoData:metricStatuses.filter((status)=>status==='no_recent_data').length,
         metricsErrored:metricStatuses.filter((status)=>status==='unavailable').length,
         sourceRecordCount:observations.filter((item)=>!item.deleted).length,
-        normalizedRecordCount:observations.length},
+        normalizedRecordCount:observations.length},metricDiagnostics,
       normalizedDomains:{Activity:steps > 0 || workoutMinutes > 0 ? Math.max(steps / 100, workoutMinutes) : null,
         Sleep:sleepMinutes > 0 ? sleepMinutes / 60 : null,Recovery:hrvMs,Calm:null,Cycle:null,Nutrition:null}},observations,anchors:nextAnchors};
 };

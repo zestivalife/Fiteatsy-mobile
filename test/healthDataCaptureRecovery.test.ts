@@ -66,12 +66,25 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(native).toContain('options: .cumulativeSum');
     expect(apple).toContain('readHealthKitCumulativeStatistics');
     expect(apple).toContain('anchored source rows remain available for audit');
+    expect(apple).toContain('startDate.setHours(0, 0, 0, 0)');
+    expect(apple).toContain("dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_SLEEP_STAGE']");
+  });
+
+  test('authorization and foreground return immediately execute local query and retain local UI rows', () => {
+    const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    expect(screen).toContain('AUTH_REQUEST_STARTED');
+    expect(screen).toContain('AUTH_REQUEST_COMPLETED');
+    expect(screen).toContain('POST_AUTH_QUERY_STARTED');
+    expect(screen).toContain('await syncNow()');
+    expect(screen).toContain('applyLocalObservations(result.observations)');
+    expect(screen).toContain('Metrics available');
+    expect(screen).toContain('No visible health data found');
   });
 
   test('QA diagnostics are safe, metric-specific, and development-gated', () => {
     const diagnostics = read('src/services/healthSourceDiagnostics.ts');
     const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
-    for (const field of ['sourcePlatform','metricKey','localQueryState','localRecordCount','normalisationState','dedupState','uploadState','backendPersistenceState','dailyAggregateState','calculationState','trackerState','orbState','lastErrorClass','lastErrorMessageSafe']) expect(diagnostics).toContain(field);
+    for (const field of ['sourcePlatform','metricKey','healthSourceIdentifier','queryWindowDays','queryExecuted','nativeRecordCount','normalizedRecordCount','droppedRecordCount','localQueryState','localRecordCount','normalisationState','dedupState','uploadState','backendPersistenceState','dailyAggregateState','calculationState','trackerState','orbState','lastErrorClass','lastErrorMessageSafe']) expect(diagnostics).toContain(field);
     expect(screen).toContain('__DEV__&&sourceDiagnostics.length');
     expect(diagnostics).not.toContain('Authorization');
   });
