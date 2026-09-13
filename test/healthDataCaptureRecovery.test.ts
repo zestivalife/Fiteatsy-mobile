@@ -86,6 +86,21 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain('anchored source rows remain available for audit');
     expect(apple).toContain('startDate.setHours(0, 0, 0, 0)');
     expect(apple).toContain("dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_OR_NON_POSITIVE_SAMPLE']");
+    expect(apple).toContain('presentationObservations.push');
+    expect(apple).toContain("measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'");
+  });
+
+  test('cards render presentation aggregates and connected sessions sync automatically', () => {
+    const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
+    const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
+    expect(coordinator).toContain('buildPresentedHealthObservations');
+    expect(coordinator).toContain('presentationObservations');
+    expect(coordinator).toContain("providerState !== 'CONNECTED' || automaticInitialSyncStarted.current");
+    expect(coordinator).toContain('void syncLocalMetrics()');
+    expect(screen).toContain('HEALTHKIT_DAILY_CUMULATIVE_STATISTIC');
+    for (const color of ['#FF5E1A','#0A84FF','#5E5CE6','#FF375F','#32D74B','#BF5AF2','#64D2FF']) {
+      expect(screen).toContain(color);
+    }
   });
 
   test('backend accepts the complete Apple Health provenance contract and a bounded backfill body', () => {

@@ -413,7 +413,7 @@ export const ReportsScreen = () => {
   }, [reports, sortMode]);
   const overallScore = latestReport?.score ?? (wellness.availability === 'available' ? wellness.wellnessScore : null);
   const totalParams = latestReport?.parameters ?? 0;
-  const healthScoreLabel = isReportBackedScore ? 'Report-backed Health Score' : 'Wellness score unavailable';
+  const healthScoreLabel = isReportBackedScore ? 'Health Biomarker Snapshot' : 'Health biomarker snapshot unavailable';
   const healthScoreDescription = isReportBackedScore
     ? `out of 100 · ${totalParams} lab parameters analysed`
     : 'sync current wellness data or upload a publishable lab report';

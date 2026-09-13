@@ -328,6 +328,8 @@ export type WearableSyncPayload = {
     }>;
   };
   observations?: HealthObservationDraft[];
+  /** Device-local values prepared for presentation. Never uploaded as source records. */
+  presentationObservations?: HealthObservationDraft[];
 };
 
 export type HealthObservationDraft = {

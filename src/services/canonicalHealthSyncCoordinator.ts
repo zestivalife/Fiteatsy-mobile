@@ -19,6 +19,7 @@ import {
   runHealthSync
 } from './healthSyncManager';
 import { getOrCreateHealthInstallationId, migrateLegacyHealthInstallationId } from './healthSyncLocalStore';
+import { buildPresentedHealthObservations } from './healthMetricPresentation';
 import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 
@@ -55,12 +56,14 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const awaitingPermissionReturn = useRef(false);
   const foregroundRefreshAt = useRef(0);
   const forceBackfill = useRef(false);
+  const automaticInitialSyncStarted = useRef(false);
   const healthChangeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionIdOverride = useRef<string | null>(null);
   const [providerState, setProviderState] = useState<HealthProviderState>('AVAILABLE');
   const [uploadState, setUploadState] = useState<HealthUploadState>('IDLE');
   const [status, setStatus] = useState<HealthSyncStatus | null>(null);
   const [observations, setObservations] = useState<HealthObservationDto[]>([]);
+  const [presentationObservations, setPresentationObservations] = useState<HealthObservationDto[]>([]);
   const [activity, setActivity] = useState<HealthSyncActivity[]>([]);
   const [queryStates, setQueryStates] = useState<Record<string, HealthMetricQueryState>>({});
   const [errors, setErrors] = useState<Record<string, string | null>>({});
@@ -102,6 +105,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
 
   const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean } = {}) => {
     if (inFlight.current) return;
+    automaticInitialSyncStarted.current = true;
     inFlight.current = true;
     setUploadState('UPLOADING');
     setMessage(`Reading ${sourceName}…`);
@@ -116,6 +120,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       } : undefined, options);
       if (!mounted.current) return;
       mergeLocalObservations(result.observations);
+      setPresentationObservations((result.payload.presentationObservations ?? [])
+        .map((item,index)=>toDto(item,status?.fiteatsyClientId ?? 'local',index)));
       setSelectedDeviceId(adapter.appId);
       setWellness(result.wellness);
       setDiagnostics(result.diagnostics);
@@ -143,6 +149,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       if (!mounted.current) return;
       if (error instanceof HealthSyncUploadPendingError || error instanceof HealthSyncPostUploadRefreshError) {
         mergeLocalObservations(error.observations);
+        setPresentationObservations((error.payload.presentationObservations ?? [])
+          .map((item,index)=>toDto(item,status?.fiteatsyClientId ?? 'local',index)));
         setSelectedDeviceId(adapter.appId);
         setDiagnostics(error.diagnostics);
         setProviderState('CONNECTED');
@@ -223,6 +231,12 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   }, [refreshRemoteSnapshot]);
 
   useEffect(() => {
+    if (providerState !== 'CONNECTED' || automaticInitialSyncStarted.current) return;
+    automaticInitialSyncStarted.current = true;
+    void syncLocalMetrics();
+  }, [providerState, syncLocalMetrics]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active') return;
       const now = Date.now();
@@ -249,14 +263,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     };
   }, [adapter.platform, providerState, syncLocalMetrics]);
 
-  const latestByMetric = useMemo(() => {
-    const latest = new Map<string, HealthObservationDto>();
-    observations.forEach((item) => {
-      const current = latest.get(item.metricType);
-      if (!current || item.measuredAtISO > current.measuredAtISO) latest.set(item.metricType, item);
-    });
-    return latest;
-  }, [observations]);
+  const latestByMetric = useMemo(() => buildPresentedHealthObservations(observations,presentationObservations),
+    [observations,presentationObservations]);
 
   const metrics = useMemo<CanonicalHealthMetricState[]>(() => HEALTH_METRIC_REGISTRY.map((definition) => {
     const supported = adapter.platform === 'APPLE_HEALTH' ? Boolean(definition.appleHealthType) : Boolean(definition.healthConnectRecord);

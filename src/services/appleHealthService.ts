@@ -73,7 +73,8 @@ export const syncFromAppleHealth = async (
   const availabilityStartedAt = Date.now();
   if (Platform.OS !== 'ios' || !(await inspectAppleHealthAvailability())) throw new Error('apple_health_unavailable');
   diagnostic('HEALTHKIT_AVAILABLE', { durationMs: Date.now() - availabilityStartedAt, status: 'SUCCESS' });
-  const observations: HealthObservationDraft[] = []; const nextAnchors: Record<string,string> = {};
+  const observations: HealthObservationDraft[] = []; const presentationObservations: HealthObservationDraft[] = [];
+  const nextAnchors: Record<string,string> = {};
   const statuses: Record<string,string> = {};
   const metricValues: Record<string, number[]> = {};
   const metricDiagnostics:NonNullable<WearableSyncPayload['dataQuality']['metricDiagnostics']>={};
@@ -178,10 +179,22 @@ export const syncFromAppleHealth = async (
   });
   // HealthKit statistics apply Apple's source-priority policy for cumulative
   // product totals while anchored source rows remain available for audit.
+  const statisticEndISO = new Date().toISOString();
+  const statisticStartDate = new Date(); statisticStartDate.setHours(0, 0, 0, 0);
   (await statisticsPromise).forEach(({ metric, value }) => {
     // Older installed native builds may not expose statistics yet. Anchored
     // values remain truthful fallback data until the next native build.
-    if (value != null) metricValues[metric] = value > 0 ? [value] : [];
+    if (value != null) {
+      metricValues[metric] = value > 0 ? [value] : [];
+      if (value > 0) {
+        const canonicalMetric = metric === 'exercise_minutes' ? 'active_minutes' : metric;
+        const unit = {steps:'count',active_energy:'kcal',distance:'m',exercise_minutes:'min'}[metric] ?? '';
+        presentationObservations.push({metricType:canonicalMetric,value,unit,measuredAtISO:statisticEndISO,
+          startAtISO:statisticStartDate.toISOString(),endAtISO:statisticEndISO,sourceProvider:'apple_health',
+          sourceRecordId:`daily-total:${metric}:${statisticStartDate.toISOString().slice(0,10)}`,
+          qualityStatus:'accepted',sourceMetadata:{recordType:metric,measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'}});
+      }
+    }
   });
   void withAppleHealthTimeout(enableHealthKitBackgroundDelivery(APPLE_HEALTH_SCOPES), 5_000,
     'apple_health_background_delivery_timeout').catch(() => undefined);
@@ -208,5 +221,6 @@ export const syncFromAppleHealth = async (
         sourceRecordCount:observations.filter((item)=>!item.deleted).length,
         normalizedRecordCount:observations.length},metricDiagnostics,
       normalizedDomains:{Activity:steps > 0 || workoutMinutes > 0 ? Math.max(steps / 100, workoutMinutes) : null,
-        Sleep:sleepMinutes > 0 ? sleepMinutes / 60 : null,Recovery:hrvMs,Calm:null,Cycle:null,Nutrition:null}},observations,anchors:nextAnchors};
+        Sleep:sleepMinutes > 0 ? sleepMinutes / 60 : null,Recovery:hrvMs,Calm:null,Cycle:null,Nutrition:null}},observations,
+    presentationObservations,anchors:nextAnchors};
 };
