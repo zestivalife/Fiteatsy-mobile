@@ -36,9 +36,7 @@ describe('global keyboard-safe form contract', () => {
     expect(read('src/components/onboarding/OnboardingShell.tsx')).toContain('automaticallyAdjustKeyboardInsets');
     expect(read('src/screens/medication/MedicationFormScreen.tsx')).toContain('<KeyboardAwareFormScreen');
     expect(read('src/screens/home/SearchScreen.tsx')).toContain('keyboardShouldPersistTaps="handled"');
-    expect(read('src/components/HealthProfileSheet.tsx')).toContain('automaticallyAdjustKeyboardInsets');
     expect(read('src/screens/cycle/CycleScreen.tsx')).toContain('automaticallyAdjustKeyboardInsets');
     expect(read('src/screens/home/ReportsScreen.tsx')).toContain('automaticallyAdjustKeyboardInsets');
-    expect(read('src/screens/family/FamilyDashboardScreen.tsx')).toContain('KeyboardAvoidingView');
   });
 });

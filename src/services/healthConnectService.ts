@@ -75,7 +75,7 @@ const safeReadRecords = async <TRecord>(
     } while (pageToken);
     return records;
   } catch (error) {
-    console.warn('[HealthConnect] readRecords_failed', recordType, error instanceof Error ? error.message : 'unknown_error');
+    healthConnectLog.warn('[HealthConnect] readRecords_failed', recordType, error instanceof Error ? error.message : 'unknown_error');
     throw new Error(`health_connect_read_failed_${recordType}`);
   }
 };
@@ -386,7 +386,7 @@ const readIncrementalHealthConnectChanges = async (changesToken: string) => {
 
 const syncFromHealthConnectInternal = async (changesToken?: string): Promise<WearableSyncPayload & { anchors?: Record<string,string> }> => {
   if (Platform.OS !== 'android') {
-    console.warn('[HealthConnect] Unsupported platform:', Platform.OS);
+    healthConnectLog.warn('[HealthConnect] Unsupported platform:', Platform.OS);
     throw new Error('health_connect_unsupported_platform');
   }
 
@@ -396,7 +396,7 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
   } catch {
     throw new Error('health_connect_status_failed');
   }
-  console.info('[HealthConnect] SDK status:', sdkStatus);
+  healthConnectLog.info('[HealthConnect] SDK status:', sdkStatus);
   if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
     throw new Error(`health_connect_unavailable_${sdkStatus}`);
   }
@@ -407,7 +407,7 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
   } catch {
     throw new Error('health_connect_initialize_failed');
   }
-  console.info('[HealthConnect] initialize:', initialized);
+  healthConnectLog.info('[HealthConnect] initialize:', initialized);
   if (!initialized) {
     throw new Error('health_connect_initialize_failed');
   }
@@ -513,27 +513,27 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
 
   let stepCount = 0;
   if (connectedMetrics.sleep !== 'no_permission') {
-    console.info('[HealthConnect] Sleep permission granted');
+    healthConnectLog.info('[HealthConnect] Sleep permission granted');
   } else {
-    console.warn('[HealthConnect] Sleep permission denied');
+    healthConnectLog.warn('[HealthConnect] Sleep permission denied');
   }
 
   if (connectedMetrics.heart_rate !== 'no_permission') {
-    console.info('[HealthConnect] Resting HR permission granted');
+    healthConnectLog.info('[HealthConnect] Resting HR permission granted');
   } else {
-    console.warn('[HealthConnect] Resting HR permission denied');
+    healthConnectLog.warn('[HealthConnect] Resting HR permission denied');
   }
 
   if (connectedMetrics.hrv !== 'no_permission') {
-    console.info('[HealthConnect] HRV permission granted');
+    healthConnectLog.info('[HealthConnect] HRV permission granted');
   } else {
-    console.warn('[HealthConnect] HRV permission denied');
+    healthConnectLog.warn('[HealthConnect] HRV permission denied');
   }
 
   if (connectedMetrics.workouts !== 'no_permission') {
-    console.info('[HealthConnect] Workout permission granted');
+    healthConnectLog.info('[HealthConnect] Workout permission granted');
   } else {
-    console.warn('[HealthConnect] Workout permission denied');
+    healthConnectLog.warn('[HealthConnect] Workout permission denied');
   }
 
   if (hasPermission(grantedSet, 'Steps')) {
@@ -545,10 +545,10 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
     if (stepCount > 0) {
       connectedMetrics.steps = 'synced';
       valid.forEach((record) => addObservation('steps', record.count ?? null, 'count', record.endTime, 'Steps', record));
-      console.info('[HealthConnect] Steps read success:', stepCount);
+      healthConnectLog.info('[HealthConnect] Steps read success:', stepCount);
     } else if (connectedMetrics.steps !== 'read_failed') {
       connectedMetrics.steps = 'no_recent_data';
-      console.warn('[HealthConnect] Steps no recent data');
+      healthConnectLog.warn('[HealthConnect] Steps no recent data');
     }
   }
 
@@ -569,7 +569,7 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
       const minutes = Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000);
       addObservation('sleep_minutes', minutes, 'min', record.endTime, 'SleepSession', record);
     });
-    console.info('[HealthConnect] Sleep read', connectedMetrics.sleep, sleepMinutes);
+    healthConnectLog.info('[HealthConnect] Sleep read', connectedMetrics.sleep, sleepMinutes);
   }
 
   const hrRecords = hasPermission(grantedSet, 'RestingHeartRate')
@@ -584,7 +584,7 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
     hrRecords.filter((record) => within(record.time, backfillWindow)).forEach((record) =>
       addObservation('resting_heart_rate', record.beatsPerMinute, 'bpm', record.time, 'RestingHeartRate', record)
     );
-    console.info('[HealthConnect] RestingHeartRate read', connectedMetrics.heart_rate, heartRateAvg ?? null);
+    healthConnectLog.info('[HealthConnect] RestingHeartRate read', connectedMetrics.heart_rate, heartRateAvg ?? null);
   }
 
   const hrvRecords = hasPermission(grantedSet, 'HeartRateVariabilityRmssd')
@@ -599,7 +599,7 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
     hrvRecords.filter((record) => within(record.time, backfillWindow)).forEach((record) =>
       addObservation('hrv_rmssd_ms', record.heartRateVariabilityMillis, 'ms', record.time, 'HeartRateVariabilityRmssd', record)
     );
-    console.info('[HealthConnect] HRV read', connectedMetrics.hrv, hrvAvg ?? null);
+    healthConnectLog.info('[HealthConnect] HRV read', connectedMetrics.hrv, hrvAvg ?? null);
   }
 
   const workoutRecords = hasPermission(grantedSet, 'ExerciseSession')
@@ -620,7 +620,7 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
       const minutes = Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000);
       addObservation('workout_minutes', minutes, 'min', record.endTime, 'ExerciseSession', record);
     });
-    console.info('[HealthConnect] ExerciseSession read', connectedMetrics.workouts, workoutMinutes);
+    healthConnectLog.info('[HealthConnect] ExerciseSession read', connectedMetrics.workouts, workoutMinutes);
   }
 
   let caloriesKcal: number | null = null;
@@ -657,7 +657,7 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
 
   const realSyncedCount = observations.length;
   if (realSyncedCount === 0) {
-    console.warn('[HealthConnect] No real metric synced.');
+    healthConnectLog.warn('[HealthConnect] No real metric synced.');
   }
 
   const payload: WearableSyncPayload = {
@@ -716,3 +716,7 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
 };
 
 export const syncFromHealthConnect = syncFromHealthConnectInternal;
+const healthConnectLog = {
+  info: (...values: unknown[]) => { if (__DEV__) console.info(...values); },
+  warn: (...values: unknown[]) => { if (__DEV__) console.warn(...values); }
+};

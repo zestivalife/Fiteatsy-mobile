@@ -126,7 +126,7 @@ export const apiResponse = async (path: string, init: ApiRequestInit = {}): Prom
       networkType: networkTypeProvider?.() ?? 'UNKNOWN', authenticated, tokenRefreshAttempted: false,
       durationMs: Date.now() - startedAt, outcome };
     diagnosticSink?.(event);
-    console.info('[ApiRequest]', event);
+    if (__DEV__) console.info('[ApiRequest]', event);
   };
   const controller = new AbortController();
   const callerSignal = init.signal;

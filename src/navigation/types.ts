@@ -5,8 +5,6 @@ export type RootStackParamList = {
   Splash: undefined;
   OnboardingBasics: undefined;
   OnboardingAnthropometrics: undefined;
-  OnboardingCalendar: undefined;
-  OnboardingNotifications: undefined;
   OnboardingAssessment: {
     startPhase?: 'lifestyle' | 'recovery';
     lifestyle?: { heightCm: number; weightKg: number; activityLevel: string; sleepHours: number; sleepQuality: string };
@@ -56,15 +54,12 @@ export type RootStackParamList = {
   HealthSyncDebug: undefined;
   ReportsChat: { reportName: string; reportId: string; reportParameters: ReportParameter[] };
   NutritionPlan: undefined;
-  NutritionExperience: undefined;
   MedicationForm: { medicationId?: string } | undefined;
   MedicationCalendar: undefined;
   MedicationNotifications: undefined;
   CycleCalendar: undefined;
   CycleInsights: undefined;
   CycleNotifications: undefined;
-  FamilyDashboard: undefined;
-  FamilyMemberDetail: { connectionId: string };
   Pss10Assessment: { mode?: 'intro' | 'history' } | undefined;
   TrackerDetail: {
     metricKey: string;

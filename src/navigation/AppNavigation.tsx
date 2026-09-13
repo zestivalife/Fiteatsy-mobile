@@ -7,8 +7,6 @@ import { RootStackParamList, MainTabParamList } from './types';
 import { SplashScreen } from '../screens/auth/SplashScreen';
 import { OnboardingBasicsScreen } from '../screens/onboarding/OnboardingBasicsScreen';
 import { OnboardingAnthropometricsScreen } from '../screens/onboarding/OnboardingAnthropometricsScreen';
-import { OnboardingCalendarScreen } from '../screens/onboarding/OnboardingCalendarScreen';
-import { OnboardingNotificationsScreen } from '../screens/onboarding/OnboardingNotificationsScreen';
 import { OnboardingAssessmentScreen } from '../screens/onboarding/OnboardingAssessmentScreen';
 import { OnboardingReadyScreen } from '../screens/onboarding/OnboardingReadyScreen';
 import { FoodPreferencesScreen } from '../screens/onboarding/FoodPreferencesScreen';
@@ -44,7 +42,7 @@ import { CanonicalHealthSyncDebugScreen } from '../screens/sync/CanonicalHealthS
 import { HealthDataSyncScreen } from '../screens/sync/CanonicalHealthDataSyncScreen';
 import { ReportsChatScreen } from '../screens/home/ReportsChatScreen';
 import { NutritionPlanScreen } from '../screens/home/NutritionPlanScreen';
-import { NutritionExperienceScreen } from '../screens/home/NutritionExperienceScreen';
+import { NutritionHubScreen } from '../screens/home/NutritionHubScreen';
 import { MedicationFormScreen } from '../screens/medication/MedicationFormScreen';
 import { MedicationCalendarScreen } from '../screens/medication/MedicationCalendarScreen';
 import { MedicationNotificationsScreen } from '../screens/medication/MedicationNotificationsScreen';
@@ -52,8 +50,6 @@ import { CycleScreen } from '../screens/cycle/CycleScreen';
 import { CycleCalendarScreen } from '../screens/cycle/CycleCalendarScreen';
 import { CycleInsightsScreen } from '../screens/cycle/CycleInsightsScreen';
 import { CycleNotificationsScreen } from '../screens/cycle/CycleNotificationsScreen';
-import { FamilyDashboardScreen } from '../screens/family/FamilyDashboardScreen';
-import { FamilyMemberDetailScreen } from '../screens/family/FamilyMemberDetailScreen';
 import { Pss10AssessmentScreen } from '../screens/assessments/Pss10AssessmentScreen';
 import { useAppContext } from '../state/AppContext';
 
@@ -77,7 +73,7 @@ const MainTabs = () => {
     >
       <Tab.Screen name="Journey" component={HomeScreen} />
       <Tab.Screen name="Tracker" component={TrackerScreen} />
-      <Tab.Screen name="Nutrition" component={NutritionExperienceScreen} />
+      <Tab.Screen name="Nutrition" component={NutritionHubScreen} />
       <Tab.Screen name="Care" component={CareTabScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -114,8 +110,6 @@ export const AppNavigation = () => {
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="OnboardingBasics" component={OnboardingBasicsScreen} />
         <Stack.Screen name="OnboardingAnthropometrics" component={OnboardingAnthropometricsScreen} />
-        <Stack.Screen name="OnboardingCalendar" component={OnboardingCalendarScreen} />
-        <Stack.Screen name="OnboardingNotifications" component={OnboardingNotificationsScreen} />
         <Stack.Screen name="OnboardingAssessment" component={OnboardingAssessmentScreen} />
         <Stack.Screen name="OnboardingReady" component={OnboardingReadyScreen} />
         <Stack.Screen name="FoodPreferences" component={FoodPreferencesScreen} />
@@ -150,15 +144,12 @@ export const AppNavigation = () => {
         <Stack.Screen name="Sessions" component={SessionsScreen} />
         <Stack.Screen name="Cycle" component={CycleScreen} />
         <Stack.Screen name="NutritionPlan" component={NutritionPlanScreen} />
-        <Stack.Screen name="NutritionExperience" component={NutritionExperienceScreen} />
         <Stack.Screen name="MedicationForm" component={MedicationFormScreen} />
         <Stack.Screen name="MedicationCalendar" component={MedicationCalendarScreen} />
         <Stack.Screen name="MedicationNotifications" component={MedicationNotificationsScreen} />
         <Stack.Screen name="CycleCalendar" component={CycleCalendarScreen} />
         <Stack.Screen name="CycleInsights" component={CycleInsightsScreen} />
         <Stack.Screen name="CycleNotifications" component={CycleNotificationsScreen} />
-        <Stack.Screen name="FamilyDashboard" component={FamilyDashboardScreen} />
-        <Stack.Screen name="FamilyMemberDetail" component={FamilyMemberDetailScreen} />
         <Stack.Screen name="Pss10Assessment" component={Pss10AssessmentScreen} />
       </Stack.Navigator>
     </NavigationContainer>
