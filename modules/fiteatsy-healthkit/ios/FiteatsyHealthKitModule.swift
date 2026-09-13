@@ -3,6 +3,7 @@ import HealthKit
 import OSLog
 
 public final class FiteatsyHealthKitModule: Module {
+  private let anchoredReadLimit = 2500
   private let store = HKHealthStore()
   private let iso = ISO8601DateFormatter()
   private var observerQueries: [HKObserverQuery] = []
@@ -111,7 +112,9 @@ public final class FiteatsyHealthKitModule: Module {
       let anchor = anchorText.flatMap { Data(base64Encoded: $0) }.flatMap { try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: $0) }
       let start = startText.flatMap { self.iso.date(from: $0) }
       let predicate = start.map { HKQuery.predicateForSamples(withStart: $0, end: nil, options: []) }
-      let query = HKAnchoredObjectQuery(type: type, predicate: predicate, anchor: anchor, limit: HKObjectQueryNoLimit) {
+      // A first sync can contain a very large heart-rate history. Bound each
+      // bridge response; HealthKit's returned anchor continues the next page.
+      let query = HKAnchoredObjectQuery(type: type, predicate: predicate, anchor: anchor, limit: self.anchoredReadLimit) {
         _, samples, deleted, newAnchor, error in
         if let error = error as NSError? {
           self.logger.error("HealthKit read failed for \(metric, privacy: .public); domain=\(error.domain, privacy: .public), code=\(error.code, privacy: .public)")

@@ -65,6 +65,8 @@ describe('end-to-end health data capture recovery contracts', () => {
     const native = read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift');
     const apple = read('src/services/appleHealthService.ts');
     expect(native).toContain('HKStatisticsQuery');
+    expect(native).toContain('anchoredReadLimit = 2500');
+    expect(native).not.toContain('limit: HKObjectQueryNoLimit');
     expect(native).toContain('options: .cumulativeSum');
     expect(apple).toContain('readHealthKitCumulativeStatistics');
     expect(apple).toContain('anchored source rows remain available for audit');

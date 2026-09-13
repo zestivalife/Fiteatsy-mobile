@@ -7,7 +7,9 @@ import { APPLE_HEALTH_QUERYABLE_METRICS, APPLE_HEALTH_READ_TYPES } from './healt
 export const APPLE_HEALTH_SCOPES = APPLE_HEALTH_READ_TYPES;
 export const APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS = 5_000;
 export const APPLE_HEALTH_PERMISSION_TIMEOUT_MS = 20_000;
-export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 8_000;
+// Thirteen reads run in groups of three. Keep the worst-case local read budget
+// below HEALTH_SYNC_PIPELINE_TIMEOUT_MS even when every native query times out.
+export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 6_000;
 export const APPLE_HEALTH_QUERY_CONCURRENCY = 3;
 const APPLE_HEALTH_STATUS_KEYS: Record<string, string> = {
   steps: 'steps', sleep_minutes: 'sleep', resting_heart_rate: 'heart_rate', heart_rate: 'heart_rate',
@@ -75,6 +77,19 @@ export const syncFromAppleHealth = async (
   const metricValues: Record<string, number[]> = {};
   const metricDiagnostics:NonNullable<WearableSyncPayload['dataQuality']['metricDiagnostics']>={};
   diagnostic('HEALTH_SYNC_START', { metricCount: APPLE_HEALTH_SCOPES.length, status: 'STARTED' });
+  // Statistics are independent of anchored change reads. Starting them here
+  // prevents their timeout budget from being added after every read batch.
+  const statisticsPromise = Promise.all(['steps', 'active_energy', 'distance', 'exercise_minutes'].map(async (metric) => {
+    const startDate = new Date(); startDate.setHours(0, 0, 0, 0);
+    const start = startDate.toISOString();
+    try {
+      const statistic = await withAppleHealthTimeout(readHealthKitCumulativeStatistics(metric, start, new Date().toISOString()),
+        APPLE_HEALTH_METRIC_TIMEOUT_MS, `apple_health_statistics_timeout:${metric}`);
+      return { metric, value: statistic.value };
+    } catch {
+      return { metric, value: null };
+    }
+  }));
   const settledReads = await settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY, async (metric) => {
     const definition = APPLE_HEALTH_QUERYABLE_METRICS.find((item) => item.appleHealthType === metric);
     const start = new Date(Date.now() - (definition?.syncWindowDays ?? 30) * 86400000).toISOString();
@@ -149,18 +164,11 @@ export const syncFromAppleHealth = async (
   });
   // HealthKit statistics apply Apple's source-priority policy for cumulative
   // product totals while anchored source rows remain available for audit.
-  await Promise.all(['steps', 'active_energy', 'distance', 'exercise_minutes'].map(async (metric) => {
-    const startDate = new Date(); startDate.setHours(0, 0, 0, 0);
-    const start = startDate.toISOString();
-    try {
-      const statistic = await withAppleHealthTimeout(readHealthKitCumulativeStatistics(metric, start, new Date().toISOString()),
-        APPLE_HEALTH_METRIC_TIMEOUT_MS, `apple_health_statistics_timeout:${metric}`);
-      metricValues[metric] = statistic.value > 0 ? [statistic.value] : [];
-    } catch {
-      // Older installed native builds may not expose statistics yet. Anchored
-      // values remain truthful fallback data until the next native build.
-    }
-  }));
+  (await statisticsPromise).forEach(({ metric, value }) => {
+    // Older installed native builds may not expose statistics yet. Anchored
+    // values remain truthful fallback data until the next native build.
+    if (value != null) metricValues[metric] = value > 0 ? [value] : [];
+  });
   void withAppleHealthTimeout(enableHealthKitBackgroundDelivery(APPLE_HEALTH_SCOPES), 5_000,
     'apple_health_background_delivery_timeout').catch(() => undefined);
   const steps = sum(validValues(metricValues.steps ?? []));

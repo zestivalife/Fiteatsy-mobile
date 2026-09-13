@@ -6,7 +6,13 @@ jest.mock('../modules/fiteatsy-healthkit', () => ({
   requestHealthKitAuthorization: jest.fn()
 }));
 
-import { settleWithConcurrency, withAppleHealthTimeout } from '../src/services/appleHealthService';
+import {
+  APPLE_HEALTH_METRIC_TIMEOUT_MS,
+  APPLE_HEALTH_QUERY_CONCURRENCY,
+  APPLE_HEALTH_SCOPES,
+  settleWithConcurrency,
+  withAppleHealthTimeout
+} from '../src/services/appleHealthService';
 
 describe('Apple Health native deadline', () => {
   beforeEach(() => jest.useFakeTimers());
@@ -38,5 +44,15 @@ describe('Apple Health native deadline', () => {
     expect(result.map((item) => item.status)).toEqual([
       'fulfilled', 'fulfilled', 'rejected', 'fulfilled', 'fulfilled'
     ]);
+  });
+
+  test('the throttled native-read deadline cannot exceed the enclosing pipeline deadline', () => {
+    const batches = Math.ceil(APPLE_HEALTH_SCOPES.length / APPLE_HEALTH_QUERY_CONCURRENCY);
+    // Keep this assertion independent of the backend/upload module graph.
+    const pipelineSource = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/services/healthSyncManager.ts'), 'utf8'
+    );
+    const pipelineTimeout = Number(pipelineSource.match(/HEALTH_SYNC_PIPELINE_TIMEOUT_MS = ([\d_]+)/)?.[1].replace(/_/g, ''));
+    expect(batches * APPLE_HEALTH_METRIC_TIMEOUT_MS).toBeLessThan(pipelineTimeout);
   });
 });
