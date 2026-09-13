@@ -172,7 +172,7 @@ test('actual events stay scoped to the published plan version and preserve out-o
   assert.match(service, /nutritionDate: nutritionDateKey\(eventTimeISO\)/);
 });
 
-test('Home and Consultant consume the same date-scoped backend projection', () => {
+test('Home uses canonical intelligence for Nourishment while Nutrition keeps the date-scoped projection', () => {
   const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
   const home = readFileSync(new URL('../../src/screens/home/HomeScreen.tsx', import.meta.url), 'utf8');
   const dateUtility = readFileSync(new URL('../../src/utils/nutritionDate.ts', import.meta.url), 'utf8');
@@ -180,7 +180,9 @@ test('Home and Consultant consume the same date-scoped backend projection', () =
   assert.match(service, /nutritionScore,/);
   assert.match(service, /nutritionMonitoring: dailyMonitoring/);
   assert.match(home, /getNutritionExperience\(nutritionDate\(\)\)/);
-  assert.match(home, /dailyNutrition\?\.nutritionScore/);
+  assert.match(home, /getHealthScoreSummary\(\)/);
+  assert.match(home, /healthSummary\?\.nourishmentScore/);
+  assert.doesNotMatch(home, /dailyNutrition\?\.nutritionScore/);
   assert.match(dateUtility, /Asia\/Kolkata/);
   assert.match(dateUtility, /AppState\.addEventListener/);
 });
