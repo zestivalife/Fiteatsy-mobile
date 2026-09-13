@@ -78,6 +78,19 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain("dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_SLEEP_STAGE']");
   });
 
+  test('backend accepts the complete Apple Health provenance contract and a bounded backfill body', () => {
+    const routes = read('backend/src/modules/health/health.routes.ts');
+    const server = read('backend/src/server.ts');
+    expect(routes).toContain('sourceVersion: z.string().trim().max(120).optional()');
+    expect(routes).toContain('sourceProductType: z.string().trim().max(180).optional()');
+    expect(routes).toContain('canonicalFingerprint: z.string().trim().max(240).optional()');
+    expect(server).toContain("app.use('/v1/health/observations:batch', parseHealthObservationBatch)");
+    expect(server).toContain("express.json({ limit: '512kb' })");
+    expect(routes).toContain('recalculateIntelligence: z.boolean().optional().default(true)');
+    expect(routes).toContain('parsed.data.recalculateIntelligence ? await calculateHealthScores(owner) : null');
+    expect(read('src/services/healthSyncManager.ts')).toContain('recalculateIntelligence: false');
+  });
+
   test('authorization and foreground return immediately execute local query and retain local UI rows', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');

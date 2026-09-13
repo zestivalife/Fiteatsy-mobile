@@ -38,7 +38,10 @@ const observationSchema = z.object({
     }).optional(),
     recordingMethod: z.number().int().optional(),
     sleepStage: z.string().trim().max(40).optional(),
-    measurementMethod: z.string().trim().max(40).optional()
+    measurementMethod: z.string().trim().max(40).optional(),
+    sourceVersion: z.string().trim().max(120).optional(),
+    sourceProductType: z.string().trim().max(180).optional(),
+    canonicalFingerprint: z.string().trim().max(240).optional()
   }).strict().optional()
   ,startAtISO: z.string().datetime().nullable().optional()
   ,endAtISO: z.string().datetime().nullable().optional()
@@ -85,7 +88,8 @@ const validateObservation = (observation: z.infer<typeof observationSchema>) => 
 };
 
 const batchSchema = z.object({
-  observations: z.array(observationSchema).min(1).max(1000)
+  observations: z.array(observationSchema).min(1).max(1000),
+  recalculateIntelligence: z.boolean().optional().default(true)
 });
 
 export const healthRouter = Router();
@@ -237,7 +241,11 @@ healthRouter.post('/observations:batch', async (req, res) => {
     }
   }
   const result = await ingestHealthObservations(owner, parsed.data.observations);
-  const scores = await calculateHealthScores(owner);
+  // A first sync is uploaded in bounded chunks. Recalculating the complete
+  // intelligence model for every chunk makes the request path grow with both
+  // history size and chunk count. The mobile coordinator performs one summary
+  // refresh after the final chunk, so intermediate chunks can defer it.
+  const scores = parsed.data.recalculateIntelligence ? await calculateHealthScores(owner) : null;
   return res.status(200).json({
     accepted: result.accepted.length,
     duplicate: result.duplicate.length,
@@ -247,7 +255,7 @@ healthRouter.post('/observations:batch', async (req, res) => {
     items: result.accepted.map((item) => toObservationDto(item, account.client.fiteatsyClientId)),
     duplicates: result.duplicate,
     rejections: result.rejected,
-    intelligence: {
+    intelligence: scores ? {
       recalculated: true,
       scores: scores.map((score) => ({
         scoreType: score.scoreType,
@@ -256,7 +264,7 @@ healthRouter.post('/observations:batch', async (req, res) => {
         confidence: score.confidence,
         calculatedAtISO: score.calculatedAtISO
       }))
-    }
+    } : null
   });
 });
 

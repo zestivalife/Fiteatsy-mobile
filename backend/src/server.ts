@@ -75,6 +75,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   const app = express();
   const readinessCheck = options.readinessCheck ?? checkDatabaseReadiness;
   const parseDietDraftUpdate = express.json({ limit: '512kb' });
+  const parseHealthObservationBatch = express.json({ limit: '512kb' });
 
   app.use(cors());
   app.use('/v1/webhooks', razorpayWebhookRouter);
@@ -82,6 +83,10 @@ export const createApp = (options: CreateAppOptions = {}) => {
     if (req.method !== 'PATCH') return next();
     return parseDietDraftUpdate(req, res, next);
   });
+  // HealthKit backfills contain source provenance for every observation. Parse
+  // this one bounded batch route with an explicit ceiling before the default
+  // JSON middleware; the route still enforces its 1,000-item schema limit.
+  app.use('/v1/health/observations:batch', parseHealthObservationBatch);
   app.use(express.json());
 
   app.get('/', (_req, res) => {

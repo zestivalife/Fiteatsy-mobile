@@ -194,7 +194,10 @@ export const runHealthSync = async (
     let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     while (pending.length) {
       const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
-        '/v1/health/observations:batch', { observations: pending.map((item) => item.observation) }), 'health_sync_upload_timeout');
+        '/v1/health/observations:batch', {
+          observations: pending.map((item) => item.observation),
+          recalculateIntelligence: false
+        }), 'health_sync_upload_timeout');
       accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
       updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
       if (ingest.rejected > 0) break;
