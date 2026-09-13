@@ -4,19 +4,18 @@ import { join } from 'node:path';
 describe('Journey recovery star canonical data contract', () => {
   const source = readFileSync(join(process.cwd(), 'src/screens/home/HomeScreen.tsx'), 'utf8');
 
-  it('loads the same backend health-score summary and recovery history exposed to Consultant workspace', () => {
-    expect(source).toContain('getHealthScoreSummary()');
+  it('loads the account-scoped canonical snapshot and canonical recovery history', () => {
     expect(source).toContain("getHealthScoreHistory('recovery')");
-    expect(source).toContain('healthSummary?.recoveryScore');
-    expect(source).toContain('healthSummary?.healthIntelligenceScore');
-    expect(source).toContain('healthSummary?.activityScore');
-    expect(source).toContain('healthSummary?.sleepScore');
-    expect(source).toContain('healthSummary?.calmScore');
-    expect(source).toContain('healthSummary?.cycleScore');
+    expect(source).toContain('health.canonicalIntelligence?.scores.recovery.score');
+    expect(source).toContain('health.canonicalIntelligence?.scores.healthIntelligence.score');
+    expect(source).toContain('health.canonicalIntelligence?.scores.activity.score');
+    expect(source).toContain('health.canonicalIntelligence?.scores.sleep.score');
+    expect(source).toContain('health.canonicalIntelligence?.scores.calm.score');
+    expect(source).toContain('health.canonicalIntelligence?.scores.cycle.score');
   });
 
   it('maps Nourishment only to the canonical Nutrition framework score', () => {
-    expect(source).toContain('healthSummary?.nutritionScore');
+    expect(source).toContain('health.canonicalIntelligence?.scores.nutrition.score');
     expect(source).not.toContain('HOME_RECOVERY_UI_FIXTURE');
     expect(source).not.toContain('ENABLE_HOME_RECOVERY_UI_FIXTURE');
     expect(source).not.toContain('scoreForHomeUi');

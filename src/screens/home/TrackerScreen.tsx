@@ -1322,7 +1322,6 @@ export const TrackerScreen = () => {
     return 'Low';
   };
 
-  const driverMap = useMemo(() => Object.fromEntries(recoveryIntel.recoveryDrivers.map((d) => [d.label, d])), [recoveryIntel.recoveryDrivers]);
   const latestObservations = health.observations;
   const observationSeries = (metricTypes: string[]) => days
     .map((day) => {
@@ -1340,12 +1339,13 @@ export const TrackerScreen = () => {
   const stepsValue = latestObservationValue(latestObservations, 'steps');
   const caloriesValue = latestObservationValueFor(latestObservations, ['active_energy','calories_kcal']);
   const workoutMinutesValue = latestObservationValueFor(latestObservations, ['workout_minutes','active_minutes']);
-  const activityScoreValue = canonicalIntelligence?.scores.activity.score ?? null;
+  const displayScores = canonicalIntelligence?.scores ?? health.canonicalIntelligence?.scores ?? null;
+  const activityScoreValue = displayScores?.activity.score ?? null;
   const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? latestObservationValueFor(latestObservations,['resting_heart_rate','heart_rate']) : null;
   const hrvValue = recoveryIntel.signalCoverage.hrv ? latestObservationValueFor(latestObservations,['hrv_sdnn_ms','hrv_rmssd_ms']) : null;
   const sleepMinutesValue = recoveryIntel.signalCoverage.sleep ? latestObservationValue(latestObservations,'sleep_minutes') : null;
   const sleepHoursValue = sleepMinutesValue == null ? null : sleepMinutesValue / 60;
-  const sleepScoreValue = canonicalIntelligence?.scores.sleep.score ?? null;
+  const sleepScoreValue = displayScores?.sleep.score ?? null;
   const bedtimeValue = toClockMinutes(onboarding?.sleepTime);
   const wakeTimeValue = toClockMinutes(onboarding?.wakeTime);
   const sleepDurationMinutes = calculateSleepMinutes(bedtimeValue, wakeTimeValue, sleepHoursValue);
@@ -1360,17 +1360,17 @@ export const TrackerScreen = () => {
   const hydrationValue = wellness.hydrationLiters > 0 ? wellness.hydrationLiters : null;
   const activeMinutesValue = wellness.movementMinutes > 0 ? wellness.movementMinutes : workoutMinutesValue;
   const recommendationText = recoveryIntel.highestImpactActions[0] ?? recoveryIntel.insufficientReason ?? 'Sync health data to unlock personalized guidance.';
-  const canonicalScoreRows: Array<[string, HealthIntelligenceV1['scores']['activity']]> = canonicalIntelligence ? [
-    ['Health Intelligence', canonicalIntelligence.scores.healthIntelligence],
-    ['Recovery', canonicalIntelligence.scores.recovery],
-    ['Activity', canonicalIntelligence.scores.activity],
-    ['Sleep', canonicalIntelligence.scores.sleep],
-    ['Calm', canonicalIntelligence.scores.calm],
-    ['Stress Recovery', canonicalIntelligence.scores.stressRecovery],
-    ['Nourishment', canonicalIntelligence.scores.nutrition]
+  const canonicalScoreRows: Array<[string, HealthIntelligenceV1['scores']['activity']]> = displayScores ? [
+    ['Health Intelligence', displayScores.healthIntelligence],
+    ['Recovery', displayScores.recovery],
+    ['Activity', displayScores.activity],
+    ['Sleep', displayScores.sleep],
+    ['Calm', displayScores.calm],
+    ['Stress Recovery', displayScores.stressRecovery],
+    ['Nourishment', displayScores.nutrition]
   ] : [];
-  if (canonicalIntelligence?.scores.cycle.status !== 'NOT_APPLICABLE' && canonicalIntelligence) {
-    canonicalScoreRows.push(['Cycle Wellness', canonicalIntelligence.scores.cycle]);
+  if (displayScores?.cycle.status !== 'NOT_APPLICABLE') {
+    if (displayScores) canonicalScoreRows.push(['Cycle Wellness', displayScores.cycle]);
   }
   const supportingScoreRows: Array<[string, number | null, string]> = [
     ['Energy Balance', masterScoreSummary?.energyBalanceScore ?? null, 'Secondary daily energy insight from approved inputs'],
@@ -1387,10 +1387,10 @@ export const TrackerScreen = () => {
       kind: 'spark',
       color: '#60AF00',
       values: observationSeries(['resting_heart_rate', 'heart_rate']),
-      latestValue: driverMap['Resting heart load']?.score ?? 0,
+      latestValue: restingHeartRateValue ?? 0,
       compareValues: observationSeries(['resting_heart_rate', 'heart_rate']),
       signalState: trendState(observationSeries(['resting_heart_rate', 'heart_rate'])),
-      recoveryImpact: impactState(driverMap['Resting heart load']?.score ?? 0),
+      recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
       freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='resting_heart_rate')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     },
@@ -1403,10 +1403,10 @@ export const TrackerScreen = () => {
       kind: 'bars',
       color: '#60AF00',
       values: observationSeries(['workout_minutes', 'active_minutes']),
-      latestValue: driverMap['Movement / Workouts']?.score ?? 0,
+      latestValue: workoutMinutesValue ?? 0,
       compareValues: observationSeries(['workout_minutes', 'active_minutes']),
       signalState: trendState(observationSeries(['workout_minutes', 'active_minutes'])),
-      recoveryImpact: impactState(driverMap['Movement / Workouts']?.score ?? 0),
+      recoveryImpact: impactState(displayScores?.activity.score ?? 0),
       freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='workout')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     },
@@ -1419,10 +1419,10 @@ export const TrackerScreen = () => {
       kind: 'spark',
       color: '#60AF00',
       values: observationSeries(['hrv_sdnn_ms', 'hrv_rmssd_ms']),
-      latestValue: driverMap['HRV / Recovery balance']?.score ?? 0,
+      latestValue: hrvValue ?? 0,
       compareValues: observationSeries(['hrv_sdnn_ms', 'hrv_rmssd_ms']),
       signalState: trendState(observationSeries(['hrv_sdnn_ms', 'hrv_rmssd_ms'])),
-      recoveryImpact: impactState(driverMap['HRV / Recovery balance']?.score ?? 0),
+      recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
       freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey.startsWith('hrv_'))?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     },
@@ -1435,10 +1435,10 @@ export const TrackerScreen = () => {
       kind: 'bars',
       color: '#60AF00',
       values: scoreSeries('sleep'),
-      latestValue: driverMap.Sleep?.score ?? 0,
+      latestValue: sleepScoreValue ?? 0,
       compareValues: scoreSeries('sleep'),
       signalState: trendState(scoreSeries('sleep')),
-      recoveryImpact: impactState(driverMap.Sleep?.score ?? 0),
+      recoveryImpact: impactState(sleepScoreValue ?? 0),
       freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='sleep')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     }
@@ -1454,10 +1454,10 @@ export const TrackerScreen = () => {
       kind: 'spark',
       color: '#60AF00',
       values: scoreSeries('recovery'),
-      latestValue: masterScoreSummary?.recoveryScore ?? 0,
+      latestValue: displayScores?.recovery.score ?? 0,
       compareValues: scoreSeries('recovery'),
       signalState: trendState(scoreSeries('recovery')),
-      recoveryImpact: impactState(masterScoreSummary?.recoveryScore ?? 0),
+      recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
       freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Synced Recently',
       confidence: confidenceState()
     },
@@ -1470,10 +1470,10 @@ export const TrackerScreen = () => {
       kind: 'bars',
       color: '#60AF00',
       values: scoreSeries('stress_resilience'),
-      latestValue: masterScoreSummary?.stressResilienceScore ?? 0,
+      latestValue: displayScores?.stressRecovery.score ?? 0,
       compareValues: scoreSeries('stress_resilience'),
       signalState: trendState(scoreSeries('stress_resilience')),
-      recoveryImpact: impactState(masterScoreSummary?.stressResilienceScore ?? 0),
+      recoveryImpact: impactState(displayScores?.stressRecovery.score ?? 0),
       freshness: recoveryIntel.questionnaireAvailable ? 'Synced Recently' : 'No Recent Data',
       confidence: confidenceState()
     },
@@ -1486,10 +1486,10 @@ export const TrackerScreen = () => {
       kind: 'spark',
       color: '#60AF00',
       values: scoreSeries('calm'),
-      latestValue: driverMap['Calm sessions']?.score ?? 0,
+      latestValue: displayScores?.calm.score ?? 0,
       compareValues: scoreSeries('calm'),
       signalState: trendState(scoreSeries('calm')),
-      recoveryImpact: impactState(driverMap['Calm sessions']?.score ?? 0),
+      recoveryImpact: impactState(displayScores?.calm.score ?? 0),
       freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Manual Input',
       confidence: confidenceState()
     },
@@ -1502,10 +1502,10 @@ export const TrackerScreen = () => {
       kind: 'bars',
       color: '#60AF00',
       values: scoreSeries('recovery'),
-      latestValue: masterScoreSummary?.recoveryScore ?? 0,
+      latestValue: displayScores?.recovery.score ?? 0,
       compareValues: scoreSeries('recovery'),
       signalState: trendState(scoreSeries('recovery')),
-      recoveryImpact: impactState(masterScoreSummary?.recoveryScore ?? 0),
+      recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
       freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Synced Recently',
       confidence: confidenceState()
     }
@@ -1646,7 +1646,7 @@ export const TrackerScreen = () => {
 
   const renderHealthOverview = () => (
     <View style={styles.healthContentStack}>
-      <RecoveryParticleMetric value={masterScoreSummary?.recoveryScore ?? null} label={statusLabel(masterScoreSummary?.recoveryScore)} />
+      <RecoveryParticleMetric value={displayScores?.recovery.score ?? null} label={statusLabel(displayScores?.recovery.score)} />
       <Card style={styles.healthPanel}>
         <Text style={styles.healthPanelTitle}>Health Intelligence Scores</Text>
         {canonicalScoreRows.map(([label, result]) => (
@@ -1705,7 +1705,7 @@ export const TrackerScreen = () => {
       <Card style={styles.healthPanel}>
         <Text style={styles.healthPanelTitle}>Cardiovascular Stability</Text>
         <Text style={styles.healthMuted}>Heart performance is shown from canonical measurements; Cardio Efficiency methodology is pending.</Text>
-        {renderMetricRow('Recovery Signal', scoreLabel(recoveryIntel.recoveryScore), '', recoveryIntel.recoveryScore, '#6FD3FF')}
+        {renderMetricRow('Recovery', scoreLabel(displayScores?.recovery.score ?? null), '', displayScores?.recovery.score ?? null, '#6FD3FF')}
       </Card>
       <Card style={[styles.recommendationCard, styles.heartInsightCard]}>
         <Text style={[styles.recommendationTitle, { color: '#FF8188' }]}>Recovery Insight</Text>

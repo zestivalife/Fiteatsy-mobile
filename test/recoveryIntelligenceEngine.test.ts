@@ -32,7 +32,7 @@ describe('recoveryIntelligenceEngine', () => {
   const observation = (metricType:string,value:number,unit:string):HealthObservationDraft => ({metricType,value,unit,measuredAtISO:observedAt,sourceProvider:'HEALTH_CONNECT'});
   const healthObservations = [observation('steps',8000,'count'),observation('sleep_minutes',444,'min'),observation('resting_heart_rate',63,'bpm'),observation('hrv_rmssd_ms',46,'ms'),observation('workout_minutes',34,'min')];
 
-  it('returns explainable, bounded recovery output', () => {
+  it('returns context without becoming a second canonical score authority', () => {
     const output = buildRecoveryIntelligence({
       wellness: baseWellness,
       checkIns: [makeCheckIn(12, 4, 4, 4), makeCheckIn(13, 4, 3, 4), makeCheckIn(14, 3, 4, 3)],
@@ -40,9 +40,9 @@ describe('recoveryIntelligenceEngine', () => {
       healthObservations
     });
 
-    expect(output.recoveryScore).not.toBeNull();
-    expect(output.recoveryScore as number).toBeGreaterThanOrEqual(0);
-    expect(output.recoveryScore as number).toBeLessThanOrEqual(100);
+    expect(output.recoveryScore).toBeNull();
+    expect(output.calmScore).toBeNull();
+    expect(output.stressRecoveryScore).toBeNull();
     expect(output.recoveryDrivers.length).toBeGreaterThanOrEqual(6);
     expect(output.trendValues7d).toEqual([80, 73, 67]);
     expect(output.highestImpactActions.length).toBeGreaterThan(0);
@@ -63,7 +63,7 @@ describe('recoveryIntelligenceEngine', () => {
     expect(output.contextualInsights[0]).toContain('Recovery insights improve');
   });
 
-  it('hydrates approved PSS-10 questionnaire results into stress recovery and trend values', () => {
+  it('retains approved PSS-10 input without deriving a competing stress-recovery score', () => {
     const output = buildRecoveryIntelligence({
       wellness: baseWellness,
       checkIns: [],
@@ -76,7 +76,7 @@ describe('recoveryIntelligenceEngine', () => {
     });
     expect(output.questionnaireAvailable).toBe(true);
     expect(output.pss10Score).toBe(10);
-    expect(output.stressRecoveryScore).toBe(75);
+    expect(output.stressRecoveryScore).toBeNull();
     expect(output.trendValues7d).toEqual([50, 75]);
   });
 });

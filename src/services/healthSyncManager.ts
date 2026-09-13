@@ -1,5 +1,5 @@
 import { HealthObservationDraft, WearableSyncPayload, WellnessSnapshot } from '../types';
-import { recalculateWellness } from '../utils/wellness';
+import { mergeWellnessInputs } from '../utils/wellness';
 import { apiFetch, postJson } from './apiClient';
 import { getHealthPlatformAdapter, type HealthAppId } from './healthPlatformAdapter';
 import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceService';
@@ -126,7 +126,7 @@ export const wellnessFromHealthScores = (
   scores: HealthScoreSummary
 ): WellnessSnapshot => {
   const metrics = payload?.metrics;
-  const next = recalculateWellness({
+  const next = mergeWellnessInputs({
     ...previous,
     heartRateAvg: positiveOrExisting(metrics?.heartRateAvg, previous.heartRateAvg),
     sleepHours: positiveOrExisting(metrics?.sleepHours, previous.sleepHours),

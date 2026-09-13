@@ -10,7 +10,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import { acknowledgeLocalObservations, countPendingLocalObservations, markLocalHealthProviderConnected,
   persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalHealthObservations,
   readLocalHealthPresentationObservations, readLocalHealthProviderConnected,
-  readLocalSyncCursors, readPendingLocalObservations } from '../src/services/healthSyncLocalStore';
+  readLocalSyncCursors, readPendingLocalObservations, persistLocalCanonicalHealthSnapshot,
+  readLocalCanonicalHealthSnapshot } from '../src/services/healthSyncLocalStore';
+import { calculateCanonicalHealthIntelligence } from '../src/services/localHealthIntelligence';
 
 const observation = (value: number, deleted = false, recordId = 'record-1') => ({
   metricType: 'steps', value, unit: deleted ? 'deleted' : 'count',
@@ -79,5 +81,21 @@ describe('durable local health sync store', () => {
     await persistLocalHealthPresentationObservations(scope, [total]);
     expect(await readLocalHealthPresentationObservations(scope)).toEqual([total]);
     expect(await readPendingLocalObservations(scope)).toEqual([]);
+  });
+
+  it('restores only the account-scoped canonical V1 score snapshot after restart', async () => {
+    const scope = 'account:user-1:apple-health';
+    const snapshot = calculateCanonicalHealthIntelligence({
+      activity: { steps: 10_000, stepGoal: 10_000, exerciseMinutes: 30, exerciseTarget: 30, balance: 80 },
+      sleep: { minutes: 480, targetMinutes: 480, deep: 80, rem: 80, efficiency: 80, consistency: 80 },
+      nutrition: { protein: 80, hydration: 80, foodQuality: 80, clinical: 80 },
+      calm: { hrv: 80, stress: 80, mindfulness: 80 },
+      stressRecovery: { hrv: 80, sleep: 80, adaptation: 80 },
+      recovery: { sleep: 80, body: 80, activityBalance: 80, lifestyle: 80 },
+      cycle: { applicable: false }
+    }, '2026-09-14T10:00:00.000Z');
+    await persistLocalCanonicalHealthSnapshot(scope, snapshot);
+    expect(await readLocalCanonicalHealthSnapshot(scope)).toEqual(snapshot);
+    expect(await readLocalCanonicalHealthSnapshot('account:user-2:apple-health')).toBeNull();
   });
 });

@@ -29,8 +29,6 @@ import { getMySubscription } from '../../services/subscriptionService';
 import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
 import {
   getHealthScoreHistory,
-  getHealthScoreSummary,
-  type HealthScoreSummary
 } from '../../services/healthIntelligenceService';
 import type { Medication, MedicationLogStatus } from '../../types';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
@@ -133,7 +131,6 @@ export const HomeScreen = () => {
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('healthIntelligence');
   const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
-  const [healthSummary, setHealthSummary] = useState<HealthScoreSummary | null>(null);
   const [recoveryTrend, setRecoveryTrend] = useState<number[]>([]);
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
@@ -211,16 +208,11 @@ export const HomeScreen = () => {
 
   const refreshHealthScores = useCallback(async () => {
     if (!hasAuthSession) {
-      setHealthSummary(null);
       setRecoveryTrend([]);
       return;
     }
     try {
-      const [summary, history] = await Promise.all([
-        getHealthScoreSummary(),
-        getHealthScoreHistory('recovery')
-      ]);
-      setHealthSummary(summary);
+      const history = await getHealthScoreHistory('recovery');
       setRecoveryTrend(
         history.items
           .filter((item) => item.scoreStatus === 'calculated' && item.scoreValue != null)
@@ -230,8 +222,7 @@ export const HomeScreen = () => {
           .filter((score): score is number => score != null)
       );
     } catch {
-      setHealthSummary(null);
-      setRecoveryTrend([]);
+      // Keep the last canonical trend while temporarily offline.
     }
   }, [hasAuthSession]);
 
@@ -257,7 +248,7 @@ export const HomeScreen = () => {
     {
       key: 'recovery',
       label: 'Recovery',
-      score: normalizeScore(healthSummary?.recoveryScore),
+      score: normalizeScore(health.canonicalIntelligence?.scores.recovery.score),
       color: '#FF1717',
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
@@ -266,7 +257,7 @@ export const HomeScreen = () => {
     {
       key: 'activity',
       label: 'Activity',
-      score: normalizeScore(healthSummary?.activityScore),
+      score: normalizeScore(health.canonicalIntelligence?.scores.activity.score),
       color: '#F27A1A',
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
@@ -275,7 +266,7 @@ export const HomeScreen = () => {
     {
       key: 'nourishment',
       label: 'Nourishment',
-      score: normalizeScore(healthSummary?.nutritionScore),
+      score: normalizeScore(health.canonicalIntelligence?.scores.nutrition.score),
       color: '#77FF22',
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
@@ -284,7 +275,7 @@ export const HomeScreen = () => {
     {
       key: 'calm',
       label: 'Calm',
-      score: normalizeScore(healthSummary?.calmScore),
+      score: normalizeScore(health.canonicalIntelligence?.scores.calm.score),
       color: '#763CEF',
       position: 'bottomLeft',
       DefaultIcon: MindDefaultIcon,
@@ -293,7 +284,7 @@ export const HomeScreen = () => {
     {
       key: 'sleep',
       label: 'Sleep',
-      score: normalizeScore(healthSummary?.sleepScore),
+      score: normalizeScore(health.canonicalIntelligence?.scores.sleep.score),
       color: '#0F80FF',
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
@@ -302,7 +293,7 @@ export const HomeScreen = () => {
     {
       key: 'cycleWellness',
       label: 'Cycle Wellness',
-      score: normalizeScore(healthSummary?.cycleScore),
+      score: normalizeScore(health.canonicalIntelligence?.scores.cycle.score),
       color: '#FF4FA3',
       position: 'bottomCenter',
       DefaultIcon: MindDefaultIcon,
@@ -312,7 +303,7 @@ export const HomeScreen = () => {
   const displayMetrics = metrics;
   const trendValues = recoveryTrend;
   const hasTrendData = trendValues.length > 0;
-  const healthIntelligenceScore = normalizeScore(healthSummary?.healthIntelligenceScore);
+  const healthIntelligenceScore = normalizeScore(health.canonicalIntelligence?.scores.healthIntelligence.score);
 
   const selected = selectedMetric === 'healthIntelligence'
     ? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' }

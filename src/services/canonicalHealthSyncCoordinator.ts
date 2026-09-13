@@ -20,11 +20,13 @@ import {
   runHealthSync,
   wellnessFromHealthScores
 } from './healthSyncManager';
-import type { HealthScoreSummary } from './healthIntelligenceService';
+import { getHealthIntelligenceV1, type HealthIntelligenceV1, type HealthScoreSummary } from './healthIntelligenceService';
 import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLocalHealthProviderConnected,
   migrateLegacyHealthInstallationId, readLocalHealthObservations, readLocalHealthPresentationObservations,
-  readLocalHealthProviderConnected } from './healthSyncLocalStore';
+  readLocalHealthProviderConnected, readLocalCanonicalHealthSnapshot, persistLocalCanonicalHealthSnapshot } from './healthSyncLocalStore';
 import { buildPresentedHealthObservations } from './healthMetricPresentation';
+import { calculateCanonicalHealthIntelligenceFromObservations, hasCalculatedCanonicalScore,
+  markCanonicalSnapshotStale, type LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
 import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 
@@ -49,11 +51,20 @@ const toDto = (item: HealthObservationDraft, clientId: string, index: number): H
   createdAtISO: new Date().toISOString()
 });
 
+const serverSnapshot = (value: HealthIntelligenceV1): LocalCanonicalHealthSnapshot => ({
+  calculationVersion: value.calculationVersion,
+  calculatedAt: value.latestCalculationAt,
+  inputWindow: { startAtISO: null, endAtISO: value.latestSourceReadAt },
+  inputFreshness: value.scores.healthIntelligence.freshness,
+  source: 'CACHED_CANONICAL_SERVER',
+  scores: value.scores
+});
+
 export const countAvailableHealthMetrics = (metrics: CanonicalHealthMetricState[]) =>
   metrics.filter((metric) => metric.queryState === 'DATA_AVAILABLE').length;
 
 const useCreateCanonicalHealthSyncCoordinator = () => {
-  const { authSession, bootstrapped, wellness, setWellness, setSelectedDeviceId } = useAppContext();
+  const { authSession, bootstrapped, wellness, onboarding, setWellness, setSelectedDeviceId } = useAppContext();
   const adapter = useMemo(() => getHealthPlatformAdapter(), []);
   const sourceName = adapter.platform === 'APPLE_HEALTH' ? 'Apple Health' : 'Health Connect';
   const mounted = useRef(true);
@@ -78,6 +89,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const [localHydrated, setLocalHydrated] = useState(false);
   const [localProviderConnected, setLocalProviderConnected] = useState(false);
   const [pendingUploadCount, setPendingUploadCount] = useState(0);
+  const [canonicalIntelligence, setCanonicalIntelligence] = useState<LocalCanonicalHealthSnapshot | null>(null);
   const localScope = useMemo(() => authSession
     ? `account:${authSession.accountId}:${adapter.appId}`
     : null, [adapter.appId, authSession]);
@@ -97,8 +109,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const refreshRemoteSnapshot = useCallback(async () => {
     const locallyAvailable = await adapter.isAvailable().catch(() => false);
     try {
-      const [nextStatus, nextObservations, nextActivity] = await Promise.all([
-        getHealthSyncStatus(), getLatestHealthObservations(200), getHealthSyncActivity(8)
+      const [nextStatus, nextObservations, nextActivity, nextIntelligence] = await Promise.all([
+        getHealthSyncStatus(), getLatestHealthObservations(200), getHealthSyncActivity(8), getHealthIntelligenceV1()
       ]);
       if (!mounted.current) return;
       setStatus(nextStatus);
@@ -109,11 +121,14 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         return [...byIdentity.values()];
       });
       setActivity(nextActivity.items);
+      const snapshot = serverSnapshot(nextIntelligence);
+      setCanonicalIntelligence(snapshot);
+      if (localScope) await persistLocalCanonicalHealthSnapshot(localScope, snapshot);
     } catch {
       // Backend availability is not provider availability. Local reads stay usable.
       if (mounted.current) setProviderState((current) => current === 'CONNECTED' ? current : locallyAvailable ? 'AVAILABLE' : 'UNAVAILABLE');
     }
-  }, [adapter]);
+  }, [adapter, localScope]);
 
   const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean } = {}) => {
     if (!authSession || !localScope) return;
@@ -270,14 +285,15 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     setQueryStates({});
     setErrors({});
     setPendingUploadCount(0);
+    setCanonicalIntelligence(null);
     setLocalProviderConnected(false);
     setLocalHydrated(false);
     if (!bootstrapped || !localScope) return;
     let active = true;
     Promise.all([readLocalHealthObservations(localScope), readLocalHealthPresentationObservations(localScope),
       countPendingLocalObservations(localScope),
-      readLocalHealthProviderConnected(localScope)])
-      .then(([cached, cachedPresentation, pending, connected]) => {
+      readLocalHealthProviderConnected(localScope), readLocalCanonicalHealthSnapshot(localScope)])
+      .then(([cached, cachedPresentation, pending, connected, cachedIntelligence]) => {
         if (!active || !mounted.current) return;
         mergeLocalObservations(cached);
         setPresentationObservations(cachedPresentation.map((item, index) =>
@@ -285,11 +301,25 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setPendingUploadCount(pending);
         setLocalProviderConnected(connected || cached.length > 0);
         if (connected || cached.length > 0) setProviderState('CONNECTED');
+        if (cachedIntelligence) setCanonicalIntelligence(markCanonicalSnapshotStale(cachedIntelligence));
         setLocalHydrated(true);
       })
       .catch(() => { if (active && mounted.current) setLocalHydrated(true); });
     return () => { active = false; };
   }, [authSession?.client.fiteatsyClientId, bootstrapped, localScope, mergeLocalObservations]);
+
+  useEffect(() => {
+    if (!localHydrated || !localScope) return;
+    const calculated = calculateCanonicalHealthIntelligenceFromObservations(observations, {
+      sleepTargetMinutes: onboarding?.sleepGoalHours == null ? null : onboarding.sleepGoalHours * 60,
+      cycleApplicable: onboarding?.gender === 'Female'
+    });
+    setCanonicalIntelligence((current) => {
+      if (current && hasCalculatedCanonicalScore(current) && !hasCalculatedCanonicalScore(calculated)) return current;
+      void persistLocalCanonicalHealthSnapshot(localScope, calculated);
+      return calculated;
+    });
+  }, [localHydrated, localScope, observations, onboarding?.gender, onboarding?.sleepGoalHours]);
 
   useEffect(() => {
     if (!authSession || !localHydrated || automaticInitialSyncStarted.current) return;
@@ -370,6 +400,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     activity,
     message,
     diagnostics,
+    canonicalIntelligence,
     localHydrated,
     pendingUploadCount,
     syncLocalMetrics,

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { HealthObservationDraft } from '../types';
+import type { LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
 
 const STORE_VERSION = 1;
 const keyFor = (scope: string) => `@fiteatsy/health-sync-local-v${STORE_VERSION}:${scope}`;
@@ -10,8 +11,9 @@ const identity = (item: HealthObservationDraft) => item.syncKey
 
 type StoredRecord = { observation: HealthObservationDraft; uploaded: boolean; updatedAtISO: string };
 type LocalSyncState = { records: Record<string, StoredRecord>; presentationRecords: Record<string, HealthObservationDraft>;
-  cursors: Record<string, string>; providerConnected: boolean };
-const emptyState = (): LocalSyncState => ({ records: {}, presentationRecords: {}, cursors: {}, providerConnected: false });
+  cursors: Record<string, string>; providerConnected: boolean; canonicalScoreSnapshot: LocalCanonicalHealthSnapshot | null };
+const emptyState = (): LocalSyncState => ({ records: {}, presentationRecords: {}, cursors: {}, providerConnected: false,
+  canonicalScoreSnapshot: null });
 const scopeOperations = new Map<string, Promise<unknown>>();
 const serializeScopeOperation = <T>(scope: string, operation: () => Promise<T>): Promise<T> => {
   const previous = scopeOperations.get(scope) ?? Promise.resolve();
@@ -28,7 +30,9 @@ const readState = async (scope: string): Promise<LocalSyncState> => {
     if (!raw) return emptyState();
     const parsed = JSON.parse(raw) as Partial<LocalSyncState>;
     return { records: parsed.records ?? {}, presentationRecords: parsed.presentationRecords ?? {},
-      cursors: parsed.cursors ?? {}, providerConnected: parsed.providerConnected === true };
+      cursors: parsed.cursors ?? {}, providerConnected: parsed.providerConnected === true,
+      canonicalScoreSnapshot: parsed.canonicalScoreSnapshot?.calculationVersion === 'HEALTH_INTELLIGENCE_V1'
+        ? parsed.canonicalScoreSnapshot : null };
   } catch {
     return emptyState();
   }
@@ -73,6 +77,16 @@ export const markLocalHealthProviderConnected = (scope: string) =>
   serializeScopeOperation(scope, async () => {
     const state = await readState(scope);
     state.providerConnected = true;
+    await writeState(scope, state);
+  });
+
+export const readLocalCanonicalHealthSnapshot = (scope: string) =>
+  serializeScopeOperation(scope, async () => (await readState(scope)).canonicalScoreSnapshot);
+
+export const persistLocalCanonicalHealthSnapshot = (scope: string, snapshot: LocalCanonicalHealthSnapshot) =>
+  serializeScopeOperation(scope, async () => {
+    const state = await readState(scope);
+    state.canonicalScoreSnapshot = snapshot;
     await writeState(scope, state);
   });
 

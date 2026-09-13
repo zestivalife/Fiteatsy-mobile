@@ -31,9 +31,10 @@ export type RecoveryOutput = {
     workouts: boolean;
   };
   recoveryDirection: RecoveryDirection;
-  recoveryScore: number | null;
-  calmScore: number | null;
-  stressRecoveryScore: number | null;
+  /** Canonical scores are intentionally unavailable from this context-only helper. */
+  recoveryScore: null;
+  calmScore: null;
+  stressRecoveryScore: null;
   pss10Score: number | null;
   questionnaireAvailable: boolean;
   recoveryDrivers: RecoveryDriver[];
@@ -43,12 +44,6 @@ export type RecoveryOutput = {
   blockers: string[];
   trendValues7d: number[];
   debug: {
-    rawRecoveryScore: number;
-    smoothedRecoveryScore: number | null;
-    rawCalmScore: number;
-    smoothedCalmScore: number | null;
-    rawStressRecoveryScore: number;
-    smoothedStressRecoveryScore: number | null;
     sessionInfluenceMultiplier: number;
     recentCooldownPenalty: number;
     effectiveSessionInfluence: number;
@@ -112,11 +107,6 @@ const latestMetric = (observations: HealthObservationDraft[], metricTypes: strin
   observations.filter(item => !item.deleted && metricTypes.includes(item.metricType))
     .sort((left,right) => right.measuredAtISO.localeCompare(left.measuredAtISO))[0] ?? null;
 
-const smoothScore = (previous: number, nextRaw: number, maxDelta = 8) => {
-  const bounded = clamp(nextRaw, previous - maxDelta, previous + maxDelta);
-  return round(clamp(previous * 0.72 + bounded * 0.28, 0, 100));
-};
-
 const buildTrend = (checkIns: DailyCheckIn[]) => {
   const recent = lastNDays(checkIns, 7).reverse();
   return recent.map((entry) => round(clamp(((entry.mood + entry.energy + entry.sleepQuality) / 15) * 100, 0, 100)));
@@ -149,7 +139,6 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
   const coverageCount = Object.values(signalCoverage).filter(Boolean).length;
   const pss10Results = [...(input.pss10Results ?? [])].sort((a, b) => +new Date(a.completedAtISO) - +new Date(b.completedAtISO));
   const latestPss10 = pss10Results[pss10Results.length - 1] ?? null;
-  const pss10ResilienceScore = latestPss10 ? round(clamp(100 - (latestPss10.rawScore / 40) * 100, 0, 100)) : null;
 
   const hasSessionSignals = input.wellness.breathingMinutes > 0 || input.wellness.focusMinutes > 0 || input.wellness.moodScore > 0;
   const hasEnoughForCalibration = coverageCount >= 3 && hasSessionSignals;
@@ -249,17 +238,11 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
     }
   ];
 
-  const rawRecoveryScore = round(clamp(drivers.reduce((sum, item) => sum + item.contribution, 0), 0, 100));
-  const rawCalmScore = round(clamp((sessionsScore * 0.35) + (hrvScore * 0.35) + (sleepScore * 0.2) + (restingHrScore * 0.1), 0, 100));
-  const rawStressRecoveryScore = round(clamp((rawCalmScore * 0.55) + (sleepScore * 0.25) + (hrvScore * 0.2), 0, 100));
-
-  const previousRecovery = clamp(input.wellness.recoveryScore, 0, 100);
-  const previousCalm = clamp(100 - input.wellness.stressScore, 0, 100);
-  const previousStressRecovery = clamp(100 - input.wellness.stressScore, 0, 100);
-
-  const recoveryScore = hasEnoughForCalibration ? smoothScore(previousRecovery, rawRecoveryScore, 9) : null;
-  const calmScore = hasEnoughForCalibration ? smoothScore(previousCalm, rawCalmScore, 8) : null;
-  const stressRecoveryScore = pss10ResilienceScore ?? (hasEnoughForCalibration ? smoothScore(previousStressRecovery, rawStressRecoveryScore, 8) : null);
+  // This module supplies context and freshness only. HEALTH_INTELLIGENCE_V1 is
+  // the sole authority allowed to produce Recovery, Calm, or Stress Recovery.
+  const recoveryScore = null;
+  const calmScore = null;
+  const stressRecoveryScore = null;
 
   const prior7 = lastNDays(input.checkIns, 14).slice(7);
   const priorMood = prior7.length ? mean(prior7.map((item) => item.mood)) : 3;
@@ -268,13 +251,7 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
   const moodDelta = recentMood - priorMood;
 
   const direction: RecoveryDirection =
-    recoveryScore == null
-      ? 'stable'
-      : recoveryScore >= previousRecovery + 2 && moodDelta >= -0.1
-        ? 'improving'
-        : recoveryScore <= previousRecovery - 2 || moodDelta <= -0.25
-          ? 'declining'
-          : 'stable';
+    moodDelta > 0.25 ? 'improving' : moodDelta < -0.25 ? 'declining' : 'stable';
 
   const scored = drivers.filter((driver) => driver.weight > 0);
   const sortedByScore = [...scored].sort((a, b) => a.score - b.score);
@@ -341,12 +318,6 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
       ? pss10Results.slice(-7).map((result) => round(clamp(100 - (result.rawScore / 40) * 100, 0, 100)))
       : buildTrend(input.checkIns),
     debug: {
-      rawRecoveryScore,
-      smoothedRecoveryScore: recoveryScore,
-      rawCalmScore,
-      smoothedCalmScore: calmScore,
-      rawStressRecoveryScore,
-      smoothedStressRecoveryScore: stressRecoveryScore,
       sessionInfluenceMultiplier: antiManip.sessionInfluenceMultiplier,
       recentCooldownPenalty: antiManip.recentCooldownPenalty,
       effectiveSessionInfluence: sessionInfluence,
