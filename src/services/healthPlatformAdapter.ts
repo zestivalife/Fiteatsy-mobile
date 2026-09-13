@@ -47,6 +47,14 @@ export const appleHealthAdapter: HealthPlatformAdapter = {
   getSupportedMetricRegistry: () => APPLE_HEALTH_QUERYABLE_METRICS.map((metric) => metric.metricKey)
 };
 
+let healthConnectOperation: Promise<unknown> | null = null;
+const serializeHealthConnect = async <T>(operation: () => Promise<T>): Promise<T> => {
+  if (healthConnectOperation) throw new Error('health_connect_operation_in_progress');
+  const pending = operation();
+  healthConnectOperation = pending;
+  try { return await pending; } finally { healthConnectOperation = null; }
+};
+
 export const healthConnectAdapter: HealthPlatformAdapter = {
   platform: 'HEALTH_CONNECT',
   appId: 'health-connect',
@@ -59,13 +67,13 @@ export const healthConnectAdapter: HealthPlatformAdapter = {
     }
   },
   async requestAccess() {
-    const result = await requestHealthConnectPermissionsOnly();
+    const result = await serializeHealthConnect(requestHealthConnectPermissionsOnly);
     const grantedScopes = Object.entries(result.permissionStates)
       .filter(([, granted]) => granted)
       .map(([scope]) => scope);
     return { supportedScopes: Object.keys(result.permissionStates), grantedScopes };
   },
-  queryAllSupportedMetrics: (checkpoints) => syncFromHealthConnect(checkpoints.__changes__),
+  queryAllSupportedMetrics: (checkpoints) => serializeHealthConnect(() => syncFromHealthConnect(checkpoints.__changes__)),
   getSupportedMetricRegistry: () => HEALTH_CONNECT_QUERYABLE_METRICS.map((metric) => metric.metricKey)
 };
 

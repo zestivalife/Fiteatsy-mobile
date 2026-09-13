@@ -10,7 +10,6 @@ import {
   type Permission
 } from 'react-native-health-connect';
 import { HealthObservationDraft, WearableSyncPayload } from '../types';
-import { runHealthConnectOperation } from './healthConnectOperationCoordinator';
 import { HEALTH_CONNECT_READ_RECORDS } from './healthMetricRegistry';
 
 type HealthConnectMetricStatus = 'synced' | 'no_permission' | 'no_recent_data' | 'read_failed' | 'unsupported' | 'unavailable';
@@ -157,8 +156,7 @@ const inspectHealthConnectPermissionsInternal = async (): Promise<HealthConnectP
   return summarizePermissions(granted);
 };
 
-export const inspectHealthConnectPermissions = () =>
-  runHealthConnectOperation('RECONCILING_PERMISSION', inspectHealthConnectPermissionsInternal);
+export const inspectHealthConnectPermissions = inspectHealthConnectPermissionsInternal;
 
 const requestHealthConnectPermissionsOnlyInternal = async (): Promise<HealthConnectPermissionPreparation> => {
   if (Platform.OS !== 'android') {
@@ -195,8 +193,7 @@ const requestHealthConnectPermissionsOnlyInternal = async (): Promise<HealthConn
   return summarizePermissions(granted);
 };
 
-export const requestHealthConnectPermissionsOnly = () =>
-  runHealthConnectOperation('REQUESTING_PERMISSION', requestHealthConnectPermissionsOnlyInternal);
+export const requestHealthConnectPermissionsOnly = requestHealthConnectPermissionsOnlyInternal;
 
 const getHealthConnectRuntimeDiagnosticsInternal = async (): Promise<HealthConnectRuntimeDiagnostics> => {
   const base: HealthConnectRuntimeDiagnostics = {
@@ -330,8 +327,7 @@ const getHealthConnectRuntimeDiagnosticsInternal = async (): Promise<HealthConne
   return diagnostics;
 };
 
-export const getHealthConnectRuntimeDiagnostics = () =>
-  runHealthConnectOperation('CHECKING', getHealthConnectRuntimeDiagnosticsInternal);
+export const getHealthConnectRuntimeDiagnostics = getHealthConnectRuntimeDiagnosticsInternal;
 
 const HEALTH_CONNECT_RECORD_TYPES = permissionList.map((permission) => permission.recordType);
 
@@ -719,9 +715,4 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
   return baselineToken ? { ...payload, anchors: { __changes__: baselineToken } } : payload;
 };
 
-export const syncFromHealthConnect = (changesToken?: string) =>
-  runHealthConnectOperation(
-    'SYNCING',
-    () => syncFromHealthConnectInternal(changesToken),
-    (payload) => Object.values(payload.dataQuality.connectedMetrics ?? {}).includes('read_failed') ? 'PARTIAL_SUCCESS' : 'SUCCESS'
-  );
+export const syncFromHealthConnect = syncFromHealthConnectInternal;

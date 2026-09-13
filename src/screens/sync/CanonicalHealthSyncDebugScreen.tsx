@@ -1,0 +1,19 @@
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AppBackButton } from '../../components/AppBackButton';
+import { Card } from '../../components/Card';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { Screen } from '../../components/Screen';
+import { getThemeColors, typography } from '../../design/tokens';
+import type { RootStackParamList } from '../../navigation/types';
+import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
+import { useAppContext } from '../../state/AppContext';
+
+type Props=NativeStackScreenProps<RootStackParamList,'HealthSyncDebug'>;
+export const CanonicalHealthSyncDebugScreen=({navigation}:Props)=>{
+  const {themeMode}=useAppContext();const health=useCanonicalHealthSyncCoordinator();const palette=getThemeColors(themeMode);
+  return <Screen scroll><AppBackButton onPress={()=>navigation.goBack()}/><Text style={[styles.title,{color:palette.textPrimary}]}>Health Sync Diagnostics</Text><Card><Row label="Provider" value={health.providerState}/><Row label="Upload" value={health.uploadState}/><Row label="Available metrics" value={String(health.availableMetricCount)}/><Row label="Diagnostic events" value={String(health.diagnostics.length)}/></Card>{health.metrics.map(metric=><Card key={metric.definition.metricKey}><Row label={metric.definition.displayName} value={`${metric.queryState} · ${metric.localRecordCount}`}/></Card>)}<PrimaryButton title="Run Canonical Sync" onPress={()=>void health.syncLocalMetrics()}/></Screen>;
+};
+const Row=({label,value}:{label:string;value:string})=><View style={styles.row}><Text style={styles.label}>{label}</Text><Text style={styles.value}>{value}</Text></View>;
+const styles=StyleSheet.create({title:{...typography.section,marginVertical:16},row:{flexDirection:'row',justifyContent:'space-between',gap:8},label:{...typography.body},value:{...typography.bodyStrong}});

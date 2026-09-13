@@ -1,5 +1,5 @@
 import { buildRecoveryIntelligence } from '../src/services/recoveryIntelligenceEngine';
-import { DailyCheckIn, WearableSyncPayload, WellnessSnapshot } from '../src/types';
+import { DailyCheckIn, HealthObservationDraft, WellnessSnapshot } from '../src/types';
 
 const baseWellness: WellnessSnapshot = {
   focusMinutes: 38,
@@ -28,49 +28,16 @@ const makeCheckIn = (day: number, mood: 1 | 2 | 3 | 4 | 5, energy: 1 | 2 | 3 | 4
 });
 
 describe('recoveryIntelligenceEngine', () => {
-  const syncedPayload: WearableSyncPayload = {
-    deviceId: 'hc-1',
-    brand: 'Other',
-    model: 'Health Connect',
-    provider: 'Health Connect',
-    syncedAtISO: new Date().toISOString(),
-    source: 'api',
-    metrics: {
-      heartRateAvg: 63,
-      sleepHours: 7.4,
-      hydrationLiters: 0,
-      focusMinutes: 12,
-      breathingMinutes: 8,
-      movementMinutes: 34,
-      hrvMs: 46,
-      caloriesKcal: 312,
-      workoutMinutes: 34,
-      stressScore: null,
-      cyclePhase: null,
-      spo2Pct: null,
-      respiratoryRateBrpm: null
-    },
-    dataQuality: {
-      confidence: 0.96,
-      isEstimated: false,
-      warnings: [],
-      connectedMetrics: {
-        steps: 'synced',
-        sleep: 'synced',
-        heart_rate: 'synced',
-        hrv: 'synced',
-        workouts: 'synced'
-      }
-    }
-  };
+  const observedAt = new Date().toISOString();
+  const observation = (metricType:string,value:number,unit:string):HealthObservationDraft => ({metricType,value,unit,measuredAtISO:observedAt,sourceProvider:'HEALTH_CONNECT'});
+  const healthObservations = [observation('steps',8000,'count'),observation('sleep_minutes',444,'min'),observation('resting_heart_rate',63,'bpm'),observation('hrv_rmssd_ms',46,'ms'),observation('workout_minutes',34,'min')];
 
   it('returns explainable, bounded recovery output', () => {
     const output = buildRecoveryIntelligence({
       wellness: baseWellness,
       checkIns: [makeCheckIn(12, 4, 4, 4), makeCheckIn(13, 4, 3, 4), makeCheckIn(14, 3, 4, 3)],
       medication: { scheduledToday: 3, takenToday: 2, pendingToday: 1, skippedToday: 0, missedToday: 0 },
-      hasWearable: true,
-      wearableSyncData: [syncedPayload]
+      healthObservations
     });
 
     expect(output.recoveryScore).not.toBeNull();
@@ -87,8 +54,7 @@ describe('recoveryIntelligenceEngine', () => {
       wellness: { ...baseWellness, sleepHours: 5.2, movementMinutes: 6, hydrationLiters: 0.8, focusMinutes: 4, breathingMinutes: 0, stressScore: 71 },
       checkIns: [],
       medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
-      hasWearable: false,
-      wearableSyncData: []
+      healthObservations: []
     });
 
     expect(output.isCalibrating).toBe(true);
@@ -102,8 +68,7 @@ describe('recoveryIntelligenceEngine', () => {
       wellness: baseWellness,
       checkIns: [],
       medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
-      hasWearable: false,
-      wearableSyncData: [],
+      healthObservations: [],
       pss10Results: [
         { rawScore: 20, completedAtISO: '2026-09-05T10:00:00.000Z' },
         { rawScore: 10, completedAtISO: '2026-09-06T10:00:00.000Z' }

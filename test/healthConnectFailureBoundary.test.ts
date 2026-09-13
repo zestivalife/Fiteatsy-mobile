@@ -18,7 +18,6 @@ import {
   syncFromHealthConnect,
   withHealthConnectTimeout
 } from '../src/services/healthConnectService';
-import { runHealthConnectOperation } from '../src/services/healthConnectOperationCoordinator';
 
 const recordTypes = [
   'Steps',
@@ -59,19 +58,6 @@ describe('Health Connect native failure boundary', () => {
 
   it('returns a native success before the boundary expires', async () => {
     await expect(withHealthConnectTimeout(Promise.resolve('ready'), 100)).resolves.toBe('ready');
-  });
-
-  it('rejects overlapping native operations and releases the coordinator afterwards', async () => {
-    let finish: ((value: string) => void) | undefined;
-    const first = runHealthConnectOperation('SYNCING', () => new Promise<string>((resolve) => { finish = resolve; }));
-
-    await expect(runHealthConnectOperation('CHECKING', async () => 'overlap')).rejects.toThrow(
-      'health_connect_operation_in_progress'
-    );
-
-    finish?.('complete');
-    await expect(first).resolves.toBe('complete');
-    await expect(runHealthConnectOperation('CHECKING', async () => 'next')).resolves.toBe('next');
   });
 
   it('isolates one metric read failure and continues syncing the remaining metrics', async () => {

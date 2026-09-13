@@ -31,14 +31,12 @@ describe('Health Connect D2 production contracts', () => {
     expect(manifest).not.toMatch(/android\.permission\.health\.WRITE_/);
   });
 
-  it('uses one shared coordinator for native permission, diagnostic, and sync operations', () => {
-    const coordinator = read('src/services/healthConnectOperationCoordinator.ts');
-    expect(coordinator).toContain('let activeOperation: Promise<unknown> | null = null');
-    expect(coordinator).toContain('health_connect_operation_in_progress');
-    expect(service).toContain("runHealthConnectOperation('RECONCILING_PERMISSION'");
-    expect(service).toContain("runHealthConnectOperation('REQUESTING_PERMISSION'");
-    expect(service).toContain("runHealthConnectOperation('CHECKING'");
-    expect(service).toContain("runHealthConnectOperation(\n    'SYNCING'");
+  it('keeps sequencing in the platform adapter without a second UI state machine', () => {
+    const adapter = read('src/services/healthPlatformAdapter.ts');
+    expect(adapter).toContain('let healthConnectOperation: Promise<unknown> | null = null');
+    expect(adapter).toContain('health_connect_operation_in_progress');
+    expect(service).not.toContain('runHealthConnectOperation');
+    expect(fs.existsSync(path.join(root,'src/services/healthConnectOperationCoordinator.ts'))).toBe(false);
   });
 
   it('registers the native Health Connect permission delegate in MainActivity', () => {
@@ -99,7 +97,7 @@ describe('Health Connect D2 production contracts', () => {
     const home = read('src/screens/home/HomeScreen.tsx');
     expect(service).toContain('HEALTH_CONNECT_OPERATION_TIMEOUT_MS = 30_000');
     expect(service).toContain('withHealthConnectTimeout');
-    expect(service).toMatch(/runHealthConnectOperation\(\s*'SYNCING'/);
+    expect(read('src/services/healthPlatformAdapter.ts')).toContain('serializeHealthConnect(() => syncFromHealthConnect');
     expect(screen).not.toContain('getSdkStatus');
     expect(coordinator).toContain('runHealthSync(adapter.appId');
     expect(coordinator).toContain('acceptWearableConsent(adapter.platform, requested)');

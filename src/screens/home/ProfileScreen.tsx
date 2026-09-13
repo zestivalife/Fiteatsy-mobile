@@ -9,6 +9,7 @@ import { colors, getThemeColors, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { AssessmentGender } from '../../types';
 import { useAppContext } from '../../state/AppContext';
+import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
 import { formatConsultantAvailability, formatDobLabel, getConsultantProfile } from '../../utils/healthProfile';
 import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
 import { resolveClientName } from '../../utils/clientIdentity';
@@ -34,7 +35,6 @@ export const ProfileScreen = ({ navigation }: Props) => {
     devices,
     selectedDeviceId,
     checkIns,
-    wearableSyncData,
     nudges,
     assessment,
     healthProfileSyncDiagnostics,
@@ -43,6 +43,7 @@ export const ProfileScreen = ({ navigation }: Props) => {
     canonicalProfile,
     clientBootstrap
   } = useAppContext();
+  const health = useCanonicalHealthSyncCoordinator();
   const connectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? null;
   const palette = getThemeColors(themeMode);
   const isLight = themeMode === 'light';
@@ -193,7 +194,7 @@ export const ProfileScreen = ({ navigation }: Props) => {
       <Card>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Health Sync</Text>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Connected Device</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{connectedDevice ? `${connectedDevice.brand} ${connectedDevice.model}` : 'Not connected'}</Text></View>
-        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Total Syncs</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{wearableSyncData.length}</Text></View>
+        <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Recent Syncs</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{health.activity.length}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Check-ins Logged</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{checkIns.length}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Care Nudges</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{nudges.length}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Profile Sync Status</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfileSyncDiagnostics.status}</Text></View>

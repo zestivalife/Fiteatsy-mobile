@@ -8,7 +8,8 @@ describe('Health Data Sync control-centre contracts', () => {
   test('routes connected users to the control centre and disconnected users to permission onboarding', () => {
     const home = read('src/screens/home/HomeScreen.tsx');
     expect(home).toContain("navigation.navigate('HealthDataSync')");
-    expect(home).toContain('label="Sync Health"');
+    expect(home).toContain("health.providerState === 'CONNECTED' ? 'Sync Health' : 'Connect Health'");
+    expect(home).toContain('useCanonicalHealthSyncCoordinator');
     expect(home).not.toContain('resolveHealthSyncRoute');
     expect(home).not.toContain("status.overallStatus === 'CONNECTED'");
     expect(read('src/navigation/types.ts')).toContain("HealthDataSync: { entryContext?: 'ONBOARDING' | 'HOME' | 'SETTINGS'");

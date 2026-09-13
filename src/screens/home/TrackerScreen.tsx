@@ -18,8 +18,8 @@ import {
 import { toDayKey } from '../../utils/date';
 import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
 import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
-import type { WearableSyncPayload } from '../../types';
 import {getHealthIntelligenceV1,type HealthIntelligenceV1} from '../../services/healthIntelligenceService';
+import { useCanonicalHealthSyncCoordinator, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
 
 type RangeMode = '7D' | '30D';
 type HealthSubTab = 'overview' | 'activity' | 'heart' | 'sleep';
@@ -252,12 +252,12 @@ const sleepParticlePoints = Array.from({ length: SLEEP_PARTICLE_COUNT }, (_, ind
 });
 
 const latestObservationValue = (
-  observations: WearableSyncPayload['observations'] | undefined,
+  observations: HealthObservationDto[] | undefined,
   metricType: string
 ) => observations?.find((item) => item.metricType === metricType)?.value ?? null;
 
 const latestObservationValueFor = (
-  observations: WearableSyncPayload['observations'] | undefined,
+  observations: HealthObservationDto[] | undefined,
   metricTypes: string[]
 ) => observations?.find((item) => metricTypes.includes(item.metricType))?.value ?? null;
 
@@ -1166,7 +1166,8 @@ const MetricBarsCard = ({
 
 export const TrackerScreen = () => {
   const navigation = useNavigation<TrackerNavigation>();
-  const { themeMode, checkIns, onboarding, wearableSyncData, wellness, authSession } = useAppContext();
+  const { themeMode, checkIns, onboarding, wellness, authSession } = useAppContext();
+  const health = useCanonicalHealthSyncCoordinator();
   const [pss10History, setPss10History] = useState<AssessmentResult[]>([]);
   const [canonicalIntelligence,setCanonicalIntelligence]=useState<HealthIntelligenceV1|null>(null);
   const isLight = themeMode === 'light';
@@ -1212,12 +1213,14 @@ export const TrackerScreen = () => {
       const d = new Date(weekStart);
       d.setDate(weekStart.getDate() + i);
       const dayKey = toDayKey(d.toISOString());
-      const sync = wearableSyncData.find((item) => toDayKey(item.syncedAtISO) === dayKey);
-      const calories = sync?.metrics.caloriesKcal ?? 0;
-      const heartRate = sync?.metrics.heartRateAvg ?? 0;
-      const activityEnergy = sync?.metrics.movementMinutes == null ? [] : [sync.metrics.movementMinutes];
-      const stressLoad = sync?.metrics.stressScore == null ? [] : [sync.metrics.stressScore];
-      const focusTrend = sync?.metrics.focusMinutes == null ? [] : [sync.metrics.focusMinutes];
+      const daily = health.observations.filter(item => toDayKey(item.measuredAtISO) === dayKey);
+      const value = (types:string[]) => daily.find(item => types.includes(item.metricType))?.value ?? 0;
+      const calories = value(['active_energy']);
+      const heartRate = value(['resting_heart_rate','heart_rate']);
+      const movement = value(['active_minutes','workout_minutes']);
+      const activityEnergy = movement ? [movement] : [];
+      const stressLoad:number[] = [];
+      const focusTrend:number[] = [];
 
       return {
         key: dayKey,
@@ -1235,7 +1238,7 @@ export const TrackerScreen = () => {
         wellnessTrend: []
       };
     });
-  }, [wearableSyncData]);
+  }, [health.observations]);
 
   const selected = days[selectedDay] ?? days[days.length - 1];
   const yesterday = days[Math.max(0, selectedDay - 1)] ?? selected;
@@ -1245,11 +1248,10 @@ export const TrackerScreen = () => {
       wellness,
       checkIns,
       medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
-      hasWearable: wearableSyncData.length > 0,
-      wearableSyncData,
+      healthObservations: health.observations,
       pss10Results: pss10History
     });
-  }, [wellness, checkIns, wearableSyncData, pss10History]);
+  }, [wellness, checkIns, health.observations, pss10History]);
 
   useEffect(() => {
     contentAnim.setValue(0.86);
@@ -1303,15 +1305,15 @@ export const TrackerScreen = () => {
   };
 
   const driverMap = useMemo(() => Object.fromEntries(recoveryIntel.recoveryDrivers.map((d) => [d.label, d])), [recoveryIntel.recoveryDrivers]);
-  const latestSync = wearableSyncData[0] ?? null;
-  const latestObservations = latestSync?.observations;
+  const latestObservations = health.observations;
   const stepsValue = latestObservationValue(latestObservations, 'steps');
-  const caloriesValue = latestSync?.metrics.caloriesKcal ?? latestObservationValue(latestObservations, 'calories_kcal');
-  const workoutMinutesValue = latestSync?.metrics.workoutMinutes ?? latestSync?.metrics.movementMinutes ?? null;
+  const caloriesValue = latestObservationValueFor(latestObservations, ['active_energy','calories_kcal']);
+  const workoutMinutesValue = latestObservationValueFor(latestObservations, ['workout_minutes','active_minutes']);
   const activityScoreValue = canonicalIntelligence?.scores.activity.score ?? null;
-  const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? latestSync?.metrics.heartRateAvg ?? null : null;
-  const hrvValue = recoveryIntel.signalCoverage.hrv ? latestSync?.metrics.hrvMs ?? null : null;
-  const sleepHoursValue = recoveryIntel.signalCoverage.sleep ? latestSync?.metrics.sleepHours ?? null : null;
+  const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? latestObservationValueFor(latestObservations,['resting_heart_rate','heart_rate']) : null;
+  const hrvValue = recoveryIntel.signalCoverage.hrv ? latestObservationValueFor(latestObservations,['hrv_sdnn_ms','hrv_rmssd_ms']) : null;
+  const sleepMinutesValue = recoveryIntel.signalCoverage.sleep ? latestObservationValue(latestObservations,'sleep_minutes') : null;
+  const sleepHoursValue = sleepMinutesValue == null ? null : sleepMinutesValue / 60;
   const sleepScoreValue = canonicalIntelligence?.scores.sleep.score ?? null;
   const bedtimeValue = toClockMinutes(onboarding?.sleepTime);
   const wakeTimeValue = toClockMinutes(onboarding?.wakeTime);
@@ -1354,7 +1356,7 @@ export const TrackerScreen = () => {
       compareValues: recoveryIntel.trendValues7d,
       signalState: trendState(recoveryIntel.trendValues7d),
       recoveryImpact: impactState(driverMap['Resting heart load']?.score ?? 0),
-      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.heart_rate),
+      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='resting_heart_rate')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     },
     {
@@ -1370,7 +1372,7 @@ export const TrackerScreen = () => {
       compareValues: recoveryIntel.trendValues7d,
       signalState: trendState(recoveryIntel.trendValues7d),
       recoveryImpact: impactState(driverMap['Movement / Workouts']?.score ?? 0),
-      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.workouts),
+      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='workout')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     },
     {
@@ -1386,7 +1388,7 @@ export const TrackerScreen = () => {
       compareValues: recoveryIntel.trendValues7d,
       signalState: trendState(recoveryIntel.trendValues7d),
       recoveryImpact: impactState(driverMap['HRV / Recovery balance']?.score ?? 0),
-      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.hrv),
+      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey.startsWith('hrv_'))?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     },
     {
@@ -1402,7 +1404,7 @@ export const TrackerScreen = () => {
       compareValues: recoveryIntel.trendValues7d,
       signalState: trendState(recoveryIntel.trendValues7d),
       recoveryImpact: impactState(driverMap.Sleep?.score ?? 0),
-      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.sleep),
+      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='sleep')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     }
   ];

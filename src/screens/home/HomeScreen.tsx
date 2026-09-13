@@ -24,6 +24,7 @@ import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
+import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
 import { getMySubscription } from '../../services/subscriptionService';
 import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
 import {
@@ -124,6 +125,7 @@ const normalizeScore = (value: number | null | undefined) => {
 
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
+  const health = useCanonicalHealthSyncCoordinator();
   const {
     authSession,
     getMedicationTimelineForDate
@@ -338,7 +340,7 @@ export const HomeScreen = () => {
                 onPress={() => { void openAssist(); }}
               />
               <ActionPill
-                label="Sync Health"
+                label={health.providerState === 'CONNECTED' ? 'Sync Health' : 'Connect Health'}
                 Icon={WearableSyncIcon}
                 onPress={() => {
                   navigation.navigate('HealthDataSync');

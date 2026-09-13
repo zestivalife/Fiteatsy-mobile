@@ -30,7 +30,6 @@ import {
   PriorityPlan,
   ThemeMode,
   WearableDevice,
-  WearableSyncPayload,
   WellnessSnapshot,
   HealthProfileSyncDiagnostics
 } from '../types';
@@ -129,8 +128,6 @@ type AppContextValue = {
   decisionLogs: DecisionLog[];
   nudges: Nudge[];
   logNudgeAction: (nudgeId: string, action: NudgeAction) => void;
-  wearableSyncData: WearableSyncPayload[];
-  addWearableSyncData: (payload: WearableSyncPayload) => void;
   themeMode: ThemeMode;
   setThemeMode: React.Dispatch<React.SetStateAction<ThemeMode>>;
   logout: () => void;
@@ -298,7 +295,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [priorityPlan, setPriorityPlan] = useState<PriorityPlan | null>(null);
   const [decisionLogs, setDecisionLogs] = useState<DecisionLog[]>([]);
   const [nudges, setNudges] = useState<Nudge[]>([]);
-  const [wearableSyncData, setWearableSyncData] = useState<WearableSyncPayload[]>([]);
   const [themeMode, setThemeModeState] = useState<ThemeMode>('dark');
   const [selectedDeviceId, setSelectedDeviceIdState] = useState<string | null>(null);
   const [wearableSetupCompleted, setWearableSetupCompletedState] = useState(false);
@@ -1633,20 +1629,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     [clientId, nudges, onboarding, userId]
   );
 
-  const addWearableSyncData = useCallback((payload: WearableSyncPayload) => {
-    setWearableSyncData((previous) => [payload, ...previous].slice(0, 60));
-    if (userId) {
-      void queueHealthEvent({
-        userId,
-        clientId,
-        onboarding,
-        eventType: 'wearable_synced',
-        eventSource: 'mobile.wearable',
-        eventPayload: payload
-      });
-    }
-  }, [clientId, onboarding, userId]);
-
   const logNudgeAction = useCallback((nudgeId: string, action: NudgeAction) => {
     setDecisionLogs((previous) => [
       ...previous.slice(-99),
@@ -1680,7 +1662,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setPriorityPlan(null);
     setDecisionLogs([]);
     setNudges([]);
-    setWearableSyncData([]);
     setMedications([]);
     setMedicationLogs([]);
     setCycleLogs([]);
@@ -1748,8 +1729,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       decisionLogs,
       nudges,
       logNudgeAction,
-      wearableSyncData,
-      addWearableSyncData,
       themeMode,
       setThemeMode,
       logout,
@@ -1794,7 +1773,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       refreshPublishedNutritionPlan
     }),
     [
-      addWearableSyncData,
       assessment,
       authSession,
       bootstrapped,
@@ -1862,7 +1840,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       refreshPublishedNutritionPlan,
       submitCheckIn,
       themeMode,
-      wearableSyncData,
       wellness
     ]
   );

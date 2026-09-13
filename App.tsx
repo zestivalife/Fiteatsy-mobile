@@ -15,6 +15,7 @@ import { AppNavigation } from './src/navigation/AppNavigation';
 import { AppProvider, useAppContext } from './src/state/AppContext';
 import { getThemeColors } from './src/design/tokens';
 import './src/services/wearableBackgroundSync';
+import { CanonicalHealthSyncProvider } from './src/services/canonicalHealthSyncCoordinator';
 
 let hasConfiguredGlobalFont = false;
 
@@ -63,7 +64,9 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>
-        <Root />
+        <CanonicalHealthSyncProvider>
+          <Root />
+        </CanonicalHealthSyncProvider>
       </AppProvider>
     </GestureHandlerRootView>
   );

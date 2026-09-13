@@ -1,4 +1,4 @@
-import { DailyCheckIn, WellnessSnapshot, WearableSyncPayload } from '../types';
+import { DailyCheckIn, HealthObservationDraft, WellnessSnapshot } from '../types';
 
 type RecoveryDirection = 'improving' | 'declining' | 'stable';
 
@@ -73,8 +73,7 @@ type Input = {
     skippedToday: number;
     missedToday: number;
   };
-  hasWearable: boolean;
-  wearableSyncData: WearableSyncPayload[];
+  healthObservations: HealthObservationDraft[];
   sessionAntiManipulation?: SessionAntiManipulation;
   pss10Results?: Array<{ rawScore: number; completedAtISO: string }>;
 };
@@ -109,8 +108,9 @@ const isRecent = (iso: string | undefined, windowMs: number) => {
   return Date.now() - time <= windowMs;
 };
 
-const hasStatus = (payload: WearableSyncPayload | null, key: 'steps' | 'sleep' | 'heart_rate' | 'hrv' | 'workouts') =>
-  payload?.dataQuality.connectedMetrics?.[key] === 'synced';
+const latestMetric = (observations: HealthObservationDraft[], metricTypes: string[]) =>
+  observations.filter(item => !item.deleted && metricTypes.includes(item.metricType))
+    .sort((left,right) => right.measuredAtISO.localeCompare(left.measuredAtISO))[0] ?? null;
 
 const smoothScore = (previous: number, nextRaw: number, maxDelta = 8) => {
   const bounded = clamp(nextRaw, previous - maxDelta, previous + maxDelta);
@@ -133,15 +133,18 @@ const contextualInsight = (direction: RecoveryDirection, topDriver: string, bloc
 };
 
 export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
-  const latestSync = input.wearableSyncData[0] ?? null;
-  const latestSyncAt = latestSync?.syncedAtISO;
+  const steps = latestMetric(input.healthObservations, ['steps']);
+  const sleep = latestMetric(input.healthObservations, ['sleep_minutes']);
+  const restingHeartRate = latestMetric(input.healthObservations, ['resting_heart_rate','heart_rate']);
+  const hrv = latestMetric(input.healthObservations, ['hrv_sdnn_ms','hrv_rmssd_ms']);
+  const workouts = latestMetric(input.healthObservations, ['workout_minutes','active_minutes']);
 
   const signalCoverage = {
-    steps: hasStatus(latestSync, 'steps') && isRecent(latestSyncAt, freshnessWindows.steps),
-    sleep: hasStatus(latestSync, 'sleep') && isRecent(latestSyncAt, freshnessWindows.sleep),
-    restingHeartRate: hasStatus(latestSync, 'heart_rate') && isRecent(latestSyncAt, freshnessWindows.restingHeartRate),
-    hrv: hasStatus(latestSync, 'hrv') && isRecent(latestSyncAt, freshnessWindows.hrv),
-    workouts: hasStatus(latestSync, 'workouts') && isRecent(latestSyncAt, freshnessWindows.workouts)
+    steps: Boolean(steps && isRecent(steps.measuredAtISO, freshnessWindows.steps)),
+    sleep: Boolean(sleep && isRecent(sleep.measuredAtISO, freshnessWindows.sleep)),
+    restingHeartRate: Boolean(restingHeartRate && isRecent(restingHeartRate.measuredAtISO, freshnessWindows.restingHeartRate)),
+    hrv: Boolean(hrv && isRecent(hrv.measuredAtISO, freshnessWindows.hrv)),
+    workouts: Boolean(workouts && isRecent(workouts.measuredAtISO, freshnessWindows.workouts))
   };
   const coverageCount = Object.values(signalCoverage).filter(Boolean).length;
   const pss10Results = [...(input.pss10Results ?? [])].sort((a, b) => +new Date(a.completedAtISO) - +new Date(b.completedAtISO));
@@ -156,10 +159,10 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
       ? 'Recovery insights improve as more recovery signals become available.'
       : 'Recovery calibration adapting to your rhythm.';
 
-  const sleepHours = latestSync?.metrics.sleepHours ?? 0;
-  const workoutsMinutes = latestSync?.metrics.workoutMinutes ?? latestSync?.metrics.movementMinutes ?? 0;
-  const restingHr = latestSync?.metrics.heartRateAvg ?? 0;
-  const hrvDerived = latestSync?.metrics.hrvMs ?? null;
+  const sleepHours = sleep ? sleep.value / 60 : 0;
+  const workoutsMinutes = workouts?.value ?? 0;
+  const restingHr = restingHeartRate?.value ?? 0;
+  const hrvDerived = hrv?.value ?? null;
 
   const antiManip = input.sessionAntiManipulation ?? {
     todaySessionCount: 0,

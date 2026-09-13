@@ -15,7 +15,6 @@ import { FoodPreferencesScreen } from '../screens/onboarding/FoodPreferencesScre
 import { SignInScreen } from '../screens/auth/SignInScreen';
 import { SignUpScreen } from '../screens/auth/SignUpScreen';
 import { ChangePinScreen } from '../screens/auth/ChangePinScreen';
-import { SyncSuccessScreen } from '../screens/sync/SyncSuccessScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { TrackerScreen } from '../screens/home/TrackerScreen';
 import { TrackerDetailScreen } from '../screens/home/TrackerDetailScreen';
@@ -40,8 +39,8 @@ import { SubscriptionPaymentPlaceholderScreen } from '../screens/home/Subscripti
 import { SearchScreen } from '../screens/home/SearchScreen';
 import { NotificationsScreen } from '../screens/home/NotificationsScreen';
 import { ProfileScreen } from '../screens/home/ProfileScreen';
-import { ConnectedMetricsScreen } from '../screens/sync/ConnectedMetricsScreen';
-import { HealthSyncDebugScreen } from '../screens/sync/HealthSyncDebugScreen';
+import { CanonicalConnectedMetricsScreen } from '../screens/sync/CanonicalConnectedMetricsScreen';
+import { CanonicalHealthSyncDebugScreen } from '../screens/sync/CanonicalHealthSyncDebugScreen';
 import { HealthDataSyncScreen } from '../screens/sync/CanonicalHealthDataSyncScreen';
 import { ReportsChatScreen } from '../screens/home/ReportsChatScreen';
 import { NutritionPlanScreen } from '../screens/home/NutritionPlanScreen';
@@ -124,7 +123,6 @@ export const AppNavigation = () => {
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="ChangePin" component={ChangePinScreen} />
         <Stack.Screen name="HealthDataSync" component={HealthDataSyncScreen} />
-        <Stack.Screen name="SyncSuccess" component={SyncSuccessScreen} />
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="TrackerDetail" component={TrackerDetailScreen} />
         <Stack.Screen name="FocusSession" component={FocusScreen} />
@@ -144,8 +142,8 @@ export const AppNavigation = () => {
         <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="ConnectedMetrics" component={ConnectedMetricsScreen} />
-        {__DEV__ ? <Stack.Screen name="HealthSyncDebug" component={HealthSyncDebugScreen} /> : null}
+        <Stack.Screen name="ConnectedMetrics" component={CanonicalConnectedMetricsScreen} />
+        {__DEV__ ? <Stack.Screen name="HealthSyncDebug" component={CanonicalHealthSyncDebugScreen} /> : null}
         <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
         <Stack.Screen name="ReportComparison" component={ReportComparisonScreen} />

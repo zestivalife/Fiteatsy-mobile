@@ -1,4 +1,4 @@
-import { OnboardingProfile, PublishedNutritionPlan, WearableSyncPayload } from '../types';
+import { OnboardingProfile, PublishedNutritionPlan } from '../types';
 import { SubscriptionPlan } from './subscriptionService';
 
 export type SupportPreference = 'self_guided' | 'one_consult' | 'regular_support' | null;
@@ -19,7 +19,7 @@ export type PlanCatalogItem = SubscriptionPlan & {
 
 export type PlanRecommendationContext = {
   onboarding: OnboardingProfile | null;
-  wearableSyncData: WearableSyncPayload[];
+  hasHealthSignals: boolean;
   publishedNutritionPlan: PublishedNutritionPlan | null;
   planCatalog: SubscriptionPlan[];
   supportPreference?: SupportPreference;
@@ -60,7 +60,7 @@ export const recommendPlan = (context: PlanRecommendationContext): RecommendedPl
   const onboarding = context.onboarding;
   const goals = [onboarding?.primaryGoal, onboarding?.wellnessGoal, ...(onboarding?.healthGoals ?? []), ...(onboarding?.secondaryGoals ?? [])];
   const conditions = [...(onboarding?.primaryConditions ?? []), ...(onboarding?.previousConditions ?? [])];
-  const hasWearableSignals = context.wearableSyncData.length > 0 || onboarding?.wearablePreference === 'sync';
+  const hasWearableSignals = context.hasHealthSignals;
   const hasNutritionPlan = Boolean(context.publishedNutritionPlan);
   const longTermGoal = includesAny(goals, ['sustainable', 'recovery', 'diabetes', 'pcos', 'hormone', 'weight loss', 'muscle']);
   const clinicalSupportSignal = conditions.length > 0 || longTermGoal || hasNutritionPlan;

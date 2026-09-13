@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useAppContext } from '../state/AppContext';
 import type { HealthObservationDraft } from '../types';
@@ -44,8 +44,8 @@ const toDto = (item: HealthObservationDraft, clientId: string, index: number): H
 export const countAvailableHealthMetrics = (metrics: CanonicalHealthMetricState[]) =>
   metrics.filter((metric) => metric.queryState === 'DATA_AVAILABLE').length;
 
-export const useCanonicalHealthSyncCoordinator = () => {
-  const { wellness, setWellness, addWearableSyncData, setSelectedDeviceId } = useAppContext();
+const useCreateCanonicalHealthSyncCoordinator = () => {
+  const { wellness, setWellness, setSelectedDeviceId } = useAppContext();
   const adapter = useMemo(() => getHealthPlatformAdapter(), []);
   const sourceName = adapter.platform === 'APPLE_HEALTH' ? 'Apple Health' : 'Health Connect';
   const mounted = useRef(true);
@@ -113,7 +113,6 @@ export const useCanonicalHealthSyncCoordinator = () => {
       } : undefined, options);
       if (!mounted.current) return;
       mergeLocalObservations(result.observations);
-      addWearableSyncData(result.payload);
       setSelectedDeviceId(adapter.appId);
       setWellness(result.wellness);
       setDiagnostics(result.diagnostics);
@@ -141,7 +140,6 @@ export const useCanonicalHealthSyncCoordinator = () => {
       if (!mounted.current) return;
       if (error instanceof HealthSyncUploadPendingError) {
         mergeLocalObservations(error.observations);
-        addWearableSyncData(error.payload);
         setSelectedDeviceId(adapter.appId);
         setDiagnostics(error.diagnostics);
         setProviderState('CONNECTED');
@@ -165,7 +163,7 @@ export const useCanonicalHealthSyncCoordinator = () => {
     } finally {
       inFlight.current = false;
     }
-  }, [adapter, addWearableSyncData, mergeLocalObservations, refreshRemoteSnapshot, setSelectedDeviceId, setWellness, sourceName, status, wellness]);
+  }, [adapter, mergeLocalObservations, refreshRemoteSnapshot, setSelectedDeviceId, setWellness, sourceName, status, wellness]);
 
   const requestAccess = useCallback(async () => {
     if (inFlight.current) return;
@@ -267,6 +265,7 @@ export const useCanonicalHealthSyncCoordinator = () => {
     availableMetricCount: countAvailableHealthMetrics(metrics),
     uploadState,
     status,
+    observations,
     platformStatus,
     activity,
     message,
@@ -275,4 +274,18 @@ export const useCanonicalHealthSyncCoordinator = () => {
     requestAccess,
     markPermissionReviewStarted
   };
+};
+
+export type CanonicalHealthSyncSnapshot = ReturnType<typeof useCreateCanonicalHealthSyncCoordinator>;
+const CanonicalHealthSyncContext = createContext<CanonicalHealthSyncSnapshot | null>(null);
+
+export const CanonicalHealthSyncProvider = ({ children }: { children: React.ReactNode }) => {
+  const value = useCreateCanonicalHealthSyncCoordinator();
+  return React.createElement(CanonicalHealthSyncContext.Provider, { value }, children);
+};
+
+export const useCanonicalHealthSyncCoordinator = () => {
+  const value = useContext(CanonicalHealthSyncContext);
+  if (!value) throw new Error('useCanonicalHealthSyncCoordinator must be used inside CanonicalHealthSyncProvider');
+  return value;
 };

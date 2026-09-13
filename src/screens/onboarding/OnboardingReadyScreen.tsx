@@ -17,7 +17,7 @@ export const OnboardingReadyScreen = ({ navigation }: Props) => {
   const healthReady = Boolean(onboarding?.dateOfBirthISO && onboarding?.gender);
   const recoveryReady = Boolean(assessment?.completedAtISO);
   const nutritionReady = Boolean(onboarding?.primaryGoal || onboarding?.healthGoals.length);
-  const healthConnected = onboarding?.wearablePreference === 'sync';
+  const healthSetupAttempted = onboarding?.wearablePreference === 'sync';
   const consultantReady = Boolean(onboarding?.assignedConsultantId);
   const enter = () => { void clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId); setWearableSetupCompleted(true); navigation.reset({ index: 0, routes: [{ name: 'Main' }] }); };
 
@@ -30,7 +30,7 @@ export const OnboardingReadyScreen = ({ navigation }: Props) => {
       <Status icon="person-outline" label="Health profile" status={healthReady ? 'Ready' : 'Needs attention'} tone="green" />
       <Status icon="pulse-outline" label="Recovery baseline" status={recoveryReady ? 'Ready' : 'Needs attention'} tone="green" />
       <Status icon="heart-outline" label="Nutrition profile" status={nutritionReady ? 'Ready' : 'Needs attention'} tone="green" />
-      <Status icon="wifi-outline" label="Health data" status={healthConnected ? 'Connected' : wearableSetupCompleted ? 'Skipped' : 'Not connected'} tone="cyan" />
+      <Status icon="wifi-outline" label="Health data" status={healthSetupAttempted ? 'Setup attempted' : wearableSetupCompleted ? 'Skipped' : 'Optional'} tone="cyan" />
       <Status icon="star-outline" label="Consultant matching" status={consultantReady ? 'Ready' : 'Pending'} tone="yellow" />
     </View>
   </OnboardingShell>;

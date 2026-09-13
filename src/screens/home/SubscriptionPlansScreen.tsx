@@ -29,6 +29,7 @@ import {
 } from '../../services/subscriptionService';
 import { runVerifiedSubscriptionCheckout } from '../../services/razorpayCheckoutService';
 import { useAppContext } from '../../state/AppContext';
+import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SubscriptionPlans'>;
 
@@ -67,7 +68,8 @@ const planDailyCostLabel = (plan: SubscriptionPlan) => {
 };
 
 export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
-  const { onboarding, publishedNutritionPlan, themeMode, wearableSyncData } = useAppContext();
+  const { onboarding, publishedNutritionPlan, themeMode } = useAppContext();
+  const health = useCanonicalHealthSyncCoordinator();
   const palette = getThemeColors(themeMode);
   const source = (route.params?.source ?? 'subscription_management') as PremiumSource;
   const requiredEntitlement = (route.params?.requiredEntitlement ?? premiumSourceEntitlements[source]) as EntitlementCode | null;
@@ -109,13 +111,13 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
       recommendPlan({
         onboarding,
         publishedNutritionPlan,
-        wearableSyncData,
+        hasHealthSignals: health.availableMetricCount > 0,
         planCatalog: plans,
         supportPreference,
         durationPreference,
         priority
       }),
-    [durationPreference, onboarding, plans, priority, publishedNutritionPlan, supportPreference, wearableSyncData]
+    [durationPreference, health.availableMetricCount, onboarding, plans, priority, publishedNutritionPlan, supportPreference]
   );
 
   const navigateAfterActivation = useCallback(() => {

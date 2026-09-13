@@ -23,6 +23,13 @@ describe('canonical health sync architecture',()=>{
     expect(coordinator).toContain('foregroundRefreshAt.current');
   });
 
+  test('one mounted provider owns the only live provider and metric state authority',()=>{
+    const app=read('App.tsx');
+    expect(app.match(/<CanonicalHealthSyncProvider>/g)).toHaveLength(1);
+    expect(coordinator.match(/useState<HealthProviderState>/g)).toHaveLength(1);
+    expect(coordinator.match(/useState<Record<string, HealthMetricQueryState>>/g)).toHaveLength(1);
+  });
+
   test('provider, metric, and upload finite states are separate',()=>{
     expect(read('src/services/healthPlatformAdapter.ts')).toContain("'UNAVAILABLE' | 'AVAILABLE' | 'CONNECTED' | 'ACTION_REQUIRED' | 'ERROR'");
     expect(read('src/services/healthSyncState.ts')).toContain("'IDLE'|'QUERYING'|'DATA_AVAILABLE'|'NO_VISIBLE_DATA'|'ERROR'|'TIMEOUT'|'UPLOAD_PENDING'");
@@ -71,5 +78,38 @@ describe('canonical health sync architecture',()=>{
     expect(store).toContain("'@fiteatsy/wearable-installation-id'");
     expect(store).toContain("'@fiteatsy/wearable-last-foreground-sync'");
     expect(store).toContain('AsyncStorage.multiRemove([...LEGACY_KEYS])');
+  });
+
+  test('Home, Tracker, diagnostics, and connected metrics use the canonical authority',()=>{
+    const home=read('src/screens/home/HomeScreen.tsx');
+    const tracker=read('src/screens/home/TrackerScreen.tsx');
+    const debug=read('src/screens/sync/CanonicalHealthSyncDebugScreen.tsx');
+    const connected=read('src/screens/sync/CanonicalConnectedMetricsScreen.tsx');
+    const appContext=read('src/state/AppContext.tsx');
+    expect(home).toContain('useCanonicalHealthSyncCoordinator');
+    expect(home).not.toContain('HealthSyncStatus');
+    expect(home).not.toContain('getHealthSyncStatus');
+    expect(tracker).toContain('useCanonicalHealthSyncCoordinator');
+    expect(tracker).not.toContain('wearableSyncData');
+    expect(debug).toContain('health.syncLocalMetrics()');
+    expect(debug).not.toContain('runHealthSync');
+    expect(connected).toContain('useCanonicalHealthSyncCoordinator');
+    expect(connected).not.toContain('wearableSyncData');
+    expect(appContext).not.toContain('wearableSyncData');
+    expect(appContext).not.toContain('addWearableSyncData');
+  });
+
+  test('onboarding metadata cannot define live provider state',()=>{
+    expect(coordinator).not.toContain('wearableSetupCompleted');
+    expect(coordinator).not.toContain('wearablePreference');
+    const ready=read('src/screens/onboarding/OnboardingReadyScreen.tsx');
+    expect(ready).not.toContain("status={healthConnected ? 'Connected'");
+  });
+
+  test('Health Connect has adapter sequencing but no duplicate operation-state authority',()=>{
+    expect(fs.existsSync(path.join(root,'src/services/healthConnectOperationCoordinator.ts'))).toBe(false);
+    expect(adapter).toContain('serializeHealthConnect');
+    expect(adapter).not.toContain("'CHECKING'");
+    expect(adapter).not.toContain("'SYNCING'");
   });
 });

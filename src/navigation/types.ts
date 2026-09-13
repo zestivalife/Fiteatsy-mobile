@@ -20,7 +20,6 @@ export type RootStackParamList = {
   SignUp: undefined;
   ChangePin: { force?: boolean } | undefined;
   HealthDataSync: { entryContext?: 'ONBOARDING' | 'HOME' | 'SETTINGS'; autoSync?: boolean } | undefined;
-  SyncSuccess: { deviceName: string };
   Main: undefined;
   FocusSession: undefined;
   BreathingSession: undefined;
