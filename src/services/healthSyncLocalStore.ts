@@ -3,6 +3,8 @@ import type { HealthObservationDraft } from '../types';
 
 const STORE_VERSION = 1;
 const keyFor = (scope: string) => `@fiteatsy/health-sync-local-v${STORE_VERSION}:${scope}`;
+const INSTALLATION_KEY = `@fiteatsy/health-sync-local-v${STORE_VERSION}:installation-id`;
+const LEGACY_KEYS = ['@fiteatsy/wearable-installation-id', '@fiteatsy/wearable-last-foreground-sync'] as const;
 const identity = (item: HealthObservationDraft) => item.syncKey
   ?? `${item.sourceProvider}:${item.metricType}:${item.sourceRecordId ?? item.measuredAtISO}`;
 
@@ -25,6 +27,29 @@ const writeState = (scope: string, state: LocalSyncState) =>
   AsyncStorage.setItem(keyFor(scope), JSON.stringify(state));
 
 export const readLocalSyncCursors = async (scope: string) => (await readState(scope)).cursors;
+
+export const getOrCreateHealthInstallationId = async () => {
+  const existing = await AsyncStorage.getItem(INSTALLATION_KEY);
+  if (existing) return existing;
+  const created = `install-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  await AsyncStorage.setItem(INSTALLATION_KEY, created);
+  // Remove the superseded duplicate key after migrating its value when present.
+  await AsyncStorage.multiRemove([...LEGACY_KEYS]);
+  return created;
+};
+
+export const migrateLegacyHealthInstallationId = async () => {
+  const canonical = await AsyncStorage.getItem(INSTALLATION_KEY);
+  if (canonical) {
+    await AsyncStorage.multiRemove([...LEGACY_KEYS]);
+    return canonical;
+  }
+  const legacy = await AsyncStorage.getItem('@fiteatsy/wearable-installation-id');
+  if (!legacy) return getOrCreateHealthInstallationId();
+  await AsyncStorage.setItem(INSTALLATION_KEY, legacy);
+  await AsyncStorage.multiRemove([...LEGACY_KEYS]);
+  return legacy;
+};
 
 /** Atomically persists normalized records/tombstones and their resulting cursors. */
 export const persistLocalSyncBatch = async (

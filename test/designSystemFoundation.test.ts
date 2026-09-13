@@ -33,7 +33,7 @@ describe('Foundation V1 interaction contracts', () => {
     const contracts = [
       ['src/screens/cycle/CycleScreen.tsx', ['PageHeader', 'PrimaryButton']],
       ['src/screens/assessments/Pss10AssessmentScreen.tsx', ['PageHeader', 'PrimaryButton']],
-      ['src/screens/sync/SyncWearableScreen.tsx', ['PageHeader', 'PrimaryButton']],
+      ['src/screens/sync/CanonicalHealthDataSyncScreen.tsx', ['PageHeader', 'PrimaryButton']],
       ['src/screens/home/SubscriptionPlansScreen.tsx', ['PageHeader', 'PrimaryButton']],
       ['src/screens/home/ConsultantBookingScreen.tsx', ['PageHeader', 'PrimaryButton']],
       ['src/screens/medication/MedicationCalendarScreen.tsx', ['PageHeader', 'PrimaryButton', 'SegmentedTabs']],

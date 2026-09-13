@@ -1,0 +1,53 @@
+import React, { useCallback, useState } from 'react';
+import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Card } from '../../components/Card';
+import { PageHeader } from '../../components/PageHeader';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { Screen } from '../../components/Screen';
+import { getThemeColors, radius, spacing, typography } from '../../design/tokens';
+import type { RootStackParamList } from '../../navigation/types';
+import { useCanonicalHealthSyncCoordinator, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
+import { useAppContext } from '../../state/AppContext';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'HealthDataSync'>;
+const icons:Record<string,keyof typeof Ionicons.glyphMap>={steps:'footsteps-outline',distance:'navigate-outline',sleep:'moon-outline',heart_rate:'heart-outline',resting_heart_rate:'heart-circle-outline',hrv_sdnn:'pulse-outline',hrv_rmssd:'pulse-outline',active_energy:'flame-outline',exercise:'fitness-outline',workout:'barbell-outline',weight:'scale-outline',hydration:'water-outline',spo2:'water-outline',respiratory_rate:'cloud-outline'};
+const when=(iso?:string|null)=>{if(!iso)return'Not synced yet';const date=new Date(iso);if(Number.isNaN(date.getTime()))return'Not available';const minutes=Math.floor((Date.now()-date.getTime())/60000);return minutes<1?'Just now':minutes<60?`${minutes} min ago`:date.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});};
+const shown=(item:HealthObservationDto)=>item.metricType==='sleep_minutes'?{value:(item.value/60).toFixed(1),unit:'hr'}:{value:new Intl.NumberFormat().format(item.value),unit:item.unit};
+const queryLabel=(state:string)=>({QUERYING:'Checking',DATA_AVAILABLE:'Synced',UPLOAD_PENDING:'Upload pending',TIMEOUT:'Timed out',ERROR:'Couldn’t read',NO_VISIBLE_DATA:'No recent data'}[state]??'No recent data');
+
+export const HealthDataSyncScreen=({navigation,route}:Props)=>{
+  const {themeMode,onboarding,setOnboarding,setWearableSetupCompleted}=useAppContext();
+  const palette=getThemeColors(themeMode);const health=useCanonicalHealthSyncCoordinator();
+  const [selected,setSelected]=useState<HealthObservationDto|null>(null);const [permissionHelp,setPermissionHelp]=useState(false);
+  const connected=health.providerState==='CONNECTED';const busy=health.metrics.some(metric=>metric.queryState==='QUERYING');
+  const finishOnboarding=useCallback(()=>{setWearableSetupCompleted(true);if(onboarding)setOnboarding({...onboarding,wearablePreference:connected?'sync':'later'});navigation.reset({index:0,routes:[{name:'Main'}]});},[connected,navigation,onboarding,setOnboarding,setWearableSetupCompleted]);
+  const reviewPermissions=useCallback(()=>{health.markPermissionReviewStarted();if(Platform.OS==='ios')setPermissionHelp(true);else void Linking.openSettings();},[health]);
+  return <>
+    <Screen scroll contentStyle={styles.content}>
+      <PageHeader title="Health Data Sync" onBack={()=>navigation.goBack()}/>
+      <Card style={styles.connectionCard}>
+        <View style={styles.row}><View style={[styles.sourceIcon,{backgroundColor:palette.blueSoft}]}><Ionicons name={Platform.OS==='ios'?'heart':'fitness'} size={24} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.title,{color:palette.textPrimary}]}>{health.sourceName}</Text><Text style={[styles.body,{color:connected?palette.success:palette.warning}]}>{health.providerLabel}</Text></View><View style={[styles.chip,{backgroundColor:connected?palette.successSoft:palette.warningSoft}]}><Text style={[styles.chipText,{color:connected?palette.success:palette.warning}]}>{health.providerLabel}</Text></View></View>
+        <View style={styles.summary}><View><Text style={[styles.caption,{color:palette.textMuted}]}>Last synced</Text><Text style={[styles.value,{color:palette.textPrimary}]}>{when(health.platformStatus?.lastSuccessISO??health.status?.lastSyncISO)}</Text></View><View><Text style={[styles.caption,{color:palette.textMuted}]}>Available metrics</Text><Text style={[styles.value,{color:palette.textPrimary}]}>{health.availableMetricCount}</Text></View></View>
+        {connected ? (
+          <PrimaryButton title={busy ? 'Reading health data…' : 'Sync Now'} loading={busy} onPress={() => void health.syncLocalMetrics()} />
+        ) : (
+          <PrimaryButton title="Request Health Access" onPress={() => void health.requestAccess()} />
+        )}
+        <PrimaryButton title="Review Permissions" variant="secondary" onPress={reviewPermissions}/>
+        {health.uploadState==='PENDING'?<Text style={[styles.message,{color:palette.warning}]}>Upload pending. Your health data remains available securely on this device.</Text>:null}
+        {health.message?<Text accessibilityLiveRegion="polite" style={[styles.message,{color:palette.textSecondary}]}>{health.message}</Text>:null}
+      </Card>
+      <Text style={[styles.section,{color:palette.textPrimary}]}>Your Health Data</Text>
+      {health.metrics.map(metric=>{const item=metric.observation;const display=item?shown(item):null;const label=queryLabel(metric.queryState);return <Pressable key={metric.definition.metricKey} disabled={!item} accessibilityRole="button" accessibilityLabel={`${metric.definition.displayName}, ${display?`${display.value} ${display.unit}`:label}`} onPress={()=>item&&setSelected(item)}><Card style={styles.metric}><View style={[styles.metricIcon,{backgroundColor:palette.surfaceTint}]}><Ionicons name={icons[metric.definition.metricKey]??'analytics-outline'} size={20} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.title,{color:palette.textPrimary}]}>{metric.definition.displayName}</Text>{display?<Text style={[styles.metricValue,{color:palette.textPrimary}]}>{display.value} <Text style={styles.metricUnit}>{display.unit}</Text></Text>:null}<Text style={[styles.caption,{color:palette.textMuted}]}>{item?`${health.sourceName} · Updated ${when(item.measuredAtISO).toLowerCase()}`:`${health.sourceName} · ${label}`}</Text></View><Text style={[styles.chipText,{color:metric.queryState==='DATA_AVAILABLE'?palette.success:palette.warning}]}>{label}</Text></Card></Pressable>;})}
+      <Text style={[styles.section,{color:palette.textPrimary}]}>Sync Activity</Text>
+      <Card>{health.activity.length?health.activity.map((item,index)=><View key={item.id} style={[styles.activity,index>0&&{borderTopColor:palette.stroke,borderTopWidth:1}]}><View style={styles.grow}><Text style={[styles.value,{color:palette.textPrimary}]}>{when(item.completedAtISO??item.startedAtISO)}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>{item.metricsUpdated?`${item.metricsUpdated} records updated`:item.status==='RUNNING'?'Updating health data':'No visible health data found'}</Text></View><Text style={[styles.chipText,{color:item.status==='FAILED'?palette.danger:item.status==='PARTIAL'?palette.warning:palette.success}]}>{item.status}</Text></View>):<Text style={[styles.body,{color:palette.textSecondary}]}>Your recent sync activity will appear here.</Text>}</Card>
+      {route.params?.entryContext==='ONBOARDING'?<View style={styles.onboarding}><PrimaryButton title={connected?'Continue':'Set Up Later'} onPress={finishOnboarding}/></View>:null}
+    </Screen>
+    <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={()=>setSelected(null)}><Pressable style={[styles.overlay,{backgroundColor:palette.overlay}]} onPress={()=>setSelected(null)}><Pressable style={[styles.sheet,{backgroundColor:palette.card}]} onPress={()=>undefined}>{selected?<><View style={styles.handle}/><Text style={[styles.section,{color:palette.textPrimary}]}>{health.metrics.find(metric=>metric.definition.backendCanonicalType===selected.metricType)?.definition.displayName??selected.metricType}</Text><Text style={[styles.detail,{color:palette.textPrimary}]}>{shown(selected).value} {shown(selected).unit}</Text><View style={styles.summary}><Text style={[styles.body,{color:palette.textMuted}]}>Last updated</Text><Text style={[styles.value,{color:palette.textPrimary}]}>{when(selected.measuredAtISO)}</Text></View><PrimaryButton title="Done" onPress={()=>setSelected(null)}/></>:null}</Pressable></Pressable></Modal>
+    <Modal visible={permissionHelp} transparent animationType="slide" onRequestClose={()=>setPermissionHelp(false)}><Pressable style={[styles.overlay,{backgroundColor:palette.overlay}]} onPress={()=>setPermissionHelp(false)}><Pressable style={[styles.sheet,{backgroundColor:palette.card}]} onPress={()=>undefined}><View style={styles.handle}/><Text style={[styles.section,{color:palette.textPrimary}]}>Apple Health access</Text><Text style={[styles.body,{color:palette.textSecondary}]}>Review the health categories Fiteatsy may read. Returning to Fiteatsy refreshes local metrics once without reconnecting.</Text><PrimaryButton title="Request Health Access" onPress={()=>void health.requestAccess().then(()=>setPermissionHelp(false))}/><PrimaryButton title="Done" variant="secondary" onPress={()=>setPermissionHelp(false)}/></Pressable></Pressable></Modal>
+  </>;
+};
+
+const styles=StyleSheet.create({content:{paddingBottom:spacing.xxl},connectionCard:{gap:spacing.md,marginTop:spacing.md},row:{flexDirection:'row',alignItems:'center',gap:spacing.sm},sourceIcon:{width:48,height:48,borderRadius:radius.md,alignItems:'center',justifyContent:'center'},grow:{flex:1},title:{...typography.cardTitle},body:{...typography.body},caption:{...typography.caption},chip:{paddingHorizontal:spacing.sm,paddingVertical:spacing.xs,borderRadius:radius.pill},chipText:{...typography.badge},summary:{flexDirection:'row',justifyContent:'space-between'},value:{...typography.bodyStrong},message:{...typography.subtext,textAlign:'center'},section:{...typography.sectionTitle,marginTop:spacing.xl,marginBottom:spacing.sm},metric:{flexDirection:'row',alignItems:'center',gap:spacing.sm,marginBottom:spacing.sm},metricIcon:{width:40,height:40,borderRadius:radius.md,alignItems:'center',justifyContent:'center'},metricValue:{...typography.metricSmall,marginVertical:2},metricUnit:{...typography.subtext},activity:{flexDirection:'row',alignItems:'center',paddingVertical:spacing.sm},onboarding:{marginTop:spacing.xl},overlay:{flex:1,justifyContent:'flex-end'},sheet:{borderTopLeftRadius:radius.lg,borderTopRightRadius:radius.lg,padding:spacing.xl,gap:spacing.md},handle:{width:44,height:4,borderRadius:2,backgroundColor:'#94A3B8',alignSelf:'center'},detail:{...typography.metric}});

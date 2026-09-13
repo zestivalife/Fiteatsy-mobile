@@ -42,7 +42,7 @@ import { NotificationsScreen } from '../screens/home/NotificationsScreen';
 import { ProfileScreen } from '../screens/home/ProfileScreen';
 import { ConnectedMetricsScreen } from '../screens/sync/ConnectedMetricsScreen';
 import { HealthSyncDebugScreen } from '../screens/sync/HealthSyncDebugScreen';
-import { HealthDataSyncScreen } from '../screens/sync/HealthDataSyncScreen';
+import { HealthDataSyncScreen } from '../screens/sync/CanonicalHealthDataSyncScreen';
 import { ReportsChatScreen } from '../screens/home/ReportsChatScreen';
 import { NutritionPlanScreen } from '../screens/home/NutritionPlanScreen';
 import { NutritionExperienceScreen } from '../screens/home/NutritionExperienceScreen';

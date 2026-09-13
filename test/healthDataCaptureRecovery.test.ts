@@ -40,7 +40,7 @@ describe('end-to-end health data capture recovery contracts', () => {
 
   test('local source read precedes every backend operation and checkpoints are device-local', () => {
     const manager = read('src/services/healthSyncManager.ts');
-    const localRead = manager.indexOf('syncConnectedHealthApp(appId, localCursors, options)');
+    const localRead = manager.indexOf('adapter.queryAllSupportedMetrics(localCursors');
     const backendRun = manager.indexOf('beginWearableSyncRun', localRead);
     const upload = manager.indexOf("'/v1/health/observations:batch'", localRead);
     expect(localRead).toBeGreaterThan(0);
@@ -73,24 +73,20 @@ describe('end-to-end health data capture recovery contracts', () => {
   });
 
   test('authorization and foreground return immediately execute local query and retain local UI rows', () => {
-    const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
-    const onboarding = read('src/screens/sync/SyncWearableScreen.tsx');
-    expect(screen).toContain('AUTH_REQUEST_STARTED');
-    expect(screen).toContain('AUTH_REQUEST_COMPLETED');
-    expect(screen).toContain('POST_AUTH_QUERY_STARTED');
-    expect(screen).toContain('await syncNow({forceSourceBackfill:true})');
-    expect(screen).toContain('applyLocalObservations(result.observations)');
-    expect(screen).toContain('Metrics available');
-    expect(screen).toContain('No visible health data found');
-    expect(onboarding).toContain('forceAppleBackfillOnNextSyncRef.current = Platform.OS === \'ios\'');
-    expect(onboarding).toContain('{ forceSourceBackfill }');
+    const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
+    const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
+    expect(coordinator).toContain('await syncLocalMetrics({ forceSourceBackfill: true })');
+    expect(coordinator).toContain('mergeLocalObservations(result.observations)');
+    expect(coordinator).toContain('awaitingPermissionReturn.current');
+    expect(screen).toContain('Available metrics');
+    expect(screen).toContain('No recent data');
   });
 
   test('QA diagnostics are safe, metric-specific, and development-gated', () => {
     const diagnostics = read('src/services/healthSourceDiagnostics.ts');
-    const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     for (const field of ['sourcePlatform','metricKey','healthSourceIdentifier','queryWindowDays','queryExecuted','nativeRecordCount','normalizedRecordCount','droppedRecordCount','localQueryState','localRecordCount','normalisationState','dedupState','uploadState','backendPersistenceState','dailyAggregateState','calculationState','trackerState','orbState','lastErrorClass','lastErrorMessageSafe']) expect(diagnostics).toContain(field);
-    expect(screen).toContain('__DEV__&&sourceDiagnostics.length');
+    expect(read('src/services/canonicalHealthSyncCoordinator.ts')).toContain('setDiagnostics(result.diagnostics)');
     expect(diagnostics).not.toContain('Authorization');
   });
 
@@ -125,13 +121,13 @@ describe('end-to-end health data capture recovery contracts', () => {
     const registry = read('src/services/healthMetricRegistry.ts');
     const apple = read('src/services/appleHealthService.ts');
     const android = read('src/services/healthConnectService.ts');
-    const screen = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     for (const aggregation of ["'SUM'", "'LATEST'", "'AVERAGE'", "'INTERVAL'", "'SAMPLE_SERIES'"]) {
       expect(registry).toContain(aggregation);
     }
     expect(apple).toContain('APPLE_HEALTH_READ_TYPES');
     expect(android).toContain('HEALTH_CONNECT_READ_RECORDS');
-    expect(screen).toContain('HEALTH_METRIC_REGISTRY.map');
+    expect(coordinator).toContain('HEALTH_METRIC_REGISTRY.map');
     expect(android).toContain("accessType: 'read'");
     expect(android).not.toContain("accessType: 'write'");
     expect(read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift')).toContain('requestAuthorization(toShare: [], read: types)');

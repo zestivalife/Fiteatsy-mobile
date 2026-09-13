@@ -6,8 +6,8 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 
 describe('Apple Health sync hang repair', () => {
   const apple = read('src/services/appleHealthService.ts');
-  const onboarding = read('src/screens/sync/SyncWearableScreen.tsx');
-  const controlCentre = read('src/screens/sync/HealthDataSyncScreen.tsx');
+  const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
+  const controlCentre = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
 
   test('bounds availability, authorization, every metric read, and background delivery', () => {
     expect(apple).toContain('APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS');
@@ -24,19 +24,16 @@ describe('Apple Health sync hang repair', () => {
     expect(apple).toContain("acceptedSampleCount > 0 ? 'synced' : 'no_recent_data'");
   });
 
-  test('setup later and back invalidate the active operation before navigating immediately', () => {
-    expect(onboarding).toContain('operationIdRef.current += 1');
-    expect(onboarding).toContain("const skipForNow = () => { exitWearableFlow('later'); };");
-    expect(onboarding).toContain('void clearOnboardingRuntimeProgress');
-    expect(onboarding).toContain('onBack={cancelAndGoBack}');
-    expect(onboarding).toContain('isCurrentOperation');
+  test('setup later and back remain available without a second onboarding state machine', () => {
+    expect(controlCentre).toContain("wearablePreference:connected?'sync':'later'");
+    expect(controlCentre).toContain('onBack={()=>navigation.goBack()}');
+    expect(controlCentre).not.toContain('HealthDataSyncExperience');
   });
 
-  test('both authoring surfaces clear running state through finalisation and reject late callbacks', () => {
-    expect(onboarding).toMatch(/finally \{[\s\S]*setIsRunning\(false\)/);
-    expect(controlCentre).toContain('reachedTerminalState');
-    expect(controlCentre).toContain('operationId.current+=1');
-    expect(controlCentre).toContain('running.current=false');
+  test('the coordinator owns and clears the single in-flight sync guard', () => {
+    expect(coordinator).toContain('if (inFlight.current) return');
+    expect(coordinator).toContain('inFlight.current = false');
+    expect(controlCentre).not.toContain('runHealthSync');
   });
 
   test('diagnostics contain timing and status but do not log source health values', () => {

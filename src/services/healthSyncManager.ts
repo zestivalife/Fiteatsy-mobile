@@ -1,7 +1,7 @@
 import { HealthObservationDraft, WearableSyncPayload, WellnessSnapshot } from '../types';
 import { recalculateWellness } from '../utils/wellness';
 import { apiFetch, postJson } from './apiClient';
-import { HealthAppId, syncConnectedHealthApp } from './healthAppService';
+import { getHealthPlatformAdapter, type HealthAppId } from './healthPlatformAdapter';
 import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceService';
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
@@ -173,8 +173,10 @@ export const runHealthSync = async (
     // must never delay or prevent HealthKit / Health Connect from returning data.
     const localScope = governed?.connectionId ?? `ungoverned:${appId}`;
     const localCursors = await readLocalSyncCursors(localScope);
+    const adapter = getHealthPlatformAdapter();
+    if (adapter.appId !== appId) throw new Error('health_provider_not_available');
     payload = await withHealthSyncPipelineTimeout(
-      syncConnectedHealthApp(appId, localCursors, options),
+      adapter.queryAllSupportedMetrics(localCursors, { forceBackfill: options.forceSourceBackfill }),
       'health_sync_native_read_timeout'
     );
     observations = deriveObservations(payload);
@@ -218,10 +220,10 @@ export const runHealthSync = async (
     if (run) await finishWearableSyncRun(run.id, { status:'FAILED',recordsRead:0,recordsUploaded:0,recordsInserted:0,
       recordsDuplicates:0,recordsUpdated:0,recordsDeleted:0,errorStage:'SYNC',errorCode:error instanceof Error ? error.message.slice(0,100) : 'UNKNOWN',
       safeErrorSummary:'Wearable synchronization could not complete.' }).catch(() => undefined);
-    if (payload && error && typeof error === 'object' && 'code' in error) {
-      const code = String((error as { code?: unknown }).code);
-      if (code === 'NETWORK_ERROR' || code === 'TIMEOUT') throw new HealthSyncUploadPendingError(payload, observations);
-    }
+    // The native read and durable local write have already succeeded. Any later
+    // failure belongs to the upload/backend plane and must not erase readable
+    // device data or turn the provider into a disconnected state.
+    if (payload) throw new HealthSyncUploadPendingError(payload, observations);
     throw error;
   }
 };

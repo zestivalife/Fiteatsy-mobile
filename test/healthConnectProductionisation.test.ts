@@ -94,26 +94,26 @@ describe('Health Connect D2 production contracts', () => {
   });
 
   it('bounds native calls and requires an explicit user sync action', () => {
-    const screen = read('src/screens/sync/SyncWearableScreen.tsx');
+    const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
+    const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     const home = read('src/screens/home/HomeScreen.tsx');
     expect(service).toContain('HEALTH_CONNECT_OPERATION_TIMEOUT_MS = 30_000');
     expect(service).toContain('withHealthConnectTimeout');
     expect(service).toMatch(/runHealthConnectOperation\(\s*'SYNCING'/);
     expect(screen).not.toContain('getSdkStatus');
-    expect(screen).toContain("runHealthSync(Platform.OS === 'ios' ? 'apple-health' : 'health-connect'");
-    expect(screen).toContain('acceptWearableConsent(provider, requested)');
+    expect(coordinator).toContain('runHealthSync(adapter.appId');
+    expect(coordinator).toContain('acceptWearableConsent(adapter.platform, requested)');
     expect(screen).not.toContain('route.params?.autoSync');
-    expect(screen).toMatch(/requestHealthPermission[\s\S]*if \(inFlightRef\.current\) \{\s*return;\s*\}/);
-    expect(home).toContain('navigation.navigate(healthSyncRoute.destination)');
-    expect(home).toContain('resolveHealthSyncRoute(healthSyncStatus)');
+    expect(coordinator).toMatch(/requestAccess[\s\S]*if \(inFlight\.current\) return/);
+    expect(home).toContain("navigation.navigate('HealthDataSync')");
+    expect(home).not.toContain('resolveHealthSyncRoute');
     expect(home).not.toContain("navigation.navigate('SyncWearable', { autoSync: true })");
   });
 
   it('settles failures into retryable UI instead of unlocked insights', () => {
-    const screen = read('src/screens/sync/SyncWearableScreen.tsx');
-    expect(screen).toMatch(/stage === 'failed'\s*\? 'Try Again'/);
-    expect(screen).not.toContain("stage === 'failed' || stage === 'insufficient_data'");
-    expect(screen).toContain("setStage('failed')");
-    expect(screen).toContain('setIsRunning(false)');
+    const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
+    expect(coordinator).toContain("setProviderState(available ? 'ERROR' : 'UNAVAILABLE')");
+    expect(coordinator).toContain("setUploadState('ERROR')");
+    expect(coordinator).toContain('inFlight.current = false');
   });
 });

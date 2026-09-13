@@ -60,11 +60,11 @@ describe('Onboarding V2 contract', () => {
   });
 
   it('keeps platform connectivity and consultant readiness truthful', () => {
-    const sync = read('src/screens/sync/SyncWearableScreen.tsx');
+    const sync = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
+    const adapter = read('src/services/healthPlatformAdapter.ts');
     const ready = read('src/screens/onboarding/OnboardingReadyScreen.tsx');
-    expect(sync).toContain("Platform.OS === 'android'");
-    expect(sync).toContain("'Apple Health · read-only access'");
-    expect(sync).toContain('requestAppleHealthPermissions');
+    expect(sync).toContain('Request Health Access');
+    expect(adapter).toContain('requestAppleHealthPermissions');
     expect(ready).toContain("Boolean(onboarding?.assignedConsultantId)");
     expect(ready).toContain("consultantReady ? 'Ready' : 'Pending'");
   });

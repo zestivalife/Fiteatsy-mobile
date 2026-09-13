@@ -31,8 +31,6 @@ import {
   getHealthScoreSummary,
   type HealthScoreSummary
 } from '../../services/healthIntelligenceService';
-import { getHealthSyncStatus, type HealthSyncStatus } from '../../services/healthSyncManager';
-import { resolveHealthSyncRoute } from '../../services/healthSyncRouting';
 import type { Medication, MedicationLogStatus } from '../../types';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import { resolveClientFirstName } from '../../utils/clientIdentity';
@@ -133,7 +131,6 @@ export const HomeScreen = () => {
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('recovery');
   const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
   const [healthSummary, setHealthSummary] = useState<HealthScoreSummary | null>(null);
-  const [healthSyncStatus, setHealthSyncStatus] = useState<HealthSyncStatus | null>(null);
   const [recoveryTrend, setRecoveryTrend] = useState<number[]>([]);
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
@@ -235,26 +232,12 @@ export const HomeScreen = () => {
     }
   }, [hasAuthSession]);
 
-  const refreshHealthConnection = useCallback(async () => {
-    if (!hasAuthSession) {
-      setHealthSyncStatus(null);
-      return;
-    }
-    try {
-      const status = await getHealthSyncStatus();
-      setHealthSyncStatus(status);
-    } catch {
-      // Keep the previous connection state when the status endpoint is temporarily unavailable.
-    }
-  }, [hasAuthSession]);
-
   useFocusEffect(
     useCallback(() => {
       void refreshPss10Context();
       void refreshDailyNutrition();
       void refreshHealthScores();
-      void refreshHealthConnection();
-    }, [refreshDailyNutrition, refreshHealthConnection, refreshHealthScores, refreshPss10Context])
+    }, [refreshDailyNutrition, refreshHealthScores, refreshPss10Context])
   );
   useEffect(
     () => subscribeToNutritionDay(() => {
@@ -322,7 +305,6 @@ export const HomeScreen = () => {
     : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D' };
   const selectedState = stateFromScore(selected.score);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
-  const healthSyncRoute = resolveHealthSyncRoute(healthSyncStatus);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -356,12 +338,11 @@ export const HomeScreen = () => {
                 onPress={() => { void openAssist(); }}
               />
               <ActionPill
-                label={healthSyncRoute.ctaLabel}
+                label="Sync Health"
                 Icon={WearableSyncIcon}
                 onPress={() => {
-                  if (healthSyncRoute.destination) navigation.navigate(healthSyncRoute.destination);
+                  navigation.navigate('HealthDataSync');
                 }}
-                disabled={healthSyncRoute.connectionState === 'UNKNOWN'}
               />
               <ActionPill label="Health Reports" Icon={ReportsActionIcon} onPress={() => navigation.navigate('Reports')} />
               <ActionPill label="Cycle" Icon={CycleActionIcon} onPress={() => navigation.navigate('Cycle')} />

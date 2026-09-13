@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
-import type { HealthAppId } from './healthAppService';
+import type { HealthAppId } from './healthPlatformAdapter';
 import { runHealthSync } from './healthSyncManager';
 import type { GovernedProvider } from './wearablePlatformService';
 import type { WellnessSnapshot } from '../types';

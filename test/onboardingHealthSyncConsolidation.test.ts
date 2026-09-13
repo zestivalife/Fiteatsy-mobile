@@ -46,23 +46,19 @@ describe('returning-user bootstrap and canonical Health Data Sync', () => {
   test('all navigation entries use the one canonical screen', () => {
     const navigation = read('src/navigation/AppNavigation.tsx');
     const assessment = read('src/screens/onboarding/OnboardingAssessmentScreen.tsx');
-    const routing = read('src/services/healthSyncRouting.ts');
-    const canonical = read('src/screens/sync/HealthDataSyncScreen.tsx');
+    const canonical = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     expect(navigation).toContain('<Stack.Screen name="HealthDataSync" component={HealthDataSyncScreen} />');
     expect(navigation).not.toContain('<Stack.Screen name="SyncWearable"');
     expect(assessment).toContain("navigation.navigate('HealthDataSync', { entryContext: 'ONBOARDING' })");
-    expect(routing).not.toContain("'SyncWearable'");
-    expect(canonical).toContain("import { HealthDataSyncExperience } from './SyncWearableScreen'");
-    expect(canonical).toContain("entryContext==='ONBOARDING'||(!loading&&status!==null&&!connected)");
-    expect(canonical).toContain('canReadLocalSource=connected||status===null');
+    expect(navigation).toContain("from '../screens/sync/CanonicalHealthDataSyncScreen'");
+    expect(canonical).toContain('useCanonicalHealthSyncCoordinator');
+    expect(canonical).not.toContain('HealthDataSyncExperience');
   });
 
   test('setup later is governed by entry context, not connection state', () => {
-    const experience = read('src/screens/sync/SyncWearableScreen.tsx');
-    expect(experience).toContain("const entryContext = route.params?.entryContext ?? 'HOME'");
-    expect(experience).toContain("const isOnboardingEntry = entryContext === 'ONBOARDING'");
-    expect(experience).toContain('if (isOnboardingEntry)');
+    const experience = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
+    expect(experience).toContain("route.params?.entryContext==='ONBOARDING'");
     expect(experience).toContain('setWearableSetupCompleted(true)');
-    expect(experience).toContain('clearOnboardingRuntimeProgress');
+    expect(experience).toContain("wearablePreference:connected?'sync':'later'");
   });
 });

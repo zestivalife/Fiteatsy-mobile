@@ -8,7 +8,9 @@ describe('Apple Health physical-device permission flow', () => {
   const bridge = read('modules/fiteatsy-healthkit/index.ts');
   const apple = read('src/services/appleHealthService.ts');
   const manager = read('src/services/healthSyncManager.ts');
-  const screen = read('src/screens/sync/SyncWearableScreen.tsx');
+  const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
+  const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
+  const adapter = read('src/services/healthPlatformAdapter.ts');
 
   it('requests read-only supported HealthKit types and omits unsupported metrics', () => {
     expect(native).toContain('requestAuthorization(toShare: [], read: types)');
@@ -25,7 +27,7 @@ describe('Apple Health physical-device permission flow', () => {
     expect(native).not.toContain('"grantedScopes"');
     expect(bridge).toContain('requestCompleted: boolean');
     expect(bridge).not.toContain('grantedScopes: string[]');
-    expect(screen).toContain("const persistedGrantedScopes = Platform.OS === 'ios' ? [] : grantedScopes");
+    expect(coordinator).toContain("grantedScopes: adapter.platform === 'APPLE_HEALTH' ? [] : access.grantedScopes");
   });
 
   it('supports a lightweight return-to-app request-status inspection', () => {
@@ -38,8 +40,8 @@ describe('Apple Health physical-device permission flow', () => {
   it('keeps no-data distinct from permission failure and starts initial sync', () => {
     expect(manager).not.toContain("throw new Error('INSUFFICIENT_DATA')");
     expect(apple).toContain("'no_recent_data'");
-    expect(screen).toContain('shouldStartInitialSyncRef.current = Platform.OS === \'ios\'');
-    expect(screen).toContain('void runRecoveryConnection()');
+    expect(coordinator).toContain('await syncLocalMetrics({ forceSourceBackfill: true })');
+    expect(coordinator).toContain('forceBackfill.current = true');
   });
 
   it('projects Apple metric names into canonical connected-domain keys', () => {
@@ -67,15 +69,14 @@ describe('Apple Health physical-device permission flow', () => {
   });
 
   it('exits the optional wearable flow instead of chaining calendar/reminder onboarding', () => {
-    expect(screen).toContain("clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId)");
-    expect(screen).toContain("navigation.reset({ index:0, routes:[{ name:'Main' }] })");
-    expect(screen).toContain("const skipForNow = () => { exitWearableFlow('later'); };");
+    expect(screen).toContain("wearablePreference:connected?'sync':'later'");
+    expect(screen).toContain("navigation.reset({index:0,routes:[{name:'Main'}]})");
     expect(screen).not.toContain("navigation.navigate('OnboardingCalendar')");
   });
 
   it('uses platform-correct copy and no unsupported Apple Health URL scheme', () => {
-    expect(screen).toContain("Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect'");
-    expect(screen).toContain('`${healthProviderName} access could not be completed.`');
+    expect(adapter).toContain("Platform.OS === 'ios' ? appleHealthAdapter : healthConnectAdapter");
+    expect(screen).toContain('health.sourceName');
     expect(screen).not.toContain("Linking.openURL('x-apple-health://')");
   });
 
