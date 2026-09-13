@@ -481,7 +481,13 @@ export const ReportsScreen = () => {
   const reportHistoryErrorMessage = (error: unknown) => {
     if (error && typeof error === 'object' && 'code' in error) {
       const code = String((error as { code?: unknown }).code);
-      if (code === 'NETWORK_ERROR') return 'You appear to be offline. Report history will refresh when your connection returns.';
+      if (code === 'NETWORK_ERROR') {
+        const serverCode = String((error as { serverCode?: unknown }).serverCode ?? '');
+        if (serverCode === 'DEVICE_OFFLINE') {
+          return 'This device is offline. Report history will refresh when your connection returns.';
+        }
+        return 'The report service could not be reached. Check your connection and try again.';
+      }
       if (code === 'TIMEOUT') return 'Report history took too long to load. Please try again.';
       if (code === 'UNAUTHORIZED') return 'Your session needs to be refreshed. Please sign in again.';
     }

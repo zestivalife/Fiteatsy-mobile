@@ -1,4 +1,5 @@
 import { apiBaseUrl } from './apiClient';
+import NetInfo from '@react-native-community/netinfo';
 
 type SignupRequestParams = {
   name: string;
@@ -182,7 +183,14 @@ const requestJson = async <T>(
       errorMessage: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
-    throw new AuthServiceError('NETWORK_OFFLINE', `Unable to reach the authentication service at ${apiBaseUrl}.`);
+    const networkState = await NetInfo.fetch().catch(() => null);
+    const isDefinitelyOffline = networkState?.isConnected === false || networkState?.isInternetReachable === false;
+    throw new AuthServiceError(
+      isDefinitelyOffline ? 'NETWORK_OFFLINE' : 'SERVER_ERROR',
+      isDefinitelyOffline
+        ? 'This device is offline. Connect using Wi-Fi or mobile data and try again.'
+        : 'The authentication service could not be reached. Check your connection and try again.'
+    );
   }
 
   authLogger.log(`${AUTH_LOG_PREFIX} RESPONSE STATUS`, { url, status: response.status });

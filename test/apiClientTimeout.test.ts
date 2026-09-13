@@ -2,7 +2,12 @@ jest.mock('expo-constants', () => ({
   expoConfig: { extra: { apiBaseUrl: 'https://api.fiteatsy.test' } }
 }));
 
-import { apiFetch, registerAccessTokenProvider, registerUnauthorizedHandler } from '../src/services/apiClient';
+import {
+  apiFetch,
+  registerAccessTokenProvider,
+  registerNetworkReachabilityProvider,
+  registerUnauthorizedHandler
+} from '../src/services/apiClient';
 
 describe('shared API bounded completion', () => {
   const originalFetch = global.fetch;
@@ -11,6 +16,7 @@ describe('shared API bounded completion', () => {
     jest.useRealTimers();
     global.fetch = originalFetch;
     registerAccessTokenProvider(() => null);
+    registerNetworkReachabilityProvider(null);
     registerUnauthorizedHandler(null);
   });
 
@@ -48,6 +54,26 @@ describe('shared API bounded completion', () => {
       status: 404,
       serverCode: 'DIET_PLAN_NOT_FOUND',
       message: 'No published plan.',
+    });
+  });
+
+  it.each([true, null])('does not claim the device is offline when reachability is %s', async (reachable) => {
+    registerNetworkReachabilityProvider(() => reachable);
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+
+    await expect(apiFetch('/v1/reports')).rejects.toMatchObject({
+      code: 'NETWORK_ERROR',
+      serverCode: 'SERVICE_UNREACHABLE'
+    });
+  });
+
+  it('reports offline only when transport evidence is definitively offline', async () => {
+    registerNetworkReachabilityProvider(() => false);
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+
+    await expect(apiFetch('/v1/reports')).rejects.toMatchObject({
+      code: 'NETWORK_ERROR',
+      serverCode: 'DEVICE_OFFLINE'
     });
   });
 

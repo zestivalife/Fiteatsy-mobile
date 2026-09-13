@@ -36,11 +36,15 @@ export type ApiRequestDiagnostic = {
 
 let diagnosticSink: ((event: ApiRequestDiagnostic) => void) | null = null;
 let networkTypeProvider: (() => string | null | undefined) | null = null;
+let networkReachabilityProvider: (() => boolean | null | undefined) | null = null;
 export const registerApiDiagnosticSink = (sink: ((event: ApiRequestDiagnostic) => void) | null) => {
   diagnosticSink = sink;
 };
 export const registerNetworkTypeProvider = (provider: (() => string | null | undefined) | null) => {
   networkTypeProvider = provider;
+};
+export const registerNetworkReachabilityProvider = (provider: (() => boolean | null | undefined) | null) => {
+  networkReachabilityProvider = provider;
 };
 
 export const getApiBaseUrl = () => {
@@ -145,7 +149,13 @@ export const apiResponse = async (path: string, init: ApiRequestInit = {}): Prom
       throw new ApiClientError('TIMEOUT', 'The platform request timed out. Please try again.');
     }
     emit('NETWORK_ERROR');
-    throw new ApiClientError('NETWORK_ERROR', 'Unable to reach the platform backend.');
+    const isDefinitelyOffline = networkReachabilityProvider?.() === false;
+    throw new ApiClientError(
+      'NETWORK_ERROR',
+      isDefinitelyOffline ? 'This device is offline.' : 'Unable to reach the platform backend.',
+      undefined,
+      isDefinitelyOffline ? 'DEVICE_OFFLINE' : 'SERVICE_UNREACHABLE'
+    );
   } finally {
     clearTimeout(timeout);
     callerSignal?.removeEventListener('abort', abortFromCaller);

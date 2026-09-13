@@ -71,7 +71,12 @@ import {
   type AuthSessionResponse,
   type CurrentAuthSession
 } from '../services/authService';
-import { registerAccessTokenProvider, registerNetworkTypeProvider, registerUnauthorizedHandler } from '../services/apiClient';
+import {
+  registerAccessTokenProvider,
+  registerNetworkReachabilityProvider,
+  registerNetworkTypeProvider,
+  registerUnauthorizedHandler
+} from '../services/apiClient';
 import { queueHealthEvent } from '../services/platformEventService';
 import {
   getPlatformHealthProfile,
@@ -513,9 +518,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [authSession]);
 
   const networkTypeRef = useRef('UNKNOWN');
+  const networkReachabilityRef = useRef<boolean | null>(null);
   useEffect(() => {
     registerNetworkTypeProvider(() => networkTypeRef.current);
-    return () => registerNetworkTypeProvider(null);
+    registerNetworkReachabilityProvider(() => networkReachabilityRef.current);
+    return () => {
+      registerNetworkTypeProvider(null);
+      registerNetworkReachabilityProvider(null);
+    };
   }, []);
 
   useEffect(() => {
@@ -1691,10 +1701,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentStorageIdentity, refreshHealthProfileSyncDiagnostics]);
 
   useEffect(() => {
-    if (!authSession) return undefined;
     const unsubscribe = NetInfo.addEventListener((state) => {
       networkTypeRef.current = state.type?.toUpperCase() ?? 'UNKNOWN';
-      if (state.isConnected) {
+      networkReachabilityRef.current = state.isConnected === false || state.isInternetReachable === false
+        ? false
+        : state.isConnected === true
+          ? true
+          : null;
+      if (authSession && networkReachabilityRef.current === true) {
         void retryPendingHealthProfileSync();
       }
     });
