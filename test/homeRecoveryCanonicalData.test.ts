@@ -8,9 +8,9 @@ describe('Journey recovery star canonical data contract', () => {
     expect(source).toContain('getHealthScoreSummary()');
     expect(source).toContain("getHealthScoreHistory('recovery')");
     expect(source).toContain('healthSummary?.recoveryScore');
-    expect(source).toContain('healthSummary?.activePerformanceScore');
-    expect(source).toContain('healthSummary?.energyBalanceScore');
-    expect(source).toContain('healthSummary?.stressResilienceScore');
+    expect(source).toContain('healthSummary?.activityScore');
+    expect(source).toContain('healthSummary?.calmScore');
+    expect(source).toContain('healthSummary?.sleepScore');
   });
 
   it('keeps Nutrition on the canonical daily projection and contains no presentation fixture', () => {
