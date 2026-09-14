@@ -32,6 +32,7 @@ export const SignInScreen = ({ navigation }: Props) => {
   const [nowMs, setNowMs] = useState(Date.now());
   const phoneRef = useRef<TextInput>(null);
   const pinRef = useRef<TextInput>(null);
+  const loginRequestRef = useRef<AbortController | null>(null);
   const lockRemainingSec = Math.max(0, Math.ceil((lockUntilMs - nowMs) / 1000));
 
   const normalizedPhone = useMemo(() => {
@@ -50,19 +51,27 @@ export const SignInScreen = ({ navigation }: Props) => {
     return () => clearInterval(timer);
   }, [lockRemainingSec]);
 
+  useEffect(() => () => {
+    loginRequestRef.current?.abort();
+    loginRequestRef.current = null;
+  }, []);
+
   const submitPinLogin = async () => {
+    if (loading || loginRequestRef.current) return;
     if (!normalizedPhone) {
       setError('Enter a valid phone number.');
       return;
     }
     setError(null);
     setLoading(true);
+    const requestController = new AbortController();
+    loginRequestRef.current = requestController;
     try {
       await AsyncStorage.setItem(LAST_COUNTRY_KEY, selectedCountry.iso2);
       const session = await loginWithPin({
         mobile: normalizedPhone.normalizedNumber,
         pin
-      });
+      }, { signal: requestController.signal });
       await completeAuthentication(session);
       if (session.requiresPinChange) {
         navigation.reset({ index: 0, routes: [{ name: 'ChangePin', params: { force: true } }] });
@@ -70,6 +79,7 @@ export const SignInScreen = ({ navigation }: Props) => {
       }
       navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
     } catch (e) {
+      if (requestController.signal.aborted) return;
       const err = e as AuthServiceError;
       console.error('[SignInScreen] PIN LOGIN FAILED', {
         errorMessage: err.message,
@@ -82,7 +92,10 @@ export const SignInScreen = ({ navigation }: Props) => {
         setLockUntilMs(Date.now() + err.retryAfterSec * 1000);
       }
     } finally {
-      setLoading(false);
+      if (loginRequestRef.current === requestController) {
+        loginRequestRef.current = null;
+        setLoading(false);
+      }
     }
   };
 

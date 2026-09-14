@@ -67,9 +67,12 @@ describe('v17.38 mobile production readiness contracts', () => {
     expect(screen).not.toContain('9240');
   });
 
-  test('an authenticated 401 clears the expired session through the app context', () => {
-    expect(read('src/services/apiClient.ts')).toContain('unauthorizedHandler?.()');
-    expect(read('src/state/AppContext.tsx')).toContain('registerUnauthorizedHandler(() => clearPersistedAuth(authSession))');
+  test('only explicit terminal authentication evidence clears a durable local session', () => {
+    expect(read('src/services/apiClient.ts')).toContain('unauthorizedHandler?.({ status: 401, serverCode: payload?.error })');
+    const context = read('src/state/AppContext.tsx');
+    expect(context).toContain("serverCode === 'SESSION_REVOKED'");
+    expect(context).toContain("serverCode === 'ACCOUNT_DISABLED'");
+    expect(context).not.toContain('registerUnauthorizedHandler(() => clearPersistedAuth(authSession))');
   });
 
   test('signup does not fabricate clinical demographics, symptoms, or goals', () => {

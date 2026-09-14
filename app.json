@@ -78,7 +78,8 @@
       "react-native-health-connect",
       "./plugins/withHealthConnectPermissionDelegate",
       "expo-video",
-      "./plugins/withFrozenSplashBridge"
+      "./plugins/withFrozenSplashBridge",
+      "expo-secure-store"
     ]
   }
 }

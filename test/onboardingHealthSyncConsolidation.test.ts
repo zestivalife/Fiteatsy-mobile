@@ -40,7 +40,9 @@ describe('returning-user bootstrap and canonical Health Data Sync', () => {
     const splash = read('src/screens/auth/SplashScreen.tsx');
     expect(splash).toContain("onboardingStatus === 'COMPLETED'\n      ? null");
     expect(splash).toContain("onboardingStatus !== 'COMPLETED' && progress?.phase === 'connect'");
-    expect(splash).toContain("isAuthenticated && onboardingStatus === 'UNKNOWN'");
+    expect(splash).toContain("if (onboardingStatus === 'UNKNOWN')");
+    expect(splash).toContain("navigation.replace('Main')");
+    expect(splash).not.toContain("if (isAuthenticated && onboardingStatus === 'UNKNOWN') return");
   });
 
   test('all navigation entries use the one canonical screen', () => {

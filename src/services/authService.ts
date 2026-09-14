@@ -1,5 +1,6 @@
 import { apiBaseUrl } from './apiClient';
 import NetInfo from '@react-native-community/netinfo';
+import { traceSessionLifecycle } from './sessionLifecycleTrace';
 
 type SignupRequestParams = {
   name: string;
@@ -21,6 +22,7 @@ type ApiErrorCode =
   | 'PIN_INVALID'
   | 'PIN_LOCKED'
   | 'PIN_REUSE_NOT_ALLOWED'
+  | 'TIMEOUT'
   | 'NETWORK_OFFLINE'
   | 'SERVER_ERROR';
 
@@ -69,6 +71,7 @@ export class AuthServiceError extends Error {
 }
 
 const AUTH_LOG_PREFIX = '[AuthService]';
+export const AUTH_REQUEST_TIMEOUT_MS = 15_000;
 const REDACTED = '[REDACTED]';
 const authLogger = {
   log: (...values: unknown[]) => { if (__DEV__) console.log(...values); },
@@ -158,18 +161,26 @@ const parseError = async (response: Response, url: string): Promise<never> => {
 
 const requestJson = async <T>(
   path: string,
-  init: RequestInit & { skipJsonBody?: boolean } = {}
+  init: RequestInit & { skipJsonBody?: boolean; timeoutMs?: number } = {}
 ): Promise<T> => {
   let response: Response;
   const url = `${apiBaseUrl}${path}`;
   const method = init.method ?? 'GET';
   authLogger.log(`${AUTH_LOG_PREFIX} REQUEST`, { apiBaseUrl, url, method });
+  traceSessionLifecycle('AUTH_REQUEST_START', { route: path, method });
+  const controller = new AbortController();
+  const callerSignal = init.signal;
+  const abortFromCaller = () => controller.abort();
+  callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+  const timeout = setTimeout(() => controller.abort(), init.timeoutMs ?? AUTH_REQUEST_TIMEOUT_MS);
   try {
     // Authentication bootstrap intentionally precedes creation of an access
     // token, so it cannot use the authenticated API client. Keep this as the
     // sole direct-fetch exception and retain redacted auth-specific logging.
+    const { skipJsonBody: _skipJsonBody, timeoutMs: _timeoutMs, ...requestInit } = init;
     response = await fetch(url, {
-      ...init,
+      ...requestInit,
+      signal: controller.signal,
       headers: {
         ...(init.skipJsonBody ? {} : { 'Content-Type': 'application/json' }),
         ...(init.headers ?? {})
@@ -183,6 +194,10 @@ const requestJson = async <T>(
       errorMessage: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
+    if (controller.signal.aborted && !callerSignal?.aborted) {
+      traceSessionLifecycle('AUTH_REQUEST_TIMEOUT', { route: path, method });
+      throw new AuthServiceError('TIMEOUT', 'Authentication timed out. Check your connection and try again.');
+    }
     const networkState = await NetInfo.fetch().catch(() => null);
     const isDefinitelyOffline = networkState?.isConnected === false || networkState?.isInternetReachable === false;
     throw new AuthServiceError(
@@ -191,6 +206,9 @@ const requestJson = async <T>(
         ? 'This device is offline. Connect using Wi-Fi or mobile data and try again.'
         : 'The authentication service could not be reached. Check your connection and try again.'
     );
+  } finally {
+    clearTimeout(timeout);
+    callerSignal?.removeEventListener('abort', abortFromCaller);
   }
 
   authLogger.log(`${AUTH_LOG_PREFIX} RESPONSE STATUS`, { url, status: response.status });
@@ -200,6 +218,7 @@ const requestJson = async <T>(
   }
 
   if (response.status === 204) {
+    traceSessionLifecycle('AUTH_REQUEST_SUCCESS', { route: path, method, status: response.status });
     authLogger.log(`${AUTH_LOG_PREFIX} RESPONSE EMPTY`, { url, status: response.status });
     return undefined as T;
   }
@@ -208,6 +227,7 @@ const requestJson = async <T>(
   try {
     responseText = await response.text();
     const payload = (responseText ? JSON.parse(responseText) : undefined) as T;
+    traceSessionLifecycle('AUTH_REQUEST_SUCCESS', { route: path, method, status: response.status });
     authLogger.log(`${AUTH_LOG_PREFIX} RESPONSE JSON`, {
       url,
       status: response.status,
@@ -243,10 +263,11 @@ export const requestSignupOtp = (params: SignupRequestParams) =>
     body: JSON.stringify(params)
   });
 
-export const loginWithPin = (params: { mobile: string; pin: string }) =>
+export const loginWithPin = (params: { mobile: string; pin: string }, options: { signal?: AbortSignal } = {}) =>
   requestJson<AuthSessionResponse>('/v1/auth/login/pin', {
     method: 'POST',
-    body: JSON.stringify(params)
+    body: JSON.stringify(params),
+    signal: options.signal
   });
 
 export const changePin = (sessionToken: string, params: { currentPin: string; newPin: string; confirmNewPin: string }) =>

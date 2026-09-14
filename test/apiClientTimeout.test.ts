@@ -77,13 +77,14 @@ describe('shared API bounded completion', () => {
     });
   });
 
-  it('invalidates an existing authenticated session after a 401 response', async () => {
+  it('does not destroy a durable session for an unclassified 401 response', async () => {
     const onUnauthorized = jest.fn();
     registerAccessTokenProvider(() => 'expired-session-token');
     registerUnauthorizedHandler(onUnauthorized);
-    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: 'SESSION_EXPIRED' }) });
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: 'ACCESS_TOKEN_REJECTED' }) });
 
     await expect(apiFetch('/v1/platform/health-profile')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).toHaveBeenCalledWith({ status: 401, serverCode: 'ACCESS_TOKEN_REJECTED' });
   });
 });

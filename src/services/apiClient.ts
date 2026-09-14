@@ -79,13 +79,14 @@ export const getApiBaseUrl = () => {
 export const apiBaseUrl = getApiBaseUrl();
 
 let accessTokenProvider: (() => string | null | undefined) | null = null;
-let unauthorizedHandler: (() => void) | null = null;
+export type UnauthorizedContext = { status: 401; serverCode?: string };
+let unauthorizedHandler: ((context: UnauthorizedContext) => void) | null = null;
 
 export const registerAccessTokenProvider = (provider: () => string | null | undefined) => {
   accessTokenProvider = provider;
 };
 
-export const registerUnauthorizedHandler = (handler: (() => void) | null) => {
+export const registerUnauthorizedHandler = (handler: ((context: UnauthorizedContext) => void) | null) => {
   unauthorizedHandler = handler;
 };
 
@@ -168,7 +169,9 @@ export const apiResponse = async (path: string, init: ApiRequestInit = {}): Prom
     } catch {
       payload = null;
     }
-    if (response.status === 401 && accessTokenProvider?.()) unauthorizedHandler?.();
+    if (response.status === 401 && accessTokenProvider?.()) {
+      unauthorizedHandler?.({ status: 401, serverCode: payload?.error });
+    }
     const code = toErrorCode(response.status);
     emit(code);
     throw new ApiClientError(code, payload?.message ?? 'Platform request failed.', response.status, payload?.error);

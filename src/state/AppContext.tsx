@@ -64,7 +64,6 @@ import {
   validateInviteCode
 } from '../services/familyConnectService';
 import {
-  AuthServiceError,
   buildSessionFromAuthResponse,
   getCurrentAuthSession,
   logoutAuthSession,
@@ -101,6 +100,8 @@ import { normalizeOnboardingProfile } from '../utils/healthProfile';
 import { wellnessFromHealthScores } from '../services/healthSyncManager';
 import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/identityScopedStorage';
 import { deriveOnboardingGate, type OnboardingResumeStep, type OnboardingStatus } from '../utils/onboardingGate';
+import { traceSessionLifecycle } from '../services/sessionLifecycleTrace';
+import { clearPersistedAuthSession, readPersistedAuthSession, writePersistedAuthSession } from '../services/authSessionStore';
 
 type StoredAuthSession = CurrentAuthSession & {
   sessionToken: string;
@@ -125,7 +126,6 @@ type AppContextValue = {
   authSession: StoredAuthSession | null;
   isAuthenticated: boolean;
   completeAuthentication: (session: AuthSessionResponse) => Promise<void>;
-  setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
   checkIns: DailyCheckIn[];
   submitCheckIn: (checkIn: Omit<DailyCheckIn, 'dateISO'> & { stressLevel?: 1 | 2 | 3 | 4 | 5 }) => Promise<void>;
   hasCheckedInToday: boolean;
@@ -210,7 +210,6 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 const STORAGE_KEYS = {
   onboarding: 'nuetra.onboarding',
   assessment: 'nuetra.assessment',
-  auth: 'nuetra.auth',
   theme: 'nuetra.theme',
   selectedDeviceId: 'nuetra.selectedDeviceId',
   wearableSetupCompleted: 'nuetra.wearableSetupCompleted',
@@ -425,37 +424,37 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setClientBootstrap(createClientBootstrapState());
     setOnboardingStatus('NOT_STARTED');
     setOnboardingResumeStep('basics');
-    AsyncStorage.removeItem(STORAGE_KEYS.auth);
+    void clearPersistedAuthSession();
     void removeUserStorage(sessionToClear);
   }, []);
 
-  const persistAuthSession = useCallback((session: StoredAuthSession | null) => {
+  const persistAuthSession = useCallback(async (session: StoredAuthSession | null) => {
     setAuthSessionState(session);
     if (session) {
-      AsyncStorage.setItem(STORAGE_KEYS.auth, JSON.stringify(session));
+      await writePersistedAuthSession(JSON.stringify(session));
     } else {
-      AsyncStorage.removeItem(STORAGE_KEYS.auth);
+      await clearPersistedAuthSession();
     }
   }, []);
 
   const completeAuthentication = useCallback(async (session: AuthSessionResponse) => {
     const fallback = buildSessionFromAuthResponse(session);
-    if (fallback) {
-      setOnboardingStatus('UNKNOWN');
-      setOnboardingResumeStep(null);
-      persistAuthSession({
-        ...fallback,
-        sessionToken: session.sessionToken
-      });
-    }
+    if (!fallback) throw new Error('AUTH_SESSION_IDENTITY_MISSING');
+    const localSession: StoredAuthSession = { ...fallback, sessionToken: session.sessionToken };
+    setOnboardingStatus('UNKNOWN');
+    setOnboardingResumeStep(null);
+    // Authentication is complete once the canonical local session is durable.
+    // Profile, onboarding, Nutrition and Health reconciliation must not delay navigation.
+    await persistAuthSession(localSession);
 
-    try {
+    void (async () => {
+      try {
       const current = await getCurrentAuthSession(session.sessionToken);
       const authenticatedSession: StoredAuthSession = {
         ...current,
         sessionToken: session.sessionToken
       };
-      persistAuthSession(authenticatedSession);
+      await persistAuthSession(authenticatedSession);
       const remoteBundle = await getPlatformHealthProfile(session.sessionToken);
       if (remoteBundle.profile.userId !== current.accountId) throw new Error('CANONICAL_IDENTITY_MISMATCH');
       setCanonicalProfile(remoteBundle);
@@ -484,15 +483,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           console.warn('[CanonicalData] post-auth nutrition projection deferred', { errorCode: resourceErrorCode(error) });
         }
       }
-    } catch (error) {
+      } catch (error) {
       if (error instanceof Error && error.message === 'CANONICAL_IDENTITY_MISMATCH') {
         clearPersistedAuth(fallback ? { ...fallback, sessionToken: session.sessionToken } : null);
         throw error;
       }
-      if (!fallback) throw error;
       if (isCanonicalNoData(error)) {
-        setOnboardingStatus('NOT_STARTED');
-        setOnboardingResumeStep('basics');
+        // UNKNOWN remains fail-open for an established authenticated user.
+        setOnboardingStatus('UNKNOWN');
+        setOnboardingResumeStep(null);
       }
       console.warn('[AppContext] auth/me refresh deferred after fresh login', {
         errorCode: resourceErrorCode(error)
@@ -510,7 +509,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           });
         }
       }
-    }
+      }
+    })();
   }, [clearPersistedAuth, persistAuthSession]);
 
   useEffect(() => {
@@ -529,17 +529,23 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    registerUnauthorizedHandler(() => clearPersistedAuth(authSession));
+    registerUnauthorizedHandler(({ serverCode }) => {
+      // A generic 401 can be caused by an access-token race or transient server
+      // state. Only explicit terminal server evidence may destroy local identity.
+      if (serverCode === 'SESSION_REVOKED' || serverCode === 'ACCOUNT_DISABLED' || serverCode === 'SESSION_EXPIRED') {
+        clearPersistedAuth(authSession);
+      }
+    });
     return () => registerUnauthorizedHandler(null);
   }, [authSession, clearPersistedAuth]);
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        await initMedicationNotifications();
-
+        traceSessionLifecycle('APP_START');
+        traceSessionLifecycle('LOCAL_SESSION_READ_START');
         const [storedAuth, storedTheme] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEYS.auth),
+          readPersistedAuthSession(),
           AsyncStorage.getItem(STORAGE_KEYS.theme)
         ]);
 
@@ -553,28 +559,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           if (parsed?.sessionToken) {
             setAuthSessionState(parsed);
             sessionForStorage = parsed;
-            try {
-              const refreshed = await getCurrentAuthSession(parsed.sessionToken);
-              sessionForStorage = {
-                ...refreshed,
-                sessionToken: parsed.sessionToken
-              };
-              persistAuthSession(sessionForStorage);
-            } catch (error) {
-              if (
-                error instanceof AuthServiceError &&
-                (error.code === 'NETWORK_OFFLINE' || error.code === 'SERVER_ERROR')
-              ) {
-                setAuthSessionState(parsed);
-              } else {
-                clearPersistedAuth(parsed);
-                sessionForStorage = null;
-              }
-            }
+            traceSessionLifecycle('LOCAL_SESSION_READ_SUCCESS');
+            // Local persisted identity is authoritative for initial navigation.
+            // Remote validation is reconciled after the authenticated shell mounts.
           }
         }
 
         if (!sessionForStorage) {
+          traceSessionLifecycle('LOCAL_SESSION_READ_EMPTY');
           setOnboardingStatus('NOT_STARTED');
           setOnboardingResumeStep('basics');
           return;
@@ -654,6 +646,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           if (parsed && typeof parsed === 'object') {
             const normalized = normalizeOnboardingProfile(parsed);
             setOnboardingState(normalized);
+            if (!cachedCanonicalProfile) {
+              const localGate = deriveOnboardingGate(normalized);
+              setOnboardingStatus(localGate.status);
+              setOnboardingResumeStep(localGate.resumeStep);
+            }
             const scopedKey = getSessionScopedKey(STORAGE_KEYS.onboarding, sessionForStorage);
             if (scopedKey) {
               AsyncStorage.setItem(scopedKey, JSON.stringify(normalized));
@@ -664,92 +661,114 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const parsed = safeParse<AssessmentProfile | null>(storedAssessment, null);
           if (parsed && typeof parsed === 'object') setAssessmentState(parsed);
         }
-        try {
-          await processPendingHealthProfileSync(toSessionStorageIdentity(sessionForStorage)).catch((error) => {
-            console.warn('[CanonicalData] pending profile sync deferred', { errorCode: resourceErrorCode(error) });
+        setBootstrapped(true);
+        void initMedicationNotifications().catch((error) => {
+          console.warn('[AppContext] medication notification initialization deferred', {
+            errorCode: resourceErrorCode(error)
           });
-          const remoteBundle = await getPlatformHealthProfile(sessionForStorage.sessionToken);
-          if (remoteBundle.profile.userId !== identity.userId) throw new Error('CANONICAL_IDENTITY_MISMATCH');
-          setCanonicalProfile(remoteBundle);
-          const canonicalKey = getSessionScopedKey(STORAGE_KEYS.canonicalProfile, sessionForStorage);
-          if (canonicalKey) await AsyncStorage.setItem(canonicalKey, JSON.stringify(remoteBundle));
-          const gate = deriveOnboardingGate(remoteBundle.profile);
-          setOnboardingStatus(gate.status);
-          setOnboardingResumeStep(gate.resumeStep);
-          setOnboardingState((previous) => {
-            const baseProfile = previous ?? normalizeOnboardingProfile({
-              name: sessionForStorage.user.name,
-              createdAtISO: sessionForStorage.user.createdAtISO ?? remoteBundle.profile.createdAtISO
+        });
+
+        void (async () => {
+          try {
+            const refreshed = await getCurrentAuthSession(sessionForStorage.sessionToken);
+            if (refreshed.accountId !== identity.userId) throw new Error('CANONICAL_IDENTITY_MISMATCH');
+            await persistAuthSession({ ...refreshed, sessionToken: sessionForStorage.sessionToken });
+          } catch (error) {
+            if (error instanceof Error && error.message === 'CANONICAL_IDENTITY_MISMATCH') {
+              clearPersistedAuth(sessionForStorage);
+              return;
+            }
+            console.warn('[AppContext] background auth/session reconciliation deferred', {
+              errorCode: resourceErrorCode(error)
             });
-            const normalized = normalizeOnboardingProfile(mergePlatformProfileIntoOnboarding(baseProfile, remoteBundle.profile));
-            const scopedKey = getSessionScopedKey(STORAGE_KEYS.onboarding, sessionForStorage);
-            if (scopedKey) {
-              AsyncStorage.setItem(scopedKey, JSON.stringify(normalized));
-            }
-            return normalized;
-          });
-          setAssessmentState((previous) => {
-            if (!previous) return previous;
-            const next = {
-              ...previous,
-              heightCm: remoteBundle.profile.heightCm ?? previous?.heightCm ?? 0,
-              weightKg: remoteBundle.profile.currentWeightKg ?? previous?.weightKg ?? 0
-            };
-            const scopedKey = getSessionScopedKey(STORAGE_KEYS.assessment, sessionForStorage);
-            if (scopedKey) {
-              AsyncStorage.setItem(scopedKey, JSON.stringify(next));
-            }
-            return next;
-          });
-          setClientBootstrap((previous) => ({ ...previous, profile: { status: 'READY', errorCode: null } }));
-        } catch (error) {
-          if (isCanonicalNoData(error)) {
-            setCanonicalProfile(null);
+          }
+        })();
+
+        void (async () => {
+          try {
+            await processPendingHealthProfileSync(toSessionStorageIdentity(sessionForStorage));
+          } catch (error) {
+            console.warn('[CanonicalData] pending profile sync deferred', {
+              errorCode: resourceErrorCode(error)
+            });
+          }
+          traceSessionLifecycle('REMOTE_PROFILE_START');
+          try {
+            const remoteBundle = await getPlatformHealthProfile(sessionForStorage.sessionToken);
+            if (remoteBundle.profile.userId !== identity.userId) throw new Error('CANONICAL_IDENTITY_MISMATCH');
+            setCanonicalProfile(remoteBundle);
             const canonicalKey = getSessionScopedKey(STORAGE_KEYS.canonicalProfile, sessionForStorage);
-            if (canonicalKey) await AsyncStorage.removeItem(canonicalKey);
-            setClientBootstrap((previous) => ({ ...previous, profile: { status: 'NO_DATA', errorCode: null } }));
-            if (!cachedCanonicalProfile) {
-              setOnboardingStatus('NOT_STARTED');
-              setOnboardingResumeStep('basics');
+            if (canonicalKey) await AsyncStorage.setItem(canonicalKey, JSON.stringify(remoteBundle));
+            const gate = deriveOnboardingGate(remoteBundle.profile);
+            setOnboardingStatus(gate.status);
+            setOnboardingResumeStep(gate.resumeStep);
+            setOnboardingState((previous) => {
+              const baseProfile = previous ?? normalizeOnboardingProfile({
+                name: sessionForStorage.user.name,
+                createdAtISO: sessionForStorage.user.createdAtISO ?? remoteBundle.profile.createdAtISO
+              });
+              const normalized = normalizeOnboardingProfile(mergePlatformProfileIntoOnboarding(baseProfile, remoteBundle.profile));
+              const scopedKey = getSessionScopedKey(STORAGE_KEYS.onboarding, sessionForStorage);
+              if (scopedKey) void AsyncStorage.setItem(scopedKey, JSON.stringify(normalized));
+              return normalized;
+            });
+            setClientBootstrap((previous) => ({ ...previous, profile: { status: 'READY', errorCode: null } }));
+            traceSessionLifecycle('REMOTE_PROFILE_END', { outcome: 'SUCCESS' });
+          } catch (error) {
+            if (error instanceof Error && error.message === 'CANONICAL_IDENTITY_MISMATCH') {
+              clearPersistedAuth(sessionForStorage);
+              return;
             }
-          } else {
+            if (isCanonicalNoData(error)) {
+              setClientBootstrap((previous) => ({ ...previous, profile: { status: 'NO_DATA', errorCode: null } }));
+              // An absent remote projection is not evidence that an existing user
+              // has never completed onboarding. Preserve local routing evidence.
+            } else {
+              setClientBootstrap((previous) => ({ ...previous, profile: { status: 'ERROR', errorCode: resourceErrorCode(error) } }));
+            }
             console.warn('[CanonicalData] profile projection failed; retaining last valid profile', {
               authenticatedUserId: identity.userId,
               clientId: identity.clientId,
               errorCode: resourceErrorCode(error)
             });
-            setClientBootstrap((previous) => ({ ...previous, profile: { status: 'ERROR', errorCode: resourceErrorCode(error) } }));
-            if (!cachedCanonicalProfile) {
+            if (!cachedCanonicalProfile && !storedOnboarding) {
               setOnboardingStatus('UNKNOWN');
               setOnboardingResumeStep(null);
             }
+            traceSessionLifecycle('REMOTE_PROFILE_END', { outcome: resourceErrorCode(error) });
           }
-        }
-        const diagnostics = await getPlatformHealthProfileSyncDiagnostics(toSessionStorageIdentity(sessionForStorage));
-        setHealthProfileSyncDiagnosticsState(diagnostics);
+        })();
 
-        try {
-          const plan = await getPublishedNutritionPlan();
-          setPublishedNutritionPlan(plan);
-          const planKey = getSessionScopedKey(STORAGE_KEYS.publishedNutritionPlan, sessionForStorage);
-          if (planKey) await AsyncStorage.setItem(planKey, JSON.stringify(plan));
-          setClientBootstrap((previous) => ({ ...previous, nutrition: { status: 'READY', errorCode: null } }));
-        } catch (error) {
-          if (isCanonicalNoData(error)) {
-            setPublishedNutritionPlan(null);
+        void getPlatformHealthProfileSyncDiagnostics(toSessionStorageIdentity(sessionForStorage))
+          .then(setHealthProfileSyncDiagnosticsState)
+          .catch((error) => console.warn('[CanonicalData] profile diagnostics deferred', {
+            errorCode: resourceErrorCode(error)
+          }));
+
+        void (async () => {
+          try {
+            const plan = await getPublishedNutritionPlan();
+            setPublishedNutritionPlan(plan);
             const planKey = getSessionScopedKey(STORAGE_KEYS.publishedNutritionPlan, sessionForStorage);
-            if (planKey) await AsyncStorage.removeItem(planKey);
-            setClientBootstrap((previous) => ({ ...previous, nutrition: { status: 'NO_DATA', errorCode: null } }));
-          } else {
-            console.warn('[CanonicalData] nutrition projection failed; retaining last valid plan', {
-              authenticatedUserId: identity.userId,
-              clientId: identity.clientId,
-              errorCode: resourceErrorCode(error)
-            });
-            setClientBootstrap((previous) => ({ ...previous, nutrition: { status: 'ERROR', errorCode: resourceErrorCode(error) } }));
+            if (planKey) await AsyncStorage.setItem(planKey, JSON.stringify(plan));
+            setClientBootstrap((previous) => ({ ...previous, nutrition: { status: 'READY', errorCode: null } }));
+          } catch (error) {
+            if (isCanonicalNoData(error)) {
+              setPublishedNutritionPlan(null);
+              const planKey = getSessionScopedKey(STORAGE_KEYS.publishedNutritionPlan, sessionForStorage);
+              if (planKey) await AsyncStorage.removeItem(planKey);
+              setClientBootstrap((previous) => ({ ...previous, nutrition: { status: 'NO_DATA', errorCode: null } }));
+            } else {
+              console.warn('[CanonicalData] nutrition projection failed; retaining last valid plan', {
+                authenticatedUserId: identity.userId,
+                clientId: identity.clientId,
+                errorCode: resourceErrorCode(error)
+              });
+              setClientBootstrap((previous) => ({ ...previous, nutrition: { status: 'ERROR', errorCode: resourceErrorCode(error) } }));
+            }
           }
-        }
-        setClientBootstrap((previous) => settleClientBootstrap(previous));
+          setClientBootstrap((previous) => settleClientBootstrap(previous));
+        })();
         if (storedSelectedDeviceId) {
           setSelectedDeviceIdState(storedSelectedDeviceId);
         }
@@ -877,16 +896,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       });
     },
     [clientId, currentStorageIdentity, onboarding, refreshHealthProfileSyncDiagnostics, removeUserStorageItem, setUserStorageItem, userId]
-  );
-
-  const setIsAuthenticated = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(
-    (updater) => {
-      const next = typeof updater === 'function' ? updater(authSession !== null) : updater;
-      if (!next) {
-        clearPersistedAuth(authSession);
-      }
-    },
-    [authSession, clearPersistedAuth]
   );
 
   const setThemeMode = useCallback<React.Dispatch<React.SetStateAction<ThemeMode>>>(
@@ -1735,7 +1744,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       authSession,
       isAuthenticated,
       completeAuthentication,
-      setIsAuthenticated,
       checkIns,
       submitCheckIn,
       hasCheckedInToday,
@@ -1822,7 +1830,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       wearableSetupCompleted,
       setAssessment,
       setDevices,
-      setIsAuthenticated,
       setMoodWithImpact,
       setOnboarding,
       setSelectedDeviceId,

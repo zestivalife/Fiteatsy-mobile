@@ -15,6 +15,7 @@ import FiteatsyLogo from '../../assets/brand/fiteatsy-logo.svg';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import { getOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
+import { traceSessionLifecycle } from '../../services/sessionLifecycleTrace';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
@@ -69,7 +70,16 @@ export const SplashScreen = ({ navigation }: Props) => {
 
   const resolveAndNavigate = useCallback(async () => {
     if (!isAuthenticated) {
+      traceSessionLifecycle('NAVIGATION_LOGIN');
       transitionTo(() => navigation.replace('SignIn'));
+      return;
+    }
+
+    // A returning user's remotely unresolved onboarding state must never reopen
+    // onboarding or block the authenticated shell. UNKNOWN is not INCOMPLETE.
+    if (onboardingStatus === 'UNKNOWN') {
+      traceSessionLifecycle('NAVIGATION_HOME', { onboardingState: 'UNKNOWN_LOCAL_SESSION' });
+      transitionTo(() => navigation.replace('Main'));
       return;
     }
 
@@ -100,6 +110,7 @@ export const SplashScreen = ({ navigation }: Props) => {
       transitionTo(() => navigation.replace('OnboardingAnthropometrics'));
       return;
     }
+    traceSessionLifecycle('NAVIGATION_HOME', { onboardingState: onboardingStatus });
     transitionTo(() => navigation.replace('Main'));
   }, [
     authSession?.client.fiteatsyClientId,
@@ -156,7 +167,6 @@ export const SplashScreen = ({ navigation }: Props) => {
 
   useEffect(() => {
     if (!exitRequested || navigated.current || (!bootstrapped && !forceExit)) return;
-    if (isAuthenticated && onboardingStatus === 'UNKNOWN') return;
     navigated.current = true;
     void resolveAndNavigate();
   }, [bootstrapped, exitRequested, forceExit, isAuthenticated, onboardingStatus, resolveAndNavigate]);

@@ -29,6 +29,7 @@ import { calculateCanonicalHealthIntelligenceFromObservations, hasCalculatedCano
   markCanonicalSnapshotStale, type LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
 import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
+import { traceSessionLifecycle } from './sessionLifecycleTrace';
 
 export type { HealthObservationDto } from './healthSyncManager';
 
@@ -138,6 +139,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     }
     automaticInitialSyncStarted.current = true;
     inFlight.current = true;
+    traceSessionLifecycle('HEALTH_SYNC_START', { trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL' });
     setUploadState('UPLOADING');
     setMessage(`Reading ${sourceName}…`);
     setQueryStates(Object.fromEntries(adapter.getSupportedMetricRegistry().map((key) => [key, 'QUERYING'])));
