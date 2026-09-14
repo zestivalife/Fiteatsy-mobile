@@ -23,7 +23,9 @@ import {
 import { getHealthIntelligenceV1, type HealthIntelligenceV1, type HealthScoreSummary } from './healthIntelligenceService';
 import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLocalHealthProviderConnected,
   migrateLegacyHealthInstallationId, readLocalHealthObservations, readLocalHealthPresentationObservations,
-  readLocalHealthProviderConnected, readLocalCanonicalHealthSnapshot, persistLocalCanonicalHealthSnapshot } from './healthSyncLocalStore';
+  readLocalHealthProviderConnected, readLocalCanonicalHealthSnapshot, persistLocalCanonicalHealthSnapshot,
+  readLocalHealthAggregates,readLocalHealthLifecycle,type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
+import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
 import { buildPresentedHealthObservations } from './healthMetricPresentation';
 import { calculateCanonicalHealthIntelligenceFromObservations, hasCalculatedCanonicalScore,
   markCanonicalSnapshotStale, type LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
@@ -91,6 +93,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const [localProviderConnected, setLocalProviderConnected] = useState(false);
   const [pendingUploadCount, setPendingUploadCount] = useState(0);
   const [canonicalIntelligence, setCanonicalIntelligence] = useState<LocalCanonicalHealthSnapshot | null>(null);
+  const [aggregates,setAggregates]=useState<CanonicalDailyAggregate[]>([]);
+  const [lifecycle,setLifecycle]=useState<HealthSyncLifecycleTimestamps>({lastHealthReadAtISO:null,lastSavedAtISO:null,lastUploadedAtISO:null,lastFullySyncedAtISO:null});
   const localScope = useMemo(() => authSession
     ? `account:${authSession.accountId}:${adapter.appId}`
     : null, [adapter.appId, authSession]);
@@ -159,6 +163,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       setSelectedDeviceId(adapter.appId);
       setWellness(result.wellness);
       setPendingUploadCount(await countPendingLocalObservations(localScope));
+      setAggregates(await readLocalHealthAggregates(localScope));
+      setLifecycle(await readLocalHealthLifecycle(localScope));
       setDiagnostics(result.diagnostics);
       setProviderState('CONNECTED');
       setLocalProviderConnected(true);
@@ -191,6 +197,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setSelectedDeviceId(adapter.appId);
         setWellness((current) => wellnessFromHealthScores(current, error.payload, {} as HealthScoreSummary));
         setPendingUploadCount(await countPendingLocalObservations(localScope));
+        setAggregates(await readLocalHealthAggregates(localScope));
+        setLifecycle(await readLocalHealthLifecycle(localScope));
         setDiagnostics(error.diagnostics);
         setProviderState('CONNECTED');
         setLocalProviderConnected(true);
@@ -288,14 +296,15 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     setErrors({});
     setPendingUploadCount(0);
     setCanonicalIntelligence(null);
+    setAggregates([]);
     setLocalProviderConnected(false);
     setLocalHydrated(false);
     if (!bootstrapped || !localScope) return;
     let active = true;
     Promise.all([readLocalHealthObservations(localScope), readLocalHealthPresentationObservations(localScope),
       countPendingLocalObservations(localScope),
-      readLocalHealthProviderConnected(localScope), readLocalCanonicalHealthSnapshot(localScope)])
-      .then(([cached, cachedPresentation, pending, connected, cachedIntelligence]) => {
+      readLocalHealthProviderConnected(localScope), readLocalCanonicalHealthSnapshot(localScope),readLocalHealthAggregates(localScope),readLocalHealthLifecycle(localScope)])
+      .then(([cached, cachedPresentation, pending, connected, cachedIntelligence,cachedAggregates,cachedLifecycle]) => {
         if (!active || !mounted.current) return;
         mergeLocalObservations(cached);
         setPresentationObservations(cachedPresentation.map((item, index) =>
@@ -304,6 +313,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setLocalProviderConnected(connected || cached.length > 0);
         if (connected || cached.length > 0) setProviderState('CONNECTED');
         if (cachedIntelligence) setCanonicalIntelligence(markCanonicalSnapshotStale(cachedIntelligence));
+        setAggregates(cachedAggregates);setLifecycle(cachedLifecycle);
         setLocalHydrated(true);
       })
       .catch(() => { if (active && mounted.current) setLocalHydrated(true); });
@@ -398,6 +408,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     uploadState,
     status,
     observations,
+    aggregates,
+    lifecycle,
     platformStatus,
     activity,
     message,

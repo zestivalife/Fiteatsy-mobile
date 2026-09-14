@@ -1323,6 +1323,8 @@ export const TrackerScreen = () => {
   };
 
   const latestObservations = health.observations;
+  const todayAggregate=(metricTypes:string[])=>health.aggregates.filter((item)=>metricTypes.includes(item.metricType))
+    .sort((a,b)=>b.healthDay.localeCompare(a.healthDay))[0]?.value??null;
   const observationSeries = (metricTypes: string[]) => days
     .map((day) => {
       const observations = latestObservations.filter((item) =>
@@ -1336,14 +1338,14 @@ export const TrackerScreen = () => {
     .sort((a, b) => +new Date(a.calculatedAtISO) - +new Date(b.calculatedAtISO))
     .slice(-7)
     .map((item) => item.scoreValue as number);
-  const stepsValue = latestObservationValue(latestObservations, 'steps');
-  const caloriesValue = latestObservationValueFor(latestObservations, ['active_energy','calories_kcal']);
-  const workoutMinutesValue = latestObservationValueFor(latestObservations, ['workout_minutes','active_minutes']);
+  const stepsValue = todayAggregate(['steps']);
+  const caloriesValue = todayAggregate(['active_energy']);
+  const workoutMinutesValue = todayAggregate(['workout_minutes','active_minutes']);
   const displayScores = canonicalIntelligence?.scores ?? health.canonicalIntelligence?.scores ?? null;
   const activityScoreValue = displayScores?.activity.score ?? null;
-  const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? latestObservationValueFor(latestObservations,['resting_heart_rate','heart_rate']) : null;
-  const hrvValue = recoveryIntel.signalCoverage.hrv ? latestObservationValueFor(latestObservations,['hrv_sdnn_ms','hrv_rmssd_ms']) : null;
-  const sleepMinutesValue = recoveryIntel.signalCoverage.sleep ? latestObservationValue(latestObservations,'sleep_minutes') : null;
+  const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? todayAggregate(['resting_heart_rate']) : null;
+  const hrvValue = recoveryIntel.signalCoverage.hrv ? todayAggregate(['hrv_sdnn_ms','hrv_rmssd_ms']) : null;
+  const sleepMinutesValue = recoveryIntel.signalCoverage.sleep ? todayAggregate(['sleep_minutes']) : null;
   const sleepHoursValue = sleepMinutesValue == null ? null : sleepMinutesValue / 60;
   const sleepScoreValue = displayScores?.sleep.score ?? null;
   const bedtimeValue = toClockMinutes(onboarding?.sleepTime);

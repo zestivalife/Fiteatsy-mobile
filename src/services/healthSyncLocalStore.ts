@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { HealthObservationDraft } from '../types';
 import type { LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
+import type { CanonicalDailyAggregate } from '@fiteatsy/health-intelligence';
 
 const STORE_VERSION = 1;
 const keyFor = (scope: string) => `@fiteatsy/health-sync-local-v${STORE_VERSION}:${scope}`;
@@ -10,10 +11,13 @@ const identity = (item: HealthObservationDraft) => item.syncKey
   ?? `${item.sourceProvider}:${item.metricType}:${item.sourceRecordId ?? item.measuredAtISO}`;
 
 type StoredRecord = { observation: HealthObservationDraft; uploaded: boolean; updatedAtISO: string };
+export type HealthSyncLifecycleTimestamps = { lastHealthReadAtISO:string|null; lastSavedAtISO:string|null;
+  lastUploadedAtISO:string|null; lastFullySyncedAtISO:string|null };
 type LocalSyncState = { records: Record<string, StoredRecord>; presentationRecords: Record<string, HealthObservationDraft>;
-  cursors: Record<string, string>; providerConnected: boolean; canonicalScoreSnapshot: LocalCanonicalHealthSnapshot | null };
+  cursors: Record<string, string>; providerConnected: boolean; canonicalScoreSnapshot: LocalCanonicalHealthSnapshot | null;
+  aggregates:CanonicalDailyAggregate[]; lifecycle:HealthSyncLifecycleTimestamps };
 const emptyState = (): LocalSyncState => ({ records: {}, presentationRecords: {}, cursors: {}, providerConnected: false,
-  canonicalScoreSnapshot: null });
+  canonicalScoreSnapshot: null,aggregates:[],lifecycle:{lastHealthReadAtISO:null,lastSavedAtISO:null,lastUploadedAtISO:null,lastFullySyncedAtISO:null} });
 const scopeOperations = new Map<string, Promise<unknown>>();
 const serializeScopeOperation = <T>(scope: string, operation: () => Promise<T>): Promise<T> => {
   const previous = scopeOperations.get(scope) ?? Promise.resolve();
@@ -32,7 +36,7 @@ const readState = async (scope: string): Promise<LocalSyncState> => {
     return { records: parsed.records ?? {}, presentationRecords: parsed.presentationRecords ?? {},
       cursors: parsed.cursors ?? {}, providerConnected: parsed.providerConnected === true,
       canonicalScoreSnapshot: parsed.canonicalScoreSnapshot?.calculationVersion === 'HEALTH_INTELLIGENCE_V1'
-        ? parsed.canonicalScoreSnapshot : null };
+        ? parsed.canonicalScoreSnapshot : null,aggregates:parsed.aggregates??[],lifecycle:{...emptyState().lifecycle,...parsed.lifecycle} };
   } catch {
     return emptyState();
   }
@@ -89,6 +93,16 @@ export const persistLocalCanonicalHealthSnapshot = (scope: string, snapshot: Loc
     state.canonicalScoreSnapshot = snapshot;
     await writeState(scope, state);
   });
+
+export const readLocalHealthAggregates = (scope:string) => serializeScopeOperation(scope,async()=>(await readState(scope)).aggregates);
+export const readLocalHealthLifecycle = (scope:string) => serializeScopeOperation(scope,async()=>(await readState(scope)).lifecycle);
+export const persistLocalHealthAggregates = (scope:string,aggregates:CanonicalDailyAggregate[],readAtISO:string) =>
+  serializeScopeOperation(scope,async()=>{const state=await readState(scope);state.aggregates=aggregates;
+    state.lifecycle={...state.lifecycle,lastHealthReadAtISO:readAtISO,lastSavedAtISO:new Date().toISOString()};await writeState(scope,state);});
+export const markLocalHealthUploaded = (scope:string,fullySynced:boolean) => serializeScopeOperation(scope,async()=>{
+  const state=await readState(scope);const at=new Date().toISOString();state.lifecycle={...state.lifecycle,lastUploadedAtISO:at,
+    lastFullySyncedAtISO:fullySynced?at:state.lifecycle.lastFullySyncedAtISO};await writeState(scope,state);
+});
 
 export const getOrCreateHealthInstallationId = async () => {
   const existing = await AsyncStorage.getItem(INSTALLATION_KEY);

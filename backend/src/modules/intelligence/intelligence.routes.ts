@@ -29,7 +29,7 @@ import {
 import { calculateHealthScores } from './health-calculation-engine.js';
 import { ingestHealthObservations } from '../health/health-observations.repository.js';
 import { getReport } from '../reports/reports.store.js';
-import { listHealthObservations } from '../health/health-observations.repository.js';
+import { listHealthObservationsForCalculation } from '../health/health-observations.repository.js';
 import { buildHealthIntelligenceV1 } from './health-intelligence-projection.js';
 
 export const intelligenceRouter = Router();
@@ -41,7 +41,7 @@ const currentOwner = (account: ReturnType<typeof getAuthenticatedAccount>): Clie
 
 intelligenceRouter.get('/v1', requireAuthenticatedAccount, async (req, res) => {
   const owner = currentOwner(getAuthenticatedAccount(req));
-  const observations = await listHealthObservations(owner, { limit: 5000, offset: 0 });
+  const observations = await listHealthObservationsForCalculation(owner);
   return res.status(200).json(buildHealthIntelligenceV1(observations));
 });
 

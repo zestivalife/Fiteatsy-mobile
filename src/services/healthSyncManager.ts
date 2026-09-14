@@ -6,7 +6,8 @@ import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceS
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
 import { acknowledgeLocalObservations, persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalSyncCursors,
-  readPendingLocalObservations } from './healthSyncLocalStore';
+  readPendingLocalObservations,persistLocalHealthAggregates,markLocalHealthUploaded } from './healthSyncLocalStore';
+import { aggregateCanonicalHealthObservations } from '@fiteatsy/health-intelligence';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -203,6 +204,10 @@ export const runHealthSync = async (
     // local transaction and always precede every backend operation.
     await persistLocalSyncBatch(localScope, observations, anchors);
     await persistLocalHealthPresentationObservations(localScope, payload.presentationObservations ?? []);
+    const readAtISO=new Date().toISOString();
+    const aggregateInput=[...observations,...(payload.presentationObservations??[])].map(item=>({...item,
+      sourceProvider:item.sourceMetadata?.measurementMethod==='HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'?'platform_aggregate':item.sourceProvider}));
+    await persistLocalHealthAggregates(localScope,aggregateCanonicalHealthObservations(aggregateInput,{fallbackOffsetMinutes:-new Date().getTimezoneOffset()}),readAtISO);
     // Sync-run telemetry must not become a prerequisite for ingestion. The
     // observation endpoint independently enforces authenticated ownership and
     // active provider consent.
@@ -223,6 +228,10 @@ export const runHealthSync = async (
       pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     }
     uploadCompleted = rejected === 0 && pending.length === 0;
+    if(uploadCompleted){
+      await withHealthSyncPipelineTimeout(postJson('/v1/health/intelligence:recalculate',{}),'health_sync_recalculation_timeout');
+      await markLocalHealthUploaded(localScope,true);
+    }
     if (governed && Object.keys(anchors).length && rejected === 0) {
       await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
         commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,

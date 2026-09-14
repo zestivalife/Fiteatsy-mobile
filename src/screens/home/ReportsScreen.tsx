@@ -55,6 +55,7 @@ import {
   uploadAndAnalyzeReport,
   waitForReportAnalysis
 } from '../../services/reportUploadService';
+import {readReportMetadataCache,writeReportMetadataCache} from '../../services/reportMetadataCache';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type CategoryKey = 'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins';
@@ -393,7 +394,7 @@ export const ReportsScreen = () => {
 
   const shimmer = useRef(new Animated.Value(0)).current;
   const authenticatedReportOwnerKey = authSession
-    ? `${authSession.accountId}:${authSession.client.fiteatsyClientId}:${authSession.sessionId}`
+    ? `${authSession.accountId}:${authSession.client.fiteatsyClientId}`
     : 'signed-out';
 
   const latestReport = reports[0] ?? null;
@@ -460,6 +461,7 @@ export const ReportsScreen = () => {
   const refreshReportData = async () => {
     setReportsLoadError(null);
     const reportDtos = await listAnalyzedReports();
+    if(authSession)await writeReportMetadataCache(authenticatedReportOwnerKey,reportDtos);
     const hydratedReports = reportDtos.reduce<ReportItem[]>((acc, dto) => {
       const item = reportDtoToItem(dto);
       return item ? [...acc, item] : acc;
@@ -569,7 +571,9 @@ export const ReportsScreen = () => {
       };
     }
     setReportsLoading(true);
-    refreshReportData()
+    readReportMetadataCache(authenticatedReportOwnerKey).then(cached=>{
+      if(!active||!cached.length)return;setReports(cached.reduce<ReportItem[]>((acc,dto)=>{const item=reportDtoToItem(dto);return item?[...acc,item]:acc;},[]));
+    }).then(refreshReportData)
       .catch((error) => {
         if (!active) return;
         setReportsLoadError(reportHistoryErrorMessage(error));

@@ -10,6 +10,7 @@ import {
   sleepScore,
   stressRecoveryScore,
   type ScoreResult
+  ,aggregateCanonicalHealthObservations
 } from '@fiteatsy/health-intelligence';
 import type { HealthObservationDraft } from '../types';
 
@@ -73,35 +74,25 @@ export const calculateCanonicalHealthIntelligence = (
   };
 };
 
-const localDay = (iso: string, timezoneOffsetMinutes = 330) =>
+const localDay = (iso: string, timezoneOffsetMinutes = -new Date().getTimezoneOffset()) =>
   new Date(Date.parse(iso) + timezoneOffsetMinutes * 60_000).toISOString().slice(0, 10);
-
-const dailyValue = (observations: HealthObservationDraft[], metricType: string, today: string) => {
-  const rows = observations.filter((item) => !item.deleted && item.metricType === metricType
-    && localDay(item.measuredAtISO, item.timezoneOffsetMinutes ?? 330) === today && finite(item.value));
-  if (!rows.length) return null;
-  if (['steps', 'active_minutes', 'sleep_minutes', 'hydration_ml', 'mindfulness_minutes'].includes(metricType)) {
-    // Apple/Health Connect samples are additive packets. Deduplicate stable source records first.
-    const unique = new Map(rows.map((item) => [item.syncKey ?? item.sourceRecordId ?? `${item.measuredAtISO}:${item.value}`, item]));
-    return [...unique.values()].reduce((sum, item) => sum + item.value, 0);
-  }
-  return [...rows].sort((left, right) => right.measuredAtISO.localeCompare(left.measuredAtISO))[0].value;
-};
 
 export const calculateCanonicalHealthIntelligenceFromObservations = (
   observations: HealthObservationDraft[],
   options: { sleepTargetMinutes?: number | null; cycleApplicable?: boolean; now?: Date } = {}
 ) => {
   const now = options.now ?? new Date();
-  const today = localDay(now.toISOString());
+  const fallbackOffsetMinutes=-now.getTimezoneOffset();const today = localDay(now.toISOString(),fallbackOffsetMinutes);
   const timestamps = observations.filter((item) => !item.deleted).map((item) => item.measuredAtISO).sort();
   const freshness: ScoreResult['freshness'] = timestamps.length && Date.parse(timestamps[timestamps.length - 1]) >= now.getTime() - 36 * 3_600_000
     ? 'CURRENT' : timestamps.length ? 'STALE' : 'UNKNOWN';
-  const steps = dailyValue(observations, 'steps', today);
-  const exercise = dailyValue(observations, 'active_minutes', today);
-  const sleepMinutes = dailyValue(observations, 'sleep_minutes', today);
-  const hydration = dailyValue(observations, 'hydration_ml', today);
-  const mindfulness = dailyValue(observations, 'mindfulness_minutes', today);
+  const aggregates=aggregateCanonicalHealthObservations(observations,{fallbackOffsetMinutes,nowMs:now.getTime()});
+  const dailyValue=(metricType:string)=>aggregates.find(row=>row.healthDay===today&&row.metricType===metricType)?.value??null;
+  const steps = dailyValue('steps');
+  const exercise = dailyValue('active_minutes');
+  const sleepMinutes = dailyValue('sleep_minutes');
+  const hydration = dailyValue('hydration_ml');
+  const mindfulness = dailyValue('mindfulness_minutes');
   return calculateCanonicalHealthIntelligence({
     activity: { steps, stepGoal: HEALTH_INTELLIGENCE_CONFIG.targets.steps, exerciseMinutes: exercise,
       exerciseTarget: HEALTH_INTELLIGENCE_CONFIG.targets.exerciseMinutes, balance: null, freshness },

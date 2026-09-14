@@ -188,6 +188,17 @@ export const listHealthObservations = async (
   return result.rows.map(rowToObservation);
 };
 
+/** Complete calculation input. UI pagination limits must never truncate score inputs. */
+export const listHealthObservationsForCalculation = async (owner: ClientOwnershipContext) => {
+  const result = await pool.query(
+    `select * from health_observations
+     where user_id=$1 and client_id=$2 and deleted_at is null
+     order by measured_at desc, created_at desc`,
+    [owner.accountId, owner.clientId]
+  );
+  return result.rows.map(rowToObservation);
+};
+
 export const countHealthObservations = async (owner: ClientOwnershipContext, metricType?: string) => {
   const result = await pool.query(
     `

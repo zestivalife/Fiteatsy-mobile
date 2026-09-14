@@ -1,5 +1,5 @@
 import { listBiomarkerHistory } from '../biomarkers/biomarkers.repository.js';
-import { listHealthObservations } from '../health/health-observations.repository.js';
+import { listHealthObservationsForCalculation } from '../health/health-observations.repository.js';
 import { getHealthProfileByClientId } from '../platform/platform.store.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { HealthScoreInput, clearHealthScoresForOwner, createHealthScores } from './health-scores.repository.js';
@@ -9,7 +9,7 @@ import {replaceDailyAggregates} from './health-aggregates.repository.js';
 
 export const CALCULATION_VERSION = 'FIT-WELLNESS-200.v1';
 
-type ScoringObservation = Awaited<ReturnType<typeof listHealthObservations>>[number];
+type ScoringObservation = Awaited<ReturnType<typeof listHealthObservationsForCalculation>>[number];
 
 const IST_OFFSET_MS = 330 * 60 * 1000;
 const ADDITIVE_DAILY_METRICS = new Set([
@@ -121,7 +121,7 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
   const evaluatedAtMs = Date.now();
   const [biomarkers, observations, profile] = await Promise.all([
     listBiomarkerHistory(owner, { limit: 200, offset: 0 }),
-    listHealthObservations(owner, { limit: 200, offset: 0 }),
+    listHealthObservationsForCalculation(owner),
     getHealthProfileByClientId(owner.clientId)
   ]);
 
@@ -303,19 +303,13 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
 
   const v1=buildHealthIntelligenceV1(eligibleObservations);
   await replaceDailyAggregates(owner,v1.aggregates);
-  const canonicalTypes=new Set(['recovery','activity','sleep','calm','nutrition','overall','stress_recovery','cycle','health_intelligence']);
-  // Alias scores are appended after the master dimensions above. Build the
-  // compatibility map only after that step so a methodology-pending V1 score
-  // can retain an already calculated governed legacy projection.
-  const canonicalFallbackByType = new Map(scores.map((score) => [score.scoreType, score]));
+  // Persist only the canonical V1 score projection. Legacy calculations above
+  // remain input-normalisation compatibility code and cannot become an output
+  // authority or substitute a methodology-pending canonical score.
   const canonicalScores:HealthScoreInput[]=Object.entries({recovery:v1.scores.recovery,activity:v1.scores.activity,sleep:v1.scores.sleep,calm:v1.scores.calm,nutrition:v1.scores.nutrition,stress_recovery:v1.scores.stressRecovery,cycle:v1.scores.cycle,overall:v1.scores.healthIntelligence,health_intelligence:v1.scores.healthIntelligence}).map(([scoreType,value])=>{
     const typedScoreType=scoreType as HealthScoreInput['scoreType'];
-    const legacyFallback=canonicalFallbackByType.get(typedScoreType);
-    if(value.score==null&&legacyFallback?.scoreStatus==='calculated'&&legacyFallback.scoreValue!=null){
-      return legacyFallback;
-    }
     return {scoreType:typedScoreType,scoreValue:value.score,scoreStatus:value.score==null?'insufficient_data':'calculated',confidence:value.confidence==='HIGH'?1:value.confidence==='MODERATE'?0.67:0,inputSummary:value,calculationVersion:'HEALTH_INTELLIGENCE_V1'};
   });
   await clearHealthScoresForOwner(owner);
-  return createHealthScores(owner,[...scores.filter(s=>!canonicalTypes.has(s.scoreType)),...canonicalScores]);
+  return createHealthScores(owner,canonicalScores);
 };

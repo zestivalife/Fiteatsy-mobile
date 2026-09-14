@@ -182,9 +182,10 @@ describe('end-to-end health data capture recovery contracts', () => {
     const apple = read('src/services/appleHealthService.ts');
     const android = read('src/services/healthConnectService.ts');
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
-    for (const aggregation of ["'SUM'", "'LATEST'", "'AVERAGE'", "'INTERVAL'", "'SAMPLE_SERIES'"]) {
-      expect(registry).toContain(aggregation);
-    }
+    expect(registry).toContain('HealthAggregationMethod');
+    expect(registry).toContain('HEALTH_METRIC_SEMANTICS.steps.display');
+    const semantics=read('packages/health-intelligence/src/index.ts');
+    for (const aggregation of ["'DAILY_SUM'", "'LATEST'", "'DAILY_AVERAGE'", "'SESSION_AGGREGATE'", "'RAW_SERIES'"]) expect(semantics).toContain(aggregation);
     expect(apple).toContain('APPLE_HEALTH_READ_TYPES');
     expect(android).toContain('HEALTH_CONNECT_READ_RECORDS');
     expect(coordinator).toContain('HEALTH_METRIC_REGISTRY.map');

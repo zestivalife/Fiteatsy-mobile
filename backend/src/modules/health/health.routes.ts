@@ -268,6 +268,12 @@ healthRouter.post('/observations:batch', async (req, res) => {
   });
 });
 
+healthRouter.post('/intelligence:recalculate', async (req,res)=>{
+  const account=getAuthenticatedAccount(req);const owner=currentOwner(account);
+  const scores=await calculateHealthScores(owner);
+  return res.status(200).json({recalculated:true,calculationVersion:'HEALTH_INTELLIGENCE_V1',scoreCount:scores.length});
+});
+
 healthRouter.get('/sync/status', async (req, res) => {
   const account = getAuthenticatedAccount(req);
   const owner = currentOwner(account);
