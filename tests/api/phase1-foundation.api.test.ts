@@ -9,6 +9,9 @@ import {
 } from '../../backend/src/modules/biomarkers/biomarkers.repository.js';
 import { getClientByAccountUserId } from '../../backend/src/modules/client/client.repository.js';
 import { ingestHealthObservations } from '../../backend/src/modules/health/health-observations.repository.js';
+import { pool } from '../../backend/src/db/pool.js';
+import { enqueueHealthRecalculation } from '../../backend/src/modules/intelligence/health-aggregate-assertions.repository.js';
+import { processPendingHealthRecalculations } from '../../backend/src/jobs/process-health-recalculations.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
@@ -110,6 +113,48 @@ test('POST /v1/health/observations:batch persists client-owned observations and 
   assert.equal(listed.body.items[0].fiteatsyClientId, session.current.body.client.fiteatsyClientId);
   assert.equal(listed.body.items[0].clientId, undefined);
   assert.equal(listed.body.items[0].userId, undefined);
+});
+
+test('local aggregate assertions traverse authenticated upload and backend canonical recomputation with parity',async()=>{
+  const session=await createAuthenticatedSession(server.baseUrl);
+  await grantHealthConnectConsent(session.token);
+  const measuredAtISO='2026-09-14T08:00:00.000Z';
+  const upload=await postJson(server.baseUrl,'/v1/health/observations:batch',{observations:[{
+    metricType:'steps',value:1200,unit:'count',measuredAtISO,sourceProvider:'health_connect',
+    sourceRecordId:'parity-steps-1',syncKey:'parity-steps-1',timezoneOffsetMinutes:330
+  }]},{headers:authHeaders(session.token)});
+  assert.equal(upload.response.status,200);
+  const parity=await postJson(server.baseUrl,'/v1/health/intelligence:recalculate',{
+    healthDay:'2026-09-14',aggregateAssertions:[{healthDay:'2026-09-14',metricType:'steps',value:1200,
+      unit:'count',aggregateVersion:'HEALTH_AGGREGATION_V2',lineageHash:'local-lineage-parity-1',
+      aggregateSource:'CANONICAL_RAW_RECOMPUTATION',rawLineageAvailable:true,calculatedAtISO:new Date().toISOString()}]
+  },{headers:authHeaders(session.token)});
+  assert.equal(parity.response.status,200);
+  assert.equal(parity.body.aggregateVersion,'HEALTH_AGGREGATION_V2');
+  assert.equal(parity.body.mismatchCount,0);
+  assert.equal(parity.body.parity[0].status,'MATCH');
+  assert.equal(parity.body.parity[0].localValue,1200);
+  assert.equal(parity.body.parity[0].backendValue,1200);
+});
+
+test('durable failed-upload recalculation queue is atomically claimed, drained, and does not run twice',async()=>{
+  const session=await createAuthenticatedSession(server.baseUrl);
+  const client=await getClientByAccountUserId(session.current.body.accountId);
+  assert.ok(client);
+  const owner={accountId:session.current.body.accountId,clientId:client.id};
+  await enqueueHealthRecalculation(owner,'2026-09-14','SYNTHETIC_TRANSIENT_FAILURE');
+  const first=await processPendingHealthRecalculations();
+  const second=await processPendingHealthRecalculations();
+  assert.deepEqual(first,{claimed:1,succeeded:1,failed:0});
+  assert.deepEqual(second,{claimed:0,succeeded:0,failed:0});
+  const queue=await pool.query(`select status,completed_at from health_intelligence_recalculation_queue
+    where client_id=$1 and health_day=$2`,[client.id,'2026-09-14']);
+  assert.equal(queue.rows.length,1);
+  assert.equal(queue.rows[0].status,'SUCCEEDED');
+  assert.ok(queue.rows[0].completed_at);
+  const scores=await pool.query(`select count(*)::int as count from health_scores where client_id=$1
+    and calculation_version='HEALTH_INTELLIGENCE_V1'`,[client.id]);
+  assert.equal(scores.rows[0].count,9);
 });
 
 test('health ingestion preserves Health Connect provenance and rejects unsafe observations atomically', async () => {

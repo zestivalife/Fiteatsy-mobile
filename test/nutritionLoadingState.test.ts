@@ -2,6 +2,9 @@ jest.mock('expo-constants', () => ({
   expoConfig: { extra: { apiBaseUrl: 'https://api.fiteatsy.test' } }
 }));
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { ApiClientError } from '../src/services/apiClient';
 import { classifyNutritionLoadError, nutritionLoadCopy } from '../src/services/nutritionLoadState';
 
@@ -40,5 +43,15 @@ describe('Nutrition bounded loading states', () => {
       expect(copy.retryable).toBe(true);
       expect(`${copy.title} ${copy.message}`).not.toMatch(/SERVER_ERROR|NETWORK_ERROR|TIMEOUT|MALFORMED_PLAN/);
     }
+  });
+});
+
+describe('Nutrition reconnect contract', () => {
+  it('refreshes after an offline-to-online edge while retaining cached Nutrition and authentication on failure', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/state/AppContext.tsx'), 'utf8');
+    expect(source).toContain('const previousReachability = previousNetworkReachabilityRef.current');
+    expect(source).toContain('if (previousReachability === false) void refreshPublishedNutritionPlan();');
+    expect(source).toContain('nutrition projection refresh failed; retaining last valid plan');
+    expect(source).not.toMatch(/nutrition projection refresh failed[\s\S]{0,300}clearPersistedAuth/);
   });
 });

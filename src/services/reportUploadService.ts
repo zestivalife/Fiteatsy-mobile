@@ -1,5 +1,5 @@
 import { ReportParameter } from './nuetraService';
-import { apiBaseUrl, apiFetch, apiResponse } from './apiClient';
+import { apiBaseUrl, apiFetch, apiResponse, hasAuthenticatedApiSession } from './apiClient';
 
 type CategoryScores = Record<'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins', number>;
 
@@ -173,14 +173,43 @@ const POLL_TIMEOUT_MS = 120000;
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
 
-const safeHeaderSummary = (headers: Record<string, string>) => ({
-  hasAuthorization: Boolean(headers.Authorization),
-  headerKeys: Object.keys(headers)
-});
-
-const logReportDebug = (event: string, payload: Record<string, unknown>) => {
-  if (__DEV__) console.log(`[ReportsUpload] ${event}`, payload);
+type ReportTrace = {
+  correlationId: string;
+  hostname: string;
+  route: string;
+  method: string;
+  phase: string;
+  durationMs: number;
+  authenticated: boolean;
+  httpStatus?: number;
+  errorCode?: string;
+  reportId?: string;
+  pollingState?: string;
+  hydrationResult?: 'PRESENT' | 'MISSING' | 'NOT_APPLICABLE';
 };
+
+let reportTraceSink: ((trace: ReportTrace) => void) | null = null;
+
+export const registerReportTraceSink = (sink: ((trace: ReportTrace) => void) | null) => {
+  reportTraceSink = sink;
+};
+
+const newCorrelationId = () => `report-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+const emitReportTrace = (trace: ReportTrace) => {
+  reportTraceSink?.(trace);
+  if (__DEV__) console.info('[ReportsTrace]', trace);
+};
+
+const safeErrorCode = (error: unknown) => {
+  if (!(error instanceof Error)) return 'UNKNOWN';
+  if (error.name === 'AbortError') return 'ABORTED';
+  const match = error.message.match(/^(REPORT_API_HTTP_\d+|REQUEST_[A-Z_]+|[A-Z][A-Z0-9_]+)(?::|$)/);
+  return match?.[1] ?? 'REQUEST_FAILED';
+};
+
+const hasAnalysisPayload = (payload: unknown) =>
+  typeof payload === 'object' && payload !== null && 'analysis' in payload && Boolean((payload as { analysis?: unknown }).analysis);
 
 const isTerminalHttpError = (error: unknown) => error instanceof Error && error.message.startsWith('REPORT_API_HTTP_');
 
@@ -212,26 +241,52 @@ const parseJson = async <T>(response: Response): Promise<T> => {
   return JSON.parse(raw) as T;
 };
 
-const requestJson = async <T>(baseUrl: string, path: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> => {
+const requestJson = async <T>(
+  baseUrl: string,
+  path: string,
+  options?: RequestInit & { timeoutMs?: number },
+  traceContext?: { correlationId?: string; phase?: string; reportId?: string; pollingState?: string }
+): Promise<T> => {
   const { timeoutMs, signal, ...fetchOptions } = options ?? {};
-  logReportDebug('request:start', {
-    url: `${baseUrl}${path}`,
-    method: fetchOptions.method ?? 'GET',
-    headers: safeHeaderSummary({})
-  });
+  const startedAt = Date.now();
+  const correlationId = traceContext?.correlationId ?? newCorrelationId();
+  const method = fetchOptions.method ?? 'GET';
+  const route = path.split('?')[0];
+  const hostname = new URL(baseUrl).hostname;
   try {
     const response = await apiResponse(path, { ...fetchOptions, signal, timeoutMs: timeoutMs ?? STATUS_REQUEST_TIMEOUT_MS });
     const payload = await parseJson<T & { message?: string; error?: string }>(response).catch(() => ({} as T & { message?: string; error?: string }));
-    logReportDebug('request:response', {
-      url: `${baseUrl}${path}`,
-      status: response.status,
-      payload
+    emitReportTrace({
+      correlationId,
+      hostname,
+      route,
+      method,
+      phase: traceContext?.phase ?? 'REQUEST',
+      durationMs: Date.now() - startedAt,
+      authenticated: hasAuthenticatedApiSession(),
+      httpStatus: response.status,
+      reportId: traceContext?.reportId,
+      pollingState: traceContext?.pollingState,
+      hydrationResult: traceContext?.phase === 'HYDRATE' ? (hasAnalysisPayload(payload) ? 'PRESENT' : 'MISSING') : 'NOT_APPLICABLE'
     });
     if (!response.ok) {
       throw new Error(`REPORT_API_HTTP_${response.status}: ${payload.message ?? payload.error ?? 'Request failed.'}`);
     }
     return payload as T;
   } catch (error) {
+    emitReportTrace({
+      correlationId,
+      hostname,
+      route,
+      method,
+      phase: traceContext?.phase ?? 'REQUEST',
+      durationMs: Date.now() - startedAt,
+      authenticated: hasAuthenticatedApiSession(),
+      errorCode: safeErrorCode(error),
+      reportId: traceContext?.reportId,
+      pollingState: traceContext?.pollingState,
+      hydrationResult: traceContext?.phase === 'HYDRATE' ? 'MISSING' : 'NOT_APPLICABLE'
+    });
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error(signal?.aborted ? 'REQUEST_CANCELLED' : 'REQUEST_TIMEOUT');
     }
@@ -297,13 +352,15 @@ export const waitForReportAnalysis = async (params: {
 }): Promise<ReportAnalysisResponse> => {
   const startedAt = Date.now();
   const timeoutMs = params.timeoutMs ?? POLL_TIMEOUT_MS;
+  const correlationId = newCorrelationId();
 
   while (Date.now() - startedAt < timeoutMs) {
     await sleep(POLL_INTERVAL_MS, params.signal);
     const statusPayload = await requestJson<{ reportId: string; status: string; error?: string }>(
       apiBaseUrl,
       `/v1/reports/${encodeURIComponent(params.reportId)}/status`,
-      { signal: params.signal }
+      { signal: params.signal },
+      { correlationId, phase: 'POLL', reportId: params.reportId, pollingState: 'REQUESTED' }
     );
     const progress = statusToReportPresentation(statusPayload.status);
     params.onProgress?.({
@@ -316,7 +373,12 @@ export const waitForReportAnalysis = async (params: {
       throw new Error(statusPayload.error ?? progress.message);
     }
     if (isSuccessfulReportStatus(statusPayload.status)) {
-      const report = await getAnalyzedReport(params.reportId, params.signal);
+      const report = await requestJson<ReportDto>(apiBaseUrl, `/v1/reports/${encodeURIComponent(params.reportId)}`, { signal: params.signal }, {
+        correlationId,
+        phase: 'HYDRATE',
+        reportId: params.reportId,
+        pollingState: statusPayload.status
+      });
       if (!report.analysis) throw new Error('Report completed but analysis payload is missing.');
       return { ...report.analysis, reportId: report.id, status: report.status };
     }
@@ -340,14 +402,12 @@ export const getCurrentReportComparison = async (): Promise<ReportComparisonProj
 
 export const listBiomarkerHistory = async (): Promise<BiomarkerHistoryItem[]> => {
   let lastError = 'network_error';
-  logReportDebug('biomarkers:start', { baseUrls: getBaseUrls() });
   for (const baseUrl of getBaseUrls()) {
     try {
       const payload = await requestJson<{ items: BiomarkerHistoryItem[] }>(baseUrl, '/v1/biomarkers/history?limit=200');
       return payload.items ?? [];
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'network_error';
-      logReportDebug('biomarkers:failure', { baseUrl, error: lastError });
       if (isTerminalHttpError(error)) throw error;
     }
   }
@@ -365,7 +425,6 @@ export const deleteAnalyzedReport = async (reportId: string): Promise<{ deleted:
       );
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'network_error';
-      logReportDebug('delete:failure', { baseUrl, reportId, error: lastError });
       if (isTerminalHttpError(error)) throw error;
     }
   }
@@ -383,7 +442,6 @@ export const deleteAllAnalyzedReports = async (): Promise<{ deletedCount: number
       });
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'network_error';
-      logReportDebug('delete-all:failure', { baseUrl, error: lastError });
       if (isTerminalHttpError(error)) throw error;
     }
   }
@@ -411,14 +469,7 @@ export const uploadAndAnalyzeReport = async (params: {
   if (params.source) form.append('source', params.source);
 
   let lastError = 'network_error';
-  logReportDebug('upload:start', {
-    baseUrls: getBaseUrls(),
-    mimeType: params.mimeType,
-    source: params.source,
-    hasFileName: Boolean(params.fileName),
-    hasReportDate: Boolean(params.reportDate),
-    hasLabName: Boolean(params.labName)
-  });
+  const correlationId = newCorrelationId();
   for (const baseUrl of getBaseUrls()) {
     const controller = new AbortController();
     const abortFromCaller = () => controller.abort();
@@ -426,18 +477,7 @@ export const uploadAndAnalyzeReport = async (params: {
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     params.onProgress?.({ stage: 'uploading', message: 'Uploading report', status: 'UPLOADING' });
     try {
-      logReportDebug('upload:request', {
-        url: `${baseUrl}/v1/reports/analyze/start`,
-        method: 'POST',
-        headers: safeHeaderSummary({}),
-        payload: {
-          mimeType: params.mimeType,
-          source: params.source,
-          hasFileName: Boolean(params.fileName),
-          hasReportDate: Boolean(params.reportDate),
-          hasLabName: Boolean(params.labName)
-        }
-      });
+      const uploadStartedAt = Date.now();
       const response = await apiResponse('/v1/reports/analyze/start', {
         method: 'POST',
         body: form,
@@ -450,11 +490,11 @@ export const uploadAndAnalyzeReport = async (params: {
       );
       if (!response.ok || !startPayload.reportId) {
         lastError = `REPORT_API_HTTP_${response.status}: ${startPayload.message ?? startPayload.error ?? 'Upload start failed.'}`;
-        logReportDebug('upload:response-failed', { baseUrl, status: response.status, payload: startPayload });
+        emitReportTrace({ correlationId, hostname: new URL(baseUrl).hostname, route: '/v1/reports/analyze/start', method: 'POST', phase: 'UPLOAD', durationMs: Date.now() - uploadStartedAt, authenticated: hasAuthenticatedApiSession(), httpStatus: response.status, errorCode: `REPORT_API_HTTP_${response.status}`, hydrationResult: 'NOT_APPLICABLE' });
         if (!response.ok) throw new Error(lastError);
         continue;
       }
-      logReportDebug('upload:response-ok', { baseUrl, status: response.status, reportId: startPayload.reportId, reportStatus: startPayload.status });
+      emitReportTrace({ correlationId, hostname: new URL(baseUrl).hostname, route: '/v1/reports/analyze/start', method: 'POST', phase: 'UPLOAD', durationMs: Date.now() - uploadStartedAt, authenticated: hasAuthenticatedApiSession(), httpStatus: response.status, reportId: startPayload.reportId, pollingState: startPayload.status, hydrationResult: 'NOT_APPLICABLE' });
 
       params.onProgress?.({
         stage: 'uploaded',
@@ -469,15 +509,10 @@ export const uploadAndAnalyzeReport = async (params: {
         const statusPayload = await requestJson<{ reportId: string; status: string; error?: string }>(
           baseUrl,
           `/v1/reports/${encodeURIComponent(startPayload.reportId)}/status`,
-          { signal: params.signal }
+          { signal: params.signal },
+          { correlationId, phase: 'POLL', reportId: startPayload.reportId, pollingState: 'REQUESTED' }
         );
         const progress = statusToReportPresentation(statusPayload.status);
-        logReportDebug('poll:status', {
-          baseUrl,
-          reportId: statusPayload.reportId,
-          status: statusPayload.status,
-          error: statusPayload.error
-        });
         params.onProgress?.({
           stage: progress.stage,
           message: statusPayload.error ? `${progress.message} ${statusPayload.error}` : progress.message,
@@ -490,15 +525,10 @@ export const uploadAndAnalyzeReport = async (params: {
         if (statusPayload.status === 'COMPLETED' || statusPayload.status === 'PUBLISHED' || statusPayload.status === 'PARTIALLY_VALIDATED') {
           const report = await requestJson<ReportDto>(baseUrl, `/v1/reports/${encodeURIComponent(startPayload.reportId)}`, {
             signal: params.signal
-          });
+          }, { correlationId, phase: 'HYDRATE', reportId: startPayload.reportId, pollingState: statusPayload.status });
           if (!report.analysis) {
             throw new Error('Report completed but analysis payload is missing.');
           }
-          logReportDebug('result:fetched', {
-            reportId: report.id,
-            status: report.status,
-            parameterCount: report.analysis.parameters.length
-          });
           return {
             ...report.analysis,
             reportId: report.id,
@@ -513,7 +543,7 @@ export const uploadAndAnalyzeReport = async (params: {
       if (error instanceof Error && error.name === 'AbortError') {
         lastError = params.signal?.aborted ? 'REQUEST_CANCELLED' : 'REQUEST_TIMEOUT';
       }
-      logReportDebug('upload:error', { baseUrl, error: lastError });
+      emitReportTrace({ correlationId, hostname: new URL(baseUrl).hostname, route: '/v1/reports/analyze/start', method: 'POST', phase: 'UPLOAD_OR_POLL', durationMs: 0, authenticated: hasAuthenticatedApiSession(), errorCode: safeErrorCode(error), hydrationResult: 'NOT_APPLICABLE' });
       if (isTerminalHttpError(error)) throw error;
     } finally {
       params.signal?.removeEventListener('abort', abortFromCaller);
@@ -556,7 +586,6 @@ export const reanalyzeReport = async (reportId: string, signal?: AbortSignal): P
       return { ...payload, reportId: payload.reportId ?? reportId };
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'network_error';
-      logReportDebug('reanalyze:failure', { baseUrl, reportId, error: lastError });
       if (lastError === 'REQUEST_TIMEOUT') {
         return waitForReportAnalysis({ reportId, signal, timeoutMs: POLL_TIMEOUT_MS });
       }

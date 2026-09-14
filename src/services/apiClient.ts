@@ -86,6 +86,8 @@ export const registerAccessTokenProvider = (provider: () => string | null | unde
   accessTokenProvider = provider;
 };
 
+export const hasAuthenticatedApiSession = () => Boolean(accessTokenProvider?.());
+
 export const registerUnauthorizedHandler = (handler: ((context: UnauthorizedContext) => void) | null) => {
   unauthorizedHandler = handler;
 };

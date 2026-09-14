@@ -1,9 +1,11 @@
 jest.mock('../src/services/apiClient', () => ({
   apiBaseUrl: 'http://localhost:4000',
-  apiResponse: jest.fn((path: string, init: RequestInit) => global.fetch(`http://localhost:4000${path}`, init))
+  apiFetch: jest.fn(),
+  apiResponse: jest.fn((path: string, init: RequestInit) => global.fetch(`http://localhost:4000${path}`, init)),
+  hasAuthenticatedApiSession: jest.fn(() => true)
 }));
 
-import { uploadAndAnalyzeReport } from '../src/services/reportUploadService';
+import { registerReportTraceSink, uploadAndAnalyzeReport } from '../src/services/reportUploadService';
 
 describe('reportUploadService', () => {
   const originalFetch = global.fetch;
@@ -13,11 +15,14 @@ describe('reportUploadService', () => {
   });
 
   afterEach(() => {
+    registerReportTraceSink(null);
     jest.clearAllMocks();
     global.fetch = originalFetch;
   });
 
   it('returns parsed response when upload succeeds', async () => {
+    const traces: unknown[] = [];
+    registerReportTraceSink((trace) => traces.push(trace));
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       status: 202,
@@ -64,6 +69,13 @@ describe('reportUploadService', () => {
 
     expect(response.labName).toBe('Dr. Lal PathLabs');
     expect(response.score).toBe(78);
+    const serialized = JSON.stringify(traces);
+    expect(serialized).toContain('rep_1');
+    expect(serialized).toContain('HYDRATE');
+    expect(serialized).toContain('PRESENT');
+    expect(serialized).not.toContain('Dr. Lal PathLabs');
+    expect(serialized).not.toContain('report.pdf');
+    expect(serialized).not.toContain('categoryScores');
   });
 
   it('maps timeout/abort errors to actionable message', async () => {

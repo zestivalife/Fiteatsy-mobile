@@ -519,6 +519,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const networkTypeRef = useRef('UNKNOWN');
   const networkReachabilityRef = useRef<boolean | null>(null);
+  const previousNetworkReachabilityRef = useRef<boolean | null>(null);
   useEffect(() => {
     registerNetworkTypeProvider(() => networkTypeRef.current);
     registerNetworkReachabilityProvider(() => networkReachabilityRef.current);
@@ -1711,18 +1712,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
+      const previousReachability = previousNetworkReachabilityRef.current;
       networkTypeRef.current = state.type?.toUpperCase() ?? 'UNKNOWN';
       networkReachabilityRef.current = state.isConnected === false || state.isInternetReachable === false
         ? false
         : state.isConnected === true
           ? true
           : null;
+      previousNetworkReachabilityRef.current = networkReachabilityRef.current;
       if (authSession && networkReachabilityRef.current === true) {
         void retryPendingHealthProfileSync();
+        if (previousReachability === false) void refreshPublishedNutritionPlan();
       }
     });
     return () => unsubscribe();
-  }, [authSession, retryPendingHealthProfileSync]);
+  }, [authSession, refreshPublishedNutritionPlan, retryPendingHealthProfileSync]);
 
   const value = useMemo(
     () => ({

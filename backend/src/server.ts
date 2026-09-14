@@ -25,6 +25,7 @@ import { delegatedRouter } from './modules/admin/delegated.routes.js';
 import { paymentsRouter, razorpayWebhookRouter, subscriptionsRouter } from './modules/subscriptions/subscriptions.routes.js';
 import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.service.js';
 import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
+import { scheduleHealthRecalculationProcessor } from './jobs/process-health-recalculations.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -199,6 +200,7 @@ export const initializeBackend = async () => {
     console.log('Initial admin bootstrap completed.');
   }
   scheduleDeletedReportPurge();
+  scheduleHealthRecalculationProcessor();
 };
 
 export const startServer = async () => {

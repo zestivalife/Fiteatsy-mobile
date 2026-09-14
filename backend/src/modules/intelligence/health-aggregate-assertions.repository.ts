@@ -31,3 +31,29 @@ export const enqueueHealthRecalculation=async(owner:ClientOwnershipContext,healt
     values($1,$2,$3,$4,'PENDING',1,$5) on conflict(client_id,health_day,status) do update set attempts=health_intelligence_recalculation_queue.attempts+1,
     last_error_code=excluded.last_error_code,requested_at=now()`,[`hrecalc_${crypto.randomUUID()}`,owner.accountId,owner.clientId,healthDay,errorCode??null]);
 };
+
+export type HealthRecalculationQueueItem={id:string;userId:string;clientId:string;healthDay:string;attempts:number};
+
+export const claimPendingHealthRecalculations=async(limit=10):Promise<HealthRecalculationQueueItem[]>=>{
+  const boundedLimit=Math.max(1,Math.min(50,Math.trunc(limit)));
+  const result=await pool.query(`with pending as (
+      select id from health_intelligence_recalculation_queue
+      where status='PENDING' order by requested_at asc,id asc
+      for update skip locked limit $1
+    ) update health_intelligence_recalculation_queue queue
+      set status='RUNNING',attempts=queue.attempts+1,last_error_code=null
+      from pending where queue.id=pending.id
+      returning queue.id,queue.user_id,queue.client_id,queue.health_day,queue.attempts`,[boundedLimit]);
+  return result.rows.map(row=>({id:String(row.id),userId:String(row.user_id),clientId:String(row.client_id),
+    healthDay:new Date(String(row.health_day)).toISOString().slice(0,10),attempts:Number(row.attempts)}));
+};
+
+export const completeHealthRecalculation=async(id:string)=>{
+  await pool.query(`update health_intelligence_recalculation_queue set status='SUCCEEDED',completed_at=now(),last_error_code=null
+    where id=$1 and status='RUNNING'`,[id]);
+};
+
+export const failHealthRecalculation=async(id:string,errorCode:string)=>{
+  await pool.query(`update health_intelligence_recalculation_queue set status='FAILED',completed_at=now(),last_error_code=$2
+    where id=$1 and status='RUNNING'`,[id,errorCode.slice(0,100)]);
+};

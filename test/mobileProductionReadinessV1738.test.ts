@@ -88,7 +88,8 @@ describe('v17.38 mobile production readiness contracts', () => {
 
   test('authentication and report payload debug logging is disabled in production', () => {
     expect(read('src/services/authService.ts')).toContain('if (__DEV__) console.log');
-    expect(read('src/services/reportUploadService.ts')).toContain('if (__DEV__) console.log');
+    expect(read('src/services/reportUploadService.ts')).toContain("if (__DEV__) console.info('[ReportsTrace]', trace)");
+    expect(read('src/services/reportUploadService.ts')).not.toContain("payload\n    });");
   });
 
   test('the obsolete production-shaped mock device catalogue is removed', () => {
