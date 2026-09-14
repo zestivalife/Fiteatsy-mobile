@@ -252,7 +252,7 @@ test('GET /v1/biomarkers and /v1/biomarkers/history return client-owned biomarke
   assert.equal(history.body.items[0].userId, undefined);
 });
 
-test('GET /v1/intelligence/scores calculates traceable scores from validated client data', async () => {
+test('GET /v1/intelligence/scores exposes only traceable canonical scores without legacy fallbacks', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   await grantHealthConnectConsent(session.token);
   const controlledNowMs = Date.now();
@@ -307,12 +307,13 @@ test('GET /v1/intelligence/scores calculates traceable scores from validated cli
     headers: authHeaders(session.token)
   });
   assert.equal(scores.response.status, 200);
-  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'nourishment' && item.scoreStatus === 'calculated'), true);
-  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'active_performance' && item.scoreStatus === 'calculated'), true);
-  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'energy_balance' && item.scoreStatus === 'calculated'), true);
-  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'stress_resilience' && item.scoreStatus === 'calculated'), true);
-  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'physical_wellness_index' && item.scoreStatus === 'calculated'), true);
-  assert.equal(scores.body.items.some((item: { scoreType: string; scoreStatus: string }) => item.scoreType === 'nutrition' && item.scoreStatus === 'calculated'), true);
+  const scoreTypes = scores.body.items.map((item: { scoreType: string }) => item.scoreType).sort();
+  assert.deepEqual(scoreTypes, [
+    'activity', 'calm', 'cycle', 'health_intelligence', 'nutrition',
+    'overall', 'recovery', 'sleep', 'stress_recovery'
+  ]);
+  assert.equal(scores.body.items.every((item: { scoreStatus: string }) => item.scoreStatus === 'insufficient_data'), true);
+  assert.equal(scores.body.items.every((item: { calculationVersion: string }) => item.calculationVersion === 'HEALTH_INTELLIGENCE_V1'), true);
   assert.equal(scores.body.items[0].clientId, undefined);
   assert.equal(scores.body.items[0].inputSummary != null, true);
 
@@ -320,12 +321,13 @@ test('GET /v1/intelligence/scores calculates traceable scores from validated cli
     headers: authHeaders(session.token)
   });
   assert.equal(summary.response.status, 200);
-  assert.equal(summary.body.status, 'calculated');
-  assert.equal(typeof summary.body.energyBalanceScore, 'number');
-  assert.equal(typeof summary.body.stressResilienceScore, 'number');
-  assert.equal(typeof summary.body.physicalWellnessIndex, 'number');
-  assert.equal(typeof summary.body.sleepScore, 'number');
-  assert.equal(typeof summary.body.calmScore, 'number');
+  assert.equal(summary.body.status, 'insufficient_data');
+  assert.equal(summary.body.energyBalanceScore, null);
+  assert.equal(summary.body.stressResilienceScore, null);
+  assert.equal(summary.body.physicalWellnessIndex, null);
+  assert.equal(summary.body.activityScore, null);
+  assert.equal(summary.body.sleepScore, null);
+  assert.equal(summary.body.healthIntelligenceScore, null);
 });
 
 test('GET /v1/health/sync/status reports durable sync state without internal ownership ids', async () => {

@@ -65,6 +65,9 @@ jobs:
       - name: Install locked backend dependencies
         run: npm ci --prefix backend
 
+      - name: Build shared health intelligence package
+        run: npm --prefix packages/health-intelligence run build
+
       - name: Download pinned official USDA FoodData Central releases
         run: |
           mkdir -p /tmp/fdc
