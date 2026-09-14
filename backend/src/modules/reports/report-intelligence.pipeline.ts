@@ -1,5 +1,5 @@
 import { createBiomarkerObservation, deleteBiomarkerObservationsForReport, upsertBiomarker } from '../biomarkers/biomarkers.repository.js';
-import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
+import { calculateCanonicalHealthScores as calculateHealthScores } from '../intelligence/canonical-health-calculation-engine.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
 import { ReportAnalysisResult, ParsedParameter } from './reports.service.js';
 import { biomarkerDimension, biomarkerTier, canonicalBiomarkerName } from './report-governance.js';

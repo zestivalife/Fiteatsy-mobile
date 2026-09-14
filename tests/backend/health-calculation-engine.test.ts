@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeAdditiveObservationsForScoring } from '../../backend/src/modules/intelligence/health-calculation-engine.js';
+import { aggregateCanonicalHealthObservations } from '../../packages/health-intelligence/src/index.js';
 
 const observation = (
   id: string,
@@ -23,23 +23,23 @@ const observation = (
   sourceMetadata: { sourceApplication }
 });
 
-test('additive Health Connect fragments aggregate by IST day without double-counting source streams', () => {
-  const normalized = normalizeAdditiveObservationsForScoring([
+test('canonical aggregation prefers the governed watch source without double-counting phone overlap', () => {
+  const normalized = aggregateCanonicalHealthObservations([
     observation('watch-1', 3000, 'com.watch'),
     observation('watch-2', 4000, 'com.watch'),
     observation('phone-1', 6800, 'com.phone')
-  ]);
+  ], { fallbackOffsetMinutes: 330, nowMs: Date.parse('2026-08-25T08:00:00.000Z') });
 
   assert.equal(normalized.length, 1);
   assert.equal(normalized[0].value, 7000);
-  assert.equal(normalized[0].sourceMetadata?.sourceApplication, 'com.watch');
+  assert.equal(normalized[0].sourcePriority, 500);
 });
 
-test('IST business-day boundary keeps additive observations on their correct day', () => {
-  const normalized = normalizeAdditiveObservationsForScoring([
+test('canonical business-day boundary keeps observations on their correct health day', () => {
+  const normalized = aggregateCanonicalHealthObservations([
     observation('day-1', 2000, 'com.watch', '2026-08-24T18:29:59.000Z'),
     observation('day-2', 2500, 'com.watch', '2026-08-24T18:30:00.000Z')
-  ]);
+  ], { fallbackOffsetMinutes: 330, nowMs: Date.parse('2026-08-25T08:00:00.000Z') });
 
   assert.equal(normalized.length, 2);
   assert.deepEqual(normalized.map((item) => item.value).sort((a, b) => a - b), [2000, 2500]);

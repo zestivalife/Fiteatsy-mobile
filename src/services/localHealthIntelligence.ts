@@ -10,7 +10,7 @@ import {
   sleepScore,
   stressRecoveryScore,
   type ScoreResult
-  ,aggregateCanonicalHealthObservations
+  ,aggregateCanonicalHealthObservations,type CanonicalDailyAggregate
 } from '@fiteatsy/health-intelligence';
 import type { HealthObservationDraft } from '../types';
 
@@ -104,6 +104,22 @@ export const calculateCanonicalHealthIntelligenceFromObservations = (
     recovery: { sleep: null, body: null, activityBalance: null, lifestyle: null, freshness },
     cycle: { applicable: options.cycleApplicable === true, phase: null, symptoms: null, energy: null }
   }, now.toISOString(), { startAtISO: timestamps[0] ?? null, endAtISO: timestamps[timestamps.length - 1] ?? null });
+};
+
+export const calculateCanonicalHealthIntelligenceFromAggregates=(aggregates:CanonicalDailyAggregate[],options:{sleepTargetMinutes?:number|null;
+  cycleApplicable?:boolean;now?:Date}={})=>{const now=options.now??new Date();const fallbackOffsetMinutes=-now.getTimezoneOffset();
+  const today=localDay(now.toISOString(),fallbackOffsetMinutes);const daily=(metric:string)=>aggregates.find(row=>row.healthDay===today&&row.metricType===metric)?.value??null;
+  const timestamps=aggregates.map(row=>row.latestMeasuredAtISO).sort();const latest=timestamps.at(-1)??null;
+  const freshness:ScoreResult['freshness']=latest&&Date.parse(latest)>=now.getTime()-36*3_600_000?'CURRENT':latest?'STALE':'UNKNOWN';
+  return calculateCanonicalHealthIntelligence({activity:{steps:daily('steps'),stepGoal:HEALTH_INTELLIGENCE_CONFIG.targets.steps,
+    exerciseMinutes:daily('active_minutes'),exerciseTarget:HEALTH_INTELLIGENCE_CONFIG.targets.exerciseMinutes,balance:null,freshness},
+    sleep:{minutes:daily('sleep_minutes'),targetMinutes:options.sleepTargetMinutes??HEALTH_INTELLIGENCE_CONFIG.targets.sleepMinutes,
+      deep:null,rem:null,efficiency:null,consistency:null,freshness},
+    nutrition:{protein:null,hydration:percentOf(daily('hydration_ml'),2500),foodQuality:null,clinical:null,freshness},
+    calm:{hrv:null,stress:null,mindfulness:percentOf(daily('mindfulness_minutes'),15),freshness},
+    stressRecovery:{hrv:null,sleep:null,adaptation:null,freshness},recovery:{sleep:null,body:null,activityBalance:null,lifestyle:null,freshness},
+    cycle:{applicable:options.cycleApplicable===true,phase:null,symptoms:null,energy:null}},now.toISOString(),
+    {startAtISO:timestamps[0]??null,endAtISO:latest});
 };
 
 export const hasCalculatedCanonicalScore = (snapshot: LocalCanonicalHealthSnapshot) =>

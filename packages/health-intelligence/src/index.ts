@@ -35,7 +35,7 @@ export const cycleScore=(i:{applicable:boolean;phase?:number|null;symptoms?:numb
 export const overallScore=(scores:Record<string,ScoreResult>)=>weighted('health_intelligence',Object.fromEntries(Object.keys(HEALTH_INTELLIGENCE_CONFIG.weights.overall).map(k=>[k,scores[k]?.score])),{...HEALTH_INTELLIGENCE_CONFIG.weights.overall},Object.entries(scores).filter(([,s])=>s.status==='METHODOLOGY_PENDING').map(([k])=>k),Object.entries(scores).filter(([,s])=>s.status==='NOT_APPLICABLE').map(([k])=>k));
 export const mindScore=():ScoreResult=>({...weighted('mind',{}, {methodology:1},['methodology']),explanation:'Numeric Mind methodology is not approved.'});
 
-export const HEALTH_AGGREGATION_VERSION = 'HEALTH_AGGREGATION_V1' as const;
+export const HEALTH_AGGREGATION_VERSION = 'HEALTH_AGGREGATION_V2' as const;
 export type HealthAggregationMethod = 'DAILY_SUM'|'LATEST'|'DAILY_AVERAGE'|'SESSION_AGGREGATE'|'RAW_SERIES';
 export type HealthMetricSemantics = {unit:string;display:HealthAggregationMethod;calculation:HealthAggregationMethod;freshHours:number};
 export const HEALTH_METRIC_SEMANTICS = {
@@ -47,6 +47,7 @@ export const HEALTH_METRIC_SEMANTICS = {
   mindfulness_minutes:{unit:'min',display:'DAILY_SUM',calculation:'DAILY_SUM',freshHours:36},
   sleep_minutes:{unit:'min',display:'SESSION_AGGREGATE',calculation:'SESSION_AGGREGATE',freshHours:36},
   sleep_deep_minutes:{unit:'min',display:'SESSION_AGGREGATE',calculation:'SESSION_AGGREGATE',freshHours:36},
+  sleep_core_minutes:{unit:'min',display:'SESSION_AGGREGATE',calculation:'SESSION_AGGREGATE',freshHours:36},
   sleep_rem_minutes:{unit:'min',display:'SESSION_AGGREGATE',calculation:'SESSION_AGGREGATE',freshHours:36},
   sleep_awake_minutes:{unit:'min',display:'SESSION_AGGREGATE',calculation:'SESSION_AGGREGATE',freshHours:36},
   workout_minutes:{unit:'min',display:'SESSION_AGGREGATE',calculation:'SESSION_AGGREGATE',freshHours:36},
@@ -71,10 +72,22 @@ export type CanonicalDailyAggregate = {
   latest:number|null;average:number|null;minimum:number|null;maximum:number|null;
   sourceObservationIds:string[];sourceProvider:string;sourcePriority:number;
   aggregateVersion:typeof HEALTH_AGGREGATION_VERSION;lineageHash:string;latestMeasuredAtISO:string;
+  calculatedAtISO:string; aggregateSource:'HEALTHKIT_STATISTICS'|'CANONICAL_RAW_RECOMPUTATION';
+  rawLineageAvailable:boolean;
 };
 const validTime=(iso:string)=>Number.isFinite(Date.parse(iso));
 const offsetDay=(iso:string,offset:number)=>new Date(Date.parse(iso)+offset*60000).toISOString().slice(0,10);
 const metadataString=(o:CanonicalObservation,key:string)=>typeof o.sourceMetadata?.[key]==='string'?String(o.sourceMetadata?.[key]):'';
+const UNIT_FACTORS:Record<string,Record<string,number>>={
+  m:{m:1,km:1000},kcal:{kcal:1,kJ:1/4.184},kg:{kg:1,lb:0.45359237},ml:{ml:1,L:1000},
+  min:{min:1,h:60},count:{count:1},bpm:{bpm:1},ms:{ms:1},pct:{pct:1,'%':1},brpm:{brpm:1},score:{score:1}
+};
+export const normalizeCanonicalObservation=(o:CanonicalObservation):CanonicalObservation|null=>{
+  const semantics=HEALTH_METRIC_SEMANTICS[o.metricType as keyof typeof HEALTH_METRIC_SEMANTICS];
+  if(!semantics)return null;const factor=UNIT_FACTORS[semantics.unit]?.[o.unit];
+  if(factor==null||!Number.isFinite(o.value))return null;
+  return {...o,value:o.value*factor,unit:semantics.unit};
+};
 export const canonicalHealthDay=(o:CanonicalObservation,fallbackOffsetMinutes:number)=>{
   const timestamp=o.metricType.startsWith('sleep_')||o.metricType==='workout_minutes'?(o.endAtISO||o.measuredAtISO):o.measuredAtISO;
   return offsetDay(timestamp,o.timezoneOffsetMinutes??fallbackOffsetMinutes);
@@ -98,15 +111,18 @@ const unionMinutes=(rows:CanonicalObservation[])=>{
 };
 export const aggregateCanonicalHealthObservations=(input:CanonicalObservation[],options:{fallbackOffsetMinutes:number;nowMs?:number})=>{
   const now=options.nowMs??Date.now(); const futureLimit=now+5*60_000; const dedup=new Map<string,CanonicalObservation>();
-  input.forEach(o=>{if(!o.deleted&&Number.isFinite(o.value)&&validTime(o.measuredAtISO)&&Date.parse(o.measuredAtISO)<=futureLimit)dedup.set(stableId(o),o);});
+  input.forEach(raw=>{const o=normalizeCanonicalObservation(raw);if(o&&!o.deleted&&validTime(o.measuredAtISO)&&Date.parse(o.measuredAtISO)<=futureLimit)dedup.set(stableId(o),o);});
   const groups=new Map<string,CanonicalObservation[]>();
   dedup.forEach(o=>{if(!(o.metricType in HEALTH_METRIC_SEMANTICS))return;const key=`${canonicalHealthDay(o,options.fallbackOffsetMinutes)}|${o.metricType}`;groups.set(key,[...(groups.get(key)??[]),o]);});
   return [...groups.entries()].map(([key,all])=>{const [healthDay,metricType]=key.split('|');const semantics=HEALTH_METRIC_SEMANTICS[metricType as keyof typeof HEALTH_METRIC_SEMANTICS];
     const maxPriority=Math.max(...all.map(healthSourcePriority));const rows=all.filter(o=>healthSourcePriority(o)===maxPriority);const sorted=[...rows].sort((a,b)=>b.measuredAtISO.localeCompare(a.measuredAtISO));
     const values=rows.map(o=>o.value);const average=values.reduce((s,v)=>s+v,0)/values.length;const method=semantics.calculation;
     const value=method==='DAILY_SUM'?values.reduce((s,v)=>s+v,0):method==='SESSION_AGGREGATE'?unionMinutes(rows):method==='LATEST'?sorted[0].value:average;
-    const ids=rows.map(stableId).sort();const normalized=Number(value.toFixed(4));return {healthDay,metricType,value:normalized,unit:semantics.unit,method,
+    const ids=rows.map(stableId).sort();const normalized=Number(value.toFixed(4));const authority=rows.some(o=>healthSourcePriority(o)===600);
+    return {healthDay,metricType,value:normalized,unit:semantics.unit,method,
       latest:sorted[0]?.value??null,average:Number(average.toFixed(4)),minimum:Math.min(...values),maximum:Math.max(...values),sourceObservationIds:ids,
       sourceProvider:sorted[0].sourceProvider,sourcePriority:maxPriority,aggregateVersion:HEALTH_AGGREGATION_VERSION,
-      lineageHash:hash(JSON.stringify([HEALTH_AGGREGATION_VERSION,healthDay,metricType,normalized,ids])),latestMeasuredAtISO:sorted[0].measuredAtISO};});
+      lineageHash:hash(JSON.stringify([HEALTH_AGGREGATION_VERSION,healthDay,metricType,normalized,semantics.unit,ids])),latestMeasuredAtISO:sorted[0].measuredAtISO,
+      calculatedAtISO:new Date(now).toISOString(),aggregateSource:(authority?'HEALTHKIT_STATISTICS':'CANONICAL_RAW_RECOMPUTATION') as CanonicalDailyAggregate['aggregateSource'],
+      rawLineageAvailable:all.some(o=>healthSourcePriority(o)<600)};});
 };

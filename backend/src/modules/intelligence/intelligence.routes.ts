@@ -26,7 +26,7 @@ import {
   listHealthScoreHistory,
   listLatestHealthScores
 } from './health-scores.repository.js';
-import { calculateHealthScores } from './health-calculation-engine.js';
+import { calculateCanonicalHealthScores as calculateHealthScores } from './canonical-health-calculation-engine.js';
 import { ingestHealthObservations } from '../health/health-observations.repository.js';
 import { getReport } from '../reports/reports.store.js';
 import { listHealthObservationsForCalculation } from '../health/health-observations.repository.js';
@@ -41,8 +41,10 @@ const currentOwner = (account: ReturnType<typeof getAuthenticatedAccount>): Clie
 
 intelligenceRouter.get('/v1', requireAuthenticatedAccount, async (req, res) => {
   const owner = currentOwner(getAuthenticatedAccount(req));
+  const parsed = z.object({ healthDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error:'HEALTH_DAY_REQUIRED', details:parsed.error.flatten() });
   const observations = await listHealthObservationsForCalculation(owner);
-  return res.status(200).json(buildHealthIntelligenceV1(observations));
+  return res.status(200).json(buildHealthIntelligenceV1(observations, parsed.data.healthDay));
 });
 
 const toScoreDto = (score: Awaited<ReturnType<typeof listLatestHealthScores>>[number], fiteatsyClientId: string) => ({

@@ -365,6 +365,10 @@ export type HealthObservationDraft = {
     recordingMethod?: number;
     sleepStage?: string;
     measurementMethod?: string;
+    workoutActivityType?: number | string;
+    workoutEnergyKcal?: number;
+    workoutDistanceMeters?: number;
+    workoutDurationSeconds?: number;
   };
 };
 

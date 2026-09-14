@@ -1,4 +1,5 @@
 import { HealthObservationDraft, WearableSyncPayload, WellnessSnapshot } from '../types';
+import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
 import { mergeWellnessInputs } from '../utils/wellness';
 import { apiFetch, postJson } from './apiClient';
 import { getHealthPlatformAdapter, type HealthAppId } from './healthPlatformAdapter';
@@ -6,8 +7,7 @@ import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceS
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
 import { acknowledgeLocalObservations, persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalSyncCursors,
-  readPendingLocalObservations,persistLocalHealthAggregates,markLocalHealthUploaded } from './healthSyncLocalStore';
-import { aggregateCanonicalHealthObservations } from '@fiteatsy/health-intelligence';
+  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded } from './healthSyncLocalStore';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -154,6 +154,16 @@ export const wellnessFromHealthScores = (
   };
 };
 
+export const wellnessFromCanonicalAggregates=(previous:WellnessSnapshot,aggregates:CanonicalDailyAggregate[],scores:HealthScoreSummary,
+  healthDay=new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10)):WellnessSnapshot=>{
+  const value=(metric:string)=>aggregates.find(row=>row.healthDay===healthDay&&row.metricType===metric)?.value;
+  const next=mergeWellnessInputs({...previous,heartRateAvg:positiveOrExisting(value('heart_rate')??value('resting_heart_rate'),previous.heartRateAvg),
+    sleepHours:positiveOrExisting(value('sleep_minutes')==null?undefined:(value('sleep_minutes') as number)/60,previous.sleepHours),
+    movementMinutes:positiveOrExisting(value('active_minutes')??value('workout_minutes'),previous.movementMinutes),
+    hydrationLiters:positiveOrExisting(value('hydration_ml')==null?undefined:(value('hydration_ml') as number)/1000,previous.hydrationLiters)});
+  return wellnessFromHealthScores(next,null,scores);
+};
+
 export const getHealthSyncStatus = () => apiFetch<HealthSyncStatus>('/v1/health/sync/status');
 
 export const getLatestHealthObservations = (limit = 10) =>
@@ -205,9 +215,7 @@ export const runHealthSync = async (
     await persistLocalSyncBatch(localScope, observations, anchors);
     await persistLocalHealthPresentationObservations(localScope, payload.presentationObservations ?? []);
     const readAtISO=new Date().toISOString();
-    const aggregateInput=[...observations,...(payload.presentationObservations??[])].map(item=>({...item,
-      sourceProvider:item.sourceMetadata?.measurementMethod==='HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'?'platform_aggregate':item.sourceProvider}));
-    await persistLocalHealthAggregates(localScope,aggregateCanonicalHealthObservations(aggregateInput,{fallbackOffsetMinutes:-new Date().getTimezoneOffset()}),readAtISO);
+    const canonicalAggregates=await recomputeLocalHealthAggregates(localScope,readAtISO,-new Date().getTimezoneOffset());
     // Sync-run telemetry must not become a prerequisite for ingestion. The
     // observation endpoint independently enforces authenticated ownership and
     // active provider consent.
@@ -229,7 +237,10 @@ export const runHealthSync = async (
     }
     uploadCompleted = rejected === 0 && pending.length === 0;
     if(uploadCompleted){
-      await withHealthSyncPipelineTimeout(postJson('/v1/health/intelligence:recalculate',{}),'health_sync_recalculation_timeout');
+      await withHealthSyncPipelineTimeout(postJson('/v1/health/intelligence:recalculate',{
+        healthDay:new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10),
+        aggregateAssertions:canonicalAggregates
+      }),'health_sync_recalculation_timeout');
       await markLocalHealthUploaded(localScope,true);
     }
     if (governed && Object.keys(anchors).length && rejected === 0) {
@@ -250,7 +261,7 @@ export const runHealthSync = async (
     const [scores, status] = await Promise.all([getHealthScoreSummary(), getHealthSyncStatus()]);
     return { payload, observations, accepted, duplicate, rejected, scores, status,
       diagnostics: buildHealthSourceDiagnostics(appId === 'apple-health' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', payload, { state: 'SUCCESS' }),
-      wellness: wellnessFromHealthScores(previousWellness, payload, scores) };
+      wellness: wellnessFromCanonicalAggregates(previousWellness,canonicalAggregates,scores) };
   } catch (error) {
     if (run) await finishWearableSyncRun(run.id, { status:'FAILED',recordsRead:0,recordsUploaded:0,recordsInserted:0,
       recordsDuplicates:0,recordsUpdated:0,recordsDeleted:0,errorStage:'SYNC',errorCode:error instanceof Error ? error.message.slice(0,100) : 'UNKNOWN',

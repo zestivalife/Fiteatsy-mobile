@@ -1326,12 +1326,9 @@ export const TrackerScreen = () => {
   const todayAggregate=(metricTypes:string[])=>health.aggregates.filter((item)=>metricTypes.includes(item.metricType))
     .sort((a,b)=>b.healthDay.localeCompare(a.healthDay))[0]?.value??null;
   const observationSeries = (metricTypes: string[]) => days
-    .map((day) => {
-      const observations = latestObservations.filter((item) =>
-        metricTypes.includes(item.metricType) && toDayKey(item.measuredAtISO) === day.key
-      );
-      return observations.length ? observations[observations.length - 1].value : null;
-    })
+    .map((day) => health.aggregates.find((item) =>
+      metricTypes.includes(item.metricType) && item.healthDay === day.key
+    )?.value ?? null)
     .filter((value): value is number => value != null && Number.isFinite(value));
   const scoreSeries = (scoreType: HealthScoreType) => canonicalScoreHistory
     .filter((item) => item.scoreType === scoreType && item.scoreStatus === 'calculated' && item.scoreValue != null)
@@ -1352,10 +1349,10 @@ export const TrackerScreen = () => {
   const wakeTimeValue = toClockMinutes(onboarding?.wakeTime);
   const sleepDurationMinutes = calculateSleepMinutes(bedtimeValue, wakeTimeValue, sleepHoursValue);
   const sleepStages = [
-    ['Deep', formatSleepStage(latestObservationValueFor(latestObservations, ['deep_sleep_pct', 'deep_sleep_percent', 'sleep_deep_pct']))],
-    ['REM', formatSleepStage(latestObservationValueFor(latestObservations, ['rem_sleep_pct', 'rem_sleep_percent', 'sleep_rem_pct']))],
-    ['Light', formatSleepStage(latestObservationValueFor(latestObservations, ['light_sleep_pct', 'light_sleep_percent', 'sleep_light_pct']))],
-    ['Awake', formatSleepStage(latestObservationValueFor(latestObservations, ['awake_sleep_pct', 'awake_sleep_percent', 'sleep_awake_pct']))]
+    ['Deep', formatSleepStage(todayAggregate(['sleep_deep_minutes']))],
+    ['REM', formatSleepStage(todayAggregate(['sleep_rem_minutes']))],
+    ['Light', formatSleepStage(todayAggregate(['sleep_core_minutes']))],
+    ['Awake', formatSleepStage(todayAggregate(['sleep_awake_minutes']))]
   ]
     .filter((stage): stage is [string, string] => Boolean(stage[1]))
     .map(([label, value]) => `${label} ${value}`);

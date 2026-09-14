@@ -26,7 +26,7 @@ import { createProcessingJob, updateProcessingJobStatus } from '../processing/pr
 import { persistReportIntelligence } from './report-intelligence.pipeline.js';
 import { documentHash } from './report-governance.js';
 import { sanitizeReportAnalysisForPublic, sanitizeReportErrorForPublic } from './report-response.js';
-import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
+import { calculateCanonicalHealthScores as calculateHealthScores } from '../intelligence/canonical-health-calculation-engine.js';
 import { clearHealthScoresForOwner } from '../intelligence/health-scores.repository.js';
 import { buildReportComparison, sortAnalysableReports } from './report-comparison.js';
 

@@ -58,7 +58,9 @@ describe('Apple Health physical-device permission flow', () => {
     expect(apple).toContain('const sleepMinutes = sum(validValues(metricValues.sleep_minutes ?? []))');
     expect(apple).toContain('heartRateAvg:restingHeartRate');
     expect(apple).toContain('hrvMs');
-    expect(apple).toContain("['AWAKE', 'IN_BED'].includes(sample.sleepStage ?? '')");
+    expect(apple).toContain("sample.sleepStage === 'IN_BED'");
+    expect(apple).toContain("sample.sleepStage!=='AWAKE'");
+    expect(apple).toContain("sleep_awake_minutes");
   });
 
   it('preserves Apple Watch/source provenance without filtering valid sources', () => {

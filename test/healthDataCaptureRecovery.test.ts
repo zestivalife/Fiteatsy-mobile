@@ -114,7 +114,8 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(server).toContain("app.use('/v1/health/observations:batch', parseHealthObservationBatch)");
     expect(server).toContain("express.json({ limit: '512kb' })");
     expect(routes).toContain('recalculateIntelligence: z.boolean().optional().default(true)');
-    expect(routes).toContain('parsed.data.recalculateIntelligence ? await calculateHealthScores(owner) : null');
+    expect(routes).toContain('scores = await calculateHealthScores(owner, healthDays.at(-1))');
+    expect(routes).toContain("enqueueHealthRecalculation(");
     expect(read('src/services/healthSyncManager.ts')).toContain('recalculateIntelligence: false');
   });
 

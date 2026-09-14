@@ -224,6 +224,13 @@ public final class FiteatsyHealthKitModule: Module {
       "sourceProductType":sample.sourceRevision.productType ?? "",
       "device":sample.device?.name ?? ""]
     if let category = sample as? HKCategorySample, metric == "sleep_minutes" { row["sleepStage"] = sleepStage(category.value) }
+    if let workout = sample as? HKWorkout, metric == "workout_minutes" {
+      var metadata: [String: Any] = ["workoutActivityType": workout.workoutActivityType.rawValue,
+                                     "durationSeconds": workout.duration]
+      if let energy = workout.totalEnergyBurned?.doubleValue(for: .kilocalorie()) { metadata["energyKcal"] = energy }
+      if let distance = workout.totalDistance?.doubleValue(for: .meter()) { metadata["distanceMeters"] = distance }
+      row["metadata"] = metadata
+    }
     if metric == "hrv_ms" { row["measurementMethod"] = "SDNN" }
     return row
   }

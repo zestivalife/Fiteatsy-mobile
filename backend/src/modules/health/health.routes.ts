@@ -8,7 +8,11 @@ import {
   listHealthObservations
 } from './health-observations.repository.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
-import { calculateHealthScores } from '../intelligence/health-calculation-engine.js';
+import { calculateCanonicalHealthScores as calculateHealthScores } from '../intelligence/canonical-health-calculation-engine.js';
+import {persistAggregateAssertions,enqueueHealthRecalculation} from '../intelligence/health-aggregate-assertions.repository.js';
+import {aggregateDaily} from '../intelligence/health-aggregation-v1.js';
+import {listDailyAggregates} from '../intelligence/health-aggregates.repository.js';
+import {listHealthObservationsForCalculation} from './health-observations.repository.js';
 import {
   acceptWearableConsent, commitWearableCheckpoint, completeWearableSyncRun,
   getActiveWearableConsent, listWearableConnections, listWearableCheckpoints, listWearableSyncRuns, startWearableSyncRun,
@@ -42,6 +46,10 @@ const observationSchema = z.object({
     sourceVersion: z.string().trim().max(120).optional(),
     sourceProductType: z.string().trim().max(180).optional(),
     canonicalFingerprint: z.string().trim().max(240).optional()
+    ,workoutActivityType:z.union([z.number(),z.string().max(80)]).optional()
+    ,workoutEnergyKcal:z.number().finite().nonnegative().optional()
+    ,workoutDistanceMeters:z.number().finite().nonnegative().optional()
+    ,workoutDurationSeconds:z.number().finite().nonnegative().optional()
   }).strict().optional()
   ,startAtISO: z.string().datetime().nullable().optional()
   ,endAtISO: z.string().datetime().nullable().optional()
@@ -67,6 +75,10 @@ const metricUnits: Record<string, ReadonlySet<string>> = {
   stress_score: new Set(['score']),
   mindfulness_minutes: new Set(['min'])
   ,sleep_stage: new Set(['min'])
+  ,sleep_core_minutes: new Set(['min'])
+  ,sleep_deep_minutes: new Set(['min'])
+  ,sleep_rem_minutes: new Set(['min'])
+  ,sleep_awake_minutes: new Set(['min'])
   ,heart_rate: new Set(['bpm'])
   ,spo2: new Set(['pct'])
   ,respiratory_rate: new Set(['brpm'])
@@ -245,7 +257,23 @@ healthRouter.post('/observations:batch', async (req, res) => {
   // intelligence model for every chunk makes the request path grow with both
   // history size and chunk count. The mobile coordinator performs one summary
   // refresh after the final chunk, so intermediate chunks can defer it.
-  const scores = parsed.data.recalculateIntelligence ? await calculateHealthScores(owner) : null;
+  const healthDays = [...new Set(parsed.data.observations.map((item) => {
+    const instant = item.endAtISO ?? item.sourceMetadata?.endAtISO ?? item.measuredAtISO;
+    const offset = item.timezoneOffsetMinutes ?? 0;
+    return new Date(Date.parse(instant) + offset * 60_000).toISOString().slice(0, 10);
+  }))].sort();
+  let scores: Awaited<ReturnType<typeof calculateHealthScores>> | null = null;
+  try {
+    // Recalculation is backend-owned. A client disappearing after a successful
+    // upload cannot leave Consultant or server-derived projections stale.
+    scores = await calculateHealthScores(owner, healthDays.at(-1));
+  } catch (error) {
+    await Promise.all(healthDays.map((day) => enqueueHealthRecalculation(
+      owner,
+      day,
+      error instanceof Error ? error.message.slice(0, 100) : 'UPLOAD_RECALC_FAILED'
+    )));
+  }
   return res.status(200).json({
     accepted: result.accepted.length,
     duplicate: result.duplicate.length,
@@ -268,10 +296,20 @@ healthRouter.post('/observations:batch', async (req, res) => {
   });
 });
 
+const aggregateAssertionSchema=z.object({healthDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),metricType:z.string().min(1).max(80),
+  value:z.number().finite(),unit:z.string().min(1).max(40),aggregateVersion:z.literal('HEALTH_AGGREGATION_V2'),
+  lineageHash:z.string().min(1).max(100),aggregateSource:z.enum(['HEALTHKIT_STATISTICS','CANONICAL_RAW_RECOMPUTATION']),
+  rawLineageAvailable:z.boolean(),calculatedAtISO:z.string().datetime()});
 healthRouter.post('/intelligence:recalculate', async (req,res)=>{
   const account=getAuthenticatedAccount(req);const owner=currentOwner(account);
-  const scores=await calculateHealthScores(owner);
-  return res.status(200).json({recalculated:true,calculationVersion:'HEALTH_INTELLIGENCE_V1',scoreCount:scores.length});
+  const parsed=z.object({healthDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),aggregateAssertions:z.array(aggregateAssertionSchema).max(500).optional()}).safeParse(req.body??{});
+  if(!parsed.success)return res.status(400).json({error:'INVALID_HEALTH_RECALCULATION',details:parsed.error.flatten()});
+  const healthDay=parsed.data.healthDay??new Date().toISOString().slice(0,10);
+  try{const scores=await calculateHealthScores(owner,healthDay);const observations=await listHealthObservationsForCalculation(owner);
+    const parity=parsed.data.aggregateAssertions?.length?await persistAggregateAssertions(owner,parsed.data.aggregateAssertions,aggregateDaily(observations)):[];
+    return res.status(200).json({recalculated:true,calculationVersion:'HEALTH_INTELLIGENCE_V1',scoreCount:scores.length,
+      aggregateVersion:'HEALTH_AGGREGATION_V2',parity,mismatchCount:parity.filter(item=>item.status==='MISMATCH').length});
+  }catch(error){await enqueueHealthRecalculation(owner,healthDay,error instanceof Error?error.message.slice(0,100):'UNKNOWN');throw error;}
 });
 
 healthRouter.get('/sync/status', async (req, res) => {
@@ -378,16 +416,9 @@ healthRouter.get('/observations', async (req, res) => {
 healthRouter.get('/aggregates', async (req, res) => {
   const account = getAuthenticatedAccount(req); const owner = currentOwner(account);
   const days = Math.max(1, Math.min(90, Number(req.query.days || 30)));
-  const result = await (await import('../../db/pool.js')).pool.query(
-    `select metric_type,
-      date(measured_at + make_interval(mins => coalesce(timezone_offset_minutes,0))) as local_day,
-      case when metric_type in ('steps','sleep_minutes','workout_minutes','active_minutes','active_energy','distance','hydration_ml')
-        then sum(value) else avg(value) end as value,
-      min(unit) as unit,max(measured_at) as latest_measurement,array_agg(distinct source_provider) as sources
-     from health_observations where user_id=$1 and client_id=$2 and deleted_at is null
-       and quality_status in ('accepted','estimated') and measured_at >= now() - make_interval(days => $3)
-     group by metric_type,local_day order by local_day desc,metric_type`, [owner.accountId,owner.clientId,days]);
-  return res.status(200).json({ days, items: result.rows.map((row) => ({ metricType:row.metric_type,
-    localDay:String(row.local_day).slice(0,10),value:Number(row.value),unit:row.unit,
-    latestMeasurementISO:new Date(row.latest_measurement).toISOString(),sources:row.sources })) });
+  const rows = await listDailyAggregates(owner, days);
+  return res.status(200).json({ days, aggregateVersion:'HEALTH_AGGREGATION_V2', items:rows.map((row) => ({
+    metricType:row.metric,localDay:row.date,value:row.value,unit:row.unit,method:row.method,
+    freshness:row.freshness,lineageHash:row.lineageHash
+  })) });
 });

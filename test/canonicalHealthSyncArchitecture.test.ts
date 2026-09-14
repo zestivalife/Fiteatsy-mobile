@@ -113,4 +113,12 @@ describe('canonical health sync architecture',()=>{
     expect(adapter).not.toContain("'CHECKING'");
     expect(adapter).not.toContain("'SYNCING'");
   });
+
+  test('all executable backend score paths use the canonical calculation engine',()=>{
+    const files=['backend/src/modules/health/health.routes.ts','backend/src/modules/intelligence/intelligence.routes.ts',
+      'backend/src/modules/reports/reports.routes.ts','backend/src/modules/reports/report-intelligence.pipeline.ts'];
+    files.forEach((file)=>expect(read(file)).toContain('canonical-health-calculation-engine'));
+    files.forEach((file)=>expect(read(file)).not.toMatch(/from ['"](?:\.\.\/)*intelligence\/health-calculation-engine\.js['"]/));
+    expect(read('backend/src/modules/health/health.routes.ts')).toContain('listDailyAggregates(owner, days)');
+  });
 });

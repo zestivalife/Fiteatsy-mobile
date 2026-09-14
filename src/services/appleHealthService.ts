@@ -139,31 +139,40 @@ export const syncFromAppleHealth = async (
       }
       const observationCountBefore = observations.length;
       result.samples.forEach((sample) => {
-        if (sample.metric === 'sleep_minutes' && ['AWAKE', 'IN_BED'].includes(sample.sleepStage ?? '')) return;
+        if (sample.metric === 'sleep_minutes' && sample.sleepStage === 'IN_BED') return;
         const canonicalMetric = sample.metric === 'exercise_minutes' ? 'active_minutes'
           : sample.metric === 'hrv_ms' ? 'hrv_sdnn_ms' : sample.metric;
-        metricValues[canonicalMetric] = [...(metricValues[canonicalMetric] ?? []), sample.value];
+        if(sample.metric!=='sleep_minutes'||sample.sleepStage!=='AWAKE')
+          metricValues[canonicalMetric] = [...(metricValues[canonicalMetric] ?? []), sample.value];
         // Zero/negative quantity samples do not contribute to Fiteatsy health
         // aggregates and are invalid under the backend observation contract.
         // Drop them locally so one empty HealthKit sample cannot poison a
         // complete upload batch. Deletion tombstones remain handled below.
         if (!Number.isFinite(sample.value) || sample.value <= 0) return;
-        observations.push({ metricType:canonicalMetric,value:sample.value,unit:sample.unit,
+        const base={value:sample.value,unit:sample.unit,
           measuredAtISO:sample.endAtISO,startAtISO:sample.startAtISO,endAtISO:sample.endAtISO,
           timezoneOffsetMinutes:-new Date(sample.endAtISO).getTimezoneOffset(),sourceProvider:'apple_health',sourceRecordId:sample.id,
-          syncKey:`apple_health:${sample.metric}:${sample.sourceApplication ?? 'unknown_source'}:${sample.id}`,qualityStatus:'accepted',
+          qualityStatus:'accepted' as const,
           providerVersion:sample.measurementMethod ? `APPLE_${sample.measurementMethod}` : null,
           sourceMetadata:{recordType:sample.metric,sourceApplication:sample.sourceApplication,sleepStage:sample.sleepStage,
             measurementMethod:sample.measurementMethod,
+            workoutActivityType:typeof sample.metadata?.workoutActivityType==='number'?sample.metadata.workoutActivityType:undefined,
+            workoutEnergyKcal:typeof sample.metadata?.energyKcal==='number'?sample.metadata.energyKcal:undefined,
+            workoutDistanceMeters:typeof sample.metadata?.distanceMeters==='number'?sample.metadata.distanceMeters:undefined,
+            workoutDurationSeconds:typeof sample.metadata?.durationSeconds==='number'?sample.metadata.durationSeconds:undefined,
             sourceVersion:sample.sourceVersion,sourceProductType:sample.sourceProductType,
             canonicalFingerprint:sample.metric==='workout_minutes'
               ? [Math.round(Date.parse(sample.startAtISO)/60_000),Math.round(Date.parse(sample.endAtISO)/60_000),Number(sample.value.toFixed(1))].join(':')
               : undefined,
-            ...(sample.device ? { device: { manufacturer:'Apple', model:sample.device } } : {})} });
+            ...(sample.device ? { device: { manufacturer:'Apple', model:sample.device } } : {})}};
+        if(sample.metric!=='sleep_minutes'||sample.sleepStage!=='AWAKE')observations.push({...base,metricType:canonicalMetric,
+          syncKey:`apple_health:${sample.metric}:${sample.sourceApplication ?? 'unknown_source'}:${sample.id}`});
+        if(sample.metric==='sleep_minutes'&&sample.sleepStage){const stageMetric={AWAKE:'sleep_awake_minutes',DEEP:'sleep_deep_minutes',
+          REM:'sleep_rem_minutes',CORE:'sleep_core_minutes'}[sample.sleepStage];
+          if(stageMetric)observations.push({...base,metricType:stageMetric,
+            syncKey:`apple_health:${stageMetric}:${sample.sourceApplication ?? 'unknown_source'}:${sample.id}`});}
       });
-      const canonicalDeletionMetric = metric === 'exercise_minutes' ? 'active_minutes'
-        : metric === 'hrv_ms' ? 'hrv_sdnn_ms' : metric;
-      result.deletedIds.forEach((id) => observations.push({metricType:canonicalDeletionMetric,value:0,unit:'deleted',measuredAtISO:new Date().toISOString(),
+      result.deletedIds.forEach((id) => observations.push({metricType:'provider_record_deletion',value:0,unit:'deleted',measuredAtISO:new Date().toISOString(),
         sourceProvider:'apple_health',sourceRecordId:id,syncKey:`apple_health:${metric}:${id}`,deleted:true}));
       const statusKey = APPLE_HEALTH_STATUS_KEYS[metric] ?? metric;
       const acceptedSampleCount = observations.length - observationCountBefore - result.deletedIds.length;

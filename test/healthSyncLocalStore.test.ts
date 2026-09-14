@@ -3,7 +3,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: {
     getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
-    setItem: jest.fn(async (key: string, value: string) => { mockStorage.set(key, value); })
+    setItem: jest.fn(async (key: string, value: string) => { mockStorage.set(key, value); }),
+    multiRemove: jest.fn(async (keys: string[]) => { keys.forEach((key) => mockStorage.delete(key)); })
   }
 }));
 
@@ -11,7 +12,8 @@ import { acknowledgeLocalObservations, countPendingLocalObservations, markLocalH
   persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalHealthObservations,
   readLocalHealthPresentationObservations, readLocalHealthProviderConnected,
   readLocalSyncCursors, readPendingLocalObservations, persistLocalCanonicalHealthSnapshot,
-  readLocalCanonicalHealthSnapshot } from '../src/services/healthSyncLocalStore';
+  readLocalCanonicalHealthSnapshot, recomputeLocalHealthAggregates, readLocalHealthAggregates,
+  ensureLocalHealthAggregatesCurrent } from '../src/services/healthSyncLocalStore';
 import { calculateCanonicalHealthIntelligence } from '../src/services/localHealthIntelligence';
 
 const observation = (value: number, deleted = false, recordId = 'record-1') => ({
@@ -97,5 +99,24 @@ describe('durable local health sync store', () => {
     await persistLocalCanonicalHealthSnapshot(scope, snapshot);
     expect(await readLocalCanonicalHealthSnapshot(scope)).toEqual(snapshot);
     expect(await readLocalCanonicalHealthSnapshot('account:user-2:apple-health')).toBeNull();
+  });
+
+  it('recomputes a cumulative day from the complete retained window after an incremental delta', async () => {
+    const scope = 'account:user-1:apple-health';
+    await persistLocalSyncBatch(scope, [observation(100, false, 'record-1')], { steps: 'anchor-1' });
+    await recomputeLocalHealthAggregates(scope, '2026-09-13T01:00:00.000Z', 330, Date.parse('2026-09-13T01:00:00.000Z'));
+    await persistLocalSyncBatch(scope, [observation(50, false, 'record-2')], { steps: 'anchor-2' });
+    const aggregates = await recomputeLocalHealthAggregates(scope, '2026-09-13T02:00:00.000Z', 330, Date.parse('2026-09-13T02:00:00.000Z'));
+    expect(aggregates.find((item) => item.metricType === 'steps')?.value).toBe(150);
+    expect((await readLocalHealthAggregates(scope))[0].aggregateVersion).toBe('HEALTH_AGGREGATION_V2');
+  });
+
+  it('invalidates deleted source records and recovers an interrupted dirty aggregate state', async () => {
+    const scope = 'account:user-1:apple-health';
+    await persistLocalSyncBatch(scope, [observation(100, false, 'record-1')], { steps: 'anchor-1' });
+    await recomputeLocalHealthAggregates(scope, '2026-09-13T01:00:00.000Z', 330, Date.parse('2026-09-13T01:00:00.000Z'));
+    await persistLocalSyncBatch(scope, [observation(0, true, 'record-1')], { steps: 'anchor-2' });
+    const aggregates = await ensureLocalHealthAggregatesCurrent(scope, 330, Date.parse('2026-09-13T02:00:00.000Z'));
+    expect(aggregates).toEqual([]);
   });
 });
