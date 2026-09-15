@@ -32,8 +32,12 @@ describe('profile ecosystem gap closure v2 contracts',()=>{
   test('consultant health projections fail closed unless account consent is granted',()=>{
     const server=read('backend/src/server.ts');
     const repository=read('backend/src/modules/preferences/preferences.repository.ts');
-    expect(server).toContain("'/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireGrantedConsultantAccess");
-    expect(server).toContain("'/v1/clients/:clientId',requireAuthenticatedAccount,requireGrantedConsultantAccess");
+    expect(server).toContain(
+      "'/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment,requireGrantedConsultantAccess"
+    );
+    expect(server).toContain(
+      "'/v1/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment,requireGrantedConsultantAccess"
+    );
     expect(repository).toContain("status='GRANTED'");
   });
 
