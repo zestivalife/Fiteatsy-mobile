@@ -46,6 +46,13 @@ export type RootStackParamList = {
   Search: undefined;
   Notifications: undefined;
   Profile: undefined;
+  MyProfile: undefined;
+  ConnectedHealth: undefined;
+  PrivacyConsent: undefined;
+  Security: undefined;
+  NotificationPreferences: undefined;
+  AppPreferences: undefined;
+  HelpSupport: undefined;
   Reports: undefined;
   ReportComparison: undefined;
   Sessions: undefined;
