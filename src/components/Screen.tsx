@@ -8,11 +8,13 @@ import { useAppContext } from '../state/AppContext';
 export const Screen = ({
   children,
   scroll = false,
-  contentStyle
+  contentStyle,
+  keyboardShouldPersistTaps = 'handled'
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  keyboardShouldPersistTaps?: 'always' | 'never' | 'handled';
 }) => {
   const { themeMode } = useAppContext();
   const themeGradients = getThemeGradients(themeMode);
@@ -26,7 +28,7 @@ export const Screen = ({
             automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
             contentContainerStyle={[styles.content, contentStyle]}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps={keyboardShouldPersistTaps}
             nestedScrollEnabled
             showsVerticalScrollIndicator={false}
           >{children}</ScrollView>

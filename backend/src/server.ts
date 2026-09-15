@@ -26,6 +26,7 @@ import { paymentsRouter, razorpayWebhookRouter, subscriptionsRouter } from './mo
 import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.service.js';
 import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
 import { scheduleHealthRecalculationProcessor } from './jobs/process-health-recalculations.js';
+import { adminGrievancesRouter, grievancesRouter, profilePhotoRouter } from './modules/grievances/grievances.routes.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -60,6 +61,8 @@ const REGISTERED_ROUTE_GROUPS = [
   '/v1/platform/nutrition-plan',
   '/v1/assessments',
   '/v1/profile'
+  ,'/v1/grievances'
+  ,'/v1/admin/grievances'
 ];
 
 const logStartupRoutes = () => {
@@ -166,6 +169,8 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/consultants', consultantNutritionRouter);
   app.use('/v1/clients', consultantWorkspaceContractRouter);
   app.use('/v1/admin', adminRouter);
+  app.use('/v1/admin/grievances', adminGrievancesRouter);
+  app.use('/v1/grievances', grievancesRouter);
   app.use('/v1/professional-assignments', professionalAssignmentsRouter);
   app.use('/v1/internal/delegated', delegatedRouter);
   app.use('/v1/subscriptions', subscriptionsRouter);
@@ -175,6 +180,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/platform', platformNutritionRouter);
   app.use('/v1/assessments', assessmentsRouter);
   app.use('/v1/profile', profileRouter);
+  app.use('/v1/profile', profilePhotoRouter);
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message });

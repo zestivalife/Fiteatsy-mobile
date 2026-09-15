@@ -53,6 +53,7 @@ export type RootStackParamList = {
   NotificationPreferences: undefined;
   AppPreferences: undefined;
   HelpSupport: undefined;
+  GrievanceForm: undefined;
   Reports: undefined;
   ReportComparison: undefined;
   Sessions: undefined;

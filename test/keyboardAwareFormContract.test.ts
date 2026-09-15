@@ -18,7 +18,8 @@ describe('global keyboard-safe form contract', () => {
   it('makes the shared scrolling Screen keyboard-safe for existing long forms', () => {
     const screen = read('src/components/Screen.tsx');
     expect(screen).toContain('automaticallyAdjustKeyboardInsets={Platform.OS');
-    expect(screen).toContain('keyboardShouldPersistTaps="handled"');
+    expect(screen).toContain("keyboardShouldPersistTaps = 'handled'");
+    expect(screen).toContain('keyboardShouldPersistTaps={keyboardShouldPersistTaps}');
     expect(screen).toContain('nestedScrollEnabled');
   });
 

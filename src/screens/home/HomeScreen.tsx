@@ -64,14 +64,14 @@ type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Journey'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
-type MetricKey = 'healthIntelligence' | 'recovery' | 'sleep' | 'activity' | 'nourishment' | 'calm' | 'cycleWellness';
+type MetricKey = 'healthIntelligence' | 'recovery' | 'sleep' | 'activity' | 'nourishment' | 'calm';
 type SvgAsset = React.FC<SvgProps>;
 type RecoveryMetric = {
   key: Exclude<MetricKey, 'healthIntelligence'>;
   label: string;
   score: number | null;
   color: string;
-  position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight' | 'bottomCenter';
+  position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
   DefaultIcon: SvgAsset | ImageSourcePropType;
   ActiveIcon: SvgAsset | ImageSourcePropType;
   defaultIconType?: 'svg' | 'image';
@@ -124,7 +124,6 @@ const arcGradientForMetric = (key: MetricKey) => {
       return ['#9B70FF', '#763CEF'];
     case 'sleep':
       return ['#2E92FF', '#0643B5'];
-    case 'cycleWellness':
     case 'recovery':
     case 'healthIntelligence':
     default:
@@ -305,15 +304,6 @@ export const HomeScreen = () => {
       DefaultIcon: SleepDefaultIcon,
       ActiveIcon: SleepActiveIcon
     },
-    {
-      key: 'cycleWellness',
-      label: 'Cycle Wellness',
-      score: normalizeScore(health.canonicalIntelligence?.scores.cycle.score),
-      color: '#FF4FA3',
-      position: 'bottomCenter',
-      DefaultIcon: MindDefaultIcon,
-      ActiveIcon: MindActiveIcon
-    }
   ];
   const displayMetrics = metrics;
   const trendValues = recoveryTrend;
@@ -329,8 +319,7 @@ export const HomeScreen = () => {
     sleep: health.canonicalIntelligence.scores.sleep,
     activity: health.canonicalIntelligence.scores.activity,
     nourishment: health.canonicalIntelligence.scores.nutrition,
-    calm: health.canonicalIntelligence.scores.calm,
-    cycleWellness: health.canonicalIntelligence.scores.cycle
+    calm: health.canonicalIntelligence.scores.calm
   } : null;
   const selectedFramework = frameworkByMetric?.[selectedMetric];
   const selectedState = stateFromScore(selected.score, selectedFramework?.status);
@@ -433,6 +422,7 @@ const HeaderIcon = ({ icon, onPress, badge }: { icon: keyof typeof Ionicons.glyp
 const RecoveryTrend = ({ values, hasData }: { values: number[]; hasData: boolean }) => (
   <View style={styles.trendCard}>
     <Text style={styles.trendTitle}>Your 7 day’s Recovery Trend</Text>
+    {!hasData ? <Text style={styles.trendEmpty}>Not enough recovery history yet</Text> : null}
     <View style={styles.trendRow}>
       {trendDays.map((day, index) => {
         const value = values[index] ?? 0;
@@ -440,7 +430,7 @@ const RecoveryTrend = ({ values, hasData }: { values: number[]; hasData: boolean
         return (
           <View key={`${day}-${index}`} style={styles.trendItem}>
             <View style={[styles.trendPill, { backgroundColor: tone.bg }]}>
-              <Text style={[styles.trendValue, { color: tone.text }]}>{hasData ? `${Math.round(value)}%` : '--'}</Text>
+              <Text style={[styles.trendValue, { color: tone.text }]}>{hasData ? `${Math.round(value)}%` : '—'}</Text>
             </View>
             <Text style={styles.trendDay}>{day}</Text>
           </View>
@@ -461,7 +451,7 @@ const CycleActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
 const ActionPill = ({ label, Icon, onPress, disabled = false }: { label: string; Icon: SvgAsset; onPress: () => void; disabled?: boolean }) => (
   <Pressable onPress={onPress} disabled={disabled} style={[styles.actionPill, disabled && { opacity:0.65 }]} accessibilityRole="button">
     <Icon width={18} height={18} />
-    <Text style={styles.actionText}>{label}</Text>
+    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.actionText}>{label}</Text>
   </Pressable>
 );
 
@@ -698,10 +688,6 @@ const nodePositions = StyleSheet.create({
     right: 52,
     bottom: 17
   },
-  bottomCenter: {
-    left: 131,
-    bottom: -42
-  }
 });
 
 const styles = StyleSheet.create({
@@ -791,6 +777,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 16
   },
+  trendEmpty:{color:'#AEB5BD',fontFamily:font.regular,fontSize:11,lineHeight:14,position:'absolute',top:35,left:0,right:0,textAlign:'center'},
   trendRow: {
     marginTop: 8,
     flexDirection: 'row',
@@ -820,18 +807,18 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     height: 36,
-    marginTop: -1,
+    marginTop: 8,
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
-    gap: 8
+    gap: 5
   },
   actionPill: {
     height: 30,
     borderRadius: 16,
     backgroundColor: '#050505',
-    paddingHorizontal: 8,
-    flexShrink: 1,
+    paddingHorizontal: 6,
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -844,7 +831,7 @@ const styles = StyleSheet.create({
     lineHeight: 15
   },
   recoveryPanel: {
-    height: 371,
+    height: 350,
     marginTop: 0,
     position: 'relative',
     alignItems: 'center',
@@ -856,7 +843,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: '100%',
-    transform: [{ translateY: -18 }]
+    transform: [{ translateY: 0 }]
   },
   starShadow: {
     position: 'absolute',

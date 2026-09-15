@@ -6,9 +6,10 @@ const read = (value: string) => fs.readFileSync(path.join(root, value), 'utf8');
 describe('Health Intelligence V1 canonical surfaces', () => {
   test('Star Orb uses canonical framework scores and names', () => {
     const home = read('src/screens/home/HomeScreen.tsx');
-    for (const key of ['healthIntelligence', 'recovery', 'activity', 'sleep', 'nutrition', 'calm', 'cycle']) {
+    for (const key of ['healthIntelligence', 'recovery', 'activity', 'sleep', 'nutrition', 'calm']) {
       expect(home).toContain(`health.canonicalIntelligence?.scores.${key}.score`);
     }
+    expect(home).not.toContain('health.canonicalIntelligence?.scores.cycle.score');
     expect(home).toContain("label: 'Nourishment'");
     expect(home).not.toContain("label: 'Active Performance'");
   });

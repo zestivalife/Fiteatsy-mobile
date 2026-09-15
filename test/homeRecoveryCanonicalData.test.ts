@@ -11,7 +11,9 @@ describe('Journey recovery star canonical data contract', () => {
     expect(source).toContain('health.canonicalIntelligence?.scores.activity.score');
     expect(source).toContain('health.canonicalIntelligence?.scores.sleep.score');
     expect(source).toContain('health.canonicalIntelligence?.scores.calm.score');
-    expect(source).toContain('health.canonicalIntelligence?.scores.cycle.score');
+    // Cycle remains part of canonical health intelligence, but is intentionally
+    // not rendered as a sixth Star Orb node.
+    expect(source).not.toContain('health.canonicalIntelligence?.scores.cycle.score');
   });
 
   it('maps Nourishment only to the canonical Nutrition framework score', () => {

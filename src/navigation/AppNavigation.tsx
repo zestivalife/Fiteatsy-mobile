@@ -44,6 +44,7 @@ import { SecurityScreen } from '../screens/profile/SecurityScreen';
 import { NotificationPreferencesScreen } from '../screens/profile/NotificationPreferencesScreen';
 import { AppPreferencesScreen } from '../screens/profile/AppPreferencesScreen';
 import { HelpSupportScreen } from '../screens/profile/HelpSupportScreen';
+import { GrievanceFormScreen } from '../screens/profile/GrievanceFormScreen';
 import { CanonicalConnectedMetricsScreen } from '../screens/sync/CanonicalConnectedMetricsScreen';
 import { CanonicalHealthSyncDebugScreen } from '../screens/sync/CanonicalHealthSyncDebugScreen';
 import { HealthDataSyncScreen } from '../screens/sync/CanonicalHealthDataSyncScreen';
@@ -150,6 +151,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
         <Stack.Screen name="AppPreferences" component={AppPreferencesScreen} />
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+        <Stack.Screen name="GrievanceForm" component={GrievanceFormScreen} />
         <Stack.Screen name="ConnectedMetrics" component={CanonicalConnectedMetricsScreen} />
         {__DEV__ ? <Stack.Screen name="HealthSyncDebug" component={CanonicalHealthSyncDebugScreen} /> : null}
         <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
