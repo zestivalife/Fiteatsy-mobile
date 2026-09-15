@@ -66,6 +66,34 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     assert.equal(denied.response.status, 403, JSON.stringify(denied.body));
     assert.equal(denied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 
+    const consentDenied = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, { headers: authHeaders(consultant.token) });
+    assert.equal(consentDenied.response.status, 403, JSON.stringify(consentDenied.body));
+    assert.equal(consentDenied.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
+    const grantedConsent = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+      status: 'GRANTED',
+      policyVersion: 'CONSULTANT_ACCESS_V1',
+    }, { headers: authHeaders(client.token) });
+    assert.equal(grantedConsent.response.status, 200, JSON.stringify(grantedConsent.body));
+    assert.equal(grantedConsent.body.consent.status, 'GRANTED');
+
+    const assertRevokedGuardOrder = async () => {
+      const revokedConsent = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+        status: 'REVOKED',
+        policyVersion: 'CONSULTANT_ACCESS_V1',
+      }, { headers: authHeaders(client.token) });
+      assert.equal(revokedConsent.response.status, 200, JSON.stringify(revokedConsent.body));
+      const consentBlocked = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, { headers: authHeaders(consultant.token) });
+      assert.equal(consentBlocked.response.status, 403, JSON.stringify(consentBlocked.body));
+      assert.equal(consentBlocked.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
+      const revokedAssignment = await postJson(server.baseUrl, `/v1/admin/client-assignments/${assignment.body.assignment.id}/revoke`, {
+        reason: 'Authenticated common-food guard-order acceptance complete',
+      }, { headers: authHeaders(admin.token) });
+      assert.equal(revokedAssignment.response.status, 200, JSON.stringify(revokedAssignment.body));
+      const assignmentBlocked = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, { headers: authHeaders(consultant.token) });
+      assert.equal(assignmentBlocked.response.status, 403, JSON.stringify(assignmentBlocked.body));
+      assert.equal(assignmentBlocked.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
+    };
+
     const draft = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/draft`, {}, { headers: authHeaders(consultant.token) });
     assert.equal(draft.response.status, 201, JSON.stringify(draft.body));
     const planId = String(draft.body.plan.id);
@@ -155,6 +183,7 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     if (dietType === 'vegan') {
       assert.equal(generated.body.supported, false);
       assert.equal(generated.body.code, 'VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED');
+      await assertRevokedGuardOrder();
       continue;
     }
     assert.equal(generated.body.meals.length, 7);
@@ -195,5 +224,6 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     }, { headers: authHeaders(consultant.token) });
     assert.equal(stale.response.status, 409, JSON.stringify(stale.body));
     assert.equal(stale.body.error, 'STALE_PLAN_VERSION');
+    await assertRevokedGuardOrder();
   }
 });

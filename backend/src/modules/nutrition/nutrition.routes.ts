@@ -1,4 +1,4 @@
-import { type Response, Router } from 'express';
+import { type NextFunction, type Request, type Response, Router } from 'express';
 import { promises as fs } from 'node:fs';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
@@ -337,6 +337,27 @@ const handleNutritionRouteError = (res: Response, error: unknown) => {
   }
 
   throw error;
+};
+
+export const requireConsultantClientAssignment = async (req: Request, res: Response, next: NextFunction) => {
+  const account = getAuthenticatedAccount(req);
+  if (!canAccessConsultantClientApi(account)) {
+    return res.status(403).json({
+      error: 'ROLE_NOT_ALLOWED',
+      message: 'A consultant account is required to access client resources.',
+    });
+  }
+  try {
+    if (!await canAccessConsultantNutritionClient(String(req.params.clientId), account, { allowSeniorAuthority: true })) {
+      return res.status(403).json({
+        error: 'CLIENT_ASSIGNMENT_REQUIRED',
+        message: 'An active client assignment is required to access this client.',
+      });
+    }
+    return next();
+  } catch (error) {
+    return next(error);
+  }
 };
 
 consultantNutritionRouter.get('/clients/:clientId/nutrition-intelligence', async (req, res) => {
