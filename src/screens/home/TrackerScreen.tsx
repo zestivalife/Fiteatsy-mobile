@@ -1372,8 +1372,8 @@ export const TrackerScreen = () => {
     if (displayScores) canonicalScoreRows.push(['Cycle Wellness', displayScores.cycle]);
   }
   const supportingScoreRows: Array<[string, number | null, string]> = [
-    ['Energy Balance', masterScoreSummary?.energyBalanceScore ?? null, 'Secondary daily energy insight from approved inputs'],
-    ['Body & Biomarker Health', masterScoreSummary?.bodySupportScore ?? null, 'Secondary validated body and biomarker insight']
+    ['Energy Balance', null, 'Supporting insight only · Methodology pending'],
+    ['Body & Biomarker Health', null, 'Supporting insight only · Methodology pending']
   ];
 
   const healthMetrics: MetricConfig[] = [

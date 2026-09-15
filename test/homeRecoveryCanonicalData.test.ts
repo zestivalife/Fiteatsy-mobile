@@ -23,6 +23,8 @@ describe('Journey recovery star canonical data contract', () => {
 
   it('shows no score when the backend reports insufficient data', () => {
     expect(source).toContain("selectedScore == null ? '--/100'");
-    expect(source).toContain("if (score == null) return { label: 'No data' }");
+    expect(source).toContain("case 'METHODOLOGY_PENDING': return 'Methodology pending'");
+    expect(source).toContain("case 'NOT_APPLICABLE': return 'Not applicable'");
+    expect(source).toContain('stateFromScore(selected.score, selectedFramework?.status)');
   });
 });

@@ -1,6 +1,6 @@
 import { apiFetch } from './apiClient';
 
-export type HealthScoreStatus = 'calculated' | 'insufficient_data';
+export type HealthScoreStatus = 'available'|'calculating'|'calibrating'|'no_data'|'calculated'|'insufficient_data'|'methodology_pending'|'not_applicable'|'stale'|'offline'|'error';
 export type HealthScoreType =
   | 'energy_balance'
   | 'body_support'

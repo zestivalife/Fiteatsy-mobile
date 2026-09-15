@@ -92,8 +92,23 @@ const trendTone = (value: number) => {
   return { bg: '#050505', text: '#FFFFFF' };
 };
 
-const stateFromScore = (score: number | null) => {
-  if (score == null) return { label: 'No data' };
+export const frameworkStatusLabel = (status?: string | null) => {
+  switch (status) {
+    case 'METHODOLOGY_PENDING': return 'Methodology pending';
+    case 'NOT_APPLICABLE': return 'Not applicable';
+    case 'INSUFFICIENT_DATA': return 'Not enough data';
+    case 'NO_DATA': return 'No data yet';
+    case 'CALCULATING': return 'Calculating';
+    case 'CALIBRATING': return 'Calibrating';
+    case 'STALE': return 'Update needed';
+    case 'OFFLINE': return 'Available offline';
+    case 'ERROR': return 'Unavailable';
+    default: return 'No data yet';
+  }
+};
+
+const stateFromScore = (score: number | null, status?: string | null) => {
+  if (score == null) return { label: frameworkStatusLabel(status) };
   if (score >= 80) return { label: 'Strong Today' };
   if (score >= 55) return { label: 'Borderline' };
   return { label: 'Lower Today' };
@@ -308,7 +323,17 @@ export const HomeScreen = () => {
   const selected = selectedMetric === 'healthIntelligence'
     ? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' }
     : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' };
-  const selectedState = stateFromScore(selected.score);
+  const frameworkByMetric = health.canonicalIntelligence ? {
+    healthIntelligence: health.canonicalIntelligence.scores.healthIntelligence,
+    recovery: health.canonicalIntelligence.scores.recovery,
+    sleep: health.canonicalIntelligence.scores.sleep,
+    activity: health.canonicalIntelligence.scores.activity,
+    nourishment: health.canonicalIntelligence.scores.nutrition,
+    calm: health.canonicalIntelligence.scores.calm,
+    cycleWellness: health.canonicalIntelligence.scores.cycle
+  } : null;
+  const selectedFramework = frameworkByMetric?.[selectedMetric];
+  const selectedState = stateFromScore(selected.score, selectedFramework?.status);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
 
   return (

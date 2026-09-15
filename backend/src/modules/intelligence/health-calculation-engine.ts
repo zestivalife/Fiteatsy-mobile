@@ -308,7 +308,7 @@ export const calculateHealthScores = async (owner: ClientOwnershipContext) => {
   // authority or substitute a methodology-pending canonical score.
   const canonicalScores:HealthScoreInput[]=Object.entries({recovery:v1.scores.recovery,activity:v1.scores.activity,sleep:v1.scores.sleep,calm:v1.scores.calm,nutrition:v1.scores.nutrition,stress_recovery:v1.scores.stressRecovery,cycle:v1.scores.cycle,overall:v1.scores.healthIntelligence,health_intelligence:v1.scores.healthIntelligence}).map(([scoreType,value])=>{
     const typedScoreType=scoreType as HealthScoreInput['scoreType'];
-    return {scoreType:typedScoreType,scoreValue:value.score,scoreStatus:value.score==null?'insufficient_data':'calculated',confidence:value.confidence==='HIGH'?1:value.confidence==='MODERATE'?0.67:0,inputSummary:value,calculationVersion:'HEALTH_INTELLIGENCE_V1'};
+    return {scoreType:typedScoreType,scoreValue:value.score,scoreStatus:value.status.toLowerCase() as HealthScoreInput['scoreStatus'],confidence:value.confidence==='HIGH'?1:value.confidence==='MODERATE'?0.67:0,inputSummary:{...value,scoreKey:value.key,methodologyVersion:value.calculationVersion,aggregateVersion:'HEALTH_AGGREGATION_V2'},calculationVersion:'HEALTH_INTELLIGENCE_V1'};
   });
   await clearHealthScoresForOwner(owner);
   return createHealthScores(owner,canonicalScores);

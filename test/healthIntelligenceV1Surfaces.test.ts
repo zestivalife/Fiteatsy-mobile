@@ -1,2 +1,34 @@
-import fs from 'node:fs';import path from 'node:path';const root=path.resolve(__dirname,'..');const read=(p:string)=>fs.readFileSync(path.join(root,p),'utf8');
-describe('Health Intelligence V1 canonical surfaces',()=>{test('Star Orb uses the approved framework names and account-scoped canonical snapshot',()=>{const home=read('src/screens/home/HomeScreen.tsx');expect(home).toContain('health.canonicalIntelligence?.scores.healthIntelligence.score');expect(home).toContain('health.canonicalIntelligence?.scores.recovery.score');expect(home).toContain('health.canonicalIntelligence?.scores.activity.score');expect(home).toContain('health.canonicalIntelligence?.scores.sleep.score');expect(home).toContain('health.canonicalIntelligence?.scores.nutrition.score');expect(home).toContain('health.canonicalIntelligence?.scores.calm.score');expect(home).toContain('health.canonicalIntelligence?.scores.cycle.score');expect(home).toContain("label: 'Nourishment'");expect(home).not.toContain("label: 'Active Performance'");expect(home).not.toContain("label: 'Physical Wellness'");});test('Tracker consumes canonical histories without manufacturing or duplicating scores',()=>{const tracker=read('src/screens/home/TrackerScreen.tsx');expect(tracker).toContain('getHealthIntelligenceV1');expect(tracker).toContain('health.canonicalIntelligence?.scores');expect(tracker).toContain('getHealthScoreHistory()');expect(tracker).toContain('Promise.allSettled');expect(tracker).toContain("scoreSeries('recovery')");expect(tracker).toContain("observationSeries(['resting_heart_rate', 'heart_rate'])");expect(tracker).not.toMatch(/trendValues7d\.map/);expect(tracker).not.toMatch(/Math\.round\(v\s*[-+]\s*\d/);expect(tracker).toContain("['Energy Balance', masterScoreSummary?.energyBalanceScore");expect(tracker).toContain("['Body & Biomarker Health', masterScoreSummary?.bodySupportScore");expect(tracker).not.toContain('Physical Ease');expect(tracker).not.toContain("['Active Performance', masterScoreSummary?.activePerformanceScore");expect(tracker).not.toContain("['Nourishment', masterScoreSummary?.nourishmentScore");expect(tracker).not.toContain('const stepTarget = 5000');expect(tracker).not.toContain("renderMetricRow('Cardio Efficiency'");expect((tracker.match(/renderMetricRow\('Recovery'/g)??[])).toHaveLength(1);});test('mobile offline calculations import the shared V1 authority rather than defining weights',()=>{const local=read('src/services/localHealthIntelligence.ts');expect(local).toContain("from '@fiteatsy/health-intelligence'");expect(local).not.toMatch(/weights\s*:/);});test('backend exposes one versioned projection for client and consultant use',()=>{const routes=read('backend/src/modules/intelligence/intelligence.routes.ts');const consultant=read('backend/src/modules/consultants/consultants.service.ts');expect(routes).toContain("intelligenceRouter.get('/v1'");expect(consultant).toContain("calculationVersion: 'HEALTH_INTELLIGENCE_V1'");expect(consultant).toContain("scoreType === 'health_intelligence'");});});
+import fs from 'node:fs';
+import path from 'node:path';
+const root = path.resolve(__dirname, '..');
+const read = (value: string) => fs.readFileSync(path.join(root, value), 'utf8');
+
+describe('Health Intelligence V1 canonical surfaces', () => {
+  test('Star Orb uses canonical framework scores and names', () => {
+    const home = read('src/screens/home/HomeScreen.tsx');
+    for (const key of ['healthIntelligence', 'recovery', 'activity', 'sleep', 'nutrition', 'calm', 'cycle']) {
+      expect(home).toContain(`health.canonicalIntelligence?.scores.${key}.score`);
+    }
+    expect(home).toContain("label: 'Nourishment'");
+    expect(home).not.toContain("label: 'Active Performance'");
+  });
+
+  test('Tracker consumes canonical histories and keeps supporting scores non-numeric', () => {
+    const tracker = read('src/screens/home/TrackerScreen.tsx');
+    expect(tracker).toContain('getHealthIntelligenceV1');
+    expect(tracker).toContain('getHealthScoreHistory()');
+    expect(tracker).toContain('Promise.allSettled');
+    expect(tracker).toContain("['Energy Balance', null, 'Supporting insight only · Methodology pending']");
+    expect(tracker).toContain("['Body & Biomarker Health', null, 'Supporting insight only · Methodology pending']");
+    expect(tracker).not.toContain('Physical Ease');
+    expect(tracker).not.toContain('const stepTarget = 5000');
+  });
+
+  test('mobile and backend use the shared V1 authority', () => {
+    expect(read('src/services/localHealthIntelligence.ts')).toContain("from '@fiteatsy/health-intelligence'");
+    const routes = read('backend/src/modules/intelligence/intelligence.routes.ts');
+    const consultant = read('backend/src/modules/consultants/consultants.service.ts');
+    expect(routes).toContain("intelligenceRouter.get('/v1'");
+    expect(consultant).toContain("calculationVersion: 'HEALTH_INTELLIGENCE_V1'");
+  });
+});

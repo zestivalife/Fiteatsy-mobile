@@ -908,7 +908,9 @@ export const getConsultantClientWorkspace = async (
       stressRecoveryScore: scoreByType.get('stress_recovery') ?? null,
       cycleScore: scoreByType.get('cycle') ?? null,
       nourishmentScore: scoreByType.get('nutrition') ?? null,
-      bodySupportScore: scoreByType.get('body_support') ?? scoreByType.get('clinical') ?? null,
+      // Supporting insight only until HS-23 is approved. Never project a legacy
+      // FIT-WELLNESS-200 numeric value as a current canonical score.
+      bodySupportScore: null,
       physicalWellnessIndex: scoreByType.get('physical_wellness_index') ?? overallScore,
       overallScore,
       mindScore: { scoreValue: null, scoreStatus: 'methodology_pending', calculationVersion: 'HEALTH_INTELLIGENCE_V1' }

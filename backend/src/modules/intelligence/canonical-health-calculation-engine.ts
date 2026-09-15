@@ -6,6 +6,9 @@ import { buildHealthIntelligenceV1 } from './health-intelligence-projection.js';
 
 export const CALCULATION_VERSION = 'HEALTH_INTELLIGENCE_V1';
 
+const persistedStatus = (status: string): HealthScoreInput['scoreStatus'] =>
+  status.toLowerCase() as HealthScoreInput['scoreStatus'];
+
 /** Canonical, append-only score calculation. No legacy score formula executes. */
 export const calculateCanonicalHealthScores = async (
   owner: ClientOwnershipContext,
@@ -31,9 +34,16 @@ export const calculateCanonicalHealthScores = async (
   }).map(([scoreType, value]) => ({
     scoreType: scoreType as HealthScoreInput['scoreType'],
     scoreValue: value.score,
-    scoreStatus: value.score == null ? 'insufficient_data' : 'calculated',
+    scoreStatus: persistedStatus(value.status),
     confidence: value.confidence === 'HIGH' ? 1 : value.confidence === 'MODERATE' ? 0.67 : 0,
-    inputSummary: { ...value, healthDay, aggregateVersion: 'HEALTH_AGGREGATION_V2' },
+    inputSummary: {
+      ...value,
+      scoreKey: value.key,
+      methodologyVersion: value.calculationVersion,
+      aggregateVersion: 'HEALTH_AGGREGATION_V2',
+      inputWindow: { healthDay },
+      healthDay
+    },
     calculationVersion: CALCULATION_VERSION
   }));
 

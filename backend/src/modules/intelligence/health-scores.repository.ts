@@ -16,7 +16,18 @@ export type HealthScoreType =
   | 'sleep'
   | 'calm'
   | 'overall'|'stress_recovery'|'cycle'|'health_intelligence';
-export type HealthScoreStatus = 'calculated' | 'insufficient_data';
+export type HealthScoreStatus =
+  | 'available'
+  | 'calculating'
+  | 'calibrating'
+  | 'no_data'
+  | 'calculated'
+  | 'insufficient_data'
+  | 'methodology_pending'
+  | 'not_applicable'
+  | 'stale'
+  | 'offline'
+  | 'error';
 
 export type HealthScoreRecord = {
   id: string;

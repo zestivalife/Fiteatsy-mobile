@@ -203,8 +203,9 @@ intelligenceRouter.get('/summary', requireAuthenticatedAccount, async (req, res)
     scores = await calculateHealthScores(owner);
   }
   return res.status(200).json({
-    energyBalanceScore: getScoreValue(scores, 'energy_balance'),
-    bodySupportScore: getScoreValue(scores, 'body_support'),
+    // HS-23: supporting insight only until a new canonical methodology is approved.
+    energyBalanceScore: null,
+    bodySupportScore: null,
     nourishmentScore: getScoreValue(scores, 'nourishment'),
     recoveryScore: getScoreValue(scores, 'recovery'),
     physicalWellnessIndex: getScoreValue(scores, 'physical_wellness_index'),
