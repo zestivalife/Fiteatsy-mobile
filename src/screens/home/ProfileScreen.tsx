@@ -7,7 +7,7 @@ import { Screen } from '../../components/Screen';
 import { ProfileRow, ProfileSection } from '../../components/ProfileUi';
 import { getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import type { MainTabParamList, RootStackParamList } from '../../navigation/types';
-import { hydrateProfilePhoto } from '../../services/profilePhotoService';
+import { useProfilePhoto } from '../../hooks/useProfilePhoto';
 import { useAppContext } from '../../state/AppContext';
 import { resolveClientName } from '../../utils/clientIdentity';
 
@@ -18,8 +18,7 @@ export const ProfileScreen=({navigation}:Props)=>{
   const p=getThemeColors(themeMode);const name=resolveClientName(authSession?.user.name);
   const initials=name.split(/\s+/).map(v=>v[0]).join('').slice(0,2).toUpperCase();
   const completion=canonicalProfile ? canonicalProfile.nutrition.completionPercent : null;
-  const [photo,setPhoto]=React.useState<string|null>(null);
-  React.useEffect(()=>{if(authSession?.accountId)void hydrateProfilePhoto(authSession.accountId).then(setPhoto);},[authSession?.accountId]);
+  const photo=useProfilePhoto(authSession?.accountId??'');
   return <Screen scroll contentStyle={styles.screen}>
     <Text accessibilityRole="header" style={[styles.heading,{color:p.textPrimary}]}>Profile</Text>
     <View style={[styles.identity,{backgroundColor:p.card,borderColor:p.stroke}]}>

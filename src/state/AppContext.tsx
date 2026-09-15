@@ -1331,7 +1331,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       let notificationIds: string[] = [];
       if (medicationPermissionGranted) {
-        notificationIds = await scheduleMedicationNotifications(medication);
+        notificationIds = await scheduleMedicationNotifications(medication, userId);
       }
 
       const withNotifications = { ...medication, notificationIds };
@@ -1376,7 +1376,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       };
 
       const nextNotificationIds =
-        medicationPermissionGranted && candidate.status === 'active' ? await scheduleMedicationNotifications(candidate) : [];
+        medicationPermissionGranted && candidate.status === 'active' ? await scheduleMedicationNotifications(candidate, userId) : [];
       const hydrated = { ...candidate, notificationIds: nextNotificationIds };
 
       setMedications((previous) => {
@@ -1386,7 +1386,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return next;
       });
     },
-    [medicationLogs, medicationPermissionGranted, medications, persistMedications, syncMedicationStateToBackend]
+    [medicationLogs, medicationPermissionGranted, medications, persistMedications, syncMedicationStateToBackend, userId]
   );
 
   const pauseMedication = useCallback<AppContextValue['pauseMedication']>(
@@ -1484,7 +1484,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           if (medication.status !== 'active') {
             return { ...medication, notificationIds: [] };
           }
-          const notificationIds = await scheduleMedicationNotifications(medication);
+          const notificationIds = await scheduleMedicationNotifications(medication, userId);
           return { ...medication, notificationIds };
         })
       );
@@ -1497,7 +1497,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     return () => {
       cancelled = true;
     };
-  }, [bootstrapped, medicationPermissionGranted, medications.length, persistMedications]);
+  }, [bootstrapped, medicationPermissionGranted, medications.length, persistMedications, userId]);
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response: Notifications.NotificationResponse) => {

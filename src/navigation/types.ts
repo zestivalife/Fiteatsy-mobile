@@ -54,6 +54,8 @@ export type RootStackParamList = {
   AppPreferences: undefined;
   HelpSupport: undefined;
   GrievanceForm: undefined;
+  MyIssues: undefined;
+  MyIssueDetail: { id: string };
   Reports: undefined;
   ReportComparison: undefined;
   Sessions: undefined;

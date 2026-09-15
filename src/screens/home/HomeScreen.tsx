@@ -33,6 +33,7 @@ import {
 import type { Medication, MedicationLogStatus } from '../../types';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import { resolveClientFirstName } from '../../utils/clientIdentity';
+import { useProfilePhoto } from '../../hooks/useProfilePhoto';
 import {
   buildPss10StressContext,
   formatPss10Change,
@@ -150,6 +151,7 @@ export const HomeScreen = () => {
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
   );
   const sessionToken = authSession?.sessionToken;
+  const profilePhoto = useProfilePhoto(authSession?.accountId ?? '');
   const hasAuthSession = Boolean(authSession);
 
   const openAssist = useCallback(async () => {
@@ -332,6 +334,7 @@ export const HomeScreen = () => {
           <View style={styles.referenceFrame}>
             <HomeHeader
               name={resolveClientFirstName(authSession?.user.name)}
+              photo={profilePhoto}
               onSearch={() => navigation.navigate('Search')}
               onAdd={() => navigation.navigate('Leadership')}
               onNotifications={() => navigation.navigate('Notifications')}
@@ -384,12 +387,14 @@ export const HomeScreen = () => {
 
 const HomeHeader = ({
   name,
+  photo,
   onSearch,
   onAdd,
   onNotifications,
   onProfile
 }: {
   name: string;
+  photo: string | null;
   onSearch: () => void;
   onAdd: () => void;
   onNotifications: () => void;
@@ -402,7 +407,7 @@ const HomeHeader = ({
       <HeaderIcon icon="trophy-outline" onPress={onAdd} />
       <HeaderIcon icon="notifications-outline" onPress={onNotifications} badge="9" />
       <Pressable onPress={onProfile} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Open profile">
-        <Ionicons name="person-outline" size={23} color="#EDF3EE" />
+        {photo ? <Image source={{ uri: photo }} style={styles.headerAvatarImage} /> : <Ionicons name="person-outline" size={23} color="#EDF3EE" />}
       </Pressable>
     </View>
   </View>
@@ -742,8 +747,10 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: '#153923',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    overflow: 'hidden'
   },
+  headerAvatarImage: { width: '100%', height: '100%' },
   headerBadge: {
     position: 'absolute',
     top: -3,

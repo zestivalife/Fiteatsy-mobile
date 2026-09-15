@@ -21,12 +21,16 @@ describe('profile and account experience contract', () => {
     expect(security).toContain('governed server workflows');
   });
 
-  test('notification settings are account-scoped and master toggle governs children', () => {
+  test('notification settings are account-scoped, server persisted and OS reconciled', () => {
     const service = read('src/services/profilePreferenceService.ts');
     const screen = read('src/screens/profile/NotificationPreferencesScreen.tsx');
     expect(service).toContain('fiteatsy.profile.${accountId}');
+    expect(service).toContain("apiFetch<{preferences:ProfileNotificationPreferences");
+    expect(service).toContain("'/v1/preferences/notifications'");
+    expect(service).toContain('APP_ENABLED_OS_DENIED');
     expect(screen).toContain("key==='all'");
-    expect(screen).toContain("filter(([k])=>k!=='all').every");
+    expect(screen).toContain('Open Settings');
+    expect(screen).toContain('previous');
   });
 
   test('connected health is device-platform aware and reuses canonical sync', () => {

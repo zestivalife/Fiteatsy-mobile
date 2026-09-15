@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { Medication } from '../types';
 import { getMedicationOccurrencesForDate } from './medicationUtils';
+import { isNotificationPreferenceEnabled } from './profilePreferenceService';
 
 const ACTIONS = ['TAKEN', 'SNOOZE_5', 'SNOOZE_10', 'SNOOZE_15', 'SNOOZE_30', 'SKIP'] as const;
 
@@ -84,7 +85,8 @@ export const clearScheduledMedicationNotifications = async (notificationIds: str
   await Promise.all(notificationIds.map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => null)));
 };
 
-export const scheduleMedicationNotifications = async (medication: Medication) => {
+export const scheduleMedicationNotifications = async (medication: Medication, accountId: string) => {
+  if (!accountId || !(await isNotificationPreferenceEnabled(accountId, 'medication'))) return [];
   const next30Days: Date[] = [];
   const today = new Date();
 

@@ -27,6 +27,9 @@ import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.serv
 import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
 import { scheduleHealthRecalculationProcessor } from './jobs/process-health-recalculations.js';
 import { adminGrievancesRouter, grievancesRouter, profilePhotoRouter } from './modules/grievances/grievances.routes.js';
+import { preferencesRouter } from './modules/preferences/preferences.routes.js';
+import { requireGrantedConsultantAccess } from './modules/preferences/preferences.routes.js';
+import { requireAuthenticatedAccount } from './modules/auth/auth.middleware.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -61,6 +64,7 @@ const REGISTERED_ROUTE_GROUPS = [
   '/v1/platform/nutrition-plan',
   '/v1/assessments',
   '/v1/profile'
+  ,'/v1/preferences'
   ,'/v1/grievances'
   ,'/v1/admin/grievances'
 ];
@@ -165,8 +169,10 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/reports', reportsRouter);
   app.use('/v1/health', healthRouter);
   app.use('/v1/biomarkers', biomarkersRouter);
+  app.use('/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireGrantedConsultantAccess);
   app.use('/v1/consultants', consultantsRouter);
   app.use('/v1/consultants', consultantNutritionRouter);
+  app.use('/v1/clients/:clientId',requireAuthenticatedAccount,requireGrantedConsultantAccess);
   app.use('/v1/clients', consultantWorkspaceContractRouter);
   app.use('/v1/admin', adminRouter);
   app.use('/v1/admin/grievances', adminGrievancesRouter);
@@ -181,6 +187,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/assessments', assessmentsRouter);
   app.use('/v1/profile', profileRouter);
   app.use('/v1/profile', profilePhotoRouter);
+  app.use('/v1/preferences', preferencesRouter);
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message });

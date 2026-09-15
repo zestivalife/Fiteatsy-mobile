@@ -29,7 +29,8 @@ describe('grievance, profile photo and home presentation contracts',()=>{
     expect(screen).toContain('width:720,height:720');
     expect(service).toContain("getIdentityScopedStorageKey('fiteatsy.profile.photo.v1'");
     expect(service).toContain("apiResponse('/v1/profile/photo'");
-    expect(profile).toContain('hydrateProfilePhoto');
+    expect(profile).toContain('useProfilePhoto');
+    expect(service).toContain('subscribeProfilePhoto');
   });
 
   test('Star Orb contains exactly five non-cycle domains and actions cannot overlap it',()=>{
