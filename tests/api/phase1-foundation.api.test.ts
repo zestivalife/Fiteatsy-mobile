@@ -312,7 +312,20 @@ test('GET /v1/intelligence/scores exposes only traceable canonical scores withou
     'activity', 'calm', 'cycle', 'health_intelligence', 'nutrition',
     'overall', 'recovery', 'sleep', 'stress_recovery'
   ]);
-  assert.equal(scores.body.items.every((item: { scoreStatus: string }) => item.scoreStatus === 'insufficient_data'), true);
+  const scoreStatuses = Object.fromEntries(
+    scores.body.items.map((item: { scoreType: string; scoreStatus: string }) => [item.scoreType, item.scoreStatus])
+  );
+  assert.deepEqual(scoreStatuses, {
+    recovery: 'methodology_pending',
+    activity: 'methodology_pending',
+    sleep: 'methodology_pending',
+    calm: 'methodology_pending',
+    nutrition: 'methodology_pending',
+    stress_recovery: 'methodology_pending',
+    cycle: 'not_applicable',
+    overall: 'methodology_pending',
+    health_intelligence: 'methodology_pending'
+  });
   assert.equal(scores.body.items.every((item: { calculationVersion: string }) => item.calculationVersion === 'HEALTH_INTELLIGENCE_V1'), true);
   assert.equal(scores.body.items[0].clientId, undefined);
   assert.equal(scores.body.items[0].inputSummary != null, true);
