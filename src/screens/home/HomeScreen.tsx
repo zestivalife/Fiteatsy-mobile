@@ -427,7 +427,6 @@ const HeaderIcon = ({ icon, onPress, badge }: { icon: keyof typeof Ionicons.glyp
 const RecoveryTrend = ({ values, hasData }: { values: number[]; hasData: boolean }) => (
   <View style={styles.trendCard}>
     <Text style={styles.trendTitle}>Your 7-Day Recovery Trend</Text>
-    {!hasData ? <Text style={styles.trendEmpty}>Not enough recovery history yet</Text> : null}
     <View style={styles.trendRow}>
       {trendDays.map((day, index) => {
         const value = values[index] ?? 0;
@@ -784,7 +783,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 16
   },
-  trendEmpty:{color:'#AEB5BD',fontFamily:font.regular,fontSize:11,lineHeight:14,position:'absolute',top:35,left:0,right:0,textAlign:'center'},
   trendRow: {
     marginTop: 10,
     flexDirection: 'row',
