@@ -475,7 +475,7 @@ const RecoveryPanel = ({
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
         <View style={styles.starShadow} pointerEvents="none">
-          <RecoveryStarAsset width="100%" height="100%" preserveAspectRatio="none" pointerEvents="none" />
+          <RecoveryStarAsset width="100%" height="100%" pointerEvents="none" />
         </View>
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
         {selectedScore != null ? (
@@ -839,10 +839,11 @@ const styles = StyleSheet.create({
   },
   starShadow: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
+    top: -34,
+    left: '50%',
+    width: 320,
+    height: 388,
+    marginLeft: -160,
     shadowColor: '#000000',
     shadowOpacity: 0.5,
     shadowRadius: 18,

@@ -36,7 +36,9 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).toContain("width: 96,\n    height: 70");
     expect(source).toContain('marginLeft: -48');
     expect(source).toContain('marginTop: -35');
-    expect(source).toContain('<RecoveryStarAsset width="100%" height="100%" preserveAspectRatio="none"');
+    expect(source).toContain('<RecoveryStarAsset width="100%" height="100%" pointerEvents="none"');
+    expect(source).not.toContain('preserveAspectRatio="none"');
+    expect(source).toContain("width: 320,\n    height: 388,\n    marginLeft: -160");
     expect(source).toContain("height: 320");
     expect(source).toContain("overflow: 'hidden'");
     expect(source).not.toContain('recoveryNodeSelected');
