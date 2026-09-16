@@ -7,6 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Path, Polyline, Rect, Stop } from 'react-native-svg';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
+import { SegmentedTabs } from '../../components/SegmentedTabs';
 import { colors, radius, spacing, typography } from '../../design/tokens';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
@@ -837,56 +838,8 @@ const CurvedHealthTabs = ({
   activeTab: HealthSubTab;
   onChange: (tab: HealthSubTab) => void;
 }) => {
-  const [barWidth, setBarWidth] = useState(0);
-  const activeX = useRef(new Animated.Value(0)).current;
-  const activeIndex = Math.max(0, healthSubTabs.findIndex((tab) => tab.key === activeTab));
-  const activePalette = healthSubTabs[activeIndex] ?? healthSubTabs[0];
-  const tabWidth = barWidth > 0 ? barWidth / healthSubTabs.length : 0;
-  const sliderWidth = tabWidth + 40;
-
-  useEffect(() => {
-    if (!tabWidth) return;
-    activeX.stopAnimation();
-    Animated.timing(activeX, {
-      toValue: activeIndex * tabWidth,
-      duration: 420,
-      useNativeDriver: true
-    }).start();
-  }, [activeIndex, activeX, tabWidth]);
-
   return (
-    <View
-      style={styles.curvedTabsShell}
-      onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
-      accessibilityRole="tablist"
-      accessibilityLabel="Health Tracker"
-    >
-      {barWidth > 0 ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.curvedActiveSlider,
-            {
-              width: sliderWidth,
-              transform: [{ translateX: activeX }],
-              shadowColor: activePalette.gradientEnd
-            }
-          ]}
-        >
-          <Svg width="100%" height="100%" viewBox="0 0 236 92" preserveAspectRatio="none">
-            <Defs>
-              <SvgLinearGradient id="activeTrackerTabBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-                <Stop offset="0%" stopColor={activePalette.gradientStart} />
-                <Stop offset="100%" stopColor={activePalette.gradientEnd} />
-              </SvgLinearGradient>
-            </Defs>
-            <Path d={CURVED_TAB_FILL_PATH} fill="#0B0910" />
-            <Path d={CURVED_TAB_PATH} fill="none" stroke="url(#activeTrackerTabBorder)" strokeWidth="2" />
-          </Svg>
-          <View style={[styles.curvedActiveGlow, { backgroundColor: activePalette.surface }]} />
-        </Animated.View>
-      ) : null}
-
+    <View style={styles.curvedTabsShell} accessibilityRole="tablist" accessibilityLabel="Health Tracker categories">
       {healthSubTabs.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
@@ -898,9 +851,6 @@ const CurvedHealthTabs = ({
             accessibilityState={{ selected: isActive }}
             accessibilityLabel={`${tab.label} health tracker tab`}
           >
-            <Svg style={styles.curvedTabOutline} viewBox="0 0 236 92" preserveAspectRatio="none" pointerEvents="none">
-              <Path d={CURVED_TAB_PATH} fill="transparent" stroke={isActive ? 'transparent' : '#26222F'} strokeWidth="1.1" />
-            </Svg>
             <View style={[styles.curvedTabContent, isActive && styles.curvedTabContentActive]}>
               <CurvedTabIcon tabKey={tab.key} active={isActive} gradientStart={tab.gradientStart} gradientEnd={tab.gradientEnd} />
               <Text style={[styles.curvedTabLabel, isActive && styles.curvedTabLabelActive]}>{tab.label}</Text>
@@ -1742,23 +1692,8 @@ export const TrackerScreen = () => {
   return (
     <Screen scroll contentStyle={styles.screenContent}>
       <View style={styles.topRow}>
-        <View style={[styles.tabSwitch, isLight ? styles.tabSwitchLight : styles.tabSwitchDark]}>
-          <Pressable
-            style={[styles.tabButton, activeTab === 'health' && styles.tabButtonActive, activeTab === 'health' && { backgroundColor: sectionHighlight }]}
-            onPress={() => setActiveTab('health')}
-            accessibilityRole="button"
-            accessibilityLabel="Health Tracker tab"
-          >
-            <Text style={[styles.tabText, !isLight && styles.tabTextDark, activeTab === 'health' && styles.tabTextActive]}>Health Tracker</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.tabButton, activeTab === 'wellness' && styles.tabButtonActive, activeTab === 'wellness' && { backgroundColor: sectionHighlight }]}
-            onPress={() => setActiveTab('wellness')}
-            accessibilityRole="button"
-            accessibilityLabel="Wellness Tracker tab"
-          >
-            <Text style={[styles.tabText, !isLight && styles.tabTextDark, activeTab === 'wellness' && styles.tabTextActive]}>Wellness Tracker</Text>
-          </Pressable>
+        <View style={styles.tabSwitch}>
+          <SegmentedTabs tabs={[{ key: 'health', label: 'Health' }, { key: 'wellness', label: 'Wellness' }]} value={activeTab} onChange={setActiveTab} />
         </View>
 
         <Pressable
@@ -1937,24 +1872,19 @@ export const TrackerScreen = () => {
 
 const styles = StyleSheet.create({
   screenContent: {
-    paddingTop: 12,
-    paddingHorizontal: 12,
-    paddingBottom: 176
+    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 144
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginBottom: spacing.md
+    marginBottom: spacing.sm
   },
   tabSwitch: {
     flex: 1,
-    flexDirection: 'row',
-    borderRadius: radius.pill,
-    backgroundColor: colors.cardMuted,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
-    padding: 4
+    minWidth: 0
   },
   tabSwitchLight: {
     backgroundColor: colors.surfaceTint
@@ -1989,8 +1919,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.stroke,
     backgroundColor: colors.cardRaised,
-    paddingHorizontal: 16,
-    paddingVertical: 10
+    minWidth: 48,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   rangeChipActive: {
     backgroundColor: colors.blue,
@@ -2054,14 +1988,12 @@ const styles = StyleSheet.create({
     color: '#A5A7B1'
   },
   curvedTabsShell: {
-    position: 'relative',
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 88,
-    marginBottom: 18,
-    overflow: 'visible',
+    alignItems: 'center',
+    minHeight: 60,
+    marginBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#24202D'
+    borderBottomColor: '#343A40'
   },
   curvedActiveSlider: {
     position: 'absolute',
@@ -2085,9 +2017,7 @@ const styles = StyleSheet.create({
   },
   curvedTab: {
     flex: 1,
-    position: 'relative',
-    zIndex: 4,
-    height: 78,
+    minHeight: 60,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 0,
@@ -2106,10 +2036,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    transform: [{ translateY: 2 }]
+    paddingVertical: 8
   },
   curvedTabContentActive: {
-    transform: [{ translateY: -1 }]
+    borderBottomWidth: 3,
+    borderBottomColor: '#8D7CFF'
   },
   curvedTabLabel: {
     ...typography.bodyStrong,
@@ -2117,7 +2048,7 @@ const styles = StyleSheet.create({
     lineHeight: 12,
     fontFamily: 'Exo_600SemiBold',
     letterSpacing: 0.1,
-    color: '#6E6878'
+    color: '#A7AFB8'
   },
   curvedTabLabelActive: {
     color: '#FFFFFF'
@@ -2144,14 +2075,14 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     paddingHorizontal: 0,
     paddingVertical: 0,
-    height: 392,
+    height: 310,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center'
   },
   particleMetricWrap: {
     width: '100%',
-    height: 392,
+    height: 310,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -2170,8 +2101,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,4,20,0.34)'
   },
   particleMetricValue: {
-    fontSize: 52,
-    lineHeight: 54,
+    fontSize: 42,
+    lineHeight: 46,
     letterSpacing: -1.76,
     fontFamily: 'Exo_700Bold',
     color: '#FFFFFF'
@@ -2271,14 +2202,14 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     paddingHorizontal: 0,
     paddingVertical: 0,
-    height: 392,
+    height: 330,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center'
   },
   sleepParticleWrap: {
     width: '100%',
-    height: 392,
+    height: 330,
     alignItems: 'center',
     justifyContent: 'center'
   },

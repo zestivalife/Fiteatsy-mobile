@@ -2,8 +2,8 @@ import { TextStyle, ViewStyle } from 'react-native';
 import { ThemeMode } from '../types';
 
 export const darkColors = {
-  bgPrimary: '#000000',
-  bgSecondary: '#000000',
+  bgPrimary: '#171B1F',
+  bgSecondary: '#111418',
   card: '#131313',
   cardMuted: '#131313',
   cardRaised: '#131313',
@@ -12,8 +12,8 @@ export const darkColors = {
   stroke: '#2A2A2A',
   strokeStrong: '#C9CFD4',
   textPrimary: '#FFFFFF',
-  textSecondary: '#FFFFFF',
-  textMuted: '#FFFFFF',
+  textSecondary: '#D9DEE3',
+  textMuted: '#98A1AA',
   blue: '#60AF00',
   blueDark: '#00401F',
   blueSoft: 'rgba(96, 175, 0, 0.16)',
@@ -70,13 +70,15 @@ export const spacing = {
   md: 16,
   lg: 20,
   xl: 24,
-  xxl: 32
+  xxl: 32,
+  xxxl: 40
 } as const;
 
 export const radius = {
   sm: 10,
   md: 16,
   lg: 20,
+  xl: 28,
   pill: 999
 } as const;
 

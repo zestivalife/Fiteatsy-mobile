@@ -426,7 +426,7 @@ const HeaderIcon = ({ icon, onPress, badge }: { icon: keyof typeof Ionicons.glyp
 
 const RecoveryTrend = ({ values, hasData }: { values: number[]; hasData: boolean }) => (
   <View style={styles.trendCard}>
-    <Text style={styles.trendTitle}>Your 7 day’s Recovery Trend</Text>
+    <Text style={styles.trendTitle}>Your 7-Day Recovery Trend</Text>
     {!hasData ? <Text style={styles.trendEmpty}>Not enough recovery history yet</Text> : null}
     <View style={styles.trendRow}>
       {trendDays.map((day, index) => {
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 116
+    paddingBottom: 132
   },
   referenceFrame: {
     width: '100%',
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
     paddingTop: 0
   },
   header: {
-    height: 43,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between'
@@ -733,18 +733,18 @@ const styles = StyleSheet.create({
     gap: 9
   },
   headerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#303642',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative'
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#153923',
     alignItems: 'center',
     justifyContent: 'center',
@@ -769,14 +769,14 @@ const styles = StyleSheet.create({
     lineHeight: 11
   },
   trendCard: {
-    height: 89,
+    minHeight: 104,
     marginTop: 10,
     borderRadius: 15,
     borderWidth: 1,
     borderColor: '#101516',
     backgroundColor: '#090A0B',
-    paddingHorizontal: 8,
-    paddingTop: 8
+    paddingHorizontal: 10,
+    paddingVertical: 10
   },
   trendTitle: {
     color: '#FFFFFF',
@@ -786,16 +786,18 @@ const styles = StyleSheet.create({
   },
   trendEmpty:{color:'#AEB5BD',fontFamily:font.regular,fontSize:11,lineHeight:14,position:'absolute',top:35,left:0,right:0,textAlign:'center'},
   trendRow: {
-    marginTop: 8,
+    marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between'
   },
   trendItem: {
+    flex: 1,
     alignItems: 'center',
-    gap: 7
+    gap: 6
   },
   trendPill: {
-    width: 46,
+    width: '88%',
+    maxWidth: 44,
     height: 27,
     borderRadius: 6,
     alignItems: 'center',
@@ -813,32 +815,34 @@ const styles = StyleSheet.create({
     lineHeight: 13
   },
   actionRow: {
-    height: 36,
-    marginTop: 8,
+    minHeight: 48,
+    marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
     gap: 5
   },
   actionPill: {
-    height: 30,
-    borderRadius: 16,
-    backgroundColor: '#050505',
-    paddingHorizontal: 6,
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#2B3137',
+    backgroundColor: '#111418',
+    paddingHorizontal: 5,
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6
+    gap: 4
   },
   actionText: {
     color: '#FFFFFF',
     fontFamily: font.bold,
-    fontSize: 12,
-    lineHeight: 15
+    fontSize: 10,
+    lineHeight: 13
   },
   recoveryPanel: {
-    height: 350,
+    height: 330,
     marginTop: 0,
     position: 'relative',
     alignItems: 'center',

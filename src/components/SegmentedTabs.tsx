@@ -24,8 +24,8 @@ export const SegmentedTabs = <T extends string>({ tabs, value, onChange }: Props
 };
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: spacing.xs },
-  tab: { flex: 1, minHeight: 40, paddingHorizontal: spacing.md, paddingVertical: 9, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', gap: spacing.xxs, padding: spacing.xxs, borderRadius: radius.pill, backgroundColor: '#111418', borderWidth: 1, borderColor: '#3A4148' },
+  tab: { flex: 1, minHeight: 40, paddingHorizontal: spacing.sm, paddingVertical: 8, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   active: { backgroundColor: '#67E638' },
   label: { ...typography.tab },
   activeLabel: { color: '#071006' }

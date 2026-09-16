@@ -13,7 +13,7 @@ import CareIcon from '../assets/fiteatsy-footer/Care.svg';
 import CareActiveIcon from '../assets/fiteatsy-footer/Care-fill.svg';
 import ProfileIcon from '../assets/fiteatsy-footer/Profile.svg';
 import ProfileActiveIcon from '../assets/fiteatsy-footer/Profile-fill.svg';
-import { typography } from '../design/tokens';
+import { colors, typography } from '../design/tokens';
 import { MainTabParamList } from '../navigation/types';
 
 type FooterIcon = React.FC<SvgProps>;
@@ -59,13 +59,13 @@ export const FloatingTabBar = ({ state, navigation }: BottomTabBarProps) => {
                 style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
               >
                 <View style={styles.itemInner}>
-                  {React.createElement(isFocused ? iconMap[routeName].active : iconMap[routeName].inactive, { width: 22, height: 22 })}
+                  {React.createElement(isFocused ? iconMap[routeName].active : iconMap[routeName].inactive, { width: 24, height: 24 })}
                   <Text
                     numberOfLines={1}
                     style={[
                       styles.label,
                       {
-                        color: isFocused ? '#FFFFFF' : '#7D8187',
+                        color: isFocused ? '#FFFFFF' : colors.textMuted,
                         fontFamily: isFocused ? 'Exo_700Bold' : 'Exo_500Medium'
                       }
                     ]}
@@ -91,15 +91,17 @@ const styles = StyleSheet.create({
   },
   footer: {
     overflow: 'hidden',
-    backgroundColor: '#000000',
-    paddingTop: 1,
-    paddingHorizontal: 5
+    backgroundColor: '#0D1013',
+    borderTopWidth: 1,
+    borderTopColor: '#272D33',
+    paddingTop: 6,
+    paddingHorizontal: 8
   },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50
+    minHeight: 58
   },
   item: {
     flex: 1,
@@ -107,20 +109,19 @@ const styles = StyleSheet.create({
   },
   itemInner: {
     width: '100%',
-    minHeight: 44,
+    minHeight: 52,
     paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    transform: [{ translateY: 8 }]
+    gap: 4
   },
   itemPressed: {
     transform: [{ scale: 0.97 }]
   },
   label: {
     ...typography.caption,
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 14,
     textAlign: 'center'
   }
 });
