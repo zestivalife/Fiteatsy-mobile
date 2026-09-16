@@ -27,14 +27,17 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).toContain("import { SegmentedTabs } from '../../components/SegmentedTabs'");
     expect(source).toContain("label: 'Health'");
     expect(source).toContain("label: 'Wellness'");
-    expect(source).toContain("height: 310");
+    expect(source).toContain("height: 264");
+    expect(source).toContain("if (score == null) return 'Waiting for data'");
+    expect(source).toContain('Scores appear automatically when enough recent health data is available.');
     expect(source).not.toContain('Your 7 day’s Recovery Trend');
   });
 
   test('bottom navigation reserves a stable visible surface without vertical translation', () => {
     const source = read('src/components/FloatingTabBar.tsx');
     expect(source).toContain("backgroundColor: '#0D1013'");
-    expect(source).toContain('minHeight: 58');
+    expect(source).toContain('minHeight: 52');
+    expect(source).toContain('minHeight: 46');
     expect(source).not.toContain('translateY: 8');
   });
 });

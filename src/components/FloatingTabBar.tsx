@@ -59,7 +59,7 @@ export const FloatingTabBar = ({ state, navigation }: BottomTabBarProps) => {
                 style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
               >
                 <View style={styles.itemInner}>
-                  {React.createElement(isFocused ? iconMap[routeName].active : iconMap[routeName].inactive, { width: 24, height: 24 })}
+                  {React.createElement(isFocused ? iconMap[routeName].active : iconMap[routeName].inactive, { width: 22, height: 22 })}
                   <Text
                     numberOfLines={1}
                     style={[
@@ -94,14 +94,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#0D1013',
     borderTopWidth: 1,
     borderTopColor: '#272D33',
-    paddingTop: 6,
+    paddingTop: 4,
     paddingHorizontal: 8
   },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 58
+    minHeight: 52
   },
   item: {
     flex: 1,
@@ -109,19 +109,19 @@ const styles = StyleSheet.create({
   },
   itemInner: {
     width: '100%',
-    minHeight: 52,
+    minHeight: 46,
     paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4
+    gap: 2
   },
   itemPressed: {
     transform: [{ scale: 0.97 }]
   },
   label: {
     ...typography.caption,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 10,
+    lineHeight: 13,
     textAlign: 'center'
   }
 });

@@ -121,7 +121,7 @@ const decimalLabel = (value: number | null | undefined, suffix = '') =>
   value == null || !Number.isFinite(value) || value <= 0 ? 'No data' : `${value.toFixed(1)}${suffix}`;
 
 const statusLabel = (score: number | null | undefined) => {
-  if (score == null) return 'Calibrating';
+  if (score == null) return 'Waiting for data';
   if (score >= 80) return 'Strong Today';
   if (score >= 60) return 'Stable Today';
   return 'Needs Attention';
@@ -417,9 +417,7 @@ const RecoveryParticleMetric = ({
           </Svg>
         </Animated.View>
         <View style={styles.particleMetricCenter}>
-          <Text style={styles.particleMetricValue}>
-            {value == null ? '--' : Math.round(value)}
-          </Text>
+          <Text style={styles.particleMetricValue}>{value == null ? '—' : Math.round(value)}</Text>
           <Text style={styles.particleMetricLabel}>{label}</Text>
         </View>
       </View>
@@ -1598,15 +1596,16 @@ export const TrackerScreen = () => {
       <RecoveryParticleMetric value={displayScores?.recovery.score ?? null} label={statusLabel(displayScores?.recovery.score)} />
       <Card style={styles.healthPanel}>
         <Text style={styles.healthPanelTitle}>Health Intelligence Scores</Text>
-        {canonicalScoreRows.map(([label, result]) => (
-          <View key={label} style={styles.healthMetricLabelWrap}>
+        <Text style={styles.healthPanelIntro}>Scores appear automatically when enough recent health data is available.</Text>
+        {canonicalScoreRows.map(([label, result], index) => (
+          <View key={label} style={[styles.healthMetricLabelWrap, index > 0 && styles.healthMetricRowDivider]}>
             <Text style={styles.healthMetricLabel}>{label}</Text>
             <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{scoreLabel(result.score)}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Details for ${label}`} hitSlop={10} onPress={() => Alert.alert(label, `${result.status.replaceAll('_', ' ')} · ${result.confidence} confidence · ${result.freshness.toLowerCase()}`)}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
           </View>
         ))}
-        <Text style={styles.healthPanelTitle}>Supporting Intelligence</Text>
-        {supportingScoreRows.map(([label, value, basis]) => (
-          <View key={label} style={styles.healthMetricLabelWrap}>
+        <Text style={[styles.healthPanelTitle, styles.supportingTitle]}>Supporting Intelligence</Text>
+        {supportingScoreRows.map(([label, value, basis], index) => (
+          <View key={label} style={[styles.healthMetricLabelWrap, index > 0 && styles.healthMetricRowDivider]}>
             <Text style={styles.healthMetricLabel}>{label}</Text>
             <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{scoreLabel(value)}</Text><Pressable accessibilityRole="button" accessibilityLabel={`How ${label} is calculated`} hitSlop={10} onPress={() => Alert.alert(label, basis)}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
           </View>
@@ -1872,15 +1871,15 @@ export const TrackerScreen = () => {
 
 const styles = StyleSheet.create({
   screenContent: {
-    paddingTop: 8,
+    paddingTop: 4,
     paddingHorizontal: 16,
-    paddingBottom: 144
+    paddingBottom: 176
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginBottom: spacing.sm
+    marginBottom: 8
   },
   tabSwitch: {
     flex: 1,
@@ -1919,10 +1918,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.stroke,
     backgroundColor: colors.cardRaised,
-    minWidth: 48,
-    minHeight: 48,
+    minWidth: 52,
+    minHeight: 44,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -1990,8 +1989,8 @@ const styles = StyleSheet.create({
   curvedTabsShell: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 60,
-    marginBottom: 12,
+    minHeight: 56,
+    marginBottom: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#343A40'
   },
@@ -2017,7 +2016,7 @@ const styles = StyleSheet.create({
   },
   curvedTab: {
     flex: 1,
-    minHeight: 60,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 0,
@@ -2035,8 +2034,8 @@ const styles = StyleSheet.create({
   curvedTabContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 8
+    gap: 3,
+    paddingVertical: 7
   },
   curvedTabContentActive: {
     borderBottomWidth: 3,
@@ -2054,10 +2053,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF'
   },
   healthContentStack: {
-    gap: 16
+    gap: 12
   },
   healthPanel: {
-    borderRadius: 28,
+    borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 18,
     backgroundColor: TRACKER_CARD,
@@ -2066,23 +2065,37 @@ const styles = StyleSheet.create({
   },
   healthPanelTitle: {
     ...typography.section,
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 26,
     fontFamily: 'Exo_700Bold',
     color: TRACKER_TEXT
+  },
+  healthPanelIntro: {
+    ...typography.body,
+    marginTop: 4,
+    marginBottom: 12,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#A7AFB8'
+  },
+  supportingTitle: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#242A30'
   },
   particleMetricField: {
     alignSelf: 'stretch',
     paddingHorizontal: 0,
     paddingVertical: 0,
-    height: 310,
+    height: 264,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center'
   },
   particleMetricWrap: {
     width: '100%',
-    height: 310,
+    height: 264,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -2093,7 +2106,7 @@ const styles = StyleSheet.create({
   },
   particleMetricCenter: {
     position: 'absolute',
-    width: '31%',
+    width: '34%',
     aspectRatio: 1,
     borderRadius: 999,
     alignItems: 'center',
@@ -2101,16 +2114,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,4,20,0.34)'
   },
   particleMetricValue: {
-    fontSize: 42,
-    lineHeight: 46,
-    letterSpacing: -1.76,
+    fontSize: 36,
+    lineHeight: 40,
+    letterSpacing: -1.4,
     fontFamily: 'Exo_700Bold',
     color: '#FFFFFF'
   },
   particleMetricLabel: {
-    marginTop: 8,
-    fontSize: 13,
-    lineHeight: 16,
+    marginTop: 6,
+    maxWidth: 104,
+    fontSize: 12,
+    lineHeight: 15,
+    textAlign: 'center',
     fontFamily: 'Exo_600SemiBold',
     color: '#A9A2B6'
   },
@@ -2118,14 +2133,14 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     paddingHorizontal: 0,
     paddingVertical: 0,
-    height: 352,
+    height: 286,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center'
   },
   heartParticleWrap: {
-    width: '283%',
-    height: 352,
+    width: '235%',
+    height: 286,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -2139,7 +2154,7 @@ const styles = StyleSheet.create({
   },
   heartParticleCenter: {
     position: 'absolute',
-    width: '35%',
+    width: '38%',
     aspectRatio: 1,
     borderRadius: 999,
     alignItems: 'center',
@@ -2475,10 +2490,14 @@ const styles = StyleSheet.create({
   },
   healthMetricLabelWrap: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    minHeight: 38,
     gap: 12
+  },
+  healthMetricRowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#1F2429'
   },
   healthMetricLabel: {
     ...typography.body,
