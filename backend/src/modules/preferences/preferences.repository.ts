@@ -43,4 +43,11 @@ export const setConsultantConsent = async (userId:string,clientId:string,status:
     version=consultant_access_consents.version+1,updated_at=now() returning *`,[userId,clientId,status,policyVersion,source]);
   return mapConsent(result.rows[0]);
 };
-export const isConsultantConsentGranted = async(clientId:string) => Boolean((await pool.query("select 1 from consultant_access_consents where client_id=$1 and status='GRANTED'",[clientId])).rowCount);
+export const isConsultantConsentGranted = async(clientId:string) => Boolean((await pool.query(
+  `select 1
+     from consultant_access_consents consent
+     join fiteatsy_clients client on client.id = consent.client_id
+    where (client.id = $1 or client.fiteatsy_client_id = $1)
+      and consent.status = 'GRANTED'`,
+  [clientId]
+)).rowCount);
