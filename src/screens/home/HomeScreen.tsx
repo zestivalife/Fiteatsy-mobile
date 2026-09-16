@@ -33,7 +33,7 @@ import {
 
 const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const STAR_CENTER_X = 183;
-const STAR_CENTER_Y = 164;
+const STAR_CENTER_Y = 138;
 const DONUT_ASSET_SIZE = 236;
 const DONUT_ASSET_VISUAL_CENTER = 118;
 const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
@@ -62,7 +62,7 @@ type RecoveryMetric = {
   label: string;
   score: number | null;
   color: string;
-  position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
+  position: 'recovery' | 'activity' | 'nourishment' | 'calm' | 'sleep';
   icon: keyof typeof Ionicons.glyphMap;
 };
 
@@ -253,7 +253,7 @@ export const HomeScreen = () => {
       label: 'Recovery',
       score: normalizeScore(health.canonicalIntelligence?.scores.recovery.score),
       color: '#FF1717',
-      position: 'top',
+      position: 'recovery',
       icon: 'heart-outline'
     },
     {
@@ -261,7 +261,7 @@ export const HomeScreen = () => {
       label: 'Activity',
       score: normalizeScore(health.canonicalIntelligence?.scores.activity.score),
       color: '#F27A1A',
-      position: 'left',
+      position: 'activity',
       icon: 'walk-outline'
     },
     {
@@ -269,7 +269,7 @@ export const HomeScreen = () => {
       label: 'Nourishment',
       score: normalizeScore(health.canonicalIntelligence?.scores.nutrition.score),
       color: '#77FF22',
-      position: 'right',
+      position: 'nourishment',
       icon: 'nutrition-outline'
     },
     {
@@ -277,7 +277,7 @@ export const HomeScreen = () => {
       label: 'Calm',
       score: normalizeScore(health.canonicalIntelligence?.scores.calm.score),
       color: '#763CEF',
-      position: 'bottomLeft',
+      position: 'calm',
       icon: 'leaf-outline'
     },
     {
@@ -285,7 +285,7 @@ export const HomeScreen = () => {
       label: 'Sleep',
       score: normalizeScore(health.canonicalIntelligence?.scores.sleep.score),
       color: '#0F80FF',
-      position: 'bottomRight',
+      position: 'sleep',
       icon: 'moon-outline'
     },
   ];
@@ -543,7 +543,7 @@ const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; s
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.recoveryNode, nodePositions[metric.position], selected && styles.recoveryNodeSelected]}
+      style={[styles.recoveryNode, nodePositions[metric.position]]}
       hitSlop={14}
       accessibilityRole="button"
       accessibilityLabel={`View today's ${metric.label} score`}
@@ -641,25 +641,25 @@ const StressCard = ({
 };
 
 const nodePositions = StyleSheet.create({
-  top: {
-    top: 12,
-    left: 131
+  recovery: {
+    left: '50%',
+    top: '13%'
   },
-  left: {
-    top: 101,
-    left: 1
+  nourishment: {
+    left: '85%',
+    top: '39%'
   },
-  right: {
-    top: 101,
-    right: 1
+  sleep: {
+    left: '71%',
+    top: '76%'
   },
-  bottomLeft: {
-    left: 52,
-    bottom: 8
+  calm: {
+    left: '29%',
+    top: '76%'
   },
-  bottomRight: {
-    right: 52,
-    bottom: 8
+  activity: {
+    left: '15%',
+    top: '39%'
   },
 });
 
@@ -909,13 +909,12 @@ const styles = StyleSheet.create({
   recoveryNode: {
     position: 'absolute',
     width: 104,
-    minHeight: 70,
+    height: 70,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: -52,
+    marginTop: -35,
     zIndex: 5
-  },
-  recoveryNodeSelected: {
-    transform: [{ scale: 1.02 }]
   },
   recoveryNodeLabel: {
     marginTop: 3,

@@ -24,6 +24,18 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).not.toContain("key: 'cycleWellness'");
   });
 
+  test('places Star Orb domains on one stable radial ring', () => {
+    const source = read('src/screens/home/HomeScreen.tsx');
+    expect(source).toContain("recovery: {\n    left: '50%',\n    top: '13%'");
+    expect(source).toContain("nourishment: {\n    left: '85%',\n    top: '39%'");
+    expect(source).toContain("sleep: {\n    left: '71%',\n    top: '76%'");
+    expect(source).toContain("calm: {\n    left: '29%',\n    top: '76%'");
+    expect(source).toContain("activity: {\n    left: '15%',\n    top: '39%'");
+    expect(source).toContain('marginLeft: -52');
+    expect(source).toContain('marginTop: -35');
+    expect(source).not.toContain('recoveryNodeSelected');
+  });
+
   test('uses shared segmented control and compact Tracker categories', () => {
     const source = read('src/screens/home/TrackerScreen.tsx');
     expect(source).toContain("import { SegmentedTabs } from '../../components/SegmentedTabs'");
