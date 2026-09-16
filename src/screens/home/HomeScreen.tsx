@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -11,16 +11,6 @@ import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
 import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
 import ProgressDonutChartAsset from '../../assets/fiteatsy-home/progress-donut-chart.svg';
-import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-inactive.svg';
-import ActivityActiveIcon from '../../assets/fiteatsy-home/activity-selected.svg';
-import NutritionDefaultIcon from '../../assets/fiteatsy-home/nutrition-inactive.svg';
-import NutritionActiveIcon from '../../assets/fiteatsy-home/nutrition-selected.svg';
-import MindDefaultIcon from '../../assets/fiteatsy-home/mind-inactive.svg';
-import MindActiveIcon from '../../assets/fiteatsy-home/mind-selected.svg';
-import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-inactive.svg';
-import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-selected.svg';
-import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-inactive.svg';
-import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
@@ -43,14 +33,14 @@ import {
 
 const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const STAR_CENTER_X = 183;
-const STAR_CENTER_Y = 196;
-const DONUT_ASSET_SIZE = 276;
-const DONUT_ASSET_VISUAL_CENTER = 126;
+const STAR_CENTER_Y = 164;
+const DONUT_ASSET_SIZE = 236;
+const DONUT_ASSET_VISUAL_CENTER = 118;
 const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
-const CORE_SIZE = 150;
-const SCORE_ARC_SIZE = 209;
-const SCORE_ARC_RADIUS = 69;
-const SCORE_ARC_STROKE_WIDTH = 20;
+const CORE_SIZE = 126;
+const SCORE_ARC_SIZE = 178;
+const SCORE_ARC_RADIUS = 59;
+const SCORE_ARC_STROKE_WIDTH = 17;
 const SCORE_ARC_CIRCUMFERENCE = 2 * Math.PI * SCORE_ARC_RADIUS;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -73,10 +63,7 @@ type RecoveryMetric = {
   score: number | null;
   color: string;
   position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
-  DefaultIcon: SvgAsset | ImageSourcePropType;
-  ActiveIcon: SvgAsset | ImageSourcePropType;
-  defaultIconType?: 'svg' | 'image';
-  activeIconType?: 'svg' | 'image';
+  icon: keyof typeof Ionicons.glyphMap;
 };
 
 type MedicationTimelineEntry = {
@@ -267,8 +254,7 @@ export const HomeScreen = () => {
       score: normalizeScore(health.canonicalIntelligence?.scores.recovery.score),
       color: '#FF1717',
       position: 'top',
-      DefaultIcon: CalmDefaultIcon,
-      ActiveIcon: CalmActiveIcon
+      icon: 'heart-outline'
     },
     {
       key: 'activity',
@@ -276,8 +262,7 @@ export const HomeScreen = () => {
       score: normalizeScore(health.canonicalIntelligence?.scores.activity.score),
       color: '#F27A1A',
       position: 'left',
-      DefaultIcon: ActivityDefaultIcon,
-      ActiveIcon: ActivityActiveIcon
+      icon: 'walk-outline'
     },
     {
       key: 'nourishment',
@@ -285,8 +270,7 @@ export const HomeScreen = () => {
       score: normalizeScore(health.canonicalIntelligence?.scores.nutrition.score),
       color: '#77FF22',
       position: 'right',
-      DefaultIcon: NutritionDefaultIcon,
-      ActiveIcon: NutritionActiveIcon
+      icon: 'nutrition-outline'
     },
     {
       key: 'calm',
@@ -294,8 +278,7 @@ export const HomeScreen = () => {
       score: normalizeScore(health.canonicalIntelligence?.scores.calm.score),
       color: '#763CEF',
       position: 'bottomLeft',
-      DefaultIcon: MindDefaultIcon,
-      ActiveIcon: MindActiveIcon
+      icon: 'leaf-outline'
     },
     {
       key: 'sleep',
@@ -303,8 +286,7 @@ export const HomeScreen = () => {
       score: normalizeScore(health.canonicalIntelligence?.scores.sleep.score),
       color: '#0F80FF',
       position: 'bottomRight',
-      DefaultIcon: SleepDefaultIcon,
-      ActiveIcon: SleepActiveIcon
+      icon: 'moon-outline'
     },
   ];
   const displayMetrics = metrics;
@@ -401,7 +383,7 @@ const HomeHeader = ({
   onProfile: () => void;
 }) => (
   <View style={styles.header}>
-    <Text style={styles.headerGreeting} numberOfLines={1}>Hi!, {name}</Text>
+    <Text style={styles.headerGreeting} numberOfLines={1}>Hi, {name}</Text>
     <View style={styles.headerActions}>
       <HeaderIcon icon="search-outline" onPress={onSearch} />
       <HeaderIcon icon="trophy-outline" onPress={onAdd} />
@@ -426,16 +408,17 @@ const HeaderIcon = ({ icon, onPress, badge }: { icon: keyof typeof Ionicons.glyp
 
 const RecoveryTrend = ({ values, hasData }: { values: number[]; hasData: boolean }) => (
   <View style={styles.trendCard}>
-    <Text style={styles.trendTitle}>Your 7-Day Recovery Trend</Text>
+    <View style={styles.trendHeadingRow}>
+      <Text style={styles.trendTitle}>7-Day Recovery</Text>
+      {!hasData ? <Text style={styles.trendEmptyLabel}>Waiting for data</Text> : null}
+    </View>
     <View style={styles.trendRow}>
       {trendDays.map((day, index) => {
         const value = values[index] ?? 0;
         const tone = trendTone(hasData ? value : 0);
         return (
           <View key={`${day}-${index}`} style={styles.trendItem}>
-            <View style={[styles.trendPill, { backgroundColor: tone.bg }]}>
-              <Text style={[styles.trendValue, { color: tone.text }]}>{hasData ? `${Math.round(value)}%` : '—'}</Text>
-            </View>
+            {hasData ? <View style={[styles.trendPill, { backgroundColor: tone.bg }]}><Text style={[styles.trendValue, { color: tone.text }]}>{`${Math.round(value)}%`}</Text></View> : <View style={styles.trendEmptyDot} />}
             <Text style={styles.trendDay}>{day}</Text>
           </View>
         );
@@ -496,7 +479,7 @@ const RecoveryPanel = ({
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
         <View style={styles.starShadow} pointerEvents="none">
-          <RecoveryStarAsset width={406} height={492} pointerEvents="none" />
+          <RecoveryStarAsset width={350} height={424} pointerEvents="none" />
         </View>
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
         {selectedScore != null ? (
@@ -545,7 +528,7 @@ const RecoveryPanel = ({
           accessibilityRole="button"
           accessibilityLabel="View today's Health Intelligence score"
         >
-          <Text style={styles.coreScore}>{selectedScore == null ? '--/100' : `${selectedScore}/100`}</Text>
+          <Text style={styles.coreScore}>{selectedScore == null ? '—' : `${selectedScore}`}</Text>
           <Text style={styles.coreLabel}>{selectedLabel}</Text>
           <View style={[styles.stateChip, { backgroundColor: selectedScore == null ? '#23272D' : selectedColor }]}>
             <Text style={styles.stateChipText}>{selectedState.label}</Text>
@@ -557,10 +540,6 @@ const RecoveryPanel = ({
 };
 
 const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; selected: boolean; onPress: () => void }) => {
-  const Icon = selected ? metric.ActiveIcon : metric.DefaultIcon;
-  const isImage = (selected ? metric.activeIconType : metric.defaultIconType) === 'image';
-  const SvgIcon = Icon as SvgAsset;
-  const iconSize = selected ? 35 : 32;
   return (
     <Pressable
       onPress={onPress}
@@ -569,19 +548,9 @@ const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; s
       accessibilityRole="button"
       accessibilityLabel={`View today's ${metric.label} score`}
     >
-      {isImage ? (
-        <Image
-          source={Icon as ImageSourcePropType}
-          resizeMode="contain"
-          style={[
-            styles.nodeImage,
-            metric.key === 'calm' && selected ? styles.nodeImageCalmActive : null,
-            metric.key === 'calm' && !selected ? styles.nodeImageCalmDefault : null
-          ]}
-        />
-      ) : (
-        <SvgIcon width={iconSize} height={iconSize} />
-      )}
+      <View style={[styles.recoveryNodeIconBox, selected && { backgroundColor: `${metric.color}22`, borderColor: `${metric.color}66` }]}>
+        <Ionicons name={metric.icon} size={24} color={selected ? metric.color : '#B6BDC5'} />
+      </View>
       <Text style={[styles.recoveryNodeLabel, selected && { color: metric.color }]}>{metric.label}</Text>
     </Pressable>
   );
@@ -673,38 +642,38 @@ const StressCard = ({
 
 const nodePositions = StyleSheet.create({
   top: {
-    top: 24,
+    top: 12,
     left: 131
   },
   left: {
-    top: 125,
+    top: 101,
     left: 1
   },
   right: {
-    top: 125,
+    top: 101,
     right: 1
   },
   bottomLeft: {
     left: 52,
-    bottom: 17
+    bottom: 8
   },
   bottomRight: {
     right: 52,
-    bottom: 17
+    bottom: 8
   },
 });
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#262B2F'
+    backgroundColor: 'transparent'
   },
   screenGradient: {
     flex: 1
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 132
+    paddingBottom: 112
   },
   referenceFrame: {
     width: '100%',
@@ -723,8 +692,8 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#FFFFFF',
     fontFamily: font.semiBold,
-    fontSize: 16,
-    lineHeight: 20
+    fontSize: 15,
+    lineHeight: 19
   },
   headerActions: {
     flexDirection: 'row',
@@ -768,30 +737,42 @@ const styles = StyleSheet.create({
     lineHeight: 11
   },
   trendCard: {
-    minHeight: 104,
-    marginTop: 10,
-    borderRadius: 15,
+    minHeight: 78,
+    marginTop: 8,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#101516',
-    backgroundColor: '#090A0B',
-    paddingHorizontal: 10,
-    paddingVertical: 10
+    borderColor: '#2B3239',
+    backgroundColor: '#101419',
+    paddingHorizontal: 12,
+    paddingVertical: 9
+  },
+  trendHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12
   },
   trendTitle: {
     color: '#FFFFFF',
     fontFamily: font.semiBold,
-    fontSize: 13,
-    lineHeight: 16
+    fontSize: 12,
+    lineHeight: 15
+  },
+  trendEmptyLabel: {
+    color: '#AAB2BB',
+    fontFamily: font.medium,
+    fontSize: 10,
+    lineHeight: 13
   },
   trendRow: {
-    marginTop: 10,
+    marginTop: 7,
     flexDirection: 'row',
     justifyContent: 'space-between'
   },
   trendItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 6
+    gap: 4
   },
   trendPill: {
     width: '88%',
@@ -807,31 +788,37 @@ const styles = StyleSheet.create({
     lineHeight: 14
   },
   trendDay: {
-    color: '#FFFFFF',
+    color: '#C2C8CF',
     fontFamily: font.medium,
     fontSize: 11,
     lineHeight: 13
   },
+  trendEmptyDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#59616A'
+  },
   actionRow: {
-    minHeight: 48,
-    marginTop: 10,
+    marginTop: 8,
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 5
+    rowGap: 7
   },
   actionPill: {
     minHeight: 44,
-    borderRadius: 14,
+    width: '49%',
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#2B3137',
-    backgroundColor: '#111418',
-    paddingHorizontal: 5,
-    flex: 1,
+    backgroundColor: '#171C21',
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4
+    gap: 8
   },
   actionText: {
     color: '#FFFFFF',
@@ -840,7 +827,7 @@ const styles = StyleSheet.create({
     lineHeight: 13
   },
   recoveryPanel: {
-    height: 330,
+    height: 278,
     marginTop: 0,
     position: 'relative',
     alignItems: 'center',
@@ -856,10 +843,10 @@ const styles = StyleSheet.create({
   },
   starShadow: {
     position: 'absolute',
-    top: -48,
-    left: -20,
-    width: 406,
-    height: 492,
+    top: -54,
+    left: 8,
+    width: 350,
+    height: 424,
     shadowColor: '#000000',
     shadowOpacity: 0.5,
     shadowRadius: 18,
@@ -893,35 +880,36 @@ const styles = StyleSheet.create({
   coreScore: {
     color: '#E4E8ED',
     fontFamily: font.bold,
-    fontSize: 26,
-    lineHeight: 31,
+    fontSize: 30,
+    lineHeight: 34,
     textAlign: 'center'
   },
   coreLabel: {
     color: '#E1E4E3',
     fontFamily: font.regular,
-    fontSize: 15,
-    lineHeight: 18,
+    maxWidth: 108,
+    fontSize: 12,
+    lineHeight: 15,
     textAlign: 'center'
   },
   stateChip: {
-    minHeight: 24,
-    borderRadius: 13,
+    minHeight: 21,
+    borderRadius: 11,
     backgroundColor: '#FF1717',
-    paddingHorizontal: 11,
+    paddingHorizontal: 9,
     alignItems: 'center',
     justifyContent: 'center'
   },
   stateChipText: {
     color: '#FFFFFF',
     fontFamily: font.bold,
-    fontSize: 11,
-    lineHeight: 13
+    fontSize: 9,
+    lineHeight: 11
   },
   recoveryNode: {
     position: 'absolute',
     width: 104,
-    minHeight: 86,
+    minHeight: 70,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5
@@ -933,24 +921,22 @@ const styles = StyleSheet.create({
     marginTop: 3,
     color: '#F4F7F4',
     fontFamily: font.medium,
-    fontSize: 12,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 13,
     textAlign: 'center'
   },
-  nodeImage: {
-    width: 50,
-    height: 55
-  },
-  nodeImageCalmActive: {
-    width: 46,
-    height: 64
-  },
-  nodeImageCalmDefault: {
+  recoveryNodeIconBox: {
     width: 36,
-    height: 58
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#3A4148',
+    backgroundColor: '#1B2025',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   summaryRow: {
-    marginTop: 11,
+    marginTop: 10,
     flexDirection: 'row',
     gap: 10
   },
@@ -959,8 +945,8 @@ const styles = StyleSheet.create({
     minHeight: 131,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#202423',
-    backgroundColor: '#0F1010',
+    borderColor: '#2B3137',
+    backgroundColor: '#13171B',
     paddingHorizontal: 10,
     paddingTop: 12,
     paddingBottom: 12
@@ -998,7 +984,7 @@ const styles = StyleSheet.create({
   },
   medLabel: {
     marginTop: 8,
-    color: '#777C79',
+    color: '#A7AFB8',
     fontFamily: font.regular,
     fontSize: 11,
     lineHeight: 13
@@ -1028,8 +1014,8 @@ const styles = StyleSheet.create({
     minHeight: 131
   },
   stressLabel: {
-    marginTop: 18,
-    color: '#9B98C7',
+    marginTop: 12,
+    color: '#B4B0D7',
     fontFamily: font.medium,
     fontSize: 11,
     lineHeight: 13
@@ -1044,8 +1030,8 @@ const styles = StyleSheet.create({
   stressValue: {
     color: '#FFFFFF',
     fontFamily: font.bold,
-    fontSize: 18,
-    lineHeight: 22
+    fontSize: 15,
+    lineHeight: 19
   },
   stressTrend: {
     color: '#C9C7FF',
@@ -1054,8 +1040,8 @@ const styles = StyleSheet.create({
     lineHeight: 13
   },
   stressSupportText: {
-    marginTop: 7,
-    color: '#777C79',
+    marginTop: 5,
+    color: '#A7AFB8',
     fontFamily: font.regular,
     fontSize: 11,
     lineHeight: 14
@@ -1082,8 +1068,8 @@ const styles = StyleSheet.create({
   stressPrimaryActionText: {
     color: '#C9C7FF',
     fontFamily: font.bold,
-    fontSize: 11,
-    lineHeight: 13
+    fontSize: 10,
+    lineHeight: 12
   },
   stressSecondaryAction: {
     minHeight: 24,

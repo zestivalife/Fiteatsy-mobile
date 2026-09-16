@@ -5,9 +5,11 @@ const root = path.resolve(__dirname, '..');
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 
 describe('Journey and Tracker UI consistency', () => {
-  test('uses the governed recovery trend title and seven responsive columns', () => {
+  test('uses a compact recovery trend with seven responsive columns', () => {
     const source = read('src/screens/home/HomeScreen.tsx');
-    expect(source).toContain('Your 7-Day Recovery Trend');
+    expect(source).toContain('7-Day Recovery');
+    expect(source).toContain('Waiting for data');
+    expect(source).toContain('trendEmptyDot');
     expect(source).toContain("trendItem: {\n    flex: 1");
     expect(source).not.toContain('Your 7 day’s Recovery Trend');
   });
