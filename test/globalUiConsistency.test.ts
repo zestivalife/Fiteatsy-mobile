@@ -31,14 +31,14 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).toContain("sleep: {\n    left: '72%',\n    top: '74%'");
     expect(source).toContain("calm: {\n    left: '28%',\n    top: '74%'");
     expect(source).toContain("activity: {\n    left: '18%',\n    top: '40%'");
-    expect(source.match(/top: '51\.5%'/g)).toHaveLength(3);
+    expect(source.match(/top: '51\.5%'/g)).toHaveLength(4);
     expect(source.match(/left: '50%'/g)?.length).toBeGreaterThanOrEqual(4);
     expect(source).toContain("width: 96,\n    height: 70");
     expect(source).toContain('marginLeft: -48');
     expect(source).toContain('marginTop: -35');
     expect(source).toContain('<RecoveryStarAsset width="100%" height="100%" pointerEvents="none"');
     expect(source).not.toContain('preserveAspectRatio="none"');
-    expect(source).toContain("width: 320,\n    height: 388,\n    marginLeft: -160");
+    expect(source).toContain("top: '51.5%',\n    left: '50%',\n    width: 384,\n    height: 465.6,\n    marginTop: -232.8,\n    marginLeft: -192");
     expect(source).toContain("height: 320");
     expect(source).toContain("overflow: 'hidden'");
     expect(source).not.toContain('recoveryNodeSelected');
