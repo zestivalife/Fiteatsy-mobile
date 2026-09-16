@@ -33,6 +33,13 @@ import {
 
 const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DONUT_ASSET_SIZE = 236;
+const DONUT_VIEWBOX_SIZE = 276;
+const DONUT_ART_CENTER = 126;
+const DONUT_ART_CENTER_OFFSET =
+  DONUT_ASSET_SIZE * ((DONUT_VIEWBOX_SIZE / 2 - DONUT_ART_CENTER) / DONUT_VIEWBOX_SIZE);
+const SIDE_NODE_STEP = 70 * 0.1;
+const LOWER_NODE_OFFSET = 70 * 0.4;
+const CENTRAL_CIRCLE_OFFSET = DONUT_ASSET_SIZE * 0.05;
 const CORE_SIZE = 126;
 const SCORE_ARC_SIZE = 178;
 const SCORE_ARC_RADIUS = 59;
@@ -643,19 +650,23 @@ const nodePositions = StyleSheet.create({
   },
   nourishment: {
     left: '82%',
-    top: '40%'
+    top: '40%',
+    transform: [{ translateY: SIDE_NODE_STEP }]
   },
   sleep: {
     left: '72%',
-    top: '74%'
+    top: '74%',
+    transform: [{ translateY: LOWER_NODE_OFFSET }]
   },
   calm: {
     left: '28%',
-    top: '74%'
+    top: '74%',
+    transform: [{ translateY: LOWER_NODE_OFFSET }]
   },
   activity: {
     left: '18%',
-    top: '40%'
+    top: '40%',
+    transform: [{ translateY: SIDE_NODE_STEP }]
   },
 });
 
@@ -855,8 +866,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '51.5%',
     left: '50%',
-    marginTop: -(DONUT_ASSET_SIZE / 2),
-    marginLeft: -(DONUT_ASSET_SIZE / 2),
+    marginTop: -(DONUT_ASSET_SIZE / 2) + DONUT_ART_CENTER_OFFSET,
+    marginLeft: -(DONUT_ASSET_SIZE / 2) + DONUT_ART_CENTER_OFFSET,
+    transform: [{ translateY: CENTRAL_CIRCLE_OFFSET }],
     zIndex: 1
   },
   scoreArc: {
@@ -865,6 +877,7 @@ const styles = StyleSheet.create({
     left: '50%',
     marginTop: -(SCORE_ARC_SIZE / 2),
     marginLeft: -(SCORE_ARC_SIZE / 2),
+    transform: [{ translateY: CENTRAL_CIRCLE_OFFSET }],
     zIndex: 2
   },
   coreCenter: {
@@ -873,6 +886,7 @@ const styles = StyleSheet.create({
     left: '50%',
     marginTop: -(CORE_SIZE / 2),
     marginLeft: -(CORE_SIZE / 2),
+    transform: [{ translateY: CENTRAL_CIRCLE_OFFSET }],
     width: CORE_SIZE,
     height: CORE_SIZE,
     borderRadius: CORE_SIZE / 2,

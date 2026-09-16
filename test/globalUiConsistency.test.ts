@@ -27,10 +27,10 @@ describe('Journey and Tracker UI consistency', () => {
   test('places Star Orb domains on one stable radial ring', () => {
     const source = read('src/screens/home/HomeScreen.tsx');
     expect(source).toContain("recovery: {\n    left: '50%',\n    top: '16%'");
-    expect(source).toContain("nourishment: {\n    left: '82%',\n    top: '40%'");
-    expect(source).toContain("sleep: {\n    left: '72%',\n    top: '74%'");
-    expect(source).toContain("calm: {\n    left: '28%',\n    top: '74%'");
-    expect(source).toContain("activity: {\n    left: '18%',\n    top: '40%'");
+    expect(source).toContain("nourishment: {\n    left: '82%',\n    top: '40%',\n    transform: [{ translateY: SIDE_NODE_STEP }]");
+    expect(source).toContain("sleep: {\n    left: '72%',\n    top: '74%',\n    transform: [{ translateY: LOWER_NODE_OFFSET }]");
+    expect(source).toContain("calm: {\n    left: '28%',\n    top: '74%',\n    transform: [{ translateY: LOWER_NODE_OFFSET }]");
+    expect(source).toContain("activity: {\n    left: '18%',\n    top: '40%',\n    transform: [{ translateY: SIDE_NODE_STEP }]");
     expect(source.match(/top: '51\.5%'/g)).toHaveLength(4);
     expect(source.match(/left: '50%'/g)?.length).toBeGreaterThanOrEqual(4);
     expect(source).toContain("width: 96,\n    height: 70");
@@ -39,6 +39,13 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).toContain('<RecoveryStarAsset width="100%" height="100%" pointerEvents="none"');
     expect(source).not.toContain('preserveAspectRatio="none"');
     expect(source).toContain("top: '51.5%',\n    left: '50%',\n    width: 384,\n    height: 465.6,\n    marginTop: -232.8,\n    marginLeft: -192");
+    expect(source).toContain('DONUT_ASSET_SIZE * ((DONUT_VIEWBOX_SIZE / 2 - DONUT_ART_CENTER) / DONUT_VIEWBOX_SIZE)');
+    expect(source).toContain('marginTop: -(DONUT_ASSET_SIZE / 2) + DONUT_ART_CENTER_OFFSET');
+    expect(source).toContain('marginLeft: -(DONUT_ASSET_SIZE / 2) + DONUT_ART_CENTER_OFFSET');
+    expect(source).toContain('const SIDE_NODE_STEP = 70 * 0.1');
+    expect(source).toContain('const LOWER_NODE_OFFSET = 70 * 0.4');
+    expect(source).toContain('const CENTRAL_CIRCLE_OFFSET = DONUT_ASSET_SIZE * 0.05');
+    expect(source.match(/transform: \[\{ translateY: CENTRAL_CIRCLE_OFFSET \}\]/g)).toHaveLength(3);
     expect(source).toContain("height: 320");
     expect(source).toContain("overflow: 'hidden'");
     expect(source).not.toContain('recoveryNodeSelected');
