@@ -115,6 +115,11 @@ export type OnboardingProfile = {
   thighCircumferenceCm?: number;
   calfCircumferenceCm?: number;
   bodyFatPct?: number;
+  bodyFatSource?: 'MANUAL'|'CALCULATED'|'APPLE_HEALTH'|'HEALTH_CONNECT'|'SMART_SCALE'|'CONSULTANT'|'OTHER';
+  bodyFatMeasuredAt?: string;
+  muscleMassKg?: number;
+  muscleMassCategory?: string;
+  location?: string;
   occupation?: string;
   workingHoursLabel?: string;
   shiftType?: string;

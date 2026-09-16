@@ -8,11 +8,15 @@ describe('profile ecosystem gap closure v2 contracts',()=>{
     const route=read('backend/src/modules/profile/profile.routes.ts');
     const screen=read('src/screens/profile/MyProfileScreen.tsx');
     expect(route).toContain("profileRouter.patch('/'");
-    expect(route).toContain('profileEditSchema');
+    expect(route).toContain('personalSchema');
+    expect(route).toContain('healthSchema');
+    expect(route).toContain('health_profile_measurement_history');
     expect(route).toContain("update users set name");
     expect(route).toContain('update health_profiles');
-    expect(screen).toContain('await saveProfile(next)');
-    expect(screen).toContain('Your edits are still on this screen');
+    expect(screen).toContain("section:'PERSONAL'");
+    expect(screen).toContain("section:'HEALTH'");
+    expect(screen).toContain('await saveProfile(');
+    expect(screen).toContain('Your edits remain on this screen');
     expect(screen).not.toContain('onboardingComplete:false');
   });
 

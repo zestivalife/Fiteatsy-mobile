@@ -171,6 +171,12 @@ create table if not exists health_profiles (
   hip_cm numeric(6,2),
   neck_cm numeric(6,2),
   body_fat_pct numeric(5,2),
+  body_fat_source text,
+  body_fat_measured_at timestamptz,
+  body_fat_updated_at timestamptz,
+  muscle_mass_kg numeric(6,2),
+  muscle_mass_category text,
+  location text,
   occupation text,
   working_hours_label text,
   shift_type text,
@@ -225,6 +231,18 @@ create table if not exists health_profiles (
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict
+);
+
+create table if not exists health_profile_measurement_history (
+  id uuid primary key,
+  health_profile_id uuid not null references health_profiles(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  measurement_type text not null,
+  value numeric(10,3) not null,
+  unit text not null,
+  source text not null,
+  measured_at timestamptz not null,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists recovery_programs (

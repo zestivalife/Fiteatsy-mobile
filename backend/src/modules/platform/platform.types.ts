@@ -45,6 +45,11 @@ export type HealthProfileRecord = AuditFields & {
   thighCircumferenceCm: number | null;
   calfCircumferenceCm: number | null;
   bodyFatPct: number | null;
+  bodyFatSource: 'MANUAL'|'CALCULATED'|'APPLE_HEALTH'|'HEALTH_CONNECT'|'SMART_SCALE'|'CONSULTANT'|'OTHER'|null;
+  bodyFatMeasuredAt: string | null;
+  muscleMassKg: number | null;
+  muscleMassCategory: string | null;
+  location: string | null;
   occupation: string | null;
   workingHoursLabel: string | null;
   shiftType: string | null;

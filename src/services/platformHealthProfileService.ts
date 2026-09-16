@@ -23,6 +23,11 @@ export type PlatformHealthProfile = {
   thighCircumferenceCm?: number | null;
   calfCircumferenceCm?: number | null;
   bodyFatPct: number | null;
+  bodyFatSource?: OnboardingProfile['bodyFatSource'] | null;
+  bodyFatMeasuredAt?: string | null;
+  muscleMassKg?: number | null;
+  muscleMassCategory?: string | null;
+  location?: string | null;
   occupation: string | null;
   workingHoursLabel: string | null;
   shiftType: string | null;
@@ -128,6 +133,11 @@ export const buildPlatformHealthProfilePayload = (
     thighCircumferenceCm: positiveNumber(onboarding.thighCircumferenceCm),
     calfCircumferenceCm: positiveNumber(onboarding.calfCircumferenceCm),
     bodyFatPct: positiveNumber(onboarding.bodyFatPct),
+    bodyFatSource: onboarding.bodyFatSource,
+    bodyFatMeasuredAt: onboarding.bodyFatMeasuredAt,
+    muscleMassKg: positiveNumber(onboarding.muscleMassKg),
+    muscleMassCategory: onboarding.muscleMassCategory,
+    location: onboarding.location,
     occupation: onboarding.occupation,
     workingHoursLabel: onboarding.workingHoursLabel ?? onboarding.workHours,
     shiftType: onboarding.shiftType,
@@ -407,6 +417,11 @@ export const mergePlatformProfileIntoOnboarding = (
     thighCircumferenceCm: profile.thighCircumferenceCm ?? onboarding.thighCircumferenceCm,
     calfCircumferenceCm: profile.calfCircumferenceCm ?? onboarding.calfCircumferenceCm,
     bodyFatPct: profile.bodyFatPct ?? onboarding.bodyFatPct,
+    bodyFatSource: profile.bodyFatSource ?? onboarding.bodyFatSource,
+    bodyFatMeasuredAt: profile.bodyFatMeasuredAt ?? onboarding.bodyFatMeasuredAt,
+    muscleMassKg: profile.muscleMassKg ?? onboarding.muscleMassKg,
+    muscleMassCategory: profile.muscleMassCategory ?? onboarding.muscleMassCategory,
+    location: profile.location ?? onboarding.location,
     occupation: profile.occupation ?? onboarding.occupation,
     workingHoursLabel: profile.workingHoursLabel ?? onboarding.workingHoursLabel,
     shiftType: profile.shiftType ?? onboarding.shiftType,

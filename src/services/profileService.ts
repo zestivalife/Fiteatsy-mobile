@@ -1,5 +1,8 @@
 import { apiFetch } from './apiClient';
 import { AssessmentGender } from '../types';
-export type ProfileEdit={name:string;dateOfBirthISO:string;gender:AssessmentGender;heightCm:number;currentWeightKg:number};
-export type ConfirmedProfile=ProfileEdit&{version:number;updatedAt:string};
-export const saveProfile=async(value:ProfileEdit)=>{const response=await apiFetch<{profile:ConfirmedProfile}>('/v1/profile',{method:'PATCH',body:JSON.stringify(value)});return response.profile;};
+export type BodyFatSource='MANUAL'|'CALCULATED'|'APPLE_HEALTH'|'HEALTH_CONNECT'|'SMART_SCALE'|'CONSULTANT'|'OTHER';
+export type ConfirmedProfile={firstName:string;lastName:string;name:string;dateOfBirthISO:string|null;gender:AssessmentGender|null;location:string|null;heightCm:number|null;currentWeightKg:number|null;waistCm:number|null;hipCm:number|null;neckCm:number|null;armCircumferenceCm:number|null;thighCircumferenceCm:number|null;calfCircumferenceCm:number|null;bodyFatPct:number|null;bodyFatSource:BodyFatSource|null;bodyFatMeasuredAt:string|null;bodyFatUpdatedAt:string|null;muscleMassKg:number|null;muscleMassCategory:string|null;email:string|null;mobileNumber:string|null;version:number;updatedAt:string};
+export type PersonalProfileEdit={section:'PERSONAL';firstName:string;lastName:string;dateOfBirthISO:string;gender:AssessmentGender;location:string|null};
+export type HealthProfileEdit={section:'HEALTH';heightCm:number|null;currentWeightKg:number|null;waistCm:number|null;hipCm:number|null;neckCm:number|null;armCircumferenceCm:number|null;thighCircumferenceCm:number|null;calfCircumferenceCm:number|null;bodyFatPct:number|null;bodyFatSource:BodyFatSource|null;bodyFatMeasuredAt:string|null;muscleMassKg:number|null;muscleMassCategory:string|null};
+export const getProfile=async()=>{const response=await apiFetch<{profile:ConfirmedProfile}>('/v1/profile');return response.profile;};
+export const saveProfile=async(value:PersonalProfileEdit|HealthProfileEdit)=>{const response=await apiFetch<{profile:ConfirmedProfile}>('/v1/profile',{method:'PATCH',body:JSON.stringify(value)});return response.profile;};

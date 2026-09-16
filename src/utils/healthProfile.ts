@@ -5,19 +5,12 @@ import {
   HealthGoal,
   OnboardingProfile
 } from '../types';
+import { calculateAgeFromDateOfBirth, calculateBodyFatPercentage } from './canonicalBodyMetrics';
 
 
 export const calculateAgeFromDob = (dobInput: Date | string): number => {
-  const dob = dobInput instanceof Date ? dobInput : new Date(dobInput);
-  if (Number.isNaN(dob.getTime())) return 28;
-
-  const now = new Date();
-  let years = now.getFullYear() - dob.getFullYear();
-  const monthDiff = now.getMonth() - dob.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
-    years -= 1;
-  }
-  return Math.max(18, Math.min(99, years));
+  const iso = dobInput instanceof Date ? dobInput.toISOString().slice(0, 10) : dobInput.slice(0, 10);
+  return calculateAgeFromDateOfBirth(iso) ?? 28;
 };
 
 export const toAgeBracket = (age: number): AgeBracket => {
@@ -50,40 +43,7 @@ export const getSecondaryGoals = (profile: Pick<OnboardingProfile, 'primaryGoal'
   return profile.healthGoals.filter((goal) => goal !== primary);
 };
 
-export const calculateBodyFatPercentage = (params: {
-  gender?: AssessmentGender;
-  heightCm?: number;
-  waistCm?: number;
-  neckCm?: number;
-  hipCm?: number;
-}): number | null => {
-  const { gender, heightCm, waistCm, neckCm, hipCm } = params;
-  if (!heightCm || !waistCm || !neckCm || heightCm <= 0 || waistCm <= 0 || neckCm <= 0) {
-    return null;
-  }
-
-  const log10 = (value: number) => Math.log(value) / Math.log(10);
-
-  let bodyFat: number | null = null;
-  if (gender === 'Male') {
-    const base = waistCm - neckCm;
-    if (base > 0) {
-      bodyFat = 86.01 * log10(base) - 70.041 * log10(heightCm) + 36.76;
-    }
-  } else if (gender === 'Female') {
-    if (!hipCm || hipCm <= 0) return null;
-    const base = waistCm + hipCm - neckCm;
-    if (base > 0) {
-      bodyFat = 163.205 * log10(base) - 97.684 * log10(heightCm) - 78.387;
-    }
-  }
-
-  if (bodyFat == null || Number.isNaN(bodyFat) || !Number.isFinite(bodyFat)) {
-    return null;
-  }
-
-  return Number(Math.min(60, Math.max(3, bodyFat)).toFixed(1));
-};
+export { calculateBodyFatPercentage };
 
 export const createPendingConsultant = (careTrack: string, createdAtISO?: string): ConsultantProfile => ({
   id: 'pending-consultant-assignment',

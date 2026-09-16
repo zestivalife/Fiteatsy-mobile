@@ -60,6 +60,11 @@ const mapHealthProfile = (row: Record<string, unknown>): HealthProfileRecord => 
   thighCircumferenceCm: toNumberOrNull(row.thigh_circumference_cm),
   calfCircumferenceCm: toNumberOrNull(row.calf_circumference_cm),
   bodyFatPct: toNumberOrNull(row.body_fat_pct),
+  bodyFatSource: row.body_fat_source == null ? null : String(row.body_fat_source) as HealthProfileRecord['bodyFatSource'],
+  bodyFatMeasuredAt: toIso(row.body_fat_measured_at),
+  muscleMassKg: toNumberOrNull(row.muscle_mass_kg),
+  muscleMassCategory: row.muscle_mass_category == null ? null : String(row.muscle_mass_category),
+  location: row.location == null ? null : String(row.location),
   occupation: row.occupation == null ? null : String(row.occupation),
   workingHoursLabel: row.working_hours_label == null ? null : String(row.working_hours_label),
   shiftType: row.shift_type == null ? null : String(row.shift_type),
@@ -210,6 +215,11 @@ const buildHealthProfileDefaults = (owner: ClientOwnershipContext): HealthProfil
   thighCircumferenceCm: null,
   calfCircumferenceCm: null,
   bodyFatPct: null,
+  bodyFatSource: null,
+  bodyFatMeasuredAt: null,
+  muscleMassKg: null,
+  muscleMassCategory: null,
+  location: null,
   occupation: null,
   workingHoursLabel: null,
   shiftType: null,
@@ -504,7 +514,12 @@ const saveHealthProfileProgressiveFields = async (
         thigh_circumference_cm = $24,
         calf_circumference_cm = $25,
         wellness_goal_ids = $26::jsonb,
-        updated_at = $27
+        updated_at = $27,
+        body_fat_source = $28,
+        body_fat_measured_at = $29,
+        muscle_mass_kg = $30,
+        muscle_mass_category = $31,
+        location = $32
       where id = $1
         and client_id = $2
       returning *
@@ -537,6 +552,11 @@ const saveHealthProfileProgressiveFields = async (
       next.calfCircumferenceCm,
       JSON.stringify(next.wellnessGoalIds),
       nowIso(),
+      next.bodyFatSource,
+      next.bodyFatMeasuredAt,
+      next.muscleMassKg,
+      next.muscleMassCategory,
+      next.location,
     ]
   );
   if (updated.rowCount === 0) {
