@@ -1,9 +1,8 @@
 import React from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Platform, ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { colors, getThemeGradients, spacing } from '../design/tokens';
-import { useAppContext } from '../state/AppContext';
+import { spacing } from '../design/tokens';
+import { AppBackground } from './AppBackground';
 
 export const Screen = ({
   children,
@@ -16,12 +15,8 @@ export const Screen = ({
   contentStyle?: StyleProp<ViewStyle>;
   keyboardShouldPersistTaps?: 'always' | 'never' | 'handled';
 }) => {
-  const { themeMode } = useAppContext();
-  const themeGradients = getThemeGradients(themeMode);
-  const backgroundGradient = themeGradients.appBackground;
-
   return (
-    <LinearGradient colors={[...backgroundGradient]} style={styles.gradient}>
+    <AppBackground>
       <SafeAreaView style={styles.safe}>
         {scroll ? (
           <ScrollView
@@ -36,15 +31,11 @@ export const Screen = ({
           <View style={[styles.content, contentStyle]}>{children}</View>
         )}
       </SafeAreaView>
-    </LinearGradient>
+    </AppBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-    backgroundColor: colors.bgPrimary
-  },
   safe: {
     flex: 1
   },

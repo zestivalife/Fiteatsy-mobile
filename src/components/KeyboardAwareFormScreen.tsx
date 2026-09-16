@@ -10,10 +10,9 @@ import {
   View,
   ViewStyle
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, getThemeGradients, spacing } from '../design/tokens';
-import { useAppContext } from '../state/AppContext';
+import { spacing } from '../design/tokens';
+import { AppBackground } from './AppBackground';
 
 type Props = {
   children: React.ReactNode;
@@ -30,12 +29,10 @@ export const KeyboardAwareFormScreen = ({
   keyboardVerticalOffset = 0,
   testID = 'keyboard-aware-form-screen'
 }: Props) => {
-  const { themeMode } = useAppContext();
   const insets = useSafeAreaInsets();
-  const background = getThemeGradients(themeMode).appBackground;
 
   return (
-    <LinearGradient colors={[...background]} style={styles.gradient}>
+    <AppBackground>
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -58,12 +55,11 @@ export const KeyboardAwareFormScreen = ({
           </Pressable>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </LinearGradient>
+    </AppBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  gradient: { flex: 1, backgroundColor: colors.bgPrimary },
   safe: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: spacing.md, paddingTop: spacing.md },
   footer: { paddingHorizontal: spacing.md, paddingTop: spacing.sm }

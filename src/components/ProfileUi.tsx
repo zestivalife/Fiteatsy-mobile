@@ -1,14 +1,12 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { AppBackButton } from './AppBackButton';
+import { ScreenHeader } from './PageHeader';
 import { getThemeColors, radius, spacing, typography } from '../design/tokens';
 import { useAppContext } from '../state/AppContext';
 
 export const ProfileHeader = ({ navigation, title }: { navigation: { goBack: () => void }; title: string }) => {
-  const { themeMode } = useAppContext();
-  const palette = getThemeColors(themeMode);
-  return <View style={styles.header}><AppBackButton onPress={() => navigation.goBack()} label="Profile" /><Text accessibilityRole="header" style={[styles.title, { color: palette.textPrimary }]}>{title}</Text></View>;
+  return <View style={styles.header}><ScreenHeader title={title} onBack={() => navigation.goBack()} /></View>;
 };
 
 export const ProfileSection = ({ label, children }: { label?: string; children: React.ReactNode }) => {
@@ -29,7 +27,6 @@ export const ProfileRow = ({ icon, color, title, subtitle, onPress, destructive 
 
 const styles = StyleSheet.create({
   header: { gap: spacing.sm, marginBottom: spacing.lg },
-  title: { ...typography.title, fontSize: 28 },
   section: { gap: spacing.xs, marginBottom: spacing.lg },
   label: { ...typography.badge, letterSpacing: 1.2, marginLeft: spacing.xxs },
   card: { borderWidth: 1, borderRadius: radius.md, overflow: 'hidden' },

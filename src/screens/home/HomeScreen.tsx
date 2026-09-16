@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
+import { AppBackground } from '../../components/AppBackground';
 import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
 import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
@@ -328,8 +328,8 @@ export const HomeScreen = () => {
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <LinearGradient colors={['#262B2F', '#16191D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.screenGradient}>
+    <AppBackground>
+      <SafeAreaView style={styles.safe}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.referenceFrame}>
             <HomeHeader
@@ -380,8 +380,8 @@ export const HomeScreen = () => {
             </View>
           </View>
         </ScrollView>
-      </LinearGradient>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AppBackground>
   );
 };
 

@@ -46,6 +46,8 @@ describe('Foundation V1 interaction contracts', () => {
   });
 
   it('defaults the shared Back Button to the compact icon-only treatment', () => {
-    expect(read('src/components/AppBackButton.tsx')).toContain('iconOnly = true');
+    const back = read('src/components/AppBackButton.tsx');
+    expect(back).toContain('name="chevron-back"');
+    expect(back).not.toContain('<Text');
   });
 });

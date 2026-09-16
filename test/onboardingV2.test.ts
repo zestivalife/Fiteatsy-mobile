@@ -8,7 +8,8 @@ describe('Onboarding V2 contract', () => {
     const shell = read('src/components/onboarding/OnboardingShell.tsx');
     expect(shell).toContain("'BASICS' | 'LIFESTYLE' | 'RECOVERY' | 'CONNECT' | 'READY'");
     expect(shell).toContain('isReduceMotionEnabled');
-    expect(shell).toContain('accessibilityLabel="Go back"');
+    expect(shell).toContain('<AppBackButton onPress={onBack} />');
+    expect(read('src/components/AppBackButton.tsx')).toContain('accessibilityLabel="Go back"');
     expect(shell).toContain("content: { flex: 1, width: '100%', paddingHorizontal: spacing.md }");
     expect(shell).toContain('paddingHorizontal: spacing.md');
     expect(shell).not.toContain('paddingHorizontal: spacing.lg');

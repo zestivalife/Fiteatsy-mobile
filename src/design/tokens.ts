@@ -139,7 +139,8 @@ export const shadows: Record<string, ViewStyle> = {
 };
 
 export const gradients = {
-  appBackground: ['#000000', '#000000'],
+  // Matches the established Home visual language and is consumed only through AppBackground.
+  appBackground: ['#262B2F', '#16191D'],
   appBackgroundLight: ['#F3F6FA', '#E8EEF5'],
   accent: ['#60AF00', '#00401F'],
   cardDark: ['rgba(51, 51, 51, 1)', 'rgba(0, 0, 0, 1)', '#000000'],

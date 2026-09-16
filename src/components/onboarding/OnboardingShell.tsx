@@ -13,6 +13,8 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '../../design/tokens';
+import { AppBackground } from '../AppBackground';
+import { AppBackButton } from '../AppBackButton';
 
 export type OnboardingPhase = 'BASICS' | 'LIFESTYLE' | 'RECOVERY' | 'CONNECT' | 'READY';
 
@@ -58,13 +60,12 @@ export const OnboardingShell = ({ phase, phaseLabel, step, total, onBack, childr
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <AppBackground>
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           {onBack ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Go back" hitSlop={8} onPress={onBack} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-              <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
-            </Pressable>
+            <AppBackButton onPress={onBack} />
           ) : <View style={styles.backSpacer} />}
           <View style={styles.progressColumn}>
             <View style={styles.phaseRow}>
@@ -93,7 +94,8 @@ export const OnboardingShell = ({ phase, phaseLabel, step, total, onBack, childr
         >{content}</ScrollView> : content}
         {action ? <View style={[styles.action, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>{action}</View> : null}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AppBackground>
   );
 };
 
@@ -134,9 +136,8 @@ export const QuestionHeader = ({ title, description }: { title: string; descript
 );
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bgPrimary },
+  safe: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.lg },
-  back: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardMuted },
   backSpacer: { width: 44, height: 44 },
   pressed: { opacity: 0.72 },
   progressColumn: { flex: 1, gap: spacing.xs },

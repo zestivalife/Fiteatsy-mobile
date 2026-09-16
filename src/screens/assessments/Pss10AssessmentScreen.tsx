@@ -277,9 +277,7 @@ export const Pss10AssessmentScreen = ({ navigation, route }: Props) => {
           </View>
         </View>
         <View style={styles.actionsRow}>
-          <Pressable style={styles.backButton} onPress={goBackWithinFlow} accessibilityRole="button">
-            <Text style={styles.backButtonText}>Back</Text>
-          </Pressable>
+          <AppBackButton onPress={goBackWithinFlow} />
           <Pressable
             style={[styles.continueButton, selectedValue == null && styles.disabledButton]}
             onPress={continueNext}
