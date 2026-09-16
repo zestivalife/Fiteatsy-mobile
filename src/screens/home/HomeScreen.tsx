@@ -32,11 +32,7 @@ import {
 } from '../../utils/pss10StressContext';
 
 const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const STAR_CENTER_X = 183;
-const STAR_CENTER_Y = 138;
 const DONUT_ASSET_SIZE = 236;
-const DONUT_ASSET_VISUAL_CENTER = 118;
-const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
 const CORE_SIZE = 126;
 const SCORE_ARC_SIZE = 178;
 const SCORE_ARC_RADIUS = 59;
@@ -479,7 +475,7 @@ const RecoveryPanel = ({
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
         <View style={styles.starShadow} pointerEvents="none">
-          <RecoveryStarAsset width={350} height={424} pointerEvents="none" />
+          <RecoveryStarAsset width="100%" height="100%" preserveAspectRatio="none" pointerEvents="none" />
         </View>
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
         {selectedScore != null ? (
@@ -643,23 +639,23 @@ const StressCard = ({
 const nodePositions = StyleSheet.create({
   recovery: {
     left: '50%',
-    top: '13%'
+    top: '16%'
   },
   nourishment: {
-    left: '85%',
-    top: '39%'
+    left: '82%',
+    top: '40%'
   },
   sleep: {
-    left: '71%',
-    top: '76%'
+    left: '72%',
+    top: '74%'
   },
   calm: {
-    left: '29%',
-    top: '76%'
+    left: '28%',
+    top: '74%'
   },
   activity: {
-    left: '15%',
-    top: '39%'
+    left: '18%',
+    top: '40%'
   },
 });
 
@@ -827,11 +823,11 @@ const styles = StyleSheet.create({
     lineHeight: 13
   },
   recoveryPanel: {
-    height: 278,
+    height: 320,
     marginTop: 0,
     position: 'relative',
     alignItems: 'center',
-    overflow: 'visible'
+    overflow: 'hidden'
   },
   recoveryStage: {
     position: 'absolute',
@@ -843,10 +839,10 @@ const styles = StyleSheet.create({
   },
   starShadow: {
     position: 'absolute',
-    top: -54,
-    left: 8,
-    width: 350,
-    height: 424,
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
     shadowColor: '#000000',
     shadowOpacity: 0.5,
     shadowRadius: 18,
@@ -855,20 +851,26 @@ const styles = StyleSheet.create({
   },
   progressDonutAsset: {
     position: 'absolute',
-    top: STAR_CENTER_Y - DONUT_ASSET_VISUAL_CENTER + DONUT_VERTICAL_OFFSET,
-    left: STAR_CENTER_X - DONUT_ASSET_VISUAL_CENTER,
+    top: '51.5%',
+    left: '50%',
+    marginTop: -(DONUT_ASSET_SIZE / 2),
+    marginLeft: -(DONUT_ASSET_SIZE / 2),
     zIndex: 1
   },
   scoreArc: {
     position: 'absolute',
-    top: STAR_CENTER_Y - SCORE_ARC_SIZE / 2 + DONUT_VERTICAL_OFFSET,
-    left: STAR_CENTER_X - SCORE_ARC_SIZE / 2,
+    top: '51.5%',
+    left: '50%',
+    marginTop: -(SCORE_ARC_SIZE / 2),
+    marginLeft: -(SCORE_ARC_SIZE / 2),
     zIndex: 2
   },
   coreCenter: {
     position: 'absolute',
-    top: STAR_CENTER_Y - CORE_SIZE / 2 + DONUT_VERTICAL_OFFSET,
-    left: STAR_CENTER_X - CORE_SIZE / 2,
+    top: '51.5%',
+    left: '50%',
+    marginTop: -(CORE_SIZE / 2),
+    marginLeft: -(CORE_SIZE / 2),
     width: CORE_SIZE,
     height: CORE_SIZE,
     borderRadius: CORE_SIZE / 2,
@@ -908,11 +910,11 @@ const styles = StyleSheet.create({
   },
   recoveryNode: {
     position: 'absolute',
-    width: 104,
+    width: 96,
     height: 70,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: -52,
+    marginLeft: -48,
     marginTop: -35,
     zIndex: 5
   },

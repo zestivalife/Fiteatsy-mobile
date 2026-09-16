@@ -26,13 +26,19 @@ describe('Journey and Tracker UI consistency', () => {
 
   test('places Star Orb domains on one stable radial ring', () => {
     const source = read('src/screens/home/HomeScreen.tsx');
-    expect(source).toContain("recovery: {\n    left: '50%',\n    top: '13%'");
-    expect(source).toContain("nourishment: {\n    left: '85%',\n    top: '39%'");
-    expect(source).toContain("sleep: {\n    left: '71%',\n    top: '76%'");
-    expect(source).toContain("calm: {\n    left: '29%',\n    top: '76%'");
-    expect(source).toContain("activity: {\n    left: '15%',\n    top: '39%'");
-    expect(source).toContain('marginLeft: -52');
+    expect(source).toContain("recovery: {\n    left: '50%',\n    top: '16%'");
+    expect(source).toContain("nourishment: {\n    left: '82%',\n    top: '40%'");
+    expect(source).toContain("sleep: {\n    left: '72%',\n    top: '74%'");
+    expect(source).toContain("calm: {\n    left: '28%',\n    top: '74%'");
+    expect(source).toContain("activity: {\n    left: '18%',\n    top: '40%'");
+    expect(source.match(/top: '51\.5%'/g)).toHaveLength(3);
+    expect(source.match(/left: '50%'/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(source).toContain("width: 96,\n    height: 70");
+    expect(source).toContain('marginLeft: -48');
     expect(source).toContain('marginTop: -35');
+    expect(source).toContain('<RecoveryStarAsset width="100%" height="100%" preserveAspectRatio="none"');
+    expect(source).toContain("height: 320");
+    expect(source).toContain("overflow: 'hidden'");
     expect(source).not.toContain('recoveryNodeSelected');
   });
 
