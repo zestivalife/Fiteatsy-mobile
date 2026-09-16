@@ -49,7 +49,10 @@ export async function getCombinationOption(id:string,planId:string,planVersionId
 }
 
 export async function listCombinationOptions(planId:string,planVersionId:string){
-  const result=await pool.query(`with selected as (
+  const result=await pool.query(`with version_mode as (
+      select coalesce(content->>'authoringMode','LEGACY') authoring_mode
+      from diet_plan_versions where id=$2 and diet_plan_id=$1
+    ), selected as (
       select logical_option_id,option_snapshot_id,meal_head,display_order from diet_plan_option_selections
       where diet_plan_id=$1 and diet_plan_version_id=$2
     ), legacy as (
@@ -58,6 +61,7 @@ export async function listCombinationOptions(planId:string,planVersionId:string)
         from diet_plan_combination_options where diet_plan_id=$1 and diet_plan_version_id=$2
         order by logical_option_id,version desc,created_at desc,id desc) latest
       where not exists(select 1 from selected)
+        and coalesce((select authoring_mode from version_mode),'LEGACY')<>'COMMON_FOOD'
     )
     select logical_option_id,option_snapshot_id,meal_head,display_order from selected
     union all select logical_option_id,option_snapshot_id,meal_head,display_order from legacy where display_order<=5
@@ -66,6 +70,11 @@ export async function listCombinationOptions(planId:string,planVersionId:string)
   // predecessor version. The version-owned selection row is authoritative; the
   // snapshot itself remains append-only and plan-scoped.
   return Promise.all(result.rows.map((row)=>getCombinationOption(String(row.option_snapshot_id),planId)));
+}
+
+export async function getDietPlanAuthoringMode(planId:string,planVersionId:string){
+  const result=await pool.query(`select coalesce(content->>'authoringMode','LEGACY') authoring_mode from diet_plan_versions where id=$2 and diet_plan_id=$1`,[planId,planVersionId]);
+  return String(result.rows[0]?.authoring_mode??'LEGACY');
 }
 
 export async function replaceCombinationOptionSelection(input:{planId:string;planVersionId:string;expectedPlanVersionId:string;options:CombinationSnapshot[]}){
@@ -88,6 +97,7 @@ export async function replaceCombinationOptionSelection(input:{planId:string;pla
   await client.query('delete from diet_plan_option_selections where diet_plan_version_id=$1',[input.planVersionId]);
   const order=new Map<string,number>();
   for(const option of input.options){const displayOrder=(order.get(option.mealHead)??0)+1;order.set(option.mealHead,displayOrder);await client.query(`insert into diet_plan_option_selections(diet_plan_id,diet_plan_version_id,logical_option_id,option_snapshot_id,meal_head,display_order) values($1,$2,$3,$4,$5,$6)`,[input.planId,input.planVersionId,option.combinationId,snapshotIds.get(option.combinationId),option.mealHead,displayOrder]);}
+  await client.query(`update diet_plan_versions set content=jsonb_set(coalesce(content,'{}'::jsonb),'{authoringMode}','"COMMON_FOOD"'::jsonb,true),updated_at=now() where id=$1 and diet_plan_id=$2`,[input.planVersionId,input.planId]);
   await client.query('commit');
  }catch(error){await client.query('rollback');throw error;}finally{client.release();}
  return listCombinationOptions(input.planId,input.planVersionId);
@@ -95,6 +105,10 @@ export async function replaceCombinationOptionSelection(input:{planId:string;pla
 
 export async function freezeCombinationOptionsForLifecycle(planId:string,planVersionId:string){
   const options=(await listCombinationOptions(planId,planVersionId)).filter((x):x is CombinationSnapshot=>x!==null);
+  if(await getDietPlanAuthoringMode(planId,planVersionId)==='COMMON_FOOD'){
+    const counts=new Map<string,number>();for(const option of options)counts.set(option.mealHead,(counts.get(option.mealHead)??0)+1);
+    if(options.length!==35||counts.size!==7||[...counts.values()].some(count=>count!==5))throw Object.assign(new Error('COMMON_FOOD_SELECTION_INCOMPLETE'),{code:'COMMON_FOOD_SELECTION_INCOMPLETE'});
+  }
   const snapshotHash=canonicalHash({planId,planVersionId,options});
   const result=await pool.query(`update diet_plan_versions set common_food_options=$3::jsonb,common_food_snapshot_hash=$4,updated_at=now() where id=$2 and diet_plan_id=$1 and lifecycle_status in ('draft','changes_requested','submitted_for_review') returning id`,[planId,planVersionId,JSON.stringify(options),snapshotHash]);
   if(!result.rowCount)throw Object.assign(new Error('LIFECYCLE_SNAPSHOT_FREEZE_FAILED'),{code:'LIFECYCLE_SNAPSHOT_FREEZE_FAILED'});
