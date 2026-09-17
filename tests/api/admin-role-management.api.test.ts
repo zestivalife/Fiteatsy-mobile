@@ -5,7 +5,7 @@ import { pool } from '../../backend/src/db/pool.js';
 import { bootstrapInitialAdminFromEnvironment } from '../../backend/src/modules/admin/admin.service.js';
 import { createProfessionalAssignment } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
-import { getJson, postJson } from '../helpers/http.js';
+import { getJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
@@ -321,6 +321,15 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
     reason: 'Verify a mapped dual-role client remains assignable'
   });
   assert.notEqual(assignment, null);
+
+  const grantedConsent = await putJson(
+    server.baseUrl,
+    '/v1/preferences/consultant-access',
+    { status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
+    { headers: authHeaders(mobileClient.token) }
+  );
+  assert.equal(grantedConsent.response.status, 200);
+  assert.equal(grantedConsent.body.consent.status, 'GRANTED');
 
   const assignedResponse = await getJson(
     server.baseUrl,
