@@ -53,6 +53,14 @@ const assignClientToConsultant = async (
     { headers: authHeaders(client.token) }
   );
   assert.equal(response.response.status, 200, JSON.stringify(response.body));
+
+  const consent = await putJson(
+    server.baseUrl,
+    '/v1/preferences/consultant-access',
+    { status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
+    { headers: authHeaders(client.token) }
+  );
+  assert.equal(consent.response.status, 200, JSON.stringify(consent.body));
 };
 
 const getClientDatabaseId = async (client: Awaited<ReturnType<typeof createAuthenticatedSession>>) => {
