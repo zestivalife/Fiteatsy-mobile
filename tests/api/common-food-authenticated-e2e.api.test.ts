@@ -262,7 +262,7 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
         toSelection(secondMeal.mealHead, sixthSecondMealOption),
       ],
     }, { headers: authHeaders(consultant.token) });
-    assert.equal(fourAndSix.response.status, 400, JSON.stringify(fourAndSix.body));
+    assert.equal(fourAndSix.response.status, 422, JSON.stringify(fourAndSix.body));
 
     for (let cycle = 0; cycle < 2; cycle += 1) {
       const saved = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
