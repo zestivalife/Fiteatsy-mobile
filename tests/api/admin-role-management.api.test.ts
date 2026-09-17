@@ -364,7 +364,8 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
     `/v1/consultants/clients/${mobileClient.current.body.client.fiteatsyClientId}`,
     { headers: authHeaders(otherConsultant.token) }
   );
-  assert.equal(wrongConsultantDetail.response.status, 404);
+  assert.equal(wrongConsultantDetail.response.status, 403);
+  assert.equal(wrongConsultantDetail.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 });
 
 test('all active canonical client cohorts remain allocation-visible and roster-isolated exactly once', async () => {
@@ -522,7 +523,8 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
     const wrongDetail = await getJson(server.baseUrl, `/v1/consultants/clients/${clientId}`, {
       headers: authHeaders(otherConsultant.token)
     });
-    assert.equal(wrongDetail.response.status, 404);
+    assert.equal(wrongDetail.response.status, 403);
+    assert.equal(wrongDetail.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
   }
 
   const activeAssignmentCounts = await pool.query(
