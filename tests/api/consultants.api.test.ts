@@ -620,8 +620,8 @@ test('Consultant Food Preference projection is assignment-scoped and isolated by
   assert.equal(projectedA.body.foodPreferences.profile.dietType, 'vegetarian');
   assert.deepEqual(projectedB.body.foodPreferences.profile.foodsLiked, ['Dhokla']);
   assert.equal(projectedB.body.foodPreferences.profile.dietType, 'vegan');
-  assert.equal(denied.response.status, 404);
-  assert.equal(denied.body.error, 'CLIENT_NOT_FOUND');
+  assert.equal(denied.response.status, 403);
+  assert.equal(denied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 });
 
 test('consultant medication monitoring uses client tracker data and enforces assignment access', async () => {
@@ -741,8 +741,8 @@ test('consultant medication monitoring uses client tracker data and enforces ass
     `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/medications`,
     { headers: authHeaders(otherConsultant.token) }
   );
-  assert.equal(denied.response.status, 404);
-  assert.equal(denied.body.error, 'CLIENT_NOT_FOUND');
+  assert.equal(denied.response.status, 403);
+  assert.equal(denied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 });
 
 const istScheduledFor = (offsetDays: number, time24h = '00:00') => {
@@ -941,8 +941,8 @@ test('consultant medication exception intelligence detects operational adherence
     `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/medication-exceptions`,
     { headers: authHeaders(otherConsultant.token) }
   );
-  assert.equal(directDenied.response.status, 404);
-  assert.equal(directDenied.body.error, 'CLIENT_NOT_FOUND');
+  assert.equal(directDenied.response.status, 403);
+  assert.equal(directDenied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 
   const acknowledge = await postJson(
     server.baseUrl,
@@ -1550,8 +1550,8 @@ test('Consultant biomarker projection is assignment-scoped and switches clients 
   assert.equal(projectedA.body.biomarkers[0].source.label, 'Manual Entry');
   assert.deepEqual(projectedB.body.biomarkers.map((item: { canonicalMarkerName: string }) => item.canonicalMarkerName), ['TSH']);
   assert.equal(projectedB.body.biomarkers[0].referenceRange, null);
-  assert.equal(denied.response.status, 404);
-  assert.equal(denied.body.error, 'CLIENT_NOT_FOUND');
+  assert.equal(denied.response.status, 403);
+  assert.equal(denied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 });
 
 test('authorised assigned Senior Consultant receives the same canonical biomarker facts', async () => {
