@@ -7,6 +7,7 @@ import { ingestHealthObservations } from '../../backend/src/modules/health/healt
 import { createProfessionalAssignment } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
 import { createReportRecord } from '../../backend/src/modules/reports/reports.store.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
+import { grantCanonicalConsultantAccess } from '../helpers/consultantAccessFixtures.js';
 import { getJson, patchJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
@@ -46,21 +47,7 @@ const assignClientToConsultant = async (
   client: Awaited<ReturnType<typeof createAuthenticatedSession>>,
   consultant: Awaited<ReturnType<typeof createConsultantSession>>
 ) => {
-  const response = await patchJson(
-    server.baseUrl,
-    '/v1/platform/health-profile',
-    { assignedConsultantId: consultant.current.body.accountId },
-    { headers: authHeaders(client.token) }
-  );
-  assert.equal(response.response.status, 200, JSON.stringify(response.body));
-
-  const consent = await putJson(
-    server.baseUrl,
-    '/v1/preferences/consultant-access',
-    { status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
-    { headers: authHeaders(client.token) }
-  );
-  assert.equal(consent.response.status, 200, JSON.stringify(consent.body));
+  await grantCanonicalConsultantAccess(server.baseUrl, client, consultant);
 };
 
 const getClientDatabaseId = async (client: Awaited<ReturnType<typeof createAuthenticatedSession>>) => {

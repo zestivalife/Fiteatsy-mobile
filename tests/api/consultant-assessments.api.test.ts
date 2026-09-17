@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pool } from '../../backend/src/db/pool.js';
 import { pss10Items } from '../../backend/src/modules/assessments/assessment-definitions.js';
-import { createOrUpdateHealthProfile } from '../../backend/src/modules/platform/platform.store.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
+import { grantCanonicalConsultantAccess } from '../helpers/consultantAccessFixtures.js';
 import { getJson, postJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
@@ -29,16 +29,7 @@ const completePss = async (token: string) => {
 };
 
 const assignConsultant = async (client: Awaited<ReturnType<typeof createAuthenticatedSession>>, consultant: Awaited<ReturnType<typeof createAuthenticatedSession>>) => {
-  const mapping = await pool.query('select id from fiteatsy_clients where account_user_id = $1 limit 1', [client.current.body.accountId]);
-  await createOrUpdateHealthProfile(
-    { accountId: client.current.body.accountId, clientId: String(mapping.rows[0].id) },
-    { assignedConsultantId: consultant.current.body.accountId }
-  );
-  const consent = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
-    status: 'GRANTED',
-    policyVersion: 'CONSULTANT_ACCESS_V1'
-  }, client.token);
-  assert.equal(consent.response.status, 200, JSON.stringify(consent.body));
+  await grantCanonicalConsultantAccess(server.baseUrl, client, consultant);
 };
 
 const promoteConsultant = async (consultant: Awaited<ReturnType<typeof createAuthenticatedSession>>) => {
@@ -80,12 +71,12 @@ test('unassigned consultant cannot access summary, history, or direct result IDs
   const summary = await getJson(server.baseUrl, `/v1/consultants/clients/${clientId}/assessments/PSS10/summary`, { headers: authHeaders(unassignedConsultant.token) });
   const history = await getJson(server.baseUrl, `/v1/consultants/clients/${clientId}/assessments/PSS10/history`, { headers: authHeaders(unassignedConsultant.token) });
   const direct = await getJson(server.baseUrl, `/v1/consultants/clients/${clientId}/assessments/results/${completed.body.result.id}`, { headers: authHeaders(unassignedConsultant.token) });
-  assert.equal(summary.response.status, 404);
-  assert.equal(summary.body.error, 'CLIENT_NOT_FOUND');
-  assert.equal(history.response.status, 404);
-  assert.equal(history.body.error, 'CLIENT_NOT_FOUND');
-  assert.equal(direct.response.status, 404);
-  assert.equal(direct.body.error, 'ASSESSMENT_RESULT_NOT_FOUND');
+  assert.equal(summary.response.status, 403);
+  assert.equal(summary.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
+  assert.equal(history.response.status, 403);
+  assert.equal(history.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
+  assert.equal(direct.response.status, 403);
+  assert.equal(direct.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 });
 
 test('latest and previous consultant values preserve score change and historical versions', async () => {
