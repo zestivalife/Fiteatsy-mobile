@@ -34,6 +34,11 @@ const assignConsultant = async (client: Awaited<ReturnType<typeof createAuthenti
     { accountId: client.current.body.accountId, clientId: String(mapping.rows[0].id) },
     { assignedConsultantId: consultant.current.body.accountId }
   );
+  const consent = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+    status: 'GRANTED',
+    policyVersion: 'CONSULTANT_ACCESS_V1'
+  }, client.token);
+  assert.equal(consent.response.status, 200, JSON.stringify(consent.body));
 };
 
 const promoteConsultant = async (consultant: Awaited<ReturnType<typeof createAuthenticatedSession>>) => {
