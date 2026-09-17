@@ -94,8 +94,8 @@ const main = async () => {
       report.coverage.vegan = { result: 'PASS', code: generated.body.code };
     } else {
       const count = generated.body.meals.reduce((n:number,m:Json)=>n+m.options.length,0);
-      assert(generated.body.meals.length===7 && count===35 && generated.body.meals.every((m:Json)=>m.options.length===5 && new Set(m.options.map((o:Json)=>o.diversitySignature)).size===5), `COVERAGE_35_FAILED:${role}`);
-      report.coverage[role] = { options: count, result: 'PASS', generationRunId: generated.body.generationRunId };
+      assert(generated.body.meals.length===7 && count>35 && generated.body.meals.every((m:Json)=>m.options.length>=5 && m.options.length<=12 && new Set(m.options.map((o:Json)=>o.combinationId)).size===m.options.length && m.recommendedOptionIds.length===5 && new Set(m.recommendedOptionIds).size===5 && m.recommendedOptionIds.every((id:string)=>m.options.some((o:Json)=>o.combinationId===id))), `CANDIDATE_POOL_CONTRACT_FAILED:${role}`);
+      report.coverage[role] = { candidates: count, selected: 35, countsByMeal:Object.fromEntries(generated.body.meals.map((meal:Json)=>[meal.mealHead,meal.options.length])), result: 'PASS', generationRunId: generated.body.generationRunId };
     }
   }
   report.coverage.supportedScopeComplete5x7Rate = '100%';
@@ -141,7 +141,7 @@ const main = async () => {
   report.explorer.p0ActivatedAddToMeal = { result: 'PASS', foodId: 'BATCH0_42', displayName: 'Cucumber' };
 
   currentPhase = 'PERSIST_35_OPTIONS';
-  const selectionPayload={expectedPlanVersionId:versionId,options:generatedByRole.vegetarian.meals.flatMap((meal:Json)=>meal.options.map((option:Json)=>({optionId:option.combinationId,mealHead:meal.mealHead,components:option.components.map((x:Json)=>({foodId:x.foodId,servingId:x.servingId,multiplier:x.multiplier}))})))};
+  const selectionPayload={expectedPlanVersionId:versionId,options:generatedByRole.vegetarian.meals.flatMap((meal:Json)=>meal.recommendedOptionIds.map((optionId:string)=>{const option=meal.options.find((candidate:Json)=>candidate.combinationId===optionId);assert(option,`RECOMMENDED_OPTION_NOT_IN_POOL:${meal.mealHead}:${optionId}`);return {optionId,mealHead:meal.mealHead,components:option.components.map((x:Json)=>({foodId:x.foodId,servingId:x.servingId,multiplier:x.multiplier}))};}))};
   const selected=await ok(tokens.consultant,'PUT',`${vegBase}/diet-plans/${planId}/common-food/options`,selectionPayload);
   const repeatedSelection=await ok(tokens.consultant,'PUT',`${vegBase}/diet-plans/${planId}/common-food/options`,selectionPayload);
   const persisted:Json[]=repeatedSelection.body.options;

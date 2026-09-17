@@ -186,11 +186,37 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
       await assertRevokedGuardOrder();
       continue;
     }
-    assert.equal(generated.body.meals.length, 7);
-    assert.equal(generated.body.meals.reduce((count: number, meal: { options: unknown[] }) => count + meal.options.length, 0), 35);
-    for (const meal of generated.body.meals) {
-      assert.equal(meal.options.length, 5, `${dietType}:${meal.mealHead}`);
-      assert.equal(new Set(meal.options.map((option: { diversitySignature: string }) => option.diversitySignature)).size, 5);
+    type GeneratedOption = {
+      combinationId: string;
+      diversitySignature: string;
+      components: Array<{ foodId: string; servingId: string; multiplier: number }>;
+    };
+    type GeneratedMeal = {
+      mealHead: string;
+      options: GeneratedOption[];
+      recommendedOptionIds: string[];
+    };
+    const generatedMeals = generated.body.meals as GeneratedMeal[];
+    assert.equal(generatedMeals.length, 7);
+    const candidateCounts = Object.fromEntries(generatedMeals.map((meal) => [meal.mealHead, meal.options.length]));
+    const generatedCandidateTotal = generatedMeals.reduce((count, meal) => count + meal.options.length, 0);
+    console.info(`COMMON_FOOD_CANDIDATE_POOL ${dietType} total=${generatedCandidateTotal} counts=${JSON.stringify(candidateCounts)}`);
+    assert.ok(generatedCandidateTotal > 35, `${dietType}: expanded candidate pool expected`);
+    for (const meal of generatedMeals) {
+      assert.ok(meal.options.length >= 5 && meal.options.length <= 12, `${dietType}:${meal.mealHead}: candidate count ${meal.options.length}`);
+      assert.equal(new Set(meal.options.map((option) => option.combinationId)).size, meal.options.length, `${dietType}:${meal.mealHead}: candidate IDs`);
+      assert.equal(meal.recommendedOptionIds.length, 5, `${dietType}:${meal.mealHead}: recommended selection`);
+      assert.equal(new Set(meal.recommendedOptionIds).size, 5, `${dietType}:${meal.mealHead}: recommended selection uniqueness`);
+      assert.ok(meal.recommendedOptionIds.every((id) => meal.options.some((option) => option.combinationId === id)), `${dietType}:${meal.mealHead}: recommended selection containment`);
+
+      // "Random 5" operates on the candidate pool. A stable hash order keeps the
+      // contract deterministic in CI while exercising a non-positional sample.
+      const randomFive = [...meal.options]
+        .sort((left, right) => crypto.createHash('sha256').update(left.combinationId).digest('hex').localeCompare(crypto.createHash('sha256').update(right.combinationId).digest('hex')))
+        .slice(0, 5);
+      assert.equal(randomFive.length, 5, `${dietType}:${meal.mealHead}: random five count`);
+      assert.equal(new Set(randomFive.map((option) => option.combinationId)).size, 5, `${dietType}:${meal.mealHead}: random five uniqueness`);
+      assert.ok(randomFive.every((option) => meal.options.includes(option)), `${dietType}:${meal.mealHead}: random five containment`);
     }
 
     const rejected = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/validate-option`, {
@@ -199,13 +225,44 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     assert.equal(rejected.response.status, 422, JSON.stringify(rejected.body));
     assert.equal(rejected.body.error, 'UNSAFE_OR_INELIGIBLE_FOOD');
 
-    const selectedOptions = generated.body.meals.flatMap((meal: { mealHead: string; options: Array<{ combinationId: string; components: Array<{ foodId: string; servingId: string; multiplier: number }> }> }) =>
-      meal.options.map((option) => ({ optionId: option.combinationId, mealHead: meal.mealHead, components: option.components.map(({ foodId, servingId, multiplier }) => ({ foodId, servingId, multiplier })) })),
+    const selectedOptions = generatedMeals.flatMap((meal) =>
+      meal.recommendedOptionIds.map((optionId) => {
+        const option = meal.options.find((candidate) => candidate.combinationId === optionId)!;
+        return { optionId, mealHead: meal.mealHead, components: option.components.map(({ foodId, servingId, multiplier }) => ({ foodId, servingId, multiplier })) };
+      }),
     );
+    assert.equal(selectedOptions.length, 35);
+    assert.equal(new Set(selectedOptions.map((option) => option.optionId)).size, 35);
+    for (const meal of generatedMeals) assert.equal(selectedOptions.filter((option) => option.mealHead === meal.mealHead).length, 5, meal.mealHead);
     const partial = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
-      expectedPlanVersionId: draft.body.version.id, options: selectedOptions.slice(0, 22),
+      expectedPlanVersionId: draft.body.version.id, options: selectedOptions.slice(0, 34),
     }, { headers: authHeaders(consultant.token) });
     assert.equal(partial.response.status, 400, JSON.stringify(partial.body));
+
+    const firstMeal = generatedMeals[0];
+    const secondMeal = generatedMeals[1];
+    const sixthFirstMealOption = firstMeal.options.find((option) => !firstMeal.recommendedOptionIds.includes(option.combinationId));
+    const sixthSecondMealOption = secondMeal.options.find((option) => !secondMeal.recommendedOptionIds.includes(option.combinationId));
+    assert.ok(sixthFirstMealOption && sixthSecondMealOption, 'expanded fixture must support 6-option negative validation');
+    const toSelection = (mealHead: string, option: GeneratedOption) => ({
+      optionId: option.combinationId,
+      mealHead,
+      components: option.components.map(({ foodId, servingId, multiplier }) => ({ foodId, servingId, multiplier })),
+    });
+    const thirtySix = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+      expectedPlanVersionId: draft.body.version.id,
+      options: [...selectedOptions, toSelection(firstMeal.mealHead, sixthFirstMealOption)],
+    }, { headers: authHeaders(consultant.token) });
+    assert.equal(thirtySix.response.status, 400, JSON.stringify(thirtySix.body));
+
+    const fourAndSix = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+      expectedPlanVersionId: draft.body.version.id,
+      options: [
+        ...selectedOptions.filter((option) => option.optionId !== firstMeal.recommendedOptionIds[0]),
+        toSelection(secondMeal.mealHead, sixthSecondMealOption),
+      ],
+    }, { headers: authHeaders(consultant.token) });
+    assert.equal(fourAndSix.response.status, 400, JSON.stringify(fourAndSix.body));
 
     for (let cycle = 0; cycle < 2; cycle += 1) {
       const saved = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
@@ -218,6 +275,10 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     const reloaded = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, { headers: authHeaders(consultant.token) });
     assert.equal(reloaded.response.status, 200, JSON.stringify(reloaded.body));
     assert.equal(reloaded.body.options.length, 35);
+    assert.deepEqual(
+      new Set(reloaded.body.options.map((item: { combinationId: string }) => item.combinationId)),
+      new Set(selectedOptions.map((item) => item.optionId)),
+    );
 
     const stale = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
       expectedPlanVersionId: crypto.randomUUID(), options: selectedOptions,
