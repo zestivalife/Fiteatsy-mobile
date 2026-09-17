@@ -59,6 +59,13 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     }, { headers: authHeaders(client.token) });
     assert.equal(preferences.response.status, 200, JSON.stringify(preferences.body));
 
+    const assignmentsAfterProfileSave = await getJson(server.baseUrl, '/v1/admin/client-assignments', { headers: authHeaders(admin.token) });
+    assert.equal(assignmentsAfterProfileSave.response.status, 200, JSON.stringify(assignmentsAfterProfileSave.body));
+    const activeAssignment = assignmentsAfterProfileSave.body.assignments.find((item: { consultantUserId: string; clientUserId: string; status: string }) =>
+      item.consultantUserId === consultant.user.id && item.clientUserId === client.user.id && item.status === 'active'
+    );
+    assert.equal(activeAssignment?.id, assignment.body.assignment.id, 'profile updates must preserve an existing active assignment identity');
+
     const visible = await getJson(server.baseUrl, '/v1/consultants/clients', { headers: authHeaders(consultant.token) });
     assert.equal(visible.response.status, 200, JSON.stringify(visible.body));
     assert.ok(visible.body.clients.some((item: { clientId: string }) => item.clientId === publicClientId));

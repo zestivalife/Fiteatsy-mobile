@@ -212,6 +212,19 @@ export const revokeProfessionalAssignment = async (assignmentId: string, actorUs
 
 export const syncLegacyProfessionalAssignment = async (input: { clientUserId: string; professionalUserId: string | null; professionalType: ProfessionalType; actorUserId: string }) => {
   if (!input.professionalUserId) return;
+  const existing = await pool.query(
+    `select *
+       from consultant_client_assignments
+      where client_user_id = $1
+        and consultant_user_id = $2
+        and product = 'FITEATSY'
+        and professional_type = $3
+        and status = 'active'
+      order by created_at desc
+      limit 1`,
+    [input.clientUserId, input.professionalUserId, input.professionalType],
+  );
+  if (existing.rowCount) return existing.rows[0];
   const assignment = await createProfessionalAssignment({
     actorUserId: input.actorUserId,
     clientUserId: input.clientUserId,
