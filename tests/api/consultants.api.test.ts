@@ -696,14 +696,7 @@ test('consultant medication monitoring uses client tracker data and enforces ass
   assert.equal(snapshot.body.medicationCount, 1);
   assert.equal(snapshot.body.logCount, 2);
 
-  await patchJson(
-    server.baseUrl,
-    '/v1/platform/health-profile',
-    {
-      assignedConsultantId: consultant.current.body.accountId
-    },
-    { headers: authHeaders(client.token) }
-  );
+  await assignClientToConsultant(client, consultant);
 
   const monitoring = await getJson(
     server.baseUrl,
