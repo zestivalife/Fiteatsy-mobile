@@ -58,9 +58,9 @@ export const canAccessConsultantClientApi = (account: AuthenticatedAccount) =>
 
 const professionalTypeForAccount = (account: AuthenticatedAccount) => account.user.role?.toLowerCase() === 'practitioner' ? 'PRACTITIONER' : account.user.role?.toLowerCase() === 'mentor' ? 'MENTOR' : 'CONSULTANT';
 
-export const listConsultantClients = async (account: AuthenticatedAccount) => {
+export const listConsultantClients = async (account: AuthenticatedAccount, options: import('./consultants.repository.js').ConsultantClientDirectoryQuery = {}) => {
   const clientsBackfilled = await ensureRegisteredClientsForEligibleUsers();
-  const clients = await listRegisteredConsultantClients(account.accountId, professionalTypeForAccount(account));
+  const directory = await listRegisteredConsultantClients(account.accountId, professionalTypeForAccount(account), options);
   const diagnostics = await getConsultantClientSyncDiagnostics();
 
   console.info('CONSULTANT_CLIENT_SYNC', {
@@ -72,10 +72,10 @@ export const listConsultantClients = async (account: AuthenticatedAccount) => {
     inactiveClientMappings: diagnostics.inactiveClientMappings,
     activeHealthProfiles: diagnostics.activeHealthProfiles,
     clientsBackfilled,
-    usersReturned: clients.length
+    usersReturned: directory.clients.length
   });
 
-  return clients;
+  return directory;
 };
 
 export const getConsultantClientProfile = async (publicClientId: string, account: AuthenticatedAccount) => {

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
+import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import {
   acknowledgeConsultantMedicationException,
@@ -31,10 +32,31 @@ const requireConsultantAccount = (req: Request, res: Response, next: NextFunctio
 consultantsRouter.use(requireAuthenticatedAccount);
 consultantsRouter.use(requireConsultantAccount);
 
+const clientDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  status: z.enum(['all', 'active', 'inactive']).default('all'),
+  sort: z.enum(['registeredAt', 'name', 'lastActiveAt']).default('registeredAt'),
+  order: z.enum(['asc', 'desc']).default('desc'),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25)
+});
+
 consultantsRouter.get('/clients', async (req, res) => {
   const account = getAuthenticatedAccount(req);
-  const clients = await listConsultantClients(account);
-  return res.status(200).json({ clients });
+  const parsed = clientDirectoryQuerySchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_CLIENT_DIRECTORY_QUERY', details: parsed.error.flatten() });
+  const directory = await listConsultantClients(account, {
+    query: parsed.data.q,
+    status: parsed.data.status,
+    sort: parsed.data.sort,
+    order: parsed.data.order,
+    page: parsed.data.page,
+    pageSize: parsed.data.pageSize
+  });
+  return res.status(200).json({
+    clients: directory.clients,
+    pagination: { total: directory.total, page: directory.page, pageSize: directory.pageSize }
+  });
 });
 
 consultantsRouter.get('/medication-exceptions', async (req, res) => {

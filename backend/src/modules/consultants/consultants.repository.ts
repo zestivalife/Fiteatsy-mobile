@@ -589,7 +589,38 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
   return result.rowCount;
 };
 
-export const listRegisteredConsultantClients = async (consultantAccountId?: string, professionalType = 'CONSULTANT'): Promise<ConsultantClientListRecord[]> => {
+export type ConsultantClientDirectoryQuery = {
+  query?: string;
+  status?: 'all' | 'active' | 'inactive';
+  sort?: 'registeredAt' | 'name' | 'lastActiveAt';
+  order?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+};
+
+export type ConsultantClientDirectoryResult = {
+  clients: ConsultantClientListRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export const listRegisteredConsultantClients = async (
+  consultantAccountId: string,
+  professionalType = 'CONSULTANT',
+  options: ConsultantClientDirectoryQuery = {}
+): Promise<ConsultantClientDirectoryResult> => {
+  const query = options.query?.trim() ?? '';
+  const status = options.status ?? 'all';
+  const page = Math.max(1, options.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, options.pageSize ?? 25));
+  const offset = (page - 1) * pageSize;
+  const sortColumn = {
+    registeredAt: 'u.created_at',
+    name: 'lower(u.name)',
+    lastActiveAt: 'greatest(coalesce(u.last_login_at, session_stats.last_session_at), coalesce(session_stats.last_session_at, u.last_login_at))'
+  }[options.sort ?? 'registeredAt'];
+  const order = options.order === 'asc' ? 'asc' : 'desc';
   const assignmentClause = consultantAccountId
       ? `
         and (
@@ -604,17 +635,48 @@ export const listRegisteredConsultantClients = async (consultantAccountId?: stri
         )
       `
     : '';
+  const directoryClause = `
+    and (
+      $8 = ''
+      or u.name ilike '%' || $8 || '%'
+      or coalesce(u.email_normalized, '') ilike '%' || $8 || '%'
+      or coalesce(u.mobile_number_normalized, '') ilike '%' || $8 || '%'
+      or coalesce(c.fiteatsy_client_id, '') ilike '%' || $8 || '%'
+    )
+    and (
+      $9 = 'all'
+      or ($9 = 'active' and lower(coalesce(u.status, '')) = 'active')
+      or ($9 = 'inactive' and lower(coalesce(u.status, '')) <> 'active')
+    )
+  `;
+  const parameters = [
+    ...AUTHENTICATED_USER_EXCLUSION_ROLES,
+    PUBLISHED_REPORT_STATUSES,
+    consultantAccountId,
+    professionalType,
+    query,
+    status
+  ];
+  const countResult = await pool.query(
+    `select count(*)::int as total from (${listClientSelect} ${assignmentClause} ${directoryClause}) directory_clients`,
+    parameters
+  );
   const result = await pool.query(
     `${listClientSelect}
       ${assignmentClause}
-      order by u.created_at desc
+      ${directoryClause}
+      order by ${sortColumn} ${order} nulls last, u.id asc
+      limit $10 offset $11
     `,
-    consultantAccountId
-      ? [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, consultantAccountId, professionalType]
-      : [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES]
+    [...parameters, pageSize, offset]
   );
 
-  return result.rows.map((row) => mapListRecord(row));
+  return {
+    clients: result.rows.map((row) => mapListRecord(row)),
+    total: Number(countResult.rows[0]?.total ?? 0),
+    page,
+    pageSize
+  };
 };
 
 export const listAssignedConsultantClientContexts = async (

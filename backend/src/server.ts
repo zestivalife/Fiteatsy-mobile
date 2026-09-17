@@ -16,6 +16,7 @@ import { profileRouter } from './modules/profile/profile.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { biomarkersRouter } from './modules/biomarkers/biomarkers.routes.js';
 import { consultantWorkspaceContractRouter, consultantsRouter } from './modules/consultants/consultants.routes.js';
+import { consultantClient360Router } from './modules/consultants/client360.routes.js';
 import { consultantNutritionRouter, platformNutritionRouter, requireConsultantClientAssignment } from './modules/nutrition/nutrition.routes.js';
 import { medicationsRouter } from './modules/medications/medications.routes.js';
 import { assessmentsRouter } from './modules/assessments/assessments.routes.js';
@@ -170,6 +171,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/health', healthRouter);
   app.use('/v1/biomarkers', biomarkersRouter);
   app.use('/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment,requireGrantedConsultantAccess);
+  app.use('/v1/consultants', consultantClient360Router);
   app.use('/v1/consultants', consultantsRouter);
   app.use('/v1/consultants', consultantNutritionRouter);
   app.use('/v1/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment,requireGrantedConsultantAccess);
