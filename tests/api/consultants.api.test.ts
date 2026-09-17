@@ -856,12 +856,7 @@ test('consultant medication exception intelligence detects operational adherence
     email: `no-medication-client-${Date.now()}@example.com`
   });
 
-  await patchJson(
-    server.baseUrl,
-    '/v1/platform/health-profile',
-    { assignedConsultantId: consultant.current.body.accountId },
-    { headers: authHeaders(emptyClient.token) }
-  );
+  await assignClientToConsultant(emptyClient, consultant);
 
   const emptyFeed = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
     headers: authHeaders(consultant.token)
@@ -878,12 +873,7 @@ test('consultant medication exception intelligence detects operational adherence
   );
   assert.equal(snapshot.response.status, 200, JSON.stringify(snapshot.body));
 
-  await patchJson(
-    server.baseUrl,
-    '/v1/platform/health-profile',
-    { assignedConsultantId: consultant.current.body.accountId },
-    { headers: authHeaders(client.token) }
-  );
+  await assignClientToConsultant(client, consultant);
 
   const feed = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
     headers: authHeaders(consultant.token)
@@ -981,12 +971,7 @@ test('medication exception rule thresholds handle non-trigger edge cases', async
     },
     { headers: authHeaders(oneMissedClient.token) }
   );
-  await patchJson(
-    server.baseUrl,
-    '/v1/platform/health-profile',
-    { assignedConsultantId: consultant.current.body.accountId },
-    { headers: authHeaders(oneMissedClient.token) }
-  );
+  await assignClientToConsultant(oneMissedClient, consultant);
 
   const seventyNineClient = await createAuthenticatedSession(server.baseUrl, {
     name: 'Seventy Nine Adherence Client',
@@ -1002,12 +987,7 @@ test('medication exception rule thresholds handle non-trigger edge cases', async
     },
     { headers: authHeaders(seventyNineClient.token) }
   );
-  await patchJson(
-    server.baseUrl,
-    '/v1/platform/health-profile',
-    { assignedConsultantId: consultant.current.body.accountId },
-    { headers: authHeaders(seventyNineClient.token) }
-  );
+  await assignClientToConsultant(seventyNineClient, consultant);
 
   const noDropClient = await createAuthenticatedSession(server.baseUrl, {
     name: 'No Drop Medication Client',
@@ -1026,12 +1006,7 @@ test('medication exception rule thresholds handle non-trigger edge cases', async
     },
     { headers: authHeaders(noDropClient.token) }
   );
-  await patchJson(
-    server.baseUrl,
-    '/v1/platform/health-profile',
-    { assignedConsultantId: consultant.current.body.accountId },
-    { headers: authHeaders(noDropClient.token) }
-  );
+  await assignClientToConsultant(noDropClient, consultant);
 
   const snoozedTakenClient = await createAuthenticatedSession(server.baseUrl, {
     name: 'Snoozed Taken Medication Client',
@@ -1075,12 +1050,7 @@ test('medication exception rule thresholds handle non-trigger edge cases', async
     },
     { headers: authHeaders(snoozedTakenClient.token) }
   );
-  await patchJson(
-    server.baseUrl,
-    '/v1/platform/health-profile',
-    { assignedConsultantId: consultant.current.body.accountId },
-    { headers: authHeaders(snoozedTakenClient.token) }
-  );
+  await assignClientToConsultant(snoozedTakenClient, consultant);
 
   const feed = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
     headers: authHeaders(consultant.token)
@@ -1132,12 +1102,7 @@ test('80 percent medication adherence does not create a low-adherence exception'
     { medications: [medication], logs },
     { headers: authHeaders(client.token) }
   );
-  await patchJson(
-    server.baseUrl,
-    '/v1/platform/health-profile',
-    { assignedConsultantId: consultant.current.body.accountId },
-    { headers: authHeaders(client.token) }
-  );
+  await assignClientToConsultant(client, consultant);
 
   const feed = await getJson(server.baseUrl, '/v1/consultants/medication-exceptions', {
     headers: authHeaders(consultant.token)
