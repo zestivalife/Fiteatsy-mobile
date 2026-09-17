@@ -474,6 +474,15 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
         professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Whole-population lifecycle matrix'
       });
       assert.notEqual(assignment, null);
+
+      const grantedConsent = await putJson(
+        server.baseUrl,
+        '/v1/preferences/consultant-access',
+        { status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
+        { headers: authHeaders(session.token) }
+      );
+      assert.equal(grantedConsent.response.status, 200);
+      assert.equal(grantedConsent.body.consent.status, 'GRANTED');
     }
     cohorts.push({ definition, session });
   }
