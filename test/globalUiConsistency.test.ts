@@ -36,7 +36,7 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).toContain("width: 96,\n    height: 70");
     expect(source).toContain('marginLeft: -48');
     expect(source).toContain('marginTop: -35');
-    expect(source).toContain('<RecoveryStarAsset width="100%" height="100%" pointerEvents="none"');
+    expect(source).toContain('<StarOrbSurface reduceMotion={reduceMotion} />');
     expect(source).not.toContain('preserveAspectRatio="none"');
     expect(source).toContain("top: '51.5%',\n    left: '50%',\n    width: 384,\n    height: 465.6,\n    marginTop: -232.8,\n    marginLeft: -192");
     expect(source).toContain('DONUT_ASSET_SIZE * ((DONUT_VIEWBOX_SIZE / 2 - DONUT_ART_CENTER) / DONUT_VIEWBOX_SIZE)');
@@ -49,6 +49,36 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).toContain("height: 320");
     expect(source).toContain("overflow: 'hidden'");
     expect(source).not.toContain('recoveryNodeSelected');
+  });
+
+  test('uses one Star Orb path for a two-pixel moving neon perimeter and reduced-motion fallback', () => {
+    const source = read('src/screens/home/HomeScreen.tsx');
+    expect(source).toContain('export const STAR_ORB_PATH =');
+    expect(source.match(/d=\{STAR_ORB_PATH\}/g)).toHaveLength(4);
+    expect(source).toContain('const STAR_ORB_PERIMETER_WIDTH = 2');
+    expect(source).toContain('const STAR_ORB_MOTION_DURATION_MS = 3500');
+    for (const color of ['#39F3FF', '#4D7CFF', '#FF4FD8', '#A970FF', '#7CFF00', '#7B61FF']) {
+      expect(source).toContain(color);
+    }
+    expect(source).toContain("AccessibilityInfo.addEventListener('reduceMotionChanged'");
+    expect(source).toContain('strokeOpacity={reduceMotion ? 0.68 : 0.3}');
+  });
+
+  test('animates selected-node glow without changing the locked node geometry', () => {
+    const source = read('src/screens/home/HomeScreen.tsx');
+    expect(source).toContain('testID={`selected-node-glow-${metric.key}`}');
+    expect(source).toContain('toValue: 1, duration: 900');
+    expect(source).toContain('toValue: 0.55, duration: 900');
+    expect(source).not.toContain('recoveryNodeSelected');
+    expect(source).not.toContain('selectedNodeScale');
+  });
+
+  test('removes the Tracker dark core while retaining the particle visualization', () => {
+    const source = read('src/screens/home/TrackerScreen.tsx');
+    expect(source).not.toContain('particleCoreGlow');
+    expect(source).not.toContain('<Circle cx={160} cy={160} r={118}');
+    expect(source).toContain('{particlePoints.map((particle) => (');
+    expect(source).toContain('style={styles.particleMetricCenter}');
   });
 
   test('uses shared segmented control and compact Tracker categories', () => {

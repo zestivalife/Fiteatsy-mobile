@@ -396,14 +396,6 @@ const RecoveryParticleMetric = ({
       >
         <Animated.View style={[styles.particleCanvas, { opacity, transform: [{ scale }, { rotate }] }]}>
           <Svg width="100%" height="100%" viewBox={`0 0 ${PARTICLE_FIELD_SIZE} ${PARTICLE_FIELD_SIZE}`}>
-            <Defs>
-              <SvgLinearGradient id="particleCoreGlow" x1="20%" y1="10%" x2="80%" y2="90%">
-                <Stop offset="0%" stopColor="#24153A" stopOpacity="0.44" />
-                <Stop offset="65%" stopColor="#07030D" stopOpacity="0.2" />
-                <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
-              </SvgLinearGradient>
-            </Defs>
-            <Circle cx={160} cy={160} r={118} fill="url(#particleCoreGlow)" />
             {particlePoints.map((particle) => (
               <Circle
                 key={particle.key}
