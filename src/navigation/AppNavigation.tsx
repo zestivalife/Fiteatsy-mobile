@@ -85,7 +85,6 @@ const MainTabs = () => {
       <Tab.Screen name="Tracker" component={TrackerScreen} />
       <Tab.Screen name="Nutrition" component={NutritionHubScreen} />
       <Tab.Screen name="Care" component={CareTabScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };

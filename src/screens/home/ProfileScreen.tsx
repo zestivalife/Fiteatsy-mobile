@@ -1,17 +1,15 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { ProfileRow, ProfileSection } from '../../components/ProfileUi';
 import { getThemeColors, radius, spacing, typography } from '../../design/tokens';
-import type { MainTabParamList, RootStackParamList } from '../../navigation/types';
+import type { RootStackParamList } from '../../navigation/types';
 import { useProfilePhoto } from '../../hooks/useProfilePhoto';
 import { useAppContext } from '../../state/AppContext';
 import { resolveClientName } from '../../utils/clientIdentity';
 
-type Props=CompositeScreenProps<BottomTabScreenProps<MainTabParamList,'Profile'>,NativeStackScreenProps<RootStackParamList>>;
+type Props=NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
 export const ProfileScreen=({navigation}:Props)=>{
   const {themeMode,authSession,onboarding,canonicalProfile}=useAppContext();

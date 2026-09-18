@@ -102,5 +102,4 @@ export type MainTabParamList = {
   Tracker: undefined;
   Nutrition: undefined;
   Care: undefined;
-  Profile: undefined;
 };

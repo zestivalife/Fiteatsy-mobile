@@ -51,17 +51,48 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).not.toContain('recoveryNodeSelected');
   });
 
-  test('uses one Star Orb path for a two-pixel moving neon perimeter and reduced-motion fallback', () => {
+  test('uses one Star Orb path for a one-pixel, slower, muted moving perimeter and reduced-motion fallback', () => {
     const source = read('src/screens/home/HomeScreen.tsx');
     expect(source).toContain('export const STAR_ORB_PATH =');
-    expect(source.match(/d=\{STAR_ORB_PATH\}/g)).toHaveLength(4);
-    expect(source).toContain('const STAR_ORB_PERIMETER_WIDTH = 2');
-    expect(source).toContain('const STAR_ORB_MOTION_DURATION_MS = 3500');
+    expect(source.match(/d=\{STAR_ORB_PATH\}/g)).toHaveLength(3);
+    expect(source).toContain('const STAR_ORB_PERIMETER_WIDTH = 1');
+    expect(source).toContain('const STAR_ORB_MOTION_DURATION_MS = 7000');
+    expect(source).toContain('const STAR_ORB_MOTION_OPACITY = 0.4');
+    expect(source).toContain('strokeOpacity={STAR_ORB_MOTION_OPACITY}');
+    expect(source).toContain('strokeLinejoin="round"');
     for (const color of ['#39F3FF', '#4D7CFF', '#FF4FD8', '#A970FF', '#7CFF00', '#7B61FF']) {
       expect(source).toContain(color);
     }
     expect(source).toContain("AccessibilityInfo.addEventListener('reduceMotionChanged'");
     expect(source).toContain('strokeOpacity={reduceMotion ? 0.68 : 0.3}');
+  });
+
+  test('keeps only notifications and profile in the Journey header', () => {
+    const source = read('src/screens/home/HomeScreen.tsx');
+    expect(source).not.toContain('<HeaderIcon icon="search-outline"');
+    expect(source).not.toContain('<HeaderIcon icon="trophy-outline"');
+    expect(source).toContain('<HeaderIcon icon="notifications-outline"');
+    expect(source).toContain('accessibilityLabel="Open profile"');
+  });
+
+  test('uses the canonical four-tab navigation while retaining stack Profile access', () => {
+    const navigation = read('src/navigation/AppNavigation.tsx');
+    const tabRoutes = [...navigation.matchAll(/<Tab\.Screen name="([^"]+)"/g)].map((match) => match[1]);
+    expect(tabRoutes).toEqual(['Journey', 'Tracker', 'Nutrition', 'Care']);
+    expect(navigation).toContain('<Stack.Screen name="Profile" component={ProfileScreen} />');
+
+    const floatingTabBar = read('src/components/FloatingTabBar.tsx');
+    expect(floatingTabBar).not.toContain("Profile: 'person-circle-outline'");
+    expect(floatingTabBar).not.toContain("Profile: 'person-circle'");
+  });
+
+  test('shares one canonical blue authority between Nutrition and plan selection CTAs', () => {
+    const tokens = read('src/design/tokens.ts');
+    const nutrition = read('src/screens/home/NutritionExperienceScreen.tsx');
+    const plans = read('src/screens/home/SubscriptionPlansScreen.tsx');
+    expect(tokens).toContain("primary: '#43C4FA'");
+    expect(nutrition).toContain('blue: nutritionActionColors.primary');
+    expect(plans).toContain('backgroundColor: nutritionActionColors.primary');
   });
 
   test('animates selected-node glow without changing the locked node geometry', () => {

@@ -10,16 +10,14 @@ const iconMap: Record<keyof MainTabParamList, { inactive: keyof typeof Ionicons.
   Journey: { inactive: 'sparkles-outline', active: 'sparkles' },
   Tracker: { inactive: 'pulse-outline', active: 'pulse' },
   Nutrition: { inactive: 'nutrition-outline', active: 'nutrition' },
-  Care: { inactive: 'heart-outline', active: 'heart' },
-  Profile: { inactive: 'person-circle-outline', active: 'person-circle' }
+  Care: { inactive: 'heart-outline', active: 'heart' }
 };
 
 const labelMap: Record<keyof MainTabParamList, string> = {
   Journey: 'Journey',
   Tracker: 'Tracker',
   Nutrition: 'Nutrition',
-  Care: 'Care',
-  Profile: 'Profile'
+  Care: 'Care'
 };
 
 export const FloatingTabBar = ({ state, navigation }: BottomTabBarProps) => {

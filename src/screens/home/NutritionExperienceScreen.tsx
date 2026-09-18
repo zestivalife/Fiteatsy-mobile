@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Circle } from 'react-native-svg';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Screen } from '../../components/Screen';
-import { radius, spacing, typography } from '../../design/tokens';
+import { nutritionActionColors, radius, spacing, typography } from '../../design/tokens';
 import { useAppContext } from '../../state/AppContext';
 import {
   getCravingSuggestions,
@@ -25,7 +25,7 @@ import {
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import { classifyNutritionLoadError, nutritionLoadCopy, NutritionLoadState } from '../../services/nutritionLoadState';
 
-const C = { bg: '#07070B', card: '#111117', raised: '#181820', line: '#272733', text: '#F3F2FA', muted: '#898899', blue: '#43C4FA', green: '#4BE38A', yellow: '#FFC229', purple: '#A985FF' };
+const C = { bg: '#07070B', card: '#111117', raised: '#181820', line: '#272733', text: '#F3F2FA', muted: '#898899', blue: nutritionActionColors.primary, green: '#4BE38A', yellow: '#FFC229', purple: '#A985FF' };
 const fmt = (value: number | null) => value == null ? '—' : Math.round(value).toLocaleString('en-IN');
 const ratio = (value: number, target: number | null) => target && target > 0 ? Math.max(0, Math.min(1, value / target)) : 0;
 const day = () => new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata' });

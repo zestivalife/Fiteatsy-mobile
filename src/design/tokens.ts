@@ -63,6 +63,12 @@ export const lightColors = {
 
 export const colors = darkColors;
 
+// Shared authority for primary Nutrition actions and plan-selection CTAs.
+export const nutritionActionColors = {
+  primary: '#43C4FA',
+  content: '#071016'
+} as const;
+
 export const spacing = {
   xxs: 4,
   xs: 8,

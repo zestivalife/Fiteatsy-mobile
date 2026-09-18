@@ -33,14 +33,16 @@ describe('FITEATSY accepted product baseline regression contracts', () => {
     expect(navigation).not.toContain('LegacyMedication');
   });
 
-  it('FITEATSY_FOUNDATION_UI_CONTRACT keeps Exo and five canonical tabs', () => {
+  it('FITEATSY_FOUNDATION_UI_CONTRACT keeps Exo, four canonical tabs, and stack-owned Profile access', () => {
     const app = read('App.tsx');
     const navigation = read('src/navigation/AppNavigation.tsx');
     const tokens = read('src/design/tokens.ts');
 
     expect(app).toContain('Exo_400Regular');
     expect(tokens).toContain("fontFamily: 'Exo_");
-    ['Journey', 'Tracker', 'Nutrition', 'Care', 'Profile'].forEach((tab) => expect(navigation).toContain(`<Tab.Screen name="${tab}"`));
+    ['Journey', 'Tracker', 'Nutrition', 'Care'].forEach((tab) => expect(navigation).toContain(`<Tab.Screen name="${tab}"`));
+    expect(navigation).not.toContain('<Tab.Screen name="Profile"');
+    expect(navigation).toContain('<Stack.Screen name="Profile" component={ProfileScreen} />');
   });
 
   it('FITEATSY_SPLASH_CONTRACT keeps the approved video-first cold-launch experience', () => {

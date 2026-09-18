@@ -7,7 +7,7 @@ import { AppBackButton } from '../../components/AppBackButton';
 import { PageHeader } from '../../components/PageHeader';
 import { Screen } from '../../components/Screen';
 import { ApiClientError } from '../../services/apiClient';
-import { colors, getThemeColors, radius, spacing, typography } from '../../design/tokens';
+import { colors, getThemeColors, nutritionActionColors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import {
   DurationPreference,
@@ -464,6 +464,7 @@ const styles = StyleSheet.create({
     gap: 10
   },
   chooseButton: {
+    backgroundColor: nutritionActionColors.primary,
     marginTop: spacing.xs
   },
   whyButton: {
