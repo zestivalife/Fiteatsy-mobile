@@ -27,15 +27,4 @@ export const calculateGst = (baseAmountMinor: number): GstBreakup => {
   };
 };
 
-export const calculateGstForPlan = (code: string, baseAmountMinor: number): GstBreakup =>
-  code === 'WELLNESS_TRACKING_6M' || code === 'WELLNESS_TRACKING_12M'
-    ? calculateGst(baseAmountMinor)
-    : {
-        baseAmountMinor,
-        cgstRatePercent: 0,
-        cgstAmountMinor: 0,
-        sgstRatePercent: 0,
-        sgstAmountMinor: 0,
-        totalTaxMinor: 0,
-        totalAmountMinor: baseAmountMinor
-      };
+export const calculateGstForPlan = (_code: string, baseAmountMinor: number): GstBreakup => calculateGst(baseAmountMinor);

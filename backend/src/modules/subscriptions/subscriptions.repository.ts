@@ -25,9 +25,15 @@ const mapPlan = (row: Record<string, unknown>): SubscriptionPlanDto => ({
   code: String(row.code),
   name: String(row.name),
   description: String(row.description),
-  durationDays: Number(row.duration_days),
-  durationMonths: Number(row.duration_months),
+  durationDays: row.duration_days == null ? null : Number(row.duration_days),
+  durationMonths: row.duration_months == null ? null : Number(row.duration_months),
   priceMinor: Number(row.price_minor),
+  gstBasisPoints: Number(row.gst_basis_points ?? 1800),
+  planType: String(row.plan_type ?? 'RECURRING_PROGRAM') as SubscriptionPlanDto['planType'],
+  purchaseMode: String(row.purchase_mode ?? 'SUBSCRIPTION') as SubscriptionPlanDto['purchaseMode'],
+  purchaseEnabled: Boolean(row.purchase_enabled),
+  ctaLabel: String(row.cta_label ?? 'Choose Plan'),
+  sessionCount: row.session_count == null ? null : Number(row.session_count),
   ...calculateGstForPlan(String(row.code), Number(row.price_minor)),
   currency: String(row.currency),
   isActive: Boolean(row.is_active),
@@ -123,7 +129,7 @@ export const listActiveSubscriptionPlans = async (db: Queryable = pool) => {
         coalesce(string_agg(entitlements.entitlement_code, ',' order by entitlements.entitlement_code), '') as entitlements
       from subscription_plans plans
       left join plan_entitlements entitlements on entitlements.plan_id = plans.id
-      where plans.is_active = true
+      where plans.is_active = true and plans.purchase_enabled = true
       group by plans.id
       order by plans.display_order asc, plans.name asc
     `
@@ -141,6 +147,7 @@ export const getActiveSubscriptionPlanById = async (planId: string, db: Queryabl
       left join plan_entitlements entitlements on entitlements.plan_id = plans.id
       where plans.id = $1
         and plans.is_active = true
+        and plans.purchase_enabled = true
       group by plans.id
       limit 1
     `,
@@ -159,7 +166,7 @@ export const listActiveEntitlementsForUser = async (userId: string, db: Queryabl
         and subscriptions.status = 'ACTIVE'
         and subscriptions.revoked_at is null
         and subscriptions.starts_at <= now()
-        and subscriptions.expires_at > now()
+        and (subscriptions.expires_at is null or subscriptions.expires_at > now())
       order by entitlements.entitlement_code
     `,
     [userId]
@@ -180,8 +187,8 @@ export const getCurrentActiveSubscriptionForUser = async (userId: string, db: Qu
         and subscriptions.status = 'ACTIVE'
         and subscriptions.revoked_at is null
         and subscriptions.starts_at <= now()
-        and subscriptions.expires_at > now()
-      order by subscriptions.expires_at desc
+        and (subscriptions.expires_at is null or subscriptions.expires_at > now())
+      order by subscriptions.expires_at desc nulls first
       limit 1
     `,
     [userId]
@@ -365,7 +372,9 @@ export const activateSubscriptionFromPayment = async (input: {
     const startsAt = currentActive?.expiresAtISO && new Date(currentActive.expiresAtISO) > nowValue
       ? new Date(currentActive.expiresAtISO)
       : nowValue;
-    const expiresAt = new Date(startsAt.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
+    const expiresAt = plan.planType === 'ONE_TIME_SERVICE' || plan.durationDays == null
+      ? null
+      : new Date(startsAt.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
     const subscriptionId = crypto.randomUUID();
 
     await client.query(
@@ -400,7 +409,7 @@ export const activateSubscriptionFromPayment = async (input: {
         lockedOrder.userId,
         lockedOrder.planId,
         startsAt.toISOString(),
-        expiresAt.toISOString(),
+        expiresAt?.toISOString() ?? null,
         lockedOrder.providerOrderId,
         input.providerPaymentId,
         lockedOrder.id,

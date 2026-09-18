@@ -63,7 +63,7 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
       fetchPayment: async (paymentId) => ({
         id: paymentId,
         order_id: 'order_test_1',
-        amount: 99900,
+        amount: 235882,
         currency: 'INR',
         status: 'captured',
         method: 'upi'
@@ -78,10 +78,16 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
 
     const plans = await getJson(server.baseUrl, '/v1/subscriptions/plans');
     assert.equal(plans.response.status, 200);
-    assert.equal(plans.body.plans.length >= 6, true);
-    const consultationPlan = plans.body.plans.find((plan: { code: string }) => plan.code === 'LIFESTYLE_MODIFICATION_CONSULT');
+    assert.equal(plans.body.plans.length, 6);
+    assert.deepEqual(plans.body.plans.map((plan: { code: string }) => plan.code), [
+      'WELLNESS_6M', 'WELLNESS_12M', 'LIFESTYLE_CONSULT', 'CLINICAL_1M', 'CLINICAL_3M', 'DEEP_HEALING_6M'
+    ]);
+    const consultationPlan = plans.body.plans.find((plan: { code: string }) => plan.code === 'LIFESTYLE_CONSULT');
     assert.ok(consultationPlan);
-    assert.equal(consultationPlan.priceMinor, 99900);
+    assert.equal(consultationPlan.priceMinor, 199900);
+    assert.equal(consultationPlan.totalAmountMinor, 235882);
+    assert.equal(consultationPlan.planType, 'ONE_TIME_SERVICE');
+    assert.equal(consultationPlan.sessionCount, 1);
     assert.equal(consultationPlan.entitlements.includes('EXPERT_CONSULTATION'), true);
 
     const emptyCurrent = await getJson(server.baseUrl, '/v1/subscriptions/current', {
@@ -107,7 +113,7 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
     assert.equal(checkout.body.checkout.provider, 'razorpay');
     assert.equal(checkout.body.checkout.keyId, 'rzp_test_key');
     assert.equal(checkout.body.checkout.orderId, 'order_test_1');
-    assert.equal(checkout.body.checkout.amount, 99900);
+    assert.equal(checkout.body.checkout.amount, 235882);
     assert.equal(checkout.body.checkout.notes.source, 'book_consultation');
 
     const invalidSignature = await postJson(
@@ -144,7 +150,9 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
     });
     assert.equal(current.response.status, 200);
     assert.equal(current.body.hasActiveSubscription, true);
-    assert.equal(current.body.subscription.planCode, 'LIFESTYLE_MODIFICATION_CONSULT');
+    assert.equal(current.body.subscription.planCode, 'LIFESTYLE_CONSULT');
+    assert.equal(current.body.subscription.expiresAt, null);
+    assert.equal(current.body.subscription.daysRemaining, null);
     assert.equal(current.body.entitlements.includes('EXPERT_CONSULTATION'), true);
 
     const repeatedVerify = await postJson(

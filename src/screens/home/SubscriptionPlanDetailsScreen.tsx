@@ -22,11 +22,11 @@ export const SubscriptionPlanDetailsScreen = ({ navigation, route }: Props) => {
       {plan.recommended ? <Text style={styles.badge}>RECOMMENDED</Text> : null}
       <Text style={[styles.title, { color: palette.textPrimary }]}>{plan.name}</Text>
       <Text style={[styles.body, { color: palette.textSecondary }]}>{plan.description}</Text>
-      <View style={[styles.hero, { borderColor: palette.stroke }]}><Text style={[styles.price, { color: palette.textPrimary }]}>{formatPlanPrice(plan)}</Text><Text style={[styles.meta, { color: palette.textSecondary }]}>{formatPlanDuration(plan.durationDays)} · approximately {formatPlanPrice({ priceMinor: plan.dailyCostMinor ?? Math.ceil(plan.priceMinor / plan.durationDays), currency: plan.currency })}/day</Text></View>
+      <View style={[styles.hero, { borderColor: palette.stroke }]}><Text style={[styles.price, { color: palette.textPrimary }]}>{formatPlanPrice(plan)}</Text><Text style={[styles.meta, { color: palette.textSecondary }]}>{formatPlanDuration(plan.durationDays, plan.sessionCount)}{plan.durationDays ? ` · approximately ${formatPlanPrice({ priceMinor: plan.dailyCostMinor ?? Math.ceil(plan.priceMinor / plan.durationDays), currency: plan.currency })}/day` : ''}</Text></View>
       <Text style={[styles.section, { color: palette.textPrimary }]}>Included</Text>
       {plan.benefits.map((item) => <View key={item} style={styles.row}><Ionicons name="checkmark-circle-outline" size={18} color="#B59CFF" /><Text style={[styles.body, { color: palette.textSecondary }]}>{item}</Text></View>)}
       <Text style={[styles.section, { color: palette.textPrimary }]}>Validity and terms</Text>
-      <Text style={[styles.body, { color: palette.textSecondary }]}>Valid for {formatPlanDuration(plan.durationDays)} from activation. {plan.version?.termsText ?? 'Taxes, if applicable, will be shown at checkout.'}</Text>
+      <Text style={[styles.body, { color: palette.textSecondary }]}>{plan.durationDays ? `Valid for ${formatPlanDuration(plan.durationDays)} from activation.` : `${formatPlanDuration(plan.durationDays, plan.sessionCount)}.`} {plan.version?.termsText ?? 'Taxes, if applicable, will be shown at checkout.'}</Text>
       <Pressable onPress={() => navigation.navigate('SubscriptionCheckout', { planId: plan.id })} style={styles.primary} accessibilityRole="button"><Text style={styles.primaryText}>Review plan</Text></Pressable>
     </> : <Text style={[styles.body, { color: palette.textSecondary }]}>This plan is unavailable.</Text>}
   </Screen>;

@@ -32,11 +32,17 @@ const mapPlan = (row: Record<string, unknown>) => ({
   priceMinor: Number(row.price_minor),
   ...calculateGstForPlan(String(row.code), Number(row.price_minor)),
   currency: String(row.currency),
-  durationDays: Number(row.duration_days),
-  durationMonths: Number(row.duration_months),
-  dailyCostMinor: Math.ceil(Number(row.price_minor) / Number(row.duration_days)),
+  durationDays: row.duration_days == null ? null : Number(row.duration_days),
+  durationMonths: row.duration_months == null ? null : Number(row.duration_months),
+  dailyCostMinor: row.duration_days == null ? null : Math.ceil(Number(row.price_minor) / Number(row.duration_days)),
+  gstBasisPoints: Number(row.gst_basis_points ?? 1800),
+  planType: String(row.plan_type ?? 'RECURRING_PROGRAM'),
+  purchaseMode: String(row.purchase_mode ?? 'SUBSCRIPTION'),
+  purchaseEnabled: Boolean(row.purchase_enabled),
+  ctaLabel: String(row.cta_label ?? 'Choose Plan'),
+  sessionCount: row.session_count == null ? null : Number(row.session_count),
   isActive: Boolean(row.is_active),
-  developmentOnly: !['WELLNESS_TRACKING_6M', 'WELLNESS_TRACKING_12M'].includes(String(row.code)),
+  developmentOnly: false,
   recommended: Boolean(row.is_featured),
   badge: row.badge == null ? null : String(row.badge),
   displayOrder: Number(row.display_order),
@@ -62,12 +68,18 @@ const planQuery = `
     plans.is_featured,
     plans.badge,
     plans.display_order,
+    plans.purchase_enabled,
     versions.id as version_id,
     versions.version_number,
     versions.price_minor,
     versions.currency,
     versions.duration_days,
     versions.duration_months,
+    versions.plan_type,
+    versions.purchase_mode,
+    versions.cta_label,
+    versions.gst_basis_points,
+    versions.session_count,
     versions.benefits,
     versions.terms_text,
     versions.effective_from,
@@ -86,12 +98,12 @@ const planQuery = `
 `;
 
 export const listFoundationPlans = async (db: Queryable = pool) => {
-  const result = await db.query(`${planQuery} where plans.is_active = true group by plans.id, versions.id order by plans.display_order asc, plans.name asc`);
+  const result = await db.query(`${planQuery} where plans.is_active = true and plans.purchase_enabled = true group by plans.id, versions.id order by plans.display_order asc, plans.name asc`);
   return result.rows.map(mapPlan);
 };
 
 export const getFoundationPlan = async (planId: string, db: Queryable = pool) => {
-  const result = await db.query(`${planQuery} where plans.id = $1 and plans.is_active = true group by plans.id, versions.id limit 1`, [planId]);
+  const result = await db.query(`${planQuery} where plans.id = $1 and plans.is_active = true and plans.purchase_enabled = true group by plans.id, versions.id limit 1`, [planId]);
   return result.rowCount ? mapPlan(result.rows[0]) : null;
 };
 
@@ -104,7 +116,7 @@ const mapSubscription = (row: Record<string, unknown>) => ({
   status: String(row.status),
   startsAtISO: row.starts_at == null ? null : new Date(String(row.starts_at)).toISOString(),
   expiresAtISO: row.expires_at == null ? null : new Date(String(row.expires_at)).toISOString(),
-  durationDays: Number(row.duration_days_snapshot ?? 0),
+  durationDays: row.duration_days_snapshot == null ? null : Number(row.duration_days_snapshot),
   amountMinor: Number(row.amount_paid_minor),
   currency: String(row.currency),
   autoRenew: Boolean(row.auto_renew)
@@ -156,7 +168,7 @@ export const listEffectiveEntitlements = async (userId: string, db: Queryable = 
     where subscriptions.user_id = $1
       and subscriptions.status in ('ACTIVE', 'CANCELLED')
       and subscriptions.starts_at <= now()
-      and subscriptions.expires_at > now()
+      and (subscriptions.expires_at is null or subscriptions.expires_at > now())
       and subscriptions.revoked_at is null
   `, [userId]);
   return result.rows.map((row) => ({

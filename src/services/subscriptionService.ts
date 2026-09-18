@@ -35,7 +35,8 @@ export type SubscriptionPlan = {
   code: string;
   name: string;
   description: string | null;
-  durationDays: number;
+  durationDays: number | null;
+  durationMonths?: number | null;
   priceMinor: number;
   cgstRatePercent?: number;
   cgstAmountMinor?: number;
@@ -49,7 +50,13 @@ export type SubscriptionPlan = {
   developmentOnly?: boolean;
   recommended?: boolean;
   displayOrder?: number;
-  dailyCostMinor?: number;
+  dailyCostMinor?: number | null;
+  gstBasisPoints: number;
+  planType: 'RECURRING_PROGRAM' | 'ONE_TIME_SERVICE';
+  purchaseMode: 'SUBSCRIPTION' | 'ONE_TIME';
+  purchaseEnabled: boolean;
+  ctaLabel: string;
+  sessionCount: number | null;
   version?: {
     id: string;
     number: number;
@@ -67,7 +74,7 @@ export type FoundationSubscription = {
   subscription: (CurrentSubscription['subscription'] & {
     planId: string;
     planVersionId: string | null;
-    durationDays: number;
+    durationDays: number | null;
     amountMinor: number;
     currency: string;
     autoRenew: boolean;
@@ -85,7 +92,7 @@ export type CurrentSubscription = {
     status: string;
     startsAt: string | null;
     expiresAt: string | null;
-    daysRemaining: number;
+    daysRemaining: number | null;
     expiringSoon: boolean;
   } | null;
   entitlements: EntitlementCode[];
@@ -151,7 +158,8 @@ export const formatPlanPrice = (plan: { priceMinor?: number; amountMinor?: numbe
 export const formatMinorPrice = (amountMinor: number, currency = 'INR') =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amountMinor / 100);
 
-export const formatPlanDuration = (durationDays: number) => {
+export const formatPlanDuration = (durationDays: number | null, sessionCount?: number | null) => {
+  if (durationDays == null) return sessionCount === 1 ? '1 session' : 'One-time service';
   if (durationDays >= 360) return '12 months';
   if (durationDays >= 180) return '6 months';
   if (durationDays >= 90) return '3 months';

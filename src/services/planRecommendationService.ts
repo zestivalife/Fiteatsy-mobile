@@ -6,11 +6,11 @@ export type DurationPreference = 'one_month' | 'three_months' | 'six_months_plus
 export type PlanPriority = 'tracking' | 'expert_guidance' | 'nutrition_lifestyle' | 'accountability' | null;
 
 export type PlanCode =
-  | 'WELLNESS_TRACKING_6M'
-  | 'WELLNESS_TRACKING_12M'
-  | 'LIFESTYLE_MODIFICATION_CONSULT'
-  | 'CLINICAL_CARE_1M'
-  | 'CLINICAL_TRANSFORMATION_3M'
+  | 'WELLNESS_6M'
+  | 'WELLNESS_12M'
+  | 'LIFESTYLE_CONSULT'
+  | 'CLINICAL_1M'
+  | 'CLINICAL_3M'
   | 'DEEP_HEALING_6M';
 
 export type PlanCatalogItem = SubscriptionPlan & {
@@ -36,7 +36,7 @@ export type RecommendedPlanResult = {
 };
 
 const planCategory = (code: string): PlanCatalogItem['category'] => {
-  if (code.includes('TRACKING')) return 'tracking';
+  if (code.includes('WELLNESS')) return 'tracking';
   if (code.includes('CONSULT')) return 'consult';
   return 'clinical';
 };
@@ -65,41 +65,41 @@ export const recommendPlan = (context: PlanRecommendationContext): RecommendedPl
   const longTermGoal = includesAny(goals, ['sustainable', 'recovery', 'diabetes', 'pcos', 'hormone', 'weight loss', 'muscle']);
   const clinicalSupportSignal = conditions.length > 0 || longTermGoal || hasNutritionPlan;
 
-  let primaryCode: PlanCode = 'WELLNESS_TRACKING_6M';
-  let secondaryCode: PlanCode | null = 'LIFESTYLE_MODIFICATION_CONSULT';
+  let primaryCode: PlanCode = 'WELLNESS_6M';
+  let secondaryCode: PlanCode | null = 'LIFESTYLE_CONSULT';
   const signals: string[] = [];
 
   if (context.supportPreference === 'self_guided') {
-    primaryCode = context.durationPreference === 'six_months_plus' ? 'WELLNESS_TRACKING_12M' : 'WELLNESS_TRACKING_6M';
-    secondaryCode = 'LIFESTYLE_MODIFICATION_CONSULT';
+    primaryCode = context.durationPreference === 'six_months_plus' ? 'WELLNESS_12M' : 'WELLNESS_6M';
+    secondaryCode = 'LIFESTYLE_CONSULT';
     signals.push('You selected independent tracking as your preferred support style.');
   } else if (context.supportPreference === 'one_consult') {
-    primaryCode = 'LIFESTYLE_MODIFICATION_CONSULT';
-    secondaryCode = 'CLINICAL_CARE_1M';
+    primaryCode = 'LIFESTYLE_CONSULT';
+    secondaryCode = 'CLINICAL_1M';
     signals.push('You selected one expert consultation without ongoing commitment.');
   } else if (context.supportPreference === 'regular_support') {
     if (context.durationPreference === 'six_months_plus' && context.priority === 'accountability') {
       primaryCode = 'DEEP_HEALING_6M';
-      secondaryCode = 'CLINICAL_TRANSFORMATION_3M';
+      secondaryCode = 'CLINICAL_3M';
     } else if (context.durationPreference === 'one_month') {
-      primaryCode = 'CLINICAL_CARE_1M';
-      secondaryCode = 'CLINICAL_TRANSFORMATION_3M';
+      primaryCode = 'CLINICAL_1M';
+      secondaryCode = 'CLINICAL_3M';
     } else {
-      primaryCode = 'CLINICAL_TRANSFORMATION_3M';
-      secondaryCode = 'CLINICAL_CARE_1M';
+      primaryCode = 'CLINICAL_3M';
+      secondaryCode = 'CLINICAL_1M';
     }
     signals.push('You selected regular expert support.');
   } else if (context.priority === 'tracking' || hasWearableSignals) {
-    primaryCode = context.durationPreference === 'six_months_plus' ? 'WELLNESS_TRACKING_12M' : 'WELLNESS_TRACKING_6M';
-    secondaryCode = 'LIFESTYLE_MODIFICATION_CONSULT';
+    primaryCode = context.durationPreference === 'six_months_plus' ? 'WELLNESS_12M' : 'WELLNESS_6M';
+    secondaryCode = 'LIFESTYLE_CONSULT';
     signals.push(hasWearableSignals ? 'Your profile indicates wearable or tracking signals.' : 'Your priority is wellness pattern tracking.');
   } else if (context.priority === 'expert_guidance') {
-    primaryCode = 'LIFESTYLE_MODIFICATION_CONSULT';
-    secondaryCode = 'CLINICAL_CARE_1M';
+    primaryCode = 'LIFESTYLE_CONSULT';
+    secondaryCode = 'CLINICAL_1M';
     signals.push('Your priority is expert guidance.');
   } else if (context.priority === 'nutrition_lifestyle' || clinicalSupportSignal) {
-    primaryCode = context.durationPreference === 'one_month' ? 'CLINICAL_CARE_1M' : 'CLINICAL_TRANSFORMATION_3M';
-    secondaryCode = 'LIFESTYLE_MODIFICATION_CONSULT';
+    primaryCode = context.durationPreference === 'one_month' ? 'CLINICAL_1M' : 'CLINICAL_3M';
+    secondaryCode = 'LIFESTYLE_CONSULT';
     signals.push('Your profile includes nutrition, lifestyle, or care-planning signals.');
   }
 

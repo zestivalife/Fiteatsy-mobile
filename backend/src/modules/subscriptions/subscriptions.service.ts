@@ -44,7 +44,7 @@ export class SubscriptionDomainError extends Error {
 }
 
 const daysRemaining = (expiresAtISO: string | null) => {
-  if (!expiresAtISO) return 0;
+  if (!expiresAtISO) return null;
   const diff = new Date(expiresAtISO).getTime() - now().getTime();
   return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
 };
@@ -71,7 +71,7 @@ export const getCurrentSubscription = async (account: AuthenticatedAccount): Pro
           startsAt: subscription.startsAtISO,
           expiresAt: subscription.expiresAtISO,
           daysRemaining: remaining,
-          expiringSoon: remaining > 0 && remaining <= env.subscriptionExpiryWarningDays
+          expiringSoon: remaining != null && remaining > 0 && remaining <= env.subscriptionExpiryWarningDays
         }
       : null,
     entitlements

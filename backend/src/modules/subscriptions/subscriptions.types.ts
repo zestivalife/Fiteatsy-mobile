@@ -36,9 +36,15 @@ export type SubscriptionPlanDto = {
   code: string;
   name: string;
   description: string;
-  durationDays: number;
-  durationMonths: number;
+  durationDays: number | null;
+  durationMonths: number | null;
   priceMinor: number;
+  gstBasisPoints: number;
+  planType: 'RECURRING_PROGRAM' | 'ONE_TIME_SERVICE';
+  purchaseMode: 'SUBSCRIPTION' | 'ONE_TIME';
+  purchaseEnabled: boolean;
+  ctaLabel: string;
+  sessionCount: number | null;
   cgstRatePercent: number;
   cgstAmountMinor: number;
   sgstRatePercent: number;
@@ -63,7 +69,7 @@ export type CurrentSubscriptionDto = {
     status: SubscriptionStatus;
     startsAt: string | null;
     expiresAt: string | null;
-    daysRemaining: number;
+    daysRemaining: number | null;
     expiringSoon: boolean;
   } | null;
   entitlements: EntitlementCode[];

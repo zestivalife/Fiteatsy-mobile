@@ -19,15 +19,12 @@ import {
   EntitlementCode,
   PremiumSource,
   SubscriptionPlan,
-  formatMinorPrice,
   formatPlanDuration,
   formatPlanPrice,
   getCurrentSubscription,
   getSubscriptionPlans,
-  hasEntitlement,
   premiumSourceEntitlements,
 } from '../../services/subscriptionService';
-import { runVerifiedSubscriptionCheckout } from '../../services/razorpayCheckoutService';
 import { useAppContext } from '../../state/AppContext';
 import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
 
@@ -59,11 +56,9 @@ const priorityChoices: Choice<PlanPriority>[] = [
   { label: 'Long-term accountability', value: 'accountability', helper: 'Stay consistent over time.' }
 ];
 
-const generateIdempotencyKey = (planId: string) => `${planId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
 const planDailyCostLabel = (plan: SubscriptionPlan) => {
-  if (plan.durationDays <= 0) return null;
-  const dailyMinor = Math.ceil(plan.priceMinor / plan.durationDays);
+  if (!plan.durationDays || plan.durationDays <= 0) return null;
+  const dailyMinor = plan.dailyCostMinor ?? Math.ceil(plan.priceMinor / plan.durationDays);
   return `${formatPlanPrice({ ...plan, priceMinor: dailyMinor })}/day`;
 };
 
@@ -81,8 +76,6 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [activeEntitlements, setActiveEntitlements] = useState<EntitlementCode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadPlans = useCallback(async () => {
@@ -120,42 +113,12 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
     [durationPreference, health.availableMetricCount, onboarding, plans, priority, publishedNutritionPlan, supportPreference]
   );
 
-  const navigateAfterActivation = useCallback(() => {
-    navigation.replace('PaymentSuccess', { returnDestination });
-  }, [navigation, returnDestination]);
-
-  const startCheckout = async (plan: SubscriptionPlan) => {
-    setCheckoutPlanId(plan.id);
-    setErrorMessage(null);
-    try {
-      const result = await runVerifiedSubscriptionCheckout({
-        plan,
-        source,
-        requiredEntitlement,
-        returnDestination: returnDestination ?? null,
-        idempotencyKey: generateIdempotencyKey(plan.id)
-      });
-
-      if (result.alreadyEntitled) {
-        navigateAfterActivation();
-        return;
-      }
-
-      navigation.replace('PaymentSuccess', { returnDestination, priceBreakup: result.priceBreakup });
-    } catch (error) {
-      const message =
-        error instanceof ApiClientError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : 'Payment could not be completed.';
-      setErrorMessage(message);
-    } finally {
-      setCheckoutPlanId(null);
-    }
-  };
-
-  const selectPlanForCheckout = (plan: SubscriptionPlan) => setSelectedPlan(plan);
+  const selectPlanForCheckout = useCallback((plan: SubscriptionPlan) => navigation.navigate('SubscriptionCheckout', {
+    planId: plan.id,
+    source,
+    requiredEntitlement,
+    returnDestination
+  }), [navigation, requiredEntitlement, returnDestination, source]);
 
   const entitledForRequiredFeature = requiredEntitlement ? activeEntitlements.includes(requiredEntitlement) : false;
   const recommendedPlan = recommendation.primary;
@@ -205,7 +168,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
             <Text style={styles.planReason}>{recommendation.reason}</Text>
             <Text style={styles.taxNote}>Base price + applicable GST at checkout</Text>
           <View style={styles.planMetaRow}>
-            <Text style={styles.planMeta}>{formatPlanDuration(recommendedPlan.durationDays)}</Text>
+            <Text style={styles.planMeta}>{formatPlanDuration(recommendedPlan.durationDays, recommendedPlan.sessionCount)}</Text>
             <Text style={styles.planPrice}>{formatPlanPrice(recommendedPlan)}</Text>
             {planDailyCostLabel(recommendedPlan) ? <Text style={styles.planMeta}>{planDailyCostLabel(recommendedPlan)}</Text> : null}
           </View>
@@ -219,9 +182,8 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
           </View>
           <View style={styles.recommendationActions}>
             <PrimaryButton
-              title={checkoutPlanId === recommendedPlan.id ? 'Opening secure checkout...' : 'Subscribe & Continue'}
+              title={recommendedPlan.ctaLabel}
               onPress={() => selectPlanForCheckout(recommendedPlan)}
-              disabled={Boolean(checkoutPlanId)}
               style={styles.chooseButton}
             />
             <Pressable onPress={() => setWhyVisible(true)} style={styles.whyButton} accessibilityRole="button">
@@ -236,11 +198,10 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
           <Text style={[styles.secondaryLabel, { color: palette.textSecondary }]}>Also worth considering</Text>
           <Text style={[styles.secondaryName, { color: palette.textPrimary }]}>{recommendation.secondary.name}</Text>
           <Text style={[styles.secondaryCopy, { color: palette.textSecondary }]}>
-            {formatPlanDuration(recommendation.secondary.durationDays)} · {formatPlanPrice(recommendation.secondary)} + applicable GST
+            {formatPlanDuration(recommendation.secondary.durationDays, recommendation.secondary.sessionCount)} · {formatPlanPrice(recommendation.secondary)} + applicable GST
           </Text>
           <Pressable
             onPress={() => selectPlanForCheckout(recommendation.secondary as SubscriptionPlan)}
-            disabled={Boolean(checkoutPlanId)}
             style={styles.secondaryAction}
             accessibilityRole="button"
           >
@@ -263,7 +224,6 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
             <Pressable
               key={plan.id}
               onPress={() => selectPlanForCheckout(plan)}
-              disabled={Boolean(checkoutPlanId)}
               style={[styles.catalogCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}
               accessibilityRole="button"
             >
@@ -272,7 +232,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
                 <Text style={styles.catalogPrice}>{formatPlanPrice(plan)}</Text>
               </View>
               <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>
-                {formatPlanDuration(plan.durationDays)}{planDailyCostLabel(plan) ? ` · ${planDailyCostLabel(plan)}` : ''}
+                {formatPlanDuration(plan.durationDays, plan.sessionCount)}{planDailyCostLabel(plan) ? ` · ${planDailyCostLabel(plan)}` : ''}
               </Text>
               <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>Base price + applicable GST at checkout</Text>
               {plan.badge ? <Text style={styles.catalogValue}>{plan.badge}</Text> : null}
@@ -297,23 +257,6 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
               </View>
             ))}
             <PrimaryButton title="Close" onPress={() => setWhyVisible(false)} style={styles.closeButton} />
-          </View>
-        </View>
-      </Modal>
-      <Modal visible={Boolean(selectedPlan)} transparent animationType="slide" onRequestClose={() => setSelectedPlan(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.sheet, { backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0D0F0D' }]}>
-            <View style={styles.sheetHandle} />
-            <Text style={[styles.sheetTitle, { color: palette.textPrimary }]}>Confirm payment</Text>
-            <Text style={[styles.sheetBody, { color: palette.textSecondary }]}>{selectedPlan?.name}</Text>
-            {selectedPlan ? <>
-              <View style={styles.taxRow}><Text style={[styles.taxLabel, { color: palette.textSecondary }]}>Plan price</Text><Text style={[styles.taxValue, { color: palette.textPrimary }]}>{formatMinorPrice(selectedPlan.priceMinor, selectedPlan.currency)}</Text></View>
-              <View style={styles.taxRow}><Text style={[styles.taxLabel, { color: palette.textSecondary }]}>CGST @ 9%</Text><Text style={[styles.taxValue, { color: palette.textPrimary }]}>{formatMinorPrice(selectedPlan.cgstAmountMinor ?? 0, selectedPlan.currency)}</Text></View>
-              <View style={styles.taxRow}><Text style={[styles.taxLabel, { color: palette.textSecondary }]}>SGST @ 9%</Text><Text style={[styles.taxValue, { color: palette.textPrimary }]}>{formatMinorPrice(selectedPlan.sgstAmountMinor ?? 0, selectedPlan.currency)}</Text></View>
-              <View style={styles.totalRow}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalValue}>{formatMinorPrice(selectedPlan.totalAmountMinor ?? selectedPlan.priceMinor, selectedPlan.currency)}</Text></View>
-              <PrimaryButton title={`Pay ${formatMinorPrice(selectedPlan.totalAmountMinor ?? selectedPlan.priceMinor, selectedPlan.currency)}`} onPress={() => { const plan = selectedPlan; setSelectedPlan(null); void startCheckout(plan); }} disabled={Boolean(checkoutPlanId)} />
-            </> : null}
-            <Pressable onPress={() => setSelectedPlan(null)} style={styles.closeButton} accessibilityRole="button"><Text style={styles.whyText}>Cancel</Text></Pressable>
           </View>
         </View>
       </Modal>

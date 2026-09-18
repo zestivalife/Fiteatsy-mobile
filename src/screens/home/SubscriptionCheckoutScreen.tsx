@@ -42,10 +42,12 @@ export const SubscriptionCheckoutScreen = ({ navigation, route }: Props) => {
     try {
       const result = await runVerifiedSubscriptionCheckout({
         plan,
-        source: 'subscription_management',
+        source: route.params.source ?? 'subscription_management',
+        requiredEntitlement: route.params.requiredEntitlement,
+        returnDestination: route.params.returnDestination ?? null,
         idempotencyKey: createIdempotencyKey(plan.id)
       });
-      navigation.replace('PaymentSuccess', { priceBreakup: result.priceBreakup });
+      navigation.replace('PaymentSuccess', { returnDestination: route.params.returnDestination, priceBreakup: result.priceBreakup });
     } catch (cause) {
       setError(cause instanceof ApiClientError ? cause.message : cause instanceof Error ? cause.message : 'Payment could not be completed.');
     } finally {
@@ -61,7 +63,7 @@ export const SubscriptionCheckoutScreen = ({ navigation, route }: Props) => {
     {!loading && plan ? <>
       <View style={[styles.card, { borderColor: palette.stroke }]}>
         <Text style={[styles.plan, { color: palette.textPrimary }]}>{plan.name}</Text>
-        <Text style={[styles.body, { color: palette.textSecondary }]}>{formatPlanDuration(plan.durationDays)} · {formatPlanPrice(plan)}</Text>
+        <Text style={[styles.body, { color: palette.textSecondary }]}>{formatPlanDuration(plan.durationDays, plan.sessionCount)} · {formatPlanPrice(plan)}</Text>
         <View style={styles.line}><Text style={[styles.body, { color: palette.textSecondary }]}>Plan price</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatMinorPrice(plan.priceMinor, plan.currency)}</Text></View>
         <View style={styles.line}><Text style={[styles.body, { color: palette.textSecondary }]}>CGST</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatMinorPrice(plan.cgstAmountMinor ?? 0, plan.currency)}</Text></View>
         <View style={styles.line}><Text style={[styles.body, { color: palette.textSecondary }]}>SGST</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatMinorPrice(plan.sgstAmountMinor ?? 0, plan.currency)}</Text></View>

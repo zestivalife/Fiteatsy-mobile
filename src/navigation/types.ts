@@ -1,5 +1,6 @@
 import { TrackerTab } from '../services/trackerAnalysisService';
 import { ReportParameter } from '../services/nuetraService';
+import type { EntitlementCode } from '../services/subscriptionService';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -34,7 +35,12 @@ export type RootStackParamList = {
   SubscriptionPlanDetails: { planId: string };
   SubscriptionCompare: undefined;
   MySubscription: undefined;
-  SubscriptionCheckout: { planId: string };
+  SubscriptionCheckout: {
+    planId: string;
+    source?: 'assist' | 'talk_to_expert' | 'get_assistance' | 'book_consultation' | 'subscription_management';
+    requiredEntitlement?: EntitlementCode | null;
+    returnDestination?: keyof RootStackParamList;
+  };
   SubscriptionPaymentPlaceholder: {
     status?: 'PENDING' | 'PAYMENT_PENDING' | 'PROCESSING' | 'PAYMENT_FAILED';
     returnDestination?: keyof RootStackParamList;
