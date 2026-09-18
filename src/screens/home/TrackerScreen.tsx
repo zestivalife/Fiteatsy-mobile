@@ -21,6 +21,7 @@ import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEn
 import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
 import {getHealthIntelligenceV1,getHealthScoreHistory,getHealthScoreSummary,type HealthIntelligenceV1,type HealthScore,type HealthScoreSummary,type HealthScoreType} from '../../services/healthIntelligenceService';
 import { useCanonicalHealthSyncCoordinator, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
+import { canonicalHealthStatusLabel } from '@fiteatsy/health-intelligence';
 
 type RangeMode = '7D' | '30D';
 type HealthSubTab = 'overview' | 'activity' | 'heart' | 'sleep';
@@ -114,7 +115,8 @@ const toPct = (value: number, min: number, max: number) => {
   return (value - min) / (max - min);
 };
 
-const scoreLabel = (score: number | null | undefined) => (score == null ? 'Calibrating' : `${score}/100`);
+const scoreLabel = (score: number | null | undefined, status?: string | null) =>
+  score == null ? canonicalHealthStatusLabel(status) : `${score}/100`;
 const numberLabel = (value: number | null | undefined, suffix = '') =>
   value == null || !Number.isFinite(value) || value <= 0 ? 'No data' : `${Math.round(value).toLocaleString()}${suffix}`;
 const decimalLabel = (value: number | null | undefined, suffix = '') =>
@@ -1585,14 +1587,14 @@ export const TrackerScreen = () => {
 
   const renderHealthOverview = () => (
     <View style={styles.healthContentStack}>
-      <RecoveryParticleMetric value={displayScores?.recovery.score ?? null} label={statusLabel(displayScores?.recovery.score)} />
+      <RecoveryParticleMetric value={displayScores?.recovery.score ?? null} label={displayScores?.recovery.score == null ? canonicalHealthStatusLabel(displayScores?.recovery.status) : statusLabel(displayScores?.recovery.score)} />
       <Card style={styles.healthPanel}>
         <Text style={styles.healthPanelTitle}>Health Intelligence Scores</Text>
         <Text style={styles.healthPanelIntro}>Scores appear automatically when enough recent health data is available.</Text>
         {canonicalScoreRows.map(([label, result], index) => (
           <View key={label} style={[styles.healthMetricLabelWrap, index > 0 && styles.healthMetricRowDivider]}>
             <Text style={styles.healthMetricLabel}>{label}</Text>
-            <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{scoreLabel(result.score)}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Details for ${label}`} hitSlop={10} onPress={() => Alert.alert(label, `${result.status.replaceAll('_', ' ')} · ${result.confidence} confidence · ${result.freshness.toLowerCase()}`)}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
+            <View style={styles.healthMetricCompactValue}><Text style={styles.healthMetricValue}>{scoreLabel(result.score, result.status)}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Details for ${label}`} hitSlop={10} onPress={() => Alert.alert(label, `${canonicalHealthStatusLabel(result.status)} · ${result.confidence} confidence · ${result.freshness.toLowerCase()}`)}><Ionicons name="information-circle-outline" size={19} color={TRACKER_MUTED}/></Pressable></View>
           </View>
         ))}
         <Text style={[styles.healthPanelTitle, styles.supportingTitle]}>Supporting Intelligence</Text>

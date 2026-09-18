@@ -23,7 +23,7 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(coordinator).toContain('getLatestHealthObservations(200)');
     expect(coordinator).toContain('getHealthSyncActivity(8)');
     expect(screen).toContain('health.metrics.map');
-    expect(screen).toContain('No recent data');
+    expect(screen).toContain('canonicalHealthStatusLabel');
     expect(screen).not.toMatch(/value:\s*['"](?:--|0)['"]/);
   });
 
@@ -73,8 +73,11 @@ describe('Health Data Sync control-centre contracts', () => {
   test('fails gracefully and uses truthful zero-data language', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
+    const shared = read('packages/health-intelligence/src/index.ts');
     expect(coordinator).toContain('access requires your attention');
-    expect(screen).toContain("NO_VISIBLE_DATA:'No recent data'");
+    expect(screen).toContain('canonicalHealthStatusLabel(state)');
+    expect(shared).toContain("NO_VISIBLE_DATA')return context.hasPartialEvidence?'INSUFFICIENT_DATA':'NO_DATA'");
+    expect(shared).toContain("NO_DATA:'No data yet'");
     expect(screen).not.toContain('Permission denied');
   });
 

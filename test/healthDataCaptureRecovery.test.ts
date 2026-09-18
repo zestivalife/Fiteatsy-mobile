@@ -140,7 +140,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(coordinator).toContain('mergeLocalObservations(result.observations)');
     expect(coordinator).toContain('awaitingPermissionReturn.current');
     expect(screen).toContain('Available metrics');
-    expect(screen).toContain('No recent data');
+    expect(screen).toContain('canonicalHealthStatusLabel');
   });
 
   test('QA diagnostics are safe, metric-specific, and development-gated', () => {

@@ -24,9 +24,11 @@ describe('Journey recovery star canonical data contract', () => {
   });
 
   it('shows no score when the backend reports insufficient data', () => {
+    const shared = readFileSync(join(process.cwd(), 'packages/health-intelligence/src/index.ts'), 'utf8');
     expect(source).toContain("selectedScore == null ? '—'");
-    expect(source).toContain("case 'METHODOLOGY_PENDING': return 'Methodology pending'");
-    expect(source).toContain("case 'NOT_APPLICABLE': return 'Not applicable'");
+    expect(source).toContain('frameworkStatusLabel = canonicalHealthStatusLabel');
+    expect(shared).toContain("METHODOLOGY_PENDING:'Methodology pending'");
+    expect(shared).toContain("NOT_APPLICABLE:'Not applicable'");
     expect(source).toContain('stateFromScore(selected.score, selectedFramework?.status)');
   });
 });

@@ -3,6 +3,24 @@ export const HEALTH_INTELLIGENCE_CONFIG={version:HEALTH_INTELLIGENCE_VERSION,cli
   targets:{sleepMinutes:null as number|null,steps:10_000,exerciseMinutes:30},
   weights:{sleep:{duration:.4,quality:.4,consistency:.2},activity:{steps:.4,exercise:.4,balance:.2},nutrition:{protein:.25,hydration:.2,foodQuality:.3,clinical:.25},calm:{hrv:.4,stress:.3,mindfulness:.3},stressRecovery:{hrv:.4,sleep:.3,adaptation:.3},recovery:{sleep:.4,body:.3,activityBalance:.2,lifestyle:.1},cycle:{phase:.4,symptoms:.3,energy:.3},overall:{activity:.15,sleep:.2,nutrition:.2,calm:.15,stressRecovery:.15,cycle:.15}}} as const;
 export type ScoreStatus='CALCULATED'|'PARTIAL'|'INSUFFICIENT_DATA'|'METHODOLOGY_PENDING'|'NOT_APPLICABLE'|'STALE';
+export type CanonicalHealthStatus='AVAILABLE'|'CALCULATING'|'CALIBRATING'|'NO_DATA'|'INSUFFICIENT_DATA'|'METHODOLOGY_PENDING'|'NOT_APPLICABLE'|'STALE'|'OFFLINE'|'UPLOAD_PENDING'|'ACTION_REQUIRED'|'ERROR';
+export type HealthRuntimeState='IDLE'|'QUERYING'|'DATA_AVAILABLE'|'NO_VISIBLE_DATA'|'ERROR'|'TIMEOUT'|'UPLOAD_PENDING';
+export const canonicalHealthStatus=(status:string|null|undefined,context:{hasCanonicalData?:boolean;hasPartialEvidence?:boolean;offline?:boolean}={}):CanonicalHealthStatus=>{
+ const normalized=String(status??'').toUpperCase();
+ if(normalized==='CALCULATED'||normalized==='AVAILABLE'||normalized==='DATA_AVAILABLE')return 'AVAILABLE';
+ if(normalized==='PARTIAL')return 'ACTION_REQUIRED';
+ if(normalized==='QUERYING'||normalized==='CALCULATING')return 'CALCULATING';
+ if(normalized==='IDLE')return context.hasCanonicalData?'AVAILABLE':'CALIBRATING';
+ if(normalized==='NO_VISIBLE_DATA')return context.hasPartialEvidence?'INSUFFICIENT_DATA':'NO_DATA';
+ if(normalized==='TIMEOUT'||normalized==='ERROR')return context.offline?'OFFLINE':'ERROR';
+ if(normalized==='CALIBRATING'||normalized==='NO_DATA'||normalized==='INSUFFICIENT_DATA'||normalized==='METHODOLOGY_PENDING'||normalized==='NOT_APPLICABLE'||normalized==='STALE'||normalized==='OFFLINE'||normalized==='UPLOAD_PENDING'||normalized==='ACTION_REQUIRED')return normalized as CanonicalHealthStatus;
+ return context.hasCanonicalData?'AVAILABLE':'NO_DATA';
+};
+export const canonicalHealthStatusLabel=(status:string|null|undefined,context:{hasCanonicalData?:boolean;hasPartialEvidence?:boolean;offline?:boolean}={})=>({
+ AVAILABLE:'Available',CALCULATING:'Calculating',CALIBRATING:'Calibrating',NO_DATA:'No data yet',INSUFFICIENT_DATA:'Not enough data',
+ METHODOLOGY_PENDING:'Methodology pending',NOT_APPLICABLE:'Not applicable',STALE:'Update needed',OFFLINE:'Available offline',
+ UPLOAD_PENDING:'Upload pending',ACTION_REQUIRED:'Action needed',ERROR:'Unavailable'
+}[canonicalHealthStatus(status,context)]);
 export type Confidence='HIGH'|'MODERATE'|'LOW';
 export type ScoreResult={key:string;score:number|null;status:ScoreStatus;confidence:Confidence;trend:number|null;
  inputsUsed:string[];inputsMissing:string[];inputsNotApplicable:string[];methodologyPending:string[];contributingFactors:string[];

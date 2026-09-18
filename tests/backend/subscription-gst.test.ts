@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { calculateGst, calculateGstForPlan } from '../../backend/src/modules/subscriptions/gst.js';
+
+test('canonical one-time consultation migration grants the expert consultation capability', () => {
+  const migration = readFileSync(
+    new URL('../../backend/src/db/migrations/0080_canonical_six_plan_catalogue.sql', import.meta.url),
+    'utf8'
+  );
+  assert.match(migration, /plans\.code = 'LIFESTYLE_CONSULT'/);
+  assert.match(migration, /registry\.code = 'EXPERT_CONSULTATION'/);
+  assert.match(migration, /select versions\.id, registry\.code, true/);
+});
 
 test('GST uses exact integer-paise amounts for the 6 month plan', () => {
   assert.deepEqual(calculateGst(299900), {

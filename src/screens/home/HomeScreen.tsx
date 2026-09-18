@@ -6,6 +6,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Path, Stop, SvgProps } from 'react-native-svg';
+import { canonicalHealthStatusLabel } from '@fiteatsy/health-intelligence';
 import { AppBackground } from '../../components/AppBackground';
 import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
 import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
@@ -88,20 +89,7 @@ const trendTone = (value: number) => {
   return { bg: '#050505', text: '#FFFFFF' };
 };
 
-export const frameworkStatusLabel = (status?: string | null) => {
-  switch (status) {
-    case 'METHODOLOGY_PENDING': return 'Methodology pending';
-    case 'NOT_APPLICABLE': return 'Not applicable';
-    case 'INSUFFICIENT_DATA': return 'Not enough data';
-    case 'NO_DATA': return 'No data yet';
-    case 'CALCULATING': return 'Calculating';
-    case 'CALIBRATING': return 'Calibrating';
-    case 'STALE': return 'Update needed';
-    case 'OFFLINE': return 'Available offline';
-    case 'ERROR': return 'Unavailable';
-    default: return 'No data yet';
-  }
-};
+export const frameworkStatusLabel = canonicalHealthStatusLabel;
 
 const stateFromScore = (score: number | null, status?: string | null) => {
   if (score == null) return { label: frameworkStatusLabel(status) };

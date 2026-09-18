@@ -161,4 +161,15 @@ join subscription_plans plans on plans.id = versions.plan_id
 where versions.effective_to is null and plans.code = 'LIFESTYLE_CONSULT'
 on conflict (plan_version_id, entitlement_code) do update set boolean_value = null, limit_value = 1, enum_value = null;
 
+-- The lifestyle consultation is a one-time expert service. Keep its explicit
+-- capability entitlement alongside the single-session limit; it must not
+-- inherit recurring clinical-plan access semantics.
+insert into subscription_plan_version_entitlements (plan_version_id, entitlement_code, boolean_value)
+select versions.id, registry.code, true
+from subscription_plan_versions versions
+join subscription_plans plans on plans.id = versions.plan_id and plans.code = 'LIFESTYLE_CONSULT'
+join subscription_entitlement_registry registry on registry.code = 'EXPERT_CONSULTATION'
+where versions.effective_to is null
+on conflict (plan_version_id, entitlement_code) do update set boolean_value = true, limit_value = null, enum_value = null;
+
 create index if not exists subscription_plans_purchase_order_idx on subscription_plans (purchase_enabled, display_order);

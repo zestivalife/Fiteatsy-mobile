@@ -15,11 +15,21 @@ describe('health score status contract', () => {
 
   it('presents framework states distinctly on Home', () => {
     const home = source('src/screens/home/HomeScreen.tsx');
-    expect(home).toContain("case 'METHODOLOGY_PENDING': return 'Methodology pending'");
-    expect(home).toContain("case 'NOT_APPLICABLE': return 'Not applicable'");
-    expect(home).toContain("case 'INSUFFICIENT_DATA': return 'Not enough data'");
-    expect(home).toContain("case 'NO_DATA': return 'No data yet'");
+    const shared = source('packages/health-intelligence/src/index.ts');
+    expect(home).toContain("import { canonicalHealthStatusLabel } from '@fiteatsy/health-intelligence'");
+    expect(home).toContain('frameworkStatusLabel = canonicalHealthStatusLabel');
+    expect(shared).toContain("METHODOLOGY_PENDING:'Methodology pending'");
+    expect(shared).toContain("NOT_APPLICABLE:'Not applicable'");
+    expect(shared).toContain("INSUFFICIENT_DATA:'Not enough data'");
+    expect(shared).toContain("NO_DATA:'No data yet'");
     expect(home).toContain('stateFromScore(selected.score, selectedFramework?.status)');
+  });
+
+  it('uses the same canonical status labels on Tracker', () => {
+    const tracker = source('src/screens/home/TrackerScreen.tsx');
+    expect(tracker).toContain("import { canonicalHealthStatusLabel } from '@fiteatsy/health-intelligence'");
+    expect(tracker).toContain('canonicalHealthStatusLabel(result.status)');
+    expect(tracker).toContain('scoreLabel(result.score, result.status)');
   });
 
   it('does not render legacy supporting scores as current numerics', () => {
