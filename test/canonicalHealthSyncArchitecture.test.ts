@@ -56,7 +56,7 @@ describe('canonical health sync architecture',()=>{
   test('available metric count derives only from metric data state',()=>{
     expect(coordinator).toContain("metric.queryState === 'DATA_AVAILABLE'");
     expect(coordinator).not.toContain("metric.queryState === 'DATA_AVAILABLE' ||");
-    expect(screen).toContain('{health.availableMetricCount}');
+    expect(screen).toContain("{health.localHydrated?health.availableMetricCount:'—'}");
     expect(screen).not.toContain('recordsAvailable');
   });
 

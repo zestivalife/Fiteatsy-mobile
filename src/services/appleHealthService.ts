@@ -76,6 +76,11 @@ export const syncFromAppleHealth = async (
   const observations: HealthObservationDraft[] = []; const presentationObservations: HealthObservationDraft[] = [];
   const nextAnchors: Record<string,string> = {};
   const statuses: Record<string,string> = {};
+  // `connectedMetrics` is a legacy, presentation-oriented status map. Some
+  // product categories deliberately share a key (for example exercise and
+  // workouts), so it must never be used to count native read tasks.
+  // Keep task status by native HealthKit identifier for truthful sync counts.
+  const terminalMetricStatuses: Record<string, 'synced' | 'no_recent_data' | 'unavailable'> = {};
   const metricValues: Record<string, number[]> = {};
   const metricDiagnostics:NonNullable<WearableSyncPayload['dataQuality']['metricDiagnostics']>={};
   diagnostic('HEALTH_SYNC_START', { metricCount: APPLE_HEALTH_SCOPES.length, status: 'STARTED' });
@@ -180,9 +185,11 @@ export const syncFromAppleHealth = async (
         droppedRecordCount:result.samples.length-acceptedSampleCount,
         dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_OR_NON_POSITIVE_SAMPLE']};
       const nextStatus = acceptedSampleCount > 0 ? 'synced' : 'no_recent_data';
+      terminalMetricStatuses[metric] = nextStatus;
       statuses[statusKey] = statuses[statusKey] === 'synced' ? 'synced' : nextStatus;
     } else {
       const statusKey = APPLE_HEALTH_STATUS_KEYS[metric] ?? metric;
+      terminalMetricStatuses[metric] = 'unavailable';
       if (statuses[statusKey] !== 'synced') statuses[statusKey] = 'unavailable';
     }
   });
@@ -215,7 +222,7 @@ export const syncFromAppleHealth = async (
   const workoutMinutes = Math.max(sum(validValues(metricValues.workout_minutes ?? [])), sum(validValues(metricValues.active_minutes ?? [])));
   const activeEnergy = sum(validValues(metricValues.active_energy ?? []));
   diagnostic('HEALTH_SYNC_COMPLETE', { durationMs: 0, status: observations.length ? 'SUCCESS' : 'NO_DATA' });
-  const metricStatuses = Object.values(statuses);
+  const metricStatuses = APPLE_HEALTH_SCOPES.map((metric) => terminalMetricStatuses[metric] ?? 'unavailable');
   return {deviceId:'ios-healthkit',brand:'Apple',model:'Apple Health',provider:'Apple Health',syncedAtISO:new Date().toISOString(),source:'api',
     metrics:{heartRateAvg:restingHeartRate,sleepHours:sleepMinutes > 0 ? sleepMinutes / 60 : null,
       hydrationLiters:sum(validValues(metricValues.hydration_ml ?? [])) / 1000 || null,focusMinutes:null,breathingMinutes:null,

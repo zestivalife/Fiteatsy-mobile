@@ -67,6 +67,14 @@ const serverSnapshot = (value: HealthIntelligenceV1): LocalCanonicalHealthSnapsh
 export const countAvailableHealthMetrics = (metrics: CanonicalHealthMetricState[]) =>
   metrics.filter((metric) => metric.queryState === 'DATA_AVAILABLE').length;
 
+/**
+ * A completed read is distinct from a metric with a visible value. HealthKit
+ * legitimately returns no data for an authorised type, and that must not
+ * leave the UI reporting a fictitious pending task.
+ */
+export const countTerminalHealthMetricReads = (metrics: CanonicalHealthMetricState[]) =>
+  metrics.filter((metric) => metric.supported && metric.queryState !== 'IDLE' && metric.queryState !== 'QUERYING').length;
+
 const useCreateCanonicalHealthSyncCoordinator = () => {
   const { authSession, bootstrapped, wellness, onboarding, setWellness, setSelectedDeviceId } = useAppContext();
   const adapter = useMemo(() => getHealthPlatformAdapter(), []);
@@ -414,6 +422,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     platform: adapter.platform,
     metrics,
     availableMetricCount: countAvailableHealthMetrics(metrics),
+    terminalMetricReadCount: countTerminalHealthMetricReads(metrics),
+    supportedMetricReadCount: metrics.filter((metric) => metric.supported).length,
     uploadState,
     status,
     observations,

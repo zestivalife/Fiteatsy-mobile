@@ -10,7 +10,8 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain('settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY');
     expect(apple).toContain('APPLE_HEALTH_METRIC_TIMEOUT_MS');
     expect(apple).toContain("result.samples.length ? 'SUCCESS' : 'NO_DATA'");
-    expect(apple).toContain("statuses[statusKey] !== 'synced'");
+    expect(apple).toContain("terminalMetricStatuses[metric] = nextStatus");
+    expect(apple).toContain('APPLE_HEALTH_SCOPES.map((metric) => terminalMetricStatuses[metric]');
   });
 
   test('first Apple sync uses bounded backfill and incremental sync uses only valid anchors', () => {
@@ -98,6 +99,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(coordinator).toContain('localProviderConnected');
     expect(coordinator).toContain('readLocalHealthObservations(localScope)');
     expect(coordinator).toContain('refreshQueued.current = true');
+    expect(coordinator).toContain('countTerminalHealthMetricReads');
     expect(coordinator).toContain('void syncLocalMetrics()');
     expect(screen).toContain('HEALTHKIT_DAILY_CUMULATIVE_STATISTIC');
     for (const color of ['#FF5E1A','#0A84FF','#5E5CE6','#FF375F','#32D74B','#BF5AF2','#64D2FF']) {

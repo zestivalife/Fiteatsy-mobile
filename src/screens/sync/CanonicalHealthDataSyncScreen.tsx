@@ -60,7 +60,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
           {busy?<ActivityIndicator size="large" color={palette.blue}/>:<View style={[styles.syncResultIcon,{backgroundColor:uploadPending?palette.warningSoft:palette.dangerSoft}]}><Ionicons name={uploadPending?'cloud-offline-outline':'alert-circle-outline'} size={30} color={uploadPending?palette.warning:palette.danger}/></View>}
           <Text style={[styles.syncTitle,{color:palette.textPrimary}]}>{busy?'Syncing health data':uploadPending?'Connection interrupted':'Health sync unsuccessful'}</Text>
           <Text style={[styles.syncBody,{color:palette.textSecondary}]}>{busy?`Reading ${health.sourceName}. Synced values will appear automatically when ready.`:uploadPending?'Your Apple Health values remain safe on this device. Upload will resume when the connection is available.':syncErrorMessage}</Text>
-          {busy?<Text style={[styles.syncProgress,{color:palette.textMuted}]}>{health.availableMetricCount} of {health.metrics.filter(metric=>metric.supported).length} metrics ready</Text>:null}
+          {busy?<Text style={[styles.syncProgress,{color:palette.textMuted}]}>Reading {health.supportedMetricReadCount} authorised metrics. Metrics with no records are reported as No data, not left pending.</Text>:null}
           {!busy?<View style={styles.syncActions}><PrimaryButton title="Try Again" onPress={startSync}/><PrimaryButton title="Close" variant="secondary" onPress={()=>setSyncPopupVisible(false)}/></View>:null}
         </View>
       </View>

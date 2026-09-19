@@ -44,6 +44,7 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(screen).toContain("busy?'Syncing health data'");
     expect(screen).toContain("uploadPending?'Connection interrupted':'Health sync unsuccessful'");
     expect(screen).toContain('Synced values will appear automatically when ready.');
+    expect(screen).toContain('Metrics with no records are reported as No data, not left pending.');
     expect(screen).toContain('Try Again');
     expect(screen).toContain("health.uploadState==='SYNCED')setSyncPopupVisible(false)");
     expect(screen).not.toContain('useState<HealthMetricQueryState');
