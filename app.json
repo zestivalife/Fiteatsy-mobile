@@ -74,6 +74,8 @@
         }
       ],
       "expo-document-picker",
+      "expo-background-task",
+      "expo-task-manager",
       "@react-native-community/datetimepicker",
       "react-native-health-connect",
       "./plugins/withHealthConnectPermissionDelegate",
