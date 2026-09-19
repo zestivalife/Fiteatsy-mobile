@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { Alert, Animated, AppState, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { CompositeNavigationProp, useIsFocused, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -84,15 +84,16 @@ const PARTICLE_OUTER_RADIUS = 0.465;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const TAU = Math.PI * 2;
 const HEART_PARTICLE_FIELD_SIZE = 356;
-const HEART_PARTICLE_COUNT = 1100;
+const HEART_PARTICLE_COUNT = 360;
 const HEART_PARTICLE_COLORS = ['#FF5489', '#FF3B67', '#E31C42', '#B01236', '#780E2A', '#43081A'];
 const SLEEP_PARTICLE_FIELD_SIZE = 356;
-const SLEEP_PARTICLE_COUNT = 1650;
+const SLEEP_PARTICLE_COUNT = 480;
 const SLEEP_PARTICLE_INNER_RADIUS = 0.245;
 const SLEEP_PARTICLE_CORE_RADIUS = 0.395;
 const SLEEP_PARTICLE_OUTER_RADIUS = 0.525;
 const SLEEP_PARTICLE_COLORS = ['#506CFF', '#544DE6', '#7E5BFF', '#A869FF', '#48A4FF', '#5BD0FF'];
 const SLEEP_FRAME_DELTA = 0.029952;
+const PARTICLE_FRAME_INTERVAL_MS = 50;
 
 const healthSubTabs: Array<{
   key: HealthSubTab;
@@ -127,6 +128,20 @@ const statusLabel = (score: number | null | undefined) => {
   if (score >= 80) return 'Strong Today';
   if (score >= 60) return 'Stable Today';
   return 'Needs Attention';
+};
+
+const useParticleAnimationActive = () => {
+  const isFocused = useIsFocused();
+  const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      setAppIsActive(nextState === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  return isFocused && appIsActive;
 };
 
 const particlePoints = Array.from({ length: PARTICLE_COUNT }, (_, index) => {
@@ -428,8 +443,14 @@ const HeartParticleMetric = ({
 }) => {
   const heartbeat = useRef(new Animated.Value(0)).current;
   const [heartTime, setHeartTime] = useState(0);
+  const animationActive = useParticleAnimationActive();
 
   useEffect(() => {
+    if (!animationActive) {
+      heartbeat.stopAnimation();
+      heartbeat.setValue(0);
+      return;
+    }
     const animation = Animated.loop(
       Animated.timing(heartbeat, {
         toValue: 1,
@@ -444,14 +465,20 @@ const HeartParticleMetric = ({
       animation.stop();
       heartbeat.setValue(0);
     };
-  }, [heartbeat]);
+  }, [animationActive, heartbeat]);
 
   useEffect(() => {
     let frame = 0;
+    if (!animationActive) return;
     let mounted = true;
+    let lastUpdateAt = 0;
     const tick = () => {
       if (!mounted) return;
-      setHeartTime((current) => current + 0.036);
+      const now = Date.now();
+      if (now - lastUpdateAt >= PARTICLE_FRAME_INTERVAL_MS) {
+        lastUpdateAt = now;
+        setHeartTime((current) => current + 0.036);
+      }
       frame = requestAnimationFrame(tick);
     };
 
@@ -460,7 +487,7 @@ const HeartParticleMetric = ({
       mounted = false;
       cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [animationActive]);
 
   const renderedHeartParticles = useMemo(
     () =>
@@ -607,14 +634,21 @@ const SleepParticleMetric = ({
   stages: string[];
 }) => {
   const [sleepTime, setSleepTime] = useState(0);
+  const animationActive = useParticleAnimationActive();
 
   useEffect(() => {
+    if (!animationActive) return;
     let frame = 0;
     let mounted = true;
+    let lastUpdateAt = 0;
 
     const tick = () => {
       if (!mounted) return;
-      setSleepTime((current) => current + SLEEP_FRAME_DELTA);
+      const now = Date.now();
+      if (now - lastUpdateAt >= PARTICLE_FRAME_INTERVAL_MS) {
+        lastUpdateAt = now;
+        setSleepTime((current) => current + SLEEP_FRAME_DELTA);
+      }
       frame = requestAnimationFrame(tick);
     };
 
@@ -623,7 +657,7 @@ const SleepParticleMetric = ({
       mounted = false;
       cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [animationActive]);
 
   const renderedSleepParticles = useMemo(() => {
     const fieldSize = SLEEP_PARTICLE_FIELD_SIZE;

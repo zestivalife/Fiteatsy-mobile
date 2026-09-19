@@ -47,13 +47,7 @@ const SCORE_ARC_RADIUS = 59;
 const SCORE_ARC_STROKE_WIDTH = 17;
 const SCORE_ARC_CIRCUMFERENCE = 2 * Math.PI * SCORE_ARC_RADIUS;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedPath = Animated.createAnimatedComponent(Path);
 export const STAR_ORB_PATH = 'M151.923 102.197C167.069 87.7458 174.642 80.5201 183.297 77.7974C190.915 75.4008 199.085 75.4008 206.703 77.7974C215.358 80.5201 222.931 87.7458 238.077 102.197L269.599 132.274C271.87 134.442 273.006 135.526 274.221 136.512C275.3 137.388 276.426 138.205 277.592 138.961C278.905 139.812 280.287 140.557 283.051 142.048L321.396 162.732C339.821 172.671 349.033 177.64 354.297 185.03C358.93 191.535 361.455 199.306 361.53 207.291C361.615 216.364 357.083 225.799 348.019 244.669L329.155 283.943C327.796 286.773 327.116 288.188 326.554 289.648C326.054 290.945 325.624 292.268 325.266 293.611C324.863 295.123 324.581 296.667 324.017 299.756L316.194 342.617C312.435 363.211 310.556 373.508 305.154 380.798C300.4 387.215 293.79 392.017 286.218 394.556C277.615 397.441 267.242 396.046 246.494 393.257L203.314 387.452C200.202 387.034 198.646 386.825 197.084 386.741C195.696 386.667 194.304 386.667 192.916 386.741C191.354 386.825 189.798 387.034 186.686 387.452L143.506 393.257C122.758 396.046 112.385 397.441 103.782 394.556C96.2102 392.017 89.6004 387.215 84.8458 380.798C79.444 373.508 77.5647 363.211 73.806 342.617L65.9832 299.756C65.4194 296.667 65.1375 295.123 64.7343 293.611C64.3759 292.268 63.9461 290.945 63.4465 289.648C62.8843 288.188 62.2045 286.773 60.845 283.943L41.9807 244.669C32.9169 225.799 28.3849 216.364 28.47 207.291C28.5449 199.306 31.0697 191.535 35.703 185.03C40.9671 177.64 50.1793 172.671 68.6036 162.732L106.949 142.048C109.713 140.557 111.095 139.812 112.408 138.961C113.574 138.205 114.7 137.388 115.779 136.512C116.994 135.526 118.13 134.442 120.401 132.274L151.923 102.197Z';
-const STAR_ORB_PERIMETER_WIDTH = 1;
-const STAR_ORB_MOTION_DURATION_MS = 7000;
-const STAR_ORB_MOTION_OPACITY = 0.4;
-const STAR_ORB_PATH_LENGTH = 1140;
-const STAR_ORB_NEON_PALETTE = ['#39F3FF', '#4D7CFF', '#FF4FD8', '#A970FF', '#7CFF00', '#7B61FF', '#39F3FF'] as const;
 
 const font = {
   regular: 'Exo_400Regular',
@@ -459,36 +453,7 @@ export const useReducedMotionPreference = () => {
   return reduceMotion;
 };
 
-const StarOrbSurface = ({ reduceMotion }: { reduceMotion: boolean }) => {
-  const perimeterProgress = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    perimeterProgress.stopAnimation();
-    if (reduceMotion) {
-      perimeterProgress.setValue(0);
-      return;
-    }
-    const animation = Animated.loop(
-      Animated.timing(perimeterProgress, {
-        toValue: 1,
-        duration: STAR_ORB_MOTION_DURATION_MS,
-        easing: Easing.linear,
-        useNativeDriver: false
-      })
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [perimeterProgress, reduceMotion]);
-
-  const perimeterOffset = perimeterProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -STAR_ORB_PATH_LENGTH]
-  });
-  const perimeterColor = perimeterProgress.interpolate({
-    inputRange: STAR_ORB_NEON_PALETTE.map((_, index) => index / (STAR_ORB_NEON_PALETTE.length - 1)),
-    outputRange: [...STAR_ORB_NEON_PALETTE]
-  });
-
+const StarOrbSurface = () => {
   return (
     <Svg width="100%" height="100%" viewBox="0 0 390 473" pointerEvents="none" testID="star-orb-surface">
       <Defs>
@@ -498,26 +463,6 @@ const StarOrbSurface = ({ reduceMotion }: { reduceMotion: boolean }) => {
         </SvgLinearGradient>
       </Defs>
       <Path d={STAR_ORB_PATH} fill="url(#starOrbSurface)" />
-      <Path
-        d={STAR_ORB_PATH}
-        fill="none"
-        stroke="#626B75"
-        strokeOpacity={reduceMotion ? 0.68 : 0.3}
-        strokeWidth={STAR_ORB_PERIMETER_WIDTH}
-      />
-      {!reduceMotion ? (
-        <AnimatedPath
-          d={STAR_ORB_PATH}
-          fill="none"
-          stroke={perimeterColor}
-          strokeOpacity={STAR_ORB_MOTION_OPACITY}
-          strokeWidth={STAR_ORB_PERIMETER_WIDTH}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeDasharray={`${STAR_ORB_PATH_LENGTH * 0.2} ${STAR_ORB_PATH_LENGTH * 0.8}`}
-          strokeDashoffset={perimeterOffset}
-        />
-      ) : null}
     </Svg>
   );
 };
@@ -560,7 +505,7 @@ const RecoveryPanel = ({
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
         <View style={styles.starShadow} pointerEvents="none">
-          <StarOrbSurface reduceMotion={reduceMotion} />
+          <StarOrbSurface />
         </View>
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
         {selectedScore != null ? (

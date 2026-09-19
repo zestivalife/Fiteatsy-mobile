@@ -36,7 +36,7 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).toContain("width: 96,\n    height: 70");
     expect(source).toContain('marginLeft: -48');
     expect(source).toContain('marginTop: -35');
-    expect(source).toContain('<StarOrbSurface reduceMotion={reduceMotion} />');
+    expect(source).toContain('<StarOrbSurface />');
     expect(source).not.toContain('preserveAspectRatio="none"');
     expect(source).toContain("top: '51.5%',\n    left: '50%',\n    width: 384,\n    height: 465.6,\n    marginTop: -232.8,\n    marginLeft: -192");
     expect(source).toContain('DONUT_ASSET_SIZE * ((DONUT_VIEWBOX_SIZE / 2 - DONUT_ART_CENTER) / DONUT_VIEWBOX_SIZE)');
@@ -51,20 +51,15 @@ describe('Journey and Tracker UI consistency', () => {
     expect(source).not.toContain('recoveryNodeSelected');
   });
 
-  test('uses one Star Orb path for a one-pixel, slower, muted moving perimeter and reduced-motion fallback', () => {
+  test('keeps the Star Orb surface free of a continuous perimeter animation', () => {
     const source = read('src/screens/home/HomeScreen.tsx');
     expect(source).toContain('export const STAR_ORB_PATH =');
-    expect(source.match(/d=\{STAR_ORB_PATH\}/g)).toHaveLength(3);
-    expect(source).toContain('const STAR_ORB_PERIMETER_WIDTH = 1');
-    expect(source).toContain('const STAR_ORB_MOTION_DURATION_MS = 7000');
-    expect(source).toContain('const STAR_ORB_MOTION_OPACITY = 0.4');
-    expect(source).toContain('strokeOpacity={STAR_ORB_MOTION_OPACITY}');
-    expect(source).toContain('strokeLinejoin="round"');
-    for (const color of ['#39F3FF', '#4D7CFF', '#FF4FD8', '#A970FF', '#7CFF00', '#7B61FF']) {
-      expect(source).toContain(color);
-    }
+    expect(source.match(/d=\{STAR_ORB_PATH\}/g)).toHaveLength(1);
+    expect(source).not.toContain('STAR_ORB_PERIMETER_WIDTH');
+    expect(source).not.toContain('STAR_ORB_MOTION_DURATION_MS');
+    expect(source).not.toContain('STAR_ORB_MOTION_OPACITY');
+    expect(source).not.toContain('strokeDashoffset={perimeterOffset}');
     expect(source).toContain("AccessibilityInfo.addEventListener('reduceMotionChanged'");
-    expect(source).toContain('strokeOpacity={reduceMotion ? 0.68 : 0.3}');
   });
 
   test('keeps only notifications and profile in the Journey header', () => {
