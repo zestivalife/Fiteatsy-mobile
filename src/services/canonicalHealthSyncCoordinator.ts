@@ -1,7 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Platform } from 'react-native';
-import NetInfo from '@react-native-community/netinfo';
-import { subscribeToHealthKitChanges } from '../../modules/fiteatsy-healthkit';
+import { AppState } from 'react-native';
 import { useAppContext } from '../state/AppContext';
 import type { HealthObservationDraft } from '../types';
 import { HEALTH_METRIC_REGISTRY, type HealthMetricDefinition } from './healthMetricRegistry';
@@ -29,7 +27,7 @@ import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
 import { buildPresentedHealthObservations } from './healthMetricPresentation';
 import { calculateCanonicalHealthIntelligenceFromAggregates, hasCalculatedCanonicalScore,
   markCanonicalSnapshotStale, type LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
-import { registerWearableBackgroundSync } from './wearableBackgroundSync';
+import { unregisterWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 import { traceSessionLifecycle } from './sessionLifecycleTrace';
 import { traceRuntimePerformance } from './runtimePerformanceTrace';
@@ -81,12 +79,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const sourceName = adapter.platform === 'APPLE_HEALTH' ? 'Apple Health' : 'Health Connect';
   const mounted = useRef(true);
   const inFlight = useRef(false);
-  const refreshQueued = useRef(false);
   const awaitingPermissionReturn = useRef(false);
-  const foregroundRefreshAt = useRef(0);
-  const forceBackfill = useRef(false);
-  const automaticInitialSyncStarted = useRef(false);
-  const healthChangeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionIdOverride = useRef<string | null>(null);
   const [providerState, setProviderState] = useState<HealthProviderState>('AVAILABLE');
   const [uploadState, setUploadState] = useState<HealthUploadState>('IDLE');
@@ -108,6 +101,14 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     ? `account:${authSession.accountId}:${adapter.appId}`
     : null, [adapter.appId, authSession]);
 
+  useEffect(() => {
+    if (!localHydrated) return;
+    // Earlier builds may have scheduled a full background read. Remove that
+    // registration once after local restore: a separate JS context cannot
+    // share this coordinator's foreground single-flight lock.
+    void unregisterWearableBackgroundSync().catch(() => undefined);
+  }, [localHydrated]);
+
   const mergeLocalObservations = useCallback((items: HealthObservationDraft[]) => {
     const deletedIds = new Set(items.filter((item) => item.deleted).map((item) => item.sourceRecordId).filter(Boolean));
     const local = items.filter((item) => !item.deleted).map((item, index) => toDto(item, status?.fiteatsyClientId ?? 'local', index));
@@ -122,6 +123,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
 
   const refreshRemoteSnapshot = useCallback(async () => {
     const locallyAvailable = await adapter.isAvailable().catch(() => false);
+    const refreshStartedAt = Date.now();
+    traceRuntimePerformance('HEALTH_UI_REFRESH_START');
     try {
       const [nextStatus, nextObservations, nextActivity, nextIntelligence] = await Promise.all([
         getHealthSyncStatus(), getLatestHealthObservations(200), getHealthSyncActivity(8), getHealthIntelligenceV1()
@@ -141,22 +144,27 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     } catch {
       // Backend availability is not provider availability. Local reads stay usable.
       if (mounted.current) setProviderState((current) => current === 'CONNECTED' ? current : locallyAvailable ? 'AVAILABLE' : 'UNAVAILABLE');
+    } finally {
+      traceRuntimePerformance('HEALTH_UI_REFRESH_END', { durationMs: Date.now() - refreshStartedAt });
     }
   }, [adapter, localScope]);
 
-  const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean } = {}) => {
+  /**
+   * The only foreground callers are the provider CTA, its explicit retry, and
+   * the initial connection flow.  In particular, hydration, AppState,
+   * NetInfo, navigation and HealthKit observer notifications must never turn
+   * into an unrequested full native read.
+   */
+  const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean; trigger?: 'USER_CTA' | 'INITIAL_CONNECT' | 'RETRY' } = {}) => {
     if (!authSession || !localScope) return;
-    if (inFlight.current) {
-      refreshQueued.current = true;
-      return;
-    }
-    automaticInitialSyncStarted.current = true;
+    if (inFlight.current) return;
     inFlight.current = true;
     const syncStartedAt = Date.now();
+    traceRuntimePerformance('HEALTH_CTA_TAP', { trigger: options.trigger ?? 'USER_CTA' });
     traceRuntimePerformance('HEALTH_SYNC_START', {
-      trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL'
+      trigger: options.trigger ?? 'USER_CTA'
     });
-    traceSessionLifecycle('HEALTH_SYNC_START', { trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL' });
+    traceSessionLifecycle('HEALTH_SYNC_START', { trigger: options.trigger ?? 'USER_CTA' });
     setUploadState('UPLOADING');
     setMessage(`Reading ${sourceName}…`);
     setQueryStates(Object.fromEntries(adapter.getSupportedMetricRegistry().map((key) => [key, 'QUERYING'])));
@@ -239,10 +247,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     } finally {
       traceRuntimePerformance('HEALTH_SYNC_END', { durationMs: Date.now() - syncStartedAt });
       inFlight.current = false;
-      if (refreshQueued.current) {
-        refreshQueued.current = false;
-        setTimeout(() => void syncLocalMetrics(), 0);
-      }
     }
   }, [adapter, authSession, localScope, mergeLocalObservations, refreshRemoteSnapshot, setSelectedDeviceId, setWellness, sourceName, status, wellness]);
 
@@ -259,7 +263,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setLocalProviderConnected(true);
         await markLocalHealthProviderConnected(localScope);
       }
-      forceBackfill.current = true;
     } catch {
       setProviderState('ACTION_REQUIRED');
       setMessage(`${sourceName} access requires your attention.`);
@@ -279,16 +282,17 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         backgroundSyncEnabled: access.grantedScopes.length > 0
       });
       connectionIdOverride.current = connection.id;
-      if (access.grantedScopes.length) await registerWearableBackgroundSync({
-        connectionId: connection.id, provider: adapter.platform, appId: adapter.appId
-      });
+      // Full background reads are deliberately not registered here. They can
+      // run in a separate JS context and cannot share the foreground
+      // single-flight lock. The foreground CTA remains the authoritative full
+      // sync trigger until a cross-process lock is explicitly governed.
+      await unregisterWearableBackgroundSync();
     } catch {
       setUploadState('PENDING');
       setMessage(`${sourceName} access is ready. Account sync will resume when the connection returns.`);
     }
     inFlight.current = false;
-    await syncLocalMetrics({ forceSourceBackfill: true });
-    forceBackfill.current = false;
+    await syncLocalMetrics({ forceSourceBackfill: true, trigger: 'INITIAL_CONNECT' });
   }, [adapter, localScope, sourceName, syncLocalMetrics]);
 
   const markPermissionReviewStarted = useCallback(() => {
@@ -304,7 +308,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   }, [refreshRemoteSnapshot]);
 
   useEffect(() => {
-    automaticInitialSyncStarted.current = false;
     connectionIdOverride.current = null;
     setObservations([]);
     setPresentationObservations([]);
@@ -351,50 +354,20 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   }, [aggregates, localHydrated, localScope, onboarding?.gender, onboarding?.sleepGoalHours]);
 
   useEffect(() => {
-    if (!authSession || !localHydrated || automaticInitialSyncStarted.current) return;
-    const previouslyConnected = providerState === 'CONNECTED' || localProviderConnected;
-    if (!previouslyConnected) return;
-    automaticInitialSyncStarted.current = true;
-    void syncLocalMetrics();
-  }, [authSession, localHydrated, localProviderConnected, providerState, syncLocalMetrics]);
-
-  useEffect(() => {
-    if (!authSession || !localHydrated) return;
-    let wasReachable = false;
-    const unsubscribe = NetInfo.addEventListener((network) => {
-      const reachable = network.isConnected === true && network.isInternetReachable !== false;
-      if (reachable && !wasReachable && pendingUploadCount > 0) void syncLocalMetrics();
-      wasReachable = reachable;
-    });
-    return unsubscribe;
-  }, [authSession, localHydrated, pendingUploadCount, syncLocalMetrics]);
-
-  useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState !== 'active') return;
-      const now = Date.now();
-      if (now - foregroundRefreshAt.current < 1_500) return;
-      foregroundRefreshAt.current = now;
-      if (!awaitingPermissionReturn.current && providerState !== 'CONNECTED') return;
-      const shouldBackfill = awaitingPermissionReturn.current || forceBackfill.current;
+      if (nextState !== 'active') {
+        traceRuntimePerformance('APP_BACKGROUND');
+        return;
+      }
+      traceRuntimePerformance('APP_FOREGROUND');
+      if (!awaitingPermissionReturn.current) return;
       awaitingPermissionReturn.current = false;
-      void syncLocalMetrics({ forceSourceBackfill: shouldBackfill });
+      // Returning from the system permission screen refreshes connection
+      // status only. It must not unexpectedly start a complete native read.
+      void refreshRemoteSnapshot();
     });
     return () => subscription.remove();
-  }, [providerState, syncLocalMetrics]);
-
-  useEffect(() => {
-    if (adapter.platform !== 'APPLE_HEALTH' || providerState !== 'CONNECTED') return;
-    const subscription = subscribeToHealthKitChanges(() => {
-      if (healthChangeDebounce.current) clearTimeout(healthChangeDebounce.current);
-      healthChangeDebounce.current = setTimeout(() => void syncLocalMetrics(), 1_000);
-    });
-    return () => {
-      if (healthChangeDebounce.current) clearTimeout(healthChangeDebounce.current);
-      healthChangeDebounce.current = null;
-      subscription?.remove();
-    };
-  }, [adapter.platform, providerState, syncLocalMetrics]);
+  }, [refreshRemoteSnapshot]);
 
   const latestByMetric = useMemo(() => buildPresentedHealthObservations(observations,presentationObservations),
     [observations,presentationObservations]);

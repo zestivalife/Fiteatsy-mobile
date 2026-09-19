@@ -64,7 +64,7 @@ describe('Onboarding V2 contract', () => {
     const sync = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     const adapter = read('src/services/healthPlatformAdapter.ts');
     const ready = read('src/screens/onboarding/OnboardingReadyScreen.tsx');
-    expect(sync).toContain('Request Health Access');
+    expect(sync).toContain('Connect ${health.sourceName}');
     expect(adapter).toContain('requestAppleHealthPermissions');
     expect(ready).toContain("Boolean(onboarding?.assignedConsultantId)");
     expect(ready).toContain("consultantReady ? 'Ready' : 'Pending'");

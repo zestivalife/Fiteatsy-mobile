@@ -30,8 +30,8 @@ describe('Health Data Sync control-centre contracts', () => {
   test('exposes connection, manual sync, permission recovery, detail, and activity states', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     for (const copy of [
-      'Sync Now', 'Reading health data…', 'Review Permissions',
-      'Automatic sync enabled', 'awaiting secure upload', 'Your Health Data', 'Sync Activity', 'Last updated'
+      'Sync health data', 'Reading health data…', 'Review Permissions',
+      'Sync health data when you want to refresh', 'awaiting secure upload', 'Your Health Data', 'Sync Activity', 'Last updated'
     ]) expect(screen).toContain(copy);
     expect(screen).toContain('Restoring saved health data…');
     expect(screen).toContain('health.localHydrated');
@@ -41,12 +41,11 @@ describe('Health Data Sync control-centre contracts', () => {
   test('shows one canonical sync popup and surfaces connection/read failures', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     expect(screen).toContain('visible={syncPopupVisible}');
-    expect(screen).toContain("busy?'Syncing health data'");
-    expect(screen).toContain("uploadPending?'Connection interrupted':'Health sync unsuccessful'");
-    expect(screen).toContain('Synced values will appear automatically when ready.');
-    expect(screen).toContain('Metrics with no records are reported as No data, not left pending.');
-    expect(screen).toContain('Try Again');
-    expect(screen).toContain("health.uploadState==='SYNCED')setSyncPopupVisible(false)");
+    expect(screen).toContain("busy?'SYNCING HEALTH DATA'");
+    expect(screen).toContain("health.uploadState==='SYNCED'?'HEALTH DATA SYNCED'");
+    expect(screen).toContain('OF ${health.supportedMetricReadCount} COMPLETED');
+    expect(screen).toContain('Try again');
+    expect(screen).toContain('setSyncRequested(true)');
     expect(screen).not.toContain('useState<HealthMetricQueryState');
   });
 
@@ -63,11 +62,12 @@ describe('Health Data Sync control-centre contracts', () => {
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     const adapter = read('src/services/healthPlatformAdapter.ts');
     expect(adapter).toContain('requestAppleHealthPermissions');
-    expect(screen).toContain('Request Health Access');
+    expect(screen).toContain('Connect ${health.sourceName}');
     expect(screen).toContain("if(Platform.OS==='ios')setPermissionHelp(true);else void Linking.openSettings()");
     expect(coordinator).toContain("AppState.addEventListener('change'");
     expect(coordinator).toContain('awaitingPermissionReturn.current');
-    expect(coordinator).toContain('forceSourceBackfill: shouldBackfill');
+    expect(coordinator).toContain('void refreshRemoteSnapshot()');
+    expect(coordinator).not.toContain('forceSourceBackfill: shouldBackfill');
     expect(screen).not.toContain('x-apple-health://');
   });
 

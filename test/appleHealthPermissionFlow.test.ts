@@ -37,11 +37,11 @@ describe('Apple Health physical-device permission flow', () => {
     expect(apple).toContain('inspectAppleHealthPermissionState');
   });
 
-  it('keeps no-data distinct from permission failure and starts initial sync', () => {
+  it('keeps no-data distinct from permission failure and starts one explicit initial sync', () => {
     expect(manager).not.toContain("throw new Error('INSUFFICIENT_DATA')");
     expect(apple).toContain("'no_recent_data'");
-    expect(coordinator).toContain('await syncLocalMetrics({ forceSourceBackfill: true })');
-    expect(coordinator).toContain('forceBackfill.current = true');
+    expect(coordinator).toContain("await syncLocalMetrics({ forceSourceBackfill: true, trigger: 'INITIAL_CONNECT' })");
+    expect(coordinator).not.toContain('forceBackfill.current');
   });
 
   it('projects Apple metric names into canonical connected-domain keys', () => {

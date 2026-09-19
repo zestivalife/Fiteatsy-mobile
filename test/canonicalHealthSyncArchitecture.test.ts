@@ -15,12 +15,14 @@ describe('canonical health sync architecture',()=>{
     for(const forbidden of ['appleHealthService','healthConnectService','healthSyncManager\';','wearablePlatformService','SyncWearableScreen','HealthDataSyncExperience','AppState.addEventListener'])expect(screen).not.toContain(forbidden);
   });
 
-  test('one coordinator owns the only health foreground listener',()=>{
+  test('one coordinator owns the only health foreground listener without implicit full reads',()=>{
     const files=['src/screens/sync/CanonicalHealthDataSyncScreen.tsx','src/services/canonicalHealthSyncCoordinator.ts'];
     const count=files.reduce((total,file)=>total+(read(file).match(/AppState\.addEventListener/g)?.length??0),0);
     expect(count).toBe(1);
-    expect(coordinator).toContain("if (nextState !== 'active') return");
-    expect(coordinator).toContain('foregroundRefreshAt.current');
+    expect(coordinator).toContain('awaitingPermissionReturn.current');
+    expect(coordinator).toContain('void refreshRemoteSnapshot()');
+    expect(coordinator).not.toContain('foregroundRefreshAt.current');
+    expect(coordinator).not.toContain('NetInfo.addEventListener');
   });
 
   test('one mounted provider owns the only live provider and metric state authority',()=>{

@@ -8,6 +8,7 @@ import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, 
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
 import { acknowledgeLocalObservations, persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalSyncCursors,
   readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded } from './healthSyncLocalStore';
+import { traceRuntimePerformance } from './runtimePerformanceTrace';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -187,6 +188,11 @@ export type HealthSyncActivity = {
 export const getHealthSyncActivity = (limit = 10) =>
   apiFetch<{items:HealthSyncActivity[]}>(`/v1/health/sync-runs?limit=${encodeURIComponent(String(limit))}`);
 
+// Process-local telemetry only. The coordinator prevents a second foreground
+// run; this counter makes an accidental overlap observable without recording
+// any health value, identity or payload.
+let activeHealthSyncRuns = 0;
+
 export const runHealthSync = async (
   appId: HealthAppId,
   previousWellness: WellnessSnapshot,
@@ -197,6 +203,7 @@ export const runHealthSync = async (
   let payload: WearableSyncPayload | null = null;
   let observations: HealthObservationDraft[] = [];
   let uploadCompleted = false;
+  activeHealthSyncRuns += 1;
   try {
     // Local source access is the first I/O boundary. A backend checkpoint lookup
     // must never delay or prevent HealthKit / Health Connect from returning data.
@@ -204,24 +211,40 @@ export const runHealthSync = async (
     const localCursors = await readLocalSyncCursors(localScope);
     const adapter = getHealthPlatformAdapter();
     if (adapter.appId !== appId) throw new Error('health_provider_not_available');
+    const nativeReadStartedAt = Date.now();
+    traceRuntimePerformance('HEALTH_NATIVE_READ_START', { activeSyncCount: activeHealthSyncRuns });
     payload = await withHealthSyncPipelineTimeout(
       adapter.queryAllSupportedMetrics(localCursors, { forceBackfill: options.forceSourceBackfill }),
       'health_sync_native_read_timeout'
     );
     observations = deriveObservations(payload);
+    traceRuntimePerformance('HEALTH_NATIVE_READ_END', {
+      durationMs: Date.now() - nativeReadStartedAt,
+      inputRecordCount: observations.length,
+      activeNativeQueryCount: 0
+    });
     const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors ?? {};
     // Cursor advancement and normalized/tombstone persistence are one durable
     // local transaction and always precede every backend operation.
+    const persistenceStartedAt = Date.now();
+    traceRuntimePerformance('HEALTH_PERSISTENCE_START', { observationCount: observations.length });
     await persistLocalSyncBatch(localScope, observations, anchors);
     await persistLocalHealthPresentationObservations(localScope, payload.presentationObservations ?? []);
     const readAtISO=new Date().toISOString();
     const canonicalAggregates=await recomputeLocalHealthAggregates(localScope,readAtISO,-new Date().getTimezoneOffset());
+    traceRuntimePerformance('HEALTH_PERSISTENCE_END', {
+      durationMs: Date.now() - persistenceStartedAt,
+      observationCount: observations.length,
+      aggregateCount: canonicalAggregates.length
+    });
     // Sync-run telemetry must not become a prerequisite for ingestion. The
     // observation endpoint independently enforces authenticated ownership and
     // active provider consent.
     run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger).catch(() => null) : null;
 
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
+    const uploadStartedAt = Date.now();
+    traceRuntimePerformance('HEALTH_UPLOAD_START', { observationCount: observations.length });
     let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     while (pending.length) {
       const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
@@ -243,6 +266,12 @@ export const runHealthSync = async (
       }),'health_sync_recalculation_timeout');
       await markLocalHealthUploaded(localScope,true);
     }
+    traceRuntimePerformance('HEALTH_UPLOAD_END', {
+      durationMs: Date.now() - uploadStartedAt,
+      acceptedCount: accepted,
+      duplicateCount: duplicate,
+      rejectedCount: rejected
+    });
     if (governed && Object.keys(anchors).length && rejected === 0) {
       await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
         commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
@@ -272,5 +301,7 @@ export const runHealthSync = async (
     if (payload && uploadCompleted) throw new HealthSyncPostUploadRefreshError(payload, observations);
     if (payload) throw new HealthSyncUploadPendingError(payload, observations);
     throw error;
+  } finally {
+    activeHealthSyncRuns = Math.max(0, activeHealthSyncRuns - 1);
   }
 };

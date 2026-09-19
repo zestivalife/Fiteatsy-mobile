@@ -48,6 +48,8 @@ const styles = StyleSheet.create({
   label: {
     ...typography.button,
     color: colors.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   secondaryLabel: { color: colors.blue }
 });

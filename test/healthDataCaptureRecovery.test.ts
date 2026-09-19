@@ -91,20 +91,17 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain("measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'");
   });
 
-  test('cards render presentation aggregates and connected sessions sync automatically', () => {
+  test('cards render presentation aggregates and connected sessions require an explicit sync', () => {
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     expect(coordinator).toContain('buildPresentedHealthObservations');
     expect(coordinator).toContain('presentationObservations');
     expect(coordinator).toContain('localProviderConnected');
     expect(coordinator).toContain('readLocalHealthObservations(localScope)');
-    expect(coordinator).toContain('refreshQueued.current = true');
     expect(coordinator).toContain('countTerminalHealthMetricReads');
-    expect(coordinator).toContain('void syncLocalMetrics()');
-    expect(screen).toContain('HEALTHKIT_DAILY_CUMULATIVE_STATISTIC');
-    for (const color of ['#FF5E1A','#0A84FF','#5E5CE6','#FF375F','#32D74B','#BF5AF2','#64D2FF']) {
-      expect(screen).toContain(color);
-    }
+    expect(coordinator).toContain("options.trigger ?? 'USER_CTA'");
+    expect(coordinator).not.toContain('refreshQueued.current');
+    expect(screen).toContain('Sync health data');
   });
 
   test('backend accepts the complete Apple Health provenance contract and a bounded backfill body', () => {
@@ -121,7 +118,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(read('src/services/healthSyncManager.ts')).toContain('recalculateIntelligence: false');
   });
 
-  test('HealthKit pagination, poison-sample filtering, queue serialization, and observer refresh are wired', () => {
+  test('HealthKit pagination, poison-sample filtering, and queue serialization are wired without observer-triggered full sync', () => {
     const apple = read('src/services/appleHealthService.ts');
     const bridge = read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift');
     const store = read('src/services/healthSyncLocalStore.ts');
@@ -131,16 +128,17 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain('while (hasMore && pagesRead < APPLE_HEALTH_MAX_PAGES_PER_METRIC)');
     expect(apple).toContain('sample.value <= 0');
     expect(store).toContain('serializeScopeOperation');
-    expect(coordinator).toContain('subscribeToHealthKitChanges');
-    expect(coordinator).toContain('subscription?.remove()');
+    expect(coordinator).not.toContain('subscribeToHealthKitChanges');
+    expect(coordinator).toContain('unregisterWearableBackgroundSync');
   });
 
-  test('authorization and foreground return immediately execute local query and retain local UI rows', () => {
+  test('authorization runs one initial query while foreground return refreshes status only', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
-    expect(coordinator).toContain('await syncLocalMetrics({ forceSourceBackfill: true })');
+    expect(coordinator).toContain("await syncLocalMetrics({ forceSourceBackfill: true, trigger: 'INITIAL_CONNECT' })");
     expect(coordinator).toContain('mergeLocalObservations(result.observations)');
     expect(coordinator).toContain('awaitingPermissionReturn.current');
+    expect(coordinator).toContain('void refreshRemoteSnapshot()');
     expect(screen).toContain('Available metrics');
     expect(screen).toContain('canonicalHealthStatusLabel');
   });
