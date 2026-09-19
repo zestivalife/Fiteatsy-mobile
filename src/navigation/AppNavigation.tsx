@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -62,6 +62,7 @@ import { CycleInsightsScreen } from '../screens/cycle/CycleInsightsScreen';
 import { CycleNotificationsScreen } from '../screens/cycle/CycleNotificationsScreen';
 import { Pss10AssessmentScreen } from '../screens/assessments/Pss10AssessmentScreen';
 import { useAppContext } from '../state/AppContext';
+import { traceRuntimePerformance } from '../services/runtimePerformanceTrace';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -105,8 +106,12 @@ export const AppNavigation = () => {
     }
   };
 
+  const handleNavigationReady = useCallback(() => {
+    traceRuntimePerformance('NAVIGATION_READY');
+  }, []);
+
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer theme={navTheme} onReady={handleNavigationReady}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

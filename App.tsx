@@ -16,6 +16,9 @@ import { AppProvider, useAppContext } from './src/state/AppContext';
 import { getThemeColors } from './src/design/tokens';
 import './src/services/wearableBackgroundSync';
 import { CanonicalHealthSyncProvider } from './src/services/canonicalHealthSyncCoordinator';
+import { traceRuntimePerformance } from './src/services/runtimePerformanceTrace';
+
+traceRuntimePerformance('APP_JS_START');
 
 let hasConfiguredGlobalFont = false;
 

@@ -32,6 +32,7 @@ import { calculateCanonicalHealthIntelligenceFromAggregates, hasCalculatedCanoni
 import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 import { traceSessionLifecycle } from './sessionLifecycleTrace';
+import { traceRuntimePerformance } from './runtimePerformanceTrace';
 
 export type { HealthObservationDto } from './healthSyncManager';
 
@@ -143,6 +144,10 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     }
     automaticInitialSyncStarted.current = true;
     inFlight.current = true;
+    const syncStartedAt = Date.now();
+    traceRuntimePerformance('HEALTH_SYNC_START', {
+      trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL'
+    });
     traceSessionLifecycle('HEALTH_SYNC_START', { trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL' });
     setUploadState('UPLOADING');
     setMessage(`Reading ${sourceName}…`);
@@ -224,6 +229,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setMessage('Health data could not be read. Previous local data is safe.');
       }
     } finally {
+      traceRuntimePerformance('HEALTH_SYNC_END', { durationMs: Date.now() - syncStartedAt });
       inFlight.current = false;
       if (refreshQueued.current) {
         refreshQueued.current = false;
@@ -283,6 +289,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
 
   useEffect(() => {
     mounted.current = true;
+    traceRuntimePerformance('HEALTH_COORDINATOR_MOUNT');
     void migrateLegacyHealthInstallationId();
     void refreshRemoteSnapshot();
     return () => { mounted.current = false; };

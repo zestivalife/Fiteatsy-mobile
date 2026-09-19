@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { HealthObservationDraft } from '../types';
 import type { LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
 import { aggregateCanonicalHealthObservations, HEALTH_AGGREGATION_VERSION, type CanonicalDailyAggregate } from '@fiteatsy/health-intelligence';
+import { traceRuntimePerformance } from './runtimePerformanceTrace';
 
 const STORE_VERSION = 1;
 const keyFor = (scope: string) => `@fiteatsy/health-sync-local-v${STORE_VERSION}:${scope}`;
@@ -111,7 +112,9 @@ export const recomputeLocalHealthAggregates = (scope:string,readAtISO:string,fal
     const input=[...Object.values(state.records).map(record=>record.observation),...Object.values(state.presentationRecords)]
       .map(item=>({...item,sourceProvider:item.sourceMetadata?.measurementMethod==='HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'
         ?'platform_aggregate':item.sourceProvider}));
+    const startedAt=Date.now();traceRuntimePerformance('AGGREGATION_START',{recordCount:input.length});
     state.aggregates=aggregateCanonicalHealthObservations(input,{fallbackOffsetMinutes,nowMs});
+    traceRuntimePerformance('AGGREGATION_END',{durationMs:Date.now()-startedAt,recordCount:input.length});
     state.aggregatesDirty=false;state.canonicalScoreSnapshot=null;
     state.lifecycle={...state.lifecycle,lastHealthReadAtISO:readAtISO,lastSavedAtISO:new Date(nowMs).toISOString()};
     await writeState(scope,state);return state.aggregates;
@@ -122,7 +125,9 @@ export const ensureLocalHealthAggregatesCurrent=(scope:string,fallbackOffsetMinu
     const input=[...Object.values(state.records).map(record=>record.observation),...Object.values(state.presentationRecords)]
       .map(item=>({...item,sourceProvider:item.sourceMetadata?.measurementMethod==='HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'
         ?'platform_aggregate':item.sourceProvider}));
-    state.aggregates=aggregateCanonicalHealthObservations(input,{fallbackOffsetMinutes,nowMs});state.aggregatesDirty=false;
+    const startedAt=Date.now();traceRuntimePerformance('AGGREGATION_START',{recordCount:input.length});
+    state.aggregates=aggregateCanonicalHealthObservations(input,{fallbackOffsetMinutes,nowMs});
+    traceRuntimePerformance('AGGREGATION_END',{durationMs:Date.now()-startedAt,recordCount:input.length});state.aggregatesDirty=false;
     state.canonicalScoreSnapshot=null;state.lifecycle={...state.lifecycle,lastSavedAtISO:new Date(nowMs).toISOString()};
     await writeState(scope,state);return state.aggregates;
   });

@@ -24,6 +24,7 @@ import type { Medication, MedicationLogStatus } from '../../types';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import { resolveClientFirstName } from '../../utils/clientIdentity';
 import { useProfilePhoto } from '../../hooks/useProfilePhoto';
+import { traceRuntimePerformance } from '../../services/runtimePerformanceTrace';
 import {
   buildPss10StressContext,
   formatPss10Change,
@@ -137,6 +138,15 @@ export const HomeScreen = () => {
   const sessionToken = authSession?.sessionToken;
   const profilePhoto = useProfilePhoto(authSession?.accountId ?? '');
   const hasAuthSession = Boolean(authSession);
+
+  useEffect(() => {
+    traceRuntimePerformance('HOME_MOUNT_START');
+    const frame = requestAnimationFrame(() => {
+      traceRuntimePerformance('HOME_MOUNT_END');
+      traceRuntimePerformance('FIRST_INTERACTIVE');
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const openAssist = useCallback(async () => {
     try {

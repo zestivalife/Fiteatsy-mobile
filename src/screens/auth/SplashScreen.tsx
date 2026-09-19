@@ -16,10 +16,15 @@ import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import { getOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
 import { traceSessionLifecycle } from '../../services/sessionLifecycleTrace';
+import {
+  shouldExitSplash,
+  SPLASH_MAX_DURATION_MS,
+  SPLASH_MIN_DURATION_MS
+} from './splashExitPolicy';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
-export const SPLASH_MAX_DURATION_MS = 10_000;
+export { SPLASH_MAX_DURATION_MS, SPLASH_MIN_DURATION_MS } from './splashExitPolicy';
 const EXIT_FADE_DURATION = 320;
 const LOGO_ANIMATION_DURATION = 640;
 const SPLASH_VIDEO_URL = 'https://zestiva.life/assets/Fiteatsy.mp4';
@@ -27,8 +32,8 @@ const SPLASH_VIDEO_URL = 'https://zestiva.life/assets/Fiteatsy.mp4';
 export const SplashScreen = ({ navigation }: Props) => {
   const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep, authSession } = useAppContext();
   const { width, height } = useWindowDimensions();
-  const [exitRequested, setExitRequested] = useState(false);
-  const [forceExit, setForceExit] = useState(false);
+  const [minimumVisualElapsed, setMinimumVisualElapsed] = useState(false);
+  const [failsafeElapsed, setFailsafeElapsed] = useState(false);
   const navigated = useRef(false);
   const screenOpacity = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -42,11 +47,6 @@ export const SplashScreen = ({ navigation }: Props) => {
     videoPlayer.staysActiveInBackground = false;
     videoPlayer.play();
   });
-
-  const requestExit = useCallback((forced = false) => {
-    if (forced) setForceExit(true);
-    setExitRequested(true);
-  }, []);
 
   const pauseVideo = useCallback(() => {
     try {
@@ -147,7 +147,12 @@ export const SplashScreen = ({ navigation }: Props) => {
       ]).start();
     });
 
-    const maximumDurationTimer = setTimeout(() => requestExit(true), SPLASH_MAX_DURATION_MS);
+    const minimumDurationTimer = setTimeout(() => setMinimumVisualElapsed(true), SPLASH_MIN_DURATION_MS);
+    const maximumDurationTimer = setTimeout(() => setFailsafeElapsed(true), SPLASH_MAX_DURATION_MS);
+    const videoEndSubscription = player.addListener('playToEnd', () => {
+      // Completion is recorded by the player, while the single exit predicate
+      // below remains authoritative and preserves the minimum brand duration.
+    });
     const statusSubscription = player.addListener('statusChange', ({ status, error }) => {
       if (status !== 'error') return;
       console.warn('[VideoIntro] playback failed; continuing with branded fallback', error?.message ?? 'unknown_error');
@@ -155,7 +160,9 @@ export const SplashScreen = ({ navigation }: Props) => {
 
     return () => {
       mounted = false;
+      clearTimeout(minimumDurationTimer);
       clearTimeout(maximumDurationTimer);
+      videoEndSubscription.remove();
       statusSubscription.remove();
       logoOpacity.stopAnimation();
       logoTranslateY.stopAnimation();
@@ -163,13 +170,14 @@ export const SplashScreen = ({ navigation }: Props) => {
       screenOpacity.stopAnimation();
       pauseVideo();
     };
-  }, [logoOpacity, logoScale, logoTranslateY, pauseVideo, player, requestExit, screenOpacity]);
+  }, [logoOpacity, logoScale, logoTranslateY, pauseVideo, player, screenOpacity]);
 
   useEffect(() => {
-    if (!exitRequested || navigated.current || (!bootstrapped && !forceExit)) return;
+    const mayExit = shouldExitSplash({ bootstrapped, minimumVisualElapsed, failsafeElapsed });
+    if (!mayExit || navigated.current) return;
     navigated.current = true;
     void resolveAndNavigate();
-  }, [bootstrapped, exitRequested, forceExit, isAuthenticated, onboardingStatus, resolveAndNavigate]);
+  }, [bootstrapped, failsafeElapsed, minimumVisualElapsed, resolveAndNavigate]);
 
   const logoWidth = Math.min(width * 0.72, 480);
   const logoTop = Math.max(height * 0.16, 96);

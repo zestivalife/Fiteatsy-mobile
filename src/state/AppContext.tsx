@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as Notifications from 'expo-notifications';
+import { traceRuntimePerformance } from '../services/runtimePerformanceTrace';
 import { emptyWellness } from './emptyWellness';
 import {
   AssessmentProfile,
@@ -544,6 +545,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const bootstrap = async () => {
       try {
         traceSessionLifecycle('APP_START');
+        traceRuntimePerformance('SESSION_RESTORE_START');
         traceSessionLifecycle('LOCAL_SESSION_READ_START');
         const [storedAuth, storedTheme] = await Promise.all([
           readPersistedAuthSession(),
@@ -824,6 +826,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
       } finally {
         setBootstrapped(true);
+        traceRuntimePerformance('SESSION_RESTORE_END');
       }
     };
 
