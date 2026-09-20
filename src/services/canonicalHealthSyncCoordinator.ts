@@ -22,7 +22,8 @@ import { getHealthIntelligenceV1, type HealthIntelligenceV1, type HealthScoreSum
 import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLocalHealthProviderConnected,
   migrateLegacyHealthInstallationId, readLocalHealthBootstrapSnapshot,
   persistLocalCanonicalHealthSnapshot,
-  readLocalHealthAggregates,readLocalHealthLifecycle,type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
+  readLocalHealthAggregates, readLocalHealthLifecycle, readLocalHealthPresentationObservations,
+  type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
 import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
 import { buildPresentedHealthObservations } from './healthMetricPresentation';
 import { calculateCanonicalHealthIntelligenceFromAggregates, hasCalculatedCanonicalScore,
@@ -323,13 +324,16 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     setLocalHydrated(false);
     if (!bootstrapped || !localScope) return;
     let active = true;
-    readLocalHealthBootstrapSnapshot(localScope)
-      .then((snapshot) => {
+    Promise.all([
+      readLocalHealthBootstrapSnapshot(localScope),
+      readLocalHealthPresentationObservations(localScope)
+    ]).then(([snapshot, presentations]) => {
         if (!active || !mounted.current) return;
         setPendingUploadCount(snapshot.pendingUploadCount);
         if (snapshot.providerConnected) setProviderState('CONNECTED');
         if (snapshot.canonicalScoreSnapshot) setCanonicalIntelligence(markCanonicalSnapshotStale(snapshot.canonicalScoreSnapshot));
         setAggregates(snapshot.aggregates);
+        setPresentationObservations(presentations.map((item, index) => toDto(item, 'local', index)));
         setLifecycle(snapshot.lifecycle);
         setLocalHydrated(true);
       })
@@ -370,8 +374,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     return () => subscription.remove();
   }, [refreshRemoteSnapshot, syncLocalMetrics]);
 
-  const latestByMetric = useMemo(() => buildPresentedHealthObservations(observations,presentationObservations),
-    [observations,presentationObservations]);
+  const latestByMetric = useMemo(() => buildPresentedHealthObservations(observations,presentationObservations,aggregates),
+    [aggregates,observations,presentationObservations]);
 
   const metrics = useMemo<CanonicalHealthMetricState[]>(() => HEALTH_METRIC_REGISTRY.map((definition) => {
     const supported = adapter.platform === 'APPLE_HEALTH' ? Boolean(definition.appleHealthType) : Boolean(definition.healthConnectRecord);
@@ -380,7 +384,12 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       definition,
       sourcePlatform: adapter.platform,
       supported,
-      queryState: observation ? 'DATA_AVAILABLE' : (queryStates[definition.metricKey] ?? 'IDLE'),
+      // Never label a blank card as data available. Native completion state is
+      // useful diagnostics, but presentation availability requires a value.
+      queryState: observation ? 'DATA_AVAILABLE'
+        : queryStates[definition.metricKey] === 'TIMEOUT' ? 'TIMEOUT'
+        : queryStates[definition.metricKey] === 'ERROR' ? 'ERROR'
+        : queryStates[definition.metricKey] === 'QUERYING' ? 'QUERYING' : 'NO_VISIBLE_DATA',
       observation,
       localRecordCount: observations.filter((item) => item.metricType === definition.backendCanonicalType).length,
       uploadState,
