@@ -21,7 +21,7 @@ import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEn
 import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
 import {getHealthIntelligenceV1,getHealthScoreHistory,getHealthScoreSummary,type HealthIntelligenceV1,type HealthScore,type HealthScoreSummary,type HealthScoreType} from '../../services/healthIntelligenceService';
 import { useCanonicalHealthSyncCoordinator, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
-import { baselineCopy, buildSleepStagePresentation, hasCanonicalMetricData, latestAggregate } from '../../services/healthPresentationState';
+import { baselineCopy, buildSleepStagePresentation, currentDayAggregate, hasCanonicalMetricData } from '../../services/healthPresentationState';
 
 type RangeMode = '7D' | '30D';
 type HealthSubTab = 'overview' | 'activity' | 'heart' | 'sleep';
@@ -1267,7 +1267,7 @@ export const TrackerScreen = () => {
   };
 
   const latestObservations = health.observations;
-  const todayAggregate=(metricTypes:string[])=>latestAggregate(health.aggregates,metricTypes)?.value??null;
+  const todayAggregate=(metricTypes:string[])=>currentDayAggregate(health.aggregates,metricTypes)?.value??null;
   const observationSeries = (metricTypes: string[]) => days
     .map((day) => health.aggregates.find((item) =>
       metricTypes.includes(item.metricType) && item.healthDay === day.key

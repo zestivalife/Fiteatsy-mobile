@@ -1,4 +1,4 @@
-import { baselineCopy, buildSleepStagePresentation, hasCanonicalMetricData } from '../src/services/healthPresentationState';
+import { baselineCopy, buildSleepStagePresentation, currentDayAggregate, hasCanonicalMetricData } from '../src/services/healthPresentationState';
 import type { CanonicalDailyAggregate } from '@fiteatsy/health-intelligence';
 
 const row = (healthDay: string, metricType: string, value: number): CanonicalDailyAggregate => ({
@@ -36,5 +36,11 @@ describe('post-sync health presentation integrity', () => {
     expect(hasCanonicalMetricData(aggregates, ['steps'])).toBe(true);
     expect(baselineCopy(aggregates, 'steps', 7)).toBe('Building your baseline');
     expect(baselineCopy([...aggregates, row('2026-09-19', 'steps', 4000)], 'steps', 7)).toBe('4,469');
+  });
+
+  it('does not use the latest historical aggregate as today\'s value', () => {
+    const aggregates = [row('2026-08-04', 'steps', 1750), row('2026-09-20', 'steps', 513)];
+    expect(currentDayAggregate(aggregates, ['steps'], Date.parse('2026-09-20T12:00:00.000Z'), 0)?.value).toBe(513);
+    expect(currentDayAggregate(aggregates, ['steps'], Date.parse('2026-09-21T12:00:00.000Z'), 0)).toBeNull();
   });
 });

@@ -101,6 +101,7 @@ export const syncFromAppleHealth = async (
     }
     return results;
   };
+  const statisticsPromise = readStatistics();
   const settledReads = await settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY, async (metric) => {
     const definition = APPLE_HEALTH_QUERYABLE_METRICS.find((item) => item.appleHealthType === metric);
     const start = new Date(Date.now() - (definition?.syncWindowDays ?? 30) * 86400000).toISOString();
@@ -202,7 +203,7 @@ export const syncFromAppleHealth = async (
   // product totals while anchored source rows remain available for audit.
   const statisticEndISO = new Date().toISOString();
   const statisticStartDate = new Date(); statisticStartDate.setHours(0, 0, 0, 0);
-  (await readStatistics()).forEach(({ metric, value }) => {
+  (await statisticsPromise).forEach(({ metric, value }) => {
     // Older installed native builds may not expose statistics yet. Anchored
     // values remain truthful fallback data until the next native build.
     if (value != null) {
@@ -221,8 +222,9 @@ export const syncFromAppleHealth = async (
     'apple_health_background_delivery_timeout').catch(() => undefined);
   const steps = sum(validValues(metricValues.steps ?? []));
   const sleepMinutes = sum(validValues(metricValues.sleep_minutes ?? []));
-  const restingHeartRate = average(validValues(metricValues.resting_heart_rate ?? []))
-    ?? average(validValues(metricValues.heart_rate ?? []));
+  // Resting heart rate and sampled heart rate are distinct HealthKit types.
+  // Never manufacture a resting value from ordinary heart-rate samples.
+  const restingHeartRate = average(validValues(metricValues.resting_heart_rate ?? []));
   const hrvMs = average(validValues(metricValues.hrv_sdnn_ms ?? []));
   const workoutMinutes = Math.max(sum(validValues(metricValues.workout_minutes ?? [])), sum(validValues(metricValues.active_minutes ?? [])));
   const activeEnergy = sum(validValues(metricValues.active_energy ?? []));

@@ -8,17 +8,23 @@ import { aggregateCanonicalHealthObservations } from '@fiteatsy/health-intellige
 export const buildPresentedHealthObservations = (
   source: HealthObservationDto[],
   devicePresentation: HealthObservationDto[] = [],
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  timezoneOffsetMinutes = -new Date(nowMs).getTimezoneOffset()
 ) => {
   const futureToleranceMs = 5 * 60_000;
   const valid = source.filter((item) => !item.deleted && Number.isFinite(item.value)
     && Date.parse(item.measuredAtISO) <= nowMs + futureToleranceMs);
   const all=[...valid,...devicePresentation.filter((item) => Date.parse(item.measuredAtISO) <= nowMs + futureToleranceMs)];
   const aggregates=aggregateCanonicalHealthObservations(all.map(item=>({...item,sourceProvider:item.sourceMetadata?.measurementMethod==='HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'?'platform_aggregate':item.sourceProvider})),
-    {fallbackOffsetMinutes:-new Date().getTimezoneOffset(),nowMs});
+    {fallbackOffsetMinutes:timezoneOffsetMinutes,nowMs});
+  const currentHealthDay = new Date(nowMs + timezoneOffsetMinutes * 60_000).toISOString().slice(0, 10);
   const result = new Map<string, HealthObservationDto>();
   HEALTH_METRIC_REGISTRY.forEach((definition) => {
-    const aggregate=aggregates.filter(row=>row.metricType===definition.backendCanonicalType).sort((a,b)=>b.healthDay.localeCompare(a.healthDay))[0];
+    const candidates=aggregates.filter(row=>row.metricType===definition.backendCanonicalType);
+    const aggregate=definition.aggregation==='LATEST'
+      ? candidates.filter((row)=>nowMs-Date.parse(row.latestMeasuredAtISO)<=definition.syncWindowDays*86_400_000)
+        .sort((a,b)=>b.latestMeasuredAtISO.localeCompare(a.latestMeasuredAtISO))[0]
+      : candidates.find((row)=>row.healthDay===currentHealthDay);
     if(!aggregate)return;const source=all.find(item=>(item.syncKey||item.sourceRecordId||item.id)===aggregate.sourceObservationIds[0])??all.find(item=>item.metricType===definition.backendCanonicalType);
     if(!source)return;result.set(definition.backendCanonicalType,{...source,id:`aggregate:${aggregate.lineageHash}`,value:aggregate.value,
       unit:aggregate.unit,measuredAtISO:aggregate.latestMeasuredAtISO});

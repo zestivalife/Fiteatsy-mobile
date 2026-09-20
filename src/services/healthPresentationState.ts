@@ -15,6 +15,17 @@ export const latestAggregate = (
   .filter((item) => metricTypes.includes(item.metricType) && finitePositive(item.value))
   .sort((left, right) => right.healthDay.localeCompare(left.healthDay))[0] ?? null;
 
+export const currentDayAggregate = (
+  aggregates: CanonicalDailyAggregate[],
+  metricTypes: string[],
+  nowMs = Date.now(),
+  timezoneOffsetMinutes = -new Date(nowMs).getTimezoneOffset()
+) => {
+  const healthDay = new Date(nowMs + timezoneOffsetMinutes * 60_000).toISOString().slice(0, 10);
+  return aggregates.find((item) => item.healthDay === healthDay
+    && metricTypes.includes(item.metricType) && finitePositive(item.value)) ?? null;
+};
+
 export const hasCanonicalMetricData = (
   aggregates: CanonicalDailyAggregate[],
   metricTypes: string[]

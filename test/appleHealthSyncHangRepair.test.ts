@@ -25,6 +25,18 @@ describe('Apple Health sync hang repair', () => {
     expect(apple).toContain("acceptedSampleCount > 0 ? 'synced' : 'no_recent_data'");
   });
 
+  test('starts current-day cumulative statistics before serial source-history reads', () => {
+    expect(apple.indexOf('const statisticsPromise = readStatistics()')).toBeLessThan(
+      apple.indexOf('settleWithConcurrency(APPLE_HEALTH_SCOPES')
+    );
+    expect(apple).toContain('(await statisticsPromise).forEach');
+  });
+
+  test('never substitutes ordinary heart rate for resting heart rate', () => {
+    expect(apple).toContain('average(validValues(metricValues.resting_heart_rate ?? []))');
+    expect(apple).not.toContain("?? average(validValues(metricValues.heart_rate ?? []))");
+  });
+
   test('setup later and back remain available without a second onboarding state machine', () => {
     expect(controlCentre).toContain("wearablePreference:connected?'sync':'later'");
     expect(controlCentre).toContain('onBack={()=>navigation.goBack()}');
@@ -48,6 +60,11 @@ describe('Apple Health sync hang repair', () => {
     expect(coordinator).toContain('onLocalComplete: applyLocalCompletion');
     expect(controlCentre).toContain('terminalMetricCount');
     expect(controlCentre).toContain('Health sync partially complete');
+  });
+
+  test('bounds foreground queue draining while retaining the durable pending queue', () => {
+    expect(manager).toContain('HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 10');
+    expect(manager).toContain('uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN');
   });
 
   test('diagnostics contain timing and status but do not log source health values', () => {

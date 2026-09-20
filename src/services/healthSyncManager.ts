@@ -101,6 +101,10 @@ export const HEALTH_SYNC_PIPELINE_TIMEOUT_MS = 45_000;
 // JSON body limit. First-sync heart-rate samples carry source metadata and can
 // exceed that boundary when the previous 250-record chunk is used.
 export const HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50;
+// A foreground sync must not remain active while draining years of durable
+// history. The queue resumes later and stable record identity prevents an
+// unchanged HealthKit sample from being enqueued twice.
+export const HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 10;
 export const withHealthSyncPipelineTimeout = <T>(operation: Promise<T>, code: string): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(code)), HEALTH_SYNC_PIPELINE_TIMEOUT_MS);
@@ -235,7 +239,8 @@ export const runHealthSync = async (
 
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
     let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
-    while (pending.length) {
+    let uploadBatchCount = 0;
+    while (pending.length && uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN) {
       const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
         '/v1/health/observations:batch', {
           observations: pending.map((item) => item.observation),
@@ -245,6 +250,7 @@ export const runHealthSync = async (
       updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
       if (ingest.rejected > 0) break;
       await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
+      uploadBatchCount += 1;
       pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     }
     uploadCompleted = rejected === 0 && pending.length === 0;
