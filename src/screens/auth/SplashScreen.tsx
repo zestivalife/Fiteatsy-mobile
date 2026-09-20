@@ -3,14 +3,11 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
-  Platform,
   StyleSheet,
   useWindowDimensions,
-  View
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import FiteatsyLogo from '../../assets/brand/fiteatsy-logo.svg';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
@@ -20,9 +17,9 @@ import { traceSessionLifecycle } from '../../services/sessionLifecycleTrace';
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
 export const SPLASH_MAX_DURATION_MS = 10_000;
+export const SPLASH_MIN_DURATION_MS = 1_200;
 const EXIT_FADE_DURATION = 320;
 const LOGO_ANIMATION_DURATION = 640;
-const SPLASH_VIDEO_ASSET = require('../../assets/brand/fiteatsy-splash-720p.mp4');
 
 export const SplashScreen = ({ navigation }: Props) => {
   const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep, authSession } = useAppContext();
@@ -35,36 +32,12 @@ export const SplashScreen = ({ navigation }: Props) => {
   const logoTranslateY = useRef(new Animated.Value(8)).current;
   const logoScale = useRef(new Animated.Value(0.97)).current;
 
-  const player = useVideoPlayer(SPLASH_VIDEO_ASSET, (videoPlayer) => {
-    videoPlayer.loop = false;
-    videoPlayer.muted = true;
-    videoPlayer.allowsExternalPlayback = false;
-    videoPlayer.staysActiveInBackground = false;
-    videoPlayer.play();
-  });
-
   const requestExit = useCallback((forced = false) => {
     if (forced) setForceExit(true);
     setExitRequested(true);
   }, []);
 
-  const pauseVideo = useCallback(() => {
-    try {
-      player.pause();
-    } catch {
-      // The native player may already be released during a development reload.
-    }
-  }, [player]);
-
-  const unloadVideo = useCallback(() => {
-    pauseVideo();
-    // Detach the decoded media immediately instead of retaining AVPlayer's
-    // frame buffers until the navigation transition is garbage-collected.
-    void player.replaceAsync(null).catch(() => undefined);
-  }, [pauseVideo, player]);
-
   const transitionTo = useCallback((navigate: () => void) => {
-    unloadVideo();
     Animated.timing(screenOpacity, {
       toValue: 0,
       duration: EXIT_FADE_DURATION,
@@ -73,7 +46,7 @@ export const SplashScreen = ({ navigation }: Props) => {
     }).start(({ finished }) => {
       if (finished) navigate();
     });
-  }, [screenOpacity, unloadVideo]);
+  }, [screenOpacity]);
 
   const resolveAndNavigate = useCallback(async () => {
     if (!isAuthenticated) {
@@ -154,23 +127,19 @@ export const SplashScreen = ({ navigation }: Props) => {
       ]).start();
     });
 
+    const minimumDurationTimer = setTimeout(() => requestExit(false), SPLASH_MIN_DURATION_MS);
     const maximumDurationTimer = setTimeout(() => requestExit(true), SPLASH_MAX_DURATION_MS);
-    const statusSubscription = player.addListener('statusChange', ({ status, error }) => {
-      if (status !== 'error') return;
-      console.warn('[VideoIntro] playback failed; continuing with branded fallback', error?.message ?? 'unknown_error');
-    });
 
     return () => {
       mounted = false;
+      clearTimeout(minimumDurationTimer);
       clearTimeout(maximumDurationTimer);
-      statusSubscription.remove();
       logoOpacity.stopAnimation();
       logoTranslateY.stopAnimation();
       logoScale.stopAnimation();
       screenOpacity.stopAnimation();
-      unloadVideo();
     };
-  }, [logoOpacity, logoScale, logoTranslateY, player, requestExit, screenOpacity, unloadVideo]);
+  }, [logoOpacity, logoScale, logoTranslateY, requestExit, screenOpacity]);
 
   useEffect(() => {
     if (!exitRequested || navigated.current || (!bootstrapped && !forceExit)) return;
@@ -184,19 +153,6 @@ export const SplashScreen = ({ navigation }: Props) => {
   return (
     <Animated.View style={[styles.screen, { opacity: screenOpacity }]}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
-      <VideoView
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        player={player}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        nativeControls={false}
-        fullscreenOptions={{ enable: false }}
-        allowsPictureInPicture={false}
-        showsTimecodes={false}
-        surfaceType={Platform.OS === 'android' ? 'textureView' : undefined}
-      />
-      <View pointerEvents="none" style={styles.overlay} />
       <Animated.View
         pointerEvents="none"
         style={[
@@ -220,10 +176,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
     overflow: 'hidden'
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.70)'
   },
   logo: {
     position: 'absolute',

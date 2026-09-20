@@ -49,26 +49,21 @@ const podfileLock = fs.readFileSync(
   'utf8'
 );
 
-describe('premium app-level video intro contract', () => {
-  it('uses the bounded local video and supplied SVG with the required presentation', () => {
-    expect(source).toContain("fiteatsy-splash-720p.mp4");
-    expect(source).not.toContain("https://zestiva.life/assets/Fiteatsy.mp4");
+describe('bounded static app intro contract', () => {
+  it('uses the supplied SVG without activating a native video decoder', () => {
     expect(source).toContain("fiteatsy-logo.svg");
-    expect(source).toContain("contentFit=\"cover\"");
-    expect(source).toContain("nativeControls={false}");
-    expect(source).toContain("backgroundColor: 'rgba(0,0,0,0.70)'");
-    expect(source).toContain('videoPlayer.muted = true');
+    expect(source).not.toContain('expo-video');
+    expect(source).not.toContain('VideoView');
+    expect(source).not.toContain('.mp4');
+    expect(source).toContain("backgroundColor: '#000000'");
   });
 
-  it('enforces the timeout, fallback, cleanup, and reduced-motion contracts', () => {
+  it('enforces minimum display, timeout fallback, cleanup, and reduced motion', () => {
+    expect(source).toContain('SPLASH_MIN_DURATION_MS = 1_200');
     expect(source).toContain('SPLASH_MAX_DURATION_MS = 10_000');
-    expect(source).toContain("player.addListener('statusChange'");
-    expect(source).not.toContain("player.addListener('playToEnd'");
-    expect(source).not.toMatch(/status !== 'error'[\s\S]{0,240}requestExit\(\)/);
     expect(source).toContain('AccessibilityInfo.isReduceMotionEnabled()');
+    expect(source).toContain('clearTimeout(minimumDurationTimer)');
     expect(source).toContain('clearTimeout(maximumDurationTimer)');
-    expect(source).toContain('player.pause()');
-    expect(source).toContain('player.replaceAsync(null)');
   });
 
   it('preserves every canonical post-startup route', () => {
@@ -140,10 +135,10 @@ describe('premium app-level video intro contract', () => {
     );
   });
 
-  it('keeps the canonical splash first and backed by the native video module', () => {
+  it('keeps the canonical bounded splash first', () => {
     expect(appNavigation).toContain('initialRouteName="Splash"');
     expect(appNavigation.match(/<Stack\.Screen name="Splash"/g)).toHaveLength(1);
-    expect(podfileLock).toContain('ExpoVideo (3.0.16)');
+    expect(podfileLock).toContain('ExpoModulesCore');
     expect(appConfig.expo.runtimeVersion).toBe('1.0.0-native-20260825-health-connect-d2');
   });
 });

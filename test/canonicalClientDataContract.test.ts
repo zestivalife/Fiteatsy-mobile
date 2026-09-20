@@ -74,7 +74,7 @@ test('FITEATSY_CANONICAL_CLIENT_DATA_CONTRACT: release surfaces retain canonical
   expect(medicationService).toMatch(/Asia\/Kolkata/);
   expect(navigation).toMatch(/FoodPreferences/);
   expect(navigation).toMatch(/OnboardingAssessment/);
-  expect(splash).toMatch(/assets\/brand\/fiteatsy-splash-720p\.mp4/);
-  expect(splash).toContain('player.replaceAsync(null)');
-  expect(splash).not.toMatch(/zestiva\.life\/assets\/Fiteatsy\.mp4/);
+  expect(splash).toContain('fiteatsy-logo.svg');
+  expect(splash).not.toContain('expo-video');
+  expect(splash).not.toMatch(/\.mp4/);
 });

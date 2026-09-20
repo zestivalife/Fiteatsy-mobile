@@ -43,14 +43,14 @@ describe('FITEATSY accepted product baseline regression contracts', () => {
     ['Journey', 'Tracker', 'Nutrition', 'Care', 'Profile'].forEach((tab) => expect(navigation).toContain(`<Tab.Screen name="${tab}"`));
   });
 
-  it('FITEATSY_SPLASH_CONTRACT keeps the approved video-first cold-launch experience', () => {
+  it('FITEATSY_SPLASH_CONTRACT keeps a bounded decoder-free cold launch', () => {
     const splash = read('src/screens/auth/SplashScreen.tsx');
     const config = JSON.parse(read('app.json'));
 
-    expect(splash).toContain("require('../../assets/brand/fiteatsy-splash-720p.mp4')");
-    expect(splash).toContain('player.replaceAsync(null)');
-    expect(splash).not.toContain('https://zestiva.life/assets/Fiteatsy.mp4');
-    expect(splash).toMatch(/rgba\(0,\s*0,\s*0,\s*0\.70?\)/);
+    expect(splash).toContain('fiteatsy-logo.svg');
+    expect(splash).not.toContain('expo-video');
+    expect(splash).not.toContain('.mp4');
+    expect(splash).toContain('SPLASH_MIN_DURATION_MS = 1_200');
     expect(splash).toContain('SPLASH_MAX_DURATION_MS = 10_000');
     expect(config.expo.runtimeVersion).toBe('1.0.0-native-20260825-health-connect-d2');
   });
