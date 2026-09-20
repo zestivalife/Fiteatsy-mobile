@@ -83,6 +83,25 @@ describe('durable local health sync store', () => {
     expect(storage.getItem.mock.calls[0][0]).toContain('health-sync-bootstrap');
   });
 
+  it('imports only the compact V1 bootstrap and never parses the legacy raw history', async () => {
+    const scope = 'account:user-legacy:apple-health';
+    mockStorage.set(`@fiteatsy/health-sync-local-v1:${scope}`, 'intentionally-not-json');
+    mockStorage.set(`@fiteatsy/health-sync-bootstrap-v1:${scope}`, JSON.stringify({
+      pendingUploadCount: 0,
+      providerConnected: true,
+      aggregates: [],
+      aggregatesDirty: false,
+      lifecycle: { lastHealthReadAtISO: '2026-09-20T00:00:00.000Z' }
+    }));
+    const storage = require('@react-native-async-storage/async-storage').default;
+    storage.getItem.mockClear();
+    const snapshot = await readLocalHealthBootstrapSnapshot(scope);
+    expect(snapshot.providerConnected).toBe(true);
+    expect(snapshot.lifecycle.lastHealthReadAtISO).toBe('2026-09-20T00:00:00.000Z');
+    expect(storage.getItem.mock.calls.map((call: [string]) => call[0]))
+      .not.toContain(`@fiteatsy/health-sync-local-v1:${scope}`);
+  });
+
   it('persists provider connection independently from onboarding metadata', async () => {
     const scope = 'account:user-1:apple-health';
     expect(await readLocalHealthProviderConnected(scope)).toBe(false);

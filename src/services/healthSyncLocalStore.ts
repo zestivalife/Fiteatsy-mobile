@@ -3,10 +3,18 @@ import type { HealthObservationDraft } from '../types';
 import type { LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
 import { aggregateCanonicalHealthObservations, HEALTH_AGGREGATION_VERSION, type CanonicalDailyAggregate } from '@fiteatsy/health-intelligence';
 
-const STORE_VERSION = 1;
+// V1 retained every HealthKit row in one monolithic JSON document. Opening that
+// document during a sync could amplify into >1.6 GiB of transient JS/native
+// allocations on a physical device. V2 deliberately starts a fresh bounded
+// raw queue while importing only V1's compact bootstrap projection.
+const STORE_VERSION = 2;
+const LEGACY_STORE_VERSION = 1;
 const keyFor = (scope: string) => `@fiteatsy/health-sync-local-v${STORE_VERSION}:${scope}`;
 const bootstrapKeyFor = (scope: string) => `@fiteatsy/health-sync-bootstrap-v${STORE_VERSION}:${scope}`;
-const INSTALLATION_KEY = `@fiteatsy/health-sync-local-v${STORE_VERSION}:installation-id`;
+const legacyBootstrapKeyFor = (scope: string) => `@fiteatsy/health-sync-bootstrap-v${LEGACY_STORE_VERSION}:${scope}`;
+// Installation identity is independent of the raw-store schema generation.
+const INSTALLATION_KEY = '@fiteatsy/health-sync-installation-id';
+const PREVIOUS_INSTALLATION_KEY = '@fiteatsy/health-sync-local-v1:installation-id';
 const LEGACY_KEYS = ['@fiteatsy/wearable-installation-id', '@fiteatsy/wearable-last-foreground-sync'] as const;
 const identity = (item: HealthObservationDraft) => item.syncKey
   ?? `${item.sourceProvider}:${item.metricType}:${item.sourceRecordId ?? item.measuredAtISO}`;
@@ -65,7 +73,10 @@ const emptyBootstrapSnapshot = () => ({
 });
 
 const readBootstrapSnapshot = async (scope: string) => {
-  const raw = await AsyncStorage.getItem(bootstrapKeyFor(scope));
+  // The legacy bootstrap is intentionally small and contains the last display
+  // projection. Never fall back to the legacy raw-history key.
+  const raw = await AsyncStorage.getItem(bootstrapKeyFor(scope))
+    ?? await AsyncStorage.getItem(legacyBootstrapKeyFor(scope));
   if (!raw) return emptyBootstrapSnapshot();
   try {
     const parsed = JSON.parse(raw) as Partial<Pick<LocalSyncState,
@@ -180,7 +191,8 @@ export const markLocalHealthUploaded = (scope:string,fullySynced:boolean) => ser
 export const getOrCreateHealthInstallationId = async () => {
   const existing = await AsyncStorage.getItem(INSTALLATION_KEY);
   if (existing) return existing;
-  const created = `install-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const previous = await AsyncStorage.getItem(PREVIOUS_INSTALLATION_KEY);
+  const created = previous ?? `install-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   await AsyncStorage.setItem(INSTALLATION_KEY, created);
   // Remove the superseded duplicate key after migrating its value when present.
   await AsyncStorage.multiRemove([...LEGACY_KEYS]);
@@ -193,7 +205,8 @@ export const migrateLegacyHealthInstallationId = async () => {
     await AsyncStorage.multiRemove([...LEGACY_KEYS]);
     return canonical;
   }
-  const legacy = await AsyncStorage.getItem('@fiteatsy/wearable-installation-id');
+  const legacy = await AsyncStorage.getItem(PREVIOUS_INSTALLATION_KEY)
+    ?? await AsyncStorage.getItem('@fiteatsy/wearable-installation-id');
   if (!legacy) return getOrCreateHealthInstallationId();
   await AsyncStorage.setItem(INSTALLATION_KEY, legacy);
   await AsyncStorage.multiRemove([...LEGACY_KEYS]);

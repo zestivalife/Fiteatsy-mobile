@@ -21,6 +21,8 @@ describe('canonical health sync architecture',()=>{
     expect(count).toBe(1);
     expect(coordinator).toContain("if (nextState !== 'active') return");
     expect(coordinator).toContain('foregroundRefreshAt.current');
+    expect(coordinator).not.toContain('subscribeToHealthKitChanges');
+    expect(coordinator).toContain('void refreshRemoteSnapshot()');
   });
 
   test('one mounted provider owns the only live provider and metric state authority',()=>{
@@ -75,7 +77,7 @@ describe('canonical health sync architecture',()=>{
 
   test('legacy installation and foreground keys are migrated into the canonical store',()=>{
     const store=read('src/services/healthSyncLocalStore.ts');
-    expect(store).toContain("@fiteatsy/health-sync-local-v${STORE_VERSION}:installation-id");
+    expect(store).toContain("'@fiteatsy/health-sync-installation-id'");
     expect(store).toContain("'@fiteatsy/wearable-installation-id'");
     expect(store).toContain("'@fiteatsy/wearable-last-foreground-sync'");
     expect(store).toContain('AsyncStorage.multiRemove([...LEGACY_KEYS])');

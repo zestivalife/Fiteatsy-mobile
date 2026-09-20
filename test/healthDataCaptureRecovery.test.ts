@@ -120,7 +120,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(read('src/services/healthSyncManager.ts')).toContain('recalculateIntelligence: false');
   });
 
-  test('HealthKit pagination, poison-sample filtering, queue serialization, and observer refresh are wired', () => {
+  test('HealthKit pagination, poison-sample filtering, and queue serialization are wired without launch-time observer sync', () => {
     const apple = read('src/services/appleHealthService.ts');
     const bridge = read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift');
     const store = read('src/services/healthSyncLocalStore.ts');
@@ -132,8 +132,9 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain('while (hasMore && pagesRead < APPLE_HEALTH_MAX_PAGES_PER_METRIC)');
     expect(apple).toContain('sample.value <= 0');
     expect(store).toContain('serializeScopeOperation');
-    expect(coordinator).toContain('subscribeToHealthKitChanges');
-    expect(coordinator).toContain('subscription?.remove()');
+    expect(coordinator).not.toContain('subscribeToHealthKitChanges');
+    expect(coordinator).toContain('Native HealthKit reads are');
+    expect(coordinator).toContain('void refreshRemoteSnapshot()');
   });
 
   test('authorization and foreground return immediately execute local query and retain local UI rows', () => {

@@ -1,7 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
-import { subscribeToHealthKitChanges } from '../../modules/fiteatsy-healthkit';
 import { useAppContext } from '../state/AppContext';
 import type { HealthObservationDraft } from '../types';
 import { HEALTH_METRIC_REGISTRY, type HealthMetricDefinition } from './healthMetricRegistry';
@@ -76,7 +75,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const awaitingPermissionReturn = useRef(false);
   const foregroundRefreshAt = useRef(0);
   const forceBackfill = useRef(false);
-  const healthChangeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionIdOverride = useRef<string | null>(null);
   const [providerState, setProviderState] = useState<HealthProviderState>('AVAILABLE');
   const [uploadState, setUploadState] = useState<HealthUploadState>('IDLE');
@@ -338,26 +336,19 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       const now = Date.now();
       if (now - foregroundRefreshAt.current < 1_500) return;
       foregroundRefreshAt.current = now;
-      if (!awaitingPermissionReturn.current && providerState !== 'CONNECTED') return;
+      if (!awaitingPermissionReturn.current) {
+        // Reconcile lightweight server state only. Native HealthKit reads are
+        // explicitly user-triggered and must never run merely because the app
+        // launched or returned to the foreground.
+        void refreshRemoteSnapshot();
+        return;
+      }
       const shouldBackfill = awaitingPermissionReturn.current || forceBackfill.current;
       awaitingPermissionReturn.current = false;
       void syncLocalMetrics({ forceSourceBackfill: shouldBackfill });
     });
     return () => subscription.remove();
-  }, [providerState, syncLocalMetrics]);
-
-  useEffect(() => {
-    if (adapter.platform !== 'APPLE_HEALTH' || providerState !== 'CONNECTED') return;
-    const subscription = subscribeToHealthKitChanges(() => {
-      if (healthChangeDebounce.current) clearTimeout(healthChangeDebounce.current);
-      healthChangeDebounce.current = setTimeout(() => void syncLocalMetrics(), 1_000);
-    });
-    return () => {
-      if (healthChangeDebounce.current) clearTimeout(healthChangeDebounce.current);
-      healthChangeDebounce.current = null;
-      subscription?.remove();
-    };
-  }, [adapter.platform, providerState, syncLocalMetrics]);
+  }, [refreshRemoteSnapshot, syncLocalMetrics]);
 
   const latestByMetric = useMemo(() => buildPresentedHealthObservations(observations,presentationObservations),
     [observations,presentationObservations]);
