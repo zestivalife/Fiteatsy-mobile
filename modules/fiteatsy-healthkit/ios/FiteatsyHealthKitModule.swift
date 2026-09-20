@@ -3,7 +3,10 @@ import HealthKit
 import OSLog
 
 public final class FiteatsyHealthKitModule: Module {
-  private let anchoredReadLimit = 2500
+  // Keep each Expo bridge payload bounded. Dense histories (especially heart
+  // rate) otherwise create multiple large Swift/NSDictionary/JS copies before
+  // the previous page can be released. The query anchor resumes the next batch.
+  private let anchoredReadLimit = 250
   private let store = HKHealthStore()
   private let iso = ISO8601DateFormatter()
   private var observerQueries: [HKObserverQuery] = []

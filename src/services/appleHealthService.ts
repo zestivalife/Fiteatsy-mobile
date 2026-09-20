@@ -7,11 +7,16 @@ import { APPLE_HEALTH_QUERYABLE_METRICS, APPLE_HEALTH_READ_TYPES } from './healt
 export const APPLE_HEALTH_SCOPES = APPLE_HEALTH_READ_TYPES;
 export const APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS = 5_000;
 export const APPLE_HEALTH_PERMISSION_TIMEOUT_MS = 20_000;
-// Thirteen reads run in groups of three. Keep the worst-case local read budget
+// Thirteen reads run in groups of two. Keep the worst-case local read budget
 // below HEALTH_SYNC_PIPELINE_TIMEOUT_MS even when every native query times out.
 export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 6_000;
-export const APPLE_HEALTH_QUERY_CONCURRENCY = 3;
-export const APPLE_HEALTH_MAX_PAGES_PER_METRIC = 8;
+// Keep the native-to-JS transfer deliberately small. A first HealthKit read can
+// contain years of dense heart-rate samples; retaining several 2,500-record
+// pages for three metrics at once caused >1.6 GiB resident memory and Jetsam.
+// The returned anchor makes every transaction incremental, so subsequent
+// explicit syncs continue without sacrificing source records.
+export const APPLE_HEALTH_QUERY_CONCURRENCY = 2;
+export const APPLE_HEALTH_MAX_PAGES_PER_METRIC = 1;
 const APPLE_HEALTH_STATUS_KEYS: Record<string, string> = {
   steps: 'steps', sleep_minutes: 'sleep', resting_heart_rate: 'heart_rate', heart_rate: 'heart_rate',
   hrv_ms: 'hrv', workout_minutes: 'workouts', exercise_minutes: 'workouts', active_energy: 'calories', distance: 'distance',
@@ -142,8 +147,10 @@ export const syncFromAppleHealth = async (
         if (sample.metric === 'sleep_minutes' && sample.sleepStage === 'IN_BED') return;
         const canonicalMetric = sample.metric === 'exercise_minutes' ? 'active_minutes'
           : sample.metric === 'hrv_ms' ? 'hrv_sdnn_ms' : sample.metric;
-        if(sample.metric!=='sleep_minutes'||sample.sleepStage!=='AWAKE')
-          metricValues[canonicalMetric] = [...(metricValues[canonicalMetric] ?? []), sample.value];
+        if(sample.metric!=='sleep_minutes'||sample.sleepStage!=='AWAKE') {
+          const values = metricValues[canonicalMetric] ?? (metricValues[canonicalMetric] = []);
+          values.push(sample.value);
+        }
         // Zero/negative quantity samples do not contribute to Fiteatsy health
         // aggregates and are invalid under the backend observation contract.
         // Drop them locally so one empty HealthKit sample cannot poison a

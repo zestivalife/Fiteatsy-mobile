@@ -79,7 +79,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     const native = read('modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift');
     const apple = read('src/services/appleHealthService.ts');
     expect(native).toContain('HKStatisticsQuery');
-    expect(native).toContain('anchoredReadLimit = 2500');
+    expect(native).toContain('anchoredReadLimit = 250');
     expect(native).not.toContain('limit: HKObjectQueryNoLimit');
     expect(native).toContain('options: .cumulativeSum');
     expect(apple).toContain('readHealthKitCumulativeStatistics');
@@ -126,7 +126,9 @@ describe('end-to-end health data capture recovery contracts', () => {
     const store = read('src/services/healthSyncLocalStore.ts');
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     expect(bridge).toContain('"hasMore": rows.count + deletedIds.count >= self.anchoredReadLimit');
-    expect(apple).toContain('APPLE_HEALTH_MAX_PAGES_PER_METRIC = 8');
+    expect(apple).toContain('APPLE_HEALTH_MAX_PAGES_PER_METRIC = 1');
+    expect(apple).toContain('values.push(sample.value)');
+    expect(apple).not.toContain('metricValues[canonicalMetric] = [...');
     expect(apple).toContain('while (hasMore && pagesRead < APPLE_HEALTH_MAX_PAGES_PER_METRIC)');
     expect(apple).toContain('sample.value <= 0');
     expect(store).toContain('serializeScopeOperation');
