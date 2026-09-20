@@ -123,7 +123,10 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       });
       setActivity(nextActivity.items);
       const snapshot = serverSnapshot(nextIntelligence);
-      setCanonicalIntelligence(snapshot);
+      // A delayed server response must not replace the canonical local
+      // projection produced from a just-completed native read. The server
+      // snapshot remains a bootstrap fallback until local aggregates hydrate.
+      setCanonicalIntelligence((current) => current?.source === 'LOCAL_CANONICAL_INPUTS' ? current : snapshot);
       if (localScope) await persistLocalCanonicalHealthSnapshot(localScope, snapshot);
     } catch {
       // Backend availability is not provider availability. Local reads stay usable.

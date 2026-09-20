@@ -21,6 +21,7 @@ import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEn
 import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
 import {getHealthIntelligenceV1,getHealthScoreHistory,getHealthScoreSummary,type HealthIntelligenceV1,type HealthScore,type HealthScoreSummary,type HealthScoreType} from '../../services/healthIntelligenceService';
 import { useCanonicalHealthSyncCoordinator, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
+import { baselineCopy, buildSleepStagePresentation, hasCanonicalMetricData, latestAggregate } from '../../services/healthPresentationState';
 
 type RangeMode = '7D' | '30D';
 type HealthSubTab = 'overview' | 'activity' | 'heart' | 'sleep';
@@ -335,11 +336,6 @@ const calculateSleepMinutes = (
     return diff > 0 ? diff : null;
   }
   return fallbackHours != null && Number.isFinite(fallbackHours) && fallbackHours > 0 ? fallbackHours * 60 : null;
-};
-
-const formatSleepStage = (value: number | null | undefined) => {
-  if (value == null || !Number.isFinite(value) || value <= 0) return null;
-  return value <= 1 ? `${Math.round(value * 100)}%` : `${Math.round(value)}%`;
 };
 
 const RecoveryParticleMetric = ({
@@ -1271,8 +1267,7 @@ export const TrackerScreen = () => {
   };
 
   const latestObservations = health.observations;
-  const todayAggregate=(metricTypes:string[])=>health.aggregates.filter((item)=>metricTypes.includes(item.metricType))
-    .sort((a,b)=>b.healthDay.localeCompare(a.healthDay))[0]?.value??null;
+  const todayAggregate=(metricTypes:string[])=>latestAggregate(health.aggregates,metricTypes)?.value??null;
   const observationSeries = (metricTypes: string[]) => days
     .map((day) => health.aggregates.find((item) =>
       metricTypes.includes(item.metricType) && item.healthDay === day.key
@@ -1286,7 +1281,9 @@ export const TrackerScreen = () => {
   const stepsValue = todayAggregate(['steps']);
   const caloriesValue = todayAggregate(['active_energy']);
   const workoutMinutesValue = todayAggregate(['workout_minutes','active_minutes']);
-  const displayScores = canonicalIntelligence?.scores ?? health.canonicalIntelligence?.scores ?? null;
+  // Tracker and Journey share the coordinator's persisted local projection.
+  // A separately fetched server snapshot may lag the native commit boundary.
+  const displayScores = health.canonicalIntelligence?.scores ?? canonicalIntelligence?.scores ?? null;
   const activityScoreValue = displayScores?.activity.score ?? null;
   const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? todayAggregate(['resting_heart_rate']) : null;
   const hrvValue = recoveryIntel.signalCoverage.hrv ? todayAggregate(['hrv_sdnn_ms','hrv_rmssd_ms']) : null;
@@ -1296,14 +1293,13 @@ export const TrackerScreen = () => {
   const bedtimeValue = toClockMinutes(onboarding?.sleepTime);
   const wakeTimeValue = toClockMinutes(onboarding?.wakeTime);
   const sleepDurationMinutes = calculateSleepMinutes(bedtimeValue, wakeTimeValue, sleepHoursValue);
-  const sleepStages = [
-    ['Deep', formatSleepStage(todayAggregate(['sleep_deep_minutes']))],
-    ['REM', formatSleepStage(todayAggregate(['sleep_rem_minutes']))],
-    ['Light', formatSleepStage(todayAggregate(['sleep_core_minutes']))],
-    ['Awake', formatSleepStage(todayAggregate(['sleep_awake_minutes']))]
-  ]
-    .filter((stage): stage is [string, string] => Boolean(stage[1]))
-    .map(([label, value]) => `${label} ${value}`);
+  const sleepStages = buildSleepStagePresentation(health.aggregates).stages;
+  const activityDataAvailable = hasCanonicalMetricData(health.aggregates, ['steps', 'active_minutes', 'workout_minutes', 'active_energy']);
+  const sleepDataAvailable = hasCanonicalMetricData(health.aggregates, ['sleep_minutes']);
+  const stepsSevenDayBaseline = baselineCopy(health.aggregates, 'steps', 7);
+  const stepsTwentyEightDayBaseline = baselineCopy(health.aggregates, 'steps', 28);
+  const sleepSevenDayBaseline = baselineCopy(health.aggregates, 'sleep_minutes', 7, ' min');
+  const sleepTwentyEightDayBaseline = baselineCopy(health.aggregates, 'sleep_minutes', 28, ' min');
   const hydrationValue = wellness.hydrationLiters > 0 ? wellness.hydrationLiters : null;
   const activeMinutesValue = wellness.movementMinutes > 0 ? wellness.movementMinutes : workoutMinutesValue;
   const recommendationText = recoveryIntel.highestImpactActions[0] ?? recoveryIntel.insufficientReason ?? 'Sync health data to unlock personalized guidance.';
@@ -1637,11 +1633,13 @@ export const TrackerScreen = () => {
           {renderMetricRow('Steps', numberLabel(stepsValue), '', null)}
           {renderMetricRow('Workout', numberLabel(workoutMinutesValue, ' min'), '', null, '#BFFFA9')}
           {renderMetricRow('Calories', numberLabel(caloriesValue, ' kcal'), '', null, '#FF8188')}
-          <Text style={styles.healthMuted}>7-day steps average: {numberLabel(canonicalIntelligence?.baselines.steps?.sevenDayAverage ?? null)} · 28-day baseline: {numberLabel(canonicalIntelligence?.baselines.steps?.twentyEightDayBaseline ?? null)}</Text>
+          <Text style={styles.healthMuted}>7-day steps average: {stepsSevenDayBaseline} · 28-day baseline: {stepsTwentyEightDayBaseline}</Text>
         </Card>
         <Card style={styles.recommendationCard}>
           <Text style={styles.recommendationTitle}>Activity Recommendation</Text>
-          <Text style={styles.recommendationCopy}>{activityScoreValue == null ? 'Sync activity data to unlock movement guidance.' : recommendationText}</Text>
+          <Text style={styles.recommendationCopy}>{activityScoreValue == null
+            ? activityDataAvailable ? 'Today’s activity data is available. Building your baseline.' : 'Sync activity data to unlock movement guidance.'
+            : recommendationText}</Text>
         </Card>
       </View>
     );
@@ -1672,11 +1670,13 @@ export const TrackerScreen = () => {
         stages={sleepStages}
       />
       <Card style={styles.healthPanel}>
-        <Text style={styles.healthMuted}>7-day sleep average: {numberLabel(canonicalIntelligence?.baselines.sleep_minutes?.sevenDayAverage ?? null, ' min')} · 28-day baseline: {numberLabel(canonicalIntelligence?.baselines.sleep_minutes?.twentyEightDayBaseline ?? null, ' min')}</Text>
+        <Text style={styles.healthMuted}>7-day sleep average: {sleepSevenDayBaseline} · 28-day baseline: {sleepTwentyEightDayBaseline}</Text>
       </Card>
       <Card style={styles.recommendationCard}>
         <Text style={[styles.recommendationTitle, { color: '#6FD3FF' }]}>Sleep Recommendation</Text>
-        <Text style={styles.recommendationCopy}>{sleepScoreValue == null ? 'Sync sleep data to unlock sleep recommendations.' : recommendationText}</Text>
+        <Text style={styles.recommendationCopy}>{sleepScoreValue == null
+          ? sleepDataAvailable ? 'Sleep data is available. Building your baseline.' : 'Sync sleep data to unlock sleep recommendations.'
+          : recommendationText}</Text>
       </Card>
     </View>
   );

@@ -15,6 +15,7 @@ import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
 import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
+import { hasCanonicalMetricData } from '../../services/healthPresentationState';
 import { getMySubscription } from '../../services/subscriptionService';
 import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
 import {
@@ -309,7 +310,14 @@ export const HomeScreen = () => {
     calm: health.canonicalIntelligence.scores.calm
   } : null;
   const selectedFramework = frameworkByMetric?.[selectedMetric];
-  const selectedState = stateFromScore(selected.score, selectedFramework?.status);
+  const selectedMetricAvailability: Partial<Record<MetricKey, boolean>> = {
+    activity: hasCanonicalMetricData(health.aggregates, ['steps', 'active_minutes', 'workout_minutes', 'active_energy']),
+    sleep: hasCanonicalMetricData(health.aggregates, ['sleep_minutes']),
+    calm: hasCanonicalMetricData(health.aggregates, ['hrv_sdnn_ms', 'hrv_rmssd_ms', 'mindfulness_minutes'])
+  };
+  const selectedState = selected.score == null && selectedMetricAvailability[selectedMetric]
+    ? { label: selectedFramework?.status === 'METHODOLOGY_PENDING' ? 'Data available · Methodology pending' : 'Data available · Building baseline' }
+    : stateFromScore(selected.score, selectedFramework?.status);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
 
   return (
