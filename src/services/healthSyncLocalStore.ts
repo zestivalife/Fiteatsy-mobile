@@ -5,6 +5,7 @@ import { aggregateCanonicalHealthObservations, HEALTH_AGGREGATION_VERSION, type 
 
 const STORE_VERSION = 1;
 const keyFor = (scope: string) => `@fiteatsy/health-sync-local-v${STORE_VERSION}:${scope}`;
+const bootstrapKeyFor = (scope: string) => `@fiteatsy/health-sync-bootstrap-v${STORE_VERSION}:${scope}`;
 const INSTALLATION_KEY = `@fiteatsy/health-sync-local-v${STORE_VERSION}:installation-id`;
 const LEGACY_KEYS = ['@fiteatsy/wearable-installation-id', '@fiteatsy/wearable-last-foreground-sync'] as const;
 const identity = (item: HealthObservationDraft) => item.syncKey
@@ -46,7 +47,43 @@ const readState = async (scope: string): Promise<LocalSyncState> => {
 };
 
 const writeState = (scope: string, state: LocalSyncState) =>
-  AsyncStorage.setItem(keyFor(scope), JSON.stringify(state));
+  AsyncStorage.multiSet([
+    [keyFor(scope), JSON.stringify(state)],
+    [bootstrapKeyFor(scope), JSON.stringify({
+      pendingUploadCount: Object.values(state.records).filter((record) => !record.uploaded).length,
+      providerConnected: state.providerConnected,
+      canonicalScoreSnapshot: state.canonicalScoreSnapshot,
+      aggregates: state.aggregates,
+      aggregatesDirty: state.aggregatesDirty,
+      lifecycle: state.lifecycle
+    })]
+  ]);
+
+const emptyBootstrapSnapshot = () => ({
+  pendingUploadCount: 0, providerConnected: false, canonicalScoreSnapshot: null as LocalCanonicalHealthSnapshot | null,
+  aggregates: [] as CanonicalDailyAggregate[], aggregatesDirty: false, lifecycle: emptyState().lifecycle
+});
+
+const readBootstrapSnapshot = async (scope: string) => {
+  const raw = await AsyncStorage.getItem(bootstrapKeyFor(scope));
+  if (!raw) return emptyBootstrapSnapshot();
+  try {
+    const parsed = JSON.parse(raw) as Partial<Pick<LocalSyncState,
+      'providerConnected' | 'canonicalScoreSnapshot' | 'aggregates' | 'aggregatesDirty' | 'lifecycle'>>
+      & { pendingUploadCount?: number };
+    return {
+      pendingUploadCount: parsed.pendingUploadCount ?? 0,
+      providerConnected: parsed.providerConnected === true,
+      canonicalScoreSnapshot: parsed.canonicalScoreSnapshot?.calculationVersion === 'HEALTH_INTELLIGENCE_V1'
+        ? parsed.canonicalScoreSnapshot : null,
+      aggregates: (parsed.aggregates ?? []).filter((item) => item.aggregateVersion === HEALTH_AGGREGATION_VERSION),
+      aggregatesDirty: parsed.aggregatesDirty === true,
+      lifecycle: { ...emptyState().lifecycle, ...parsed.lifecycle }
+    };
+  } catch {
+    return emptyBootstrapSnapshot();
+  }
+};
 
 export const readLocalSyncCursors = (scope: string) =>
   serializeScopeOperation(scope, async () => (await readState(scope)).cursors);
@@ -89,42 +126,26 @@ export const markLocalHealthProviderConnected = (scope: string) =>
   });
 
 export const readLocalCanonicalHealthSnapshot = (scope: string) =>
-  serializeScopeOperation(scope, async () => (await readState(scope)).canonicalScoreSnapshot);
+  serializeScopeOperation(scope, async () => (await readBootstrapSnapshot(scope)).canonicalScoreSnapshot);
 
 export const persistLocalCanonicalHealthSnapshot = (scope: string, snapshot: LocalCanonicalHealthSnapshot) =>
   serializeScopeOperation(scope, async () => {
-    const state = await readState(scope);
-    state.canonicalScoreSnapshot = snapshot;
-    await writeState(scope, state);
+    const current = await readBootstrapSnapshot(scope);
+    await AsyncStorage.setItem(bootstrapKeyFor(scope), JSON.stringify({ ...current, canonicalScoreSnapshot: snapshot }));
   });
 
 export const readLocalHealthAggregates = (scope:string) => serializeScopeOperation(scope,async()=>(await readState(scope)).aggregates);
 export const readLocalHealthLifecycle = (scope:string) => serializeScopeOperation(scope,async()=>(await readState(scope)).lifecycle);
 /**
- * Reads the complete startup projection with one AsyncStorage fetch/JSON parse.
- * The previous coordinator called seven public selectors in parallel. Those
- * selectors are intentionally serialized per account, so a large retained
- * HealthKit history was parsed seven times during cold launch.
+ * Reads only the bounded startup projection. It never touches the retained raw
+ * HealthKit store: legacy installations without this projection start empty
+ * and populate it on the next explicit or observer-driven sync.
  *
  * Startup must remain a cheap local restore. Dirty aggregates are deliberately
  * not recomputed here; the explicit/observer sync pipeline owns that work.
  */
 export const readLocalHealthBootstrapSnapshot = (scope: string) =>
-  serializeScopeOperation(scope, async () => {
-    const state = await readState(scope);
-    return {
-      observations: Object.values(state.records)
-        .sort((left, right) => left.updatedAtISO.localeCompare(right.updatedAtISO))
-        .map((record) => record.observation),
-      presentationObservations: Object.values(state.presentationRecords),
-      pendingUploadCount: Object.values(state.records).filter((record) => !record.uploaded).length,
-      providerConnected: state.providerConnected,
-      canonicalScoreSnapshot: state.canonicalScoreSnapshot,
-      aggregates: state.aggregates,
-      aggregatesDirty: state.aggregatesDirty,
-      lifecycle: state.lifecycle
-    };
-  });
+  serializeScopeOperation(scope, () => readBootstrapSnapshot(scope));
 export const persistLocalHealthAggregates = (scope:string,aggregates:CanonicalDailyAggregate[],readAtISO:string) =>
   serializeScopeOperation(scope,async()=>{const state=await readState(scope);state.aggregates=aggregates;
     state.aggregatesDirty=false;

@@ -4,6 +4,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
     setItem: jest.fn(async (key: string, value: string) => { mockStorage.set(key, value); }),
+    multiSet: jest.fn(async (entries: [string, string][]) => {
+      entries.forEach(([key, value]) => mockStorage.set(key, value));
+    }),
     multiRemove: jest.fn(async (keys: string[]) => { keys.forEach((key) => mockStorage.delete(key)); })
   }
 }));
@@ -69,15 +72,15 @@ describe('durable local health sync store', () => {
     expect(await readLocalHealthObservations('account:user-2:apple-health')).toEqual([]);
   });
 
-  it('hydrates the complete startup projection with one storage read', async () => {
+  it('hydrates a bounded startup projection without parsing the raw health store', async () => {
     const scope = 'account:user-1:apple-health';
     await persistLocalSyncBatch(scope, [observation(100)], { steps: 'anchor-1' });
     const storage = require('@react-native-async-storage/async-storage').default;
     storage.getItem.mockClear();
     const snapshot = await readLocalHealthBootstrapSnapshot(scope);
-    expect(snapshot.observations).toEqual([observation(100)]);
     expect(snapshot.pendingUploadCount).toBe(1);
     expect(storage.getItem).toHaveBeenCalledTimes(1);
+    expect(storage.getItem.mock.calls[0][0]).toContain('health-sync-bootstrap');
   });
 
   it('persists provider connection independently from onboarding metadata', async () => {

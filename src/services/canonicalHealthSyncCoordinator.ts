@@ -297,11 +297,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     readLocalHealthBootstrapSnapshot(localScope)
       .then((snapshot) => {
         if (!active || !mounted.current) return;
-        mergeLocalObservations(snapshot.observations);
-        setPresentationObservations(snapshot.presentationObservations.map((item, index) =>
-          toDto(item, authSession?.client.fiteatsyClientId ?? 'local', index)));
         setPendingUploadCount(snapshot.pendingUploadCount);
-        if (snapshot.providerConnected || snapshot.observations.length > 0) setProviderState('CONNECTED');
+        if (snapshot.providerConnected) setProviderState('CONNECTED');
         if (snapshot.canonicalScoreSnapshot) setCanonicalIntelligence(markCanonicalSnapshotStale(snapshot.canonicalScoreSnapshot));
         setAggregates(snapshot.aggregates);
         setLifecycle(snapshot.lifecycle);
