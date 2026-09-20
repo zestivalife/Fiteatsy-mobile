@@ -22,9 +22,9 @@ import {
 } from './healthSyncManager';
 import { getHealthIntelligenceV1, type HealthIntelligenceV1, type HealthScoreSummary } from './healthIntelligenceService';
 import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLocalHealthProviderConnected,
-  migrateLegacyHealthInstallationId, readLocalHealthObservations, readLocalHealthPresentationObservations,
-  readLocalHealthProviderConnected, readLocalCanonicalHealthSnapshot, persistLocalCanonicalHealthSnapshot,
-  readLocalHealthAggregates,readLocalHealthLifecycle,ensureLocalHealthAggregatesCurrent,type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
+  migrateLegacyHealthInstallationId, readLocalHealthBootstrapSnapshot,
+  persistLocalCanonicalHealthSnapshot,
+  readLocalHealthAggregates,readLocalHealthLifecycle,type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
 import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
 import { buildPresentedHealthObservations } from './healthMetricPresentation';
 import { calculateCanonicalHealthIntelligenceFromAggregates, hasCalculatedCanonicalScore,
@@ -76,7 +76,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const awaitingPermissionReturn = useRef(false);
   const foregroundRefreshAt = useRef(0);
   const forceBackfill = useRef(false);
-  const automaticInitialSyncStarted = useRef(false);
   const healthChangeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionIdOverride = useRef<string | null>(null);
   const [providerState, setProviderState] = useState<HealthProviderState>('AVAILABLE');
@@ -90,7 +89,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<HealthSyncResult['diagnostics']>([]);
   const [localHydrated, setLocalHydrated] = useState(false);
-  const [localProviderConnected, setLocalProviderConnected] = useState(false);
   const [pendingUploadCount, setPendingUploadCount] = useState(0);
   const [canonicalIntelligence, setCanonicalIntelligence] = useState<LocalCanonicalHealthSnapshot | null>(null);
   const [aggregates,setAggregates]=useState<CanonicalDailyAggregate[]>([]);
@@ -141,7 +139,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       refreshQueued.current = true;
       return;
     }
-    automaticInitialSyncStarted.current = true;
     inFlight.current = true;
     traceSessionLifecycle('HEALTH_SYNC_START', { trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL' });
     setUploadState('UPLOADING');
@@ -167,7 +164,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       setLifecycle(await readLocalHealthLifecycle(localScope));
       setDiagnostics(result.diagnostics);
       setProviderState('CONNECTED');
-      setLocalProviderConnected(true);
       await markLocalHealthProviderConnected(localScope);
       setUploadState(result.rejected > 0 ? 'ERROR' : 'SYNCED');
       const nextQueries: Record<string, HealthMetricQueryState> = {};
@@ -202,7 +198,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setLifecycle(await readLocalHealthLifecycle(localScope));
         setDiagnostics(error.diagnostics);
         setProviderState('CONNECTED');
-        setLocalProviderConnected(true);
         await markLocalHealthProviderConnected(localScope);
         setUploadState(error instanceof HealthSyncPostUploadRefreshError ? 'SYNCED' : 'PENDING');
         const locallyAvailableTypes = new Set(error.observations
@@ -242,7 +237,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       access = await adapter.requestAccess();
       setProviderState('CONNECTED');
       if (localScope) {
-        setLocalProviderConnected(true);
         await markLocalHealthProviderConnected(localScope);
       }
       forceBackfill.current = true;
@@ -289,7 +283,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   }, [refreshRemoteSnapshot]);
 
   useEffect(() => {
-    automaticInitialSyncStarted.current = false;
     connectionIdOverride.current = null;
     setObservations([]);
     setPresentationObservations([]);
@@ -298,24 +291,20 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     setPendingUploadCount(0);
     setCanonicalIntelligence(null);
     setAggregates([]);
-    setLocalProviderConnected(false);
     setLocalHydrated(false);
     if (!bootstrapped || !localScope) return;
     let active = true;
-    Promise.all([readLocalHealthObservations(localScope), readLocalHealthPresentationObservations(localScope),
-      countPendingLocalObservations(localScope),
-      readLocalHealthProviderConnected(localScope), readLocalCanonicalHealthSnapshot(localScope),readLocalHealthAggregates(localScope),readLocalHealthLifecycle(localScope)])
-      .then(async([cached, cachedPresentation, pending, connected, cachedIntelligence,cachedAggregates,cachedLifecycle]) => {
+    readLocalHealthBootstrapSnapshot(localScope)
+      .then((snapshot) => {
         if (!active || !mounted.current) return;
-        mergeLocalObservations(cached);
-        setPresentationObservations(cachedPresentation.map((item, index) =>
+        mergeLocalObservations(snapshot.observations);
+        setPresentationObservations(snapshot.presentationObservations.map((item, index) =>
           toDto(item, authSession?.client.fiteatsyClientId ?? 'local', index)));
-        setPendingUploadCount(pending);
-        setLocalProviderConnected(connected || cached.length > 0);
-        if (connected || cached.length > 0) setProviderState('CONNECTED');
-        if (cachedIntelligence) setCanonicalIntelligence(markCanonicalSnapshotStale(cachedIntelligence));
-        const currentAggregates=await ensureLocalHealthAggregatesCurrent(localScope,-new Date().getTimezoneOffset());
-        if(!active||!mounted.current)return;setAggregates(currentAggregates.length?currentAggregates:cachedAggregates);setLifecycle(cachedLifecycle);
+        setPendingUploadCount(snapshot.pendingUploadCount);
+        if (snapshot.providerConnected || snapshot.observations.length > 0) setProviderState('CONNECTED');
+        if (snapshot.canonicalScoreSnapshot) setCanonicalIntelligence(markCanonicalSnapshotStale(snapshot.canonicalScoreSnapshot));
+        setAggregates(snapshot.aggregates);
+        setLifecycle(snapshot.lifecycle);
         setLocalHydrated(true);
       })
       .catch(() => { if (active && mounted.current) setLocalHydrated(true); });
@@ -334,14 +323,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       return calculated;
     });
   }, [aggregates, localHydrated, localScope, onboarding?.gender, onboarding?.sleepGoalHours]);
-
-  useEffect(() => {
-    if (!authSession || !localHydrated || automaticInitialSyncStarted.current) return;
-    const previouslyConnected = providerState === 'CONNECTED' || localProviderConnected;
-    if (!previouslyConnected) return;
-    automaticInitialSyncStarted.current = true;
-    void syncLocalMetrics();
-  }, [authSession, localHydrated, localProviderConnected, providerState, syncLocalMetrics]);
 
   useEffect(() => {
     if (!authSession || !localHydrated) return;

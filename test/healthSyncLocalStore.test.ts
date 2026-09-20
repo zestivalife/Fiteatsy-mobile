@@ -13,7 +13,7 @@ import { acknowledgeLocalObservations, countPendingLocalObservations, markLocalH
   readLocalHealthPresentationObservations, readLocalHealthProviderConnected,
   readLocalSyncCursors, readPendingLocalObservations, persistLocalCanonicalHealthSnapshot,
   readLocalCanonicalHealthSnapshot, recomputeLocalHealthAggregates, readLocalHealthAggregates,
-  ensureLocalHealthAggregatesCurrent } from '../src/services/healthSyncLocalStore';
+  ensureLocalHealthAggregatesCurrent, readLocalHealthBootstrapSnapshot } from '../src/services/healthSyncLocalStore';
 import { calculateCanonicalHealthIntelligence } from '../src/services/localHealthIntelligence';
 
 const observation = (value: number, deleted = false, recordId = 'record-1') => ({
@@ -67,6 +67,17 @@ describe('durable local health sync store', () => {
     expect(await readLocalHealthObservations(scope)).toEqual([observation(100)]);
     expect(await countPendingLocalObservations(scope)).toBe(1);
     expect(await readLocalHealthObservations('account:user-2:apple-health')).toEqual([]);
+  });
+
+  it('hydrates the complete startup projection with one storage read', async () => {
+    const scope = 'account:user-1:apple-health';
+    await persistLocalSyncBatch(scope, [observation(100)], { steps: 'anchor-1' });
+    const storage = require('@react-native-async-storage/async-storage').default;
+    storage.getItem.mockClear();
+    const snapshot = await readLocalHealthBootstrapSnapshot(scope);
+    expect(snapshot.observations).toEqual([observation(100)]);
+    expect(snapshot.pendingUploadCount).toBe(1);
+    expect(storage.getItem).toHaveBeenCalledTimes(1);
   });
 
   it('persists provider connection independently from onboarding metadata', async () => {

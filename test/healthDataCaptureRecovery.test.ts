@@ -90,13 +90,14 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain("measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'");
   });
 
-  test('cards render presentation aggregates and connected sessions sync automatically', () => {
+  test('cards restore presentation aggregates cheaply and sync only from explicit lifecycle triggers', () => {
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     expect(coordinator).toContain('buildPresentedHealthObservations');
     expect(coordinator).toContain('presentationObservations');
-    expect(coordinator).toContain('localProviderConnected');
-    expect(coordinator).toContain('readLocalHealthObservations(localScope)');
+    expect(coordinator).toContain('readLocalHealthBootstrapSnapshot(localScope)');
+    expect(coordinator).not.toContain('ensureLocalHealthAggregatesCurrent');
+    expect(coordinator).not.toContain('automaticInitialSyncStarted');
     expect(coordinator).toContain('refreshQueued.current = true');
     expect(coordinator).toContain('void syncLocalMetrics()');
     expect(screen).toContain('HEALTHKIT_DAILY_CUMULATIVE_STATISTIC');

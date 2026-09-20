@@ -100,6 +100,31 @@ export const persistLocalCanonicalHealthSnapshot = (scope: string, snapshot: Loc
 
 export const readLocalHealthAggregates = (scope:string) => serializeScopeOperation(scope,async()=>(await readState(scope)).aggregates);
 export const readLocalHealthLifecycle = (scope:string) => serializeScopeOperation(scope,async()=>(await readState(scope)).lifecycle);
+/**
+ * Reads the complete startup projection with one AsyncStorage fetch/JSON parse.
+ * The previous coordinator called seven public selectors in parallel. Those
+ * selectors are intentionally serialized per account, so a large retained
+ * HealthKit history was parsed seven times during cold launch.
+ *
+ * Startup must remain a cheap local restore. Dirty aggregates are deliberately
+ * not recomputed here; the explicit/observer sync pipeline owns that work.
+ */
+export const readLocalHealthBootstrapSnapshot = (scope: string) =>
+  serializeScopeOperation(scope, async () => {
+    const state = await readState(scope);
+    return {
+      observations: Object.values(state.records)
+        .sort((left, right) => left.updatedAtISO.localeCompare(right.updatedAtISO))
+        .map((record) => record.observation),
+      presentationObservations: Object.values(state.presentationRecords),
+      pendingUploadCount: Object.values(state.records).filter((record) => !record.uploaded).length,
+      providerConnected: state.providerConnected,
+      canonicalScoreSnapshot: state.canonicalScoreSnapshot,
+      aggregates: state.aggregates,
+      aggregatesDirty: state.aggregatesDirty,
+      lifecycle: state.lifecycle
+    };
+  });
 export const persistLocalHealthAggregates = (scope:string,aggregates:CanonicalDailyAggregate[],readAtISO:string) =>
   serializeScopeOperation(scope,async()=>{const state=await readState(scope);state.aggregates=aggregates;
     state.aggregatesDirty=false;
