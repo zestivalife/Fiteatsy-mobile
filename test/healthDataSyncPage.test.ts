@@ -42,10 +42,12 @@ describe('Health Data Sync control-centre contracts', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     expect(screen).toContain('visible={syncPopupVisible}');
     expect(screen).toContain("busy?'Syncing health data'");
-    expect(screen).toContain("uploadPending?'Connection interrupted':'Health sync unsuccessful'");
-    expect(screen).toContain('Synced values will appear automatically when ready.');
+    expect(screen).toContain("'Health sync partially complete'");
+    expect(screen).toContain('Each metric has a bounded completion state.');
+    expect(screen).toContain('metric tasks complete');
+    expect(screen).toContain('Completed data is saved on this device.');
     expect(screen).toContain('Try Again');
-    expect(screen).toContain("health.uploadState==='SYNCED')setSyncPopupVisible(false)");
+    expect(screen).toContain("localReadComplete?'OK':'Close'");
     expect(screen).not.toContain('useState<HealthMetricQueryState');
   });
 

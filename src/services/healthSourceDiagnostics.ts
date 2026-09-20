@@ -16,7 +16,7 @@ export const buildHealthSourceDiagnostics=(sourcePlatform:HealthSourceMetricDiag
   const supported=sourcePlatform==='APPLE_HEALTH'?definition.appleHealthType!=null:definition.healthConnectRecord!=null;
   const records=(payload.observations??[]).filter((item:HealthObservationDraft)=>item.metricType===definition.backendCanonicalType);
   const status=sourceStatus(payload,definition.metricKey);
-  const localQueryState:HealthSourceDiagnosticState=!supported?'NOT_APPLICABLE':records.length?'DATA_AVAILABLE':status==='read_failed'||status==='unavailable'?'ERROR':'NO_VISIBLE_DATA';
+  const localQueryState:HealthSourceDiagnosticState=!supported?'NOT_APPLICABLE':records.length?'DATA_AVAILABLE':status==='timeout'?'TIMEOUT':status==='read_failed'||status==='unavailable'?'ERROR':'NO_VISIBLE_DATA';
   const uploaded=upload.state==='SUCCESS';
   const counts=payload.dataQuality.metricDiagnostics?.[sourcePlatform==='APPLE_HEALTH'?(definition.appleHealthType??definition.metricKey):(definition.healthConnectRecord??definition.metricKey)];
   return {sourcePlatform,metricKey:definition.metricKey,supported,

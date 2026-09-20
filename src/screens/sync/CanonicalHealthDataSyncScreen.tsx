@@ -26,8 +26,12 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   const failed=health.uploadState==='ERROR'||health.providerState==='ERROR';const uploadPending=health.uploadState==='PENDING';
   const timedOutCount=health.metrics.filter(metric=>metric.queryState==='TIMEOUT').length;
   const readErrorCount=health.metrics.filter(metric=>metric.queryState==='ERROR').length;
+  const supportedMetrics=health.metrics.filter(metric=>metric.supported);
+  const terminalMetricCount=supportedMetrics.filter(metric=>metric.queryState!=='QUERYING'&&metric.queryState!=='IDLE').length;
+  const unavailableMetricCount=supportedMetrics.filter(metric=>metric.queryState==='NO_VISIBLE_DATA'||metric.queryState==='TIMEOUT'||metric.queryState==='ERROR').length;
+  const localReadComplete=terminalMetricCount===supportedMetrics.length&&supportedMetrics.length>0;
   const syncErrorMessage=health.message??(timedOutCount?`${timedOutCount} health ${timedOutCount===1?'metric took':'metrics took'} too long to respond.`:readErrorCount?`${readErrorCount} health ${readErrorCount===1?'metric could':'metrics could'} not be read.`:'Health data could not be synced. Check your connection and try again.');
-  useEffect(()=>{if(busy)setSyncPopupVisible(true);else if(health.uploadState==='SYNCED')setSyncPopupVisible(false);else if(failed||uploadPending)setSyncPopupVisible(true);},[busy,failed,health.uploadState,uploadPending]);
+  useEffect(()=>{if(busy)setSyncPopupVisible(true);else if(failed||uploadPending)setSyncPopupVisible(true);},[busy,failed,uploadPending]);
   const startSync=useCallback(()=>{setSyncPopupVisible(true);void health.syncLocalMetrics();},[health]);
   const finishOnboarding=useCallback(()=>{setWearableSetupCompleted(true);if(onboarding)setOnboarding({...onboarding,wearablePreference:connected?'sync':'later'});navigation.reset({index:0,routes:[{name:'Main'}]});},[connected,navigation,onboarding,setOnboarding,setWearableSetupCompleted]);
   const reviewPermissions=useCallback(()=>{health.markPermissionReviewStarted();if(Platform.OS==='ios')setPermissionHelp(true);else void Linking.openSettings();},[health]);
@@ -56,11 +60,11 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
     <Modal visible={syncPopupVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={()=>{if(!busy)setSyncPopupVisible(false);}}>
       <View style={[styles.syncOverlay,{backgroundColor:palette.overlay}]}>
         <View accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.syncDialog,{backgroundColor:palette.card,borderColor:palette.stroke}]}>
-          {busy?<ActivityIndicator size="large" color={palette.blue}/>:<View style={[styles.syncResultIcon,{backgroundColor:uploadPending?palette.warningSoft:palette.dangerSoft}]}><Ionicons name={uploadPending?'cloud-offline-outline':'alert-circle-outline'} size={30} color={uploadPending?palette.warning:palette.danger}/></View>}
-          <Text style={[styles.syncTitle,{color:palette.textPrimary}]}>{busy?'Syncing health data':uploadPending?'Connection interrupted':'Health sync unsuccessful'}</Text>
-          <Text style={[styles.syncBody,{color:palette.textSecondary}]}>{busy?`Reading ${health.sourceName}. Synced values will appear automatically when ready.`:uploadPending?'Your Apple Health values remain safe on this device. Upload will resume when the connection is available.':syncErrorMessage}</Text>
-          {busy?<Text style={[styles.syncProgress,{color:palette.textMuted}]}>{health.availableMetricCount} of {health.metrics.filter(metric=>metric.supported).length} metrics ready</Text>:null}
-          {!busy?<View style={styles.syncActions}><PrimaryButton title="Try Again" onPress={startSync}/><PrimaryButton title="Close" variant="secondary" onPress={()=>setSyncPopupVisible(false)}/></View>:null}
+          {busy?<ActivityIndicator size="large" color={palette.blue}/>:<View style={[styles.syncResultIcon,{backgroundColor:localReadComplete?palette.successSoft:uploadPending?palette.warningSoft:palette.dangerSoft}]}><Ionicons name={localReadComplete?'checkmark-circle-outline':uploadPending?'cloud-offline-outline':'alert-circle-outline'} size={30} color={localReadComplete?palette.success:uploadPending?palette.warning:palette.danger}/></View>}
+          <Text style={[styles.syncTitle,{color:palette.textPrimary}]}>{busy?'Syncing health data':localReadComplete?(unavailableMetricCount?'Health sync partially complete':'Health data ready'):uploadPending?'Connection interrupted':'Health sync unsuccessful'}</Text>
+          <Text style={[styles.syncBody,{color:palette.textSecondary}]}>{busy?`Reading ${health.sourceName}. Each metric has a bounded completion state.`:localReadComplete?(unavailableMetricCount?`${terminalMetricCount-unavailableMetricCount} metrics have data. ${unavailableMetricCount} completed with no data, an unavailable permission, an error, or a timeout. Completed data is saved on this device.`:'All supported metrics completed and are saved on this device.'):uploadPending?'Your Apple Health values remain safe on this device. Upload will resume when the connection is available.':syncErrorMessage}</Text>
+          {busy?<Text style={[styles.syncProgress,{color:palette.textMuted}]}>{terminalMetricCount} of {supportedMetrics.length} metric tasks complete</Text>:null}
+          {!busy?<View style={styles.syncActions}>{!localReadComplete?<PrimaryButton title="Try Again" onPress={startSync}/>:null}<PrimaryButton title={localReadComplete?'OK':'Close'} variant="secondary" onPress={()=>setSyncPopupVisible(false)}/></View>:null}
         </View>
       </View>
     </Modal>

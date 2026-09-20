@@ -191,7 +191,15 @@ export const runHealthSync = async (
   appId: HealthAppId,
   previousWellness: WellnessSnapshot,
   governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY'; localScope?: string },
-  options: { forceSourceBackfill?: boolean; localScope?: string } = {}
+  options: {
+    forceSourceBackfill?: boolean;
+    localScope?: string;
+    onLocalComplete?: (result: {
+      payload: WearableSyncPayload;
+      observations: HealthObservationDraft[];
+      aggregates: CanonicalDailyAggregate[];
+    }) => void | Promise<void>;
+  } = {}
 ): Promise<HealthSyncResult> => {
   let run: Awaited<ReturnType<typeof beginWearableSyncRun>> | null = null;
   let payload: WearableSyncPayload | null = null;
@@ -216,6 +224,10 @@ export const runHealthSync = async (
     await persistLocalHealthPresentationObservations(localScope, payload.presentationObservations ?? []);
     const readAtISO=new Date().toISOString();
     const canonicalAggregates=await recomputeLocalHealthAggregates(localScope,readAtISO,-new Date().getTimezoneOffset());
+    // Native reads and durable local persistence are the user-facing sync
+    // boundary. Backend upload/recalculation may continue afterward without
+    // keeping the Health Sync dialog or the JS interaction plane blocked.
+    await options.onLocalComplete?.({ payload, observations, aggregates: canonicalAggregates });
     // Sync-run telemetry must not become a prerequisite for ingestion. The
     // observation endpoint independently enforces authenticated ownership and
     // active provider consent.

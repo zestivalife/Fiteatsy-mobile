@@ -30,6 +30,7 @@ import { calculateCanonicalHealthIntelligenceFromAggregates, hasCalculatedCanoni
 import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 import { traceSessionLifecycle } from './sessionLifecycleTrace';
+import { buildHealthSourceDiagnostics } from './healthSourceDiagnostics';
 
 export type { HealthObservationDto } from './healthSyncManager';
 
@@ -144,12 +145,40 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     const connection = adapter.platform === 'APPLE_HEALTH' ? status?.appleHealth : status?.healthConnect;
     const connectionId = connectionIdOverride.current ?? connection?.connectionId ?? null;
     try {
+      const applyLocalCompletion = async (localResult: {
+        payload: Awaited<ReturnType<typeof adapter.queryAllSupportedMetrics>>;
+        observations: HealthObservationDraft[];
+        aggregates: CanonicalDailyAggregate[];
+      }) => {
+        if (!mounted.current) return;
+        mergeLocalObservations(localResult.observations);
+        setPresentationObservations((localResult.payload.presentationObservations ?? [])
+          .map((item,index)=>toDto(item,status?.fiteatsyClientId ?? 'local',index)));
+        setAggregates(localResult.aggregates);
+        setLifecycle(await readLocalHealthLifecycle(localScope));
+        const localDiagnostics = buildHealthSourceDiagnostics(adapter.platform, localResult.payload, { state: 'PENDING' });
+        setDiagnostics(localDiagnostics);
+        const nextQueries: Record<string, HealthMetricQueryState> = {};
+        const nextErrors: Record<string, string | null> = {};
+        HEALTH_METRIC_REGISTRY.forEach((definition) => {
+          const diagnostic = localDiagnostics.find((item) => item.metricKey === definition.metricKey);
+          if (!diagnostic?.supported) return;
+          nextQueries[definition.metricKey] = diagnostic.localQueryState === 'DATA_AVAILABLE' ? 'DATA_AVAILABLE'
+            : diagnostic.localQueryState === 'TIMEOUT' ? 'TIMEOUT'
+            : diagnostic.localQueryState === 'ERROR' ? 'ERROR' : 'NO_VISIBLE_DATA';
+          nextErrors[definition.metricKey] = nextQueries[definition.metricKey] === 'ERROR' ? 'NATIVE_ERROR'
+            : nextQueries[definition.metricKey] === 'TIMEOUT' ? 'TIMEOUT' : null;
+        });
+        setQueryStates(nextQueries);
+        setErrors(nextErrors);
+        setMessage('Health data is available on this device. Secure upload continues in the background.');
+      };
       const result = await runHealthSync(adapter.appId, wellness, connectionId ? {
         connectionId,
         provider: adapter.platform,
         trigger: 'MANUAL',
         localScope
-      } : undefined, { ...options, localScope });
+      } : undefined, { ...options, localScope, onLocalComplete: applyLocalCompletion });
       if (!mounted.current) return;
       mergeLocalObservations(result.observations);
       setPresentationObservations((result.payload.presentationObservations ?? [])

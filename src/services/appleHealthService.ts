@@ -194,7 +194,8 @@ export const syncFromAppleHealth = async (
       statuses[statusKey] = statuses[statusKey] === 'synced' ? 'synced' : nextStatus;
     } else {
       const statusKey = APPLE_HEALTH_STATUS_KEYS[metric] ?? metric;
-      if (statuses[statusKey] !== 'synced') statuses[statusKey] = 'unavailable';
+      const reason = settled.reason as { timeout?: boolean } | undefined;
+      if (statuses[statusKey] !== 'synced') statuses[statusKey] = reason?.timeout ? 'timeout' : 'read_failed';
     }
   });
   // HealthKit statistics apply Apple's source-priority policy for cumulative

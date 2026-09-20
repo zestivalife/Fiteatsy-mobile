@@ -7,6 +7,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 describe('Apple Health sync hang repair', () => {
   const apple = read('src/services/appleHealthService.ts');
   const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
+  const manager = read('src/services/healthSyncManager.ts');
   const controlCentre = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
 
   test('bounds availability, authorization, every metric read, and background delivery', () => {
@@ -39,6 +40,14 @@ describe('Apple Health sync hang repair', () => {
   test('network reachability cannot recursively restart native HealthKit collection', () => {
     expect(coordinator).not.toContain('NetInfo.addEventListener');
     expect(apple).toContain('APPLE_HEALTH_QUERY_CONCURRENCY = 1');
+  });
+
+  test('ends blocking UI at durable local completion rather than backend upload completion', () => {
+    expect(manager.indexOf('onLocalComplete?.')).toBeGreaterThan(manager.indexOf('recomputeLocalHealthAggregates'));
+    expect(manager.indexOf('onLocalComplete?.')).toBeLessThan(manager.indexOf('beginWearableSyncRun(governed.connectionId'));
+    expect(coordinator).toContain('onLocalComplete: applyLocalCompletion');
+    expect(controlCentre).toContain('terminalMetricCount');
+    expect(controlCentre).toContain('Health sync partially complete');
   });
 
   test('diagnostics contain timing and status but do not log source health values', () => {
