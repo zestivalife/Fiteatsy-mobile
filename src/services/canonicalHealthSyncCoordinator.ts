@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
-import NetInfo from '@react-native-community/netinfo';
 import { useAppContext } from '../state/AppContext';
 import type { HealthObservationDraft } from '../types';
 import { HEALTH_METRIC_REGISTRY, type HealthMetricDefinition } from './healthMetricRegistry';
@@ -318,17 +317,6 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       return calculated;
     });
   }, [aggregates, localHydrated, localScope, onboarding?.gender, onboarding?.sleepGoalHours]);
-
-  useEffect(() => {
-    if (!authSession || !localHydrated) return;
-    let wasReachable = false;
-    const unsubscribe = NetInfo.addEventListener((network) => {
-      const reachable = network.isConnected === true && network.isInternetReachable !== false;
-      if (reachable && !wasReachable && pendingUploadCount > 0) void syncLocalMetrics();
-      wasReachable = reachable;
-    });
-    return unsubscribe;
-  }, [authSession, localHydrated, pendingUploadCount, syncLocalMetrics]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {

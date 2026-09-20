@@ -36,6 +36,11 @@ describe('Apple Health sync hang repair', () => {
     expect(controlCentre).not.toContain('runHealthSync');
   });
 
+  test('network reachability cannot recursively restart native HealthKit collection', () => {
+    expect(coordinator).not.toContain('NetInfo.addEventListener');
+    expect(apple).toContain('APPLE_HEALTH_QUERY_CONCURRENCY = 1');
+  });
+
   test('diagnostics contain timing and status but do not log source health values', () => {
     for (const event of [
       'HEALTH_SYNC_START', 'HEALTHKIT_AVAILABLE', 'METRIC_QUERY_START',
