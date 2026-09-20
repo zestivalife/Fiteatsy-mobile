@@ -50,8 +50,9 @@ const podfileLock = fs.readFileSync(
 );
 
 describe('premium app-level video intro contract', () => {
-  it('uses the approved remote video and supplied SVG with the required presentation', () => {
-    expect(source).toContain("https://zestiva.life/assets/Fiteatsy.mp4");
+  it('uses the bounded local video and supplied SVG with the required presentation', () => {
+    expect(source).toContain("fiteatsy-splash-720p.mp4");
+    expect(source).not.toContain("https://zestiva.life/assets/Fiteatsy.mp4");
     expect(source).toContain("fiteatsy-logo.svg");
     expect(source).toContain("contentFit=\"cover\"");
     expect(source).toContain("nativeControls={false}");
@@ -67,6 +68,7 @@ describe('premium app-level video intro contract', () => {
     expect(source).toContain('AccessibilityInfo.isReduceMotionEnabled()');
     expect(source).toContain('clearTimeout(maximumDurationTimer)');
     expect(source).toContain('player.pause()');
+    expect(source).toContain('player.replaceAsync(null)');
   });
 
   it('preserves every canonical post-startup route', () => {

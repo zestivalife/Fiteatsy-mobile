@@ -47,7 +47,9 @@ describe('FITEATSY accepted product baseline regression contracts', () => {
     const splash = read('src/screens/auth/SplashScreen.tsx');
     const config = JSON.parse(read('app.json'));
 
-    expect(splash).toContain('https://zestiva.life/assets/Fiteatsy.mp4');
+    expect(splash).toContain("require('../../assets/brand/fiteatsy-splash-720p.mp4')");
+    expect(splash).toContain('player.replaceAsync(null)');
+    expect(splash).not.toContain('https://zestiva.life/assets/Fiteatsy.mp4');
     expect(splash).toMatch(/rgba\(0,\s*0,\s*0,\s*0\.70?\)/);
     expect(splash).toContain('SPLASH_MAX_DURATION_MS = 10_000');
     expect(config.expo.runtimeVersion).toBe('1.0.0-native-20260825-health-connect-d2');

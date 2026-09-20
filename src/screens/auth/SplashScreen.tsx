@@ -22,7 +22,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 export const SPLASH_MAX_DURATION_MS = 10_000;
 const EXIT_FADE_DURATION = 320;
 const LOGO_ANIMATION_DURATION = 640;
-const SPLASH_VIDEO_URL = 'https://zestiva.life/assets/Fiteatsy.mp4';
+const SPLASH_VIDEO_ASSET = require('../../assets/brand/fiteatsy-splash-720p.mp4');
 
 export const SplashScreen = ({ navigation }: Props) => {
   const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep, authSession } = useAppContext();
@@ -35,7 +35,7 @@ export const SplashScreen = ({ navigation }: Props) => {
   const logoTranslateY = useRef(new Animated.Value(8)).current;
   const logoScale = useRef(new Animated.Value(0.97)).current;
 
-  const player = useVideoPlayer({ uri: SPLASH_VIDEO_URL }, (videoPlayer) => {
+  const player = useVideoPlayer(SPLASH_VIDEO_ASSET, (videoPlayer) => {
     videoPlayer.loop = false;
     videoPlayer.muted = true;
     videoPlayer.allowsExternalPlayback = false;
@@ -56,8 +56,15 @@ export const SplashScreen = ({ navigation }: Props) => {
     }
   }, [player]);
 
-  const transitionTo = useCallback((navigate: () => void) => {
+  const unloadVideo = useCallback(() => {
     pauseVideo();
+    // Detach the decoded media immediately instead of retaining AVPlayer's
+    // frame buffers until the navigation transition is garbage-collected.
+    void player.replaceAsync(null).catch(() => undefined);
+  }, [pauseVideo, player]);
+
+  const transitionTo = useCallback((navigate: () => void) => {
+    unloadVideo();
     Animated.timing(screenOpacity, {
       toValue: 0,
       duration: EXIT_FADE_DURATION,
@@ -66,7 +73,7 @@ export const SplashScreen = ({ navigation }: Props) => {
     }).start(({ finished }) => {
       if (finished) navigate();
     });
-  }, [pauseVideo, screenOpacity]);
+  }, [screenOpacity, unloadVideo]);
 
   const resolveAndNavigate = useCallback(async () => {
     if (!isAuthenticated) {
@@ -161,9 +168,9 @@ export const SplashScreen = ({ navigation }: Props) => {
       logoTranslateY.stopAnimation();
       logoScale.stopAnimation();
       screenOpacity.stopAnimation();
-      pauseVideo();
+      unloadVideo();
     };
-  }, [logoOpacity, logoScale, logoTranslateY, pauseVideo, player, requestExit, screenOpacity]);
+  }, [logoOpacity, logoScale, logoTranslateY, player, requestExit, screenOpacity, unloadVideo]);
 
   useEffect(() => {
     if (!exitRequested || navigated.current || (!bootstrapped && !forceExit)) return;

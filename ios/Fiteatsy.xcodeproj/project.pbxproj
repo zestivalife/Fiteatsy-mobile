@@ -397,6 +397,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Fiteatsy/Fiteatsy.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				ENTRY_FILE = node_modules/expo/AppEntry.js;
 				INFOPLIST_FILE = Fiteatsy/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (

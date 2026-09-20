@@ -53,7 +53,9 @@ if (!appConfig.expo?.plugins?.includes('./plugins/withFrozenSplashBridge')) {
 requireText(bridgePlugin, 'IOS_STORYBOARD', 'frozen splash plugin');
 requireText(bridgePlugin, 'ANDROID_BLACK_BACKGROUND', 'frozen splash plugin');
 
-requireText(splashSource, 'https://zestiva.life/assets/Fiteatsy.mp4', 'video splash');
+requireText(splashSource, 'fiteatsy-splash-720p.mp4', 'video splash');
+rejectText(splashSource, 'https://zestiva.life/assets/Fiteatsy.mp4', 'video splash');
+requireText(splashSource, 'player.replaceAsync(null)', 'video splash cleanup');
 requireText(splashSource, 'fiteatsy-logo.svg', 'video splash');
 requireText(splashSource, "backgroundColor: 'rgba(0,0,0,0.70)'", 'video splash');
 requireText(splashSource, 'SPLASH_MAX_DURATION_MS = 10_000', 'video splash');
