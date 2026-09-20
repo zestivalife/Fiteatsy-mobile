@@ -25,7 +25,7 @@ import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLoc
   readLocalHealthAggregates, readLocalHealthLifecycle, readLocalHealthPresentationObservations,
   type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
 import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
-import { buildPresentedHealthObservations } from './healthMetricPresentation';
+import { buildPresentedHealthObservations, mergeHealthPresentationObservations } from './healthMetricPresentation';
 import { calculateCanonicalHealthIntelligenceFromAggregates, hasCalculatedCanonicalScore,
   markCanonicalSnapshotStale, type LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
 import { registerWearableBackgroundSync } from './wearableBackgroundSync';
@@ -108,6 +108,11 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     });
   }, [status?.fiteatsyClientId]);
 
+  const mergePresentationObservations = useCallback((items: HealthObservationDraft[]) => {
+    const local = items.map((item, index) => toDto(item, status?.fiteatsyClientId ?? 'local', index));
+    setPresentationObservations((current) => mergeHealthPresentationObservations(current, local));
+  }, [status?.fiteatsyClientId]);
+
   const refreshRemoteSnapshot = useCallback(async () => {
     const locallyAvailable = await adapter.isAvailable().catch(() => false);
     try {
@@ -156,8 +161,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       }) => {
         if (!mounted.current) return;
         mergeLocalObservations(localResult.observations);
-        setPresentationObservations((localResult.payload.presentationObservations ?? [])
-          .map((item,index)=>toDto(item,status?.fiteatsyClientId ?? 'local',index)));
+        mergePresentationObservations(localResult.payload.presentationObservations ?? []);
         setAggregates(localResult.aggregates);
         setLifecycle(await readLocalHealthLifecycle(localScope));
         const localDiagnostics = buildHealthSourceDiagnostics(adapter.platform, localResult.payload, { state: 'PENDING' });
@@ -185,8 +189,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       } : undefined, { ...options, localScope, onLocalComplete: applyLocalCompletion });
       if (!mounted.current) return;
       mergeLocalObservations(result.observations);
-      setPresentationObservations((result.payload.presentationObservations ?? [])
-        .map((item,index)=>toDto(item,status?.fiteatsyClientId ?? 'local',index)));
+      mergePresentationObservations(result.payload.presentationObservations ?? []);
       setSelectedDeviceId(adapter.appId);
       setWellness(result.wellness);
       setPendingUploadCount(await countPendingLocalObservations(localScope));
@@ -218,8 +221,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       if (!mounted.current) return;
       if (error instanceof HealthSyncUploadPendingError || error instanceof HealthSyncPostUploadRefreshError) {
         mergeLocalObservations(error.observations);
-        setPresentationObservations((error.payload.presentationObservations ?? [])
-          .map((item,index)=>toDto(item,status?.fiteatsyClientId ?? 'local',index)));
+        mergePresentationObservations(error.payload.presentationObservations ?? []);
         setSelectedDeviceId(adapter.appId);
         const currentAggregates=await readLocalHealthAggregates(localScope);
         setWellness((current) => wellnessFromCanonicalAggregates(current,currentAggregates,{} as HealthScoreSummary));
@@ -255,7 +257,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setTimeout(() => void syncLocalMetrics(), 0);
       }
     }
-  }, [adapter, authSession, localScope, mergeLocalObservations, refreshRemoteSnapshot, setSelectedDeviceId, setWellness, sourceName, status, wellness]);
+  }, [adapter, authSession, localScope, mergeLocalObservations, mergePresentationObservations, refreshRemoteSnapshot, setSelectedDeviceId, setWellness, sourceName, status, wellness]);
 
   const requestAccess = useCallback(async () => {
     if (inFlight.current) return;
@@ -376,6 +378,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
 
   const latestByMetric = useMemo(() => buildPresentedHealthObservations(observations,presentationObservations,aggregates),
     [aggregates,observations,presentationObservations]);
+  const canonicalPresentedObservations = useMemo(() => [...latestByMetric.values()], [latestByMetric]);
 
   const metrics = useMemo<CanonicalHealthMetricState[]>(() => HEALTH_METRIC_REGISTRY.map((definition) => {
     const supported = adapter.platform === 'APPLE_HEALTH' ? Boolean(definition.appleHealthType) : Boolean(definition.healthConnectRecord);
@@ -407,7 +410,10 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     availableMetricCount: countAvailableHealthMetrics(metrics),
     uploadState,
     status,
-    observations,
+    // Consumers use the same canonical projection as the sync screen. Raw
+    // HealthKit packets remain private pipeline input and must not leak into
+    // Tracker/Home as partial packet values.
+    observations: canonicalPresentedObservations,
     aggregates,
     lifecycle,
     platformStatus,

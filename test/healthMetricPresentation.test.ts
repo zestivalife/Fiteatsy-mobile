@@ -1,4 +1,4 @@
-import { buildPresentedHealthObservations } from '../src/services/healthMetricPresentation';
+import { buildPresentedHealthObservations, mergeHealthPresentationObservations } from '../src/services/healthMetricPresentation';
 import type { HealthObservationDto } from '../src/services/healthSyncManager';
 import type { CanonicalDailyAggregate } from '@fiteatsy/health-intelligence';
 
@@ -36,5 +36,12 @@ describe('health metric presentation aggregation',()=>{
     const presented=buildPresentedHealthObservations([],[],[aggregate],Date.parse('2026-09-20T06:29:00.000Z'),0).get('steps');
     expect(presented?.value).toBe(513);
     expect(presented?.id).toBe('aggregate:hash-513');
+  });
+
+  test('incremental presentation results preserve metrics absent from the latest native read',()=>{
+    const previous=[row('steps',513,'2026-09-20T06:27:00.000Z','daily-steps'),row('sleep_minutes',318,'2026-09-20T05:00:00.000Z','sleep')];
+    const incremental=[row('resting_heart_rate',77,'2026-09-20T09:28:00.000Z','resting-heart-rate')];
+    const merged=mergeHealthPresentationObservations(previous,incremental);
+    expect(merged.map((item)=>item.metricType).sort()).toEqual(['resting_heart_rate','sleep_minutes','steps']);
   });
 });

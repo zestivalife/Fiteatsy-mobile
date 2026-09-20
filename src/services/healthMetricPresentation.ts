@@ -2,6 +2,21 @@ import type { HealthObservationDto } from './healthSyncManager';
 import { HEALTH_METRIC_REGISTRY } from './healthMetricRegistry';
 import { aggregateCanonicalHealthObservations, type CanonicalDailyAggregate } from '@fiteatsy/health-intelligence';
 
+export const mergeHealthPresentationObservations = (
+  current: HealthObservationDto[],
+  incoming: HealthObservationDto[]
+) => {
+  const byIdentity = new Map(current.map((item) => [
+    `${item.metricType}:${item.sourceRecordId ?? item.syncKey ?? item.id}`,
+    item
+  ]));
+  incoming.forEach((item) => byIdentity.set(
+    `${item.metricType}:${item.sourceRecordId ?? item.syncKey ?? item.id}`,
+    item
+  ));
+  return [...byIdentity.values()];
+};
+
 /** Builds card values without changing or manufacturing source observations.
  * Cumulative cards use platform source-aware daily statistics; interval cards
  * sum the latest local day; point-in-time metrics retain their latest sample. */
