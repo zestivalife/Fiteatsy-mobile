@@ -295,6 +295,7 @@ export type WearableSyncPayload = {
         | 'workouts'
         | 'weight'
         | 'distance'
+        | 'hydration'
         | 'stress'
         | 'cycle'
         | 'spo2'

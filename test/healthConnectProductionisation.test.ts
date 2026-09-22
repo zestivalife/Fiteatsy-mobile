@@ -15,6 +15,9 @@ describe('Health Connect D2 production contracts', () => {
       'READ_EXERCISE',
       'READ_HEART_RATE',
       'READ_HEART_RATE_VARIABILITY',
+      'READ_HYDRATION',
+      'READ_OXYGEN_SATURATION',
+      'READ_RESPIRATORY_RATE',
       'READ_SLEEP',
       'READ_STEPS',
       'READ_WEIGHT'
