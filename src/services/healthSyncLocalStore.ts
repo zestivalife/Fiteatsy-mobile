@@ -19,7 +19,9 @@ const LEGACY_KEYS = ['@fiteatsy/wearable-installation-id', '@fiteatsy/wearable-l
 const identity = (item: HealthObservationDraft) => item.syncKey
   ?? `${item.sourceProvider}:${item.metricType}:${item.sourceRecordId ?? item.measuredAtISO}`;
 
-type StoredRecord = { observation: HealthObservationDraft; uploaded: boolean; updatedAtISO: string };
+export const HEALTH_UPLOAD_MAX_RETRIES = 5;
+type StoredRecord = { observation: HealthObservationDraft; uploaded: boolean; updatedAtISO: string;
+  retryCount?: number; nextAttemptAtISO?: string|null; lastFailureCode?: string|null; poison?: boolean };
 export type HealthSyncLifecycleTimestamps = { lastHealthReadAtISO:string|null; lastSavedAtISO:string|null;
   lastUploadedAtISO:string|null; lastFullySyncedAtISO:string|null };
 type LocalSyncState = { records: Record<string, StoredRecord>; presentationRecords: Record<string, HealthObservationDraft>;
@@ -244,12 +246,29 @@ export const persistLocalSyncBatch = (
 
 export const readPendingLocalObservations = (scope: string, limit = 250) => serializeScopeOperation(scope, async () => {
   const state = await readState(scope);
+  const now = Date.now();
   return Object.entries(state.records)
-    .filter(([, record]) => !record.uploaded)
+    .filter(([, record]) => !record.uploaded && !record.poison && (!record.nextAttemptAtISO || Date.parse(record.nextAttemptAtISO) <= now))
     .sort(([, left], [, right]) => left.updatedAtISO.localeCompare(right.updatedAtISO))
     .slice(0, limit)
     .map(([recordKey, record]) => ({ recordKey, observation: record.observation }));
 });
+
+export const markLocalObservationUploadFailure = (scope: string, recordKeys: string[], failureCode: string, nowMs = Date.now()) =>
+  serializeScopeOperation(scope, async () => {
+    const state = await readState(scope);
+    for (const recordKey of recordKeys) {
+      const record = state.records[recordKey];
+      if (!record || record.uploaded) continue;
+      const retryCount = (record.retryCount ?? 0) + 1;
+      const poison = retryCount >= HEALTH_UPLOAD_MAX_RETRIES;
+      const delayMs = Math.min(15 * 60_000, 2 ** Math.min(retryCount, 8) * 1_000);
+      state.records[recordKey] = { ...record, retryCount, poison,
+        lastFailureCode: failureCode.slice(0, 120),
+        nextAttemptAtISO: poison ? null : new Date(nowMs + delayMs).toISOString() };
+    }
+    await writeState(scope, state);
+  });
 
 export const acknowledgeLocalObservations = (scope: string, recordKeys: string[]) => serializeScopeOperation(scope, async () => {
   const state = await readState(scope);

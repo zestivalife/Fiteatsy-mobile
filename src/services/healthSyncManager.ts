@@ -7,7 +7,7 @@ import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceS
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
 import { acknowledgeLocalObservations, persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalSyncCursors,
-  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded } from './healthSyncLocalStore';
+  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded,markLocalObservationUploadFailure } from './healthSyncLocalStore';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -241,11 +241,14 @@ export const runHealthSync = async (
     let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     let uploadBatchCount = 0;
     while (pending.length && uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN) {
-      const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
-        '/v1/health/observations:batch', {
-          observations: pending.map((item) => item.observation),
-          recalculateIntelligence: false
-        }), 'health_sync_upload_timeout');
+      let ingest: { accepted: number; duplicate: number; rejected: number; updated: number; deleted: number };
+      try {
+        ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
+          '/v1/health/observations:batch', { observations: pending.map((item) => item.observation), recalculateIntelligence: false }), 'health_sync_upload_timeout');
+      } catch (error) {
+        await markLocalObservationUploadFailure(localScope, pending.map((item) => item.recordKey), error instanceof Error ? error.message : 'health_sync_upload_failed');
+        throw error;
+      }
       accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
       updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
       if (ingest.rejected > 0) break;

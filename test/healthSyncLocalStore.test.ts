@@ -16,7 +16,7 @@ import { acknowledgeLocalObservations, countPendingLocalObservations, markLocalH
   readLocalHealthPresentationObservations, readLocalHealthProviderConnected,
   readLocalSyncCursors, readPendingLocalObservations, persistLocalCanonicalHealthSnapshot,
   readLocalCanonicalHealthSnapshot, recomputeLocalHealthAggregates, readLocalHealthAggregates,
-  ensureLocalHealthAggregatesCurrent, readLocalHealthBootstrapSnapshot } from '../src/services/healthSyncLocalStore';
+  ensureLocalHealthAggregatesCurrent, readLocalHealthBootstrapSnapshot, markLocalObservationUploadFailure, HEALTH_UPLOAD_MAX_RETRIES } from '../src/services/healthSyncLocalStore';
 import { calculateCanonicalHealthIntelligence } from '../src/services/localHealthIntelligence';
 
 const observation = (value: number, deleted = false, recordId = 'record-1') => ({
@@ -52,6 +52,18 @@ describe('durable local health sync store', () => {
     await acknowledgeLocalObservations('connection-1', [pending.recordKey]);
     await persistLocalSyncBatch('connection-1', [observation(0, true)], { steps: 'anchor-2' });
     expect((await readPendingLocalObservations('connection-1'))[0].observation.deleted).toBe(true);
+  });
+
+  it('backs off failed uploads and quarantines poison records after bounded retries', async () => {
+    const scope = 'connection-failure';
+    await persistLocalSyncBatch(scope, [observation(100)], {});
+    const [pending] = await readPendingLocalObservations(scope);
+    await markLocalObservationUploadFailure(scope, [pending.recordKey], 'TIMEOUT', Date.now());
+    expect(await readPendingLocalObservations(scope)).toEqual([]);
+    for (let retry = 1; retry < HEALTH_UPLOAD_MAX_RETRIES; retry++) await markLocalObservationUploadFailure(scope, [pending.recordKey], 'TIMEOUT', Date.now() + 60 * 60_000);
+    const stored = JSON.parse(mockStorage.get('@fiteatsy/health-sync-local-v2:connection-failure')!);
+    expect(stored.records[pending.recordKey].poison).toBe(true);
+    expect(stored.records[pending.recordKey].retryCount).toBe(HEALTH_UPLOAD_MAX_RETRIES);
   });
 
   it('serializes concurrent queue mutations without losing either observation', async () => {
