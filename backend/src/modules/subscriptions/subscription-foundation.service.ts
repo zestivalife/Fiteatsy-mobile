@@ -8,7 +8,7 @@ import {
   listSubscriptionHistory
 } from './subscription-foundation.repository.js';
 
-const daysRemaining = (expiresAtISO: string | null) => expiresAtISO ? Math.max(0, Math.ceil((new Date(expiresAtISO).getTime() - Date.now()) / 86400000)) : 0;
+const daysRemaining = (expiresAtISO: string | null) => expiresAtISO ? Math.max(0, Math.ceil((new Date(expiresAtISO).getTime() - Date.now()) / 86400000)) : null;
 
 const entitlementContract = (items: Awaited<ReturnType<typeof listEffectiveEntitlements>>) => Object.fromEntries(items.map((item) => [item.code, {
   valueType: item.valueType,
@@ -24,19 +24,19 @@ export const getMySubscriptionFoundation = async (account: AuthenticatedAccount)
     getLatestSubscription(account.accountId),
     getLatestPaymentState(account.accountId)
   ]);
-  const validUntil = Boolean(subscription?.expiresAtISO && new Date(subscription.expiresAtISO).getTime() > Date.now());
+  const validUntil = Boolean(subscription && (subscription.expiresAtISO == null || new Date(subscription.expiresAtISO).getTime() > Date.now()));
   const active = Boolean(subscription && validUntil && ['ACTIVE', 'CANCELLED'].includes(subscription.status));
   const status = !subscription
     ? paymentState === 'FAILED' ? 'PAYMENT_FAILED' : ['CREATED', 'ATTEMPTED'].includes(paymentState ?? '') ? 'PAYMENT_PENDING' : 'NONE'
     : active
-      ? subscription.status === 'CANCELLED' ? 'CANCELLED' : (daysRemaining(subscription.expiresAtISO) <= 7 ? 'EXPIRING_SOON' : 'ACTIVE')
+      ? subscription.status === 'CANCELLED' ? 'CANCELLED' : ((daysRemaining(subscription.expiresAtISO) ?? Number.POSITIVE_INFINITY) <= 7 ? 'EXPIRING_SOON' : 'ACTIVE')
       : subscription.status === 'PENDING_PAYMENT' || subscription.status === 'PROCESSING'
         ? 'PENDING'
         : subscription.status === 'PAYMENT_FAILED' ? 'PAYMENT_FAILED' : subscription.status === 'CANCELLED' ? 'CANCELLED' : 'EXPIRED';
   const entitlements = active ? await listEffectiveEntitlements(account.accountId) : [];
   return {
     status,
-    subscription: subscription ? { ...subscription, daysRemaining: active ? daysRemaining(subscription.expiresAtISO) : 0 } : null,
+    subscription: subscription ? { ...subscription, daysRemaining: active ? daysRemaining(subscription.expiresAtISO) : subscription.expiresAtISO == null ? null : 0 } : null,
     entitlements: entitlementContract(entitlements),
     entitlementsKnown: true
   };
