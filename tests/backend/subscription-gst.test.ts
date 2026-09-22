@@ -26,8 +26,8 @@ test('GST uses exact integer-paise amounts for the 12 month plan', () => {
   });
 });
 
-test('GST is limited to the two wellness subscription plans', () => {
+test('GST applies to every governed catalogue plan', () => {
   assert.equal(calculateGstForPlan('WELLNESS_TRACKING_6M', 299900).totalAmountMinor, 353882);
   assert.equal(calculateGstForPlan('WELLNESS_TRACKING_12M', 499900).totalAmountMinor, 589882);
-  assert.equal(calculateGstForPlan('LIFESTYLE_MODIFICATION_CONSULT', 99900).totalAmountMinor, 99900);
+  assert.equal(calculateGstForPlan('LIFESTYLE_MODIFICATION_CONSULT', 99900).totalAmountMinor, 117882);
 });
