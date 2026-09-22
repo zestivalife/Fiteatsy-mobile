@@ -36,14 +36,15 @@ const permissionList: Permission[] = HEALTH_CONNECT_READ_RECORDS.map((recordType
 
 const metricPermissionMap = {
   sleep: 'SleepSession',
-  heart_rate: 'RestingHeartRate',
+  heart_rate: 'HeartRate',
   hrv: 'HeartRateVariabilityRmssd',
   workouts: 'ExerciseSession',
   calories: 'ActiveCaloriesBurned',
+  hydration: 'Hydration',
+  spo2: 'OxygenSaturation',
+  respiratory_rate: 'RespiratoryRate',
   stress: null,
-  cycle: null,
-  spo2: null,
-  respiratory_rate: null
+  cycle: null
 } as const;
 
 const toPermissionKey = (permission: Permission) => `${permission.accessType}:${permission.recordType}`;
@@ -340,12 +341,16 @@ const incrementalObservation = (record: Record<string, any>): HealthObservationD
   const values: Record<string, { metricType: string; value: number | null; unit: string }> = {
     Steps: { metricType: 'steps', value: record.count, unit: 'count' },
     SleepSession: { metricType: 'sleep_minutes', value: intervalMinutes, unit: 'min' },
+    HeartRate: { metricType: 'heart_rate', value: Array.isArray(record.samples) && record.samples.length ? avg(record.samples.map((sample: any) => Number(sample.beatsPerMinute)).filter((value: number) => value > 0)) : null, unit: 'bpm' },
     RestingHeartRate: { metricType: 'resting_heart_rate', value: record.beatsPerMinute, unit: 'bpm' },
     HeartRateVariabilityRmssd: { metricType: 'hrv_rmssd_ms', value: record.heartRateVariabilityMillis, unit: 'ms' },
     ExerciseSession: { metricType: 'workout_minutes', value: intervalMinutes, unit: 'min' },
     ActiveCaloriesBurned: { metricType: 'active_energy', value: record.energy?.inKilocalories, unit: 'kcal' },
     Weight: { metricType: 'weight', value: record.weight?.inKilograms, unit: 'kg' },
-    Distance: { metricType: 'distance', value: record.distance?.inMeters, unit: 'm' }
+    Distance: { metricType: 'distance', value: record.distance?.inMeters, unit: 'm' },
+    Hydration: { metricType: 'hydration_ml', value: record.volume?.inMilliliters, unit: 'ml' },
+    OxygenSaturation: { metricType: 'spo2', value: Number(record.percentage) <= 1 ? Number(record.percentage) * 100 : Number(record.percentage), unit: 'pct' },
+    RespiratoryRate: { metricType: 'respiratory_rate', value: record.rate, unit: 'brpm' },
   };
   const mapped = values[recordType];
   const value = Number(mapped?.value);
@@ -443,8 +448,9 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
     distance: hasPermission(grantedSet, 'Distance') ? 'no_recent_data' : 'no_permission',
     stress: 'unsupported',
     cycle: 'unsupported',
-    spo2: 'unsupported',
-    respiratory_rate: 'unsupported'
+    spo2: hasPermission(grantedSet, metricPermissionMap.spo2) ? 'no_recent_data' : 'no_permission',
+    respiratory_rate: hasPermission(grantedSet, metricPermissionMap.respiratory_rate) ? 'no_recent_data' : 'no_permission',
+    hydration: hasPermission(grantedSet, metricPermissionMap.hydration) ? 'no_recent_data' : 'no_permission'
   };
 
   const failedMetrics: string[] = [];
@@ -522,6 +528,27 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
     healthConnectLog.info('[HealthConnect] Resting HR permission granted');
   } else {
     healthConnectLog.warn('[HealthConnect] Resting HR permission denied');
+  }
+
+  if (hasPermission(grantedSet, 'HeartRate')) {
+    const records = await readMetric<{ endTime?: string; time?: string; samples?: Array<{ time: string; beatsPerMinute: number }>; metadata?: any }>('heart_rate', 'HeartRate', {
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
+    });
+    let sampleCount = 0;
+    records.filter((record) => within(record.endTime ?? record.time ?? '', backfillWindow)).forEach((record) => {
+      (record.samples ?? []).forEach((sample) => {
+        const sampleRecord = {
+          ...record,
+          metadata: {
+            ...record.metadata,
+            id: `${record.metadata?.id ?? record.metadata?.clientRecordId ?? 'heart_rate'}:${sample.time}`,
+          },
+        };
+        addObservation('heart_rate', sample.beatsPerMinute, 'bpm', sample.time, 'HeartRate', sampleRecord);
+        sampleCount += 1;
+      });
+    });
+    if (connectedMetrics.heart_rate !== 'read_failed') connectedMetrics.heart_rate = sampleCount ? 'synced' : 'no_recent_data';
   }
 
   if (connectedMetrics.hrv !== 'no_permission') {
@@ -653,6 +680,33 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
       addObservation('distance', record.distance.inMeters, 'm', record.endTime, 'Distance', record)
     );
     if (connectedMetrics.distance !== 'read_failed') connectedMetrics.distance = records.length ? 'synced' : 'no_recent_data';
+  }
+
+  if (hasPermission(grantedSet, 'Hydration')) {
+    const records = await readMetric<{ endTime: string; volume: { inMilliliters: number }; metadata?: any }>('hydration', 'Hydration', {
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
+    });
+    const valid = records.filter((record) => within(record.endTime, backfillWindow));
+    valid.forEach((record) => addObservation('hydration_ml', record.volume.inMilliliters, 'ml', record.endTime, 'Hydration', record));
+    if (connectedMetrics.hydration !== 'read_failed') connectedMetrics.hydration = valid.length ? 'synced' : 'no_recent_data';
+  }
+
+  if (hasPermission(grantedSet, 'OxygenSaturation')) {
+    const records = await readMetric<{ time: string; percentage: number; metadata?: any }>('spo2', 'OxygenSaturation', {
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
+    });
+    const valid = records.filter((record) => within(record.time, backfillWindow));
+    valid.forEach((record) => addObservation('spo2', record.percentage <= 1 ? record.percentage * 100 : record.percentage, 'pct', record.time, 'OxygenSaturation', record));
+    if (connectedMetrics.spo2 !== 'read_failed') connectedMetrics.spo2 = valid.length ? 'synced' : 'no_recent_data';
+  }
+
+  if (hasPermission(grantedSet, 'RespiratoryRate')) {
+    const records = await readMetric<{ time: string; rate: number; metadata?: any }>('respiratory_rate', 'RespiratoryRate', {
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - backfillWindow), endTime: end }
+    });
+    const valid = records.filter((record) => within(record.time, backfillWindow));
+    valid.forEach((record) => addObservation('respiratory_rate', record.rate, 'brpm', record.time, 'RespiratoryRate', record));
+    if (connectedMetrics.respiratory_rate !== 'read_failed') connectedMetrics.respiratory_rate = valid.length ? 'synced' : 'no_recent_data';
   }
 
   const realSyncedCount = observations.length;
