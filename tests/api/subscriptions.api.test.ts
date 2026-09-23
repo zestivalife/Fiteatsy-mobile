@@ -137,7 +137,7 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
     assert.equal(verified.response.status, 200);
     assert.equal(verified.body.verified, true);
     assert.equal(verified.body.current.hasActiveSubscription, true);
-    assert.equal(verified.body.current.entitlements.includes('consultations_per_month'), true);
+    assert.equal(verified.body.current.entitlements.includes('EXPERT_CONSULTATION'), true);
 
     const current = await getJson(server.baseUrl, '/v1/subscriptions/current', {
       headers: authHeaders(session.token)
@@ -145,7 +145,7 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
     assert.equal(current.response.status, 200);
     assert.equal(current.body.hasActiveSubscription, true);
     assert.equal(current.body.subscription.planCode, 'LIFESTYLE_CONSULT');
-    assert.equal(current.body.entitlements.includes('consultations_per_month'), true);
+    assert.equal(current.body.entitlements.includes('EXPERT_CONSULTATION'), true);
 
     const repeatedVerify = await postJson(
       server.baseUrl,
