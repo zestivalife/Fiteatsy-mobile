@@ -262,6 +262,15 @@ test('consultant can access client list after admin role assignment', async () =
   });
   assert.notEqual(clientAssignment, null);
 
+  const grantedConsent = await putJson(
+    server.baseUrl,
+    '/v1/preferences/consultant-access',
+    { status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
+    { headers: authHeaders(client.token) }
+  );
+  assert.equal(grantedConsent.response.status, 200);
+  assert.equal(grantedConsent.body.consent.status, 'GRANTED');
+
   const list = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(consultant.token)
   });
