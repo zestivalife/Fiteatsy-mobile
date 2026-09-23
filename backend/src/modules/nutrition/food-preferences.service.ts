@@ -85,9 +85,12 @@ export const listVerifiedFoodCatalogue = async (query: string, limit = 30, offse
       where deleted_at is null and status = 'active' and verification_status = 'verified'
         and exists (
           select 1 from food_knowledge_food_profiles governed
+          join food_knowledge_versions governed_version
+            on governed_version.food_id = governed.food_id
+           and governed_version.retired_at is null
           where governed.food_id = nutrition_foods.id
             and governed.lifecycle_status = 'active'
-            and governed.production_eligible = true
+            and governed_version.production_eligible = true
             and governed.client_consumable = true
             and governed.food_type <> 'INGREDIENT_ONLY'
         )

@@ -5,6 +5,7 @@ import { assertDestructiveTestResetAllowed } from '../../backend/src/test-suppor
 import { FOOD_KNOWLEDGE_FIXTURE_MANIFEST } from '../../backend/src/modules/nutrition/food-knowledge/food-knowledge.fixture.js';
 import { dryRunFoodKnowledgeRelease, importFoodKnowledgeRelease } from '../../backend/src/modules/nutrition/food-knowledge/food-knowledge.importer.js';
 import { findEligibleFoodKnowledge, flattenFoodKnowledgeComposition, getFoodKnowledgeCoverage, getFoodKnowledgeProjection, searchFoodKnowledge } from '../../backend/src/modules/nutrition/food-knowledge/food-knowledge.repository.js';
+import { listVerifiedFoodCatalogue } from '../../backend/src/modules/nutrition/food-preferences.service.js';
 import { sha256 } from '../../backend/src/modules/nutrition/food-knowledge/food-knowledge.validation.js';
 
 const databaseTest = process.env.DATABASE_URL ? test : test.skip;
@@ -55,6 +56,12 @@ databaseTest('canonical projection preserves Food, Version, Family, serving, nut
   assert.equal(Number(projection.servings[0].grams), 150);
   assert.equal(Number(projection.nutrients_per_100g.energy_kcal), 96);
   assert.equal('vitamin_d_mcg' in projection.nutrients_per_100g, false);
+});
+
+databaseTest('verified catalogue reads production eligibility from the active food version', async () => {
+  const catalogue = await listVerifiedFoodCatalogue('', 50, 0);
+  assert.ok(catalogue.items.length > 0);
+  assert.ok(catalogue.items.some((item) => item.canonicalName === 'Bhindi Sabji'));
 });
 
 databaseTest('composition, Potato Avoid, No Garlic and allergen eligibility are structural and fail closed', async () => {
