@@ -632,6 +632,12 @@ export const listRegisteredConsultantClients = async (
               and cap003.professional_type = $7
               and cap003.status = 'active'
           )
+          and exists (
+            select 1 from consultant_access_consents consent
+            where consent.client_id = c.id
+              and consent.user_id = u.id
+              and consent.status = 'GRANTED'
+          )
         )
       `
     : '';

@@ -180,6 +180,104 @@ test('consultant client discovery is assignment-scoped and independent of subscr
   assert.deepEqual(unrelated.body.clients, []);
 });
 
+test('consultant roster and protected client access share assignment and consent authority', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Consent Governed Client',
+    email: `consent-governed-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  const unrelatedConsultant = await createConsultantSession();
+
+  const assignment = await createProfessionalAssignment({
+    actorUserId: consultant.current.body.accountId,
+    clientUserId: client.current.body.accountId,
+    professionalUserId: consultant.current.body.accountId,
+    professionalType: 'CONSULTANT',
+    relationshipType: 'CLIENT_CARE',
+    reason: 'Roster and protected access parity test'
+  });
+  assert.notEqual(assignment, null);
+
+  const beforeConsent = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(beforeConsent.response.status, 200);
+  assert.deepEqual(beforeConsent.body.clients, []);
+
+  const consentDenied = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${client.current.body.client.fiteatsyClientId}`,
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(consentDenied.response.status, 403);
+  assert.equal(consentDenied.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
+
+  const granted = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+    status: 'GRANTED',
+    policyVersion: 'CONSULTANT_ACCESS_V1'
+  }, { headers: authHeaders(client.token) });
+  assert.equal(granted.response.status, 200);
+
+  const visible = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(visible.response.status, 200);
+  assert.equal(visible.body.clients.length, 1);
+  assert.equal(visible.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+
+  const detail = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${client.current.body.client.fiteatsyClientId}`,
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(detail.response.status, 200);
+
+  const workspace = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${client.current.body.client.fiteatsyClientId}/workspace`,
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(workspace.response.status, 200);
+  assert.equal(workspace.body.client.id, client.current.body.client.fiteatsyClientId);
+  assert.equal(Array.isArray(workspace.body.reports), true);
+  assert.equal(Array.isArray(workspace.body.biomarkers), true);
+  assert.equal(Array.isArray(workspace.body.timeline), true);
+
+  const unrelatedRoster = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(unrelatedConsultant.token)
+  });
+  assert.equal(unrelatedRoster.response.status, 200);
+  assert.deepEqual(unrelatedRoster.body.clients, []);
+
+  const unrelatedDetail = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${client.current.body.client.fiteatsyClientId}`,
+    { headers: authHeaders(unrelatedConsultant.token) }
+  );
+  assert.equal(unrelatedDetail.response.status, 403);
+  assert.equal(unrelatedDetail.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
+
+  const revoked = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+    status: 'REVOKED',
+    policyVersion: 'CONSULTANT_ACCESS_V1'
+  }, { headers: authHeaders(client.token) });
+  assert.equal(revoked.response.status, 200);
+
+  const afterRevocation = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(afterRevocation.response.status, 200);
+  assert.deepEqual(afterRevocation.body.clients, []);
+
+  const revokedDetail = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${client.current.body.client.fiteatsyClientId}`,
+    { headers: authHeaders(consultant.token) }
+  );
+  assert.equal(revokedDetail.response.status, 403);
+  assert.equal(revokedDetail.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
+});
+
 test('consultant client discovery projects the canonical effective subscription plan', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Subscribed Assigned Client',
@@ -297,6 +395,12 @@ test('consultant discovery backfills missing client records for registered users
     reason: 'Valid missing-projection discovery fixture'
   });
   assert.ok(assignment);
+  await pool.query(
+    `insert into consultant_access_consents (
+       user_id, client_id, status, policy_version, source, granted_at
+     ) values ($1, $2, 'GRANTED', 'CONSULTANT_ACCESS_V1', 'TEST_FIXTURE', now())`,
+    [accountId, canonicalClientId]
+  );
 
   const first = await getJson(server.baseUrl, '/v1/consultants/clients', discoveryOptions);
   const second = await getJson(server.baseUrl, '/v1/consultants/clients', discoveryOptions);

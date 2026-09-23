@@ -68,7 +68,7 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
 
     const visible = await getJson(server.baseUrl, '/v1/consultants/clients', { headers: authHeaders(consultant.token) });
     assert.equal(visible.response.status, 200, JSON.stringify(visible.body));
-    assert.ok(visible.body.clients.some((item: { clientId: string }) => item.clientId === publicClientId));
+    assert.ok(!visible.body.clients.some((item: { clientId: string }) => item.clientId === publicClientId));
     const denied = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, { headers: authHeaders(outsider.token) });
     assert.equal(denied.response.status, 403, JSON.stringify(denied.body));
     assert.equal(denied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
@@ -82,6 +82,9 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     }, { headers: authHeaders(client.token) });
     assert.equal(grantedConsent.response.status, 200, JSON.stringify(grantedConsent.body));
     assert.equal(grantedConsent.body.consent.status, 'GRANTED');
+    const visibleAfterConsent = await getJson(server.baseUrl, '/v1/consultants/clients', { headers: authHeaders(consultant.token) });
+    assert.equal(visibleAfterConsent.response.status, 200, JSON.stringify(visibleAfterConsent.body));
+    assert.ok(visibleAfterConsent.body.clients.some((item: { clientId: string }) => item.clientId === publicClientId));
 
     const assertRevokedGuardOrder = async () => {
       const revokedConsent = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
