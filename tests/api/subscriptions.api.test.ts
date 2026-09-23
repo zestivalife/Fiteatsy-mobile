@@ -63,7 +63,7 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
       fetchPayment: async (paymentId) => ({
         id: paymentId,
         order_id: 'order_test_1',
-        amount: 199900,
+        amount: 235882,
         currency: 'INR',
         status: 'captured',
         method: 'upi'
@@ -107,7 +107,7 @@ test('subscription checkout verifies Razorpay payment before activating entitlem
     assert.equal(checkout.body.checkout.provider, 'razorpay');
     assert.equal(checkout.body.checkout.keyId, 'rzp_test_key');
     assert.equal(checkout.body.checkout.orderId, 'order_test_1');
-    assert.equal(checkout.body.checkout.amount, 199900);
+    assert.equal(checkout.body.checkout.amount, 235882);
     assert.equal(checkout.body.checkout.notes.source, 'book_consultation');
 
     const invalidSignature = await postJson(
