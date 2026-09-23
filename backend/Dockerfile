@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY packages/health-intelligence ./packages/health-intelligence
 COPY backend/package*.json ./backend/
+RUN npm install --global typescript@5.9.3
 WORKDIR /app/backend
 RUN npm ci
 
