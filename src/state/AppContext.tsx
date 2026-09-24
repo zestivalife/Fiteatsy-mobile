@@ -102,6 +102,7 @@ import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/iden
 import { deriveOnboardingGate, type OnboardingResumeStep, type OnboardingStatus } from '../utils/onboardingGate';
 import { traceSessionLifecycle } from '../services/sessionLifecycleTrace';
 import { clearPersistedAuthSession, readPersistedAuthSession, writePersistedAuthSession } from '../services/authSessionStore';
+import { updateNetworkTransport } from '../services/networkResilience';
 
 type StoredAuthSession = CurrentAuthSession & {
   sessionToken: string;
@@ -1719,6 +1720,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         : state.isConnected === true
           ? true
           : null;
+      updateNetworkTransport({ isConnected: state.isConnected, isInternetReachable: state.isInternetReachable,
+        networkType: state.type });
       previousNetworkReachabilityRef.current = networkReachabilityRef.current;
       if (authSession && networkReachabilityRef.current === true) {
         void retryPendingHealthProfileSync();

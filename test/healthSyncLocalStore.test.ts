@@ -16,7 +16,9 @@ import { acknowledgeLocalObservations, countPendingLocalObservations, markLocalH
   readLocalHealthPresentationObservations, readLocalHealthProviderConnected,
   readLocalSyncCursors, readPendingLocalObservations, persistLocalCanonicalHealthSnapshot,
   readLocalCanonicalHealthSnapshot, recomputeLocalHealthAggregates, readLocalHealthAggregates,
-  ensureLocalHealthAggregatesCurrent, readLocalHealthBootstrapSnapshot, markLocalObservationUploadFailure, HEALTH_UPLOAD_MAX_RETRIES } from '../src/services/healthSyncLocalStore';
+  ensureLocalHealthAggregatesCurrent, readLocalHealthBootstrapSnapshot, markLocalObservationUploadFailure,
+  readLocalHealthDailySnapshots, readLocalHealthUploadQueueStatus, rearmFailedLocalHealthUploads,
+  HEALTH_UPLOAD_MAX_RETRIES } from '../src/services/healthSyncLocalStore';
 import { calculateCanonicalHealthIntelligence } from '../src/services/localHealthIntelligence';
 
 const observation = (value: number, deleted = false, recordId = 'record-1') => ({
@@ -64,6 +66,13 @@ describe('durable local health sync store', () => {
     const stored = JSON.parse(mockStorage.get('@fiteatsy/health-sync-local-v2:connection-failure')!);
     expect(stored.records[pending.recordKey].poison).toBe(true);
     expect(stored.records[pending.recordKey].retryCount).toBe(HEALTH_UPLOAD_MAX_RETRIES);
+    expect(await readLocalHealthUploadQueueStatus(scope, Date.now() + 2 * 60 * 60_000)).toMatchObject({
+      pendingCount: 1, readyCount: 0, failedCount: 1, maximumRetryCount: HEALTH_UPLOAD_MAX_RETRIES
+    });
+    expect(await rearmFailedLocalHealthUploads(scope)).toBe(1);
+    expect(await readLocalHealthUploadQueueStatus(scope, Date.now() + 2 * 60 * 60_000)).toMatchObject({
+      pendingCount: 1, readyCount: 1, failedCount: 0, maximumRetryCount: 0
+    });
   });
 
   it('serializes concurrent queue mutations without losing either observation', async () => {
@@ -154,6 +163,22 @@ describe('durable local health sync store', () => {
     const aggregates = await recomputeLocalHealthAggregates(scope, '2026-09-13T02:00:00.000Z', 330, Date.parse('2026-09-13T02:00:00.000Z'));
     expect(aggregates.find((item) => item.metricType === 'steps')?.value).toBe(150);
     expect((await readLocalHealthAggregates(scope))[0].aggregateVersion).toBe('HEALTH_AGGREGATION_V2');
+    const dailySnapshots = await readLocalHealthDailySnapshots(scope);
+    expect(dailySnapshots['2026-09-13']).toMatchObject({
+      snapshotVersion: 'HEALTH_DAILY_SNAPSHOT_V1',
+      healthDay: '2026-09-13',
+      accountScope: scope,
+      aggregateVersion: 'HEALTH_AGGREGATION_V2'
+    });
+    expect(dailySnapshots['2026-09-13'].lineageHashes).toHaveLength(1);
+    expect(dailySnapshots['2026-09-13'].sourceProviders).toEqual(['apple_health']);
+    expect(dailySnapshots['2026-09-13'].intelligence?.inputWindow.endAtISO).toBe('2026-09-13T00:00:00.000Z');
+    expect(dailySnapshots['2026-09-13'].intelligence?.scores.activity).toMatchObject({
+      score: null,
+      status: 'METHODOLOGY_PENDING',
+      inputsUsed: ['steps']
+    });
+    expect(await readLocalHealthDailySnapshots('account:user-2:apple-health')).toEqual({});
   });
 
   it('invalidates deleted source records and recovers an interrupted dirty aggregate state', async () => {

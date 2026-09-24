@@ -1175,7 +1175,7 @@ export const TrackerScreen = () => {
       const d = new Date(weekStart);
       d.setDate(weekStart.getDate() + i);
       const dayKey = toDayKey(d.toISOString());
-      const daily = health.observations.filter(item => toDayKey(item.measuredAtISO) === dayKey);
+      const daily = health.dailySnapshots[dayKey]?.aggregates ?? [];
       const value = (types:string[]) => daily.find(item => types.includes(item.metricType))?.value ?? 0;
       const calories = value(['active_energy']);
       const heartRate = value(['resting_heart_rate','heart_rate']);
@@ -1200,7 +1200,7 @@ export const TrackerScreen = () => {
         wellnessTrend: []
       };
     });
-  }, [health.observations]);
+  }, [health.dailySnapshots]);
 
   const selected = days[selectedDay] ?? days[days.length - 1];
   const yesterday = days[Math.max(0, selectedDay - 1)] ?? selected;
@@ -1283,7 +1283,10 @@ export const TrackerScreen = () => {
   const workoutMinutesValue = todayAggregate(['workout_minutes','active_minutes']);
   // Tracker and Journey share the coordinator's persisted local projection.
   // A separately fetched server snapshot may lag the native commit boundary.
-  const displayScores = health.canonicalIntelligence?.scores ?? canonicalIntelligence?.scores ?? null;
+  const displayScores = health.currentDailySnapshot?.intelligence?.scores
+    ?? health.canonicalIntelligence?.scores
+    ?? canonicalIntelligence?.scores
+    ?? null;
   const activityScoreValue = displayScores?.activity.score ?? null;
   const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? todayAggregate(['resting_heart_rate']) : null;
   const hrvValue = recoveryIntel.signalCoverage.hrv ? todayAggregate(['hrv_sdnn_ms','hrv_rmssd_ms']) : null;

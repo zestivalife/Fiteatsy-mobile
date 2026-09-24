@@ -15,6 +15,7 @@ import {
   type HealthSyncStatus,
   HealthSyncPostUploadRefreshError,
   HealthSyncUploadPendingError,
+  resumePendingHealthUploads,
   runHealthSync,
   wellnessFromCanonicalAggregates
 } from './healthSyncManager';
@@ -23,7 +24,7 @@ import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLoc
   migrateLegacyHealthInstallationId, readLocalHealthBootstrapSnapshot,
   persistLocalCanonicalHealthSnapshot,
   readLocalHealthAggregates, readLocalHealthLifecycle, readLocalHealthPresentationObservations,
-  type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
+  rearmFailedLocalHealthUploads,readLocalHealthUploadQueueStatus,type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
 import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
 import { buildPresentedHealthObservations, mergeHealthPresentationObservations } from './healthMetricPresentation';
 import { calculateCanonicalHealthIntelligenceFromAggregates, hasCalculatedCanonicalScore,
@@ -32,6 +33,9 @@ import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 import { traceSessionLifecycle } from './sessionLifecycleTrace';
 import { buildHealthSourceDiagnostics } from './healthSourceDiagnostics';
+import { getNetworkRuntimeSnapshot, subscribeNetworkRuntime } from './networkResilience';
+import type { NetworkRuntimeSnapshot } from './networkResilience';
+import { buildCanonicalHealthDailySnapshots } from './canonicalHealthDailySnapshot';
 
 export type { HealthObservationDto } from './healthSyncManager';
 
@@ -77,6 +81,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const foregroundRefreshAt = useRef(0);
   const forceBackfill = useRef(false);
   const connectionIdOverride = useRef<string | null>(null);
+  const recoveryUploadInFlight=useRef(false);
   const [providerState, setProviderState] = useState<HealthProviderState>('AVAILABLE');
   const [uploadState, setUploadState] = useState<HealthUploadState>('IDLE');
   const [status, setStatus] = useState<HealthSyncStatus | null>(null);
@@ -92,6 +97,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const [canonicalIntelligence, setCanonicalIntelligence] = useState<LocalCanonicalHealthSnapshot | null>(null);
   const [aggregates,setAggregates]=useState<CanonicalDailyAggregate[]>([]);
   const [lifecycle,setLifecycle]=useState<HealthSyncLifecycleTimestamps>({lastHealthReadAtISO:null,lastSavedAtISO:null,lastUploadedAtISO:null,lastFullySyncedAtISO:null});
+  const [networkState,setNetworkState]=useState<NetworkRuntimeSnapshot>(getNetworkRuntimeSnapshot());
   const localScope = useMemo(() => authSession
     ? `account:${authSession.accountId}:${adapter.appId}`
     : null, [adapter.appId, authSession]);
@@ -140,7 +146,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     }
   }, [adapter, localScope]);
 
-  const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean } = {}) => {
+  const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean; explicitManual?:boolean } = {}) => {
     if (!authSession || !localScope) return;
     if (inFlight.current) {
       refreshQueued.current = true;
@@ -154,6 +160,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     const connection = adapter.platform === 'APPLE_HEALTH' ? status?.appleHealth : status?.healthConnect;
     const connectionId = connectionIdOverride.current ?? connection?.connectionId ?? null;
     try {
+      if(options.explicitManual)await rearmFailedLocalHealthUploads(localScope);
       const applyLocalCompletion = async (localResult: {
         payload: Awaited<ReturnType<typeof adapter.queryAllSupportedMetrics>>;
         observations: HealthObservationDraft[];
@@ -376,9 +383,32 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     return () => subscription.remove();
   }, [refreshRemoteSnapshot, syncLocalMetrics]);
 
+  useEffect(()=>subscribeNetworkRuntime((next,previous)=>{
+    setNetworkState(next);
+    if(!localScope||!authSession)return;
+    const recovered=next.state==='BACKEND_REACHABLE'||
+      (next.state==='RECOVERING'&&(previous.state==='OFFLINE'||previous.state==='DEGRADED'));
+    if(!recovered||recoveryUploadInFlight.current)return;
+    recoveryUploadInFlight.current=true;
+    void resumePendingHealthUploads(localScope).then(async result=>{
+      if(!mounted.current)return;
+      const queue=await readLocalHealthUploadQueueStatus(localScope);
+      setPendingUploadCount(queue.pendingCount);
+      setUploadState(result.fullySynced?'SYNCED':queue.pendingCount?'PENDING':'IDLE');
+      setLifecycle(await readLocalHealthLifecycle(localScope));
+      if(result.batches>0)void refreshRemoteSnapshot();
+    }).catch(()=>{if(mounted.current)setUploadState('PENDING');})
+      .finally(()=>{recoveryUploadInFlight.current=false;});
+  }),[authSession,localScope,refreshRemoteSnapshot]);
+
   const latestByMetric = useMemo(() => buildPresentedHealthObservations(observations,presentationObservations,aggregates),
     [aggregates,observations,presentationObservations]);
   const canonicalPresentedObservations = useMemo(() => [...latestByMetric.values()], [latestByMetric]);
+  const dailySnapshots=useMemo(()=>buildCanonicalHealthDailySnapshots(localScope??'signed-out',aggregates,canonicalIntelligence),
+    [aggregates,canonicalIntelligence,localScope]);
+  const now=new Date();
+  const currentHealthDay=[now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
+  const currentDailySnapshot=dailySnapshots[currentHealthDay]??null;
 
   const metrics = useMemo<CanonicalHealthMetricState[]>(() => HEALTH_METRIC_REGISTRY.map((definition) => {
     const supported = adapter.platform === 'APPLE_HEALTH' ? Boolean(definition.appleHealthType) : Boolean(definition.healthConnectRecord);
@@ -415,6 +445,9 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     // Tracker/Home as partial packet values.
     observations: canonicalPresentedObservations,
     aggregates,
+    dailySnapshots,
+    currentDailySnapshot,
+    networkState,
     lifecycle,
     platformStatus,
     activity,

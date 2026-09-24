@@ -131,6 +131,7 @@ const normalizeScore = (value: number | null | undefined) => {
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
   const health = useCanonicalHealthSyncCoordinator();
+  const canonicalHealthIntelligence = health.currentDailySnapshot?.intelligence ?? health.canonicalIntelligence;
   const {
     authSession,
     getMedicationTimelineForDate
@@ -255,7 +256,7 @@ export const HomeScreen = () => {
     {
       key: 'recovery',
       label: 'Recovery',
-      score: normalizeScore(health.canonicalIntelligence?.scores.recovery.score),
+      score: normalizeScore(canonicalHealthIntelligence?.scores.recovery.score),
       color: '#FF1717',
       position: 'recovery',
       icon: 'heart-outline'
@@ -263,7 +264,7 @@ export const HomeScreen = () => {
     {
       key: 'activity',
       label: 'Activity',
-      score: normalizeScore(health.canonicalIntelligence?.scores.activity.score),
+      score: normalizeScore(canonicalHealthIntelligence?.scores.activity.score),
       color: '#F27A1A',
       position: 'activity',
       icon: 'walk-outline'
@@ -271,7 +272,7 @@ export const HomeScreen = () => {
     {
       key: 'nourishment',
       label: 'Nourishment',
-      score: normalizeScore(health.canonicalIntelligence?.scores.nutrition.score),
+      score: normalizeScore(canonicalHealthIntelligence?.scores.nutrition.score),
       color: '#77FF22',
       position: 'nourishment',
       icon: 'nutrition-outline'
@@ -279,7 +280,7 @@ export const HomeScreen = () => {
     {
       key: 'calm',
       label: 'Calm',
-      score: normalizeScore(health.canonicalIntelligence?.scores.calm.score),
+      score: normalizeScore(canonicalHealthIntelligence?.scores.calm.score),
       color: '#763CEF',
       position: 'calm',
       icon: 'leaf-outline'
@@ -287,7 +288,7 @@ export const HomeScreen = () => {
     {
       key: 'sleep',
       label: 'Sleep',
-      score: normalizeScore(health.canonicalIntelligence?.scores.sleep.score),
+      score: normalizeScore(canonicalHealthIntelligence?.scores.sleep.score),
       color: '#0F80FF',
       position: 'sleep',
       icon: 'moon-outline'
@@ -296,18 +297,18 @@ export const HomeScreen = () => {
   const displayMetrics = metrics;
   const trendValues = recoveryTrend;
   const hasTrendData = trendValues.length > 0;
-  const healthIntelligenceScore = normalizeScore(health.canonicalIntelligence?.scores.healthIntelligence.score);
+  const healthIntelligenceScore = normalizeScore(canonicalHealthIntelligence?.scores.healthIntelligence.score);
 
   const selected = selectedMetric === 'healthIntelligence'
     ? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' }
     : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' };
-  const frameworkByMetric = health.canonicalIntelligence ? {
-    healthIntelligence: health.canonicalIntelligence.scores.healthIntelligence,
-    recovery: health.canonicalIntelligence.scores.recovery,
-    sleep: health.canonicalIntelligence.scores.sleep,
-    activity: health.canonicalIntelligence.scores.activity,
-    nourishment: health.canonicalIntelligence.scores.nutrition,
-    calm: health.canonicalIntelligence.scores.calm
+  const frameworkByMetric = canonicalHealthIntelligence ? {
+    healthIntelligence: canonicalHealthIntelligence.scores.healthIntelligence,
+    recovery: canonicalHealthIntelligence.scores.recovery,
+    sleep: canonicalHealthIntelligence.scores.sleep,
+    activity: canonicalHealthIntelligence.scores.activity,
+    nourishment: canonicalHealthIntelligence.scores.nutrition,
+    calm: canonicalHealthIntelligence.scores.calm
   } : null;
   const selectedFramework = frameworkByMetric?.[selectedMetric];
   const selectedMetricAvailability: Partial<Record<MetricKey, boolean>> = {

@@ -32,7 +32,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   const localReadComplete=terminalMetricCount===supportedMetrics.length&&supportedMetrics.length>0;
   const syncErrorMessage=health.message??(timedOutCount?`${timedOutCount} health ${timedOutCount===1?'metric took':'metrics took'} too long to respond.`:readErrorCount?`${readErrorCount} health ${readErrorCount===1?'metric could':'metrics could'} not be read.`:'Health data could not be synced. Check your connection and try again.');
   useEffect(()=>{if(busy)setSyncPopupVisible(true);else if(failed||uploadPending)setSyncPopupVisible(true);},[busy,failed,uploadPending]);
-  const startSync=useCallback(()=>{setSyncPopupVisible(true);void health.syncLocalMetrics();},[health]);
+  const startSync=useCallback(()=>{setSyncPopupVisible(true);void health.syncLocalMetrics({explicitManual:true});},[health]);
   const finishOnboarding=useCallback(()=>{setWearableSetupCompleted(true);if(onboarding)setOnboarding({...onboarding,wearablePreference:connected?'sync':'later'});navigation.reset({index:0,routes:[{name:'Main'}]});},[connected,navigation,onboarding,setOnboarding,setWearableSetupCompleted]);
   const reviewPermissions=useCallback(()=>{health.markPermissionReviewStarted();if(Platform.OS==='ios')setPermissionHelp(true);else void Linking.openSettings();},[health]);
   return <>

@@ -95,7 +95,8 @@ describe('canonical health sync architecture',()=>{
     expect(home).not.toContain('getHealthSyncStatus');
     expect(tracker).toContain('useCanonicalHealthSyncCoordinator');
     expect(tracker).not.toContain('wearableSyncData');
-    expect(debug).toContain('health.syncLocalMetrics()');
+    expect(debug).toContain('health.syncLocalMetrics(');
+    expect(debug).toContain('explicitManual:true');
     expect(debug).not.toContain('runHealthSync');
     expect(connected).toContain('useCanonicalHealthSyncCoordinator');
     expect(connected).not.toContain('wearableSyncData');

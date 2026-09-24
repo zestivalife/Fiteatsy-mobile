@@ -107,9 +107,10 @@ export const calculateCanonicalHealthIntelligenceFromObservations = (
 };
 
 export const calculateCanonicalHealthIntelligenceFromAggregates=(aggregates:CanonicalDailyAggregate[],options:{sleepTargetMinutes?:number|null;
-  cycleApplicable?:boolean;now?:Date}={})=>{const now=options.now??new Date();const fallbackOffsetMinutes=-now.getTimezoneOffset();
-  const today=localDay(now.toISOString(),fallbackOffsetMinutes);const daily=(metric:string)=>aggregates.find(row=>row.healthDay===today&&row.metricType===metric)?.value??null;
-  const timestamps=aggregates.map(row=>row.latestMeasuredAtISO).sort();const latest=timestamps.at(-1)??null;
+  cycleApplicable?:boolean;now?:Date;healthDay?:string}={})=>{const now=options.now??new Date();const fallbackOffsetMinutes=-now.getTimezoneOffset();
+  const targetDay=options.healthDay??localDay(now.toISOString(),fallbackOffsetMinutes);
+  const dayRows=aggregates.filter(row=>row.healthDay===targetDay);const daily=(metric:string)=>dayRows.find(row=>row.metricType===metric)?.value??null;
+  const timestamps=dayRows.map(row=>row.latestMeasuredAtISO).sort();const latest=timestamps.at(-1)??null;
   const freshness:ScoreResult['freshness']=latest&&Date.parse(latest)>=now.getTime()-36*3_600_000?'CURRENT':latest?'STALE':'UNKNOWN';
   return calculateCanonicalHealthIntelligence({activity:{steps:daily('steps'),stepGoal:HEALTH_INTELLIGENCE_CONFIG.targets.steps,
     exerciseMinutes:daily('active_minutes'),exerciseTarget:HEALTH_INTELLIGENCE_CONFIG.targets.exerciseMinutes,balance:null,freshness},

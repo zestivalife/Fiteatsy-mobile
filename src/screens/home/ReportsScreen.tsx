@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -56,6 +56,7 @@ import {
   waitForReportAnalysis
 } from '../../services/reportUploadService';
 import {readReportMetadataCache,writeReportMetadataCache} from '../../services/reportMetadataCache';
+import {subscribeNetworkRuntime} from '../../services/networkResilience';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type CategoryKey = 'Blood' | 'Metabolic' | 'Organs' | 'Thyroid' | 'Vitamins';
@@ -458,7 +459,7 @@ export const ReportsScreen = () => {
     setShowHistory(false);
   };
 
-  const refreshReportData = async () => {
+  const refreshReportData = useCallback(async () => {
     setReportsLoadError(null);
     const reportDtos = await listAnalyzedReports();
     if(authSession)await writeReportMetadataCache(authenticatedReportOwnerKey,reportDtos);
@@ -478,7 +479,7 @@ export const ReportsScreen = () => {
       setComparison(null);
       setComparisonError('Comparison is temporarily unavailable. Your latest report remains available.');
     }
-  };
+  }, [authSession, authenticatedReportOwnerKey]);
 
   const reportHistoryErrorMessage = (error: unknown) => {
     if (error && typeof error === 'object' && 'code' in error) {
@@ -584,7 +585,20 @@ export const ReportsScreen = () => {
     return () => {
       active = false;
     };
-  }, [authenticatedReportOwnerKey]);
+  }, [authSession, authenticatedReportOwnerKey, refreshReportData]);
+
+  useEffect(() => {
+    let recoveryInFlight = false;
+    return subscribeNetworkRuntime((next, previous) => {
+      const recovered = next.state === 'BACKEND_REACHABLE'
+        && ['OFFLINE', 'DEGRADED', 'RECOVERING'].includes(previous.state);
+      if (!authSession || !recovered || recoveryInFlight) return;
+      recoveryInFlight = true;
+      void refreshReportData()
+        .catch((error) => setReportsLoadError(reportHistoryErrorMessage(error)))
+        .finally(() => { recoveryInFlight = false; });
+    });
+  }, [authSession, refreshReportData]);
 
   useEffect(() => {
     if (!authSession || !pendingReportId || showProcessing || activeUploadController.current) return;

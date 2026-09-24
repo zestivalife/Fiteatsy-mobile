@@ -7,7 +7,8 @@ import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceS
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
 import { acknowledgeLocalObservations, persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalSyncCursors,
-  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded,markLocalObservationUploadFailure } from './healthSyncLocalStore';
+  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded,markLocalObservationUploadFailure,
+  readLocalHealthAggregates,readLocalHealthUploadQueueStatus,readLocalHealthLifecycle } from './healthSyncLocalStore';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -116,6 +117,43 @@ export type HealthObservationDto = HealthObservationDraft & {
   id: string;
   fiteatsyClientId: string;
   createdAtISO: string;
+};
+
+export type HealthQueueDrainResult={accepted:number;duplicate:number;rejected:number;updated:number;deleted:number;
+  batches:number;remaining:number;failed:number;fullySynced:boolean};
+
+/** Resumes durable upload work without re-reading HealthKit/Health Connect.
+ * It is safe on reconnect because rows retain stable sync keys and the backend
+ * ingestion contract is idempotent. */
+export const resumePendingHealthUploads=async(localScope:string):Promise<HealthQueueDrainResult>=>{
+  let accepted=0,duplicate=0,rejected=0,updated=0,deleted=0,batches=0;
+  let pending=await readPendingLocalObservations(localScope,HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+  while(pending.length&&batches<HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN){
+    try{
+      const ingest=await withHealthSyncPipelineTimeout(postJson<{accepted:number;duplicate:number;rejected:number;updated:number;deleted:number}>(
+        '/v1/health/observations:batch',{observations:pending.map(item=>item.observation),recalculateIntelligence:false}),
+      'health_sync_upload_timeout');
+      accepted+=ingest.accepted;duplicate+=ingest.duplicate;rejected+=ingest.rejected;updated+=ingest.updated??0;deleted+=ingest.deleted??0;
+      if(ingest.rejected>0){
+        await markLocalObservationUploadFailure(localScope,pending.map(item=>item.recordKey),'health_sync_upload_rejected');
+        break;
+      }
+      await acknowledgeLocalObservations(localScope,pending.map(item=>item.recordKey));batches+=1;
+      pending=await readPendingLocalObservations(localScope,HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+    }catch(error){await markLocalObservationUploadFailure(localScope,pending.map(item=>item.recordKey),
+      error instanceof Error?error.message:'health_sync_upload_failed');break;}
+  }
+  const queue=await readLocalHealthUploadQueueStatus(localScope);
+  const lifecycle=await readLocalHealthLifecycle(localScope);
+  const fullySynced=rejected===0&&queue.pendingCount===0;
+  const recalculationRequired=fullySynced&&lifecycle.lastSavedAtISO!==lifecycle.lastFullySyncedAtISO;
+  if(fullySynced&&(batches>0||recalculationRequired)){const aggregates=await readLocalHealthAggregates(localScope);
+    await withHealthSyncPipelineTimeout(postJson('/v1/health/intelligence:recalculate',{
+      healthDay:new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10),aggregateAssertions:aggregates
+    }),'health_sync_recalculation_timeout');
+    await markLocalHealthUploaded(localScope,true);
+  }
+  return {accepted,duplicate,rejected,updated,deleted,batches,remaining:queue.pendingCount,failed:queue.failedCount,fullySynced};
 };
 
 const deriveObservations = (payload: WearableSyncPayload): HealthObservationDraft[] => payload.observations ?? [];
@@ -251,7 +289,10 @@ export const runHealthSync = async (
       }
       accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
       updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
-      if (ingest.rejected > 0) break;
+      if (ingest.rejected > 0) {
+        await markLocalObservationUploadFailure(localScope, pending.map((item) => item.recordKey), 'health_sync_upload_rejected');
+        break;
+      }
       await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
       uploadBatchCount += 1;
       pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);

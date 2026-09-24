@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { HealthObservationDraft } from '../types';
 import type { LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
 import { aggregateCanonicalHealthObservations, HEALTH_AGGREGATION_VERSION, type CanonicalDailyAggregate } from '@fiteatsy/health-intelligence';
+import { buildCanonicalHealthDailySnapshots, HEALTH_DAILY_SNAPSHOT_VERSION,
+  type CanonicalHealthDailySnapshot } from './canonicalHealthDailySnapshot';
 
 // V1 retained every HealthKit row in one monolithic JSON document. Opening that
 // document during a sync could amplify into >1.6 GiB of transient JS/native
@@ -26,9 +28,11 @@ export type HealthSyncLifecycleTimestamps = { lastHealthReadAtISO:string|null; l
   lastUploadedAtISO:string|null; lastFullySyncedAtISO:string|null };
 type LocalSyncState = { records: Record<string, StoredRecord>; presentationRecords: Record<string, HealthObservationDraft>;
   cursors: Record<string, string>; providerConnected: boolean; canonicalScoreSnapshot: LocalCanonicalHealthSnapshot | null;
-  aggregates:CanonicalDailyAggregate[]; aggregatesDirty:boolean; lifecycle:HealthSyncLifecycleTimestamps };
+  aggregates:CanonicalDailyAggregate[]; dailySnapshots:Record<string,CanonicalHealthDailySnapshot>;
+  aggregatesDirty:boolean; lifecycle:HealthSyncLifecycleTimestamps };
 const emptyState = (): LocalSyncState => ({ records: {}, presentationRecords: {}, cursors: {}, providerConnected: false,
-  canonicalScoreSnapshot: null,aggregates:[],aggregatesDirty:false,lifecycle:{lastHealthReadAtISO:null,lastSavedAtISO:null,lastUploadedAtISO:null,lastFullySyncedAtISO:null} });
+  canonicalScoreSnapshot: null,aggregates:[],dailySnapshots:{},aggregatesDirty:false,
+  lifecycle:{lastHealthReadAtISO:null,lastSavedAtISO:null,lastUploadedAtISO:null,lastFullySyncedAtISO:null} });
 const scopeOperations = new Map<string, Promise<unknown>>();
 const serializeScopeOperation = <T>(scope: string, operation: () => Promise<T>): Promise<T> => {
   const previous = scopeOperations.get(scope) ?? Promise.resolve();
@@ -49,6 +53,8 @@ const readState = async (scope: string): Promise<LocalSyncState> => {
       canonicalScoreSnapshot: parsed.canonicalScoreSnapshot?.calculationVersion === 'HEALTH_INTELLIGENCE_V1'
         ? parsed.canonicalScoreSnapshot : null,
       aggregates:(parsed.aggregates??[]).filter(item=>item.aggregateVersion===HEALTH_AGGREGATION_VERSION),
+      dailySnapshots:Object.fromEntries(Object.entries(parsed.dailySnapshots??{}).filter(([,item])=>
+        item.snapshotVersion===HEALTH_DAILY_SNAPSHOT_VERSION)),
       aggregatesDirty:parsed.aggregatesDirty===true||(parsed.aggregates??[]).some(item=>item.aggregateVersion!==HEALTH_AGGREGATION_VERSION),
       lifecycle:{...emptyState().lifecycle,...parsed.lifecycle} };
   } catch {
@@ -64,14 +70,17 @@ const writeState = (scope: string, state: LocalSyncState) =>
       providerConnected: state.providerConnected,
       canonicalScoreSnapshot: state.canonicalScoreSnapshot,
       aggregates: state.aggregates,
+      dailySnapshots: state.dailySnapshots,
       aggregatesDirty: state.aggregatesDirty,
+      failedUploadCount: Object.values(state.records).filter((record) => !record.uploaded && record.poison).length,
       lifecycle: state.lifecycle
     })]
   ]);
 
 const emptyBootstrapSnapshot = () => ({
   pendingUploadCount: 0, providerConnected: false, canonicalScoreSnapshot: null as LocalCanonicalHealthSnapshot | null,
-  aggregates: [] as CanonicalDailyAggregate[], aggregatesDirty: false, lifecycle: emptyState().lifecycle
+  aggregates: [] as CanonicalDailyAggregate[], dailySnapshots: {} as Record<string,CanonicalHealthDailySnapshot>,
+  aggregatesDirty: false, lifecycle: emptyState().lifecycle, failedUploadCount: 0
 });
 
 const readBootstrapSnapshot = async (scope: string) => {
@@ -82,15 +91,18 @@ const readBootstrapSnapshot = async (scope: string) => {
   if (!raw) return emptyBootstrapSnapshot();
   try {
     const parsed = JSON.parse(raw) as Partial<Pick<LocalSyncState,
-      'providerConnected' | 'canonicalScoreSnapshot' | 'aggregates' | 'aggregatesDirty' | 'lifecycle'>>
-      & { pendingUploadCount?: number };
+      'providerConnected' | 'canonicalScoreSnapshot' | 'aggregates' | 'dailySnapshots' | 'aggregatesDirty' | 'lifecycle'>>
+      & { pendingUploadCount?: number; failedUploadCount?:number };
     return {
       pendingUploadCount: parsed.pendingUploadCount ?? 0,
       providerConnected: parsed.providerConnected === true,
       canonicalScoreSnapshot: parsed.canonicalScoreSnapshot?.calculationVersion === 'HEALTH_INTELLIGENCE_V1'
         ? parsed.canonicalScoreSnapshot : null,
       aggregates: (parsed.aggregates ?? []).filter((item) => item.aggregateVersion === HEALTH_AGGREGATION_VERSION),
+      dailySnapshots:Object.fromEntries(Object.entries(parsed.dailySnapshots??{}).filter(([,item])=>
+        item.snapshotVersion===HEALTH_DAILY_SNAPSHOT_VERSION)),
       aggregatesDirty: parsed.aggregatesDirty === true,
+      failedUploadCount:parsed.failedUploadCount??0,
       lifecycle: { ...emptyState().lifecycle, ...parsed.lifecycle }
     };
   } catch {
@@ -143,11 +155,14 @@ export const readLocalCanonicalHealthSnapshot = (scope: string) =>
 
 export const persistLocalCanonicalHealthSnapshot = (scope: string, snapshot: LocalCanonicalHealthSnapshot) =>
   serializeScopeOperation(scope, async () => {
-    const current = await readBootstrapSnapshot(scope);
-    await AsyncStorage.setItem(bootstrapKeyFor(scope), JSON.stringify({ ...current, canonicalScoreSnapshot: snapshot }));
+    const state = await readState(scope);
+    state.canonicalScoreSnapshot=snapshot;
+    state.dailySnapshots=buildCanonicalHealthDailySnapshots(scope,state.aggregates,snapshot);
+    await writeState(scope,state);
   });
 
 export const readLocalHealthAggregates = (scope:string) => serializeScopeOperation(scope,async()=>(await readState(scope)).aggregates);
+export const readLocalHealthDailySnapshots = (scope:string) => serializeScopeOperation(scope,async()=>(await readState(scope)).dailySnapshots);
 export const readLocalHealthLifecycle = (scope:string) => serializeScopeOperation(scope,async()=>(await readState(scope)).lifecycle);
 /**
  * Reads only the bounded startup projection. It never touches the retained raw
@@ -161,7 +176,7 @@ export const readLocalHealthBootstrapSnapshot = (scope: string) =>
   serializeScopeOperation(scope, () => readBootstrapSnapshot(scope));
 export const persistLocalHealthAggregates = (scope:string,aggregates:CanonicalDailyAggregate[],readAtISO:string) =>
   serializeScopeOperation(scope,async()=>{const state=await readState(scope);state.aggregates=aggregates;
-    state.aggregatesDirty=false;
+    state.aggregatesDirty=false;state.dailySnapshots=buildCanonicalHealthDailySnapshots(scope,aggregates,state.canonicalScoreSnapshot);
     state.lifecycle={...state.lifecycle,lastHealthReadAtISO:readAtISO,lastSavedAtISO:new Date().toISOString()};await writeState(scope,state);});
 /** Rebuilds from the complete retained account/platform window. The raw write,
  * dirty marker and this replacement are serialized so a crash is detectable. */
@@ -172,6 +187,7 @@ export const recomputeLocalHealthAggregates = (scope:string,readAtISO:string,fal
         ?'platform_aggregate':item.sourceProvider}));
     state.aggregates=aggregateCanonicalHealthObservations(input,{fallbackOffsetMinutes,nowMs});
     state.aggregatesDirty=false;state.canonicalScoreSnapshot=null;
+    state.dailySnapshots=buildCanonicalHealthDailySnapshots(scope,state.aggregates,null,new Date(nowMs).toISOString());
     state.lifecycle={...state.lifecycle,lastHealthReadAtISO:readAtISO,lastSavedAtISO:new Date(nowMs).toISOString()};
     await writeState(scope,state);return state.aggregates;
   });
@@ -183,6 +199,7 @@ export const ensureLocalHealthAggregatesCurrent=(scope:string,fallbackOffsetMinu
         ?'platform_aggregate':item.sourceProvider}));
     state.aggregates=aggregateCanonicalHealthObservations(input,{fallbackOffsetMinutes,nowMs});state.aggregatesDirty=false;
     state.canonicalScoreSnapshot=null;state.lifecycle={...state.lifecycle,lastSavedAtISO:new Date(nowMs).toISOString()};
+    state.dailySnapshots=buildCanonicalHealthDailySnapshots(scope,state.aggregates,null,new Date(nowMs).toISOString());
     await writeState(scope,state);return state.aggregates;
   });
 export const markLocalHealthUploaded = (scope:string,fullySynced:boolean) => serializeScopeOperation(scope,async()=>{
@@ -252,6 +269,26 @@ export const readPendingLocalObservations = (scope: string, limit = 250) => seri
     .sort(([, left], [, right]) => left.updatedAtISO.localeCompare(right.updatedAtISO))
     .slice(0, limit)
     .map(([recordKey, record]) => ({ recordKey, observation: record.observation }));
+});
+
+export type HealthUploadQueueStatus={pendingCount:number;readyCount:number;failedCount:number;oldestPendingAtISO:string|null;
+  maximumRetryCount:number};
+export const readLocalHealthUploadQueueStatus=(scope:string,nowMs=Date.now())=>serializeScopeOperation(scope,async()=>{
+  const records=Object.values((await readState(scope)).records).filter(record=>!record.uploaded);
+  return {pendingCount:records.length,readyCount:records.filter(record=>!record.poison&&
+      (!record.nextAttemptAtISO||Date.parse(record.nextAttemptAtISO)<=nowMs)).length,
+    failedCount:records.filter(record=>record.poison).length,
+    oldestPendingAtISO:records.map(record=>record.updatedAtISO).sort()[0]??null,
+    maximumRetryCount:Math.max(0,...records.map(record=>record.retryCount??0))};
+});
+
+/** Explicit user sync is the only operation allowed to re-arm exhausted rows.
+ * Automatic recovery retains the bounded retry ceiling and cannot storm. */
+export const rearmFailedLocalHealthUploads=(scope:string)=>serializeScopeOperation(scope,async()=>{
+  const state=await readState(scope);let rearmed=0;
+  Object.entries(state.records).forEach(([key,record])=>{if(!record.uploaded&&record.poison){rearmed+=1;
+    state.records[key]={...record,poison:false,retryCount:0,nextAttemptAtISO:null,lastFailureCode:null};}});
+  if(rearmed)await writeState(scope,state);return rearmed;
 });
 
 export const markLocalObservationUploadFailure = (scope: string, recordKeys: string[], failureCode: string, nowMs = Date.now()) =>

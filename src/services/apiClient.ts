@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { reportBackendAuthRequired, reportBackendFailure, reportBackendSuccess } from './networkResilience';
 
 export type ApiClientErrorCode =
   | 'TIMEOUT'
@@ -149,10 +150,14 @@ export const apiResponse = async (path: string, init: ApiRequestInit = {}): Prom
   } catch (error) {
     if (controller.signal.aborted && !callerSignal?.aborted) {
       emit('TIMEOUT');
+      reportBackendFailure('TIMEOUT');
       throw new ApiClientError('TIMEOUT', 'The platform request timed out. Please try again.');
     }
     emit('NETWORK_ERROR');
     const isDefinitelyOffline = networkReachabilityProvider?.() === false;
+    const failureText = error instanceof Error ? error.message.toLowerCase() : '';
+    reportBackendFailure(failureText.includes('dns') || failureText.includes('host') || failureText.includes('name resolution')
+      ? 'DNS_FAILURE' : 'BACKEND_UNREACHABLE');
     throw new ApiClientError(
       'NETWORK_ERROR',
       isDefinitelyOffline ? 'This device is offline.' : 'Unable to reach the platform backend.',
@@ -164,6 +169,10 @@ export const apiResponse = async (path: string, init: ApiRequestInit = {}): Prom
     callerSignal?.removeEventListener('abort', abortFromCaller);
   }
 
+  // Any HTTP response proves that DNS, transport and the backend boundary are
+  // reachable. Authentication and application errors are classified below.
+  reportBackendSuccess();
+
   if (!response.ok) {
     let payload: { error?: string; message?: string } | null = null;
     try {
@@ -172,6 +181,7 @@ export const apiResponse = async (path: string, init: ApiRequestInit = {}): Prom
       payload = null;
     }
     if (response.status === 401 && accessTokenProvider?.()) {
+      reportBackendAuthRequired();
       unauthorizedHandler?.({ status: 401, serverCode: payload?.error });
     }
     const code = toErrorCode(response.status);
