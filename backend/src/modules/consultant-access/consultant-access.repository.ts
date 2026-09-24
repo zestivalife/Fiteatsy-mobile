@@ -132,13 +132,17 @@ export const setConsultantAccessDecision = async (input: {
 
 export const resolveConsultantClientAccess = async (professionalUserId: string, publicClientId: string) => {
   const result = await pool.query(
-    `select assignment.id as assignment_id
+    `select assignment.id as assignment_id,
+            consent.assignment_id is not null as consent_granted
        from consultant_client_assignments assignment
        join users professional on professional.id = assignment.consultant_user_id
        join fiteatsy_clients client on client.account_user_id = assignment.client_user_id
-       join consultant_access_consents consent on ${consultantAccessSqlPredicate('assignment', 'consent')}
+       left join consultant_access_consents consent on ${consultantAccessSqlPredicate('assignment', 'consent')}
       where assignment.consultant_user_id = $1
         and client.fiteatsy_client_id = $2
+        and assignment.product = '${CONSULTANT_ACCESS_PRODUCT}'
+        and assignment.status = 'active'
+        and (assignment.ends_at is null or assignment.ends_at > now())
         and client.deleted_at is null and lower(coalesce(client.status, '')) = 'active'
         and professional.deleted_at is null and lower(coalesce(professional.status, '')) = 'active'
         and lower(coalesce(professional.role, '')) in ${SUPPORTED_CONSULTANT_ROLES_SQL}
@@ -146,7 +150,16 @@ export const resolveConsultantClientAccess = async (professionalUserId: string, 
       limit 1`,
     [professionalUserId, publicClientId],
   );
-  return result.rows[0] ? { authorized: true as const, assignmentId: String(result.rows[0].assignment_id) } : { authorized: false as const };
+  const row = result.rows[0];
+  if (!row) return { authorized: false as const, reason: 'CLIENT_ASSIGNMENT_REQUIRED' as const };
+  if (!row.consent_granted) {
+    return {
+      authorized: false as const,
+      reason: 'CONSULTANT_ACCESS_CONSENT_REQUIRED' as const,
+      assignmentId: String(row.assignment_id),
+    };
+  }
+  return { authorized: true as const, assignmentId: String(row.assignment_id) };
 };
 
 export const getConsultantAccessReconciliation = async () => {

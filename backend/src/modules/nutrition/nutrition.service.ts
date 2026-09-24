@@ -52,6 +52,7 @@ import { CALORIE_MACRO_ALLOCATION_CONFIG, CALORIE_MACRO_ALLOCATION_METHODOLOGY_V
 import { freezeCombinationOptionsForLifecycle, listCombinationOptions } from './common-food-consultant.repository.js';
 import { MEAL_HEADS as COMMON_FOOD_MEAL_HEADS } from './common-food-engine.js';
 import { isQaFixtureEntity } from '../admin/qa-provisioning.repository.js';
+import { resolveConsultantClientAccess } from '../consultant-access/consultant-access.repository.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
@@ -1684,21 +1685,32 @@ const contentSummaryFromContent = (content: NutritionPlanContent): DietPlanVersi
   ]),
 });
 
+export const resolveConsultantNutritionClientAccess = async (
+  publicClientId: string,
+  account: AuthenticatedAccount,
+) => {
+  if (!isConsultantRole(account)) return { authorized: false as const, reason: 'ROLE_NOT_ALLOWED' as const };
+  const access = await resolveConsultantClientAccess(account.accountId, publicClientId);
+  if (!access.authorized) return access;
+  const context = await getRegisteredConsultantClientAccessContext(
+    publicClientId,
+    account.accountId,
+    professionalTypeForNutritionAccount(account),
+  );
+  if (!context) return { authorized: false as const, reason: 'CLIENT_ASSIGNMENT_REQUIRED' as const };
+  if (account.qaSession && !await isQaFixtureEntity(account.qaSession.fixtureSetId, context.accountId)) {
+    return { authorized: false as const, reason: 'CLIENT_ASSIGNMENT_REQUIRED' as const };
+  }
+  return { authorized: true as const, assignmentId: access.assignmentId };
+};
+
 export const canAccessConsultantNutritionClient = async (
   publicClientId: string,
   account: AuthenticatedAccount,
-  options: { allowSeniorAuthority?: boolean } = {},
+  _options: { allowSeniorAuthority?: boolean } = {},
 ) => {
-  if (!isConsultantRole(account)) return false;
-  const useSeniorAuthority = options.allowSeniorAuthority === true && canApproveOrPublishDietPlan(account);
-  const context = await getRegisteredConsultantClientAccessContext(
-    publicClientId,
-    useSeniorAuthority ? undefined : account.accountId,
-    professionalTypeForNutritionAccount(account),
-  );
-  if (!context) return false;
-  if (account.qaSession && !await isQaFixtureEntity(account.qaSession.fixtureSetId, context.accountId)) return false;
-  return true;
+  const access = await resolveConsultantNutritionClientAccess(publicClientId, account);
+  return access.authorized;
 };
 
 export const assertLifecycleTransition = (

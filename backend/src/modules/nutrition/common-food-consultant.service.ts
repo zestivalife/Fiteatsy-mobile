@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { getRegisteredConsultantClientProfileContext, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
 import { getFoodPreferenceProfile } from './food-preferences.service.js';
-import { canAccessConsultantNutritionClient, NutritionPlanWorkflowError } from './nutrition.service.js';
+import { resolveConsultantNutritionClientAccess, NutritionPlanWorkflowError } from './nutrition.service.js';
 import { getCurrentDietPlanForClient } from './nutrition.store.js';
 import { createGovernedCommonFoodPopulation } from './common-food-population.js';
 import { canonicalHash } from './food-curation/canonical-food-foundation.js';
@@ -42,11 +42,11 @@ const debugRoleAllowed=(account:AuthenticatedAccount)=>['admin','super_admin','p
 
 export async function resolveClientMealGenerationContext(input:{account:AuthenticatedAccount;clientId:string;planId?:string;mealHead?:MealHead}){
   if(!roleAllowed(input.account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
-  const [canAccess,registered]=await Promise.all([
-    canAccessConsultantNutritionClient(input.clientId,input.account,{allowSeniorAuthority:true}),
+  const [access,registered]=await Promise.all([
+    resolveConsultantNutritionClientAccess(input.clientId,input.account),
     getRegisteredConsultantClientProfileContext(input.clientId),
   ]);
-  if(!canAccess)throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);
+  if(!access.authorized)throw new CommonFoodApiError(access.reason,403);
   if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404);
   const [prefs,latest,biomarkers]=await Promise.all([
     getFoodPreferenceProfile(input.clientId,registered.internalClientId),

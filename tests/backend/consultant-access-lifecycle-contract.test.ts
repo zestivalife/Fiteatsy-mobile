@@ -34,6 +34,19 @@ test('roster, client workspace, and client context reuse the canonical access pr
   assert.match(client360, /consultantAccessSqlPredicate/);
 });
 
+test('nutrition access preserves assignment-first denial semantics without senior-consultant bypass', () => {
+  const repository = read('backend/src/modules/consultant-access/consultant-access.repository.ts');
+  const nutrition = read('backend/src/modules/nutrition/nutrition.service.ts');
+  const commonFood = read('backend/src/modules/nutrition/common-food-consultant.service.ts');
+
+  assert.match(repository, /reason: 'CLIENT_ASSIGNMENT_REQUIRED'/);
+  assert.match(repository, /reason: 'CONSULTANT_ACCESS_CONSENT_REQUIRED'/);
+  assert.match(repository, /left join consultant_access_consents consent/);
+  assert.match(nutrition, /resolveConsultantClientAccess\(account\.accountId, publicClientId\)/);
+  assert.match(nutrition, /_options: \{ allowSeniorAuthority\?: boolean \} = \{\},[\s\S]+resolveConsultantNutritionClientAccess\(publicClientId, account\)/);
+  assert.match(commonFood, /new CommonFoodApiError\(access\.reason,403\)/);
+});
+
 test('mobile consent decisions identify the exact assignment and expose grant and revoke controls', () => {
   const service = read('src/services/consultantConsentService.ts');
   const screen = read('src/screens/profile/PrivacyConsentScreen.tsx');

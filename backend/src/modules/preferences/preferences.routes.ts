@@ -21,4 +21,4 @@ preferencesRouter.put('/consultant-access',async(req,res)=>{
   const consent=await setConsultantAccessDecision({clientUserId:account.user.id,internalClientId:account.client.id,assignmentId:parsed.data.assignmentId,status:parsed.data.status,source:'PROFILE',policyVersion:parsed.data.policyVersion});
   return consent?res.json({consent}):res.status(404).json({error:'CONSULTANT_ASSIGNMENT_NOT_FOUND'});
 });
-export const requireGrantedConsultantAccess=async(req:any,res:any,next:any)=>{try{const account=getAuthenticatedAccount(req);const result=await resolveConsultantClientAccess(account.user.id,String(req.params.clientId));return result.authorized?next():res.status(403).json({error:'CONSULTANT_ACCESS_CONSENT_REQUIRED'});}catch(error){next(error);}};
+export const requireGrantedConsultantAccess=async(req:any,res:any,next:any)=>{try{const account=getAuthenticatedAccount(req);const result=await resolveConsultantClientAccess(account.user.id,String(req.params.clientId));return result.authorized?next():res.status(403).json({error:result.reason});}catch(error){next(error);}};
