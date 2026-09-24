@@ -77,6 +77,7 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     assert.equal(consentDenied.response.status, 403, JSON.stringify(consentDenied.body));
     assert.equal(consentDenied.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
     const grantedConsent = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+      assignmentId: assignment.body.assignment.id,
       status: 'GRANTED',
       policyVersion: 'CONSULTANT_ACCESS_V1',
     }, { headers: authHeaders(client.token) });
@@ -88,6 +89,7 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
 
     const assertRevokedGuardOrder = async () => {
       const revokedConsent = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+        assignmentId: assignment.body.assignment.id,
         status: 'REVOKED',
         policyVersion: 'CONSULTANT_ACCESS_V1',
       }, { headers: authHeaders(client.token) });

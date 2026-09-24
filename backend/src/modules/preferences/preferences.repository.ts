@@ -30,24 +30,3 @@ export const updateNotificationPreferences = async (userId: string, expectedVers
   );
   return result.rows[0] ? map(result.rows[0]) : null;
 };
-
-export type ConsultantConsentStatus = 'GRANTED'|'REVOKED'|'PENDING'|'NOT_REQUESTED';
-const mapConsent = (row: any) => ({status: row?.status ?? 'NOT_REQUESTED', policyVersion: row?.policy_version ?? 'CONSULTANT_ACCESS_V1', source: row?.source ?? 'PROFILE', grantedAt: row?.granted_at?.toISOString?.() ?? null, revokedAt: row?.revoked_at?.toISOString?.() ?? null, version: Number(row?.version ?? 0), updatedAt: row?.updated_at?.toISOString?.() ?? null});
-export const getConsultantConsent = async (userId: string) => mapConsent((await pool.query('select * from consultant_access_consents where user_id=$1',[userId])).rows[0]);
-export const setConsultantConsent = async (userId:string,clientId:string,status:ConsultantConsentStatus,source:string,policyVersion:string) => {
-  const result=await pool.query(`insert into consultant_access_consents(user_id,client_id,status,policy_version,source,granted_at,revoked_at)
-    values($1,$2,$3,$4,$5,case when $3='GRANTED' then now() end,case when $3='REVOKED' then now() end)
-    on conflict(user_id) do update set status=excluded.status,policy_version=excluded.policy_version,source=excluded.source,
-    granted_at=case when excluded.status='GRANTED' then now() else consultant_access_consents.granted_at end,
-    revoked_at=case when excluded.status='REVOKED' then now() else consultant_access_consents.revoked_at end,
-    version=consultant_access_consents.version+1,updated_at=now() returning *`,[userId,clientId,status,policyVersion,source]);
-  return mapConsent(result.rows[0]);
-};
-export const isConsultantConsentGranted = async(clientId:string) => Boolean((await pool.query(
-  `select 1
-     from consultant_access_consents consent
-     join fiteatsy_clients client on client.id = consent.client_id
-    where (client.id = $1 or client.fiteatsy_client_id = $1)
-      and consent.status = 'GRANTED'`,
-  [clientId]
-)).rowCount);

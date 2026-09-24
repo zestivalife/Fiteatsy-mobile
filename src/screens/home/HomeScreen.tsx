@@ -7,6 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
 import { AppBackground } from '../../components/AppBackground';
+import { ConsultantAccessPrompt } from '../../components/ConsultantAccessPrompt';
 import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
 import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
@@ -322,6 +323,7 @@ export const HomeScreen = () => {
 
   return (
     <AppBackground>
+      <ConsultantAccessPrompt enabled={hasAuthSession} />
       <SafeAreaView style={styles.safe}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.referenceFrame}>

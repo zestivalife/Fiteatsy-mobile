@@ -198,6 +198,18 @@ test('consultant roster and protected client access share assignment and consent
   });
   assert.notEqual(assignment, null);
 
+  const pendingRequests = await getJson(server.baseUrl, '/v1/preferences/consultant-access', {
+    headers: authHeaders(client.token)
+  });
+  assert.equal(pendingRequests.response.status, 200);
+  assert.equal(pendingRequests.body.requests.length, 1);
+  assert.equal(pendingRequests.body.requests[0].assignmentId, assignment!.id);
+  assert.equal(pendingRequests.body.requests[0].consultantUserId, consultant.current.body.accountId);
+  assert.equal(pendingRequests.body.requests[0].status, 'NOT_REQUESTED');
+  assert.equal(pendingRequests.body.requests[0].policyVersion, 'CONSULTANT_ACCESS_V1');
+  assert.ok(pendingRequests.body.requests[0].consultantName);
+  assert.ok(Array.isArray(pendingRequests.body.requests[0].dataCategories));
+
   const beforeConsent = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(consultant.token)
   });
@@ -213,6 +225,7 @@ test('consultant roster and protected client access share assignment and consent
   assert.equal(consentDenied.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
 
   const granted = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+    assignmentId: assignment!.id,
     status: 'GRANTED',
     policyVersion: 'CONSULTANT_ACCESS_V1'
   }, { headers: authHeaders(client.token) });
@@ -258,6 +271,7 @@ test('consultant roster and protected client access share assignment and consent
   assert.equal(unrelatedDetail.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 
   const revoked = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+    assignmentId: assignment!.id,
     status: 'REVOKED',
     policyVersion: 'CONSULTANT_ACCESS_V1'
   }, { headers: authHeaders(client.token) });
@@ -276,6 +290,14 @@ test('consultant roster and protected client access share assignment and consent
   );
   assert.equal(revokedDetail.response.status, 403);
   assert.equal(revokedDetail.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
+
+  const invalidRelationshipDecision = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
+    assignmentId: '00000000-0000-4000-8000-000000000000',
+    status: 'GRANTED',
+    policyVersion: 'CONSULTANT_ACCESS_V1'
+  }, { headers: authHeaders(client.token) });
+  assert.equal(invalidRelationshipDecision.response.status, 404);
+  assert.equal(invalidRelationshipDecision.body.error, 'CONSULTANT_ASSIGNMENT_NOT_FOUND');
 });
 
 test('consultant client discovery projects the canonical effective subscription plan', async () => {
@@ -397,9 +419,9 @@ test('consultant discovery backfills missing client records for registered users
   assert.ok(assignment);
   await pool.query(
     `insert into consultant_access_consents (
-       user_id, client_id, status, policy_version, source, granted_at
-     ) values ($1, $2, 'GRANTED', 'CONSULTANT_ACCESS_V1', 'TEST_FIXTURE', now())`,
-    [accountId, canonicalClientId]
+       user_id, client_id, assignment_id, consultant_user_id, product, status, policy_version, source, granted_at
+     ) values ($1, $2, $3, $4, 'FITEATSY', 'GRANTED', 'CONSULTANT_ACCESS_V1', 'TEST_FIXTURE', now())`,
+    [accountId, canonicalClientId, assignment!.id, consultant.current.body.accountId]
   );
 
   const first = await getJson(server.baseUrl, '/v1/consultants/clients', discoveryOptions);

@@ -4,6 +4,7 @@ import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/au
 import { assignRoleAsAdmin, getAdminStatus } from './admin.service.js';
 import { assignQaClient, deactivateQa, getQaAssignmentsForAdmin, getQaIdentityForAdmin, issueQaSession, provisionQa, resetQaClientOnboarding, revokeQaClientAssignment } from './qa-provisioning.service.js';
 import { addAdminCommonFoodAlias, addAdminCommonFoodServing, bulkSetFoodAuthorisation, CommonFoodAdminError, inspectAdminCommonFood, listAdminCommonFoodAudit, listAdminCommonFoods, listFoodAuthorisation, removeAdminCommonFoodAlias, setAdminCommonFoodMeal, setAdminCommonFoodRole, setAdminCommonFoodServingState, setAdminCommonFoodState } from './common-food-admin.service.js';
+import { getConsultantAccessReconciliation } from '../consultant-access/consultant-access.repository.js';
 
 export const adminRouter = Router();
 
@@ -59,6 +60,12 @@ adminRouter.get('/status', async (req, res) => {
     activeAdmins: result.activeAdmins,
     bootstrapAuditRecorded: result.bootstrapAuditRecorded
   });
+});
+
+adminRouter.get('/consultant-access/reconciliation', async (req, res) => {
+  const admin = await getAdminStatus(getAuthenticatedAccount(req));
+  if (!admin.ok) return res.status(admin.status).json({ error: admin.error, message: admin.message });
+  return res.status(200).json({ reconciliation: await getConsultantAccessReconciliation() });
 });
 
 

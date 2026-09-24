@@ -265,7 +265,7 @@ test('consultant can access client list after admin role assignment', async () =
   const grantedConsent = await putJson(
     server.baseUrl,
     '/v1/preferences/consultant-access',
-    { status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
+    { assignmentId: clientAssignment!.id, status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
     { headers: authHeaders(client.token) }
   );
   assert.equal(grantedConsent.response.status, 200);
@@ -334,7 +334,7 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
   const grantedConsent = await putJson(
     server.baseUrl,
     '/v1/preferences/consultant-access',
-    { status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
+    { assignmentId: assignment!.id, status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
     { headers: authHeaders(mobileClient.token) }
   );
   assert.equal(grantedConsent.response.status, 200);
@@ -487,7 +487,7 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
       const grantedConsent = await putJson(
         server.baseUrl,
         '/v1/preferences/consultant-access',
-        { status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
+        { assignmentId: assignment!.id, status: 'GRANTED', policyVersion: 'CONSULTANT_ACCESS_V1' },
         { headers: authHeaders(session.token) }
       );
       assert.equal(grantedConsent.response.status, 200);

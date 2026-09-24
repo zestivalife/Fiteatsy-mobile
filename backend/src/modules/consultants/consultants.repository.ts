@@ -7,6 +7,7 @@ import {
   type BiomarkerClinicalStatus,
   type BiomarkerComparisonStatus
 } from '../biomarkers/biomarker-clinical-semantics.js';
+import { consultantAccessSqlPredicate } from '../consultant-access/consultant-access.repository.js';
 
 type ConsultantOnboardingProjection = {
   age?: number | null;
@@ -626,17 +627,10 @@ export const listRegisteredConsultantClients = async (
         and (
           exists (
             select 1 from consultant_client_assignments cap003
+            join consultant_access_consents consent on ${consultantAccessSqlPredicate('cap003', 'consent')}
             where cap003.client_user_id = u.id
               and cap003.consultant_user_id = $6
-              and cap003.product = 'FITEATSY'
               and cap003.professional_type = $7
-              and cap003.status = 'active'
-          )
-          and exists (
-            select 1 from consultant_access_consents consent
-            where consent.client_id = c.id
-              and consent.user_id = u.id
-              and consent.status = 'GRANTED'
           )
         )
       `
@@ -716,11 +710,10 @@ export const listAssignedConsultantClientContexts = async (
       where ${consultantVisibleUserPredicate}
         and exists (
           select 1 from consultant_client_assignments cap003
+          join consultant_access_consents consent on ${consultantAccessSqlPredicate('cap003', 'consent')}
           where cap003.client_user_id = u.id
             and cap003.consultant_user_id = $${AUTHENTICATED_USER_EXCLUSION_ROLES.length + 1}
-            and cap003.product = 'FITEATSY'
             and cap003.professional_type = 'CONSULTANT'
-            and cap003.status = 'active'
         )
       order by u.name asc, u.created_at desc
     `,
@@ -752,13 +745,13 @@ export const getRegisteredConsultantClientAccessContext = async (
 ): Promise<{ accountId: string; internalClientId: string } | null> => {
   const values: unknown[] = [publicClientId, ...AUTHENTICATED_USER_EXCLUSION_ROLES];
   const assignment = consultantAccountId
-    ? `and exists (
+      ? `and exists (
         select 1 from consultant_client_assignments assignment
+        join consultant_access_consents consent on ${consultantAccessSqlPredicate('assignment', 'consent')}
         where assignment.client_user_id = u.id
           and assignment.consultant_user_id = $${values.push(consultantAccountId)}
           and assignment.product = 'FITEATSY'
           and assignment.professional_type = $${values.push(professionalType)}
-          and assignment.status = 'active'
       )`
     : '';
   const exclusionPlaceholders = AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 2}`).join(', ');
@@ -799,11 +792,11 @@ export const getRegisteredConsultantClientProfileContext = async (
         and (
           exists (
             select 1 from consultant_client_assignments cap003
+            join consultant_access_consents consent on ${consultantAccessSqlPredicate('cap003', 'consent')}
             where cap003.client_user_id = u.id
               and cap003.consultant_user_id = $7
               and cap003.product = 'FITEATSY'
               and cap003.professional_type = $8
-              and cap003.status = 'active'
           )
         )
       `

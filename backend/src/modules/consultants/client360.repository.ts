@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { consultantAccessSqlPredicate } from '../consultant-access/consultant-access.repository.js';
 import { pool } from '../../db/pool.js';
 
 export const CLIENT_OPERATION_TYPES = ['CONSULTATION', 'TASK', 'FOLLOW_UP', 'GOAL', 'NOTE'] as const;
@@ -65,8 +66,7 @@ export const listConsultantOperations = async (consultantId: string, type?: Clie
         and assignment.status = 'active'
         and (assignment.ends_at is null or assignment.ends_at > now())
        join consultant_access_consents consent
-         on consent.client_id = client.id
-        and consent.status = 'GRANTED'
+         on ${consultantAccessSqlPredicate('assignment', 'consent')}
       where operation.deleted_at is null
         and client.deleted_at is null
         and lower(coalesce(client.status, '')) = 'active'
