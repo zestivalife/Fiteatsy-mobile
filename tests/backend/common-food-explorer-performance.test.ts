@@ -14,11 +14,13 @@ const projectionMigration = readFileSync(new URL('../../backend/src/db/migration
 const projectionIdentityMigration = readFileSync(new URL('../../backend/src/db/migrations/0070_food_explorer_projection_source_identity.sql', import.meta.url), 'utf8');
 
 test('Food Explorer reads a prepared projection without caching the authorization boundary', () => {
-  const authorization = source.indexOf('canAccessConsultantNutritionClient(input.clientId,input.account');
-  const contextResolution = source.indexOf('resolveClientMealGenerationContext({account,clientId,mealHead:q.mealHead})');
+  const authorization = source.indexOf('resolveConsultantNutritionClientAccess(input.clientId,input.account)');
+  const authorizationGuard = source.indexOf('if(!access.authorized)throw new CommonFoodApiError(access.reason,403)');
 
-  assert.ok(authorization >= 0, 'the assignment authorization check must remain present');
-  assert.ok(contextResolution > authorization, 'Explorer must use the resolver with mandatory authorization');
+  assert.ok(authorization >= 0, 'Explorer must delegate to the shared consultant nutrition access resolver');
+  assert.ok(authorizationGuard > authorization, 'Explorer must reject the shared resolver denial before using client context');
+  assert.match(nutritionService, /const access = await resolveConsultantClientAccess\(account\.accountId, publicClientId\)/);
+  assert.match(nutritionService, /if \(!access\.authorized\) return access/);
   assert.doesNotMatch(source, /explorerContextCache/);
   assert.match(source, /searchFoodExplorerProjection/);
   assert.doesNotMatch(source, /cachedExplorerSupportData/);
@@ -64,7 +66,8 @@ test('recommended eligibility joins catalogue IDs through source identity rather
 test('Food Explorer cold context avoids the full Nutrition workspace projection', () => {
   assert.match(source, /getCurrentDietPlanForClient\(registered\.internalClientId,registered\.accountId\)/);
   assert.match(source, /getFoodPreferenceProfile\(input\.clientId,registered\.internalClientId\)/);
-  assert.match(source, /const \[canAccess,registered\]=await Promise\.all/);
+  assert.match(source, /const \[access,registered\]=await Promise\.all/);
+  assert.match(source, /resolveConsultantNutritionClientAccess\(input\.clientId,input\.account\)/);
   assert.match(source, /const \[prefs,latest,biomarkers\]=await Promise\.all/);
   assert.match(nutritionService, /const context = await getRegisteredConsultantClientAccessContext\(/);
   assert.match(nutritionStore, /select row_to_json\(dp\) as plan, row_to_json\(dpv\) as version/);

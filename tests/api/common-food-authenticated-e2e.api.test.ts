@@ -45,6 +45,14 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
       reason: 'Authenticated common-food source acceptance',
     }, { headers: authHeaders(admin.token) });
     assert.equal(assignment.response.status, 201, JSON.stringify(assignment.body));
+    const canonicalAssignment = await pool.query(
+      `update consultant_client_assignments
+          set product = 'FITEATSY', professional_type = 'CONSULTANT', relationship_type = 'CLIENT_CARE'
+        where id = $1 and status = 'active'
+        returning id`,
+      [assignment.body.assignment.id],
+    );
+    assert.equal(canonicalAssignment.rowCount, 1, 'the consent-gate fixture requires an active canonical Fiteatsy consultant assignment');
 
     const health = await patchJson(server.baseUrl, '/v1/platform/health-profile', {
       dateOfBirthISO: '1990-01-01T00:00:00.000Z', gender: 'Female', heightCm: 165,
