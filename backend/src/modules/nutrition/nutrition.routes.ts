@@ -29,6 +29,7 @@ import {
   updateConsultantDietPlanDraft,
   exportConsultantDietPlanDocument,
   logNutritionMealConsumption,
+  resolveConsultantNutritionClientAccess,
 } from './nutrition.service.js';
 import { getFoodPreferenceProfile, listVerifiedFoodCatalogue, updateFoodPreferenceProfile } from './food-preferences.service.js';
 import { COMPONENT_ROLES, MEAL_HEADS } from './common-food-engine.js';
@@ -348,10 +349,13 @@ export const requireConsultantClientAssignment = async (req: Request, res: Respo
     });
   }
   try {
-    if (!await canAccessConsultantNutritionClient(String(req.params.clientId), account, { allowSeniorAuthority: true })) {
+    const access = await resolveConsultantNutritionClientAccess(String(req.params.clientId), account);
+    if (!access.authorized) {
       return res.status(403).json({
-        error: 'CLIENT_ASSIGNMENT_REQUIRED',
-        message: 'An active client assignment is required to access this client.',
+        error: access.reason,
+        message: access.reason === 'CONSULTANT_ACCESS_CONSENT_REQUIRED'
+          ? 'Client consent is required to access this client.'
+          : 'An active client assignment is required to access this client.',
       });
     }
     return next();

@@ -37,6 +37,7 @@ test('roster, client workspace, and client context reuse the canonical access pr
 test('nutrition access preserves assignment-first denial semantics without senior-consultant bypass', () => {
   const repository = read('backend/src/modules/consultant-access/consultant-access.repository.ts');
   const nutrition = read('backend/src/modules/nutrition/nutrition.service.ts');
+  const routes = read('backend/src/modules/nutrition/nutrition.routes.ts');
   const commonFood = read('backend/src/modules/nutrition/common-food-consultant.service.ts');
 
   assert.match(repository, /reason: 'CLIENT_ASSIGNMENT_REQUIRED'/);
@@ -44,6 +45,9 @@ test('nutrition access preserves assignment-first denial semantics without senio
   assert.match(repository, /left join consultant_access_consents consent/);
   assert.match(nutrition, /resolveConsultantClientAccess\(account\.accountId, publicClientId\)/);
   assert.match(nutrition, /_options: \{ allowSeniorAuthority\?: boolean \} = \{\},[\s\S]+resolveConsultantNutritionClientAccess\(publicClientId, account\)/);
+  assert.match(routes, /const access = await resolveConsultantNutritionClientAccess\(String\(req\.params\.clientId\), account\)/);
+  assert.match(routes, /error: access\.reason/);
+  assert.doesNotMatch(routes, /if \(!await canAccessConsultantNutritionClient\(String\(req\.params\.clientId\), account,[\s\S]+error: 'CLIENT_ASSIGNMENT_REQUIRED'/);
   assert.match(commonFood, /new CommonFoodApiError\(access\.reason,403\)/);
 });
 
