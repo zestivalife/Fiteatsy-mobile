@@ -105,10 +105,9 @@ test('GET /v1/consultants/clients allows historical uppercase consultant role ca
 });
 
 test('registered Fiteatsy users appear in consultant client discovery without dummy data', async () => {
-  const email = `real-client-${Date.now()}@example.com`;
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Real Client',
-    email,
+    email: `real-client-${Date.now()}@example.com`,
     mobileNumber: '+919900001234'
   });
   const consultant = await createConsultantSession();
@@ -120,31 +119,25 @@ test('registered Fiteatsy users appear in consultant client discovery without du
 
   assert.equal(response.response.status, 200);
   assert.equal(response.body.clients.length, 1);
+  assert.equal(response.body.pagination.total, 1);
   assert.equal(response.body.clients[0].name, 'Real Client');
   assert.equal(response.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
-  assert.equal(response.body.clients[0].email, email);
-  assert.equal(response.body.clients[0].mobile, '919900001234');
-  assert.equal(response.body.clients[0].mobileNumberMasked, '********1234');
   assert.equal(response.body.clients[0].status, 'active');
   assert.equal(response.body.clients[0].accountStatus, 'active');
-  assert.equal(response.body.clients[0].profileCompleted, false);
-  assert.equal(response.body.clients[0].reportsCount, 0);
-  assert.equal(response.body.clients[0].biomarkerStatus, null);
-  assert.equal(response.body.clients[0].subscriptionStatus, null);
-  assert.equal(response.body.clients[0].subscriptionPlanName, null);
-  assert.equal(response.body.clients[0].subscriptionActive, false);
-  const canonicalHealthProfile = await pool.query(
-    'select updated_at from health_profiles where user_id = $1 and client_id = $2',
-    [client.current.body.accountId, await getClientDatabaseId(client)]
-  );
-  assert.equal(canonicalHealthProfile.rows.length, 1);
-  const lastHealthUpdate = String(response.body.clients[0].lastHealthUpdate);
-  assert.equal(Number.isFinite(Date.parse(lastHealthUpdate)), true);
-  const canonicalHealthUpdatedAt = new Date(canonicalHealthProfile.rows[0].updated_at);
-  canonicalHealthUpdatedAt.setUTCMilliseconds(0);
-  assert.equal(new Date(lastHealthUpdate).toISOString(), canonicalHealthUpdatedAt.toISOString());
   assert.equal(typeof response.body.clients[0].registeredAt, 'string');
-  assert.equal(typeof response.body.clients[0].lastActiveAt, 'string');
+  assert.equal(response.body.clients[0].consentStatus, 'GRANTED');
+  assert.equal(response.body.clients[0].assignment.status, 'active');
+  assert.deepEqual(Object.keys(response.body.clients[0]).sort(), [
+    'accountStatus', 'assignment', 'clientId', 'consentStatus', 'name',
+    'registeredAt', 'registrationDate', 'status'
+  ].sort());
+  for (const protectedField of [
+    'email', 'mobile', 'mobileNumberMasked', 'healthProfile', 'onboarding',
+    'reportsCount', 'biomarkerStatus', 'subscriptionStatus', 'subscriptionPlanName',
+    'subscriptionActive', 'lastHealthUpdate', 'lastActiveAt'
+  ]) {
+    assert.equal(protectedField in response.body.clients[0], false);
+  }
 });
 
 test('consultant client discovery is assignment-scoped and independent of subscription', async () => {
@@ -169,15 +162,73 @@ test('consultant client discovery is assignment-scoped and independent of subscr
   assert.equal(assigned.response.status, 200);
   assert.equal(assigned.body.clients.length, 1);
   assert.equal(assigned.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
-  assert.equal(assigned.body.clients[0].subscriptionStatus, null);
-  assert.equal(assigned.body.clients[0].subscriptionPlanName, null);
-  assert.equal(assigned.body.clients[0].subscriptionActive, false);
+  assert.equal(assigned.body.clients[0].consentStatus, 'GRANTED');
+  assert.equal('subscriptionStatus' in assigned.body.clients[0], false);
+  assert.equal('subscriptionPlanName' in assigned.body.clients[0], false);
+  assert.equal('subscriptionActive' in assigned.body.clients[0], false);
 
   const unrelated = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(unrelatedConsultant.token)
   });
   assert.equal(unrelated.response.status, 200);
   assert.deepEqual(unrelated.body.clients, []);
+});
+
+test('consultant client discovery excludes inactive and expired assignments', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Inactive Assignment Client',
+    email: `inactive-assignment-${Date.now()}@example.com`
+  });
+  const consultant = await createConsultantSession();
+  await assignClientToConsultant(client, consultant);
+
+  const active = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(active.response.status, 200);
+  assert.equal(active.body.clients.length, 1);
+
+  await pool.query(
+    `update consultant_client_assignments
+     set status = 'inactive', updated_at = now()
+     where consultant_user_id = $1 and client_user_id = $2`,
+    [consultant.current.body.accountId, client.current.body.accountId]
+  );
+  const inactive = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(inactive.response.status, 200);
+  assert.deepEqual(inactive.body.clients, []);
+
+  await pool.query(
+    `update consultant_client_assignments
+     set status = 'active', ends_at = now() - interval '1 minute', updated_at = now()
+     where consultant_user_id = $1 and client_user_id = $2`,
+    [consultant.current.body.accountId, client.current.body.accountId]
+  );
+  const expired = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(expired.response.status, 200);
+  assert.deepEqual(expired.body.clients, []);
+});
+
+test('senior consultant roster uses the same assignment-scoped projection', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Senior Assigned Client',
+    email: `senior-assigned-${Date.now()}@example.com`
+  });
+  const senior = await createSeniorConsultantSession();
+  await assignClientToConsultant(client, senior);
+
+  const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(senior.token)
+  });
+  assert.equal(response.response.status, 200);
+  assert.equal(response.body.clients.length, 1);
+  assert.equal(response.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+  assert.equal(response.body.clients[0].assignment.professionalType, 'CONSULTANT');
+  assert.equal(response.body.clients[0].consentStatus, 'GRANTED');
 });
 
 test('consultant roster and protected client access share assignment and consent authority', async () => {
@@ -210,11 +261,24 @@ test('consultant roster and protected client access share assignment and consent
   assert.ok(pendingRequests.body.requests[0].consultantName);
   assert.ok(Array.isArray(pendingRequests.body.requests[0].dataCategories));
 
+  const consentRowsBeforeRoster = await pool.query(
+    'select count(*)::int as total from consultant_access_consents where assignment_id = $1',
+    [assignment!.id]
+  );
+  assert.equal(consentRowsBeforeRoster.rows[0].total, 0);
+
   const beforeConsent = await getJson(server.baseUrl, '/v1/consultants/clients', {
     headers: authHeaders(consultant.token)
   });
   assert.equal(beforeConsent.response.status, 200);
-  assert.deepEqual(beforeConsent.body.clients, []);
+  assert.equal(beforeConsent.body.clients.length, 1);
+  assert.equal(beforeConsent.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+  assert.equal(beforeConsent.body.clients[0].consentStatus, 'HEALTH_ACCESS_REQUIRED');
+  const consentRowsAfterRoster = await pool.query(
+    'select count(*)::int as total from consultant_access_consents where assignment_id = $1',
+    [assignment!.id]
+  );
+  assert.equal(consentRowsAfterRoster.rows[0].total, 0);
 
   const consentDenied = await getJson(
     server.baseUrl,
@@ -237,6 +301,7 @@ test('consultant roster and protected client access share assignment and consent
   assert.equal(visible.response.status, 200);
   assert.equal(visible.body.clients.length, 1);
   assert.equal(visible.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+  assert.equal(visible.body.clients[0].consentStatus, 'GRANTED');
 
   const detail = await getJson(
     server.baseUrl,
@@ -281,7 +346,9 @@ test('consultant roster and protected client access share assignment and consent
     headers: authHeaders(consultant.token)
   });
   assert.equal(afterRevocation.response.status, 200);
-  assert.deepEqual(afterRevocation.body.clients, []);
+  assert.equal(afterRevocation.body.clients.length, 1);
+  assert.equal(afterRevocation.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+  assert.equal(afterRevocation.body.clients[0].consentStatus, 'REVOKED');
 
   const revokedDetail = await getJson(
     server.baseUrl,
@@ -290,6 +357,19 @@ test('consultant roster and protected client access share assignment and consent
   );
   assert.equal(revokedDetail.response.status, 403);
   assert.equal(revokedDetail.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
+
+  await pool.query(
+    `update consultant_access_consents
+     set policy_version = 'CONSULTANT_ACCESS_V0', updated_at = now()
+     where assignment_id = $1`,
+    [assignment!.id]
+  );
+  const expiredConsent = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+  assert.equal(expiredConsent.response.status, 200);
+  assert.equal(expiredConsent.body.clients.length, 1);
+  assert.equal(expiredConsent.body.clients[0].consentStatus, 'EXPIRED');
 
   const invalidRelationshipDecision = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
     assignmentId: '00000000-0000-4000-8000-000000000000',
@@ -300,7 +380,7 @@ test('consultant roster and protected client access share assignment and consent
   assert.equal(invalidRelationshipDecision.body.error, 'CONSULTANT_ASSIGNMENT_NOT_FOUND');
 });
 
-test('consultant client discovery projects the canonical effective subscription plan', async () => {
+test('consultant client discovery never exposes an active subscription', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Subscribed Assigned Client',
     email: `subscribed-assigned-${Date.now()}@example.com`
@@ -329,12 +409,12 @@ test('consultant client discovery projects the canonical effective subscription 
 
   assert.equal(response.response.status, 200);
   assert.equal(response.body.clients.length, 1);
-  assert.equal(response.body.clients[0].subscriptionStatus, 'ACTIVE');
-  assert.equal(response.body.clients[0].subscriptionPlanName, 'Clinical Transformation');
-  assert.equal(response.body.clients[0].subscriptionActive, true);
+  assert.equal('subscriptionStatus' in response.body.clients[0], false);
+  assert.equal('subscriptionPlanName' in response.body.clients[0], false);
+  assert.equal('subscriptionActive' in response.body.clients[0], false);
 });
 
-test('consultant client discovery does not present an expired subscription as active', async () => {
+test('consultant client discovery never exposes an expired subscription', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Expired Subscription Client',
     email: `expired-subscription-${Date.now()}@example.com`
@@ -363,9 +443,9 @@ test('consultant client discovery does not present an expired subscription as ac
 
   assert.equal(response.response.status, 200);
   assert.equal(response.body.clients.length, 1);
-  assert.equal(response.body.clients[0].subscriptionStatus, null);
-  assert.equal(response.body.clients[0].subscriptionPlanName, null);
-  assert.equal(response.body.clients[0].subscriptionActive, false);
+  assert.equal('subscriptionStatus' in response.body.clients[0], false);
+  assert.equal('subscriptionPlanName' in response.body.clients[0], false);
+  assert.equal('subscriptionActive' in response.body.clients[0], false);
 });
 
 test('consultant discovery backfills missing client records for registered users', async () => {
@@ -553,24 +633,14 @@ test('consultant client profile returns real onboarding fields only', async () =
     headers: authHeaders(consultant.token)
   });
   assert.equal(list.response.status, 200);
-  assert.equal(list.body.clients[0].profileCompleted, true);
-  assert.equal(list.body.clients[0].age, ageFromDob('1991-06-14T00:00:00.000Z'));
-  assert.equal(list.body.clients[0].gender, 'Female');
-  assert.equal(list.body.clients[0].height, 162);
-  assert.equal(list.body.clients[0].weight, 61);
-  assert.equal(list.body.clients[0].goal, 'Improve energy');
-  assert.equal(list.body.clients[0].activityLevel, 'Moderate');
-  assert.equal(list.body.clients[0].dietPreference, 'Vegetarian');
-  assert.deepEqual(list.body.clients[0].medicalConditions, ['Vitamin D deficiency']);
-  assert.equal(list.body.clients[0].onboarding.height, 162);
-  assert.equal(list.body.clients[0].onboarding.weight, 61);
-  assert.equal(list.body.clients[0].onboarding.goal, 'Improve energy');
-  assert.equal(list.body.clients[0].onboarding.activityLevel, 'Moderate');
-  assert.equal(list.body.clients[0].onboarding.dietPreference, 'Vegetarian');
-  assert.deepEqual(list.body.clients[0].onboarding.medicalConditions, ['Vitamin D deficiency']);
-  assert.equal(list.body.clients[0].healthProfile.reportsCount, 0);
-  assert.equal(list.body.clients[0].healthProfile.profileCompleted, true);
-  assert.equal(list.body.clients[0].reportsCount, 0);
+  assert.equal(list.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
+  assert.equal(list.body.clients[0].consentStatus, 'GRANTED');
+  for (const protectedField of [
+    'profileCompleted', 'age', 'gender', 'height', 'weight', 'goal', 'activityLevel',
+    'dietPreference', 'medicalConditions', 'onboarding', 'healthProfile', 'reportsCount'
+  ]) {
+    assert.equal(protectedField in list.body.clients[0], false);
+  }
 
   const profile = await getJson(
     server.baseUrl,

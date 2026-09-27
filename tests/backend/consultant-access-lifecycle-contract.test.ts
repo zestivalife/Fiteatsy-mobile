@@ -26,10 +26,14 @@ test('migration preserves legacy rows without converting them into relationship 
   assert.doesNotMatch(migration, /update\s+consultant_access_consents[\s\S]+status\s*=\s*'GRANTED'/i);
 });
 
-test('roster, client workspace, and client context reuse the canonical access predicate', () => {
+test('safe roster is assignment-gated while protected client context remains consent-gated', () => {
   const roster = read('backend/src/modules/consultants/consultants.repository.ts');
   const client360 = read('backend/src/modules/consultants/client360.repository.ts');
 
+  assert.match(roster, /from consultant_client_assignments assignment/);
+  assert.match(roster, /assignment\.status = 'active'/);
+  assert.match(roster, /HEALTH_ACCESS_REQUIRED/);
+  assert.match(roster, /const protectedClientSelect/);
   assert.match(roster, /consultantAccessSqlPredicate/);
   assert.match(client360, /consultantAccessSqlPredicate/);
 });

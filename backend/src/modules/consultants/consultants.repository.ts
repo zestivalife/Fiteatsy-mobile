@@ -7,7 +7,11 @@ import {
   type BiomarkerClinicalStatus,
   type BiomarkerComparisonStatus
 } from '../biomarkers/biomarker-clinical-semantics.js';
-import { consultantAccessSqlPredicate } from '../consultant-access/consultant-access.repository.js';
+import {
+  CONSULTANT_ACCESS_POLICY_VERSION,
+  CONSULTANT_ACCESS_PRODUCT,
+  consultantAccessSqlPredicate
+} from '../consultant-access/consultant-access.repository.js';
 
 type ConsultantOnboardingProjection = {
   age?: number | null;
@@ -55,39 +59,19 @@ type ConsultantOnboardingProjection = {
 export type ConsultantClientListRecord = {
   clientId: string;
   name: string;
-  email: string | null;
-  mobile: string | null;
-  mobileNumberMasked: string | null;
   registeredAt: string;
   registrationDate: string;
   status: string;
   accountStatus: string;
-  age: number | null;
-  gender: string | null;
-  height: number | null;
-  weight: number | null;
-  goal: string | null;
-  activityLevel: string | null;
-  dietPreference: string | null;
-  medicalConditions: string[] | null;
-  biomarkerStatus: string | null;
-  reportsCount: number;
-  lastHealthUpdate: string | null;
-  profileCompleted: boolean;
-  lastActiveAt: string | null;
-  subscriptionStatus: string | null;
-  subscriptionPlanName: string | null;
-  subscriptionActive: boolean;
-  onboarding: ConsultantOnboardingProjection & {
-    age: number | null;
-    gender: string | null;
+  assignment: {
+    id: string;
+    professionalType: string;
+    relationshipType: string;
+    status: 'active';
+    startsAt: string | null;
+    endsAt: string | null;
   };
-  healthProfile: {
-    biomarkerStatus: string | null;
-    reportsCount: number;
-    lastHealthUpdate: string | null;
-    profileCompleted: boolean;
-  };
+  consentStatus: 'GRANTED' | 'HEALTH_ACCESS_REQUIRED' | 'REVOKED' | 'EXPIRED';
 };
 
 export type ConsultantClientProfileRecord = {
@@ -344,7 +328,7 @@ const consultantVisibleUserPredicate = `
   )
 `;
 
-const listClientSelect = `
+const protectedClientSelect = `
   select
     c.id as internal_client_id,
     c.fiteatsy_client_id,
@@ -464,43 +448,22 @@ const listClientSelect = `
     and lower(coalesce(c.status, '')) = 'active'
 `;
 
-const mapListRecord = (row: Record<string, unknown>): ConsultantClientListRecord => ({
+const mapRosterRecord = (row: Record<string, unknown>): ConsultantClientListRecord => ({
   clientId: String(row.fiteatsy_client_id),
   name: String(row.name),
-  email: row.email_normalized == null ? null : String(row.email_normalized),
-  mobile: row.mobile_number_normalized == null ? null : String(row.mobile_number_normalized),
-  mobileNumberMasked: maskMobileNumber(row.mobile_number_normalized),
   registeredAt: new Date(String(row.registered_at)).toISOString(),
   registrationDate: new Date(String(row.registered_at)).toISOString(),
   status: String(row.client_status),
   accountStatus: String(row.account_status),
-  age: toNumberOrNull(row.age),
-  gender: row.gender == null ? null : String(row.gender),
-  height: toNumberOrNull(row.height_cm),
-  weight: toNumberOrNull(row.current_weight_kg),
-  goal: firstString(row.wellness_goals),
-  activityLevel: row.activity_level == null ? null : String(row.activity_level),
-  dietPreference: row.diet_type == null ? null : String(row.diet_type),
-  medicalConditions: row.health_profile_id ? toStringArray(row.primary_conditions) : null,
-  biomarkerStatus: null,
-  reportsCount: Number(row.reports_count ?? 0),
-  lastHealthUpdate: toIso(row.last_health_update),
-  profileCompleted: profileCompleted(row),
-  lastActiveAt: toIso(row.last_active_at),
-  subscriptionStatus: row.subscription_status == null ? null : String(row.subscription_status),
-  subscriptionPlanName: row.subscription_plan_name == null ? null : String(row.subscription_plan_name),
-  subscriptionActive: row.subscription_active === true,
-  onboarding: {
-    ...mapOnboardingProjection(row),
-    age: toNumberOrNull(row.age),
-    gender: row.gender == null ? null : String(row.gender)
+  assignment: {
+    id: String(row.assignment_id),
+    professionalType: String(row.professional_type),
+    relationshipType: String(row.relationship_type),
+    status: 'active',
+    startsAt: toIso(row.starts_at),
+    endsAt: toIso(row.ends_at)
   },
-  healthProfile: {
-    biomarkerStatus: null,
-    reportsCount: Number(row.reports_count ?? 0),
-    lastHealthUpdate: toIso(row.last_health_update),
-    profileCompleted: profileCompleted(row)
-  }
+  consentStatus: String(row.consent_status) as ConsultantClientListRecord['consentStatus']
 });
 
 export const getConsultantClientSyncDiagnostics = async (): Promise<ConsultantClientSyncDiagnostics> => {
@@ -619,60 +582,79 @@ export const listRegisteredConsultantClients = async (
   const sortColumn = {
     registeredAt: 'u.created_at',
     name: 'lower(u.name)',
-    lastActiveAt: 'greatest(coalesce(u.last_login_at, session_stats.last_session_at), coalesce(session_stats.last_session_at, u.last_login_at))'
+    lastActiveAt: 'u.last_login_at'
   }[options.sort ?? 'registeredAt'];
   const order = options.order === 'asc' ? 'asc' : 'desc';
-  const assignmentClause = consultantAccountId
-      ? `
-        and (
-          exists (
-            select 1 from consultant_client_assignments cap003
-            join consultant_access_consents consent on ${consultantAccessSqlPredicate('cap003', 'consent')}
-            where cap003.client_user_id = u.id
-              and cap003.consultant_user_id = $6
-              and cap003.professional_type = $7
-          )
-        )
-      `
-    : '';
   const directoryClause = `
     and (
-      $8 = ''
-      or u.name ilike '%' || $8 || '%'
-      or coalesce(u.email_normalized, '') ilike '%' || $8 || '%'
-      or coalesce(u.mobile_number_normalized, '') ilike '%' || $8 || '%'
-      or coalesce(c.fiteatsy_client_id, '') ilike '%' || $8 || '%'
+      $3 = ''
+      or u.name ilike '%' || $3 || '%'
+      or c.fiteatsy_client_id ilike '%' || $3 || '%'
     )
     and (
-      $9 = 'all'
-      or ($9 = 'active' and lower(coalesce(u.status, '')) = 'active')
-      or ($9 = 'inactive' and lower(coalesce(u.status, '')) <> 'active')
+      $4 = 'all'
+      or ($4 = 'active' and lower(coalesce(u.status, '')) = 'active')
+      or ($4 = 'inactive' and lower(coalesce(u.status, '')) <> 'active')
     )
   `;
-  const parameters = [
-    ...AUTHENTICATED_USER_EXCLUSION_ROLES,
-    PUBLISHED_REPORT_STATUSES,
-    consultantAccountId,
-    professionalType,
-    query,
-    status
-  ];
+  const rosterSelect = `
+    select
+      c.fiteatsy_client_id,
+      c.status as client_status,
+      u.name,
+      u.status as account_status,
+      u.created_at as registered_at,
+      assignment.id as assignment_id,
+      assignment.professional_type,
+      assignment.relationship_type,
+      assignment.starts_at,
+      assignment.ends_at,
+      case
+        when current_consent.status = 'GRANTED' then 'GRANTED'
+        when current_consent.status = 'REVOKED' then 'REVOKED'
+        when current_consent.assignment_id is null and exists (
+          select 1 from consultant_access_consents historical_consent
+          where historical_consent.assignment_id = assignment.id
+            and historical_consent.policy_version <> '${CONSULTANT_ACCESS_POLICY_VERSION}'
+        ) then 'EXPIRED'
+        else 'HEALTH_ACCESS_REQUIRED'
+      end as consent_status
+    from consultant_client_assignments assignment
+    join users u on u.id = assignment.client_user_id
+    join fiteatsy_clients c
+      on c.account_user_id = u.id
+     and c.deleted_at is null
+     and lower(coalesce(c.status, '')) = 'active'
+    left join consultant_access_consents current_consent
+      on current_consent.assignment_id = assignment.id
+     and current_consent.consultant_user_id = assignment.consultant_user_id
+     and current_consent.user_id = assignment.client_user_id
+     and current_consent.product = assignment.product
+     and current_consent.policy_version = '${CONSULTANT_ACCESS_POLICY_VERSION}'
+    where assignment.consultant_user_id = $1
+      and assignment.professional_type = $2
+      and assignment.product = '${CONSULTANT_ACCESS_PRODUCT}'
+      and assignment.status = 'active'
+      and (assignment.starts_at is null or assignment.starts_at <= now())
+      and (assignment.ends_at is null or assignment.ends_at > now())
+      and u.deleted_at is null
+      ${directoryClause}
+  `;
+  const parameters = [consultantAccountId, professionalType, query, status];
   const countResult = await pool.query(
-    `select count(*)::int as total from (${listClientSelect} ${assignmentClause} ${directoryClause}) directory_clients`,
+    `select count(*)::int as total from (${rosterSelect}) directory_clients`,
     parameters
   );
   const result = await pool.query(
-    `${listClientSelect}
-      ${assignmentClause}
-      ${directoryClause}
+    `${rosterSelect}
       order by ${sortColumn} ${order} nulls last, u.id asc
-      limit $10 offset $11
+      limit $5 offset $6
     `,
     [...parameters, pageSize, offset]
   );
 
   return {
-    clients: result.rows.map((row) => mapListRecord(row)),
+    clients: result.rows.map((row) => mapRosterRecord(row)),
     total: Number(countResult.rows[0]?.total ?? 0),
     page,
     pageSize
@@ -802,7 +784,7 @@ export const getRegisteredConsultantClientProfileContext = async (
       `
     : '';
   const result = await pool.query(
-    `${listClientSelect}
+    `${protectedClientSelect}
       and c.fiteatsy_client_id = $6
       ${assignmentClause}
       order by hp.updated_at desc nulls last
