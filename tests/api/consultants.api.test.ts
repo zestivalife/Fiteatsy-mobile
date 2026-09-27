@@ -190,7 +190,7 @@ test('consultant client discovery excludes inactive and expired assignments', as
 
   await pool.query(
     `update consultant_client_assignments
-     set status = 'inactive', updated_at = now()
+     set status = 'revoked', updated_at = now()
      where consultant_user_id = $1 and client_user_id = $2`,
     [consultant.current.body.accountId, client.current.body.accountId]
   );
