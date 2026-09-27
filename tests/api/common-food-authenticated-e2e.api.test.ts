@@ -76,7 +76,22 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
 
     const visible = await getJson(server.baseUrl, '/v1/consultants/clients', { headers: authHeaders(consultant.token) });
     assert.equal(visible.response.status, 200, JSON.stringify(visible.body));
-    assert.ok(!visible.body.clients.some((item: { clientId: string }) => item.clientId === publicClientId));
+    const rosterClient = visible.body.clients.find(
+      (item: { clientId: string }) => item.clientId === publicClientId,
+    );
+    assert.ok(rosterClient, 'assigned client must remain visible in the safe roster before health consent');
+    assert.equal(rosterClient.consentStatus, 'HEALTH_ACCESS_REQUIRED');
+    assert.deepEqual(Object.keys(rosterClient).sort(), [
+      'accountStatus', 'assignment', 'clientId', 'consentStatus', 'name',
+      'registeredAt', 'registrationDate', 'status',
+    ].sort());
+    for (const protectedField of [
+      'email', 'mobile', 'mobileNumberMasked', 'healthProfile', 'onboarding',
+      'reportsCount', 'biomarkerStatus', 'subscriptionStatus', 'subscriptionPlanName',
+      'subscriptionActive', 'lastHealthUpdate', 'lastActiveAt',
+    ]) {
+      assert.equal(protectedField in rosterClient, false);
+    }
     const denied = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, { headers: authHeaders(outsider.token) });
     assert.equal(denied.response.status, 403, JSON.stringify(denied.body));
     assert.equal(denied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
