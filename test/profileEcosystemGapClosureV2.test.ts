@@ -33,19 +33,27 @@ describe('profile ecosystem gap closure v2 contracts',()=>{
     expect(service).toContain('OS_NOT_DETERMINED');
   });
 
-  test('consultant health projections fail closed unless account consent is granted',()=>{
+  test('consultant workspace is assignment-gated while historical consent remains auditable',()=>{
     const server=read('backend/src/server.ts');
     const repository=read('backend/src/modules/consultant-access/consultant-access.repository.ts');
+    const preferences=read('backend/src/modules/preferences/preferences.routes.ts');
+    const resolverStart=repository.indexOf('export const resolveConsultantClientAccess');
+    const resolverEnd=repository.indexOf('export const getConsultantAccessReconciliation');
+    const resolver=repository.slice(resolverStart,resolverEnd);
     expect(server).toContain(
-      "'/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment,requireGrantedConsultantAccess"
+      "'/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment"
     );
     expect(server).toContain(
-      "'/v1/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment,requireGrantedConsultantAccess"
+      "'/v1/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment"
     );
-    expect(repository).toContain(".status = 'GRANTED'");
-    expect(repository).toContain(".assignment_id = ");
-    expect(repository).toContain(".consultant_user_id = ");
-    expect(repository).toContain(".policy_version = '");
+    expect(server).not.toContain('requireGrantedConsultantAccess');
+    expect(repository).toContain('consultantAssignmentSqlPredicate');
+    expect(repository).toContain("${assignment}.status = 'active'");
+    expect(resolver).not.toContain("consent.status = 'GRANTED'");
+    expect(resolver).not.toContain('consultant_access_consents');
+    expect(preferences).toContain("preferencesRouter.get('/consultant-access'");
+    expect(preferences).toContain('setConsultantAccessDecision');
+    expect(preferences).not.toContain('requireGrantedConsultantAccess');
   });
 
   test('grievance history is account scoped, cached and excludes internal notes',()=>{

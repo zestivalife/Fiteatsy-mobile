@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 const read = (path: string) => fs.readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
-test('consultant access is assignment-scoped, product-scoped, policy-versioned, and fail-closed', () => {
+test('historical consultant consent records remain assignment-scoped and auditable', () => {
   const repository = read('backend/src/modules/consultant-access/consultant-access.repository.ts');
 
   assert.match(repository, /consent\.assignment_id = assignment\.id/);
@@ -26,7 +26,7 @@ test('migration preserves legacy rows without converting them into relationship 
   assert.doesNotMatch(migration, /update\s+consultant_access_consents[\s\S]+status\s*=\s*'GRANTED'/i);
 });
 
-test('safe roster is assignment-gated while protected client context remains consent-gated', () => {
+test('roster and every Client 360 context share the same active-assignment authority', () => {
   const roster = read('backend/src/modules/consultants/consultants.repository.ts');
   const client360 = read('backend/src/modules/consultants/client360.repository.ts');
 
@@ -34,19 +34,20 @@ test('safe roster is assignment-gated while protected client context remains con
   assert.match(roster, /assignment\.status = 'active'/);
   assert.match(roster, /HEALTH_ACCESS_REQUIRED/);
   assert.match(roster, /const protectedClientSelect/);
-  assert.match(roster, /consultantAccessSqlPredicate/);
-  assert.match(client360, /consultantAccessSqlPredicate/);
+  assert.match(roster, /consultantAssignmentSqlPredicate/);
+  assert.doesNotMatch(roster, /join consultant_access_consents consent/);
+  assert.doesNotMatch(client360, /consultant_access_consents/);
 });
 
-test('nutrition access preserves assignment-first denial semantics without senior-consultant bypass', () => {
+test('nutrition access uses active assignment without a consent business gate or senior-consultant bypass', () => {
   const repository = read('backend/src/modules/consultant-access/consultant-access.repository.ts');
   const nutrition = read('backend/src/modules/nutrition/nutrition.service.ts');
   const routes = read('backend/src/modules/nutrition/nutrition.routes.ts');
   const commonFood = read('backend/src/modules/nutrition/common-food-consultant.service.ts');
 
   assert.match(repository, /reason: 'CLIENT_ASSIGNMENT_REQUIRED'/);
-  assert.match(repository, /reason: 'CONSULTANT_ACCESS_CONSENT_REQUIRED'/);
-  assert.match(repository, /left join consultant_access_consents consent/);
+  assert.doesNotMatch(repository, /reason: 'CONSULTANT_ACCESS_CONSENT_REQUIRED'/);
+  assert.match(repository, /consultantAssignmentSqlPredicate/);
   assert.match(nutrition, /resolveConsultantClientAccess\(account\.accountId, publicClientId\)/);
   assert.match(nutrition, /_options: \{ allowSeniorAuthority\?: boolean \} = \{\},[\s\S]+resolveConsultantNutritionClientAccess\(publicClientId, account\)/);
   assert.match(routes, /const access = await resolveConsultantNutritionClientAccess\(String\(req\.params\.clientId\), account\)/);
@@ -55,7 +56,7 @@ test('nutrition access preserves assignment-first denial semantics without senio
   assert.match(commonFood, /new CommonFoodApiError\(access\.reason,403\)/);
 });
 
-test('mobile consent decisions identify the exact assignment and expose grant and revoke controls', () => {
+test('legacy mobile consent preferences remain auditable but are not Consultant workspace authority', () => {
   const service = read('src/services/consultantConsentService.ts');
   const screen = read('src/screens/profile/PrivacyConsentScreen.tsx');
   const prompt = read('src/components/ConsultantAccessPrompt.tsx');
@@ -66,4 +67,9 @@ test('mobile consent decisions identify the exact assignment and expose grant an
   assert.match(screen, /Revoke access/);
   assert.match(prompt, /Not now/);
   assert.match(prompt, /dataCategories/);
+  const repository = read('backend/src/modules/consultant-access/consultant-access.repository.ts');
+  assert.doesNotMatch(
+    repository.match(/export const resolveConsultantClientAccess[\s\S]*?^};/m)?.[0] || '',
+    /consultant_access_consents|CONSULTANT_ACCESS_CONSENT_REQUIRED/
+  );
 });

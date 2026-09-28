@@ -10,7 +10,7 @@ import {
 import {
   CONSULTANT_ACCESS_POLICY_VERSION,
   CONSULTANT_ACCESS_PRODUCT,
-  consultantAccessSqlPredicate
+  consultantAssignmentSqlPredicate
 } from '../consultant-access/consultant-access.repository.js';
 
 type ConsultantOnboardingProjection = {
@@ -692,10 +692,10 @@ export const listAssignedConsultantClientContexts = async (
       where ${consultantVisibleUserPredicate}
         and exists (
           select 1 from consultant_client_assignments cap003
-          join consultant_access_consents consent on ${consultantAccessSqlPredicate('cap003', 'consent')}
           where cap003.client_user_id = u.id
             and cap003.consultant_user_id = $${AUTHENTICATED_USER_EXCLUSION_ROLES.length + 1}
             and cap003.professional_type = 'CONSULTANT'
+            and ${consultantAssignmentSqlPredicate('cap003')}
         )
       order by u.name asc, u.created_at desc
     `,
@@ -729,11 +729,10 @@ export const getRegisteredConsultantClientAccessContext = async (
   const assignment = consultantAccountId
       ? `and exists (
         select 1 from consultant_client_assignments assignment
-        join consultant_access_consents consent on ${consultantAccessSqlPredicate('assignment', 'consent')}
         where assignment.client_user_id = u.id
           and assignment.consultant_user_id = $${values.push(consultantAccountId)}
-          and assignment.product = 'FITEATSY'
           and assignment.professional_type = $${values.push(professionalType)}
+          and ${consultantAssignmentSqlPredicate('assignment')}
       )`
     : '';
   const exclusionPlaceholders = AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 2}`).join(', ');
@@ -774,11 +773,10 @@ export const getRegisteredConsultantClientProfileContext = async (
         and (
           exists (
             select 1 from consultant_client_assignments cap003
-            join consultant_access_consents consent on ${consultantAccessSqlPredicate('cap003', 'consent')}
             where cap003.client_user_id = u.id
               and cap003.consultant_user_id = $7
-              and cap003.product = 'FITEATSY'
               and cap003.professional_type = $8
+              and ${consultantAssignmentSqlPredicate('cap003')}
           )
         )
       `

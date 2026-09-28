@@ -29,7 +29,6 @@ import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
 import { scheduleHealthRecalculationProcessor } from './jobs/process-health-recalculations.js';
 import { adminGrievancesRouter, grievancesRouter, profilePhotoRouter } from './modules/grievances/grievances.routes.js';
 import { preferencesRouter } from './modules/preferences/preferences.routes.js';
-import { requireGrantedConsultantAccess } from './modules/preferences/preferences.routes.js';
 import { requireAuthenticatedAccount } from './modules/auth/auth.middleware.js';
 
 type CreateAppOptions = {
@@ -170,11 +169,11 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/reports', reportsRouter);
   app.use('/v1/health', healthRouter);
   app.use('/v1/biomarkers', biomarkersRouter);
-  app.use('/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment,requireGrantedConsultantAccess);
+  app.use('/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment);
   app.use('/v1/consultants', consultantClient360Router);
   app.use('/v1/consultants', consultantsRouter);
   app.use('/v1/consultants', consultantNutritionRouter);
-  app.use('/v1/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment,requireGrantedConsultantAccess);
+  app.use('/v1/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment);
   app.use('/v1/clients', consultantWorkspaceContractRouter);
   app.use('/v1/admin', adminRouter);
   app.use('/v1/admin/grievances', adminGrievancesRouter);

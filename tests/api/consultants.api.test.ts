@@ -231,7 +231,7 @@ test('senior consultant roster uses the same assignment-scoped projection', asyn
   assert.equal(response.body.clients[0].consentStatus, 'GRANTED');
 });
 
-test('consultant roster and protected client access share assignment and consent authority', async () => {
+test('consultant roster and every client workspace use the same active-assignment authority', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Consent Governed Client',
     email: `consent-governed-${Date.now()}@example.com`
@@ -280,13 +280,12 @@ test('consultant roster and protected client access share assignment and consent
   );
   assert.equal(consentRowsAfterRoster.rows[0].total, 0);
 
-  const consentDenied = await getJson(
+  const detailBeforePreference = await getJson(
     server.baseUrl,
     `/v1/consultants/clients/${client.current.body.client.fiteatsyClientId}`,
     { headers: authHeaders(consultant.token) }
   );
-  assert.equal(consentDenied.response.status, 403);
-  assert.equal(consentDenied.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
+  assert.equal(detailBeforePreference.response.status, 200);
 
   const granted = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
     assignmentId: assignment!.id,
@@ -350,13 +349,12 @@ test('consultant roster and protected client access share assignment and consent
   assert.equal(afterRevocation.body.clients[0].clientId, client.current.body.client.fiteatsyClientId);
   assert.equal(afterRevocation.body.clients[0].consentStatus, 'REVOKED');
 
-  const revokedDetail = await getJson(
+  const detailAfterRevocation = await getJson(
     server.baseUrl,
     `/v1/consultants/clients/${client.current.body.client.fiteatsyClientId}`,
     { headers: authHeaders(consultant.token) }
   );
-  assert.equal(revokedDetail.response.status, 403);
-  assert.equal(revokedDetail.body.error, 'CONSULTANT_ACCESS_CONSENT_REQUIRED');
+  assert.equal(detailAfterRevocation.response.status, 200);
 
   await pool.query(
     `update consultant_access_consents

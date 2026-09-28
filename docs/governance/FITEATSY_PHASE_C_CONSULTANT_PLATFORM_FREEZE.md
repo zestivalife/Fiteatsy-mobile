@@ -20,12 +20,14 @@ This milestone records the authenticated Phase C production acceptance completed
 The following accepted contracts must not be changed incidentally by feature, refactor, cosmetic, or UI work:
 
 - client identity resolution and Consultant assignment;
+- active Consultant assignment, allowed role, and domain permission as the sole Consultant workspace authority; `CONSULTANT_ACCESS_V1` is historical/audit data and not a second business gate;
 - Client/Profile, Onboarding, Food Preferences, Health, Medication, and Nutrition projections;
 - client switching, cross-client denial, and user-switch isolation;
 - Diet Plan draft, save/reload, and exact version identity;
 - Send for Review and the Senior Consultant review queue;
 - exact submitted-version resolution, Senior Review, and Approval;
 - Consultant Publish, `ACTIVE_PUBLISHED`, and Client Nutrition receipt;
+- Approval never publishes automatically; only the exact approved version may be explicitly published;
 - transient-failure preservation;
 - Optional Guidance V2.
 

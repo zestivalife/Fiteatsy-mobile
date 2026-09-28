@@ -15,11 +15,12 @@ test('Client 360 actor references use the canonical TEXT users.id type', () => {
   assert.doesNotMatch(migration, /(created_by|updated_by|actor_id|consultant_id)\s+uuid/i);
 });
 
-test('Client 360 is mounted behind the existing client assignment and consent guard', () => {
-  const guardIndex = server.indexOf("app.use('/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment,requireGrantedConsultantAccess)");
+test('Client 360 is mounted behind the canonical active-assignment guard only', () => {
+  const guardIndex = server.indexOf("app.use('/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment)");
   const routeIndex = server.indexOf("app.use('/v1/consultants', consultantClient360Router)");
   assert.ok(guardIndex >= 0, 'client guard middleware must exist');
   assert.ok(routeIndex > guardIndex, 'Client 360 router must be mounted after client guard middleware');
+  assert.doesNotMatch(server, /requireGrantedConsultantAccess/);
 });
 
 test('operation mutations enforce idempotency and optimistic concurrency', () => {

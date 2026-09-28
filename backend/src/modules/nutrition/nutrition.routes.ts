@@ -353,9 +353,7 @@ export const requireConsultantClientAssignment = async (req: Request, res: Respo
     if (!access.authorized) {
       return res.status(403).json({
         error: access.reason,
-        message: access.reason === 'CONSULTANT_ACCESS_CONSENT_REQUIRED'
-          ? 'Client consent is required to access this client.'
-          : 'An active client assignment is required to access this client.',
+        message: 'An active client assignment is required to access this client.',
       });
     }
     return next();
