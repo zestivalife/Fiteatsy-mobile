@@ -16,6 +16,7 @@ import { AppProvider, useAppContext } from './src/state/AppContext';
 import { getThemeColors } from './src/design/tokens';
 import './src/services/wearableBackgroundSync';
 import { CanonicalHealthSyncProvider } from './src/services/canonicalHealthSyncCoordinator';
+import { ProductionErrorBoundary } from './src/components/ProductionErrorBoundary';
 
 let hasConfiguredGlobalFont = false;
 
@@ -47,9 +48,9 @@ export default function App() {
     ...MaterialCommunityIcons.font
   });
 
-  // The branded video splash must mount immediately on a cold launch. Font
-  // loading is allowed to finish behind it instead of extending the native
-  // black bridge with an otherwise blank React tree.
+  // The static branded splash mounts immediately on a cold launch. Font
+  // loading finishes behind it instead of extending the native bridge with
+  // an otherwise blank React tree.
   if (fontsLoaded && !hasConfiguredGlobalFont) {
     const GlobalText = Text as typeof Text & { defaultProps?: { style?: unknown } };
     GlobalText.defaultProps = GlobalText.defaultProps ?? {};
@@ -62,12 +63,14 @@ export default function App() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppProvider>
-        <CanonicalHealthSyncProvider>
-          <Root />
-        </CanonicalHealthSyncProvider>
-      </AppProvider>
-    </GestureHandlerRootView>
+    <ProductionErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000000' }}>
+        <AppProvider>
+          <CanonicalHealthSyncProvider>
+            <Root />
+          </CanonicalHealthSyncProvider>
+        </AppProvider>
+      </GestureHandlerRootView>
+    </ProductionErrorBoundary>
   );
 }

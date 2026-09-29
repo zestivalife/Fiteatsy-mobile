@@ -3,6 +3,8 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Text,
+  View,
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
@@ -22,7 +24,7 @@ const EXIT_FADE_DURATION = 320;
 const LOGO_ANIMATION_DURATION = 640;
 
 export const SplashScreen = ({ navigation }: Props) => {
-  const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep, authSession } = useAppContext();
+  const { isAuthenticated, bootstrapped, startupState, onboardingStatus, onboardingResumeStep, authSession } = useAppContext();
   const { width, height } = useWindowDimensions();
   const [exitRequested, setExitRequested] = useState(false);
   const [forceExit, setForceExit] = useState(false);
@@ -150,6 +152,15 @@ export const SplashScreen = ({ navigation }: Props) => {
   const logoWidth = Math.min(width * 0.72, 480);
   const logoTop = Math.max(height * 0.16, 96);
 
+  if (startupState === 'FATAL_CONFIGURATION_ERROR') {
+    return (
+      <View style={styles.configurationError} accessibilityRole="alert">
+        <Text style={styles.configurationTitle}>Fiteatsy is unavailable</Text>
+        <Text style={styles.configurationBody}>This installation is missing required service configuration. Please update or reinstall the app.</Text>
+      </View>
+    );
+  }
+
   return (
     <Animated.View style={[styles.screen, { opacity: screenOpacity }]}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
@@ -181,5 +192,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignSelf: 'center',
     aspectRatio: 1731 / 462
-  }
+  },
+  configurationError: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32, backgroundColor: '#000000' },
+  configurationTitle: { color: '#FFFFFF', fontFamily: 'Exo_700Bold', fontSize: 24, textAlign: 'center' },
+  configurationBody: { color: '#C7CBD1', fontFamily: 'Exo_400Regular', fontSize: 16, lineHeight: 24, textAlign: 'center' }
 });

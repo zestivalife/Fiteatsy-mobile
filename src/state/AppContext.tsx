@@ -72,6 +72,7 @@ import {
 } from '../services/authService';
 import {
   registerAccessTokenProvider,
+  getApiConfigurationError,
   registerNetworkReachabilityProvider,
   registerNetworkTypeProvider,
   registerUnauthorizedHandler
@@ -102,6 +103,7 @@ import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/iden
 import { deriveOnboardingGate, type OnboardingResumeStep, type OnboardingStatus } from '../utils/onboardingGate';
 import { traceSessionLifecycle } from '../services/sessionLifecycleTrace';
 import { clearPersistedAuthSession, readPersistedAuthSession, writePersistedAuthSession } from '../services/authSessionStore';
+import { transitionStartupState, type StartupState } from './startupStateMachine';
 
 type StoredAuthSession = CurrentAuthSession & {
   sessionToken: string;
@@ -109,6 +111,7 @@ type StoredAuthSession = CurrentAuthSession & {
 
 type AppContextValue = {
   bootstrapped: boolean;
+  startupState: StartupState;
   clientBootstrap: ClientBootstrapState;
   canonicalProfile: PlatformHealthProfileBundle | null;
   onboardingStatus: OnboardingStatus;
@@ -285,6 +288,8 @@ const safeParse = <T,>(raw: string | null, fallback: T): T => {
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [bootstrapped, setBootstrapped] = useState(false);
+  const [startupState, setStartupState] = useState<StartupState>('BOOTING');
+  const bootstrapStartedRef = useRef(false);
   const [clientBootstrap, setClientBootstrap] = useState<ClientBootstrapState>(createClientBootstrapState);
   const [canonicalProfile, setCanonicalProfile] = useState<PlatformHealthProfileBundle | null>(null);
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus>('UNKNOWN');
@@ -424,6 +429,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setClientBootstrap(createClientBootstrapState());
     setOnboardingStatus('NOT_STARTED');
     setOnboardingResumeStep('basics');
+    setStartupState((current) => transitionStartupState(current, 'SESSION_REVOKED'));
     void clearPersistedAuthSession();
     void removeUserStorage(sessionToClear);
   }, []);
@@ -446,8 +452,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     // Authentication is complete once the canonical local session is durable.
     // Profile, onboarding, Nutrition and Health reconciliation must not delay navigation.
     await persistAuthSession(localSession);
+    setStartupState((current) => transitionStartupState(current, 'LOCAL_SESSION_FOUND'));
 
     void (async () => {
+      setStartupState((current) => transitionStartupState(current, 'REMOTE_VALIDATION_STARTED'));
       try {
       const current = await getCurrentAuthSession(session.sessionToken);
       const authenticatedSession: StoredAuthSession = {
@@ -483,6 +491,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           console.warn('[CanonicalData] post-auth nutrition projection deferred', { errorCode: resourceErrorCode(error) });
         }
       }
+      setStartupState((current) => transitionStartupState(current, 'REMOTE_VALIDATION_SUCCEEDED'));
       } catch (error) {
       if (error instanceof Error && error.message === 'CANONICAL_IDENTITY_MISMATCH') {
         clearPersistedAuth(fallback ? { ...fallback, sessionToken: session.sessionToken } : null);
@@ -509,6 +518,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           });
         }
       }
+      setStartupState((current) => transitionStartupState(current, 'TRANSIENT_NETWORK_FAILURE'));
       }
     })();
   }, [clearPersistedAuth, persistAuthSession]);
@@ -542,9 +552,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const bootstrap = async () => {
+      if (bootstrapStartedRef.current) return;
+      bootstrapStartedRef.current = true;
       try {
         traceSessionLifecycle('APP_START');
         traceSessionLifecycle('LOCAL_SESSION_READ_START');
+        setStartupState((current) => transitionStartupState(current, 'RESTORE_LOCAL_SESSION'));
         const [storedAuth, storedTheme] = await Promise.all([
           readPersistedAuthSession(),
           AsyncStorage.getItem(STORAGE_KEYS.theme)
@@ -568,10 +581,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (!sessionForStorage) {
           traceSessionLifecycle('LOCAL_SESSION_READ_EMPTY');
+          if (getApiConfigurationError()) {
+            setStartupState((current) => transitionStartupState(current, 'FATAL_CONFIGURATION_FAILURE'));
+            return;
+          }
+          setStartupState((current) => transitionStartupState(current, 'LOCAL_SESSION_EMPTY'));
           setOnboardingStatus('NOT_STARTED');
           setOnboardingResumeStep('basics');
           return;
         }
+
+        setStartupState((current) => transitionStartupState(current, 'LOCAL_SESSION_FOUND'));
 
         const readScoped = (key: string) => {
           const scopedKey = getSessionScopedKey(key, sessionForStorage);
@@ -670,15 +690,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         });
 
         void (async () => {
+          setStartupState((current) => transitionStartupState(current, 'REMOTE_VALIDATION_STARTED'));
           try {
             const refreshed = await getCurrentAuthSession(sessionForStorage.sessionToken);
             if (refreshed.accountId !== identity.userId) throw new Error('CANONICAL_IDENTITY_MISMATCH');
             await persistAuthSession({ ...refreshed, sessionToken: sessionForStorage.sessionToken });
+            setStartupState((current) => transitionStartupState(current, 'REMOTE_VALIDATION_SUCCEEDED'));
           } catch (error) {
             if (error instanceof Error && error.message === 'CANONICAL_IDENTITY_MISMATCH') {
               clearPersistedAuth(sessionForStorage);
               return;
             }
+            setStartupState((current) => transitionStartupState(current, 'TRANSIENT_NETWORK_FAILURE'));
             console.warn('[AppContext] background auth/session reconciliation deferred', {
               errorCode: resourceErrorCode(error)
             });
@@ -1720,9 +1743,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           ? true
           : null;
       previousNetworkReachabilityRef.current = networkReachabilityRef.current;
+      if (authSession && networkReachabilityRef.current === false) {
+        setStartupState((current) => transitionStartupState(current, 'TRANSIENT_NETWORK_FAILURE'));
+      }
       if (authSession && networkReachabilityRef.current === true) {
+        if (previousReachability === false) {
+          setStartupState((current) => transitionStartupState(current, 'NETWORK_RECOVERING'));
+        }
         void retryPendingHealthProfileSync();
-        if (previousReachability === false) void refreshPublishedNutritionPlan();
+        if (previousReachability === false) {
+          void refreshPublishedNutritionPlan().finally(() => {
+            setStartupState((current) => transitionStartupState(current, 'REMOTE_VALIDATION_SUCCEEDED'));
+          });
+        }
       }
     });
     return () => unsubscribe();
@@ -1731,6 +1764,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const value = useMemo(
     () => ({
       bootstrapped,
+      startupState,
       clientBootstrap,
       canonicalProfile,
       onboardingStatus,
@@ -1802,6 +1836,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       assessment,
       authSession,
       bootstrapped,
+      startupState,
       canonicalProfile,
       clientBootstrap,
       onboardingResumeStep,

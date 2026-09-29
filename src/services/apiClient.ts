@@ -76,7 +76,17 @@ export const getApiBaseUrl = () => {
   throw new Error('Fiteatsy API base URL is not configured with a reachable HTTP(S) gateway.');
 };
 
-export const apiBaseUrl = getApiBaseUrl();
+let apiConfigurationError: Error | null = null;
+export const apiBaseUrl = (() => {
+  try {
+    return getApiBaseUrl();
+  } catch (error) {
+    apiConfigurationError = error instanceof Error ? error : new Error('Fiteatsy API configuration is invalid.');
+    return '';
+  }
+})();
+
+export const getApiConfigurationError = () => apiConfigurationError;
 
 let accessTokenProvider: (() => string | null | undefined) | null = null;
 export type UnauthorizedContext = { status: 401; serverCode?: string };
@@ -120,6 +130,9 @@ export const API_REQUEST_TIMEOUT_MS = 15_000;
 type ApiRequestInit = RequestInit & { timeoutMs?: number };
 
 export const apiResponse = async (path: string, init: ApiRequestInit = {}): Promise<Response> => {
+  if (!apiBaseUrl) {
+    throw new ApiClientError('NETWORK_ERROR', 'Fiteatsy is not configured to reach its service.', undefined, 'FATAL_CONFIGURATION_ERROR');
+  }
   const startedAt = Date.now();
   const method = init.method ?? 'GET';
   const hostname = new URL(apiBaseUrl).hostname;
