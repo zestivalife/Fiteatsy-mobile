@@ -1,25 +1,48 @@
 {
-  "status": "PENDING_FINAL_ACCEPTANCE",
-  "seal": "NOT_ACTIVE",
-  "protectedContracts": [
-    "CONSULTANT_ASSIGNMENT_ACCESS",
-    "CONSULTANT_ROSTER",
-    "CLIENT360_FULL_ASSIGNED_ACCESS",
-    "CROSS_CLIENT_ISOLATION",
-    "FALSE_ZERO_HANDLING",
-    "DIET_DRAFT_LIFECYCLE",
-    "SENIOR_REVIEW",
-    "EXACT_VERSION_APPROVAL",
-    "CONSULTANT_EXPLICIT_PUBLISH",
-    "CLIENT_PUBLISHED_VERSION",
-    "RUNTIME_PARITY"
+  "status": "ACTIVE",
+  "seal": "ACTIVE",
+  "sealDocument": "docs/governance/CONSULTANT_DIET_PLAN_ENGINEERING_SEAL.md",
+  "acceptedImplementation": {
+    "backendSha": "0fc45e318216b19487f580c34d14092aef3b71b0",
+    "frontendSha": "587179495c63ed23504bcb637964350ef7327efa"
+  },
+  "verification": {
+    "productionAcceptance": "PASS",
+    "ci": "PASS",
+    "backendRuntimeParity": "PASS",
+    "frontendRuntimeParity": "PASS"
+  },
+  "protectedFeatures": [
+    { "id": "CONSULTANT_ASSIGNMENT_ACCESS", "status": "FROZEN_PROTECTED" },
+    { "id": "CONSULTANT_ROSTER", "status": "FROZEN_PROTECTED" },
+    { "id": "CLIENT360_ASSIGNED_ACCESS", "status": "FROZEN_PROTECTED" },
+    { "id": "CROSS_CLIENT_ISOLATION", "status": "FROZEN_PROTECTED" },
+    { "id": "FALSE_ZERO_HANDLING", "status": "FROZEN_PROTECTED" },
+    { "id": "DIET_PLAN_DRAFT", "status": "FROZEN_PROTECTED" },
+    { "id": "DIET_PLAN_SAVE_RELOAD", "status": "FROZEN_PROTECTED" },
+    { "id": "DIET_PLAN_SUBMIT", "status": "FROZEN_PROTECTED" },
+    { "id": "SENIOR_REVIEW_QUEUE", "status": "FROZEN_PROTECTED" },
+    { "id": "SENIOR_REVIEW_AUTHORITY", "status": "FROZEN_PROTECTED" },
+    { "id": "CHANGE_REQUEST_LIFECYCLE", "status": "FROZEN_PROTECTED" },
+    { "id": "DIET_PLAN_REVISION", "status": "FROZEN_PROTECTED" },
+    { "id": "DIET_PLAN_RESUBMISSION", "status": "FROZEN_PROTECTED" },
+    { "id": "EXACT_VERSION_APPROVAL", "status": "FROZEN_PROTECTED" },
+    { "id": "APPROVAL_NOT_PUBLICATION", "status": "FROZEN_PROTECTED" },
+    { "id": "CONSULTANT_EXPLICIT_PUBLISH", "status": "FROZEN_PROTECTED" },
+    { "id": "CLIENT_PUBLISHED_VERSION", "status": "FROZEN_PROTECTED" },
+    { "id": "BACKEND_RUNTIME_SHA_PARITY", "status": "FROZEN_PROTECTED" },
+    { "id": "FRONTEND_RUNTIME_SHA_PARITY", "status": "FROZEN_PROTECTED" }
   ],
-  "activationRequires": [
-    "LOCAL_VALIDATION_PASS",
-    "REGRESSION_PASS_X2",
-    "EXACT_SHA_CI_PASS",
-    "DEPLOYMENT_PASS",
-    "RUNTIME_SHA_PARITY_PASS",
-    "AUTHENTICATED_PRODUCTION_ACCEPTANCE_PASS"
+  "regressionOwnership": [
+    "tests/backend/consultant-access-lifecycle-contract.test.ts",
+    "tests/backend/consultant-client360-contract.test.ts",
+    "tests/backend/senior-consultant-diet-review-authority.test.ts",
+    "tests/backend/simple-consultant-approval-workflow.test.ts",
+    "tests/backend/diet-plan-version-store-contract.test.ts",
+    "tests/database/diet-lifecycle-quality.database.test.ts",
+    "nuetra-frontend/tests/client-roster-failure-contract.test.mjs",
+    "nuetra-frontend/tests/client360-contract.test.mjs",
+    "nuetra-frontend/tests/senior-diet-plan-review.test.mjs",
+    "nuetra-frontend/tests/runtime-build-identity.test.mjs"
   ]
 }
