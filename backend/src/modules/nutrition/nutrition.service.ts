@@ -2493,6 +2493,103 @@ export const getSeniorConsultantDietPlanReviewQueue = async (account: Authentica
   });
 };
 
+const getSeniorDietPlanReviewContext = async (
+  account: AuthenticatedAccount,
+  dietPlanId: string,
+  versionId: string,
+) => {
+  if (!canApproveOrPublishDietPlan(account)) {
+    throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can review nutrition plans.', 403);
+  }
+  const review = (await listDietPlanReviewQueue(account.qaSession?.fixtureSetId))
+    .find((item) => item.dietPlanId === dietPlanId && item.version.id === versionId);
+  if (!review) {
+    throw new NutritionPlanWorkflowError(
+      'DIET_PLAN_REVIEW_NOT_FOUND',
+      'The submitted diet plan version is no longer available for review.',
+      404,
+    );
+  }
+  const plan = await getDietPlanById(dietPlanId);
+  const version = await getDietPlanVersionById(versionId);
+  if (!plan || !version || version.dietPlanId !== plan.id || plan.currentVersionId !== version.id) {
+    throw new NutritionPlanWorkflowError(
+      'DIET_PLAN_REVIEW_VERSION_MISMATCH',
+      'The submitted diet plan version has changed. Refresh the review queue before continuing.',
+      409,
+    );
+  }
+  if (plan.consultantId === account.accountId) {
+    throw new NutritionPlanWorkflowError('SELF_APPROVAL_NOT_ALLOWED', 'A Consultant cannot review their own diet plan.', 403);
+  }
+  return { plan, review, version };
+};
+
+export const requestSeniorConsultantDietPlanReviewChanges = async (
+  account: AuthenticatedAccount,
+  dietPlanId: string,
+  versionId: string,
+  comment: string,
+) => {
+  const { plan, version } = await getSeniorDietPlanReviewContext(account, dietPlanId, versionId);
+  assertLifecycleTransition(version.lifecycleStatus, 'changes_requested');
+  return updateDietPlanLifecycle({
+    dietPlanId: plan.id,
+    consultantId: plan.consultantId ?? account.accountId,
+    actorUserId: account.accountId,
+    currentVersionId: version.id,
+    lifecycle: 'changes_requested',
+    reviewComment: comment,
+    reviewEventType: 'changes_requested',
+    sourceSnapshot: version.sourceSnapshot,
+  });
+};
+
+export const approveSeniorConsultantDietPlanReview = async (
+  account: AuthenticatedAccount,
+  dietPlanId: string,
+  versionId: string,
+) => {
+  const { plan, review, version } = await getSeniorDietPlanReviewContext(account, dietPlanId, versionId);
+  if (!review.clientId) {
+    throw new NutritionPlanWorkflowError('DIET_PLAN_REVIEW_CLIENT_NOT_FOUND', 'The reviewed client profile is unavailable.', 409);
+  }
+  assertDietPlanVersionReviewComplete(version);
+  const guidance = await assertOptionalGuidanceValid(review.clientId, version.content);
+  assertLifecycleTransition(version.lifecycleStatus, 'approved');
+  const reviewedAtISO = new Date().toISOString();
+  const reviewedGuidance: OptionalNutritionGuidance | undefined = guidance ? {
+    ...guidance,
+    reviewedBy: account.accountId,
+    reviewedAtISO,
+    updatedBy: account.accountId,
+    updatedAtISO: reviewedAtISO,
+    whatCanIEatNow: guidance.whatCanIEatNow.map((item) => ({ ...item, clinicallyReviewed: true })),
+    eatingOut: Object.fromEntries(Object.entries(guidance.eatingOut).map(([key, items]) => [key, items.map((item) => ({ ...item, clinicallyReviewed: true }))])) as OptionalNutritionGuidance['eatingOut'],
+    cravings: Object.fromEntries(Object.entries(guidance.cravings).map(([key, items]) => [key, items.map((item) => ({ ...item, clinicallyReviewed: true }))])) as OptionalNutritionGuidance['cravings'],
+  } : undefined;
+  const approvedContent = { ...version.content, optionalGuidance: reviewedGuidance };
+  await updateDietPlanVersionContent({
+    dietPlanId: plan.id,
+    versionId: version.id,
+    content: approvedContent,
+    contentSummary: contentSummaryFromContent(approvedContent),
+    sourceSnapshot: version.sourceSnapshot,
+    lifecycleStatus: version.lifecycleStatus,
+    reviewNotes: version.reviewNotes,
+  });
+  return updateDietPlanLifecycle({
+    dietPlanId: plan.id,
+    consultantId: plan.consultantId ?? account.accountId,
+    actorUserId: account.accountId,
+    currentVersionId: version.id,
+    lifecycle: 'approved',
+    approvedBy: account.accountId,
+    reviewEventType: 'approved',
+    sourceSnapshot: version.sourceSnapshot,
+  });
+};
+
 export const approveConsultantDietPlan = async (
   publicClientId: string,
   account: AuthenticatedAccount,

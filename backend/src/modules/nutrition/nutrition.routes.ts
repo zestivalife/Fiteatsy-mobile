@@ -6,6 +6,7 @@ import type { NutritionPlanContent } from '../platform/platform.types.js';
 import { canAccessConsultantClientApi } from '../consultants/consultants.service.js';
 import {
   approveConsultantDietPlan,
+  approveSeniorConsultantDietPlanReview,
   canAccessConsultantNutritionClient,
   generateConsultantDietPlanDraft,
   generateConsultantOptionalGuidance,
@@ -24,6 +25,7 @@ import {
   NutritionPlanWorkflowError,
   publishConsultantDietPlan,
   requestConsultantDietPlanChanges,
+  requestSeniorConsultantDietPlanReviewChanges,
   searchConsultantOptionalGuidanceCandidates,
   submitConsultantDietPlanForReview,
   updateConsultantDietPlanDraft,
@@ -205,6 +207,10 @@ const updateDraftSchema = z.object({
 });
 
 const reviewCommentSchema = z.object({
+  comment: z.string().trim().min(1).max(2000),
+});
+const seniorReviewActionSchema = z.object({ versionId: z.string().uuid() });
+const seniorReviewChangesSchema = seniorReviewActionSchema.extend({
   comment: z.string().trim().min(1).max(2000),
 });
 
@@ -439,6 +445,35 @@ consultantNutritionRouter.get('/clients/:clientId/diet-plans/latest', async (req
 consultantNutritionRouter.get('/diet-plan-reviews', async (req, res) => {
   try {
     return res.status(200).json({ reviews: await getSeniorConsultantDietPlanReviewQueue(getAuthenticatedAccount(req)) });
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
+});
+
+consultantNutritionRouter.post('/diet-plan-reviews/:dietPlanId/request-changes', async (req, res) => {
+  const parsed = seniorReviewChangesSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_REVIEW_REQUEST', details: parsed.error.flatten() });
+  try {
+    return res.status(200).json(await requestSeniorConsultantDietPlanReviewChanges(
+      getAuthenticatedAccount(req),
+      req.params.dietPlanId,
+      parsed.data.versionId,
+      parsed.data.comment,
+    ));
+  } catch (error) {
+    return handleNutritionRouteError(res, error);
+  }
+});
+
+consultantNutritionRouter.post('/diet-plan-reviews/:dietPlanId/approve', async (req, res) => {
+  const parsed = seniorReviewActionSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_REVIEW_REQUEST', details: parsed.error.flatten() });
+  try {
+    return res.status(200).json(await approveSeniorConsultantDietPlanReview(
+      getAuthenticatedAccount(req),
+      req.params.dietPlanId,
+      parsed.data.versionId,
+    ));
   } catch (error) {
     return handleNutritionRouteError(res, error);
   }

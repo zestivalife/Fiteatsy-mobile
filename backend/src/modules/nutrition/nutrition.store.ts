@@ -664,9 +664,11 @@ export const updateDietPlanLifecycle = async (input: {
   approvedBy?: string | null;
   reviewComment?: string | null;
   reviewEventType?: 'submitted_for_review' | 'changes_requested' | 'resubmitted' | 'approved' | 'published';
+  actorUserId?: string;
   sourceSnapshot: NutritionPlanSourceSnapshot;
 }) => {
   const timestamp = nowIso();
+  const actorUserId = input.actorUserId ?? input.consultantId;
   const updatedPlan = await pool.query(
     `
       update diet_plans
@@ -680,7 +682,7 @@ export const updateDietPlanLifecycle = async (input: {
         published_at = case when $4 = 'published' then $6 else published_at end,
         archived_at = case when $4 = 'archived' then $6 else archived_at end,
         submitted_at = case when $4 in ('submitted_for_review', 'changes_requested') and submitted_at is null then $6 else submitted_at end,
-        reviewed_by = case when $4 in ('changes_requested', 'approved', 'published') then $2 else reviewed_by end,
+        reviewed_by = case when $4 in ('changes_requested', 'approved', 'published') then $9 else reviewed_by end,
         reviewed_at = case when $4 in ('changes_requested', 'approved', 'published') then $6 else reviewed_at end,
         review_comment = case when $4 = 'changes_requested' then $8 else review_comment end,
         source_snapshot = $7::jsonb,
@@ -699,6 +701,7 @@ export const updateDietPlanLifecycle = async (input: {
       timestamp,
       JSON.stringify(input.sourceSnapshot),
       input.reviewComment ?? null,
+      actorUserId,
     ],
   );
   if (updatedPlan.rowCount === 0) return null;
@@ -721,7 +724,7 @@ export const updateDietPlanLifecycle = async (input: {
     await pool.query(
       `insert into diet_plan_review_events (id, diet_plan_id, diet_plan_version_id, actor_user_id, event_type, comment)
        values ($1, $2, $3, $4, $5, $6)`,
-      [crypto.randomUUID(), input.dietPlanId, input.currentVersionId, input.consultantId, input.reviewEventType, input.reviewComment ?? null],
+      [crypto.randomUUID(), input.dietPlanId, input.currentVersionId, actorUserId, input.reviewEventType, input.reviewComment ?? null],
     );
   }
 

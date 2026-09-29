@@ -4,6 +4,8 @@ import test from 'node:test';
 
 const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
 const store = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.store.ts', import.meta.url), 'utf8');
+const routes = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.routes.ts', import.meta.url), 'utf8');
+const server = readFileSync(new URL('../../backend/src/server.ts', import.meta.url), 'utf8');
 
 const functionSlice = (startMarker: string, endMarker: string) => {
   const start = service.indexOf(startMarker);
@@ -15,13 +17,17 @@ const functionSlice = (startMarker: string, endMarker: string) => {
 test('Senior Consultant review authority is role-based and does not require client assignment', () => {
   const queue = functionSlice(
     'export const getSeniorConsultantDietPlanReviewQueue',
+    'const getSeniorDietPlanReviewContext',
+  );
+  const context = functionSlice(
+    'const getSeniorDietPlanReviewContext',
+    'export const requestSeniorConsultantDietPlanReviewChanges',
+  );
+  const seniorActions = functionSlice(
+    'export const requestSeniorConsultantDietPlanReviewChanges',
     'export const approveConsultantDietPlan',
   );
-  const requestChanges = functionSlice(
-    'export const requestConsultantDietPlanChanges',
-    'export const getSeniorConsultantDietPlanReviewQueue',
-  );
-  const approve = functionSlice(
+  const legacyApprove = functionSlice(
     'export const approveConsultantDietPlan',
     'export const publishConsultantDietPlan',
   );
@@ -29,10 +35,33 @@ test('Senior Consultant review authority is role-based and does not require clie
   assert.match(queue, /canApproveOrPublishDietPlan\(account\)/);
   assert.match(queue, /listDietPlanReviewQueue/);
   assert.doesNotMatch(queue, /getRegisteredConsultantClientProfileContext|account\.accountId/);
-  assert.match(requestChanges, /allowSeniorAuthority: true/);
-  assert.match(approve, /allowSeniorAuthority: true/);
-  assert.match(approve, /currentVersion/);
-  assert.match(approve, /assertLifecycleTransition\(currentVersion\.lifecycleStatus, 'approved'\)/);
+  assert.match(context, /canApproveOrPublishDietPlan\(account\)/);
+  assert.match(context, /item\.dietPlanId === dietPlanId && item\.version\.id === versionId/);
+  assert.match(context, /plan\.currentVersionId !== version\.id/);
+  assert.doesNotMatch(context, /getWorkspaceContext|allowSeniorAuthority|publicClientId/);
+  assert.match(seniorActions, /actorUserId: account\.accountId/);
+  assert.match(seniorActions, /consultantId: plan\.consultantId \?\? account\.accountId/);
+  assert.match(seniorActions, /assertLifecycleTransition\(version\.lifecycleStatus, 'approved'\)/);
+  assert.match(legacyApprove, /allowSeniorAuthority: true/);
+});
+
+test('Senior review routes bypass only the client-assignment path and require an immutable submitted version', () => {
+  assert.match(routes, /post\('\/diet-plan-reviews\/:dietPlanId\/approve'/);
+  assert.match(routes, /post\('\/diet-plan-reviews\/:dietPlanId\/request-changes'/);
+  assert.match(routes, /seniorReviewActionSchema = z\.object\(\{ versionId: z\.string\(\)\.uuid\(\) \}\)/);
+  assert.doesNotMatch(routes, /diet-plan-reviews\/:dietPlanId[^\n]*clientId/);
+  assert.match(server, /app\.use\('\/v1\/consultants\/clients\/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment\)/);
+  assert.doesNotMatch(server, /app\.use\('\/v1\/consultants\/diet-plan-reviews[^\n]*requireConsultantClientAssignment/);
+});
+
+test('Senior lifecycle records the reviewer without replacing the original plan Consultant', () => {
+  const start = store.indexOf('export const updateDietPlanLifecycle');
+  const end = store.indexOf('export const ', start + 10);
+  const lifecycle = store.slice(start, end);
+  assert.match(lifecycle, /const actorUserId = input\.actorUserId \?\? input\.consultantId/);
+  assert.match(lifecycle, /consultant_id = \$2/);
+  assert.match(lifecycle, /reviewed_by = case when[\s\S]*then \$9/);
+  assert.match(lifecycle, /actor_user_id[\s\S]*actorUserId/);
 });
 
 test('Consultant authoring and submission retain active-assignment enforcement', () => {

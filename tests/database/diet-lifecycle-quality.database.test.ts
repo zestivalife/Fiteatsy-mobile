@@ -15,7 +15,12 @@ import {
   updateDietPlanLifecycle,
 } from '../../backend/src/modules/nutrition/nutrition.store.js';
 import { listMealLibrarySlotsForTarget } from '../../backend/src/modules/nutrition/nutrition.library.store.js';
-import { assertDietPlanReviewContentComplete } from '../../backend/src/modules/nutrition/nutrition.service.js';
+import {
+  approveSeniorConsultantDietPlanReview,
+  assertDietPlanReviewContentComplete,
+  NutritionPlanWorkflowError,
+  requestSeniorConsultantDietPlanReviewChanges,
+} from '../../backend/src/modules/nutrition/nutrition.service.js';
 import { generateDietPlanDocument, readGeneratedDietPlanDocumentXml } from '../../backend/src/modules/nutrition/nutrition.document.js';
 
 const mealLabels: Record<(typeof NUTRITION_MEAL_SEQUENCE)[number], string> = {
@@ -130,11 +135,41 @@ test('database preserves exact 35-option identity through review, revision, appr
   assert.equal(seniorReview.version.id, persisted.id);
   assert.deepEqual(optionIds(seniorReview.version.content as NutritionPlanContent), originalIds);
 
-  await updateDietPlanLifecycle({ dietPlanId: saved.plan.id, consultantId: seniorId, lifecycle: 'changes_requested', currentVersionId: persisted.id, reviewEventType: 'changes_requested', reviewComment: 'Replace one breakfast option.', sourceSnapshot: snapshot });
+  const accountFor = (accountId: string, role: 'consultant' | 'senior_consultant') => ({
+    accountId,
+    user: { role },
+    qaSession: null,
+  }) as never;
+  await assert.rejects(
+    requestSeniorConsultantDietPlanReviewChanges(
+      accountFor(consultantId, 'consultant'),
+      saved.plan.id,
+      persisted.id,
+      'This role must not be able to review.',
+    ),
+    (error: unknown) => error instanceof NutritionPlanWorkflowError && error.code === 'ROLE_NOT_ALLOWED',
+  );
+  await assert.rejects(
+    requestSeniorConsultantDietPlanReviewChanges(
+      accountFor(consultantId, 'senior_consultant'),
+      saved.plan.id,
+      persisted.id,
+      'Self-review must not be allowed.',
+    ),
+    (error: unknown) => error instanceof NutritionPlanWorkflowError && error.code === 'SELF_APPROVAL_NOT_ALLOWED',
+  );
+
+  await requestSeniorConsultantDietPlanReviewChanges(
+    accountFor(seniorId, 'senior_consultant'),
+    saved.plan.id,
+    persisted.id,
+    'Replace one breakfast option.',
+  );
   const restored = await getCurrentDietPlanVersion(saved.plan.id);
   const restoredPlan = await getDietPlanById(saved.plan.id);
   assert.deepEqual(optionIds(restored!.content), originalIds);
   assert.equal(restoredPlan!.reviewComment, 'Replace one breakfast option.');
+  assert.equal(restoredPlan!.consultantId, consultantId, 'Senior review must preserve Consultant ownership');
 
   const revisedContent = structuredClone(restored!.content);
   const replacementCandidates = await listMealLibrarySlotsForTarget({ mealKey: 'breakfast', target: undefined, consultantId, dietPreference: 'vegetarian', includeOutsideTarget: true, limit: 10 });
@@ -149,7 +184,25 @@ test('database preserves exact 35-option identity through review, revision, appr
   const revisedSenior = (await listDietPlanReviewQueue()).find((item) => item.dietPlanId === saved.plan.id)!;
   assert.deepEqual(optionIds(revisedSenior.version.content as NutritionPlanContent), revisedIds);
 
-  const approved = await updateDietPlanLifecycle({ dietPlanId: saved.plan.id, consultantId: seniorId, lifecycle: 'approved', currentVersionId: revision!.version.id, approvedBy: seniorId, reviewEventType: 'approved', sourceSnapshot: snapshot });
+  const approved = await approveSeniorConsultantDietPlanReview(
+    accountFor(seniorId, 'senior_consultant'),
+    saved.plan.id,
+    revision!.version.id,
+  );
+  assert.equal(approved!.plan.consultantId, consultantId, 'approval must preserve Consultant ownership');
+  const reviewActors = await pool.query(
+    `select actor_user_id, event_type from diet_plan_review_events
+     where diet_plan_id = $1 and event_type in ('changes_requested', 'approved')
+     order by case event_type when 'changes_requested' then 1 when 'approved' then 2 end`,
+    [saved.plan.id],
+  );
+  assert.deepEqual(
+    reviewActors.rows.map((row) => ({ actorUserId: String(row.actor_user_id), eventType: String(row.event_type) })),
+    [
+      { actorUserId: seniorId, eventType: 'changes_requested' },
+      { actorUserId: seniorId, eventType: 'approved' },
+    ],
+  );
   assert.deepEqual(optionIds(approved!.version!.content), revisedIds);
   const document = await generateDietPlanDocument(approved!.plan, approved!.version!);
   const xml = await readGeneratedDietPlanDocumentXml(document.outputPath);
