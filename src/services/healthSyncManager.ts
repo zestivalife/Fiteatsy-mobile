@@ -7,7 +7,8 @@ import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceS
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
 import { acknowledgeLocalObservations, persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalSyncCursors,
-  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded } from './healthSyncLocalStore';
+  readLocalHealthObservations,readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded } from './healthSyncLocalStore';
+import { migrateLegacyHealthQueueToShards } from './healthSyncShardedStore';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -259,8 +260,18 @@ export const runHealthSync = async (
     // Native reads and durable local persistence are the user-facing sync
     // boundary. Backend upload/recalculation may continue afterward without
     // keeping the Health Sync dialog or the JS interaction plane blocked.
-    await options.onLocalComplete?.({ payload: localPayload, observations, aggregates: canonicalAggregates });
+    const displayObservations = await readLocalHealthObservations(localScope);
+    await options.onLocalComplete?.({ payload: localPayload, observations: displayObservations, aggregates: canonicalAggregates });
     return await serializeHealthUpload(localScope, async () => {
+      const migration = await migrateLegacyHealthQueueToShards(localScope);
+      console.warn('[HealthSyncTrace] LEGACY_QUEUE_MIGRATION_DONE', {
+        totalBefore: migration.totalBefore,
+        acknowledgedRemoved: migration.acknowledgedRemoved,
+        duplicatesRemoved: migration.duplicatesRemoved,
+        poisonQuarantined: migration.poisonQuarantined,
+        uniquePendingRetained: migration.uniquePendingRetained,
+        totalAfter: migration.totalAfter
+      });
       // Sync-run telemetry must not become a prerequisite for ingestion. The
       // observation endpoint independently enforces authenticated ownership and
       // active provider consent.

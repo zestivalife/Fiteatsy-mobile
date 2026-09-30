@@ -4,6 +4,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
     setItem: jest.fn(async (key: string, value: string) => { mockStorage.set(key, value); }),
+    removeItem: jest.fn(async (key: string) => { mockStorage.delete(key); }),
     multiSet: jest.fn(async (entries: [string, string][]) => {
       entries.forEach(([key, value]) => mockStorage.set(key, value));
     }),
@@ -18,6 +19,7 @@ import { acknowledgeLocalObservations, countPendingLocalObservations, markLocalH
   readLocalCanonicalHealthSnapshot, recomputeLocalHealthAggregates, readLocalHealthAggregates,
   ensureLocalHealthAggregatesCurrent, readLocalHealthBootstrapSnapshot } from '../src/services/healthSyncLocalStore';
 import { calculateCanonicalHealthIntelligence } from '../src/services/localHealthIntelligence';
+import { migrateLegacyHealthQueueToShards, persistShardedHealthBatch } from '../src/services/healthSyncShardedStore';
 
 const observation = (value: number, deleted = false, recordId = 'record-1') => ({
   metricType: 'steps', value, unit: deleted ? 'deleted' : 'count',
@@ -72,6 +74,51 @@ describe('durable local health sync store', () => {
     expect(await readLocalHealthObservations('account:user-2:apple-health')).toEqual([]);
   });
 
+  it('keeps only the latest compact display record per metric', async () => {
+    const scope = 'account:compact:apple-health';
+    await persistLocalSyncBatch(scope, [
+      { ...observation(100, false, 'old'), measuredAtISO: '2026-09-12T00:00:00.000Z' },
+      { ...observation(200, false, 'new'), measuredAtISO: '2026-09-13T00:00:00.000Z' }
+    ], { steps: 'anchor-2' });
+    expect(await readLocalHealthObservations(scope)).toEqual([
+      { ...observation(200, false, 'new'), measuredAtISO: '2026-09-13T00:00:00.000Z' }
+    ]);
+    expect(await countPendingLocalObservations(scope)).toBe(2);
+  });
+
+  it('migrates legacy pending rows incrementally and retains the recoverable archive', async () => {
+    const scope = 'account:legacy-migration:apple-health';
+    const pending = observation(100, false, 'pending');
+    mockStorage.set(`@fiteatsy/health-sync-local-v2:${scope}`, JSON.stringify({ records: {
+      acknowledged: { observation: observation(50, false, 'acknowledged'), uploaded: true },
+      pending: { observation: pending, uploaded: false },
+      duplicate: { observation: pending, uploaded: false },
+      poison: { observation: { metricType: 'steps', value: 'invalid' }, uploaded: false }
+    } }));
+    const summary = await migrateLegacyHealthQueueToShards(scope);
+    expect(summary).toEqual({ totalBefore: 4, acknowledgedRemoved: 1, duplicatesRemoved: 1,
+      poisonQuarantined: 1, uniquePendingRetained: 1, totalAfter: 1, dataLoss: 'NONE' });
+    expect(mockStorage.has(`@fiteatsy/health-sync-local-v2:${scope}`)).toBe(true);
+  });
+
+  it.each([100, 1_000, 10_000, 50_000, 100_000])(
+    'keeps a %i-row upload queue distributed across bounded shards', async (size) => {
+      mockStorage.clear();
+      const scope = `account:scale-${size}:apple-health`;
+      const rows = Array.from({ length: size }, (_, index) => ({
+        ...observation(index + 1, false, `record-${index}`),
+        measuredAtISO: new Date(Date.UTC(2026, 0, 1 + (index % 365))).toISOString()
+      }));
+      await persistShardedHealthBatch(scope, rows, 330);
+      expect(await countPendingLocalObservations(scope)).toBe(size);
+      const queueDocuments = [...mockStorage.entries()]
+        .filter(([key]) => key.includes(`@fiteatsy/health-queue-v3:${scope}:`))
+        .map(([, value]) => Object.keys(JSON.parse(value)).length);
+      expect(queueDocuments.length).toBeGreaterThan(1);
+      expect(Math.max(...queueDocuments)).toBeLessThan(Math.ceil(size / 128) + 100);
+    }, 120_000
+  );
+
   it('hydrates a bounded startup projection without parsing the raw health store', async () => {
     const scope = 'account:user-1:apple-health';
     await persistLocalSyncBatch(scope, [observation(100)], { steps: 'anchor-1' });
@@ -83,7 +130,7 @@ describe('durable local health sync store', () => {
     expect(storage.getItem.mock.calls[0][0]).toContain('health-sync-bootstrap');
   });
 
-  it('imports only the compact V1 bootstrap and never parses the legacy raw history', async () => {
+  it('imports only the compact legacy bootstrap and never parses the legacy raw history during startup', async () => {
     const scope = 'account:user-legacy:apple-health';
     mockStorage.set(`@fiteatsy/health-sync-local-v1:${scope}`, 'intentionally-not-json');
     mockStorage.set(`@fiteatsy/health-sync-bootstrap-v1:${scope}`, JSON.stringify({

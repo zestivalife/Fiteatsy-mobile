@@ -22,7 +22,7 @@ import { getHealthIntelligenceV1, type HealthIntelligenceV1, type HealthScoreSum
 import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLocalHealthProviderConnected,
   migrateLegacyHealthInstallationId, readLocalHealthBootstrapSnapshot,
   persistLocalCanonicalHealthSnapshot,
-  readLocalHealthAggregates, readLocalHealthLifecycle, readLocalHealthPresentationObservations,
+  readLocalHealthAggregates, readLocalHealthLifecycle, readLocalHealthObservations, readLocalHealthPresentationObservations,
   type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
 import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
 import { buildPresentedHealthObservations, mergeHealthPresentationObservations } from './healthMetricPresentation';
@@ -64,7 +64,7 @@ const serverSnapshot = (value: HealthIntelligenceV1): LocalCanonicalHealthSnapsh
 });
 
 export const countAvailableHealthMetrics = (metrics: CanonicalHealthMetricState[]) =>
-  metrics.filter((metric) => metric.queryState === 'COMPLETED').length;
+  metrics.filter((metric) => metric.queryState === 'COMPLETED' && metric.observation != null).length;
 
 const useCreateCanonicalHealthSyncCoordinator = () => {
   const { authSession, bootstrapped, wellness, onboarding, setWellness, setSelectedDeviceId } = useAppContext();
@@ -215,7 +215,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         onLocalComplete: applyLocalCompletion
       });
       if (!mounted.current || activeLocalFlight.current !== localFlight) return;
-      mergeLocalObservations(result.observations);
+      mergeLocalObservations(await readLocalHealthObservations(localScope));
       mergePresentationObservations(result.payload.presentationObservations ?? []);
       setSelectedDeviceId(adapter.appId);
       setWellness(result.wellness);
@@ -242,7 +242,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     } catch (error) {
       if (!mounted.current || activeLocalFlight.current !== localFlight) return;
       if (error instanceof HealthSyncUploadPendingError || error instanceof HealthSyncPostUploadRefreshError) {
-        mergeLocalObservations(error.observations);
+        const localDisplayObservations = await readLocalHealthObservations(localScope);
+        mergeLocalObservations(localDisplayObservations);
         mergePresentationObservations(error.payload.presentationObservations ?? []);
         setSelectedDeviceId(adapter.appId);
         const currentAggregates=await readLocalHealthAggregates(localScope);
@@ -254,7 +255,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setProviderState('CONNECTED');
         await markLocalHealthProviderConnected(localScope);
         setUploadState(error instanceof HealthSyncPostUploadRefreshError ? 'SYNCED' : 'PENDING');
-        const locallyAvailableTypes = new Set(error.observations
+        const locallyAvailableTypes = new Set(localDisplayObservations
           .filter((item) => !item.deleted)
           .map((item) => item.metricType));
         setQueryStates(Object.fromEntries(HEALTH_METRIC_REGISTRY.map((definition) => [
@@ -407,13 +408,17 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const metrics = useMemo<CanonicalHealthMetricState[]>(() => HEALTH_METRIC_REGISTRY.map((definition) => {
     const supported = adapter.platform === 'APPLE_HEALTH' ? Boolean(definition.appleHealthType) : Boolean(definition.healthConnectRecord);
     const observation = latestByMetric.get(definition.backendCanonicalType) ?? null;
+    const diagnosticState = queryStates[definition.metricKey];
+    const queryState = diagnosticState === 'COMPLETED' && !observation
+      ? 'NO_DATA'
+      : diagnosticState ?? (supported ? (observation ? 'COMPLETED' : 'IDLE') : 'UNSUPPORTED');
     return {
       definition,
       sourcePlatform: adapter.platform,
       supported,
       // Never label a blank card as data available. Native completion state is
       // useful diagnostics, but presentation availability requires a value.
-      queryState: queryStates[definition.metricKey] ?? (supported ? (observation ? 'COMPLETED' : 'IDLE') : 'UNSUPPORTED'),
+      queryState,
       observation,
       localRecordCount: observations.filter((item) => item.metricType === definition.backendCanonicalType).length,
       uploadState,

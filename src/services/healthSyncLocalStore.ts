@@ -1,17 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { HealthObservationDraft } from '../types';
 import type { LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
-import { aggregateCanonicalHealthObservations, HEALTH_AGGREGATION_VERSION, type CanonicalDailyAggregate } from '@fiteatsy/health-intelligence';
+import { HEALTH_AGGREGATION_VERSION, type CanonicalDailyAggregate } from '@fiteatsy/health-intelligence';
+import { acknowledgeShardedPending, countShardedPending, persistShardedHealthBatch,
+  readShardedPending, recomputeShardedAggregates } from './healthSyncShardedStore';
 
-// V1 retained every HealthKit row in one monolithic JSON document. Opening that
-// document during a sync could amplify into >1.6 GiB of transient JS/native
-// allocations on a physical device. V2 deliberately starts a fresh bounded
-// raw queue while importing only V1's compact bootstrap projection.
-const STORE_VERSION = 2;
-const LEGACY_STORE_VERSION = 1;
+// V1/V2 retained every HealthKit row in one monolithic JSON document. V3 is a
+// compact display/control store; canonical history and pending upload rows are
+// partitioned by health-day/metric and fixed queue shard respectively.
+const STORE_VERSION = 3;
+const LEGACY_STORE_VERSIONS = [2, 1] as const;
 const keyFor = (scope: string) => `@fiteatsy/health-sync-local-v${STORE_VERSION}:${scope}`;
 const bootstrapKeyFor = (scope: string) => `@fiteatsy/health-sync-bootstrap-v${STORE_VERSION}:${scope}`;
-const legacyBootstrapKeyFor = (scope: string) => `@fiteatsy/health-sync-bootstrap-v${LEGACY_STORE_VERSION}:${scope}`;
+const legacyBootstrapKeyFor = (scope: string, version: number) => `@fiteatsy/health-sync-bootstrap-v${version}:${scope}`;
 // Installation identity is independent of the raw-store schema generation.
 const INSTALLATION_KEY = '@fiteatsy/health-sync-installation-id';
 const PREVIOUS_INSTALLATION_KEY = '@fiteatsy/health-sync-local-v1:installation-id';
@@ -54,11 +55,12 @@ const readState = async (scope: string): Promise<LocalSyncState> => {
   }
 };
 
-const writeState = (scope: string, state: LocalSyncState) =>
-  AsyncStorage.multiSet([
+const writeState = async (scope: string, state: LocalSyncState) => {
+  const pendingUploadCount = await countShardedPending(scope);
+  await AsyncStorage.multiSet([
     [keyFor(scope), JSON.stringify(state)],
     [bootstrapKeyFor(scope), JSON.stringify({
-      pendingUploadCount: Object.values(state.records).filter((record) => !record.uploaded).length,
+      pendingUploadCount,
       providerConnected: state.providerConnected,
       canonicalScoreSnapshot: state.canonicalScoreSnapshot,
       aggregates: state.aggregates,
@@ -66,6 +68,7 @@ const writeState = (scope: string, state: LocalSyncState) =>
       lifecycle: state.lifecycle
     })]
   ]);
+};
 
 const emptyBootstrapSnapshot = () => ({
   pendingUploadCount: 0, providerConnected: false, canonicalScoreSnapshot: null as LocalCanonicalHealthSnapshot | null,
@@ -75,8 +78,13 @@ const emptyBootstrapSnapshot = () => ({
 const readBootstrapSnapshot = async (scope: string) => {
   // The legacy bootstrap is intentionally small and contains the last display
   // projection. Never fall back to the legacy raw-history key.
-  const raw = await AsyncStorage.getItem(bootstrapKeyFor(scope))
-    ?? await AsyncStorage.getItem(legacyBootstrapKeyFor(scope));
+  let raw = await AsyncStorage.getItem(bootstrapKeyFor(scope));
+  if (!raw) {
+    for (const version of LEGACY_STORE_VERSIONS) {
+      raw = await AsyncStorage.getItem(legacyBootstrapKeyFor(scope, version));
+      if (raw) break;
+    }
+  }
   if (!raw) return emptyBootstrapSnapshot();
   try {
     const parsed = JSON.parse(raw) as Partial<Pick<LocalSyncState,
@@ -115,16 +123,18 @@ export const persistLocalHealthPresentationObservations = (
   observations: HealthObservationDraft[]
 ) => serializeScopeOperation(scope, async () => {
   const state = await readState(scope);
-  for (const observation of observations) state.presentationRecords[identity(observation)] = observation;
+  for (const observation of observations) {
+    const previous = state.presentationRecords[observation.metricType];
+    if (!previous || observation.measuredAtISO >= previous.measuredAtISO) {
+      state.presentationRecords[observation.metricType] = observation;
+    }
+  }
   if(observations.length)state.aggregatesDirty=true;
   await writeState(scope, state);
 });
 
 export const countPendingLocalObservations = (scope: string) =>
-  serializeScopeOperation(scope, async () => {
-    const state = await readState(scope);
-    return Object.values(state.records).filter((record) => !record.uploaded).length;
-  });
+  serializeScopeOperation(scope, () => countShardedPending(scope));
 
 export const readLocalHealthProviderConnected = (scope: string) =>
   serializeScopeOperation(scope, async () => (await readState(scope)).providerConnected);
@@ -165,10 +175,7 @@ export const persistLocalHealthAggregates = (scope:string,aggregates:CanonicalDa
  * dirty marker and this replacement are serialized so a crash is detectable. */
 export const recomputeLocalHealthAggregates = (scope:string,readAtISO:string,fallbackOffsetMinutes:number,nowMs=Date.now()) =>
   serializeScopeOperation(scope,async()=>{const state=await readState(scope);
-    const input=[...Object.values(state.records).map(record=>record.observation),...Object.values(state.presentationRecords)]
-      .map(item=>({...item,sourceProvider:item.sourceMetadata?.measurementMethod==='HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'
-        ?'platform_aggregate':item.sourceProvider}));
-    state.aggregates=aggregateCanonicalHealthObservations(input,{fallbackOffsetMinutes,nowMs});
+    state.aggregates=await recomputeShardedAggregates(scope,Object.values(state.presentationRecords),fallbackOffsetMinutes,nowMs);
     state.aggregatesDirty=false;state.canonicalScoreSnapshot=null;
     state.lifecycle={...state.lifecycle,lastHealthReadAtISO:readAtISO,lastSavedAtISO:new Date(nowMs).toISOString()};
     await writeState(scope,state);return state.aggregates;
@@ -176,10 +183,7 @@ export const recomputeLocalHealthAggregates = (scope:string,readAtISO:string,fal
 export const ensureLocalHealthAggregatesCurrent=(scope:string,fallbackOffsetMinutes:number,nowMs=Date.now())=>
   serializeScopeOperation(scope,async()=>{const state=await readState(scope);
     if(!state.aggregatesDirty&&state.aggregates.every(item=>item.aggregateVersion===HEALTH_AGGREGATION_VERSION))return state.aggregates;
-    const input=[...Object.values(state.records).map(record=>record.observation),...Object.values(state.presentationRecords)]
-      .map(item=>({...item,sourceProvider:item.sourceMetadata?.measurementMethod==='HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'
-        ?'platform_aggregate':item.sourceProvider}));
-    state.aggregates=aggregateCanonicalHealthObservations(input,{fallbackOffsetMinutes,nowMs});state.aggregatesDirty=false;
+    state.aggregates=await recomputeShardedAggregates(scope,Object.values(state.presentationRecords),fallbackOffsetMinutes,nowMs);state.aggregatesDirty=false;
     state.canonicalScoreSnapshot=null;state.lifecycle={...state.lifecycle,lastSavedAtISO:new Date(nowMs).toISOString()};
     await writeState(scope,state);return state.aggregates;
   });
@@ -220,6 +224,7 @@ export const persistLocalSyncBatch = (
   cursors: Record<string, string>
 ) => serializeScopeOperation(scope, async () => {
   const state = await readState(scope);
+  await persistShardedHealthBatch(scope, observations, -new Date().getTimezoneOffset());
   const updatedAtISO = new Date().toISOString();
   for (const observation of observations) {
     if(observation.deleted&&observation.sourceRecordId){
@@ -232,10 +237,11 @@ export const persistLocalSyncBatch = (
           delete state.presentationRecords[existingKey];
       }
     }
-    const recordKey = identity(observation);
-    const previous = state.records[recordKey];
-    const unchanged = previous && JSON.stringify(previous.observation) === JSON.stringify(observation);
-    state.records[recordKey] = { observation, uploaded: unchanged ? previous.uploaded : false, updatedAtISO };
+    if (observation.deleted) continue;
+    const previous = state.records[observation.metricType];
+    if (!previous || observation.measuredAtISO >= previous.observation.measuredAtISO) {
+      state.records[observation.metricType] = { observation, uploaded: false, updatedAtISO };
+    }
   }
   if(observations.length){state.aggregatesDirty=true;state.canonicalScoreSnapshot=null;}
   state.cursors = { ...state.cursors, ...cursors };
@@ -243,19 +249,11 @@ export const persistLocalSyncBatch = (
 });
 
 export const readPendingLocalObservations = (scope: string, limit = 250) => serializeScopeOperation(scope, async () => {
-  const state = await readState(scope);
-  return Object.entries(state.records)
-    .filter(([, record]) => !record.uploaded)
-    .sort(([, left], [, right]) => left.updatedAtISO.localeCompare(right.updatedAtISO))
-    .slice(0, limit)
-    .map(([recordKey, record]) => ({ recordKey, observation: record.observation }));
+  return readShardedPending(scope, limit);
 });
 
 export const acknowledgeLocalObservations = (scope: string, recordKeys: string[]) => serializeScopeOperation(scope, async () => {
+  await acknowledgeShardedPending(scope, recordKeys);
   const state = await readState(scope);
-  for (const recordKey of recordKeys) {
-    const record = state.records[recordKey];
-    if (record) state.records[recordKey] = { ...record, uploaded: true };
-  }
   await writeState(scope, state);
 });

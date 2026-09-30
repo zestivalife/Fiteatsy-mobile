@@ -65,12 +65,15 @@ describe('end-to-end health data capture recovery contracts', () => {
 
   test('durable local queue stores records and tombstones before bounded upload acknowledgement', () => {
     const store = read('src/services/healthSyncLocalStore.ts');
+    const shardedStore = read('src/services/healthSyncShardedStore.ts');
     const manager = read('src/services/healthSyncManager.ts');
     expect(store).toContain('records: Record<string, StoredRecord>');
     expect(store).toContain('cursors: Record<string, string>');
-    expect(store).toContain('unchanged ? previous.uploaded : false');
-    expect(store).toContain('slice(0, limit)');
-    expect(store).toContain('uploaded: true');
+    expect(store).toContain('persistShardedHealthBatch(scope, observations');
+    expect(store).toContain('readShardedPending(scope, limit)');
+    expect(store).toContain('acknowledgeShardedPending(scope, recordKeys)');
+    expect(shardedStore).toContain('const SHARDS=256');
+    expect(shardedStore).toContain('await AsyncStorage.removeItem(qKey(scope,shard))');
     expect(manager).toContain('HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50');
     expect(manager).toContain('HEALTH_SYNC_UPLOAD_BATCH_SIZE * HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN');
     expect(manager).not.toContain('readPendingLocalObservations(localScope, 250)');
@@ -143,7 +146,8 @@ describe('end-to-end health data capture recovery contracts', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     expect(coordinator).toContain('await syncLocalMetrics({ forceSourceBackfill: true })');
-    expect(coordinator).toContain('mergeLocalObservations(result.observations)');
+    expect(coordinator).toContain('mergeLocalObservations(await readLocalHealthObservations(localScope))');
+    expect(coordinator).toContain('mergeHealthPresentationObservations(current, local)');
     expect(coordinator).toContain('awaitingPermissionReturn.current');
     expect(screen).toContain('Available metrics');
     expect(screen).toContain("NO_DATA:'No data'");

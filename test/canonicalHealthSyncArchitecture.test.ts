@@ -51,7 +51,8 @@ describe('canonical health sync architecture',()=>{
     expect(manager.indexOf('adapter.queryAllSupportedMetrics')).toBeLessThan(manager.indexOf('beginWearableSyncRun(governed.connectionId'));
     expect(manager.indexOf('persistLocalSyncBatch')).toBeLessThan(manager.indexOf('beginWearableSyncRun(governed.connectionId'));
     expect(manager).toContain('if (payload) throw new HealthSyncUploadPendingError(payload, observations)');
-    expect(coordinator).toContain('mergeLocalObservations(error.observations)');
+    expect(coordinator).toContain('mergeLocalObservations(localDisplayObservations)');
+    expect(coordinator).toContain('readLocalHealthObservations(localScope)');
     expect(coordinator.indexOf('access = await adapter.requestAccess()')).toBeLessThan(coordinator.indexOf('await acceptWearableConsent'));
     expect(coordinator).toContain("setUploadState('PENDING')");
   });
