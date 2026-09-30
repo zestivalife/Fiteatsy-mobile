@@ -188,6 +188,12 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setQueryStates(nextQueries);
         setErrors(nextErrors);
         setMessage('Health data is available on this device. Secure upload continues in the background.');
+        console.warn('[HealthSyncTrace] UI_SNAPSHOT_UPDATED', {
+          metricCount: Object.values(nextQueries).filter((state) => state === 'COMPLETED').length,
+          terminalMetricCount: Object.values(nextQueries).filter((state) =>
+            state === 'COMPLETED' || state === 'NO_DATA' || state === 'PERMISSION_DENIED' || state === 'UNSUPPORTED' || state === 'FAILED'
+          ).length
+        });
         // The native read/local persistence transaction is complete. A large or
         // offline upload queue must not suppress a later manual HealthKit read.
         releaseLocalFlight();

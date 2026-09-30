@@ -238,17 +238,24 @@ export const runHealthSync = async (
       'health_sync_native_read_timeout'
     );
     const localPayload = payload;
+    console.warn('[HealthSyncTrace] NATIVE_READ_DONE', {
+      requestedMetricCount: localPayload.dataQuality.syncCounts?.requestedMetricCount ?? 0,
+      nativeRecordCount: localPayload.dataQuality.syncCounts?.sourceRecordCount ?? 0
+    });
     options.onLifecyclePhase?.('NORMALIZING');
     observations = deriveObservations(payload);
+    console.warn('[HealthSyncTrace] NORMALIZE_DONE', { normalizedRecordCount: observations.length });
     const anchors = (localPayload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors ?? {};
     // Cursor advancement and normalized/tombstone persistence are one durable
     // local transaction and always precede every backend operation.
     options.onLifecyclePhase?.('PERSISTING');
     await persistLocalSyncBatch(localScope, observations, anchors);
     await persistLocalHealthPresentationObservations(localScope, localPayload.presentationObservations ?? []);
+    console.warn('[HealthSyncTrace] PERSIST_DONE', { persistedRecordCount: observations.length });
     const readAtISO=new Date().toISOString();
     options.onLifecyclePhase?.('AGGREGATING');
     const canonicalAggregates=await recomputeLocalHealthAggregates(localScope,readAtISO,-new Date().getTimezoneOffset());
+    console.warn('[HealthSyncTrace] AGGREGATE_DONE', { aggregateCount: canonicalAggregates.length });
     // Native reads and durable local persistence are the user-facing sync
     // boundary. Backend upload/recalculation may continue afterward without
     // keeping the Health Sync dialog or the JS interaction plane blocked.

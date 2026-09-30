@@ -77,7 +77,7 @@ describe('Apple Health sync hang repair', () => {
     expect(manager).toContain('const healthUploadFlights = new Map');
     expect(manager).toContain('serializeHealthUpload(localScope');
     expect(coordinator).toMatch(
-      /setMessage\('Health data is available on this device\. Secure upload continues in the background\.'\);\s*\/\/[^]*?releaseLocalFlight\(\);/
+      /setMessage\('Health data is available on this device\. Secure upload continues in the background\.'\);[^]*?releaseLocalFlight\(\);/
     );
     expect(coordinator).toContain('activeLocalFlight.current !== localFlight');
   });
@@ -89,6 +89,15 @@ describe('Apple Health sync hang repair', () => {
       'METRIC_QUERY_ERROR', 'HEALTH_SYNC_COMPLETE'
     ]) expect(apple).toContain(event);
     expect(apple).toContain('durationMs');
-    expect(apple).not.toMatch(/diagnostic\([^\n]*value/);
+    expect(apple).not.toMatch(/diagnostic\([^\n]*\b(sampleValue|healthValue|value):/);
+  });
+
+  test('release diagnostics expose phase counts without health values or identity', () => {
+    expect(apple).toContain('[HealthSyncTrace]');
+    expect(apple).toContain('nativeRecordCount');
+    expect(manager).toContain("'[HealthSyncTrace] PERSIST_DONE'");
+    expect(manager).toContain("'[HealthSyncTrace] AGGREGATE_DONE'");
+    expect(coordinator).toContain("'[HealthSyncTrace] UI_SNAPSHOT_UPDATED'");
+    expect(apple).not.toMatch(/HealthSyncTrace[^\n]*(sample\.value|measuredAtISO|sourceApplication)/);
   });
 });

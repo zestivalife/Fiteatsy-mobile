@@ -112,6 +112,8 @@ public final class FiteatsyHealthKitModule: Module {
 
     AsyncFunction("readChanges") { (metric: String, anchorText: String?, startText: String?, promise: Promise) in
       guard let type = self.sampleType(metric) else { promise.reject("HEALTHKIT_UNSUPPORTED_METRIC", metric); return }
+      NSLog("[HealthSyncTrace] NATIVE_READ_START metric=%@ anchorPresent=%@ windowPresent=%@", metric,
+            anchorText == nil ? "NO" : "YES", startText == nil ? "NO" : "YES")
       let anchor = anchorText.flatMap { Data(base64Encoded: $0) }.flatMap { try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: $0) }
       let start = startText.flatMap { self.iso.date(from: $0) }
       let predicate = start.map { HKQuery.predicateForSamples(withStart: $0, end: nil, options: []) }
@@ -128,6 +130,8 @@ public final class FiteatsyHealthKitModule: Module {
         let deletedIds = (deleted ?? []).map { $0.uuid.uuidString }
         let anchorData = newAnchor.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
         self.logger.info("HealthKit read completed for \(metric, privacy: .public); records=\(rows.count, privacy: .public)")
+        NSLog("[HealthSyncTrace] NATIVE_READ_DONE metric=%@ nativeRecordCount=%ld deletedRecordCount=%ld hasMore=%@",
+              metric, rows.count, deletedIds.count, rows.count + deletedIds.count >= self.anchoredReadLimit ? "YES" : "NO")
         promise.resolve(["samples": rows, "deletedIds": deletedIds, "anchor": anchorData?.base64EncodedString() ?? "",
           "hasMore": rows.count + deletedIds.count >= self.anchoredReadLimit])
       }

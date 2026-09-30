@@ -24,7 +24,10 @@ export const withAppleHealthTimeout = <T>(operation: Promise<T>, timeoutMs: numb
   });
 
 const diagnostic = (event: string, metadata: Record<string, string | number>) => {
-  if (__DEV__) console.info(`[HealthSync] ${event}`, metadata);
+  // Intentionally metadata-only and retained in Release builds for governed
+  // physical diagnostics. Never include sample values, sample timestamps,
+  // source names, account identifiers, or health payloads here.
+  console.warn(`[HealthSyncTrace] ${event}`, metadata);
 };
 
 export const inspectAppleHealthAvailability = async () => Platform.OS === 'ios' && withAppleHealthTimeout(
@@ -67,15 +70,16 @@ export const syncFromAppleHealth = async (
   anchors: Record<string,string> = {},
   options: { forceBackfill?: boolean } = {}
 ): Promise<WearableSyncPayload & { anchors: Record<string,string> }> => {
+  const syncRunId = `hs-${Date.now().toString(36)}`;
   const availabilityStartedAt = Date.now();
   if (Platform.OS !== 'ios' || !(await inspectAppleHealthAvailability())) throw new Error('apple_health_unavailable');
-  diagnostic('HEALTHKIT_AVAILABLE', { durationMs: Date.now() - availabilityStartedAt, status: 'SUCCESS' });
+  diagnostic('HEALTHKIT_AVAILABLE', { syncRunId, durationMs: Date.now() - availabilityStartedAt, status: 'SUCCESS' });
   const observations: HealthObservationDraft[] = []; const presentationObservations: HealthObservationDraft[] = [];
   const nextAnchors: Record<string,string> = {};
   const statuses: Record<string,string> = {};
   const metricValues: Record<string, number[]> = {};
   const metricDiagnostics:NonNullable<WearableSyncPayload['dataQuality']['metricDiagnostics']>={};
-  diagnostic('HEALTH_SYNC_START', { metricCount: APPLE_HEALTH_SCOPES.length, status: 'STARTED' });
+  diagnostic('HEALTH_SYNC_START', { syncRunId, metricCount: APPLE_HEALTH_SCOPES.length, status: 'STARTED' });
   // Statistics are independent of anchored change reads. Starting them here
   // prevents their timeout budget from being added after every read batch.
   const readStatistics = async () => {
@@ -98,7 +102,7 @@ export const syncFromAppleHealth = async (
     const definition = APPLE_HEALTH_QUERYABLE_METRICS.find((item) => item.appleHealthType === metric);
     const start = new Date(Date.now() - (definition?.syncWindowDays ?? 30) * 86400000).toISOString();
     const startedAt = Date.now();
-    diagnostic('METRIC_QUERY_START', { metric, durationMs: 0, status: 'CHECKING' });
+    diagnostic('METRIC_QUERY_START', { syncRunId, metric, durationMs: 0, status: 'CHECKING' });
     try {
       let pageAnchor = options.forceBackfill ? undefined : anchors[metric];
       const samples = []; const deletedIds:string[] = [];
@@ -116,13 +120,14 @@ export const syncFromAppleHealth = async (
       const result = { samples, deletedIds, anchor: pageAnchor ?? '', hasMore };
       const status = result.samples.length ? 'SUCCESS' : 'NO_DATA';
       diagnostic(status === 'SUCCESS' ? 'METRIC_QUERY_SUCCESS' : 'METRIC_QUERY_NO_DATA', {
-        metric, durationMs: Date.now() - startedAt, status
+        syncRunId, metric, nativeRecordCount: result.samples.length,
+        deletedRecordCount: result.deletedIds.length, durationMs: Date.now() - startedAt, status
       });
       return { metric, result, status };
     } catch (error) {
       const timeout = error instanceof Error && error.message.startsWith('apple_health_metric_timeout:');
       diagnostic(timeout ? 'METRIC_QUERY_TIMEOUT' : 'METRIC_QUERY_ERROR', {
-        metric, durationMs: Date.now() - startedAt, status: timeout ? 'TIMEOUT' : 'ERROR'
+        syncRunId, metric, durationMs: Date.now() - startedAt, status: timeout ? 'TIMEOUT' : 'ERROR'
       });
       throw { metric, timeout, error };
     }
@@ -220,7 +225,9 @@ export const syncFromAppleHealth = async (
   const hrvMs = average(validValues(metricValues.hrv_sdnn_ms ?? []));
   const workoutMinutes = Math.max(sum(validValues(metricValues.workout_minutes ?? [])), sum(validValues(metricValues.active_minutes ?? [])));
   const activeEnergy = sum(validValues(metricValues.active_energy ?? []));
-  diagnostic('HEALTH_SYNC_COMPLETE', { durationMs: 0, status: observations.length ? 'SUCCESS' : 'NO_DATA' });
+  diagnostic('HEALTH_SYNC_COMPLETE', { syncRunId, nativeRecordCount: Object.values(metricDiagnostics)
+    .reduce((count, item) => count + item.nativeRecordCount, 0), normalizedRecordCount: observations.length,
+    metricCount: APPLE_HEALTH_SCOPES.length, status: observations.length ? 'SUCCESS' : 'NO_DATA' });
   const metricStatuses = Object.values(statuses);
   return {deviceId:'ios-healthkit',brand:'Apple',model:'Apple Health',provider:'Apple Health',syncedAtISO:new Date().toISOString(),source:'api',
     metrics:{heartRateAvg:restingHeartRate,sleepHours:sleepMinutes > 0 ? sleepMinutes / 60 : null,
