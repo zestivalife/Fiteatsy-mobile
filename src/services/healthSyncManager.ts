@@ -203,6 +203,7 @@ export const runHealthSync = async (
       observations: HealthObservationDraft[];
       aggregates: CanonicalDailyAggregate[];
     }) => void | Promise<void>;
+    onLifecyclePhase?: (phase: 'NORMALIZING' | 'PERSISTING' | 'AGGREGATING') => void;
   } = {}
 ): Promise<HealthSyncResult> => {
   let run: Awaited<ReturnType<typeof beginWearableSyncRun>> | null = null;
@@ -220,13 +221,16 @@ export const runHealthSync = async (
       adapter.queryAllSupportedMetrics(localCursors, { forceBackfill: options.forceSourceBackfill }),
       'health_sync_native_read_timeout'
     );
+    options.onLifecyclePhase?.('NORMALIZING');
     observations = deriveObservations(payload);
     const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors ?? {};
     // Cursor advancement and normalized/tombstone persistence are one durable
     // local transaction and always precede every backend operation.
+    options.onLifecyclePhase?.('PERSISTING');
     await persistLocalSyncBatch(localScope, observations, anchors);
     await persistLocalHealthPresentationObservations(localScope, payload.presentationObservations ?? []);
     const readAtISO=new Date().toISOString();
+    options.onLifecyclePhase?.('AGGREGATING');
     const canonicalAggregates=await recomputeLocalHealthAggregates(localScope,readAtISO,-new Date().getTimezoneOffset());
     // Native reads and durable local persistence are the user-facing sync
     // boundary. Backend upload/recalculation may continue afterward without

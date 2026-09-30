@@ -22,7 +22,13 @@ describe('Apple Health sync hang repair', () => {
     expect(apple).toContain('settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY');
     expect(apple).toContain('METRIC_QUERY_TIMEOUT');
     expect(apple).toContain('METRIC_QUERY_NO_DATA');
-    expect(apple).toContain("acceptedSampleCount > 0 ? 'synced' : 'no_recent_data'");
+    expect(apple).toContain("acceptedSourceSampleCount > 0 ? 'synced' : 'no_recent_data'");
+  });
+
+  test('drains every native page instead of truncating first-sync history at an arbitrary cap', () => {
+    expect(apple).toContain('do {');
+    expect(apple).toContain('} while (hasMore);');
+    expect(apple).not.toContain('APPLE_HEALTH_MAX_PAGES_PER_METRIC');
   });
 
   test('starts current-day cumulative statistics before serial source-history reads', () => {

@@ -64,7 +64,7 @@ const serverSnapshot = (value: HealthIntelligenceV1): LocalCanonicalHealthSnapsh
 });
 
 export const countAvailableHealthMetrics = (metrics: CanonicalHealthMetricState[]) =>
-  metrics.filter((metric) => metric.queryState === 'DATA_AVAILABLE').length;
+  metrics.filter((metric) => metric.queryState === 'COMPLETED').length;
 
 const useCreateCanonicalHealthSyncCoordinator = () => {
   const { authSession, bootstrapped, wellness, onboarding, setWellness, setSelectedDeviceId } = useAppContext();
@@ -150,7 +150,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     traceSessionLifecycle('HEALTH_SYNC_START', { trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL' });
     setUploadState('UPLOADING');
     setMessage(`Reading ${sourceName}…`);
-    setQueryStates(Object.fromEntries(adapter.getSupportedMetricRegistry().map((key) => [key, 'QUERYING'])));
+    setQueryStates(Object.fromEntries(HEALTH_METRIC_REGISTRY.map((definition) => [definition.metricKey,
+      adapter.getSupportedMetricRegistry().includes(definition.metricKey) ? 'READING' : 'UNSUPPORTED'])));
     const connection = adapter.platform === 'APPLE_HEALTH' ? status?.appleHealth : status?.healthConnect;
     const connectionId = connectionIdOverride.current ?? connection?.connectionId ?? null;
     try {
@@ -170,12 +171,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         const nextErrors: Record<string, string | null> = {};
         HEALTH_METRIC_REGISTRY.forEach((definition) => {
           const diagnostic = localDiagnostics.find((item) => item.metricKey === definition.metricKey);
-          if (!diagnostic?.supported) return;
-          nextQueries[definition.metricKey] = diagnostic.localQueryState === 'DATA_AVAILABLE' ? 'DATA_AVAILABLE'
-            : diagnostic.localQueryState === 'TIMEOUT' ? 'TIMEOUT'
-            : diagnostic.localQueryState === 'ERROR' ? 'ERROR' : 'NO_VISIBLE_DATA';
-          nextErrors[definition.metricKey] = nextQueries[definition.metricKey] === 'ERROR' ? 'NATIVE_ERROR'
-            : nextQueries[definition.metricKey] === 'TIMEOUT' ? 'TIMEOUT' : null;
+          nextQueries[definition.metricKey] = diagnostic?.lifecycleState ?? 'FAILED';
+          nextErrors[definition.metricKey] = nextQueries[definition.metricKey] === 'FAILED' ? 'NATIVE_READ_FAILED' : null;
         });
         setQueryStates(nextQueries);
         setErrors(nextErrors);
@@ -186,7 +183,17 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         provider: adapter.platform,
         trigger: 'MANUAL',
         localScope
-      } : undefined, { ...options, localScope, onLocalComplete: applyLocalCompletion });
+      } : undefined, {
+        ...options,
+        localScope,
+        onLifecyclePhase: (phase) => setQueryStates((current) => Object.fromEntries(
+          Object.entries(current).map(([key, state]) => [key,
+            state === 'READING' || state === 'NORMALIZING' || state === 'PERSISTING' || state === 'AGGREGATING'
+              ? phase
+              : state])
+        )),
+        onLocalComplete: applyLocalCompletion
+      });
       if (!mounted.current) return;
       mergeLocalObservations(result.observations);
       mergePresentationObservations(result.payload.presentationObservations ?? []);
@@ -202,15 +209,10 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       const nextQueries: Record<string, HealthMetricQueryState> = {};
       const nextErrors: Record<string, string | null> = {};
       HEALTH_METRIC_REGISTRY.forEach((definition) => {
-        const nativeKey = adapter.platform === 'APPLE_HEALTH' ? definition.appleHealthType : definition.healthConnectRecord;
-        if (!nativeKey) return;
-        const diagnostic = result.diagnostics.find((item) => item.metricKey === nativeKey);
+        const diagnostic = result.diagnostics.find((item) => item.metricKey === definition.metricKey);
         const hasData = result.observations.some((item) => !item.deleted && item.metricType === definition.backendCanonicalType);
-        nextQueries[definition.metricKey] = hasData ? 'DATA_AVAILABLE'
-          : diagnostic?.localQueryState === 'TIMEOUT' ? 'TIMEOUT'
-          : diagnostic?.localQueryState === 'ERROR' ? 'ERROR' : 'NO_VISIBLE_DATA';
-        nextErrors[definition.metricKey] = nextQueries[definition.metricKey] === 'ERROR' ? 'NATIVE_ERROR'
-          : nextQueries[definition.metricKey] === 'TIMEOUT' ? 'TIMEOUT' : null;
+        nextQueries[definition.metricKey] = hasData ? 'COMPLETED' : diagnostic?.lifecycleState ?? 'FAILED';
+        nextErrors[definition.metricKey] = nextQueries[definition.metricKey] === 'FAILED' ? 'NATIVE_READ_FAILED' : null;
       });
       setQueryStates(nextQueries);
       setErrors(nextErrors);
@@ -237,7 +239,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
           .map((item) => item.metricType));
         setQueryStates(Object.fromEntries(HEALTH_METRIC_REGISTRY.map((definition) => [
           definition.metricKey,
-          locallyAvailableTypes.has(definition.backendCanonicalType) ? 'DATA_AVAILABLE' : 'NO_VISIBLE_DATA'
+          locallyAvailableTypes.has(definition.backendCanonicalType) ? 'COMPLETED'
+            : adapter.getSupportedMetricRegistry().includes(definition.metricKey) ? 'NO_DATA' : 'UNSUPPORTED'
         ])));
         setMessage(error instanceof HealthSyncPostUploadRefreshError
           ? `${sourceName} data was uploaded. Account status will refresh automatically.`
@@ -247,7 +250,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setProviderState(available ? 'ERROR' : 'UNAVAILABLE');
         setUploadState('ERROR');
         setQueryStates((current) => Object.fromEntries(Object.entries(current).map(([key, state]) => [key,
-          state === 'QUERYING' ? 'ERROR' : state])));
+          state === 'READING' || state === 'NORMALIZING' || state === 'PERSISTING' || state === 'AGGREGATING' ? 'FAILED' : state])));
         setMessage('Health data could not be read. Previous local data is safe.');
       }
     } finally {
@@ -263,6 +266,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     if (inFlight.current) return;
     inFlight.current = true;
     setMessage(`Requesting ${sourceName} access…`);
+    setQueryStates(Object.fromEntries(HEALTH_METRIC_REGISTRY.map((definition) => [definition.metricKey,
+      adapter.getSupportedMetricRegistry().includes(definition.metricKey) ? 'REQUESTING_PERMISSION' : 'UNSUPPORTED'])));
     let access;
     try {
       // Native permission must remain available without a network connection.
@@ -272,8 +277,11 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         await markLocalHealthProviderConnected(localScope);
       }
       forceBackfill.current = true;
-    } catch {
+    } catch (error) {
       setProviderState('ACTION_REQUIRED');
+      const permissionDenied = error instanceof Error && /authori[sz]ation|permission|denied/i.test(error.message);
+      setQueryStates((current) => Object.fromEntries(Object.entries(current).map(([key, state]) => [key,
+        state === 'REQUESTING_PERMISSION' ? (permissionDenied ? 'PERMISSION_DENIED' : 'FAILED') : state])));
       setMessage(`${sourceName} access requires your attention.`);
       inFlight.current = false;
       return;
@@ -389,10 +397,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       supported,
       // Never label a blank card as data available. Native completion state is
       // useful diagnostics, but presentation availability requires a value.
-      queryState: observation ? 'DATA_AVAILABLE'
-        : queryStates[definition.metricKey] === 'TIMEOUT' ? 'TIMEOUT'
-        : queryStates[definition.metricKey] === 'ERROR' ? 'ERROR'
-        : queryStates[definition.metricKey] === 'QUERYING' ? 'QUERYING' : 'NO_VISIBLE_DATA',
+      queryState: queryStates[definition.metricKey] ?? (supported ? (observation ? 'COMPLETED' : 'IDLE') : 'UNSUPPORTED'),
       observation,
       localRecordCount: observations.filter((item) => item.metricType === definition.backendCanonicalType).length,
       uploadState,

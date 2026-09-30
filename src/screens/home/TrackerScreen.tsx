@@ -1334,7 +1334,7 @@ export const TrackerScreen = () => {
       compareValues: observationSeries(['resting_heart_rate', 'heart_rate']),
       signalState: trendState(observationSeries(['resting_heart_rate', 'heart_rate'])),
       recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
-      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='resting_heart_rate')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
+      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='resting_heart_rate')?.queryState==='COMPLETED'?'synced':undefined),
       confidence: confidenceState()
     },
     {
@@ -1350,7 +1350,7 @@ export const TrackerScreen = () => {
       compareValues: observationSeries(['workout_minutes', 'active_minutes']),
       signalState: trendState(observationSeries(['workout_minutes', 'active_minutes'])),
       recoveryImpact: impactState(displayScores?.activity.score ?? 0),
-      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='workout')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
+      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='workout')?.queryState==='COMPLETED'?'synced':undefined),
       confidence: confidenceState()
     },
     {
@@ -1366,7 +1366,7 @@ export const TrackerScreen = () => {
       compareValues: observationSeries(['hrv_sdnn_ms', 'hrv_rmssd_ms']),
       signalState: trendState(observationSeries(['hrv_sdnn_ms', 'hrv_rmssd_ms'])),
       recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
-      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey.startsWith('hrv_'))?.queryState==='DATA_AVAILABLE'?'synced':undefined),
+      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey.startsWith('hrv_'))?.queryState==='COMPLETED'?'synced':undefined),
       confidence: confidenceState()
     },
     {
@@ -1382,7 +1382,7 @@ export const TrackerScreen = () => {
       compareValues: scoreSeries('sleep'),
       signalState: trendState(scoreSeries('sleep')),
       recoveryImpact: impactState(sleepScoreValue ?? 0),
-      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='sleep')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
+      freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='sleep')?.queryState==='COMPLETED'?'synced':undefined),
       confidence: confidenceState()
     }
   ];

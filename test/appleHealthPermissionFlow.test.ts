@@ -44,13 +44,12 @@ describe('Apple Health physical-device permission flow', () => {
     expect(coordinator).toContain('forceBackfill.current = true');
   });
 
-  it('projects Apple metric names into canonical connected-domain keys', () => {
-    expect(apple).toContain("sleep_minutes: 'sleep'");
-    expect(apple).toContain("hrv_ms: 'hrv'");
-    expect(apple).toContain("workout_minutes: 'workouts'");
-    expect(apple).toContain("active_energy: 'calories'");
-    expect(apple).toContain("exercise_minutes: 'workouts'");
+  it('keeps every native task independently addressable while normalizing record metric names', () => {
+    expect(apple).not.toContain("sleep_minutes: 'sleep'");
+    expect(apple).not.toContain("workout_minutes: 'workouts'");
+    expect(apple).toContain('statuses[metric] = nextStatus');
     expect(apple).toContain("sample.metric === 'exercise_minutes' ? 'active_minutes'");
+    expect(apple).toContain("sample.metric === 'hrv_ms' ? 'hrv_sdnn_ms'");
   });
 
   it('derives local tracker summaries from real Apple samples without inventing values', () => {

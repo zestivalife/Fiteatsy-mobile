@@ -34,7 +34,8 @@ describe('canonical health sync architecture',()=>{
 
   test('provider, metric, and upload finite states are separate',()=>{
     expect(read('src/services/healthPlatformAdapter.ts')).toContain("'UNAVAILABLE' | 'AVAILABLE' | 'CONNECTED' | 'ACTION_REQUIRED' | 'ERROR'");
-    expect(read('src/services/healthSyncState.ts')).toContain("'IDLE'|'QUERYING'|'DATA_AVAILABLE'|'NO_VISIBLE_DATA'|'ERROR'|'TIMEOUT'|'UPLOAD_PENDING'");
+    const lifecycle=read('src/services/healthSyncState.ts');
+    for(const state of ['IDLE','QUEUED','REQUESTING_PERMISSION','READING','NORMALIZING','PERSISTING','AGGREGATING','UPLOAD_PENDING','COMPLETED','NO_DATA','PERMISSION_DENIED','UNSUPPORTED','FAILED'])expect(lifecycle).toContain(`'${state}'`);
     expect(read('src/services/healthSyncState.ts')).toContain("'IDLE'|'UPLOADING'|'SYNCED'|'PENDING'|'ERROR'");
   });
 
@@ -56,8 +57,7 @@ describe('canonical health sync architecture',()=>{
   });
 
   test('available metric count derives only from metric data state',()=>{
-    expect(coordinator).toContain("metric.queryState === 'DATA_AVAILABLE'");
-    expect(coordinator).not.toContain("metric.queryState === 'DATA_AVAILABLE' ||");
+    expect(coordinator).toContain("metric.queryState === 'COMPLETED'");
     expect(screen).toContain("health.availableMetricCount:'—'");
     expect(screen).toContain('{terminalMetricCount} of {supportedMetrics.length} metric tasks complete');
     expect(screen).not.toContain('recordsAvailable');

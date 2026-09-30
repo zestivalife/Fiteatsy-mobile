@@ -10,7 +10,8 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain('settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY');
     expect(apple).toContain('APPLE_HEALTH_METRIC_TIMEOUT_MS');
     expect(apple).toContain("result.samples.length ? 'SUCCESS' : 'NO_DATA'");
-    expect(apple).toContain("statuses[statusKey] !== 'synced'");
+    expect(apple).toContain('statuses[metric] = nextStatus');
+    expect(apple).not.toContain('STATUS_KEY_BY_METRIC');
   });
 
   test('first Apple sync uses bounded backfill and incremental sync uses only valid anchors', () => {
@@ -85,7 +86,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain('readHealthKitCumulativeStatistics');
     expect(apple).toContain('anchored source rows remain available for audit');
     expect(apple).toContain('startDate.setHours(0, 0, 0, 0)');
-    expect(apple).toContain("dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_OR_NON_POSITIVE_SAMPLE']");
+    expect(apple).toContain("dropReasons:droppedRecordCount===0?[]:['NON_CONSUMPTIVE_OR_NON_POSITIVE_SAMPLE']");
     expect(apple).toContain('presentationObservations.push');
     expect(apple).toContain("measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'");
   });
@@ -127,10 +128,10 @@ describe('end-to-end health data capture recovery contracts', () => {
     const store = read('src/services/healthSyncLocalStore.ts');
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     expect(bridge).toContain('"hasMore": rows.count + deletedIds.count >= self.anchoredReadLimit');
-    expect(apple).toContain('APPLE_HEALTH_MAX_PAGES_PER_METRIC = 1');
+    expect(apple).not.toContain('APPLE_HEALTH_MAX_PAGES_PER_METRIC');
     expect(apple).toContain('values.push(sample.value)');
     expect(apple).not.toContain('metricValues[canonicalMetric] = [...');
-    expect(apple).toContain('while (hasMore && pagesRead < APPLE_HEALTH_MAX_PAGES_PER_METRIC)');
+    expect(apple).toContain('} while (hasMore);');
     expect(apple).toContain('sample.value <= 0');
     expect(store).toContain('serializeScopeOperation');
     expect(coordinator).not.toContain('subscribeToHealthKitChanges');
@@ -145,7 +146,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(coordinator).toContain('mergeLocalObservations(result.observations)');
     expect(coordinator).toContain('awaitingPermissionReturn.current');
     expect(screen).toContain('Available metrics');
-    expect(screen).toContain('No recent data');
+    expect(screen).toContain("NO_DATA:'No data'");
   });
 
   test('QA diagnostics are safe, metric-specific, and development-gated', () => {

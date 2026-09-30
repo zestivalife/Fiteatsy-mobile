@@ -23,7 +23,7 @@ describe('Health Data Sync control-centre contracts', () => {
     expect(coordinator).toContain('getLatestHealthObservations(200)');
     expect(coordinator).toContain('getHealthSyncActivity(8)');
     expect(screen).toContain('health.metrics.map');
-    expect(screen).toContain('No recent data');
+    expect(screen).toContain("NO_DATA:'No data'");
     expect(screen).not.toMatch(/value:\s*['"](?:--|0)['"]/);
   });
 
@@ -76,8 +76,9 @@ describe('Health Data Sync control-centre contracts', () => {
     const screen = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     expect(coordinator).toContain('access requires your attention');
-    expect(screen).toContain("NO_VISIBLE_DATA:'No recent data'");
-    expect(screen).not.toContain('Permission denied');
+    expect(screen).toContain("NO_DATA:'No data'");
+    expect(screen).toContain("PERMISSION_DENIED:'Permission denied'");
+    expect(screen).toContain("UNSUPPORTED:'Unsupported'");
   });
 
   test('keeps local health reads independent from backend upload availability', () => {

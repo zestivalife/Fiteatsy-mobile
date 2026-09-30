@@ -352,7 +352,7 @@ const incrementalObservation = (record: Record<string, any>): HealthObservationD
   const sourceRecordId = String(record.metadata?.id ?? record.metadata?.clientRecordId ?? '').trim();
   if (!mapped || !sourceRecordId || !Number.isFinite(value) || value <= 0 || !Number.isFinite(Date.parse(measuredAtISO))) return null;
   return {
-    metricType: mapped.metricType, value: Number(value.toFixed(mapped.metricType === 'sleep_minutes' ? 0 : 2)),
+    metricType: mapped.metricType, value,
     unit: mapped.unit, measuredAtISO, startAtISO: record.startTime ?? null, endAtISO: record.endTime ?? record.time ?? null,
     timezoneOffsetMinutes: -new Date(measuredAtISO).getTimezoneOffset(),
     providerUpdatedAtISO: record.metadata?.lastModifiedTime ?? null,
@@ -486,12 +486,12 @@ const syncFromHealthConnectInternal = async (changesToken?: string): Promise<Wea
     if (value == null || !Number.isFinite(value) || value <= 0) return;
     if (!Number.isFinite(Date.parse(measuredAtISO)) || Date.parse(measuredAtISO) > now() + 5 * 60_000) return;
     if (record?.startTime && record?.endTime && Date.parse(record.endTime) < Date.parse(record.startTime)) return;
-    const rounded = Number(value.toFixed(metricType === 'sleep_minutes' ? 0 : 2));
+    const canonicalValue = value;
     const sourceRecordId = record?.metadata?.id?.trim() || record?.metadata?.clientRecordId?.trim() ||
-      [recordType, record?.metadata?.dataOrigin || 'unknown_origin', measuredAtISO, rounded, unit].join(':');
+      [recordType, record?.metadata?.dataOrigin || 'unknown_origin', measuredAtISO, canonicalValue, unit].join(':');
     observations.push({
       metricType,
-      value: rounded,
+      value: canonicalValue,
       unit,
       measuredAtISO,
       sourceProvider: 'health_connect',

@@ -290,23 +290,9 @@ export type WearableSyncPayload = {
     confidence: number;
     isEstimated: boolean;
     warnings: string[];
-    connectedMetrics?: Partial<
-      Record<
-        | 'sleep'
-        | 'steps'
-        | 'heart_rate'
-        | 'hrv'
-        | 'calories'
-        | 'workouts'
-        | 'weight'
-        | 'distance'
-        | 'stress'
-        | 'cycle'
-        | 'spo2'
-        | 'respiratory_rate',
-        'synced' | 'missing' | 'unsupported' | 'estimated' | 'no_permission' | 'no_recent_data' | 'read_failed' | 'unavailable'
-      >
-    >;
+    connectedMetrics?: Partial<Record<string,
+      'synced' | 'missing' | 'unsupported' | 'estimated' | 'no_permission' |
+      'no_recent_data' | 'read_failed' | 'unavailable' | 'timeout'>>;
     normalizedDomains?: {
       Activity: number | null;
       Sleep: number | null;
