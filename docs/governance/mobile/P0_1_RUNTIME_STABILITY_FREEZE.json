@@ -1,0 +1,62 @@
+{
+  "module": "P0-1 Runtime Stability + Launch/Session",
+  "acceptedSha": "3364db31302c87eb1f24b48d71edbc1f906aecd0",
+  "moduleStatus": "PHYSICAL_ACCEPTANCE_BLOCKED_BY_TOOLING",
+  "engineeringSeal": "PARTIAL_ACTIVE",
+  "applicationDefectOpen": false,
+  "protectedContracts": [
+    "STARTUP_STATE_MACHINE",
+    "SINGLE_FLIGHT_BOOTSTRAP",
+    "LOCAL_FIRST_SESSION_RESTORE",
+    "SPLASH_TO_VISIBLE_UI",
+    "NO_BLANK_SCREEN",
+    "ROOT_ERROR_BOUNDARY",
+    "API_CONFIGURATION_FAIL_VISIBLE",
+    "OFFLINE_SESSION_PRESERVATION",
+    "DNS_FAILURE_NO_FALSE_LOGOUT",
+    "TIMEOUT_NO_FALSE_LOGOUT",
+    "BACKEND_5XX_NO_FALSE_LOGOUT",
+    "USER_SWITCH_ISOLATION",
+    "AUTHENTICATED_HARD_CLOSE_RESTORE",
+    "BACKGROUND_FOREGROUND_LIFECYCLE",
+    "NO_DUPLICATE_BOOTSTRAP",
+    "NO_DUPLICATE_OBSERVERS",
+    "PROCESS_SURVIVAL",
+    "ONLINE_OFFLINE_ONLINE_RECOVERY",
+    "EXACT_SHA_CI_PARITY",
+    "CLEAN_RELEASE_WORKTREE_DISCIPLINE"
+  ],
+  "protectedFiles": [
+    "App.tsx",
+    "src/components/ProductionErrorBoundary.tsx",
+    "src/screens/auth/SplashScreen.tsx",
+    "src/services/apiClient.ts",
+    "src/state/AppContext.tsx",
+    "src/state/startupStateMachine.ts",
+    "test/runtimeStartupStateMachine.test.ts"
+  ],
+  "openExternalEvidenceGates": [
+    {
+      "featureId": "CPU_IDLE_PHYSICAL",
+      "status": "OPEN_EXTERNAL_EVIDENCE_GATE",
+      "blockerClass": "ENVIRONMENT_TOOLCHAIN_BLOCKER"
+    },
+    {
+      "featureId": "MEMORY_STABILITY_PHYSICAL",
+      "status": "OPEN_EXTERNAL_EVIDENCE_GATE",
+      "blockerClass": "ENVIRONMENT_TOOLCHAIN_BLOCKER"
+    }
+  ],
+  "physicalEvidence": {
+    "coldLaunch": "5/5 PASS",
+    "hardCloseRestore": "5/5 PASS",
+    "authenticatedOfflineLaunch": "PASS",
+    "processSurvival": "PASS",
+    "backgroundForegroundCycles": "20/20 PASS",
+    "networkRecovery": "PASS",
+    "jetsam": "NO EVENT OBSERVED",
+    "watchdog": "NO EVENT OBSERVED",
+    "crash": "NONE OBSERVED"
+  },
+  "changePolicy": "Any FREEZE_IMPACT requires Product Owner approval, impact analysis, protected regression, exact-SHA CI, applicable simulator/physical evidence, and governance revision."
+}
