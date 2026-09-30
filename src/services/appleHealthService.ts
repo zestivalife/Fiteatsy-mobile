@@ -10,10 +10,12 @@ export const APPLE_HEALTH_PERMISSION_TIMEOUT_MS = 20_000;
 // Thirteen reads run serially. Keep the worst-case local read budget
 // below HEALTH_SYNC_PIPELINE_TIMEOUT_MS even when every native query times out.
 export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 3_000;
-// Read one metric at a time to bound concurrent native-to-JS pressure. Every
-// page inside the registry-governed sync window is drained before its anchor is
-// committed, so record-count caps cannot silently truncate native history.
+// Read one metric at a time to bound concurrent native-to-JS pressure. A single
+// page per metric is persisted atomically with its continuation anchor. Later
+// syncs resume from that anchor, so history is drained without loading an
+// unbounded native dataset into one foreground run.
 export const APPLE_HEALTH_QUERY_CONCURRENCY = 1;
+export const APPLE_HEALTH_MAX_PAGES_PER_METRIC_PER_RUN = 1;
 export const withAppleHealthTimeout = <T>(operation: Promise<T>, timeoutMs: number, code: string): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(code)), timeoutMs);
@@ -107,21 +109,27 @@ export const syncFromAppleHealth = async (
       let pageAnchor = options.forceBackfill ? undefined : anchors[metric];
       const samples = []; const deletedIds:string[] = [];
       let hasMore = false;
+      let pageCount = 0;
       do {
         const page = await withAppleHealthTimeout(
-          readHealthKitChanges(metric, pageAnchor,
-            options.forceBackfill || !pageAnchor ? start : undefined),
+          // Keep the registry-governed window stable across every page. An
+          // anchor identifies the continuation point; it must not widen a
+          // bounded 30-day query into an all-history query.
+          readHealthKitChanges(metric, pageAnchor, start),
           APPLE_HEALTH_METRIC_TIMEOUT_MS,
           `apple_health_metric_timeout:${metric}`
         );
         samples.push(...page.samples); deletedIds.push(...page.deletedIds);
         pageAnchor = page.anchor; hasMore = page.hasMore;
-      } while (hasMore);
+        pageCount += 1;
+      } while (hasMore && pageCount < APPLE_HEALTH_MAX_PAGES_PER_METRIC_PER_RUN);
       const result = { samples, deletedIds, anchor: pageAnchor ?? '', hasMore };
       const status = result.samples.length ? 'SUCCESS' : 'NO_DATA';
       diagnostic(status === 'SUCCESS' ? 'METRIC_QUERY_SUCCESS' : 'METRIC_QUERY_NO_DATA', {
         syncRunId, metric, nativeRecordCount: result.samples.length,
-        deletedRecordCount: result.deletedIds.length, durationMs: Date.now() - startedAt, status
+        deletedRecordCount: result.deletedIds.length, pageCount,
+        continuationPending: result.hasMore ? 1 : 0,
+        durationMs: Date.now() - startedAt, status
       });
       return { metric, result, status };
     } catch (error) {

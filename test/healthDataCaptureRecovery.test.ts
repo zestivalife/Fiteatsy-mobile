@@ -17,7 +17,7 @@ describe('end-to-end health data capture recovery contracts', () => {
   test('first Apple sync uses bounded backfill and incremental sync uses only valid anchors', () => {
     const apple = read('src/services/appleHealthService.ts');
     expect(apple).toContain('definition?.syncWindowDays');
-    expect(apple).toContain('options.forceBackfill || !pageAnchor ? start : undefined');
+    expect(apple).toContain('readHealthKitChanges(metric, pageAnchor, start)');
     expect(apple).toContain('options.forceBackfill ? undefined : anchors[metric]');
     expect(apple).toContain('result.samples.length > 0 || result.deletedIds.length > 0');
     expect(apple).not.toContain('new Date(null)');
@@ -128,10 +128,10 @@ describe('end-to-end health data capture recovery contracts', () => {
     const store = read('src/services/healthSyncLocalStore.ts');
     const coordinator = read('src/services/canonicalHealthSyncCoordinator.ts');
     expect(bridge).toContain('"hasMore": rows.count + deletedIds.count >= self.anchoredReadLimit');
-    expect(apple).not.toContain('APPLE_HEALTH_MAX_PAGES_PER_METRIC');
+    expect(apple).toContain('APPLE_HEALTH_MAX_PAGES_PER_METRIC_PER_RUN = 1');
     expect(apple).toContain('values.push(sample.value)');
     expect(apple).not.toContain('metricValues[canonicalMetric] = [...');
-    expect(apple).toContain('} while (hasMore);');
+    expect(apple).toContain('hasMore && pageCount < APPLE_HEALTH_MAX_PAGES_PER_METRIC_PER_RUN');
     expect(apple).toContain('sample.value <= 0');
     expect(store).toContain('serializeScopeOperation');
     expect(coordinator).not.toContain('subscribeToHealthKitChanges');
