@@ -28,8 +28,10 @@ describe('governed wearable health platform', () => {
     const manager = read('src/services/healthSyncManager.ts');
     expect(healthConnect).toContain('while (pageToken)');
     expect(healthConnect).toContain('pageSize: 500');
-    expect(manager).toContain('readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE)');
-    expect(manager).toContain("pending.map((item) => item.observation)");
+    expect(manager).toContain('HEALTH_SYNC_UPLOAD_BATCH_SIZE * HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN');
+    expect(manager).toContain('uploadWindow.slice(');
+    expect(manager).toContain('uploadBatchCount * HEALTH_SYNC_UPLOAD_BATCH_SIZE');
+    expect(manager).toContain('acknowledgeLocalObservations(localScope, acknowledgedRecordKeys)');
   });
 
   it('ships real read-only HealthKit capability and anchored reads', () => {

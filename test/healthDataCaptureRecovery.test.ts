@@ -58,7 +58,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(backendRun).toBeGreaterThan(localRead);
     expect(upload).toBeGreaterThan(localRead);
     expect(manager).toContain('persistLocalSyncBatch(localScope, observations, anchors)');
-    expect(manager).toContain('readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE)');
+    expect(manager).toContain('const uploadWindow = await readPendingLocalObservations(');
     expect(manager).toContain('acknowledgeLocalObservations');
     expect(manager).not.toContain('getWearableCheckpoints');
   });
@@ -72,7 +72,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(store).toContain('slice(0, limit)');
     expect(store).toContain('uploaded: true');
     expect(manager).toContain('HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50');
-    expect(manager).toContain('readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE)');
+    expect(manager).toContain('HEALTH_SYNC_UPLOAD_BATCH_SIZE * HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN');
     expect(manager).not.toContain('readPendingLocalObservations(localScope, 250)');
   });
 

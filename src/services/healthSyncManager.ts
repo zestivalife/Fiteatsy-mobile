@@ -268,8 +268,20 @@ export const runHealthSync = async (
       runId = run?.id ?? null;
 
       let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
-      let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+      // Snapshot the bounded foreground upload window once. Reading and
+      // rewriting the monolithic local queue for every 50-record request
+      // caused repeated JSON parse/stringify amplification on physical iOS
+      // devices (hundreds of MB plus sustained CPU). Backend ingestion is
+      // idempotent, so acknowledge every accepted chunk once after the
+      // bounded network loop; a crash before that write merely retries safe
+      // duplicates on the next run.
+      const uploadWindow = await readPendingLocalObservations(
+        localScope,
+        HEALTH_SYNC_UPLOAD_BATCH_SIZE * HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN
+      );
+      let pending = uploadWindow.slice(0, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
       let uploadBatchCount = 0;
+      const acknowledgedRecordKeys: string[] = [];
       while (pending.length && uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN) {
         const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
           '/v1/health/observations:batch', {
@@ -279,11 +291,23 @@ export const runHealthSync = async (
         accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
         updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
         if (ingest.rejected > 0) break;
-        await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
+        acknowledgedRecordKeys.push(...pending.map((item) => item.recordKey));
         uploadBatchCount += 1;
-        pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+        pending = uploadWindow.slice(
+          uploadBatchCount * HEALTH_SYNC_UPLOAD_BATCH_SIZE,
+          (uploadBatchCount + 1) * HEALTH_SYNC_UPLOAD_BATCH_SIZE
+        );
       }
-      uploadCompleted = rejected === 0 && pending.length === 0;
+      if (acknowledgedRecordKeys.length) {
+        await acknowledgeLocalObservations(localScope, acknowledgedRecordKeys);
+      }
+      // The snapshot may have reached its bounded limit while additional
+      // durable records remain. Confirm completion with one lightweight queue
+      // lookup only after all acknowledgements have been persisted.
+      const remaining = rejected === 0
+        ? await readPendingLocalObservations(localScope, 1)
+        : pending;
+      uploadCompleted = rejected === 0 && remaining.length === 0;
       if(uploadCompleted){
         await withHealthSyncPipelineTimeout(postJson('/v1/health/intelligence:recalculate',{
           healthDay:new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10),

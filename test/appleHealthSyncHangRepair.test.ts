@@ -76,6 +76,14 @@ describe('Apple Health sync hang repair', () => {
     expect(manager).toContain('uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN');
   });
 
+  test('uploads a bounded queue snapshot and acknowledges it with one durable rewrite', () => {
+    expect(manager).toContain('const uploadWindow = await readPendingLocalObservations(');
+    expect(manager).toContain('HEALTH_SYNC_UPLOAD_BATCH_SIZE * HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN');
+    expect(manager).toContain('acknowledgedRecordKeys.push');
+    expect(manager.match(/acknowledgeLocalObservations\(/g)).toHaveLength(1);
+    expect(manager).not.toContain('pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE)');
+  });
+
   test('does not let a large pending upload queue suppress a later native refresh', () => {
     expect(manager).toContain('const healthUploadFlights = new Map');
     expect(manager).toContain('serializeHealthUpload(localScope');
