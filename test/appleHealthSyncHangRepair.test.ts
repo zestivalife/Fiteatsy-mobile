@@ -73,6 +73,15 @@ describe('Apple Health sync hang repair', () => {
     expect(manager).toContain('uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN');
   });
 
+  test('does not let a large pending upload queue suppress a later native refresh', () => {
+    expect(manager).toContain('const healthUploadFlights = new Map');
+    expect(manager).toContain('serializeHealthUpload(localScope');
+    expect(coordinator).toMatch(
+      /setMessage\('Health data is available on this device\. Secure upload continues in the background\.'\);\s*\/\/[^]*?releaseLocalFlight\(\);/
+    );
+    expect(coordinator).toContain('activeLocalFlight.current !== localFlight');
+  });
+
   test('diagnostics contain timing and status but do not log source health values', () => {
     for (const event of [
       'HEALTH_SYNC_START', 'HEALTHKIT_AVAILABLE', 'METRIC_QUERY_START',

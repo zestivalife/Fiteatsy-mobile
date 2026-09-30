@@ -72,6 +72,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const sourceName = adapter.platform === 'APPLE_HEALTH' ? 'Apple Health' : 'Health Connect';
   const mounted = useRef(true);
   const inFlight = useRef(false);
+  const activeLocalFlight = useRef(0);
   const refreshQueued = useRef(false);
   const awaitingPermissionReturn = useRef(false);
   const foregroundRefreshAt = useRef(0);
@@ -147,6 +148,16 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       return;
     }
     inFlight.current = true;
+    const localFlight = activeLocalFlight.current + 1;
+    activeLocalFlight.current = localFlight;
+    const releaseLocalFlight = () => {
+      if (activeLocalFlight.current !== localFlight) return;
+      inFlight.current = false;
+      if (refreshQueued.current) {
+        refreshQueued.current = false;
+        setTimeout(() => void syncLocalMetrics(), 0);
+      }
+    };
     traceSessionLifecycle('HEALTH_SYNC_START', { trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL' });
     setUploadState('UPLOADING');
     setMessage(`Reading ${sourceName}…`);
@@ -177,6 +188,9 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setQueryStates(nextQueries);
         setErrors(nextErrors);
         setMessage('Health data is available on this device. Secure upload continues in the background.');
+        // The native read/local persistence transaction is complete. A large or
+        // offline upload queue must not suppress a later manual HealthKit read.
+        releaseLocalFlight();
       };
       const result = await runHealthSync(adapter.appId, wellness, connectionId ? {
         connectionId,
@@ -194,7 +208,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         )),
         onLocalComplete: applyLocalCompletion
       });
-      if (!mounted.current) return;
+      if (!mounted.current || activeLocalFlight.current !== localFlight) return;
       mergeLocalObservations(result.observations);
       mergePresentationObservations(result.payload.presentationObservations ?? []);
       setSelectedDeviceId(adapter.appId);
@@ -220,7 +234,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       setMessage(count ? `${count} local records available` : `No visible ${sourceName} data found in the requested date ranges.`);
       void refreshRemoteSnapshot();
     } catch (error) {
-      if (!mounted.current) return;
+      if (!mounted.current || activeLocalFlight.current !== localFlight) return;
       if (error instanceof HealthSyncUploadPendingError || error instanceof HealthSyncPostUploadRefreshError) {
         mergeLocalObservations(error.observations);
         mergePresentationObservations(error.payload.presentationObservations ?? []);
@@ -254,11 +268,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setMessage('Health data could not be read. Previous local data is safe.');
       }
     } finally {
-      inFlight.current = false;
-      if (refreshQueued.current) {
-        refreshQueued.current = false;
-        setTimeout(() => void syncLocalMetrics(), 0);
-      }
+      releaseLocalFlight();
     }
   }, [adapter, authSession, localScope, mergeLocalObservations, mergePresentationObservations, refreshRemoteSnapshot, setSelectedDeviceId, setWellness, sourceName, status, wellness]);
 

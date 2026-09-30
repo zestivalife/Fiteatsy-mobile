@@ -105,6 +105,22 @@ export const HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50;
 // history. The queue resumes later and stable record identity prevents an
 // unchanged HealthKit sample from being enqueued twice.
 export const HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 10;
+
+// Native reads are deliberately independent from network upload. More than one
+// local refresh may finish while an older durable queue is still uploading, but
+// only one uploader may consume a given account/provider queue at a time.
+const healthUploadFlights = new Map<string, Promise<unknown>>();
+
+const serializeHealthUpload = async <T>(localScope: string, operation: () => Promise<T>): Promise<T> => {
+  const previous = healthUploadFlights.get(localScope) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  healthUploadFlights.set(localScope, current);
+  try {
+    return await current;
+  } finally {
+    if (healthUploadFlights.get(localScope) === current) healthUploadFlights.delete(localScope);
+  }
+};
 export const withHealthSyncPipelineTimeout = <T>(operation: Promise<T>, code: string): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(code)), HEALTH_SYNC_PIPELINE_TIMEOUT_MS);
@@ -206,7 +222,7 @@ export const runHealthSync = async (
     onLifecyclePhase?: (phase: 'NORMALIZING' | 'PERSISTING' | 'AGGREGATING') => void;
   } = {}
 ): Promise<HealthSyncResult> => {
-  let run: Awaited<ReturnType<typeof beginWearableSyncRun>> | null = null;
+  let runId: string | null = null;
   let payload: WearableSyncPayload | null = null;
   let observations: HealthObservationDraft[] = [];
   let uploadCompleted = false;
@@ -221,71 +237,75 @@ export const runHealthSync = async (
       adapter.queryAllSupportedMetrics(localCursors, { forceBackfill: options.forceSourceBackfill }),
       'health_sync_native_read_timeout'
     );
+    const localPayload = payload;
     options.onLifecyclePhase?.('NORMALIZING');
     observations = deriveObservations(payload);
-    const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors ?? {};
+    const anchors = (localPayload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors ?? {};
     // Cursor advancement and normalized/tombstone persistence are one durable
     // local transaction and always precede every backend operation.
     options.onLifecyclePhase?.('PERSISTING');
     await persistLocalSyncBatch(localScope, observations, anchors);
-    await persistLocalHealthPresentationObservations(localScope, payload.presentationObservations ?? []);
+    await persistLocalHealthPresentationObservations(localScope, localPayload.presentationObservations ?? []);
     const readAtISO=new Date().toISOString();
     options.onLifecyclePhase?.('AGGREGATING');
     const canonicalAggregates=await recomputeLocalHealthAggregates(localScope,readAtISO,-new Date().getTimezoneOffset());
     // Native reads and durable local persistence are the user-facing sync
     // boundary. Backend upload/recalculation may continue afterward without
     // keeping the Health Sync dialog or the JS interaction plane blocked.
-    await options.onLocalComplete?.({ payload, observations, aggregates: canonicalAggregates });
-    // Sync-run telemetry must not become a prerequisite for ingestion. The
-    // observation endpoint independently enforces authenticated ownership and
-    // active provider consent.
-    run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger).catch(() => null) : null;
+    await options.onLocalComplete?.({ payload: localPayload, observations, aggregates: canonicalAggregates });
+    return await serializeHealthUpload(localScope, async () => {
+      // Sync-run telemetry must not become a prerequisite for ingestion. The
+      // observation endpoint independently enforces authenticated ownership and
+      // active provider consent.
+      const run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger).catch(() => null) : null;
+      runId = run?.id ?? null;
 
-    let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
-    let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
-    let uploadBatchCount = 0;
-    while (pending.length && uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN) {
-      const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
-        '/v1/health/observations:batch', {
-          observations: pending.map((item) => item.observation),
-          recalculateIntelligence: false
-        }), 'health_sync_upload_timeout');
-      accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
-      updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
-      if (ingest.rejected > 0) break;
-      await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
-      uploadBatchCount += 1;
-      pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
-    }
-    uploadCompleted = rejected === 0 && pending.length === 0;
-    if(uploadCompleted){
-      await withHealthSyncPipelineTimeout(postJson('/v1/health/intelligence:recalculate',{
-        healthDay:new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10),
-        aggregateAssertions:canonicalAggregates
-      }),'health_sync_recalculation_timeout');
-      await markLocalHealthUploaded(localScope,true);
-    }
-    if (governed && Object.keys(anchors).length && rejected === 0) {
-      await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
-        commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
-          ...(governed.provider === 'HEALTH_CONNECT' ? { cursorValue: checkpoint } : { anchorValue: checkpoint }),
-          backfillComplete:true }))), 'health_sync_checkpoint_commit_timeout').catch(() => undefined);
-    }
-    if (run) await finishWearableSyncRun(run.id, { status: rejected ? 'PARTIAL' : 'SUCCESS', recordsRead: observations.length,
-      recordsUploaded: observations.length, recordsInserted: accepted, recordsDuplicates: duplicate, recordsUpdated: updated, recordsDeleted: deleted,
-      checkpointAfter: rejected === 0 ? anchors : undefined }).catch(() => undefined);
+      let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
+      let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+      let uploadBatchCount = 0;
+      while (pending.length && uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN) {
+        const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
+          '/v1/health/observations:batch', {
+            observations: pending.map((item) => item.observation),
+            recalculateIntelligence: false
+          }), 'health_sync_upload_timeout');
+        accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
+        updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
+        if (ingest.rejected > 0) break;
+        await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
+        uploadBatchCount += 1;
+        pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+      }
+      uploadCompleted = rejected === 0 && pending.length === 0;
+      if(uploadCompleted){
+        await withHealthSyncPipelineTimeout(postJson('/v1/health/intelligence:recalculate',{
+          healthDay:new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10),
+          aggregateAssertions:canonicalAggregates
+        }),'health_sync_recalculation_timeout');
+        await markLocalHealthUploaded(localScope,true);
+      }
+      if (governed && Object.keys(anchors).length && rejected === 0) {
+        await withHealthSyncPipelineTimeout(Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
+          commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
+            ...(governed.provider === 'HEALTH_CONNECT' ? { cursorValue: checkpoint } : { anchorValue: checkpoint }),
+            backfillComplete:true }))), 'health_sync_checkpoint_commit_timeout').catch(() => undefined);
+      }
+      if (run) await finishWearableSyncRun(run.id, { status: rejected ? 'PARTIAL' : 'SUCCESS', recordsRead: observations.length,
+        recordsUploaded: observations.length, recordsInserted: accepted, recordsDuplicates: duplicate, recordsUpdated: updated, recordsDeleted: deleted,
+        checkpointAfter: rejected === 0 ? anchors : undefined }).catch(() => undefined);
 
-    if (payload.dataQuality.syncCounts) {
-      payload.dataQuality.syncCounts.uploadRecordCount = observations.length;
-      payload.dataQuality.syncCounts.persistedRecordCount = accepted + duplicate + updated;
-    }
+      if (localPayload.dataQuality.syncCounts) {
+        localPayload.dataQuality.syncCounts.uploadRecordCount = observations.length;
+        localPayload.dataQuality.syncCounts.persistedRecordCount = accepted + duplicate + updated;
+      }
 
-    const [scores, status] = await Promise.all([getHealthScoreSummary(), getHealthSyncStatus()]);
-    return { payload, observations, accepted, duplicate, rejected, scores, status,
-      diagnostics: buildHealthSourceDiagnostics(appId === 'apple-health' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', payload, { state: 'SUCCESS' }),
-      wellness: wellnessFromCanonicalAggregates(previousWellness,canonicalAggregates,scores) };
+      const [scores, status] = await Promise.all([getHealthScoreSummary(), getHealthSyncStatus()]);
+      return { payload: localPayload, observations, accepted, duplicate, rejected, scores, status,
+        diagnostics: buildHealthSourceDiagnostics(appId === 'apple-health' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', localPayload, { state: 'SUCCESS' }),
+        wellness: wellnessFromCanonicalAggregates(previousWellness,canonicalAggregates,scores) };
+    });
   } catch (error) {
-    if (run) await finishWearableSyncRun(run.id, { status:'FAILED',recordsRead:0,recordsUploaded:0,recordsInserted:0,
+    if (runId) await finishWearableSyncRun(runId, { status:'FAILED',recordsRead:0,recordsUploaded:0,recordsInserted:0,
       recordsDuplicates:0,recordsUpdated:0,recordsDeleted:0,errorStage:'SYNC',errorCode:error instanceof Error ? error.message.slice(0,100) : 'UNKNOWN',
       safeErrorSummary:'Wearable synchronization could not complete.' }).catch(() => undefined);
     // The native read and durable local write have already succeeded. Any later
