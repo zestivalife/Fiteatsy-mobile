@@ -54,11 +54,13 @@ export const buildPresentedHealthObservations = (
   const currentHealthDay = new Date(nowMs + timezoneOffsetMinutes * 60_000).toISOString().slice(0, 10);
   const result = new Map<string, HealthObservationDto>();
   HEALTH_METRIC_REGISTRY.forEach((definition) => {
-    const candidates=aggregates.filter(row=>row.metricType===definition.backendCanonicalType);
+    const oldestAcceptedAt = nowMs - definition.syncWindowDays * 86_400_000;
+    const candidates=aggregates.filter(row=>row.metricType===definition.backendCanonicalType
+      && Date.parse(row.latestMeasuredAtISO) >= oldestAcceptedAt)
+      .sort((left,right)=>right.latestMeasuredAtISO.localeCompare(left.latestMeasuredAtISO));
     const aggregate=definition.aggregation==='LATEST'
-      ? candidates.filter((row)=>nowMs-Date.parse(row.latestMeasuredAtISO)<=definition.syncWindowDays*86_400_000)
-        .sort((a,b)=>b.latestMeasuredAtISO.localeCompare(a.latestMeasuredAtISO))[0]
-      : candidates.find((row)=>row.healthDay===currentHealthDay);
+      ? candidates[0]
+      : candidates.find((row)=>row.healthDay===currentHealthDay) ?? candidates[0];
     if (!aggregate) return;
     const sourceObservation = all.find((item) => (
       item.syncKey || item.sourceRecordId || item.id

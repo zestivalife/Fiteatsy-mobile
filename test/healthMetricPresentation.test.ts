@@ -28,6 +28,18 @@ describe('health metric presentation aggregation',()=>{
     expect(buildPresentedHealthObservations(historical,[],[],Date.parse('2026-09-20T12:31:00.000Z'),0).has('steps')).toBe(false);
   });
 
+  test('presents the latest native health day within the governed metric window when today has no record',()=>{
+    const recent=[
+      row('steps',1750,'2026-09-20T13:49:00.000Z','recent-steps'),
+      row('sleep_minutes',318,'2026-09-20T07:00:00.000Z','recent-sleep'),
+      {...row('heart_rate',101,'2026-09-20T10:50:00.000Z','recent-heart'),unit:'bpm'}
+    ];
+    const presented=buildPresentedHealthObservations(recent,[],[],Date.parse('2026-10-01T11:26:00.000Z'),0);
+    expect(presented.get('steps')?.value).toBe(1750);
+    expect(presented.get('sleep_minutes')?.value).toBe(318);
+    expect(presented.get('heart_rate')?.value).toBe(101);
+  });
+
   test('durable aggregates remain presentable when bounded in-memory lineage is absent',()=>{
     const aggregate:CanonicalDailyAggregate={healthDay:'2026-09-20',metricType:'steps',value:513,unit:'count',method:'DAILY_SUM',latest:513,
       average:513,minimum:513,maximum:513,sourceObservationIds:['apple-health-row'],sourceProvider:'apple_health',sourcePriority:600,
