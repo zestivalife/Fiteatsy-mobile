@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { HEALTH_SYNC_METRICS } from '../../backend/src/modules/health-sync-lab/health-sync-lab.repository.ts';
 import { renderHealthSyncLabPage } from '../../backend/src/modules/health-sync-lab/health-sync-lab.page.ts';
+import { isLocalHealthLabRequest } from '../../backend/src/modules/health-sync-lab/health-sync-lab.routes.ts';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const routes=readFileSync(path.join(root,'backend/src/modules/health-sync-lab/health-sync-lab.routes.ts'),'utf8');
@@ -26,7 +27,6 @@ test('Health Sync Lab exposes the governed internal surface and no direct native
 });
 
 test('Health Sync Lab requires authentication and an internal role for inspection and requests',()=>{
-  assert.match(routes,/shell contains no account data/);
   assert.match(routes,/healthSyncLabRouter\.get\('\/devices',requireAuthenticatedAccount,requireInternalRole/);
   assert.match(routes,/requireAuthenticatedAccount,requireInternalRole/);
   assert.match(routes,/admin','super_admin','platform_owner/);
@@ -34,6 +34,41 @@ test('Health Sync Lab requires authentication and an internal role for inspectio
   assert.doesNotMatch(routes,/query\.token|req\.query\.token/);
   assert.match(repository,/health_sync_diagnostic_audit_events/);
   for (const event of ['VIEW_DIAGNOSTICS','INSPECT_RECORDS','REQUEST_DEVICE_SYNC','ADMIN_QUEUE_ACTION']) assert.match(migration,new RegExp(event));
+});
+
+test('local diagnostic mode removes manual credentials and auto-discovers governed device context',()=>{
+  const page=renderHealthSyncLabPage();
+  assert.doesNotMatch(page,/Internal bearer token|type="password"|healthLabToken|Account ID input/);
+  assert.match(page,/\/internal\/health-sync\/local\/contexts/);
+  assert.match(page,/\/internal\/health-sync\/local\/snapshot/);
+  assert.match(page,/Local diagnostic context resolved automatically/);
+  assert.match(page,/Logged in as/);
+  assert.match(repository,/listLocalDiagnosticContexts/);
+  assert.match(repository,/resolveLocalDiagnosticContext/);
+});
+
+test('local diagnostic bypass requires explicit flag, development runtime, loopback host, and loopback socket',()=>{
+  const originalFlag=process.env.FITEATSY_LOCAL_HEALTH_LAB;
+  const originalNodeEnv=process.env.NODE_ENV;
+  process.env.NODE_ENV='development';
+  process.env.FITEATSY_LOCAL_HEALTH_LAB='true';
+  const request=(hostname:string,localAddress:string)=>({hostname,socket:{localAddress}}) as never;
+  try{
+    assert.equal(isLocalHealthLabRequest(request('127.0.0.1','127.0.0.1')),true);
+    assert.equal(isLocalHealthLabRequest(request('localhost','::1')),true);
+    assert.equal(isLocalHealthLabRequest(request('health.example.com','127.0.0.1')),false);
+    assert.equal(isLocalHealthLabRequest(request('127.0.0.1','192.168.1.12')),false);
+    process.env.FITEATSY_LOCAL_HEALTH_LAB='false';
+    assert.equal(isLocalHealthLabRequest(request('127.0.0.1','127.0.0.1')),false);
+    process.env.FITEATSY_LOCAL_HEALTH_LAB='true';
+    process.env.NODE_ENV='production';
+    assert.equal(isLocalHealthLabRequest(request('127.0.0.1','127.0.0.1')),false);
+  } finally {
+    if(originalFlag===undefined) delete process.env.FITEATSY_LOCAL_HEALTH_LAB; else process.env.FITEATSY_LOCAL_HEALTH_LAB=originalFlag;
+    if(originalNodeEnv===undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV=originalNodeEnv;
+  }
+  assert.match(routes,/DIAGNOSTIC_LOCAL_ONLY/);
+  assert.match(routes,/requireLocalHealthLab/);
 });
 
 test('mobile companion APIs are account isolated and do not accept a caller-supplied account',()=>{

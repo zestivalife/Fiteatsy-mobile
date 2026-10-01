@@ -80,6 +80,9 @@ export const env = {
   get databaseUrl() {
     return resolveDatabaseUrl();
   },
+  get localHealthLabEnabled() {
+    return process.env.FITEATSY_LOCAL_HEALTH_LAB?.trim().toLowerCase() === 'true';
+  },
   get openAiApiKey() {
     return process.env.OPENAI_API_KEY?.trim() ?? '';
   },

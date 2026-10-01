@@ -5,7 +5,8 @@ import { env } from '../../config/env.js';
 import { renderHealthSyncLabPage } from './health-sync-lab.page.js';
 import {
   HEALTH_SYNC_METRICS, auditDiagnosticAccess, createSyncRequest, getDiagnosticStatus, getMetricRecords, getSyncRequest,
-  listDiagnosticDevices, listMetricDiagnostics, listPendingDeviceRequests, listQueue,
+  listDiagnosticDevices, listLocalDiagnosticContexts, listMetricDiagnostics, listPendingDeviceRequests, listQueue,
+  resolveLocalDiagnosticContext,
   recordDeviceProgress, recordDeviceSnapshot
 } from './health-sync-lab.repository.js';
 
@@ -21,9 +22,26 @@ const requireInternalRole=(req:Request,res:Response,next:NextFunction)=>{
 const query=z.object({accountId:z.string().min(1),connectionId:z.string().min(1).optional()});
 const handle=(res:Response,error:unknown)=>res.status(500).json({error:'HEALTH_SYNC_DIAGNOSTIC_FAILED',message:error instanceof Error?error.message:'Diagnostic request failed.'});
 
-// The shell contains no account data. Every diagnostic read/write remains
-// protected by bearer authentication and the internal-role gate below.
-healthSyncLabPageRouter.get('/health-sync-lab',(_req,res)=>res.type('html').send(renderHealthSyncLabPage()));
+const loopbackHosts=new Set(['127.0.0.1','localhost','::1','::ffff:127.0.0.1']);
+export const isLocalHealthLabRequest=(req:Pick<Request,'hostname'|'socket'>)=>{
+  const hostname=String(req.hostname??'').toLowerCase();
+  const localAddress=String(req.socket?.localAddress??'').toLowerCase();
+  return env.localHealthLabEnabled
+    && ['development','local','test'].includes(String(env.environment).toLowerCase())
+    && loopbackHosts.has(hostname)
+    && loopbackHosts.has(localAddress);
+};
+const requireLocalHealthLab=(req:Request,res:Response,next:NextFunction)=>isLocalHealthLabRequest(req)
+  ? next()
+  : res.status(403).json({error:'DIAGNOSTIC_LOCAL_ONLY',message:'Local Health Sync Lab requires loopback access and explicit local diagnostic mode.'});
+
+// Local diagnostic mode is a separate loopback-only adapter. The governed
+// authenticated routes below remain unchanged for non-local environments.
+healthSyncLabPageRouter.get('/health-sync-lab',requireLocalHealthLab,(_req,res)=>res.type('html').send(renderHealthSyncLabPage()));
+
+healthSyncLabRouter.get('/local/contexts',requireLocalHealthLab,async(_req,res)=>{try{return res.json({items:await listLocalDiagnosticContexts(),backendCommitSha:env.gitCommit});}catch(e){return handle(res,e)}});
+healthSyncLabRouter.get('/local/snapshot',requireLocalHealthLab,async(req,res)=>{const connectionId=z.string().min(1).safeParse(req.query.connectionId);if(!connectionId.success)return res.status(400).json({error:'INVALID_INPUT'});try{const context=await resolveLocalDiagnosticContext(connectionId.data);if(!context)return res.status(404).json({error:'DEVICE_NOT_FOUND'});const [status,metrics,queue]=await Promise.all([getDiagnosticStatus(context.account_id,context.connection_id),listMetricDiagnostics(context.account_id,context.connection_id),listQueue(context.account_id,context.connection_id)]);if(!status)return res.status(404).json({error:'DEVICE_NOT_FOUND'});await auditDiagnosticAccess({actorId:context.account_id,targetAccountId:context.account_id,connectionId:context.connection_id,eventType:'VIEW_DIAGNOSTICS',safeMetadata:{mode:'LOCAL_LOOPBACK'}});return res.json({context,status:{...status,backendCommitSha:env.gitCommit},metrics:{items:metrics},queue});}catch(e){return handle(res,e)}});
+healthSyncLabRouter.post('/local/requests',requireLocalHealthLab,async(req,res)=>{const parsed=z.object({connectionId:z.string().min(1),metrics:z.array(z.union([z.enum(HEALTH_SYNC_METRICS),z.literal('ALL_SUPPORTED')])).min(1).default(['ALL_SUPPORTED'])}).safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{const context=await resolveLocalDiagnosticContext(parsed.data.connectionId);if(!context)return res.status(404).json({error:'DEVICE_NOT_FOUND'});const value=await createSyncRequest({accountId:context.account_id,clientId:context.client_id,connectionId:context.connection_id,provider:context.provider,metrics:parsed.data.metrics,actorId:context.account_id});return value?res.status(202).json(value):res.status(404).json({error:'ACTIVE_DEVICE_NOT_FOUND'});}catch(e){return handle(res,e)}});
 
 healthSyncLabRouter.get('/devices',requireAuthenticatedAccount,requireInternalRole,async(req,res)=>{const parsed=z.object({accountId:z.string().min(1),clientId:z.string().min(1).optional()}).safeParse(req.query);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{await auditDiagnosticAccess({actorId:getAuthenticatedAccount(req).accountId,targetAccountId:parsed.data.accountId,eventType:'VIEW_DIAGNOSTICS'});return res.json({items:await listDiagnosticDevices(parsed.data.accountId,parsed.data.clientId),backendCommitSha:env.gitCommit});}catch(e){return handle(res,e)}});
 healthSyncLabRouter.get('/status',requireAuthenticatedAccount,requireInternalRole,async(req,res)=>{const parsed=query.required({connectionId:true}).safeParse(req.query);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{const value=await getDiagnosticStatus(parsed.data.accountId,parsed.data.connectionId);return value?res.json({...value,backendCommitSha:env.gitCommit}):res.status(404).json({error:'DEVICE_NOT_FOUND'});}catch(e){return handle(res,e)}});

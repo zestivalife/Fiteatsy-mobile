@@ -13,6 +13,30 @@ export type DiagnosticAuditEvent = 'VIEW_DIAGNOSTICS'|'INSPECT_RECORDS'|'REQUEST
 
 const newId = (prefix:string) => `${prefix}_${crypto.randomUUID()}`;
 
+export async function listLocalDiagnosticContexts() {
+  const result=await pool.query(`select wc.id connection_id,wc.account_id,wc.client_id,wc.provider,wc.platform,wc.status,
+    coalesce(nullif(trim(u.name),''),'Local diagnostic account') account_label,
+    coalesce(nullif(trim(h.device_label),''),case when wc.platform='IOS' then 'iPhone' else 'Android device' end) device_label,
+    h.last_app_heartbeat_at,h.last_native_heartbeat_at,wc.updated_at
+    from wearable_connections wc
+    join users u on u.id=wc.account_id and u.deleted_at is null
+    left join health_sync_device_heartbeats h on h.connection_id=wc.id
+    where wc.status in ('CONNECTED','PARTIAL','PERMISSION_REQUIRED')
+    order by h.last_app_heartbeat_at desc nulls last,wc.updated_at desc`);
+  return result.rows;
+}
+
+export async function resolveLocalDiagnosticContext(connectionId:string) {
+  const result=await pool.query(`select wc.id connection_id,wc.account_id,wc.client_id,wc.provider,wc.platform,wc.status,
+    coalesce(nullif(trim(u.name),''),'Local diagnostic account') account_label,
+    coalesce(nullif(trim(h.device_label),''),case when wc.platform='IOS' then 'iPhone' else 'Android device' end) device_label
+    from wearable_connections wc
+    join users u on u.id=wc.account_id and u.deleted_at is null
+    left join health_sync_device_heartbeats h on h.connection_id=wc.id
+    where wc.id=$1 and wc.status in ('CONNECTED','PARTIAL','PERMISSION_REQUIRED')`,[connectionId]);
+  return result.rows[0]??null;
+}
+
 export async function auditDiagnosticAccess(input:{actorId:string;targetAccountId:string;connectionId?:string;eventType:DiagnosticAuditEvent;metricType?:string;safeMetadata?:Record<string,string|number|boolean|null>}) {
   await pool.query(`insert into health_sync_diagnostic_audit_events(id,actor_user_id,target_account_id,connection_id,event_type,metric_type,safe_metadata)
     values($1,$2,$3,$4,$5,$6,$7)`,[newId('hsdaud'),input.actorId,input.targetAccountId,input.connectionId??null,input.eventType,input.metricType??null,JSON.stringify(input.safeMetadata??{})]);
