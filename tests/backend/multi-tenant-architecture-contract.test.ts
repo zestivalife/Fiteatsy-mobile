@@ -13,6 +13,7 @@ test('expand migration creates deterministic Zestiva tenant and additive nullabl
   assert.match(migration,/add column if not exists tenant_id uuid/);
   assert.doesNotMatch(migration,/alter column tenant_id set not null/i);
   assert.match(migration,/tenant_backfill_verification/);
+  assert.match(migration,/if new\.tenant_id is null and exists/);
 });
 
 test('tenant request projection resolves only active server-side membership',()=>{

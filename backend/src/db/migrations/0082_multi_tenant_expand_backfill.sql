@@ -101,7 +101,12 @@ end $$;
 create or replace function set_zestiva_tenant_during_transition()
 returns trigger language plpgsql as $$
 begin
-  if new.tenant_id is null then
+  -- Expand phase remains nullable. If an isolated test/recovery reset has
+  -- intentionally removed the seed tenant, preserve the legacy write rather
+  -- than manufacturing tenant state or violating the foreign key.
+  if new.tenant_id is null and exists (
+    select 1 from tenants where id='00000000-0000-4000-8000-000000000001'::uuid
+  ) then
     new.tenant_id := '00000000-0000-4000-8000-000000000001'::uuid;
   end if;
   return new;
