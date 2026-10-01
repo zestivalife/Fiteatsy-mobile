@@ -10,6 +10,7 @@ import {
   type OtpDomainError
 } from './auth.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from './auth.middleware.js';
+import { resolveActiveTenantContext } from '../tenancy/tenant-context.js';
 import { revokeAuthSession } from './auth.repository.js';
 import {
   assertQaHandoffExchangeRate,
@@ -206,13 +207,15 @@ authRouter.post('/signup/verify-otp', async (req, res) => {
   }
 });
 
-authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
+authRouter.get('/me', requireAuthenticatedAccount, async (req, res) => {
   const account = getAuthenticatedAccount(req);
+  const currentTenant = await resolveActiveTenantContext(account);
   return res.status(200).json({
     accountId: account.accountId,
     sessionId: account.sessionId,
     sessionExpiresAtISO: account.sessionExpiresAtISO,
     qaSession: account.qaSession,
+    currentTenant,
     client: {
       fiteatsyClientId: account.client.fiteatsyClientId,
       status: account.client.status

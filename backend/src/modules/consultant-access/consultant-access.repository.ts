@@ -134,6 +134,24 @@ export const resolveConsultantClientAccess = async (professionalUserId: string, 
       where assignment.consultant_user_id = $1
         and client.fiteatsy_client_id = $2
         and ${consultantAssignmentSqlPredicate('assignment')}
+        and (
+          assignment.tenant_id is null
+          or (
+            assignment.tenant_id = client.tenant_id
+            and exists (
+              select 1 from tenant_memberships consultant_membership
+               where consultant_membership.tenant_id = assignment.tenant_id
+                 and consultant_membership.user_id = assignment.consultant_user_id
+                 and consultant_membership.status = 'active'
+            )
+            and exists (
+              select 1 from tenant_memberships client_membership
+               where client_membership.tenant_id = assignment.tenant_id
+                 and client_membership.user_id = assignment.client_user_id
+                 and client_membership.status = 'active'
+            )
+          )
+        )
         and client.deleted_at is null and lower(coalesce(client.status, '')) = 'active'
         and professional.deleted_at is null and lower(coalesce(professional.status, '')) = 'active'
         and lower(coalesce(professional.role, '')) in ${SUPPORTED_CONSULTANT_ROLES_SQL}
