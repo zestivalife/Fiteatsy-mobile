@@ -30,6 +30,7 @@ import { scheduleHealthRecalculationProcessor } from './jobs/process-health-reca
 import { adminGrievancesRouter, grievancesRouter, profilePhotoRouter } from './modules/grievances/grievances.routes.js';
 import { preferencesRouter } from './modules/preferences/preferences.routes.js';
 import { requireAuthenticatedAccount } from './modules/auth/auth.middleware.js';
+import { healthSyncLabPageRouter, healthSyncLabRouter } from './modules/health-sync-lab/health-sync-lab.routes.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -67,6 +68,8 @@ const REGISTERED_ROUTE_GROUPS = [
   ,'/v1/preferences'
   ,'/v1/grievances'
   ,'/v1/admin/grievances'
+  ,'/health-sync-lab'
+  ,'/internal/health-sync'
 ];
 
 const logStartupRoutes = () => {
@@ -189,6 +192,8 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/profile', profileRouter);
   app.use('/v1/profile', profilePhotoRouter);
   app.use('/v1/preferences', preferencesRouter);
+  app.use(healthSyncLabPageRouter);
+  app.use('/internal/health-sync', healthSyncLabRouter);
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message });
