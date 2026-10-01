@@ -289,7 +289,7 @@ reportsRouter.get('/comparison/current', async (req, res) => {
 
 reportsRouter.get('/:reportId', async (req, res) => {
   const owner = currentOwner(getAuthenticatedAccount(req));
-  const report = await getReport(req.params.reportId);
+  const report = await getReport(req.params.reportId, reportOwner(owner));
   if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
@@ -298,7 +298,7 @@ reportsRouter.get('/:reportId', async (req, res) => {
 
 reportsRouter.get('/:reportId/status', async (req, res) => {
   const owner = currentOwner(getAuthenticatedAccount(req));
-  const report = await getReport(req.params.reportId);
+  const report = await getReport(req.params.reportId, reportOwner(owner));
   if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
@@ -322,7 +322,7 @@ reportsRouter.get('/:reportId/status', async (req, res) => {
 
 reportsRouter.patch('/:reportId/metadata', async (req, res) => {
   const owner = currentOwner(getAuthenticatedAccount(req));
-  const report = await getReport(req.params.reportId);
+  const report = await getReport(req.params.reportId, reportOwner(owner));
   if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
@@ -357,7 +357,7 @@ reportsRouter.delete('/all', async (req, res) => {
 
 reportsRouter.delete('/:reportId', async (req, res) => {
   const owner = currentOwner(getAuthenticatedAccount(req));
-  const report = await getReport(req.params.reportId);
+  const report = await getReport(req.params.reportId, reportOwner(owner));
   if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
@@ -368,7 +368,7 @@ reportsRouter.delete('/:reportId', async (req, res) => {
 
 reportsRouter.post('/:reportId/feedback', async (req, res) => {
   const owner = currentOwner(getAuthenticatedAccount(req));
-  const report = await getReport(req.params.reportId);
+  const report = await getReport(req.params.reportId, reportOwner(owner));
   if (!ownsReport(report, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Report not found.' });
   }
@@ -396,7 +396,7 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
     stage: 'auth_context',
     status: 'completed'
   });
-  const report = await getReport(req.params.reportId);
+  const report = await getReport(req.params.reportId, reportOwner(owner));
   if (!ownsReport(report, owner)) {
     logReanalysisStage({
       reportId: req.params.reportId,
@@ -543,7 +543,7 @@ reportsRouter.post('/:reportId/reanalyze', async (req, res) => {
 
 reportsRouter.get('/:reportId/comparison', async (req, res) => {
   const owner = currentOwner(getAuthenticatedAccount(req));
-  const current = await getReport(req.params.reportId);
+  const current = await getReport(req.params.reportId, reportOwner(owner));
   if (!ownsReport(current, owner)) {
     return res.status(404).json({ error: 'REPORT_NOT_FOUND', message: 'Current report not found.' });
   }
@@ -551,7 +551,7 @@ reportsRouter.get('/:reportId/comparison', async (req, res) => {
   if (!previousReportId) {
     return res.status(400).json({ error: 'MISSING_PREVIOUS_REPORT_ID', message: 'previousReportId is required.' });
   }
-  const previous = await getReport(previousReportId);
+  const previous = await getReport(previousReportId, reportOwner(owner));
   if (!ownsReport(previous, owner)) {
     return res.status(404).json({ error: 'PREVIOUS_REPORT_NOT_FOUND', message: 'Previous report not found.' });
   }

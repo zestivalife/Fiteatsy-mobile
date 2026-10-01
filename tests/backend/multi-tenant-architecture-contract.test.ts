@@ -16,6 +16,23 @@ test('expand migration creates deterministic Zestiva tenant and additive nullabl
   assert.match(migration,/if new\.tenant_id is null and exists/);
 });
 
+test('all 21 tenant-owned tables receive additive ownership, dual-write, and verification coverage',()=>{
+  const migration=read('backend/src/db/migrations/0082_multi_tenant_expand_backfill.sql');
+  const tables=[
+    'fiteatsy_clients','consultant_client_assignments','care_cases','consultant_client_operations',
+    'consultant_client_operation_audit','daily_checkins','nudges','health_reports','health_report_files',
+    'health_report_upload_sessions','document_intelligence_audit','biomarkers','biomarker_observations',
+    'health_observations','diet_plans','diet_plan_versions','diet_plan_review_events','notifications',
+    'profile_photo_assets','consultant_access_consents','consultant_access_consent_events'
+  ];
+  for(const table of tables){
+    const occurrences=migration.match(new RegExp(`'${table}'`,'g'))?.length??0;
+    assert.ok(occurrences>=3,`${table} must be covered by expand/backfill, dual-write, and verification`);
+  }
+  assert.match(migration,/tenant_relationship_verification/);
+  assert.match(migration,/mismatch_count/);
+});
+
 test('tenant request projection resolves only active server-side membership',()=>{
   const source=read('backend/src/modules/tenancy/tenant-context.ts');
   assert.match(source,/membership\.user_id=\$1/);
@@ -47,4 +64,26 @@ test('migrated Consultant access requires assignment, matching resource tenant, 
   assert.match(repository,/consultant_membership\.user_id = assignment\.consultant_user_id/);
   assert.match(repository,/client_membership\.user_id = assignment\.client_user_id/);
   assert.match(repository,/assignment\.tenant_id is null/);
+});
+
+test('report, file, upload, roster, search and count paths are tenant-aware with governed legacy fallback',()=>{
+  const reports=read('backend/src/modules/reports/reports.store.ts');
+  const consultants=read('backend/src/modules/consultants/consultants.repository.ts');
+  assert.match(reports,/health_report_upload_sessions[\s\S]*tenant_id/);
+  assert.match(reports,/health_report_files[\s\S]*tenant_id/);
+  assert.match(reports,/tenant_id = \$3 or tenant_id is null/);
+  assert.match(reports,/recordTenantResolutionPath/);
+  assert.match(consultants,/assignment\.tenant_id = \$5 or assignment\.tenant_id is null/);
+  assert.match(consultants,/c\.tenant_id = \$5 or c\.tenant_id is null/);
+  assert.match(consultants,/consultant_client_roster/);
+});
+
+test('Senior review queue scopes plans, versions and review events to the active tenant',()=>{
+  const store=read('backend/src/modules/nutrition/nutrition.store.ts');
+  const service=read('backend/src/modules/nutrition/nutrition.service.ts');
+  assert.match(store,/dp\.tenant_id = \$2::uuid and dpv\.tenant_id = \$2::uuid/);
+  assert.match(store,/events\.tenant_id = \$2::uuid/);
+  assert.match(service,/resolveActiveTenantContextForUserId\(account\.accountId\)/);
+  assert.match(service,/nutrition\.senior-review-queue/);
+  assert.match(service,/allowSeniorAuthority/);
 });

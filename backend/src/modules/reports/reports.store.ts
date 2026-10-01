@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
+import { recordTenantResolutionPath, resolveActiveTenantContextForUserId } from '../tenancy/tenant-context.js';
 import { ReportAnalysisResult } from './reports.service.js';
 
 export type ReportStatus =
@@ -89,6 +90,18 @@ export type UploadSession = {
 export type DocumentIntelligenceTriggerSource = 'USER_REANALYZE' | 'UPLOAD' | 'AUTO_RETRY' | 'BACKGROUND_SYNC' | 'CRON';
 
 const nowIso = () => new Date().toISOString();
+
+const resolveReportTenant = async (userId: string) => {
+  const context = await resolveActiveTenantContextForUserId(userId);
+  if (!context) throw new Error('TENANT_CONTEXT_REQUIRED');
+  return context;
+};
+
+const recordReportPath = async (userId: string, tenantId: unknown, routeFamily: string) => {
+  const context = await resolveReportTenant(userId);
+  await recordTenantResolutionPath(context, tenantId == null ? 'LEGACY_FALLBACK' : 'TENANT', routeFamily);
+  return context;
+};
 
 const parseJson = <T>(value: unknown, fallback: T): T => {
   if (value == null) return fallback;
@@ -206,21 +219,23 @@ export const createUploadSession = async (input: {
   source?: 'camera' | 'gallery' | 'pdf';
 }) => {
   const id = `upl_${crypto.randomUUID()}`;
-  const storageObjectRef = `pending-report://${input.clientId}/${id}/${encodeURIComponent(input.fileName)}`;
+  const tenant = await resolveReportTenant(input.userId);
+  const storageObjectRef = `pending-report://${tenant.tenantId}/${input.clientId}/${id}/${encodeURIComponent(input.fileName)}`;
   const result = await pool.query(
     `
       insert into health_report_upload_sessions (
-        id, user_id, client_id, file_name, mime_type, file_size, upload_source, storage_object_ref, expires_at
+        id, user_id, client_id, file_name, mime_type, file_size, upload_source, storage_object_ref, expires_at, tenant_id
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, now() + interval '15 minutes')
+      values ($1, $2, $3, $4, $5, $6, $7, $8, now() + interval '15 minutes', $9)
       returning *
     `,
-    [id, input.userId, input.clientId, input.fileName, input.mimeType, input.fileSize, input.source ?? null, storageObjectRef]
+    [id, input.userId, input.clientId, input.fileName, input.mimeType, input.fileSize, input.source ?? null, storageObjectRef, tenant.tenantId]
   );
   return rowToUploadSession(result.rows[0]);
 };
 
 export const completeUploadSession = async (uploadId: string, owner: { userId: string; clientId: string }) => {
+  const tenant = await resolveReportTenant(owner.userId);
   const result = await pool.query(
     `
       update health_report_upload_sessions
@@ -230,16 +245,19 @@ export const completeUploadSession = async (uploadId: string, owner: { userId: s
       where id = $1
         and user_id = $2
         and client_id = $3
+        and (tenant_id = $4 or tenant_id is null)
       returning *
     `,
-    [uploadId, owner.userId, owner.clientId]
+    [uploadId, owner.userId, owner.clientId, tenant.tenantId]
   );
   if (!result.rows[0]) return null;
+  await recordReportPath(owner.userId, result.rows[0].tenant_id, 'report_upload_complete');
   const session = rowToUploadSession(result.rows[0]);
   return session.status === 'expired' ? null : session;
 };
 
 export const getUploadSession = async (uploadId: string, owner?: { userId: string; clientId: string }) => {
+  const tenant = owner ? await resolveReportTenant(owner.userId) : null;
   const result = await pool.query(
     `
       select *
@@ -247,11 +265,13 @@ export const getUploadSession = async (uploadId: string, owner?: { userId: strin
       where id = $1
         and ($2::text is null or user_id = $2)
         and ($3::text is null or client_id = $3)
+        and ($4::uuid is null or tenant_id = $4 or tenant_id is null)
         and status <> 'expired'
         and expires_at >= now()
     `,
-    [uploadId, owner?.userId ?? null, owner?.clientId ?? null]
+    [uploadId, owner?.userId ?? null, owner?.clientId ?? null, tenant?.tenantId ?? null]
   );
+  if (owner && result.rows[0]) await recordReportPath(owner.userId, result.rows[0].tenant_id, 'report_upload_read');
   return result.rows[0] ? rowToUploadSession(result.rows[0]) : null;
 };
 
@@ -269,13 +289,14 @@ export const createReportRecord = async (input: {
   documentHash?: string;
 }) => {
   const id = `rep_${crypto.randomUUID()}`;
+  const tenant = await resolveReportTenant(input.userId);
   const result = await pool.query(
     `
       insert into health_reports (
         id, user_id, client_id, report_type, storage_object_ref, original_filename, mime_type,
-        file_size, upload_source, processing_status, report_date, lab_name, document_hash
+        file_size, upload_source, processing_status, report_date, lab_name, document_hash, tenant_id
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'UPLOADED', $10, $11, $12)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'UPLOADED', $10, $11, $12, $13)
       returning *
     `,
     [
@@ -283,14 +304,15 @@ export const createReportRecord = async (input: {
       input.userId,
       input.clientId,
       input.reportType ?? 'medical_report',
-      input.storageObjectRef ?? `report://${input.clientId}/${id}/${encodeURIComponent(input.fileName)}`,
+      input.storageObjectRef ?? `report://${tenant.tenantId}/${input.clientId}/${id}/${encodeURIComponent(input.fileName)}`,
       input.fileName,
       input.mimeType,
       input.fileSize,
       input.source ?? null,
       input.reportDate ?? null,
       input.labName ?? null,
-      input.documentHash ?? null
+      input.documentHash ?? null,
+      tenant.tenantId
     ]
   );
   return rowToReport(result.rows[0]);
@@ -301,10 +323,11 @@ export const saveReportFile = async (
   owner: { userId: string; clientId: string },
   input: { mimeType: string; fileName: string; fileSize: number; content: Buffer }
 ) => {
+  const tenant = await resolveReportTenant(owner.userId);
   await pool.query(
     `
-      insert into health_report_files (report_id, user_id, client_id, mime_type, original_filename, file_size, content)
-      values ($1, $2, $3, $4, $5, $6, $7)
+      insert into health_report_files (report_id, user_id, client_id, mime_type, original_filename, file_size, content, tenant_id)
+      values ($1, $2, $3, $4, $5, $6, $7, $8)
       on conflict (report_id)
       do update set
         mime_type = excluded.mime_type,
@@ -313,11 +336,12 @@ export const saveReportFile = async (
         content = excluded.content,
         created_at = now()
     `,
-    [reportId, owner.userId, owner.clientId, input.mimeType, input.fileName, input.fileSize, input.content]
+    [reportId, owner.userId, owner.clientId, input.mimeType, input.fileName, input.fileSize, input.content, tenant.tenantId]
   );
 };
 
 export const getReportFile = async (reportId: string, owner: { userId: string; clientId: string }) => {
+  const tenant = await resolveReportTenant(owner.userId);
   const result = await pool.query(
     `
       select *
@@ -325,11 +349,13 @@ export const getReportFile = async (reportId: string, owner: { userId: string; c
       where report_id = $1
         and user_id = $2
         and client_id = $3
+        and (tenant_id = $4 or tenant_id is null)
     `,
-    [reportId, owner.userId, owner.clientId]
+    [reportId, owner.userId, owner.clientId, tenant.tenantId]
   );
   const row = result.rows[0];
   if (!row) return null;
+  await recordReportPath(owner.userId, row.tenant_id, 'report_file_read');
   return {
     reportId: String(row.report_id),
     userId: String(row.user_id),
@@ -350,12 +376,13 @@ export const createDocumentIntelligenceAudit = async (input: {
   clientId: string;
   costEstimate?: number;
 }) => {
+  const tenant = await resolveReportTenant(input.userId);
   const result = await pool.query(
     `
       insert into document_intelligence_audit (
-        report_id, trigger_source, provider, model, user_id, client_id, cost_estimate
+        report_id, trigger_source, provider, model, user_id, client_id, cost_estimate, tenant_id
       )
-      values ($1, $2, $3, $4, $5, $6, $7)
+      values ($1, $2, $3, $4, $5, $6, $7, $8)
       returning *
     `,
     [
@@ -365,7 +392,8 @@ export const createDocumentIntelligenceAudit = async (input: {
       input.model,
       input.userId,
       input.clientId,
-      input.costEstimate ?? null
+      input.costEstimate ?? null,
+      tenant.tenantId
     ]
   );
   const row = result.rows[0];
@@ -383,6 +411,7 @@ export const createDocumentIntelligenceAudit = async (input: {
 };
 
 export const findActiveReportByDocumentHash = async (owner: { userId: string; clientId: string }, hash: string) => {
+  const tenant = await resolveReportTenant(owner.userId);
   const result = await pool.query(
     `
       select *
@@ -390,13 +419,15 @@ export const findActiveReportByDocumentHash = async (owner: { userId: string; cl
       where user_id = $1
         and client_id = $2
         and document_hash = $3
+        and (tenant_id = $4 or tenant_id is null)
         and deleted_at is null
         and processing_status not in ('FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA')
       order by created_at desc
       limit 1
     `,
-    [owner.userId, owner.clientId, hash]
+    [owner.userId, owner.clientId, hash, tenant.tenantId]
   );
+  if (result.rows[0]) await recordReportPath(owner.userId, result.rows[0].tenant_id, 'report_hash_read');
   return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };
 
@@ -512,51 +543,66 @@ export const attachReportAnalysis = async (
     : null;
 };
 
-export const getReport = async (reportId: string) => {
+export const getReport = async (reportId: string, owner?: { userId: string; clientId: string }) => {
+  const tenant = owner ? await resolveReportTenant(owner.userId) : null;
   const result = await pool.query(
     `
       select *
       from health_reports
       where id = $1
+        and ($2::text is null or user_id = $2)
+        and ($3::text is null or client_id = $3)
+        and ($4::uuid is null or tenant_id = $4 or tenant_id is null)
         and deleted_at is null
     `,
-    [reportId]
+    [reportId, owner?.userId ?? null, owner?.clientId ?? null, tenant?.tenantId ?? null]
   );
+  if (owner && result.rows[0]) await recordReportPath(owner.userId, result.rows[0].tenant_id, 'report_detail');
   return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };
 
 export const listReports = async (owner: { userId: string; clientId: string }) => {
+  const tenant = await resolveReportTenant(owner.userId);
   const result = await pool.query(
     `
       select *
       from health_reports
       where user_id = $1
         and client_id = $2
+        and (tenant_id = $3 or tenant_id is null)
         and processing_status in ('PUBLISHED', 'PARTIALLY_VALIDATED')
         and deleted_at is null
       order by created_at desc
     `,
-    [owner.userId, owner.clientId]
+    [owner.userId, owner.clientId, tenant.tenantId]
+  );
+  await recordTenantResolutionPath(
+    tenant,
+    result.rows.some((row) => row.tenant_id == null) ? 'LEGACY_FALLBACK' : 'TENANT',
+    'report_list',
   );
   return result.rows.map(rowToReport);
 };
 
 export const countReports = async (owner: { userId: string; clientId: string }) => {
+  const tenant = await resolveReportTenant(owner.userId);
   const result = await pool.query(
     `
       select count(*)::int as total
       from health_reports
       where user_id = $1
         and client_id = $2
+        and (tenant_id = $3 or tenant_id is null)
         and processing_status in ('PUBLISHED', 'PARTIALLY_VALIDATED')
         and deleted_at is null
     `,
-    [owner.userId, owner.clientId]
+    [owner.userId, owner.clientId, tenant.tenantId]
   );
   return Number(result.rows[0]?.total ?? 0);
 };
 
 export const deleteReport = async (reportId: string, owner: { userId: string; clientId: string }) => {
+  const tenant = await resolveReportTenant(owner.userId);
   const result = await pool.query(
     `
       update health_reports
@@ -564,25 +610,28 @@ export const deleteReport = async (reportId: string, owner: { userId: string; cl
       where id = $1
         and user_id = $2
         and client_id = $3
+        and (tenant_id = $5 or tenant_id is null)
         and deleted_at is null
       returning id
     `,
-    [reportId, owner.userId, owner.clientId, owner.userId]
+    [reportId, owner.userId, owner.clientId, owner.userId, tenant.tenantId]
   );
   return Boolean(result.rows[0]);
 };
 
 export const deleteAllReports = async (owner: { userId: string; clientId: string }) => {
+  const tenant = await resolveReportTenant(owner.userId);
   const result = await pool.query(
     `
       update health_reports
       set processing_status = 'DELETED', deleted_at = now(), deleted_by = $3, updated_at = now()
       where user_id = $1
         and client_id = $2
+        and (tenant_id = $4 or tenant_id is null)
         and deleted_at is null
       returning id
     `,
-    [owner.userId, owner.clientId, owner.userId]
+    [owner.userId, owner.clientId, owner.userId, tenant.tenantId]
   );
   return result.rows.map((row) => String(row.id));
 };
@@ -624,7 +673,7 @@ export const updateReportMetadata = async (
   owner: { userId: string; clientId: string },
   patch: Partial<Pick<ReportRecord, 'labName' | 'reportDate' | 'source'>>
 ) => {
-  const current = await getReport(reportId);
+  const current = await getReport(reportId, owner);
   if (!current || current.userId !== owner.userId || current.clientId !== owner.clientId) return null;
 
   const nextAnalysis = current.analysis
@@ -672,7 +721,7 @@ export const addFeedback = async (
     correctedReportDate?: string;
   }
 ) => {
-  const current = await getReport(reportId);
+  const current = await getReport(reportId, owner);
   if (!current || current.userId !== owner.userId || current.clientId !== owner.clientId) return null;
   const entry = {
     id: `fb_${crypto.randomUUID()}`,

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
+import { recordTenantResolutionPath, resolveActiveTenantContextForUserId } from '../tenancy/tenant-context.js';
 
 export const CONSULTANT_ACCESS_POLICY_VERSION = 'CONSULTANT_ACCESS_V1';
 export const CONSULTANT_ACCESS_PRODUCT = 'FITEATSY';
@@ -127,7 +128,7 @@ export const setConsultantAccessDecision = async (input: {
 
 export const resolveConsultantClientAccess = async (professionalUserId: string, publicClientId: string) => {
   const result = await pool.query(
-    `select assignment.id as assignment_id
+    `select assignment.id as assignment_id,assignment.tenant_id
        from consultant_client_assignments assignment
        join users professional on professional.id = assignment.consultant_user_id
        join fiteatsy_clients client on client.account_user_id = assignment.client_user_id
@@ -161,6 +162,14 @@ export const resolveConsultantClientAccess = async (professionalUserId: string, 
   );
   const row = result.rows[0];
   if (!row) return { authorized: false as const, reason: 'CLIENT_ASSIGNMENT_REQUIRED' as const };
+  const tenantContext=await resolveActiveTenantContextForUserId(professionalUserId);
+  if(tenantContext){
+    await recordTenantResolutionPath(
+      tenantContext,
+      row.tenant_id==null?'LEGACY_FALLBACK':'TENANT',
+      'consultant_client_access',
+    );
+  }
   return { authorized: true as const, assignmentId: String(row.assignment_id) };
 };
 

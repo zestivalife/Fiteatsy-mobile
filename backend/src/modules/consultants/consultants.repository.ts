@@ -1,5 +1,6 @@
 import { pool } from '../../db/pool.js';
 import { createOrResolveClientForAccount } from '../client/client.repository.js';
+import { recordTenantResolutionPath, resolveActiveTenantContextForUserId } from '../tenancy/tenant-context.js';
 import type { HealthCalculationInput, HealthMetrics } from '../health/health-calculations.service.js';
 import {
   compareBiomarkerObservations,
@@ -574,6 +575,8 @@ export const listRegisteredConsultantClients = async (
   professionalType = 'CONSULTANT',
   options: ConsultantClientDirectoryQuery = {}
 ): Promise<ConsultantClientDirectoryResult> => {
+  const tenant = await resolveActiveTenantContextForUserId(consultantAccountId);
+  if (!tenant) throw new Error('TENANT_CONTEXT_REQUIRED');
   const query = options.query?.trim() ?? '';
   const status = options.status ?? 'all';
   const page = Math.max(1, options.page ?? 1);
@@ -609,6 +612,7 @@ export const listRegisteredConsultantClients = async (
       assignment.relationship_type,
       assignment.starts_at,
       assignment.ends_at,
+      assignment.tenant_id,
       case
         when current_consent.status = 'GRANTED' then 'GRANTED'
         when current_consent.status = 'REVOKED' then 'REVOKED'
@@ -638,9 +642,12 @@ export const listRegisteredConsultantClients = async (
       and (assignment.starts_at is null or assignment.starts_at <= now())
       and (assignment.ends_at is null or assignment.ends_at > now())
       and u.deleted_at is null
+      and (assignment.tenant_id = $5 or assignment.tenant_id is null)
+      and (c.tenant_id = $5 or c.tenant_id is null)
+      and (current_consent.tenant_id = $5 or current_consent.tenant_id is null)
       ${directoryClause}
   `;
-  const parameters = [consultantAccountId, professionalType, query, status];
+  const parameters = [consultantAccountId, professionalType, query, status, tenant.tenantId];
   const countResult = await pool.query(
     `select count(*)::int as total from (${rosterSelect}) directory_clients`,
     parameters
@@ -648,10 +655,13 @@ export const listRegisteredConsultantClients = async (
   const result = await pool.query(
     `${rosterSelect}
       order by ${sortColumn} ${order} nulls last, u.id asc
-      limit $5 offset $6
+      limit $6 offset $7
     `,
     [...parameters, pageSize, offset]
   );
+
+  const usedLegacyFallback = result.rows.some((row) => row.tenant_id == null);
+  await recordTenantResolutionPath(tenant, usedLegacyFallback ? 'LEGACY_FALLBACK' : 'TENANT', 'consultant_client_roster');
 
   return {
     clients: result.rows.map((row) => mapRosterRecord(row)),

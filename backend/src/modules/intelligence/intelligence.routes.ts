@@ -153,7 +153,7 @@ const toReportParameter = (
   });
 
 const loadOwnedReportParameters = async (reportId: string, owner: ClientOwnershipContext) => {
-  const report = await getReport(reportId);
+  const report = await getReport(reportId, { userId: owner.accountId, clientId: owner.clientId });
   if (!report || report.userId !== owner.accountId || report.clientId !== owner.clientId) {
     return { status: 404 as const, error: { error: 'REPORT_NOT_FOUND', message: 'Report not found.' } };
   }

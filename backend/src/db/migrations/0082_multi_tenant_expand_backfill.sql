@@ -85,6 +85,7 @@ begin
   foreach table_name in array array[
     'fiteatsy_clients','consultant_client_assignments','care_cases','consultant_client_operations',
     'consultant_client_operation_audit','daily_checkins','nudges','health_reports','health_report_files',
+    'health_report_upload_sessions',
     'document_intelligence_audit','biomarkers','biomarker_observations','health_observations',
     'diet_plans','diet_plan_versions','diet_plan_review_events','notifications','profile_photo_assets',
     'consultant_access_consents','consultant_access_consent_events'
@@ -117,8 +118,10 @@ declare table_name text;
 begin
   foreach table_name in array array[
     'fiteatsy_clients','consultant_client_assignments','care_cases','consultant_client_operations',
-    'health_reports','health_report_files','diet_plans','diet_plan_versions','diet_plan_review_events',
-    'notifications','profile_photo_assets','consultant_access_consents','consultant_access_consent_events'
+    'consultant_client_operation_audit','daily_checkins','nudges','health_reports','health_report_files',
+    'health_report_upload_sessions','document_intelligence_audit','biomarkers','biomarker_observations',
+    'health_observations','diet_plans','diet_plan_versions','diet_plan_review_events','notifications',
+    'profile_photo_assets','consultant_access_consents','consultant_access_consent_events'
   ] loop
     if to_regclass(table_name) is not null then
       execute format('drop trigger if exists %I on %I','tenant_dual_write',table_name);
@@ -127,23 +130,64 @@ begin
   end loop;
 end $$;
 
+create table if not exists tenant_backfill_verification_snapshot (
+  table_name text primary key,
+  total_rows bigint not null,
+  unresolved_rows bigint not null,
+  distinct_tenants bigint not null,
+  zestiva_backfilled_rows bigint not null,
+  captured_at timestamptz not null default now()
+);
+
+create or replace function refresh_tenant_backfill_verification()
+returns void language plpgsql as $$
+declare table_name text;
+begin
+  foreach table_name in array array[
+    'fiteatsy_clients','consultant_client_assignments','care_cases','consultant_client_operations',
+    'consultant_client_operation_audit','daily_checkins','nudges','health_reports','health_report_files',
+    'health_report_upload_sessions','document_intelligence_audit','biomarkers','biomarker_observations',
+    'health_observations','diet_plans','diet_plan_versions','diet_plan_review_events','notifications',
+    'profile_photo_assets','consultant_access_consents','consultant_access_consent_events'
+  ] loop
+    if to_regclass(table_name) is not null then
+      execute format(
+        'insert into tenant_backfill_verification_snapshot(table_name,total_rows,unresolved_rows,distinct_tenants,zestiva_backfilled_rows,captured_at)
+         select %L,count(*),count(*) filter(where tenant_id is null),count(distinct tenant_id),
+                count(*) filter(where tenant_id=%L::uuid),now() from %I
+         on conflict(table_name) do update set total_rows=excluded.total_rows,
+           unresolved_rows=excluded.unresolved_rows,distinct_tenants=excluded.distinct_tenants,
+           zestiva_backfilled_rows=excluded.zestiva_backfilled_rows,captured_at=excluded.captured_at',
+        table_name,'00000000-0000-4000-8000-000000000001',table_name
+      );
+    end if;
+  end loop;
+end $$;
+
+select refresh_tenant_backfill_verification();
+
 create or replace view tenant_backfill_verification as
-select 'fiteatsy_clients'::text as table_name, count(*)::bigint as total_rows,
-       count(*) filter(where tenant_id is not null)::bigint as backfilled_rows,
-       count(*) filter(where tenant_id is null)::bigint as unresolved_rows
-from fiteatsy_clients
+select table_name,total_rows,(total_rows-unresolved_rows) as backfilled_rows,unresolved_rows,
+       distinct_tenants,zestiva_backfilled_rows,captured_at
+from tenant_backfill_verification_snapshot;
+
+create or replace view tenant_relationship_verification as
+select 'client_assignment'::text as relationship,
+       count(*) filter(where child.tenant_id is distinct from parent.tenant_id)::bigint as mismatch_count
+from consultant_client_assignments child
+join fiteatsy_clients parent on parent.account_user_id=child.client_user_id
 union all
-select 'consultant_client_assignments',count(*),count(*) filter(where tenant_id is not null),count(*) filter(where tenant_id is null) from consultant_client_assignments
+select 'report_file',count(*) filter(where child.tenant_id is distinct from parent.tenant_id)
+from health_report_files child join health_reports parent on parent.id=child.report_id
 union all
-select 'care_cases',count(*),count(*) filter(where tenant_id is not null),count(*) filter(where tenant_id is null) from care_cases
+select 'diet_plan_version',count(*) filter(where child.tenant_id is distinct from parent.tenant_id)
+from diet_plan_versions child join diet_plans parent on parent.id=child.diet_plan_id
 union all
-select 'health_reports',count(*),count(*) filter(where tenant_id is not null),count(*) filter(where tenant_id is null) from health_reports
-union all
-select 'diet_plans',count(*),count(*) filter(where tenant_id is not null),count(*) filter(where tenant_id is null) from diet_plans
-union all
-select 'diet_plan_versions',count(*),count(*) filter(where tenant_id is not null),count(*) filter(where tenant_id is null) from diet_plan_versions
-union all
-select 'notifications',count(*),count(*) filter(where tenant_id is not null),count(*) filter(where tenant_id is null) from notifications;
+select 'diet_plan_review',count(*) filter(where child.tenant_id is distinct from parent.tenant_id)
+from diet_plan_review_events child join diet_plans parent on parent.id=child.diet_plan_id;
 
 comment on view tenant_backfill_verification is
-  'Read-only P0.1 expand/backfill evidence. Contract migration is prohibited while unresolved_rows is non-zero.';
+  'Read-only P0.1 expand/backfill evidence for all 21 tenant-owned tables. Contract migration is prohibited while unresolved_rows is non-zero.';
+
+comment on view tenant_relationship_verification is
+  'Read-only parent/child tenant mismatch evidence. Every mismatch count must be zero before contract.';

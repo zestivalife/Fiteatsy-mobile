@@ -53,6 +53,7 @@ import { freezeCombinationOptionsForLifecycle, listCombinationOptions } from './
 import { MEAL_HEADS as COMMON_FOOD_MEAL_HEADS } from './common-food-engine.js';
 import { isQaFixtureEntity } from '../admin/qa-provisioning.repository.js';
 import { resolveConsultantClientAccess } from '../consultant-access/consultant-access.repository.js';
+import { resolveActiveTenantContextForUserId, recordTenantResolutionPath } from '../tenancy/tenant-context.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
@@ -2474,7 +2475,11 @@ export const getSeniorConsultantDietPlanReviewQueue = async (account: Authentica
   if (!canApproveOrPublishDietPlan(account)) {
     throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can access the review queue.', 403);
   }
-  const reviews = await listDietPlanReviewQueue(account.qaSession?.fixtureSetId);
+  const tenantContext = await resolveActiveTenantContextForUserId(account.accountId);
+  const reviews = await listDietPlanReviewQueue(account.qaSession?.fixtureSetId, tenantContext?.tenantId);
+  if (tenantContext) {
+    await recordTenantResolutionPath(tenantContext, 'TENANT', 'nutrition.senior-review-queue');
+  }
   return reviews.map((review) => {
     try {
       assertDietPlanVersionReviewComplete(review.version);
@@ -2501,7 +2506,8 @@ const getSeniorDietPlanReviewContext = async (
   if (!canApproveOrPublishDietPlan(account)) {
     throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can review nutrition plans.', 403);
   }
-  const review = (await listDietPlanReviewQueue(account.qaSession?.fixtureSetId))
+  const tenantContext = await resolveActiveTenantContextForUserId(account.accountId);
+  const review = (await listDietPlanReviewQueue(account.qaSession?.fixtureSetId, tenantContext?.tenantId))
     .find((item) => item.dietPlanId === dietPlanId && item.version.id === versionId);
   if (!review) {
     throw new NutritionPlanWorkflowError(

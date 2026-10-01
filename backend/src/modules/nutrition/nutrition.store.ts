@@ -182,7 +182,7 @@ export const getDietPlanById = async (dietPlanId: string) => {
   return mapDietPlan(result.rows[0]);
 };
 
-export const listDietPlanReviewQueue = async (qaFixtureSetId?: string) => {
+export const listDietPlanReviewQueue = async (qaFixtureSetId?: string, tenantId?: string | null) => {
   const result = await pool.query(
     `select dp.id, dp.user_id, dp.consultant_id, dp.plan_status, dp.updated_at, dp.submitted_at,
             dp.review_comment, client.name as client_name,
@@ -197,7 +197,8 @@ export const listDietPlanReviewQueue = async (qaFixtureSetId?: string) => {
               'createdAtISO', events.created_at
             ) order by events.created_at asc)
             from diet_plan_review_events events
-            where events.diet_plan_id = dp.id), '[]'::json) as review_history
+            where events.diet_plan_id = dp.id
+              and ($2::uuid is null or events.tenant_id = $2::uuid)), '[]'::json) as review_history
        from diet_plans dp
        join diet_plan_versions dpv on dpv.id = dp.current_version_id
        join users client on client.id = dp.user_id
@@ -213,13 +214,14 @@ export const listDietPlanReviewQueue = async (qaFixtureSetId?: string) => {
        ) fiteatsy_client on true
       where dp.deleted_at is null
         and dpv.deleted_at is null
+        and ($2::uuid is null or (dp.tenant_id = $2::uuid and dpv.tenant_id = $2::uuid))
         and dp.plan_status in ('submitted_for_review', 'changes_requested')
         and ($1::uuid is null or exists (
           select 1 from qa_fixture_entities qfe
           where qfe.fixture_set_id=$1::uuid and qfe.entity_type='USER' and qfe.entity_id=dp.user_id
         ))
       order by dp.submitted_at desc nulls last, dp.updated_at desc`,
-    [qaFixtureSetId ?? null]
+    [qaFixtureSetId ?? null, tenantId ?? null]
   );
   return result.rows.map((row) => ({
     dietPlanId: String(row.id),
