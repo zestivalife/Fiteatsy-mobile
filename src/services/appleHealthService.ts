@@ -1,10 +1,12 @@
 import { Platform } from 'react-native';
 import { enableHealthKitBackgroundDelivery, inspectHealthKitAuthorization, isHealthKitAvailable, readHealthKitChanges,
-  readHealthKitCumulativeStatistics, requestHealthKitAuthorization } from '../../modules/fiteatsy-healthkit';
+  readHealthKitActivitySummary, readHealthKitCumulativeStatistics, requestHealthKitAuthorization,
+  type HealthKitActivitySummary } from '../../modules/fiteatsy-healthkit';
 import type { HealthObservationDraft, WearableSyncPayload } from '../types';
 import { APPLE_HEALTH_QUERYABLE_METRICS, APPLE_HEALTH_READ_TYPES } from './healthMetricRegistry';
 
 export const APPLE_HEALTH_SCOPES = APPLE_HEALTH_READ_TYPES;
+export const APPLE_HEALTH_AUTHORIZATION_SCOPES = [...APPLE_HEALTH_READ_TYPES, 'activity_summary'];
 export const APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS = 5_000;
 export const APPLE_HEALTH_PERMISSION_TIMEOUT_MS = 20_000;
 // Thirteen reads run serially. Keep the worst-case local read budget
@@ -36,12 +38,15 @@ export const inspectAppleHealthAvailability = async () => Platform.OS === 'ios' 
   isHealthKitAvailable(), APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS, 'apple_health_availability_timeout'
 );
 export const requestAppleHealthPermissions = async () => withAppleHealthTimeout(
-  requestHealthKitAuthorization(APPLE_HEALTH_SCOPES), APPLE_HEALTH_PERMISSION_TIMEOUT_MS, 'apple_health_permission_timeout'
+  requestHealthKitAuthorization(APPLE_HEALTH_AUTHORIZATION_SCOPES), APPLE_HEALTH_PERMISSION_TIMEOUT_MS, 'apple_health_permission_timeout'
 );
 export const inspectAppleHealthPermissionState = async () => withAppleHealthTimeout(
-  inspectHealthKitAuthorization(APPLE_HEALTH_SCOPES), APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS,
+  inspectHealthKitAuthorization(APPLE_HEALTH_AUTHORIZATION_SCOPES), APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS,
   'apple_health_permission_status_timeout'
 );
+export const readTodayAppleActivitySummary = async (): Promise<HealthKitActivitySummary | null> =>
+  withAppleHealthTimeout(readHealthKitActivitySummary(new Date().toISOString()), APPLE_HEALTH_METRIC_TIMEOUT_MS,
+    'apple_health_activity_summary_timeout');
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 const average = (values: number[]) => values.length ? sum(values) / values.length : null;

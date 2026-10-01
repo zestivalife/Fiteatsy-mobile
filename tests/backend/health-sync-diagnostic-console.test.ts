@@ -10,7 +10,11 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const routes=readFileSync(path.join(root,'backend/src/modules/health-sync-lab/health-sync-lab.routes.ts'),'utf8');
 const repository=readFileSync(path.join(root,'backend/src/modules/health-sync-lab/health-sync-lab.repository.ts'),'utf8');
 const migration=readFileSync(path.join(root,'backend/src/db/migrations/0082_health_sync_diagnostic_console.sql'),'utf8');
+const activityMigration=readFileSync(path.join(root,'backend/src/db/migrations/0083_health_sync_activity_diagnostics.sql'),'utf8');
 const server=readFileSync(path.join(root,'backend/src/server.ts'),'utf8');
+const mobileBridge=readFileSync(path.join(root,'src/services/healthSyncDiagnosticBridge.ts'),'utf8');
+const coordinator=readFileSync(path.join(root,'src/services/canonicalHealthSyncCoordinator.ts'),'utf8');
+const healthKitBridge=readFileSync(path.join(root,'modules/fiteatsy-healthkit/ios/FiteatsyHealthKitModule.swift'),'utf8');
 
 test('Health Sync Lab exposes the governed internal surface and no direct native provider API',()=>{
   for(const route of ['/devices','/status','/metrics','/metrics/:metricId','/queue','/requests','/requests/:id']) assert.match(routes,new RegExp(route.replace(/[/:]/g,'\\$&')));
@@ -71,4 +75,26 @@ test('governed sync requests expire and preserve an append-only safe event trail
   assert.match(migration,/health_sync_request_events/);
   assert.match(routes,/safeMetadata:z\.record/);
   assert.doesNotMatch(routes,/healthValue|rawPayload|token:/);
+});
+
+test('physical iPhone reporting owns HealthKit activity summaries and governed request polling',()=>{
+  assert.match(healthKitBridge,/HKActivitySummaryQuery/);
+  assert.match(healthKitBridge,/activeEnergyBurned/);
+  assert.match(healthKitBridge,/appleExerciseTime/);
+  assert.match(healthKitBridge,/appleStandHours/);
+  assert.match(mobileBridge,/\/internal\/health-sync\/mobile\/heartbeat/);
+  assert.match(mobileBridge,/\/internal\/health-sync\/mobile\/requests/);
+  assert.match(activityMigration,/activity_summary jsonb/);
+  assert.match(activityMigration,/workout_summary jsonb/);
+  const page=renderHealthSyncLabPage();
+  assert.match(page,/Apple Fitness \/ Activity/);
+  assert.match(page,/NOT_AVAILABLE_VIA_HEALTHKIT/);
+});
+
+test('diagnostic reporting is metadata scoped and cannot block the canonical sync pipeline',()=>{
+  assert.doesNotMatch(mobileBridge,/observation\.value|healthValue|accessToken|sessionToken/);
+  assert.match(coordinator,/reportHealthSyncDiagnosticSnapshot[\s\S]*\.catch\(\(\)=>undefined\)/);
+  assert.match(mobileBridge,/pendingCount/);
+  assert.match(mobileBridge,/nativeRecordCount/);
+  assert.match(mobileBridge,/localRecordCount/);
 });

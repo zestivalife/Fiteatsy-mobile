@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
+import type { HealthKitActivitySummary } from '../../modules/fiteatsy-healthkit';
 import { useAppContext } from '../state/AppContext';
 import type { HealthObservationDraft } from '../types';
 import { HEALTH_METRIC_REGISTRY, type HealthMetricDefinition } from './healthMetricRegistry';
@@ -32,6 +33,9 @@ import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 import { traceSessionLifecycle } from './sessionLifecycleTrace';
 import { buildHealthSourceDiagnostics } from './healthSourceDiagnostics';
+import { inspectAppleHealthAvailability, readTodayAppleActivitySummary } from './appleHealthService';
+import { getPendingDiagnosticSyncRequests, reportDiagnosticSyncProgress, reportHealthSyncDiagnosticSnapshot,
+  type DiagnosticWorkoutSummary } from './healthSyncDiagnosticBridge';
 
 export type { HealthObservationDto } from './healthSyncManager';
 
@@ -93,6 +97,9 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const [canonicalIntelligence, setCanonicalIntelligence] = useState<LocalCanonicalHealthSnapshot | null>(null);
   const [aggregates,setAggregates]=useState<CanonicalDailyAggregate[]>([]);
   const [lifecycle,setLifecycle]=useState<HealthSyncLifecycleTimestamps>({lastHealthReadAtISO:null,lastSavedAtISO:null,lastUploadedAtISO:null,lastFullySyncedAtISO:null});
+  const [activitySummary,setActivitySummary]=useState<HealthKitActivitySummary|null>(null);
+  const diagnosticRequestsInFlight=useRef(new Set<string>());
+  const lastDiagnosticSyncOutcome=useRef<'SUCCESS'|'PARTIAL'|'FAILED'>('FAILED');
   const localScope = useMemo(() => authSession
     ? `account:${authSession.accountId}:${adapter.appId}`
     : null, [adapter.appId, authSession]);
@@ -159,6 +166,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       }
     };
     traceSessionLifecycle('HEALTH_SYNC_START', { trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL' });
+    lastDiagnosticSyncOutcome.current='FAILED';
     setUploadState('UPLOADING');
     setMessage(`Reading ${sourceName}…`);
     setQueryStates(Object.fromEntries(HEALTH_METRIC_REGISTRY.map((definition) => [definition.metricKey,
@@ -223,9 +231,13 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       setAggregates(await readLocalHealthAggregates(localScope));
       setLifecycle(await readLocalHealthLifecycle(localScope));
       setDiagnostics(result.diagnostics);
+      if (Platform.OS === 'ios') {
+        setActivitySummary(await readTodayAppleActivitySummary().catch(() => null));
+      }
       setProviderState('CONNECTED');
       await markLocalHealthProviderConnected(localScope);
       setUploadState(result.rejected > 0 ? 'ERROR' : 'SYNCED');
+      lastDiagnosticSyncOutcome.current=result.rejected>0?'PARTIAL':'SUCCESS';
       const nextQueries: Record<string, HealthMetricQueryState> = {};
       const nextErrors: Record<string, string | null> = {};
       HEALTH_METRIC_REGISTRY.forEach((definition) => {
@@ -242,6 +254,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     } catch (error) {
       if (!mounted.current || activeLocalFlight.current !== localFlight) return;
       if (error instanceof HealthSyncUploadPendingError || error instanceof HealthSyncPostUploadRefreshError) {
+        lastDiagnosticSyncOutcome.current='PARTIAL';
         const localDisplayObservations = await readLocalHealthObservations(localScope);
         mergeLocalObservations(localDisplayObservations);
         mergePresentationObservations(error.payload.presentationObservations ?? []);
@@ -267,6 +280,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
           ? `${sourceName} data was uploaded. Account status will refresh automatically.`
           : `${sourceName} data is available locally. Upload is pending.`);
       } else {
+        lastDiagnosticSyncOutcome.current='FAILED';
         const available = await adapter.isAvailable().catch(() => false);
         setProviderState(available ? 'ERROR' : 'UNAVAILABLE');
         setUploadState('ERROR');
@@ -427,6 +441,46 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   }), [adapter.platform, errors, latestByMetric, observations, queryStates, uploadState]);
 
   const platformStatus = adapter.platform === 'APPLE_HEALTH' ? status?.appleHealth : status?.healthConnect;
+  const workoutSummary = useMemo<DiagnosticWorkoutSummary|null>(() => {
+    const workouts=observations.filter((item)=>item.metricType==='workout_minutes');
+    if(!workouts.length)return null;
+    const latest=[...workouts].sort((left,right)=>right.measuredAtISO.localeCompare(left.measuredAtISO))[0];
+    return {count:workouts.length,latestAtISO:latest.measuredAtISO,
+      activityType:latest.sourceMetadata?.workoutActivityType??null,
+      durationSeconds:latest.sourceMetadata?.workoutDurationSeconds??null,
+      energyKcal:latest.sourceMetadata?.workoutEnergyKcal??null,
+      distanceMeters:latest.sourceMetadata?.workoutDistanceMeters??null,
+      source:latest.sourceProvider??null};
+  },[observations]);
+
+  useEffect(()=>{
+    const connectionId=platformStatus?.connectionId??connectionIdOverride.current;
+    if(!authSession||!connectionId||AppState.currentState!=='active')return;
+    let active=true;
+    const run=async()=>{
+      const available=adapter.platform==='APPLE_HEALTH'?await inspectAppleHealthAvailability().catch(()=>false):await adapter.isAvailable().catch(()=>false);
+      await reportHealthSyncDiagnosticSnapshot({connectionId,metrics,diagnostics,lifecycle,pendingCount:pendingUploadCount,
+        healthKitAvailable:available,activitySummary,workoutSummary}).catch(()=>undefined);
+      const pending=await getPendingDiagnosticSyncRequests(connectionId).catch(()=>({items:[]}));
+      for(const request of pending.items){
+        if(!active||diagnosticRequestsInFlight.current.has(request.id))continue;
+        diagnosticRequestsInFlight.current.add(request.id);
+        try{
+          await reportDiagnosticSyncProgress(request.id,{connectionId,status:'ACKNOWLEDGED',eventType:'ACKNOWLEDGED'});
+          await reportDiagnosticSyncProgress(request.id,{connectionId,status:'RUNNING',eventType:'SYNC_STARTED'});
+          await syncLocalMetrics({forceSourceBackfill:true});
+          const outcome=lastDiagnosticSyncOutcome.current;
+          await reportDiagnosticSyncProgress(request.id,{connectionId,status:outcome,eventType:outcome==='FAILED'?'SYNC_FAILED':'SYNC_COMPLETED',
+            safeMetadata:{requestedMetricCount:request.requested_metrics.length}});
+        }catch{
+          await reportDiagnosticSyncProgress(request.id,{connectionId,status:'FAILED',eventType:'SYNC_FAILED',
+            safeMetadata:{errorCode:'DEVICE_SYNC_FAILED'}}).catch(()=>undefined);
+        }finally{diagnosticRequestsInFlight.current.delete(request.id)}
+      }
+    };
+    void run();const timer=setInterval(()=>void run(),10_000);
+    return()=>{active=false;clearInterval(timer)};
+  },[activitySummary,adapter,authSession,diagnostics,lifecycle,metrics,pendingUploadCount,platformStatus?.connectionId,syncLocalMetrics,workoutSummary]);
   return {
     providerState,
     providerLabel: providerStatusCopy(providerState),

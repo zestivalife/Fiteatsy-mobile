@@ -14,8 +14,9 @@ describe('Apple Health physical-device permission flow', () => {
 
   it('requests read-only supported HealthKit types and omits unsupported metrics', () => {
     expect(native).toContain('requestAuthorization(toShare: [], read: types)');
-    expect(native).toContain('metrics.filter { self.sampleType($0) != nil }');
-    expect(native).toContain('metrics.filter { self.sampleType($0) == nil }');
+    expect(native).toContain('metrics.filter { self.authorizationType($0) != nil }');
+    expect(native).toContain('metrics.filter { self.authorizationType($0) == nil }');
+    expect(native).toContain('if metric == "activity_summary" { return HKObjectType.activitySummaryType() }');
     expect(native).not.toContain('toShare: types');
     expect(native).not.toContain('sampleType(metric)!');
   });

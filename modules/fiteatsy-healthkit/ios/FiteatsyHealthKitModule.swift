@@ -36,9 +36,9 @@ public final class FiteatsyHealthKitModule: Module {
         ])
         return
       }
-      let supported = metrics.filter { self.sampleType($0) != nil }
-      let unsupported = metrics.filter { self.sampleType($0) == nil }
-      let types = Set(supported.compactMap { self.sampleType($0) })
+      let supported = metrics.filter { self.authorizationType($0) != nil }
+      let unsupported = metrics.filter { self.authorizationType($0) == nil }
+      let types = Set(supported.compactMap { self.authorizationType($0) })
       guard !types.isEmpty else {
         promise.resolve([
           "available": true,
@@ -71,9 +71,9 @@ public final class FiteatsyHealthKitModule: Module {
         promise.reject("HEALTHKIT_UNAVAILABLE", "Apple Health is unavailable")
         return
       }
-      let supported = metrics.filter { self.sampleType($0) != nil }
-      let unsupported = metrics.filter { self.sampleType($0) == nil }
-      let types = Set(supported.compactMap { self.sampleType($0) })
+      let supported = metrics.filter { self.authorizationType($0) != nil }
+      let unsupported = metrics.filter { self.authorizationType($0) == nil }
+      let types = Set(supported.compactMap { self.authorizationType($0) })
       guard !types.isEmpty else {
         self.logger.error("HealthKit authorization rejected because no requested metric maps to a supported type")
         promise.reject("HEALTHKIT_NO_SUPPORTED_TYPES", "No supported Apple Health data types were requested")
@@ -134,6 +134,38 @@ public final class FiteatsyHealthKitModule: Module {
               metric, rows.count, deletedIds.count, rows.count + deletedIds.count >= self.anchoredReadLimit ? "YES" : "NO")
         promise.resolve(["samples": rows, "deletedIds": deletedIds, "anchor": anchorData?.base64EncodedString() ?? "",
           "hasMore": rows.count + deletedIds.count >= self.anchoredReadLimit])
+      }
+      self.store.execute(query)
+    }
+
+    AsyncFunction("readActivitySummary") { (dateText: String, promise: Promise) in
+      guard HKHealthStore.isHealthDataAvailable() else {
+        promise.reject("HEALTHKIT_UNAVAILABLE", "Apple Health is unavailable")
+        return
+      }
+      guard let date = self.iso.date(from: dateText) else {
+        promise.reject("HEALTHKIT_INVALID_ACTIVITY_DATE", "The activity-summary date is invalid")
+        return
+      }
+      var calendar = Calendar(identifier: .gregorian)
+      calendar.timeZone = .current
+      let components = calendar.dateComponents([.era, .year, .month, .day], from: date)
+      let query = HKActivitySummaryQuery(predicate: HKQuery.predicateForActivitySummary(with: components)) { _, summaries, error in
+        if let error = error as NSError? {
+          self.logger.error("HealthKit activity summary failed; domain=\(error.domain, privacy: .public), code=\(error.code, privacy: .public)")
+          promise.reject("HEALTHKIT_ACTIVITY_SUMMARY_FAILED", "Apple Health activity summary could not be read")
+          return
+        }
+        guard let summary = summaries?.first else { promise.resolve(nil); return }
+        promise.resolve([
+          "dateISO": dateText,
+          "move": ["value": summary.activeEnergyBurned.doubleValue(for: .kilocalorie()),
+                   "goal": summary.activeEnergyBurnedGoal.doubleValue(for: .kilocalorie()), "unit": "kcal"],
+          "exercise": ["value": summary.appleExerciseTime.doubleValue(for: .minute()),
+                       "goal": summary.appleExerciseTimeGoal.doubleValue(for: .minute()), "unit": "min"],
+          "stand": ["value": summary.appleStandHours.doubleValue(for: .count()),
+                    "goal": summary.appleStandHoursGoal.doubleValue(for: .count()), "unit": "hr"]
+        ])
       }
       self.store.execute(query)
     }
@@ -208,6 +240,11 @@ public final class FiteatsyHealthKitModule: Module {
     if metric == "sleep_minutes" { return HKObjectType.categoryType(forIdentifier: .sleepAnalysis) }
     if metric == "workout_minutes" { return HKObjectType.workoutType() }
     return ids[metric].flatMap { HKObjectType.quantityType(forIdentifier: $0) }
+  }
+
+  private func authorizationType(_ metric: String) -> HKObjectType? {
+    if metric == "activity_summary" { return HKObjectType.activitySummaryType() }
+    return sampleType(metric)
   }
 
   private func serialize(_ sample: HKSample, metric: String) -> [String: Any]? {
