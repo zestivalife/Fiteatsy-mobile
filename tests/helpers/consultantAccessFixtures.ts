@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { pool } from '../../backend/src/db/pool.js';
+import { createProfessionalAssignment } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
+import { ZESTIVA_INTERNAL_TENANT_ID } from '../../backend/src/test-support/test-tenants.js';
 import { authHeaders } from './auth.js';
 import { getJson, patchJson, putJson } from './http.js';
 
@@ -11,11 +14,43 @@ type AuthenticatedFixtureSession = {
   };
 };
 
+export const ensureCanonicalAssignmentMemberships = async (
+  consultantUserId: string,
+  clientUserId: string,
+) => {
+  await pool.query(
+    `insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status)
+     values
+       (md5('consultant-access-membership:' || $1)::uuid,$3,$1,'CONSULTANT','active'),
+       (md5('consultant-access-membership:' || $2)::uuid,$3,$2,'CLIENT','active')
+     on conflict (tenant_id,user_id) do update set
+       tenant_role=excluded.tenant_role,
+       status='active',
+       removed_at=null,
+       updated_at=now()`,
+    [consultantUserId, clientUserId, ZESTIVA_INTERNAL_TENANT_ID],
+  );
+};
+
+export const createCanonicalProfessionalAssignment = async (
+  input: Parameters<typeof createProfessionalAssignment>[0],
+) => {
+  await ensureCanonicalAssignmentMemberships(input.professionalUserId, input.clientUserId);
+  const assignment = await createProfessionalAssignment(input);
+  assert.notEqual(assignment, null, 'Canonical consultant assignment must be created');
+  assert.equal(assignment!.tenant_id, ZESTIVA_INTERNAL_TENANT_ID, 'Assignment must use the canonical Zestiva tenant');
+  return assignment;
+};
+
 export const grantCanonicalConsultantAccess = async (
   baseUrl: string,
   client: AuthenticatedFixtureSession,
   consultant: AuthenticatedFixtureSession
 ) => {
+  await ensureCanonicalAssignmentMemberships(
+    consultant.current.body.accountId,
+    client.current.body.accountId,
+  );
   const assignment = await patchJson(
     baseUrl,
     '/v1/platform/health-profile',

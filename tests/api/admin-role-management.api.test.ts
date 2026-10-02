@@ -3,8 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pool } from '../../backend/src/db/pool.js';
 import { bootstrapInitialAdminFromEnvironment } from '../../backend/src/modules/admin/admin.service.js';
-import { createProfessionalAssignment } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
+import { createCanonicalProfessionalAssignment } from '../helpers/consultantAccessFixtures.js';
 import { getJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
@@ -252,7 +252,7 @@ test('consultant can access client list after admin role assignment', async () =
   );
   assert.equal(assigned.response.status, 200);
 
-  const clientAssignment = await createProfessionalAssignment({
+  const clientAssignment = await createCanonicalProfessionalAssignment({
     actorUserId: admin.current.body.accountId,
     clientUserId: client.current.body.accountId,
     professionalUserId: consultant.current.body.accountId,
@@ -321,7 +321,7 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
   );
   assert.equal(duplicateCount.rows[0].count, 1);
 
-  const assignment = await createProfessionalAssignment({
+  const assignment = await createCanonicalProfessionalAssignment({
     actorUserId: senior.current.body.accountId,
     clientUserId: mobileClient.current.body.accountId,
     professionalUserId: consultant.current.body.accountId,
@@ -468,7 +468,7 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
     }
     if (definition.assigned) {
       if (definition.reassign) {
-        const historical = await createProfessionalAssignment({
+        const historical = await createCanonicalProfessionalAssignment({
           actorUserId: senior.current.body.accountId,
           clientUserId: session.current.body.accountId,
           professionalUserId: otherConsultant.current.body.accountId,
@@ -476,7 +476,7 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
         });
         assert.notEqual(historical, null);
       }
-      const assignment = await createProfessionalAssignment({
+      const assignment = await createCanonicalProfessionalAssignment({
         actorUserId: senior.current.body.accountId,
         clientUserId: session.current.body.accountId,
         professionalUserId: consultant.current.body.accountId,

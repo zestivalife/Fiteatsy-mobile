@@ -41,6 +41,7 @@ test('reset, fixture, request and background boundaries carry explicit tenant au
   const tenants = read('backend/src/test-support/test-tenants.ts');
   const commonFood = read('tests/helpers/commonFoodFixtures.ts');
   const lifecycle = read('tests/helpers/consultantLifecycleFixtures.ts');
+  const consultantAccess = read('tests/helpers/consultantAccessFixtures.ts');
   const request = read('tests/helpers/authenticatedApi.ts');
   const nutrition = read('backend/src/modules/nutrition/nutrition.service.ts');
   assert.match(reset, /ensureCanonicalTestTenants/);
@@ -51,6 +52,9 @@ test('reset, fixture, request and background boundaries carry explicit tenant au
   assert.match(commonFood, /tenant_memberships/);
   assert.match(commonFood, /active consultant and client memberships/);
   assert.match(lifecycle, /reviewAuthority/);
+  assert.match(consultantAccess, /ensureCanonicalAssignmentMemberships/);
+  assert.match(consultantAccess, /tenant_memberships/);
+  assert.match(consultantAccess, /createCanonicalProfessionalAssignment/);
   assert.match(request, /requestId/);
   assert.match(nutrition, /resolveActiveTenantContextForUserId\(account\.accountId\)/);
 });

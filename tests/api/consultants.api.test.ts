@@ -4,10 +4,9 @@ import crypto from 'node:crypto';
 import { pool } from '../../backend/src/db/pool.js';
 import { createBiomarkerObservation, upsertBiomarker } from '../../backend/src/modules/biomarkers/biomarkers.repository.js';
 import { ingestHealthObservations } from '../../backend/src/modules/health/health-observations.repository.js';
-import { createProfessionalAssignment } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
 import { createReportRecord } from '../../backend/src/modules/reports/reports.store.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
-import { grantCanonicalConsultantAccess } from '../helpers/consultantAccessFixtures.js';
+import { createCanonicalProfessionalAssignment, grantCanonicalConsultantAccess } from '../helpers/consultantAccessFixtures.js';
 import { getJson, patchJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
@@ -239,7 +238,7 @@ test('consultant roster and every client workspace use the same active-assignmen
   const consultant = await createConsultantSession();
   const unrelatedConsultant = await createConsultantSession();
 
-  const assignment = await createProfessionalAssignment({
+  const assignment = await createCanonicalProfessionalAssignment({
     actorUserId: consultant.current.body.accountId,
     clientUserId: client.current.body.accountId,
     professionalUserId: consultant.current.body.accountId,
@@ -486,7 +485,7 @@ test('consultant discovery backfills missing client records for registered users
   const canonicalClientId = String(clientRows.rows[0].id);
   const publicClientId = String(clientRows.rows[0].fiteatsy_client_id);
 
-  const assignment = await createProfessionalAssignment({
+  const assignment = await createCanonicalProfessionalAssignment({
     actorUserId: consultant.current.body.accountId,
     clientUserId: accountId,
     professionalUserId: consultant.current.body.accountId,
