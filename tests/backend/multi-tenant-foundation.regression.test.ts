@@ -48,6 +48,8 @@ test('reset, fixture, request and background boundaries carry explicit tenant au
   assert.match(tenants, /on conflict \(id\) do update/);
   assert.match(commonFood, /assignment_tenant_id/);
   assert.match(commonFood, /client_tenant_id/);
+  assert.match(commonFood, /tenant_memberships/);
+  assert.match(commonFood, /active consultant and client memberships/);
   assert.match(lifecycle, /reviewAuthority/);
   assert.match(request, /requestId/);
   assert.match(nutrition, /resolveActiveTenantContextForUserId\(account\.accountId\)/);
