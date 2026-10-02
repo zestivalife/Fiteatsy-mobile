@@ -16,6 +16,18 @@ test('expand migration creates deterministic Zestiva tenant and additive nullabl
   assert.match(migration,/if new\.tenant_id is null and exists/);
 });
 
+test('destructive API-test reset restores the canonical tenant after PostgreSQL cascade',()=>{
+  const reset=read('backend/src/test-support/reset.ts');
+  const truncate=reset.indexOf("truncate table auth_sessions, fiteatsy_clients, users restart identity cascade");
+  const restore=reset.indexOf('await restoreCanonicalTenantSeedAfterCascade()');
+  assert.ok(truncate>=0,'the governed destructive reset must remain explicit');
+  assert.ok(restore>truncate,'the canonical tenant must be restored after the user cascade');
+  assert.match(reset,/insert into tenants\(id,name,slug,tenant_type,status,default_timezone,country,currency\)/);
+  assert.match(reset,/insert into tenant_settings\(tenant_id\)/);
+  assert.match(reset,/00000000-0000-4000-8000-000000000001/);
+  assert.doesNotMatch(reset,/insert into tenant_memberships/);
+});
+
 test('all 21 tenant-owned tables receive additive ownership, dual-write, and verification coverage',()=>{
   const migration=read('backend/src/db/migrations/0082_multi_tenant_expand_backfill.sql');
   const tables=[
