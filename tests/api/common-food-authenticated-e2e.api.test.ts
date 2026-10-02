@@ -3,9 +3,10 @@ import test from 'node:test';
 import crypto from 'node:crypto';
 import { pool } from '../../backend/src/db/pool.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
-import { getJson, patchJson, postJson, putJson } from '../helpers/http.js';
+import { getJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 import { refreshFoodExplorerProjection } from '../../backend/src/modules/nutrition/common-food-consultant.service.js';
+import { createCommonFoodAuthenticatedFixture, provisionQaIdentity } from '../helpers/commonFoodFixtures.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
@@ -13,59 +14,20 @@ test.before(async () => { server = await startTestServer(); });
 test.after(async () => { await server?.close(); });
 test.beforeEach(async () => { await resetTestState(); await refreshFoodExplorerProjection(); });
 
-const provision = async (adminToken: string, role: 'user' | 'consultant' | 'senior_consultant', marker: string) => {
-  const created = await postJson(server.baseUrl, '/v1/admin/qa-identities', {
-    name: `Fiteatsy Synthetic ${marker}`,
-    email: `fiteatsy-e2e-${marker}-${Date.now()}@example.com`,
-    mobileNumber: `+9197${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`,
-    role,
-    reason: 'Authenticated common-food source acceptance',
-  }, { headers: authHeaders(adminToken) });
-  assert.equal(created.response.status, 201, JSON.stringify(created.body));
-  const session = await postJson(server.baseUrl, `/v1/admin/qa-identities/${created.body.user.id}/session`, {
-    reason: 'Authenticated common-food source acceptance',
-  }, { headers: authHeaders(adminToken) });
-  assert.equal(session.response.status, 201, JSON.stringify(session.body));
-  return { ...created.body, token: session.body.token as string };
-};
-
 test('QA_TEST identities exercise authenticated supported generation, vegan fail-closed, RBAC, validation, and stale writes', async () => {
   const admin = await createAuthenticatedSession(server.baseUrl, { name: 'E2E Provisioning Admin' });
   await pool.query("update users set role = 'admin', account_purpose = 'QA_TEST' where id = $1", [admin.current.body.accountId]);
-  const consultant = await provision(admin.token, 'consultant', 'consultant');
-  await provision(admin.token, 'senior_consultant', 'senior');
-  const outsider = await provision(admin.token, 'consultant', 'outsider');
+  const consultant = await provisionQaIdentity(server.baseUrl, admin.token, 'consultant', 'consultant');
+  await provisionQaIdentity(server.baseUrl, admin.token, 'senior_consultant', 'senior');
+  const outsider = await provisionQaIdentity(server.baseUrl, admin.token, 'consultant', 'outsider');
 
   for (const [index, dietType] of ['vegetarian', 'eggetarian', 'non_vegetarian', 'vegan'].entries()) {
-    const client = await provision(admin.token, 'user', `${dietType}-${index}`);
+    const fixture = await createCommonFoodAuthenticatedFixture({
+      baseUrl: server.baseUrl, adminToken: admin.token, consultant, marker: `${dietType}-${index}`, dietType,
+    });
+    const client = fixture.client;
     const publicClientId = String(client.client.fiteatsyClientId);
-    const assignment = await postJson(server.baseUrl, '/v1/admin/client-assignments', {
-      consultantUserId: consultant.user.id,
-      clientUserId: client.user.id,
-      reason: 'Authenticated common-food source acceptance',
-    }, { headers: authHeaders(admin.token) });
-    assert.equal(assignment.response.status, 201, JSON.stringify(assignment.body));
-    const canonicalAssignment = await pool.query(
-      `update consultant_client_assignments
-          set product = 'FITEATSY', professional_type = 'CONSULTANT', relationship_type = 'CLIENT_CARE'
-        where id = $1 and status = 'active'
-        returning id`,
-      [assignment.body.assignment.id],
-    );
-    assert.equal(canonicalAssignment.rowCount, 1, 'the consent-gate fixture requires an active canonical Fiteatsy consultant assignment');
-
-    const health = await patchJson(server.baseUrl, '/v1/platform/health-profile', {
-      dateOfBirthISO: '1990-01-01T00:00:00.000Z', gender: 'Female', heightCm: 165,
-      currentWeightKg: 65, activityLevel: 'Moderate', wellnessGoals: ['Maintain health'],
-      dietType, mealsPerDay: 7, waterIntakeLiters: 2.5,
-    }, { headers: authHeaders(client.token) });
-    assert.equal(health.response.status, 200, JSON.stringify(health.body));
-    const preferences = await putJson(server.baseUrl, '/v1/platform/food-preferences', {
-      dietType, proteins: [], cuisines: ['Indian'], foodsLiked: [], foodsDisliked: [],
-      foodsAvoided: [], likedFoodIds: [], dislikedFoodIds: [], avoidedFoodIds: [], restrictions: [],
-      staplePreference: null, dairyPreference: null, practicality: [],
-    }, { headers: authHeaders(client.token) });
-    assert.equal(preferences.response.status, 200, JSON.stringify(preferences.body));
+    const assignment = { body: { assignment: fixture.assignment } };
 
     const assignmentsAfterProfileSave = await getJson(server.baseUrl, '/v1/admin/client-assignments', { headers: authHeaders(admin.token) });
     assert.equal(assignmentsAfterProfileSave.response.status, 200, JSON.stringify(assignmentsAfterProfileSave.body));

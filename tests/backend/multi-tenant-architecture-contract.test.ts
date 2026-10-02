@@ -18,14 +18,27 @@ test('expand migration creates deterministic Zestiva tenant and additive nullabl
 
 test('destructive API-test reset restores the canonical tenant after PostgreSQL cascade',()=>{
   const reset=read('backend/src/test-support/reset.ts');
+  const foundation=read('backend/src/test-support/test-tenants.ts');
   const truncate=reset.indexOf("truncate table auth_sessions, fiteatsy_clients, users restart identity cascade");
-  const restore=reset.indexOf('await restoreCanonicalTenantSeedAfterCascade()');
+  const restore=reset.indexOf('await ensureCanonicalTestTenants()');
+  const invariant=reset.indexOf('await assertCanonicalTestTenantInvariant()');
   assert.ok(truncate>=0,'the governed destructive reset must remain explicit');
   assert.ok(restore>truncate,'the canonical tenant must be restored after the user cascade');
-  assert.match(reset,/insert into tenants\(id,name,slug,tenant_type,status,default_timezone,country,currency\)/);
-  assert.match(reset,/insert into tenant_settings\(tenant_id\)/);
-  assert.match(reset,/00000000-0000-4000-8000-000000000001/);
-  assert.doesNotMatch(reset,/insert into tenant_memberships/);
+  assert.ok(invariant>restore,'reset must validate the canonical tenant immediately after reseeding');
+  assert.match(foundation,/insert into tenants\(id,name,slug,tenant_type,status,default_timezone,country,currency\)/);
+  assert.match(foundation,/insert into tenant_settings\(tenant_id\)/);
+  assert.match(foundation,/ZESTIVA_INTERNAL_TENANT_ID = '00000000-0000-4000-8000-000000000001'/);
+  assert.match(foundation,/TENANT_A_ID = '00000000-0000-4000-8000-00000000000a'/);
+  assert.match(foundation,/TENANT_B_ID = '00000000-0000-4000-8000-00000000000b'/);
+  assert.doesNotMatch(foundation,/insert into tenant_memberships/);
+});
+
+test('authenticated API helper fails fast with route and method diagnostics',()=>{
+  const helper=read('tests/helpers/http.ts');
+  assert.match(helper,/TEST_REQUEST_TIMEOUT_MS = 15_000/);
+  assert.match(helper,/Authenticated test request failed: \$\{method\} \$\{path\}/);
+  assert.match(helper,/clearTimeout\(timeout\)/);
+  assert.doesNotMatch(helper,/authorization.*console/i);
 });
 
 test('all 21 tenant-owned tables receive additive ownership, dual-write, and verification coverage',()=>{

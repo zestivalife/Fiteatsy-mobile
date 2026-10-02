@@ -110,6 +110,16 @@ jobs:
       - name: Apply production migrations to ephemeral PostgreSQL
         run: npm --prefix backend run db:migrate
 
+      - name: Build backend before tenant foundation gate
+        run: npm --prefix backend run build
+
+      - name: Run tenant foundation smoke and contract gates
+        working-directory: backend
+        run: >-
+          node --import tsx --test --test-concurrency=1
+          ../tests/backend/multi-tenant-foundation.regression.test.ts
+          ../tests/backend/multi-tenant-architecture-contract.test.ts
+
       - name: Import catalogue twice and verify database contract
         working-directory: backend
         shell: bash
@@ -162,7 +172,14 @@ jobs:
 
       - name: Run full safe backend regression
         working-directory: backend
-        run: node --import tsx --test --test-concurrency=1 ../tests/api/*.test.ts ../tests/backend/*.test.ts ../tests/database/*.test.ts
+        shell: bash
+        run: |
+          mapfile -t regression_tests < <(find ../tests/api ../tests/backend ../tests/database \
+            -name '*.test.ts' \
+            ! -name 'multi-tenant-foundation.regression.test.ts' \
+            ! -name 'multi-tenant-architecture-contract.test.ts' \
+            -print | sort)
+          node --import tsx --test --test-concurrency=1 "${regression_tests[@]}"
 
       - name: Build backend
         run: npm --prefix backend run build

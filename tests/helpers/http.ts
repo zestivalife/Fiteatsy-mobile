@@ -1,11 +1,23 @@
+const TEST_REQUEST_TIMEOUT_MS = 15_000;
+
 export const getJson = async (baseUrl: string, path: string, init?: RequestInit) => {
-  const response = await fetch(`${baseUrl}${path}`, init);
-  const text = await response.text();
-  return {
-    response,
-    body: text ? JSON.parse(text) : null,
-    text,
-  };
+  const method = init?.method ?? 'GET';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error(`test request timed out after ${TEST_REQUEST_TIMEOUT_MS}ms`)), TEST_REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${baseUrl}${path}`, { ...init, signal: init?.signal ?? controller.signal });
+    const text = await response.text();
+    return {
+      response,
+      body: text ? JSON.parse(text) : null,
+      text,
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    throw new Error(`Authenticated test request failed: ${method} ${path}; ${detail}`, { cause: error });
+  } finally {
+    clearTimeout(timeout);
+  }
 };
 
 export const postJson = async (baseUrl: string, path: string, body: unknown, init?: RequestInit) =>

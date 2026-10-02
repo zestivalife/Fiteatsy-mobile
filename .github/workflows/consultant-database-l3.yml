@@ -78,6 +78,13 @@ jobs:
       - name: Build production importer artifact
         run: npm --prefix backend run build
 
+      - name: Run tenant foundation smoke and contract gates
+        working-directory: backend
+        run: >-
+          node --import tsx --test --test-concurrency=1
+          ../tests/backend/multi-tenant-foundation.regression.test.ts
+          ../tests/backend/multi-tenant-architecture-contract.test.ts
+
       - name: Validate and import immutable Batch 0 catalogue
         working-directory: backend
         shell: bash
@@ -214,6 +221,8 @@ jobs:
           mapfile -t regression_tests < <(find ../tests/api ../tests/backend ../tests/database \
             -name '*.test.ts' \
             ! -name 'diet-lifecycle-quality.database.test.ts' \
+            ! -name 'multi-tenant-foundation.regression.test.ts' \
+            ! -name 'multi-tenant-architecture-contract.test.ts' \
             -print | sort)
           set +e
           node --import tsx --test --test-concurrency=1 "${regression_tests[@]}" > full-regression.log 2>&1
