@@ -34,7 +34,8 @@ test('Senior Consultant review authority is role-based and does not require clie
 
   assert.match(queue, /canApproveOrPublishDietPlan\(account\)/);
   assert.match(queue, /listDietPlanReviewQueue/);
-  assert.doesNotMatch(queue, /getRegisteredConsultantClientProfileContext|account\.accountId/);
+  assert.match(queue, /resolveActiveTenantContextForUserId\(account\.accountId\)/);
+  assert.doesNotMatch(queue, /getRegisteredConsultantClientProfileContext|getWorkspaceContext|requireConsultantClientAssignment/);
   assert.match(context, /canApproveOrPublishDietPlan\(account\)/);
   assert.match(context, /item\.dietPlanId === dietPlanId && item\.version\.id === versionId/);
   assert.match(context, /plan\.currentVersionId !== version\.id/);
