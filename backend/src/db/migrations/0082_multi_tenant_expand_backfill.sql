@@ -44,10 +44,16 @@ create table if not exists tenant_settings (
 create table if not exists tenant_resolution_events (
   id bigserial primary key,
   tenant_id uuid references tenants(id) on delete set null,
-  path text not null check (path in ('TENANT','LEGACY_FALLBACK')),
+  path text not null check (path in ('MEMBERSHIP','LEGACY_ZESTIVA_FALLBACK','DENIED','TENANT','LEGACY_FALLBACK')),
   route_family text not null,
   created_at timestamptz not null default now()
 );
+
+-- Re-running the additive migration upgrades the instrumentation vocabulary
+-- without invalidating evidence captured by an earlier expand-phase run.
+alter table tenant_resolution_events drop constraint if exists tenant_resolution_events_path_check;
+alter table tenant_resolution_events add constraint tenant_resolution_events_path_check
+  check (path in ('MEMBERSHIP','LEGACY_ZESTIVA_FALLBACK','DENIED','TENANT','LEGACY_FALLBACK'));
 
 insert into tenants(id,name,slug,tenant_type,status,default_timezone,country,currency)
 values ('00000000-0000-4000-8000-000000000001','Zestiva','zestiva','ZESTIVA_INTERNAL','active','Asia/Kolkata','IN','INR')

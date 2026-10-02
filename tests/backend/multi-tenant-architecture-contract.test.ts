@@ -39,11 +39,28 @@ test('tenant request projection resolves only active server-side membership',()=
   assert.match(source,/membership\.status='active'/);
   assert.match(source,/tenant\.status='active'/);
   assert.doesNotMatch(source,/req\.(body|query).*tenant/i);
+  assert.match(source,/TENANT_MIGRATION_MODE/);
+  assert.match(source,/LEGACY_ZESTIVA_FALLBACK/);
+  assert.match(source,/recordTenantResolutionPath\(null,'DENIED'/);
+});
+
+test('expand compatibility resolves only membership or governed Zestiva fallback and canonical mode fails closed',async()=>{
+  const {resolveTenantResolutionDecision}=await import('../../backend/src/modules/tenancy/tenant-context.ts');
+  const membership={
+    tenantId:'tenant-a',tenantName:'A',tenantType:'PRACTICE' as const,
+    currentMembershipRole:'CONSULTANT' as const,resolutionPath:'MEMBERSHIP' as const,
+  };
+  assert.equal(resolveTenantResolutionDecision({activeMembership:membership,hasAnyMembership:true,legacyZestivaEligible:true,migrationMode:'EXPAND'}),'MEMBERSHIP');
+  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'EXPAND'}),'LEGACY_ZESTIVA_FALLBACK');
+  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'BACKFILL'}),'LEGACY_ZESTIVA_FALLBACK');
+  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'DUAL_READ'}),'LEGACY_ZESTIVA_FALLBACK');
+  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:true,legacyZestivaEligible:true,migrationMode:'EXPAND'}),'DENIED');
+  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'CANONICAL'}),'DENIED');
 });
 
 test('dual-read helper never permits a mismatched tenant and legacy requires prior sealed access',async()=>{
   const {assertTenantResourceScope}=await import('../../backend/src/modules/tenancy/tenant-context.ts');
-  const context={tenantId:'tenant-a',tenantName:'A',tenantType:'PRACTICE' as const,currentMembershipRole:'CONSULTANT' as const};
+  const context={tenantId:'tenant-a',tenantName:'A',tenantType:'PRACTICE' as const,currentMembershipRole:'CONSULTANT' as const,resolutionPath:'MEMBERSHIP' as const};
   assert.equal(assertTenantResourceScope(context,'tenant-a',false),true);
   assert.equal(assertTenantResourceScope(context,'tenant-b',true),false);
   assert.equal(assertTenantResourceScope(context,null,false),false);
