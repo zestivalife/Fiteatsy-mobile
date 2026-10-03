@@ -17,7 +17,21 @@ const LEGACY_PROFESSIONAL_SNAPSHOT_USER_IDS = [
   '78fc83c9-2d55-4815-8918-baf00fff7abb'
 ] as const;
 
-let migrationPromise: Promise<void> | null = null;
+export type MigrationReport = {
+  startingVersion: string | null;
+  appliedMigrations: string[];
+  endingVersion: string | null;
+  result: 'SUCCESS';
+};
+
+export type DatabaseSchemaStatus = {
+  status: 'CURRENT' | 'MIGRATION_REQUIRED';
+  currentVersion: string | null;
+  requiredVersion: string | null;
+  pendingVersions: string[];
+};
+
+let migrationPromise: Promise<MigrationReport> | null = null;
 
 const ensureSchemaMigrationsTable = async (client: PoolClient) => {
   await client.query(`
@@ -28,7 +42,7 @@ const ensureSchemaMigrationsTable = async (client: PoolClient) => {
   `);
 };
 
-const readMigrationFiles = async () => {
+export const readMigrationFiles = async () => {
   const entries = await fs.readdir(MIGRATIONS_DIR, { withFileTypes: true });
   return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
@@ -66,7 +80,35 @@ const shouldSkipLegacySnapshotOnFreshReplay = async (
   return Number(result.rows[0]?.matching_count ?? 0) === 0;
 };
 
-const applyMigrations = async () => {
+export const evaluateDatabaseSchemaStatus = (
+  requiredVersions: readonly string[],
+  appliedVersions: readonly string[]
+): DatabaseSchemaStatus => {
+  const applied = new Set(appliedVersions);
+  const pendingVersions = requiredVersions.filter((version) => !applied.has(version));
+  return {
+    status: pendingVersions.length === 0 ? 'CURRENT' : 'MIGRATION_REQUIRED',
+    currentVersion: [...appliedVersions].sort((left, right) => left.localeCompare(right)).at(-1) ?? null,
+    requiredVersion: [...requiredVersions].at(-1) ?? null,
+    pendingVersions
+  };
+};
+
+export const getDatabaseSchemaStatus = async (): Promise<DatabaseSchemaStatus> => {
+  const requiredVersions = await readMigrationFiles();
+  const ledger = await getPool().query<{ ledger: string | null }>(
+    "select to_regclass('public.schema_migrations')::text as ledger"
+  );
+  if (!ledger.rows[0]?.ledger) {
+    return evaluateDatabaseSchemaStatus(requiredVersions, []);
+  }
+  const applied = await getPool().query<{ version: string }>(
+    'select version from schema_migrations order by version'
+  );
+  return evaluateDatabaseSchemaStatus(requiredVersions, applied.rows.map((row) => row.version));
+};
+
+const applyMigrations = async (): Promise<MigrationReport> => {
   const pool = getPool();
   const client = await pool.connect();
   let lockAcquired = false;
@@ -77,6 +119,8 @@ const applyMigrations = async () => {
     const applied = await client.query<{ version: string }>('select version from schema_migrations');
     const appliedVersions = new Set(applied.rows.map((row) => row.version));
     const startedWithEmptyLedger = appliedVersions.size === 0;
+    const startingVersion = [...appliedVersions].sort((left, right) => left.localeCompare(right)).at(-1) ?? null;
+    const appliedMigrations: string[] = [];
 
     const files = await readMigrationFiles();
     for (const file of files) {
@@ -94,11 +138,18 @@ const applyMigrations = async () => {
         await client.query('insert into schema_migrations (version) values ($1)', [file]);
         await client.query('commit');
         appliedVersions.add(file);
+        appliedMigrations.push(file);
       } catch (error) {
         await rollbackQuietly(client);
         throw error;
       }
     }
+    return {
+      startingVersion,
+      appliedMigrations,
+      endingVersion: [...appliedVersions].sort((left, right) => left.localeCompare(right)).at(-1) ?? null,
+      result: 'SUCCESS'
+    };
   } catch (error) {
     await rollbackQuietly(client);
     throw error;
@@ -129,7 +180,8 @@ const isDirectRun =
 
 if (isDirectRun) {
   void migrateDatabase()
-    .then(async () => {
+    .then(async (report) => {
+      console.log('DATABASE_MIGRATION_JOB', report);
       await closePool();
     })
     .catch(async (error) => {

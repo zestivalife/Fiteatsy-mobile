@@ -1,6 +1,7 @@
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createApp, initializeBackend } from '../../backend/src/server.js';
+import { migrateDatabase } from '../../backend/src/db/migrator.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
 
 export type TestServer = {
@@ -9,6 +10,7 @@ export type TestServer = {
 };
 
 export const startTestServer = async (): Promise<TestServer> => {
+  await migrateDatabase();
   await initializeBackend();
   const app = createApp();
   const server = await new Promise<Server>((resolve, reject) => {

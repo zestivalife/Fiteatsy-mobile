@@ -2,7 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import { pathToFileURL } from 'node:url';
 import { env } from './config/env.js';
-import { migrateDatabase } from './db/migrator.js';
+import {
+  getDatabaseSchemaStatus,
+  type DatabaseSchemaStatus
+} from './db/migrator.js';
 import { checkDatabaseReadiness } from './db/pool.js';
 import { intelligenceRouter } from './modules/intelligence/intelligence.routes.js';
 import { checkinsRouter } from './modules/checkins/checkins.routes.js';
@@ -199,9 +202,28 @@ export const createApp = (options: CreateAppOptions = {}) => {
 
 export const app = createApp();
 
-export const initializeBackend = async () => {
-  await migrateDatabase();
-  const adminBootstrap = await bootstrapInitialAdminFromEnvironment();
+export class DatabaseMigrationRequiredError extends Error {
+  readonly code = 'DATABASE_MIGRATION_REQUIRED';
+  constructor(readonly schemaStatus: DatabaseSchemaStatus) {
+    super('DATABASE_MIGRATION_REQUIRED');
+    this.name = 'DatabaseMigrationRequiredError';
+  }
+}
+
+type InitializeBackendOptions = {
+  schemaStatusCheck?: () => Promise<DatabaseSchemaStatus>;
+  adminBootstrap?: typeof bootstrapInitialAdminFromEnvironment;
+  scheduleJobs?: boolean;
+};
+
+export const initializeBackend = async (options: InitializeBackendOptions = {}) => {
+  const schemaStatus = await (options.schemaStatusCheck ?? getDatabaseSchemaStatus)();
+  console.log('DATABASE_SCHEMA_STATUS', schemaStatus);
+  if (schemaStatus.status !== 'CURRENT') {
+    throw new DatabaseMigrationRequiredError(schemaStatus);
+  }
+
+  const adminBootstrap = await (options.adminBootstrap ?? bootstrapInitialAdminFromEnvironment)();
   console.log('Initial admin bootstrap status', {
     enabled: adminBootstrap.enabled,
     activeAdminExists: adminBootstrap.activeAdminExists,
@@ -213,8 +235,10 @@ export const initializeBackend = async () => {
   if (adminBootstrap.status === 'bootstrapped') {
     console.log('Initial admin bootstrap completed.');
   }
-  scheduleDeletedReportPurge();
-  scheduleHealthRecalculationProcessor();
+  if (options.scheduleJobs ?? true) {
+    scheduleDeletedReportPurge();
+    scheduleHealthRecalculationProcessor();
+  }
 };
 
 export const startServer = async () => {
