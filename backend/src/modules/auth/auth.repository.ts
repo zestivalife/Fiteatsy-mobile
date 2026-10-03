@@ -7,6 +7,7 @@ import {
   type PersistedClient
 } from '../client/client.repository.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
+import { ensureCanonicalZestivaMembership } from '../tenancy/tenant-context.js';
 
 type Queryable = Pick<PoolClient, 'query'>;
 
@@ -397,6 +398,11 @@ const ensureConsultantDashboardBridgeUser = async (input: {
           `,
           [input.bridgeUserId, resolvedName, firstName, lastName, input.bridgeEmail, timestamp, input.bridgeRole],
         );
+        await ensureCanonicalZestivaMembership(
+          String(inserted.rows[0].id),
+          input.bridgeRole === 'senior_consultant' ? 'SENIOR_CONSULTANT' : 'CONSULTANT',
+          client,
+        );
         await client.query('commit');
         return mapUser(inserted.rows[0]);
       }
@@ -419,6 +425,11 @@ const ensureConsultantDashboardBridgeUser = async (input: {
           returning *
         `,
         [String(existing.rows[0].id), resolvedName, firstName, lastName, input.bridgeEmail, input.bridgeRole, timestamp],
+      );
+      await ensureCanonicalZestivaMembership(
+        String(updated.rows[0].id),
+        input.bridgeRole === 'senior_consultant' ? 'SENIOR_CONSULTANT' : 'CONSULTANT',
+        client,
       );
       await client.query('commit');
       return mapUser(updated.rows[0]);
@@ -532,6 +543,7 @@ export const resolveVerifiedAccountIdentity = async (input: {
         user = mapUser(updated.rows[0]);
       }
 
+      await ensureCanonicalZestivaMembership(user.id, 'CLIENT', client);
       const resolvedClient = await createOrResolveClientForAccount(user.id, client);
       await client.query('commit');
       return {

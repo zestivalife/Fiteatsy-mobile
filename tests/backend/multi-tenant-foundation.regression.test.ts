@@ -30,7 +30,7 @@ test('tenant resolution smoke matrix remains deterministic', () => {
     tenantId: 'tenant-a', tenantName: 'Tenant A', tenantType: 'PRACTICE' as const,
     currentMembershipRole: 'CONSULTANT' as const, resolutionPath: 'MEMBERSHIP' as const,
   };
-  assert.equal(resolveTenantResolutionDecision({ activeMembership: null, hasAnyMembership: false, legacyZestivaEligible: true, migrationMode: 'EXPAND' }), 'LEGACY_ZESTIVA_FALLBACK');
+  assert.equal(resolveTenantResolutionDecision({ activeMembership: null, hasAnyMembership: false, legacyZestivaEligible: true, migrationMode: 'EXPAND' }), 'DENIED');
   assert.equal(resolveTenantResolutionDecision({ activeMembership: membership, hasAnyMembership: true, legacyZestivaEligible: true, migrationMode: 'EXPAND' }), 'MEMBERSHIP');
   assert.equal(resolveTenantResolutionDecision({ activeMembership: null, hasAnyMembership: true, legacyZestivaEligible: true, migrationMode: 'EXPAND' }), 'DENIED');
   assert.equal(resolveTenantResolutionDecision({ activeMembership: null, hasAnyMembership: false, legacyZestivaEligible: false, migrationMode: 'EXPAND' }), 'DENIED');
@@ -59,9 +59,9 @@ test('reset, fixture, request and background boundaries carry explicit tenant au
   assert.match(nutrition, /resolveActiveTenantContextForUserId\(account\.accountId\)/);
 });
 
-test('new tenant-owned writes remain protected by expand dual-write triggers', () => {
-  const migration = read('backend/src/db/migrations/0082_multi_tenant_expand_backfill.sql');
-  assert.match(migration, /create or replace function set_zestiva_tenant_during_transition/);
-  assert.match(migration, /create trigger tenant_dual_write before insert/);
-  assert.match(migration, /tenant_backfill_verification/);
+test('canonical tenant-owned writes require explicit ownership and retire expand triggers', () => {
+  const migration = read('backend/src/db/migrations/0084_multi_tenant_contract.sql');
+  assert.match(migration, /alter table %I alter column tenant_id set not null/);
+  assert.match(migration, /drop trigger if exists tenant_dual_write/);
+  assert.match(migration, /drop function if exists set_zestiva_tenant_during_transition/);
 });

@@ -1,7 +1,6 @@
 import type { PoolClient } from 'pg';
 import { pool } from '../../db/pool.js';
 import type { ClientOwnershipContext } from '../platform/platform.types.js';
-import { getTenantMigrationMode, ZESTIVA_TENANT_ID } from './tenant-context.js';
 
 type Queryable = Pick<PoolClient, 'query'>;
 
@@ -10,25 +9,18 @@ export const resolveTrustedTenantForUserWrite = async (
   routeFamily: string,
   db: Queryable = pool,
 ): Promise<string> => {
-  const result = await db.query<{ tenant_id: string | null; has_any_membership: boolean; legacy_eligible: boolean }>(
+  const result = await db.query<{ tenant_id: string | null }>(
     `select (
        select membership.tenant_id from tenant_memberships membership
        join tenants tenant on tenant.id=membership.tenant_id
        where membership.user_id=u.id and membership.status='active' and tenant.status='active'
        order by (tenant.tenant_type='ZESTIVA_INTERNAL') desc,membership.joined_at asc limit 1
-     ) as tenant_id,
-     exists(select 1 from tenant_memberships membership where membership.user_id=u.id) as has_any_membership,
-     (u.deleted_at is null and lower(coalesce(u.status,''))='active'
-       and u.account_purpose in ('PRODUCTION_USER','QA_TEST')) as legacy_eligible
+     ) as tenant_id
      from users u where u.id=$1 limit 1`,
     [userId],
   );
   const candidate = result.rows[0];
   if (candidate?.tenant_id) return candidate.tenant_id;
-  if (!candidate?.has_any_membership && candidate?.legacy_eligible && getTenantMigrationMode() !== 'CANONICAL') {
-    const legacy = await db.query('select 1 from tenants where id=$1 and status=\'active\'', [ZESTIVA_TENANT_ID]);
-    if (legacy.rowCount) return ZESTIVA_TENANT_ID;
-  }
   void routeFamily;
   throw new Error('TENANT_CONTEXT_REQUIRED');
 };

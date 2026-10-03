@@ -99,7 +99,8 @@ const resolveReportTenant = async (userId: string) => {
 
 const recordReportPath = async (userId: string, tenantId: unknown, routeFamily: string) => {
   const context = await resolveReportTenant(userId);
-  await recordTenantResolutionPath(context, tenantId == null ? 'LEGACY_FALLBACK' : 'TENANT', routeFamily);
+  if (tenantId == null) throw new Error('TENANT_CONTEXT_REQUIRED');
+  await recordTenantResolutionPath(context, 'TENANT', routeFamily);
   return context;
 };
 
@@ -245,7 +246,7 @@ export const completeUploadSession = async (uploadId: string, owner: { userId: s
       where id = $1
         and user_id = $2
         and client_id = $3
-        and (tenant_id = $4 or tenant_id is null)
+        and tenant_id = $4
       returning *
     `,
     [uploadId, owner.userId, owner.clientId, tenant.tenantId]
@@ -256,20 +257,20 @@ export const completeUploadSession = async (uploadId: string, owner: { userId: s
   return session.status === 'expired' ? null : session;
 };
 
-export const getUploadSession = async (uploadId: string, owner?: { userId: string; clientId: string }) => {
-  const tenant = owner ? await resolveReportTenant(owner.userId) : null;
+export const getUploadSession = async (uploadId: string, owner: { userId: string; clientId: string }) => {
+  const tenant = await resolveReportTenant(owner.userId);
   const result = await pool.query(
     `
       select *
       from health_report_upload_sessions
       where id = $1
-        and ($2::text is null or user_id = $2)
-        and ($3::text is null or client_id = $3)
-        and ($4::uuid is null or tenant_id = $4 or tenant_id is null)
+        and user_id = $2
+        and client_id = $3
+        and tenant_id = $4
         and status <> 'expired'
         and expires_at >= now()
     `,
-    [uploadId, owner?.userId ?? null, owner?.clientId ?? null, tenant?.tenantId ?? null]
+    [uploadId, owner.userId, owner.clientId, tenant.tenantId]
   );
   if (owner && result.rows[0]) await recordReportPath(owner.userId, result.rows[0].tenant_id, 'report_upload_read');
   return result.rows[0] ? rowToUploadSession(result.rows[0]) : null;
@@ -349,7 +350,7 @@ export const getReportFile = async (reportId: string, owner: { userId: string; c
       where report_id = $1
         and user_id = $2
         and client_id = $3
-        and (tenant_id = $4 or tenant_id is null)
+        and tenant_id = $4
     `,
     [reportId, owner.userId, owner.clientId, tenant.tenantId]
   );
@@ -419,7 +420,7 @@ export const findActiveReportByDocumentHash = async (owner: { userId: string; cl
       where user_id = $1
         and client_id = $2
         and document_hash = $3
-        and (tenant_id = $4 or tenant_id is null)
+        and tenant_id = $4
         and deleted_at is null
         and processing_status not in ('FAILED', 'REVIEW_REQUIRED', 'INSUFFICIENT_DATA')
       order by created_at desc
@@ -543,21 +544,21 @@ export const attachReportAnalysis = async (
     : null;
 };
 
-export const getReport = async (reportId: string, owner?: { userId: string; clientId: string }) => {
-  const tenant = owner ? await resolveReportTenant(owner.userId) : null;
+export const getReport = async (reportId: string, owner: { userId: string; clientId: string }) => {
+  const tenant = await resolveReportTenant(owner.userId);
   const result = await pool.query(
     `
       select *
       from health_reports
       where id = $1
-        and ($2::text is null or user_id = $2)
-        and ($3::text is null or client_id = $3)
-        and ($4::uuid is null or tenant_id = $4 or tenant_id is null)
+        and user_id = $2
+        and client_id = $3
+        and tenant_id = $4
         and deleted_at is null
     `,
-    [reportId, owner?.userId ?? null, owner?.clientId ?? null, tenant?.tenantId ?? null]
+    [reportId, owner.userId, owner.clientId, tenant.tenantId]
   );
-  if (owner && result.rows[0]) await recordReportPath(owner.userId, result.rows[0].tenant_id, 'report_detail');
+  if (result.rows[0]) await recordReportPath(owner.userId, result.rows[0].tenant_id, 'report_detail');
   return result.rows[0] ? rowToReport(result.rows[0]) : null;
 };
 
@@ -569,7 +570,7 @@ export const listReports = async (owner: { userId: string; clientId: string }) =
       from health_reports
       where user_id = $1
         and client_id = $2
-        and (tenant_id = $3 or tenant_id is null)
+        and tenant_id = $3
         and processing_status in ('PUBLISHED', 'PARTIALLY_VALIDATED')
         and deleted_at is null
       order by created_at desc
@@ -578,7 +579,7 @@ export const listReports = async (owner: { userId: string; clientId: string }) =
   );
   await recordTenantResolutionPath(
     tenant,
-    result.rows.some((row) => row.tenant_id == null) ? 'LEGACY_FALLBACK' : 'TENANT',
+    'TENANT',
     'report_list',
   );
   return result.rows.map(rowToReport);
@@ -592,7 +593,7 @@ export const countReports = async (owner: { userId: string; clientId: string }) 
       from health_reports
       where user_id = $1
         and client_id = $2
-        and (tenant_id = $3 or tenant_id is null)
+        and tenant_id = $3
         and processing_status in ('PUBLISHED', 'PARTIALLY_VALIDATED')
         and deleted_at is null
     `,
@@ -610,7 +611,7 @@ export const deleteReport = async (reportId: string, owner: { userId: string; cl
       where id = $1
         and user_id = $2
         and client_id = $3
-        and (tenant_id = $5 or tenant_id is null)
+        and tenant_id = $5
         and deleted_at is null
       returning id
     `,
@@ -627,7 +628,7 @@ export const deleteAllReports = async (owner: { userId: string; clientId: string
       set processing_status = 'DELETED', deleted_at = now(), deleted_by = $3, updated_at = now()
       where user_id = $1
         and client_id = $2
-        and (tenant_id = $4 or tenant_id is null)
+        and tenant_id = $4
         and deleted_at is null
       returning id
     `,

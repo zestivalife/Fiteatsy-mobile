@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
+import { assertPlatformOperationAuthority } from '../tenancy/platform-authority.js';
 import { createProfessionalAssignment, discoverClientsForAssignment, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, revokeProfessionalAssignment, type ProfessionalType } from './professional-assignments.repository.js';
 
 export const professionalAssignmentsRouter = Router();
@@ -11,7 +12,11 @@ export const canManageProfessionalAssignments = (role: string | null | undefined
 const assignmentSchema = z.object({ clientUserId: z.string().min(1), professionalUserId: z.string().min(1), professionalType: z.enum(['CONSULTANT', 'PRACTITIONER', 'MENTOR']), relationshipType: z.string().trim().min(2).max(80), reason: z.string().trim().max(240).optional() });
 
 professionalAssignmentsRouter.get('/clients/search', async (req, res) => {
-  if (!canManageProfessionalAssignments(getAuthenticatedAccount(req).user.role)) return res.status(403).json({ error: 'ASSIGNMENT_PERMISSION_REQUIRED' });
+  try {
+    assertPlatformOperationAuthority(getAuthenticatedAccount(req).user.role, true);
+  } catch {
+    return res.status(403).json({ error: 'PLATFORM_AUTHORITY_REQUIRED' });
+  }
   await ensureRegisteredClientsForEligibleUsers();
   const query = typeof req.query.q === 'string' ? req.query.q : '';
   const limit = Math.min(Math.max(Number(req.query.limit) || 25, 1), 100);
@@ -31,7 +36,11 @@ professionalAssignmentsRouter.get('/clients/pool', async (req, res) => {
 });
 
 professionalAssignmentsRouter.get('/professionals', async (req, res) => {
-  if (!canManageProfessionalAssignments(getAuthenticatedAccount(req).user.role)) return res.status(403).json({ error: 'ASSIGNMENT_PERMISSION_REQUIRED' });
+  try {
+    assertPlatformOperationAuthority(getAuthenticatedAccount(req).user.role, true);
+  } catch {
+    return res.status(403).json({ error: 'PLATFORM_AUTHORITY_REQUIRED' });
+  }
   const type = typeof req.query.type === 'string' && ['CONSULTANT', 'PRACTITIONER', 'MENTOR'].includes(req.query.type) ? req.query.type as ProfessionalType : undefined;
   return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type) });
 });

@@ -136,8 +136,6 @@ export const resolveConsultantClientAccess = async (professionalUserId: string, 
         and client.fiteatsy_client_id = $2
         and ${consultantAssignmentSqlPredicate('assignment')}
         and (
-          assignment.tenant_id is null
-          or (
             assignment.tenant_id = client.tenant_id
             and exists (
               select 1 from tenant_memberships consultant_membership
@@ -151,7 +149,6 @@ export const resolveConsultantClientAccess = async (professionalUserId: string, 
                  and client_membership.user_id = assignment.client_user_id
                  and client_membership.status = 'active'
             )
-          )
         )
         and client.deleted_at is null and lower(coalesce(client.status, '')) = 'active'
         and professional.deleted_at is null and lower(coalesce(professional.status, '')) = 'active'
@@ -166,7 +163,7 @@ export const resolveConsultantClientAccess = async (professionalUserId: string, 
   if(tenantContext){
     await recordTenantResolutionPath(
       tenantContext,
-      row.tenant_id==null?'LEGACY_FALLBACK':'TENANT',
+      'TENANT',
       'consultant_client_access',
     );
   }

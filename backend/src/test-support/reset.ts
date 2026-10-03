@@ -23,8 +23,9 @@ export const resetBackendStateForTests = async () => {
   // `tenants.billing_owner_user_id` references users, so PostgreSQL includes
   // the canonical tenant tables in the CASCADE even when the owner is null.
   // Seed after every destructive reset has completed, then fail at this
-  // boundary if the platform authority is not usable. Memberships remain
-  // intentionally empty so expand-phase legacy fallback is exercised.
+  // boundary if the platform authority is not usable. Tests that create
+  // tenant-owned identities must now provision explicit memberships; the
+  // CONTRACT phase intentionally has no runtime legacy fallback.
   await ensureCanonicalTestTenants();
   await assertCanonicalTestTenantInvariant();
 };

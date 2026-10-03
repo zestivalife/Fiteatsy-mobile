@@ -99,7 +99,7 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
             (active_assignment.consultant_user_id = $4) as assigned_to_me
        from users u
        join fiteatsy_clients c on c.account_user_id = u.id and c.deleted_at is null and lower(coalesce(c.status, '')) = 'active'
-         and (c.tenant_id = $6 or c.tenant_id is null)
+         and c.tenant_id = $6
        left join lateral (
          select food_preference_profile
            from health_profiles
@@ -111,7 +111,7 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
            from consultant_client_assignments a
            join users professional on professional.id = a.consultant_user_id
           where a.client_user_id = u.id and a.status = 'active' and a.product = 'FITEATSY'
-            and (a.tenant_id = $6 or a.tenant_id is null)
+            and a.tenant_id = $6
           order by a.updated_at desc limit 1
        ) active_assignment on true
        left join lateral (
@@ -129,7 +129,7 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
   );
   await recordTenantResolutionPath(
     tenant,
-    result.rows.some((row) => row.tenant_id == null) ? 'LEGACY_FALLBACK' : 'TENANT',
+    'TENANT',
     'professional_client_search',
   );
   return result.rows.map((row) => ({ clientId: String(row.fiteatsy_client_id), userId: String(row.user_id), name: String(row.name), status: String(row.status), accountPurpose: String(row.account_purpose), registrationDateISO: new Date(row.created_at as string).toISOString(), assignmentStatus: row.assignment_id ? 'ASSIGNED' : 'UNASSIGNED', assignedProfessional: row.consultant_user_id ? { userId: String(row.consultant_user_id), name: String(row.professional_name), role: String(row.professional_role) } : null, assignedToMe: Boolean(row.assigned_to_me), assignmentId: row.assignment_id ? String(row.assignment_id) : null, assignmentCreatedAtISO: row.assignment_created_at ? new Date(row.assignment_created_at as string).toISOString() : null, foodPreferenceStatus: String(row.food_preference_status), subscriptionStatus: row.subscription_status ? String(row.subscription_status) : 'NONE', product: 'FITEATSY' }));
@@ -179,7 +179,7 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
       where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
         and lower(coalesce(professional.status, '')) = 'active'
         and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
-     on conflict (consultant_user_id, client_user_id, scope) where status = 'active'
+     on conflict (tenant_id, consultant_user_id, client_user_id, scope) where status = 'active'
      do update set updated_at = now()
      returning *`,
       [crypto.randomUUID(), input.actorUserId, input.clientUserId, input.professionalType, input.relationshipType, input.professionalUserId, tenant.tenantId]

@@ -460,8 +460,8 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
       );
       await pool.query(
         `insert into care_cases
-          (id, user_id, client_id, health_profile_id, recovery_program_id, assigned_consultant_id, current_stage)
-         select $1, account_user_id, id, $3, $4, $5, 'diet_published'
+          (id, user_id, client_id, health_profile_id, recovery_program_id, assigned_consultant_id, current_stage, tenant_id)
+         select $1, account_user_id, id, $3, $4, $5, 'diet_published', tenant_id
            from fiteatsy_clients where account_user_id = $2`,
         [crypto.randomUUID(), session.current.body.accountId, healthProfileId, recoveryProgramId, consultant.current.body.accountId]
       );

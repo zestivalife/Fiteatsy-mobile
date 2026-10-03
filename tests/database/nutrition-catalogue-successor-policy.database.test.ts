@@ -14,6 +14,7 @@ import type { NutritionCatalogueManifest } from '../../backend/src/modules/nutri
 import { pool } from '../../backend/src/db/pool.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
 import { createCareCaseIfMissing } from '../../backend/src/modules/platform/platform.store.js';
+import { ensureCanonicalZestivaMembership, ZESTIVA_TENANT_ID } from '../../backend/src/modules/tenancy/tenant-context.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 const databaseTest = databaseUrl ? test : test.skip;
@@ -46,13 +47,14 @@ databaseTest('FITEATSY-CATALOGUE-SUCCESSOR-IMPORT-POLICY-v1', async () => {
   const clientId = crypto.randomUUID();
   const profileId = crypto.randomUUID();
   await pool.query(`insert into users (id,name,email_normalized,role) values ($1,'Successor Client',$2,'client')`, [userId, `${userId}@example.test`]);
-  await pool.query(`insert into fiteatsy_clients (id,fiteatsy_client_id,account_user_id) values ($1,$2,$3)`, [clientId, `fc_successor_${Date.now()}`, userId]);
+  await ensureCanonicalZestivaMembership(userId, 'CLIENT');
+  await pool.query(`insert into fiteatsy_clients (id,fiteatsy_client_id,account_user_id,tenant_id) values ($1,$2,$3,$4)`, [clientId, `fc_successor_${Date.now()}`, userId, ZESTIVA_TENANT_ID]);
   await pool.query(`insert into health_profiles (id,user_id,client_id,gender,diet_type) values ($1,$2,$3,'Female','vegetarian')`, [profileId, userId, clientId]);
   const careCase = await createCareCaseIfMissing({ clientId, accountId: userId }, profileId);
   const planId = crypto.randomUUID();
   const versionId = crypto.randomUUID();
-  await pool.query(`insert into diet_plans (id,care_case_id,user_id,plan_status) values ($1,$2,$3,'draft')`, [planId, careCase.id, userId]);
-  await pool.query(`insert into diet_plan_versions (id,diet_plan_id,version_number,content) values ($1,$2,1,$3::jsonb)`, [versionId, planId, JSON.stringify(historicalSnapshot)]);
+  await pool.query(`insert into diet_plans (id,care_case_id,user_id,plan_status,tenant_id) values ($1,$2,$3,'draft',$4)`, [planId, careCase.id, userId, ZESTIVA_TENANT_ID]);
+  await pool.query(`insert into diet_plan_versions (id,diet_plan_id,version_number,content,tenant_id) values ($1,$2,1,$3::jsonb,$4)`, [versionId, planId, JSON.stringify(historicalSnapshot), ZESTIVA_TENANT_ID]);
 
   const positive = await dryRunApprovedNutritionCatalogue(databaseUrl, APPROVED_NUTRITION_CATALOGUE_VERSION);
   assert.equal(positive.conflicts.length, 0);

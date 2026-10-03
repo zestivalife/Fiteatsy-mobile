@@ -11,6 +11,7 @@ import {
 } from '../../backend/src/modules/client/client.repository.js';
 import { resolveVerifiedAccountIdentity } from '../../backend/src/modules/auth/auth.repository.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
+import { ZESTIVA_TENANT_ID } from '../../backend/src/modules/tenancy/tenant-context.js';
 import { syntheticOperationalPhone } from '../helpers/canonicalFixtures.js';
 
 const CLIENT_MIGRATION_FILE = '0002_m3a_client_identity_foundation.sql';
@@ -67,13 +68,14 @@ test('createOrResolveClientForAccount reactivates stale client mappings and pres
         fiteatsy_client_id,
         account_user_id,
         status,
+        tenant_id,
         version,
         created_at,
         updated_at,
         deleted_at
-      ) values ($1, $2, $3, 'inactive', 3, $4, $4, $4)
+      ) values ($1, $2, $3, 'inactive', $5, 3, $4, $4, $4)
     `,
-    ['11111111-1111-1111-1111-111111111111', 'fc_existingpreserved1234567890abcdef', 'stale-client-user', timestamp]
+    ['11111111-1111-1111-1111-111111111111', 'fc_existingpreserved1234567890abcdef', 'stale-client-user', timestamp, ZESTIVA_TENANT_ID]
   );
 
   const resolved = await createOrResolveClientForAccount('stale-client-user');
@@ -88,13 +90,18 @@ test('createOrResolveClientForAccount reactivates stale client mappings and pres
 test('migration backfills one client for an existing account and records the migration', async (t) => {
   t.after(async () => {
     // This test intentionally drops a foundational table. Reapply every later
-    // migration so the shared integration database cannot retain a pre-tenant
-    // schema and poison unrelated tests that run afterward.
+    // tenant migration so the shared integration database cannot retain the
+    // nullable expand schema or lose contract constraints through CASCADE.
     const tenantExpand = fs.readFileSync(
       new URL('../../backend/src/db/migrations/0082_multi_tenant_expand_backfill.sql', import.meta.url),
       'utf8',
     );
+    const tenantContract = fs.readFileSync(
+      new URL('../../backend/src/db/migrations/0084_multi_tenant_contract.sql', import.meta.url),
+      'utf8',
+    );
     await pool.query(tenantExpand);
+    await pool.query(tenantContract);
   });
   const timestamp = new Date().toISOString();
   await pool.query(

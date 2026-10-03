@@ -4,7 +4,7 @@ import { createOrResolveClientForAccount } from '../client/client.repository.js'
 import { createOrUpdateHealthProfile, createCareCaseIfMissing } from '../platform/platform.store.js';
 import type { ClientOwnershipContext } from '../platform/platform.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
-import { resolveActiveTenantContextForUserId } from '../tenancy/tenant-context.js';
+import { ensureCanonicalZestivaMembership, resolveActiveTenantContextForUserId } from '../tenancy/tenant-context.js';
 
 type QaRole = 'user' | 'consultant' | 'senior_consultant' | 'admin';
 
@@ -96,6 +96,17 @@ export const provisionQaIdentity = async (input: {
         });
       }
       const user = mapUser(existing.rows[0]);
+      await ensureCanonicalZestivaMembership(
+        user.id,
+        input.role === 'user'
+          ? 'CLIENT'
+          : input.role === 'senior_consultant'
+            ? 'SENIOR_CONSULTANT'
+            : input.role === 'admin'
+              ? 'STAFF'
+              : 'CONSULTANT',
+        client,
+      );
       await client.query('commit');
       await recordQaIdentityReuse({
         actorUserId: input.actorUserId,
@@ -115,6 +126,17 @@ export const provisionQaIdentity = async (input: {
       [crypto.randomUUID(), input.name.trim(), normalizedEmail, normalizedMobileNumber, input.role]
     );
     const user = mapUser(inserted.rows[0]);
+    await ensureCanonicalZestivaMembership(
+      user.id,
+      input.role === 'user'
+        ? 'CLIENT'
+        : input.role === 'senior_consultant'
+          ? 'SENIOR_CONSULTANT'
+          : input.role === 'admin'
+            ? 'STAFF'
+            : 'CONSULTANT',
+      client,
+    );
     await client.query('commit');
     await audit({ actorUserId: input.actorUserId, actorReference: input.actorReference, targetUserId: user.id, action: 'QAIdentityCreated', accountPurpose: 'QA_TEST', role: input.role, reason: input.reason });
 

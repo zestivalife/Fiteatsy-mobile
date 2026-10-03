@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { getJson, postJson } from './http.js';
 import { setOtpGeneratorForTests } from '../../backend/src/modules/auth/auth.service.js';
 
@@ -22,10 +23,12 @@ export const createAuthenticatedSession = async (
   setOtpGeneratorForTests(() => otp);
 
   const requested = await postJson(baseUrl, '/v1/auth/signup/request-otp', identity);
+  assert.equal(requested.response.status, 201, JSON.stringify(requested.body));
   const verified = await postJson(baseUrl, '/v1/auth/signup/verify-otp', {
     challengeId: requested.body.challengeId,
     otp
   });
+  assert.equal(verified.response.status, 200, JSON.stringify(verified.body));
   const token = String(verified.body.sessionToken);
   const current = await getJson(baseUrl, '/v1/auth/me', {
     headers: authHeaders(token)

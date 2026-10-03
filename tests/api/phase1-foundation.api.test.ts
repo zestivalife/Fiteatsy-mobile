@@ -217,18 +217,16 @@ test('health ingestion preserves Health Connect provenance and rejects unsafe ob
 
 test('GET /v1/biomarkers and /v1/biomarkers/history return client-owned biomarker data', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
-  const biomarker = await upsertBiomarker({
+  const client = await getClientByAccountUserId(session.current.body.accountId);
+  assert.ok(client);
+  const owner = { accountId: session.current.body.accountId, clientId: client.id };
+  const biomarker = await upsertBiomarker(owner, {
     canonicalName: 'HbA1c',
     aliases: ['Glycated Hemoglobin'],
     category: 'Metabolic',
     standardUnit: '%'
   });
-  const client = await getClientByAccountUserId(session.current.body.accountId);
-  assert.ok(client);
-  await createBiomarkerObservation({
-    accountId: session.current.body.accountId,
-    clientId: client.id
-  }, {
+  await createBiomarkerObservation(owner, {
     biomarkerId: biomarker.id,
     value: 5.8,
     unit: '%',
@@ -258,18 +256,16 @@ test('GET /v1/intelligence/scores exposes only traceable canonical scores withou
   const controlledNowMs = Date.now();
   const recentMeasuredAtISO = new Date(controlledNowMs - 60_000).toISOString();
   const recentTestDate = new Date(controlledNowMs - 60_000).toISOString().slice(0, 10);
-  const biomarker = await upsertBiomarker({
+  const client = await getClientByAccountUserId(session.current.body.accountId);
+  assert.ok(client);
+  const owner = { accountId: session.current.body.accountId, clientId: client.id };
+  const biomarker = await upsertBiomarker(owner, {
     canonicalName: 'Vitamin D',
     aliases: ['25-OH Vitamin D'],
     category: 'Nutrition',
     standardUnit: 'ng/mL'
   });
-  const client = await getClientByAccountUserId(session.current.body.accountId);
-  assert.ok(client);
-  await createBiomarkerObservation({
-    accountId: session.current.body.accountId,
-    clientId: client.id
-  }, {
+  await createBiomarkerObservation(owner, {
     biomarkerId: biomarker.id,
     value: 34,
     unit: 'ng/mL',

@@ -620,6 +620,7 @@ export const listRegisteredConsultantClients = async (
         when current_consent.assignment_id is null and exists (
           select 1 from consultant_access_consents historical_consent
           where historical_consent.assignment_id = assignment.id
+            and historical_consent.tenant_id = assignment.tenant_id
             and historical_consent.policy_version <> '${CONSULTANT_ACCESS_POLICY_VERSION}'
         ) then 'EXPIRED'
         else 'HEALTH_ACCESS_REQUIRED'
@@ -636,6 +637,7 @@ export const listRegisteredConsultantClients = async (
      and current_consent.user_id = assignment.client_user_id
      and current_consent.product = assignment.product
      and current_consent.policy_version = '${CONSULTANT_ACCESS_POLICY_VERSION}'
+     and current_consent.tenant_id = $5
     where assignment.consultant_user_id = $1
       and assignment.professional_type = $2
       and assignment.product = '${CONSULTANT_ACCESS_PRODUCT}'
@@ -643,9 +645,8 @@ export const listRegisteredConsultantClients = async (
       and (assignment.starts_at is null or assignment.starts_at <= now())
       and (assignment.ends_at is null or assignment.ends_at > now())
       and u.deleted_at is null
-      and (assignment.tenant_id = $5 or assignment.tenant_id is null)
-      and (c.tenant_id = $5 or c.tenant_id is null)
-      and (current_consent.tenant_id = $5 or current_consent.tenant_id is null)
+      and assignment.tenant_id = $5
+      and c.tenant_id = $5
       ${directoryClause}
   `;
   const parameters = [consultantAccountId, professionalType, query, status, tenant.tenantId];
@@ -661,8 +662,7 @@ export const listRegisteredConsultantClients = async (
     [...parameters, pageSize, offset]
   );
 
-  const usedLegacyFallback = result.rows.some((row) => row.tenant_id == null);
-  await recordTenantResolutionPath(tenant, usedLegacyFallback ? 'LEGACY_FALLBACK' : 'TENANT', 'consultant_client_roster');
+  await recordTenantResolutionPath(tenant, 'TENANT', 'consultant_client_roster');
 
   return {
     clients: result.rows.map((row) => mapRosterRecord(row)),

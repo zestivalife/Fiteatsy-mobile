@@ -9,6 +9,7 @@ import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { createCanonicalProfessionalAssignment, grantCanonicalConsultantAccess } from '../helpers/consultantAccessFixtures.js';
 import { getJson, patchJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
+import { ensureCanonicalZestivaMembership } from '../../backend/src/modules/tenancy/tenant-context.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
@@ -457,6 +458,7 @@ test('consultant discovery backfills missing client records for registered users
      ) values ($1, $2, $3, $4, $5, $5, 'active', 1, $5, $5, $5)`,
     [accountId, 'Legacy Client', email, '919900009999', registeredAt]
   );
+  await ensureCanonicalZestivaMembership(accountId, 'CLIENT');
 
   const beforeBackfill = await pool.query(
     'select count(*)::int as total from fiteatsy_clients where account_user_id = $1',
@@ -496,9 +498,9 @@ test('consultant discovery backfills missing client records for registered users
   assert.ok(assignment);
   await pool.query(
     `insert into consultant_access_consents (
-       user_id, client_id, assignment_id, consultant_user_id, product, status, policy_version, source, granted_at
-     ) values ($1, $2, $3, $4, 'FITEATSY', 'GRANTED', 'CONSULTANT_ACCESS_V1', 'TEST_FIXTURE', now())`,
-    [accountId, canonicalClientId, assignment!.id, consultant.current.body.accountId]
+       user_id, client_id, assignment_id, consultant_user_id, product, status, policy_version, source, granted_at, tenant_id
+     ) values ($1, $2, $3, $4, 'FITEATSY', 'GRANTED', 'CONSULTANT_ACCESS_V1', 'TEST_FIXTURE', now(), $5)`,
+    [accountId, canonicalClientId, assignment!.id, consultant.current.body.accountId, assignment!.tenant_id]
   );
 
   const first = await getJson(server.baseUrl, '/v1/consultants/clients', discoveryOptions);
@@ -1487,7 +1489,7 @@ test('consultant workspace contract syncs reports and validated biomarkers from 
     { reportId: reportB.id, canonicalName: 'LDL Cholesterol', rawName: 'LDL', category: 'Heart & Lipids', value: 142, unit: 'mg/dL', range: '<130', testDate: '2026-08-10' }
   ];
   for (const fixture of fixtures) {
-    const biomarker = await upsertBiomarker({
+    const biomarker = await upsertBiomarker(owner, {
       canonicalName: fixture.canonicalName,
       aliases: [fixture.rawName],
       category: fixture.category,
@@ -1543,7 +1545,7 @@ test('consultant latest biomarker projection preserves previous value and both r
   const consultant = await createConsultantSession();
   await assignClientToConsultant(client, consultant);
   const owner = { accountId: client.current.body.accountId, clientId: await getClientDatabaseId(client) };
-  const biomarker = await upsertBiomarker({
+  const biomarker = await upsertBiomarker(owner, {
     canonicalName: 'Vitamin B12',
     aliases: ['B12'],
     category: 'Micronutrient',
@@ -1657,10 +1659,10 @@ test('Consultant biomarker projection is assignment-scoped and switches clients 
 
   const ownerA = { accountId: clientA.current.body.accountId, clientId: await getClientDatabaseId(clientA) };
   const ownerB = { accountId: clientB.current.body.accountId, clientId: await getClientDatabaseId(clientB) };
-  const ldl = await upsertBiomarker({
+  const ldl = await upsertBiomarker(ownerA, {
     canonicalName: 'LDL Cholesterol', aliases: ['LDL-C'], category: 'Heart & Lipids', standardUnit: 'mg/dL'
   });
-  const tsh = await upsertBiomarker({
+  const tsh = await upsertBiomarker(ownerB, {
     canonicalName: 'TSH', aliases: [], category: 'Thyroid', standardUnit: 'mIU/L'
   });
   await createBiomarkerObservation(ownerA, {
@@ -1700,7 +1702,7 @@ test('authorised assigned Senior Consultant receives the same canonical biomarke
   const senior = await createSeniorConsultantSession();
   await assignClientToConsultant(client, senior);
   const owner = { accountId: client.current.body.accountId, clientId: await getClientDatabaseId(client) };
-  const marker = await upsertBiomarker({
+  const marker = await upsertBiomarker(owner, {
     canonicalName: 'Ferritin', aliases: [], category: 'Micronutrient', standardUnit: 'µg/L'
   });
   await createBiomarkerObservation(owner, {

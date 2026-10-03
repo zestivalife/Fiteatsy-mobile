@@ -69,27 +69,32 @@ const rowToObservation = (row: Record<string, unknown>): BiomarkerObservationRec
   createdAtISO: new Date(String(row.created_at)).toISOString()
 });
 
-export const listBiomarkers = async () => {
-  const result = await pool.query('select * from biomarkers order by canonical_name asc');
+export const listBiomarkers = async (owner: ClientOwnershipContext) => {
+  const tenantId = await resolveTrustedTenantForClientWrite(owner, 'biomarker_list');
+  const result = await pool.query(
+    'select * from biomarkers where tenant_id=$1 order by canonical_name asc',
+    [tenantId],
+  );
   return result.rows.map(rowToBiomarker);
 };
 
-export const upsertBiomarker = async (input: {
+export const upsertBiomarker = async (owner: ClientOwnershipContext, input: {
   canonicalName: string;
   aliases?: string[];
   category: string;
   standardUnit: string;
 }) => {
+  const tenantId = await resolveTrustedTenantForClientWrite(owner, 'biomarker_upsert');
   const id = `bio_${crypto.randomUUID()}`;
   const result = await pool.query(
     `
-      insert into biomarkers (id, canonical_name, aliases, category, standard_unit)
-      values ($1, $2, $3::jsonb, $4, $5)
-      on conflict (canonical_name)
+      insert into biomarkers (id, canonical_name, aliases, category, standard_unit, tenant_id)
+      values ($1, $2, $3::jsonb, $4, $5, $6)
+      on conflict (tenant_id, canonical_name)
       do update set aliases = excluded.aliases, category = excluded.category, standard_unit = excluded.standard_unit, updated_at = now()
       returning *
     `,
-    [id, input.canonicalName, JSON.stringify(input.aliases ?? []), input.category, input.standardUnit]
+    [id, input.canonicalName, JSON.stringify(input.aliases ?? []), input.category, input.standardUnit, tenantId]
   );
   return rowToBiomarker(result.rows[0]);
 };
@@ -123,7 +128,7 @@ export const createBiomarkerObservation = async (
       )
       select inserted.*, b.canonical_name
       from inserted
-      join biomarkers b on b.id = inserted.biomarker_id
+      join biomarkers b on b.id = inserted.biomarker_id and b.tenant_id = inserted.tenant_id
     `,
     [
       id,

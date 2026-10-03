@@ -22,6 +22,7 @@ import {
   requestSeniorConsultantDietPlanReviewChanges,
 } from '../../backend/src/modules/nutrition/nutrition.service.js';
 import { generateDietPlanDocument, readGeneratedDietPlanDocumentXml } from '../../backend/src/modules/nutrition/nutrition.document.js';
+import { ensureCanonicalZestivaMembership, ZESTIVA_TENANT_ID } from '../../backend/src/modules/tenancy/tenant-context.js';
 
 const mealLabels: Record<(typeof NUTRITION_MEAL_SEQUENCE)[number], string> = {
   earlyMorning: 'Early Morning', breakfast: 'Breakfast', midMorningSnack: 'Mid-Morning', lunch: 'Lunch',
@@ -56,9 +57,12 @@ test('database preserves exact 35-option identity through review, revision, appr
       ($3, 'Diet Test Senior', $6, 'senior_consultant')`,
     [clientUserId, consultantId, seniorId, `${clientUserId}@example.test`, `${consultantId}@example.test`, `${seniorId}@example.test`],
   );
+  await ensureCanonicalZestivaMembership(clientUserId, 'CLIENT');
+  await ensureCanonicalZestivaMembership(consultantId, 'CONSULTANT');
+  await ensureCanonicalZestivaMembership(seniorId, 'SENIOR_CONSULTANT');
   await pool.query(
-    `insert into fiteatsy_clients (id, fiteatsy_client_id, account_user_id) values ($1, $2, $3)`,
-    [clientId, publicClientId, clientUserId],
+    `insert into fiteatsy_clients (id, fiteatsy_client_id, account_user_id, tenant_id) values ($1, $2, $3, $4)`,
+    [clientId, publicClientId, clientUserId, ZESTIVA_TENANT_ID],
   );
   await pool.query(
     `insert into health_profiles (id, user_id, client_id, gender, diet_type) values ($1, $2, $3, 'Female', 'vegetarian')`,

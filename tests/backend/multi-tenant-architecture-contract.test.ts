@@ -76,31 +76,30 @@ test('tenant request projection resolves only active server-side membership',()=
   assert.match(source,/tenant\.status='active'/);
   assert.doesNotMatch(source,/req\.(body|query).*tenant/i);
   assert.match(source,/TENANT_MIGRATION_MODE/);
-  assert.match(source,/LEGACY_ZESTIVA_FALLBACK/);
   assert.match(source,/recordTenantResolutionPath\(null,'DENIED'/);
 });
 
-test('expand compatibility resolves only membership or governed Zestiva fallback and canonical mode fails closed',async()=>{
+test('contract authority resolves membership only and fails closed in every migration mode',async()=>{
   const {resolveTenantResolutionDecision}=await import('../../backend/src/modules/tenancy/tenant-context.ts');
   const membership={
     tenantId:'tenant-a',tenantName:'A',tenantType:'PRACTICE' as const,
     currentMembershipRole:'CONSULTANT' as const,resolutionPath:'MEMBERSHIP' as const,
   };
   assert.equal(resolveTenantResolutionDecision({activeMembership:membership,hasAnyMembership:true,legacyZestivaEligible:true,migrationMode:'EXPAND'}),'MEMBERSHIP');
-  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'EXPAND'}),'LEGACY_ZESTIVA_FALLBACK');
-  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'BACKFILL'}),'LEGACY_ZESTIVA_FALLBACK');
-  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'DUAL_READ'}),'LEGACY_ZESTIVA_FALLBACK');
+  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'EXPAND'}),'DENIED');
+  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'BACKFILL'}),'DENIED');
+  assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'DUAL_READ'}),'DENIED');
   assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:true,legacyZestivaEligible:true,migrationMode:'EXPAND'}),'DENIED');
   assert.equal(resolveTenantResolutionDecision({activeMembership:null,hasAnyMembership:false,legacyZestivaEligible:true,migrationMode:'CANONICAL'}),'DENIED');
 });
 
-test('dual-read helper never permits a mismatched tenant and legacy requires prior sealed access',async()=>{
+test('resource scope requires exact tenant equality and never accepts unowned legacy rows',async()=>{
   const {assertTenantResourceScope}=await import('../../backend/src/modules/tenancy/tenant-context.ts');
   const context={tenantId:'tenant-a',tenantName:'A',tenantType:'PRACTICE' as const,currentMembershipRole:'CONSULTANT' as const,resolutionPath:'MEMBERSHIP' as const};
   assert.equal(assertTenantResourceScope(context,'tenant-a',false),true);
   assert.equal(assertTenantResourceScope(context,'tenant-b',true),false);
   assert.equal(assertTenantResourceScope(context,null,false),false);
-  assert.equal(assertTenantResourceScope(context,null,true),true);
+  assert.equal(assertTenantResourceScope(context,null,true),false);
 });
 
 test('sealed assignment and Senior review authorities are not replaced',()=>{
@@ -116,19 +115,62 @@ test('migrated Consultant access requires assignment, matching resource tenant, 
   assert.match(repository,/consultant_membership\.tenant_id = assignment\.tenant_id/);
   assert.match(repository,/consultant_membership\.user_id = assignment\.consultant_user_id/);
   assert.match(repository,/client_membership\.user_id = assignment\.client_user_id/);
-  assert.match(repository,/assignment\.tenant_id is null/);
+  assert.doesNotMatch(repository,/assignment\.tenant_id is null/);
 });
 
-test('report, file, upload, roster, search and count paths are tenant-aware with governed legacy fallback',()=>{
+test('report, file, upload, roster, search and count paths require canonical tenant equality',()=>{
   const reports=read('backend/src/modules/reports/reports.store.ts');
   const consultants=read('backend/src/modules/consultants/consultants.repository.ts');
   assert.match(reports,/health_report_upload_sessions[\s\S]*tenant_id/);
   assert.match(reports,/health_report_files[\s\S]*tenant_id/);
-  assert.match(reports,/tenant_id = \$3 or tenant_id is null/);
+  assert.match(reports,/and tenant_id = \$3/);
+  assert.doesNotMatch(reports,/tenant_id = \$3 or tenant_id is null/);
   assert.match(reports,/recordTenantResolutionPath/);
-  assert.match(consultants,/assignment\.tenant_id = \$5 or assignment\.tenant_id is null/);
-  assert.match(consultants,/c\.tenant_id = \$5 or c\.tenant_id is null/);
+  assert.match(consultants,/assignment\.tenant_id = \$5/);
+  assert.match(consultants,/c\.tenant_id = \$5/);
+  assert.doesNotMatch(consultants,/tenant_id is null/);
   assert.match(consultants,/consultant_client_roster/);
+});
+
+test('contract migration closes ownership, uniqueness and relational tenant boundaries',()=>{
+  const migration=read('backend/src/db/migrations/0084_multi_tenant_contract.sql');
+  const tables=[
+    'fiteatsy_clients','consultant_client_assignments','care_cases','consultant_client_operations',
+    'consultant_client_operation_audit','daily_checkins','nudges','health_reports','health_report_files',
+    'health_report_upload_sessions','document_intelligence_audit','biomarkers','biomarker_observations',
+    'health_observations','diet_plans','diet_plan_versions','diet_plan_review_events','notifications',
+    'profile_photo_assets','consultant_access_consents','consultant_access_consent_events'
+  ];
+  for(const table of tables) assert.match(migration,new RegExp(`'${table}'`));
+  assert.match(migration,/alter table %I alter column tenant_id set not null/);
+  assert.match(migration,/consultant_client_assignments_active_tenant_unique/);
+  assert.match(migration,/foreign key\(client_user_id,tenant_id\)/);
+  assert.match(migration,/foreign key\(diet_plan_version_id,tenant_id\)/);
+  assert.match(migration,/drop trigger if exists tenant_dual_write/);
+});
+
+test('platform-global authority is explicit and cannot manufacture tenant membership',()=>{
+  const authority=read('backend/src/modules/tenancy/platform-authority.ts');
+  assert.match(authority,/PLATFORM_GLOBAL_ROLES/);
+  assert.match(authority,/PLATFORM_AUTHORITY_REQUIRED/);
+  assert.match(authority,/never manufactures membership/);
+  assert.doesNotMatch(authority,/insert into tenant_memberships/i);
+});
+
+test('new mobile, dashboard and governed QA identities receive explicit canonical membership before tenant writes',()=>{
+  const tenancy=read('backend/src/modules/tenancy/tenant-context.ts');
+  const auth=read('backend/src/modules/auth/auth.repository.ts');
+  const qa=read('backend/src/modules/admin/qa-provisioning.repository.ts');
+  assert.match(tenancy,/ensureCanonicalZestivaMembership/);
+  assert.match(tenancy,/on conflict\(tenant_id,user_id\) do update/);
+  assert.match(auth,/ensureCanonicalZestivaMembership\(user\.id, 'CLIENT', client\)/);
+  assert.match(auth,/input\.bridgeRole === 'senior_consultant' \? 'SENIOR_CONSULTANT' : 'CONSULTANT'/);
+  assert.match(qa,/input\.role === 'admin'[\s\S]*\? 'STAFF'/);
+  assert.ok(
+    auth.indexOf("ensureCanonicalZestivaMembership(user.id, 'CLIENT', client)")
+      < auth.indexOf('createOrResolveClientForAccount(user.id, client)'),
+    'canonical membership must precede the first tenant-owned mobile client write',
+  );
 });
 
 test('Senior review queue scopes plans, versions and review events to the active tenant',()=>{
