@@ -98,7 +98,7 @@ test('reprovisioning a deactivated QA identity atomically restores its user and 
   await pool.query("update tenant_memberships set status = 'suspended', updated_at = now() where user_id = $1", [userId]);
 
   const reprovisioned = await postJson(server.baseUrl, '/v1/admin/qa-identities', request, { headers: authHeaders(admin.token) });
-  assert.equal(reprovisioned.response.status, 200, JSON.stringify(reprovisioned.body));
+  assert.equal(reprovisioned.response.status, 201, JSON.stringify(reprovisioned.body));
   assert.equal(reprovisioned.body.user.status, 'active');
   assert.equal(reprovisioned.body.identityReused, true);
 
