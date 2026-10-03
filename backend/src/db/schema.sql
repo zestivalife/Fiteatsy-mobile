@@ -23,6 +23,43 @@ create table if not exists users (
   deleted_at timestamptz
 );
 
+create table if not exists tenants (
+  id uuid primary key,
+  name text not null,
+  slug text not null unique,
+  tenant_type text not null check (tenant_type in ('ZESTIVA_INTERNAL','INDEPENDENT_CONSULTANT','PRACTICE','CLINIC','ENTERPRISE')),
+  status text not null default 'active' check (status in ('active','suspended','closed')),
+  billing_owner_user_id text references users(id) on delete set null,
+  subscription_id text,
+  default_timezone text not null default 'Asia/Kolkata',
+  country text not null default 'IN',
+  currency text not null default 'INR',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists tenant_memberships (
+  id uuid primary key,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  tenant_role text not null check (tenant_role in ('OWNER','CONSULTANT','SENIOR_CONSULTANT','COORDINATOR','BILLING_ADMIN','STAFF','CLIENT')),
+  status text not null default 'active' check (status in ('active','invited','suspended','removed')),
+  joined_at timestamptz not null default now(),
+  invited_by text references users(id) on delete set null,
+  removed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_id, user_id)
+);
+
+create table if not exists tenant_settings (
+  tenant_id uuid primary key references tenants(id) on delete cascade,
+  settings jsonb not null default '{}'::jsonb,
+  version integer not null default 1,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists users_pin_locked_until_idx
   on users (pin_locked_until)
   where pin_locked_until is not null;
@@ -93,6 +130,7 @@ create table if not exists daily_checkins (
   id bigserial primary key,
   user_id text not null references users(id),
   client_id text,
+  tenant_id uuid references tenants(id) on delete restrict,
   checkin_date date not null,
   mood smallint not null check (mood between 1 and 5),
   energy smallint not null check (energy between 1 and 5),
@@ -117,6 +155,7 @@ create table if not exists nudges (
   id text primary key,
   user_id text not null references users(id),
   client_id text,
+  tenant_id uuid references tenants(id) on delete restrict,
   type text not null,
   title text not null,
   body text not null,
@@ -785,6 +824,9 @@ create unique index if not exists daily_checkins_client_date_unique
   on daily_checkins (client_id, checkin_date)
   where client_id is not null;
 
+create index if not exists daily_checkins_tenant_idx
+  on daily_checkins (tenant_id);
+
 create unique index if not exists nutrition_foods_canonical_name_active_unique
   on nutrition_foods (lower(canonical_name))
   where deleted_at is null;
@@ -884,6 +926,9 @@ create index if not exists ai_decision_logs_client_created_idx
 create index if not exists nudges_client_scheduled_idx
   on nudges (client_id, scheduled_at desc)
   where client_id is not null;
+
+create index if not exists nudges_tenant_idx
+  on nudges (tenant_id);
 
 create unique index if not exists health_profiles_active_client_unique
   on health_profiles (client_id)

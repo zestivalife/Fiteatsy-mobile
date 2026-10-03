@@ -58,6 +58,17 @@ test('all 21 tenant-owned tables receive additive ownership, dual-write, and ver
   assert.match(migration,/mismatch_count/);
 });
 
+test('governed migrations create every authoritative tenant table and fail closed on drift',()=>{
+  const migration=read('backend/src/db/migrations/0083_create_daily_checkins_and_nudges.sql');
+  assert.match(migration,/create table if not exists daily_checkins/);
+  assert.match(migration,/create table if not exists nudges/);
+  assert.match(migration,/add column if not exists tenant_id uuid references tenants\(id\) on delete restrict/);
+  assert.match(migration,/authoritative tenant table missing after governed migrations/);
+  assert.match(migration,/verified_count <> 21/);
+  assert.doesNotMatch(migration,/tenant_id set not null/i);
+  assert.doesNotMatch(migration,/drop table/i);
+});
+
 test('tenant request projection resolves only active server-side membership',()=>{
   const source=read('backend/src/modules/tenancy/tenant-context.ts');
   assert.match(source,/membership\.user_id=\$1/);
