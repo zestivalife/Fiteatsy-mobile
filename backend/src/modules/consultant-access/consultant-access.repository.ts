@@ -99,21 +99,21 @@ export const setConsultantAccessDecision = async (input: {
     }
     const saved = await db.query(
       `insert into consultant_access_consents
-        (user_id, client_id, assignment_id, consultant_user_id, product, status, policy_version, source, granted_at, revoked_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,case when $6='GRANTED' then now() end,case when $6='REVOKED' then now() end)
+        (user_id, client_id, assignment_id, consultant_user_id, product, status, policy_version, source, granted_at, revoked_at, tenant_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,case when $6='GRANTED' then now() end,case when $6='REVOKED' then now() end,$9)
        on conflict (assignment_id, policy_version) where assignment_id is not null
        do update set status=excluded.status, source=excluded.source,
          granted_at=case when excluded.status='GRANTED' then now() else consultant_access_consents.granted_at end,
          revoked_at=case when excluded.status='REVOKED' then now() else null end,
          version=consultant_access_consents.version+1, updated_at=now()
        returning *`,
-      [input.clientUserId, input.internalClientId, input.assignmentId, relationship.consultant_user_id, CONSULTANT_ACCESS_PRODUCT, input.status, input.policyVersion, input.source],
+      [input.clientUserId, input.internalClientId, input.assignmentId, relationship.consultant_user_id, CONSULTANT_ACCESS_PRODUCT, input.status, input.policyVersion, input.source, relationship.tenant_id],
     );
     await db.query(
       `insert into consultant_access_consent_events
-        (id, assignment_id, client_user_id, consultant_user_id, product, policy_version, status, source, actor_user_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$3)`,
-      [crypto.randomUUID(), input.assignmentId, input.clientUserId, relationship.consultant_user_id, CONSULTANT_ACCESS_PRODUCT, input.policyVersion, input.status, input.source],
+        (id, assignment_id, client_user_id, consultant_user_id, product, policy_version, status, source, actor_user_id, tenant_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$3,$9)`,
+      [crypto.randomUUID(), input.assignmentId, input.clientUserId, relationship.consultant_user_id, CONSULTANT_ACCESS_PRODUCT, input.policyVersion, input.status, input.source, relationship.tenant_id],
     );
     await db.query('commit');
     const requests = await listConsultantAccessRequests(input.clientUserId);

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { migrateDatabase, resetMigrationStateForTests } from '../../backend/src/db/migrator.js';
 import { pool } from '../../backend/src/db/pool.js';
 import {
@@ -84,7 +85,17 @@ test('createOrResolveClientForAccount reactivates stale client mappings and pres
   assert.equal(await countClients(), 1);
 });
 
-test('migration backfills one client for an existing account and records the migration', async () => {
+test('migration backfills one client for an existing account and records the migration', async (t) => {
+  t.after(async () => {
+    // This test intentionally drops a foundational table. Reapply every later
+    // migration so the shared integration database cannot retain a pre-tenant
+    // schema and poison unrelated tests that run afterward.
+    const tenantExpand = fs.readFileSync(
+      new URL('../../backend/src/db/migrations/0082_multi_tenant_expand_backfill.sql', import.meta.url),
+      'utf8',
+    );
+    await pool.query(tenantExpand);
+  });
   const timestamp = new Date().toISOString();
   await pool.query(
     `

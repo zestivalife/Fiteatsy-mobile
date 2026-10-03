@@ -2,6 +2,7 @@ import { pool } from '../../db/pool.js';
 import { createOrResolveClientForAccount } from '../client/client.repository.js';
 import { recordTenantResolutionPath, resolveActiveTenantContextForUserId } from '../tenancy/tenant-context.js';
 import type { HealthCalculationInput, HealthMetrics } from '../health/health-calculations.service.js';
+import { toCanonicalDateOnly } from '../../utils/date-only.js';
 import {
   compareBiomarkerObservations,
   deriveBiomarkerClinicalStatus,
@@ -946,7 +947,7 @@ export const listValidatedBiomarkerSummaryForClient = async (
       type: source.sourceReportId == null ? 'manual_entry' : 'lab_report',
       label: source.sourceReportId == null ? 'Manual Entry' : 'Lab Report',
       reportId: source.sourceReportId == null ? null : String(source.sourceReportId),
-      reportDate: source.reportDate == null ? null : new Date(String(source.reportDate)).toISOString().slice(0, 10),
+      reportDate: source.reportDate == null ? null : toCanonicalDateOnly(source.reportDate),
       labName: source.labName == null ? null : String(source.labName),
       fileName: source.fileName == null ? null : String(source.fileName)
     });
@@ -967,7 +968,7 @@ export const listValidatedBiomarkerSummaryForClient = async (
           referenceRange: historyReferenceRange,
           validationStatus: historyValidationStatus
         }),
-        testDate: new Date(String(item.testDate)).toISOString().slice(0, 10),
+        testDate: toCanonicalDateOnly(item.testDate),
         rawMarkerName: item.rawMarkerName == null ? null : String(item.rawMarkerName),
         source: toSource({
           sourceReportId: item.sourceReportId,
@@ -990,7 +991,7 @@ export const listValidatedBiomarkerSummaryForClient = async (
       clinicalStatus,
       referenceRange,
       confidence: Number(row.confidence),
-      testDate: new Date(String(row.test_date)).toISOString().slice(0, 10),
+      testDate: toCanonicalDateOnly(row.test_date),
       comparisonStatus: compareBiomarkerObservations(
         { value, unit, referenceRange, clinicalStatus },
         previousValue == null || previousUnit == null || previousClinicalStatus == null
@@ -1002,7 +1003,7 @@ export const listValidatedBiomarkerSummaryForClient = async (
       previousReferenceRange,
       previousClinicalStatus,
       previousSourceReportId: row.previous_source_report_id == null ? null : String(row.previous_source_report_id),
-      previousTestDate: row.previous_test_date == null ? null : new Date(String(row.previous_test_date)).toISOString().slice(0, 10),
+      previousTestDate: row.previous_test_date == null ? null : toCanonicalDateOnly(row.previous_test_date),
       source: toSource({
         sourceReportId: row.source_report_id,
         reportDate: row.report_date,
@@ -1092,7 +1093,7 @@ export const listConsultantReportSummariesForClient = async (
         clinicalStatus: deriveBiomarkerClinicalStatus({ value, unit, referenceRange, validationStatus }),
         referenceRange,
         confidence: Number(marker.confidence),
-        testDate: new Date(String(marker.testDate)).toISOString().slice(0, 10)
+        testDate: toCanonicalDateOnly(marker.testDate)
       };
     })
   }));

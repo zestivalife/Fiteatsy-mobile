@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
+import { resolveTrustedTenantForClientWrite } from '../tenancy/tenant-write-authority.js';
+import { toCanonicalDateOnly } from '../../utils/date-only.js';
 
 export type BiomarkerRecord = {
   id: string;
@@ -58,7 +60,7 @@ const rowToObservation = (row: Record<string, unknown>): BiomarkerObservationRec
   sourceReportId: row.source_report_id == null ? null : String(row.source_report_id),
   value: Number(row.value),
   unit: String(row.unit),
-  testDate: new Date(String(row.test_date)).toISOString().slice(0, 10),
+  testDate: toCanonicalDateOnly(row.test_date),
   confidence: Number(row.confidence),
   validationStatus: String(row.validation_status),
   originalParameterName: row.original_parameter_name == null ? null : String(row.original_parameter_name),
@@ -107,15 +109,16 @@ export const createBiomarkerObservation = async (
     referenceRange?: string | null;
   }
 ) => {
+  const tenantId = await resolveTrustedTenantForClientWrite(owner, 'biomarker_observation_create');
   const id = `bobs_${crypto.randomUUID()}`;
   const result = await pool.query(
     `
       with inserted as (
         insert into biomarker_observations (
           id, user_id, client_id, biomarker_id, source_report_id, value, unit, test_date,
-          confidence, validation_status, original_parameter_name, source_location, reference_range
+          confidence, validation_status, original_parameter_name, source_location, reference_range, tenant_id
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         returning *
       )
       select inserted.*, b.canonical_name
@@ -135,7 +138,8 @@ export const createBiomarkerObservation = async (
       input.validationStatus ?? 'pending',
       input.originalParameterName ?? null,
       input.sourceLocation ?? null,
-      input.referenceRange ?? null
+      input.referenceRange ?? null,
+      tenantId
     ]
   );
   return rowToObservation(result.rows[0]);

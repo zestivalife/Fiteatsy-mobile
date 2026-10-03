@@ -12,6 +12,7 @@ import {
   NutritionProfileRecord,
   TimelineEventRecord
 } from './platform.types.js';
+import { resolveTrustedTenantForClientWrite, resolveTrustedTenantForUserWrite } from '../tenancy/tenant-write-authority.js';
 
 const nowIso = () => new Date().toISOString();
 
@@ -739,22 +740,27 @@ export const createCareCaseIfMissing = async (
   healthProfileId: string,
   stage: CareCaseStage = 'new_client'
 ) => {
+  const tenantId = await resolveTrustedTenantForClientWrite(owner, 'care_case_create');
   const existing = await getCareCaseByClientId(owner.clientId);
-  if (existing) return existing;
+  if (existing) {
+    const tenant = await pool.query<{ tenant_id: string | null }>('select tenant_id from care_cases where id=$1', [existing.id]);
+    if (tenant.rows[0]?.tenant_id !== tenantId) throw new Error('TENANT_RESOURCE_MISMATCH');
+    return existing;
+  }
 
   const recoveryProgramId = await createRecoveryProgramIfMissing(healthProfileId, stage);
   const inserted = await pool.query(
     `
       insert into care_cases (
         id, user_id, client_id, health_profile_id, recovery_program_id, assigned_consultant_id, assigned_mentor_id,
-        current_stage, previous_stage, last_transition_at, status, version, created_at, updated_at, deleted_at
+        current_stage, previous_stage, last_transition_at, status, version, created_at, updated_at, deleted_at, tenant_id
       ) values (
         $1, $2, $3, $4, $5, null, null,
-        $6, null, $7, 'active', 1, $7, $7, null
+        $6, null, $7, 'active', 1, $7, $7, null, $8
       )
       returning *
     `,
-    [crypto.randomUUID(), owner.accountId, owner.clientId, healthProfileId, recoveryProgramId, stage, nowIso()]
+    [crypto.randomUUID(), owner.accountId, owner.clientId, healthProfileId, recoveryProgramId, stage, nowIso(), tenantId]
   );
   return mapCareCase(inserted.rows[0]);
 };
@@ -1001,14 +1007,17 @@ export const updateHealthTicket = async (ticketId: string, patch: Partial<Health
 
 export const createNotificationRecord = async (input: Omit<NotificationRecord, 'id' | 'createdAtISO' | 'updatedAtISO' | 'deletedAtISO' | 'version' | 'status' | 'readAtISO' | 'dismissedAtISO'>) => {
   const createdAtISO = nowIso();
+  const tenantId = input.clientId == null
+    ? await resolveTrustedTenantForUserWrite(input.userId, 'notification_create')
+    : await resolveTrustedTenantForClientWrite({ accountId: input.userId, clientId: input.clientId }, 'notification_create');
   const inserted = await pool.query(
     `
       insert into notifications (
         id, user_id, client_id, care_case_id, channel, title, body, sent_at,
-        status, version, created_at, updated_at, deleted_at
+        status, version, created_at, updated_at, deleted_at, tenant_id
       ) values (
         $1, $2, $3, $4, $5, $6, $7, $8,
-        'active', 1, $9, $9, null
+        'active', 1, $9, $9, null, $10
       )
       returning *
     `,
@@ -1021,7 +1030,8 @@ export const createNotificationRecord = async (input: Omit<NotificationRecord, '
       input.title,
       input.body,
       input.sentAtISO,
-      createdAtISO
+      createdAtISO,
+      tenantId
     ]
   );
   return mapNotification(inserted.rows[0]);

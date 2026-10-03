@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { pool } from '../../db/pool.js';
+import { resolveTrustedTenantForUserWrite } from '../tenancy/tenant-write-authority.js';
 
 type Queryable = Pick<PoolClient, 'query'>;
 
@@ -13,6 +14,7 @@ export type PersistedClient = {
   createdAtISO: string;
   updatedAtISO: string;
   deletedAtISO: string | null;
+  tenantId: string | null;
 };
 
 const CLIENT_PUBLIC_ID_PREFIX = 'fc_';
@@ -31,6 +33,7 @@ const mapClient = (row: Record<string, unknown>): PersistedClient => ({
   createdAtISO: new Date(String(row.created_at)).toISOString(),
   updatedAtISO: new Date(String(row.updated_at)).toISOString(),
   deletedAtISO: toIso(row.deleted_at)
+  ,tenantId: row.tenant_id == null ? null : String(row.tenant_id)
 });
 
 const buildClientPublicId = () => `${CLIENT_PUBLIC_ID_PREFIX}${crypto.randomBytes(16).toString('hex')}`;
@@ -135,6 +138,7 @@ export const createOrResolveClientForAccount = async (
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
+      const tenantId = await resolveTrustedTenantForUserWrite(accountUserId, 'client_create', db);
       const inserted = await db.query(
         `
           insert into fiteatsy_clients (
@@ -145,11 +149,12 @@ export const createOrResolveClientForAccount = async (
             version,
             created_at,
             updated_at
-          ) values ($1, $2, $3, 'active', 1, $4, $4)
+            ,tenant_id
+          ) values ($1, $2, $3, 'active', 1, $4, $4, $5)
           on conflict (account_user_id) do nothing
           returning *
         `,
-        [crypto.randomUUID(), buildClientPublicId(), accountUserId, new Date().toISOString()]
+        [crypto.randomUUID(), buildClientPublicId(), accountUserId, new Date().toISOString(), tenantId]
       );
       if (inserted.rowCount === 1) return mapClient(inserted.rows[0]);
       const resolved = await getClientByAccountUserIdAnyStatus(accountUserId, db);

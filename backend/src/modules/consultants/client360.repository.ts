@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { pool } from '../../db/pool.js';
+import { resolveTrustedTenantForActorAndClientWrite } from '../tenancy/tenant-write-authority.js';
 
 export const CLIENT_OPERATION_TYPES = ['CONSULTATION', 'TASK', 'FOLLOW_UP', 'GOAL', 'NOTE'] as const;
 export type ClientOperationType = typeof CLIENT_OPERATION_TYPES[number];
@@ -79,6 +80,7 @@ export const createClientOperation = async (clientId: string, actorId: string, i
   const db = await pool.connect();
   try {
     await db.query('begin');
+    const tenantId = await resolveTrustedTenantForActorAndClientWrite(actorId, clientId, 'client_operation_create', db);
     const previous = await db.query<{ operation_id: string }>(
       'select operation_id from consultant_client_operation_idempotency where actor_id = $1 and idempotency_key = $2',
       [actorId, idempotencyKey],
@@ -91,18 +93,18 @@ export const createClientOperation = async (clientId: string, actorId: string, i
     const id = randomUUID();
     const inserted = await db.query(
       `insert into consultant_client_operations
-       (id, client_id, operation_type, title, detail, status, priority, due_at, scheduled_at, metadata, created_by, updated_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$11) returning *`,
-      [id, clientId, input.operationType, input.title, input.detail ?? null, input.status ?? 'OPEN', input.priority ?? 'NORMAL', input.dueAt ?? null, input.scheduledAt ?? null, JSON.stringify(input.metadata ?? {}), actorId],
+       (id, client_id, operation_type, title, detail, status, priority, due_at, scheduled_at, metadata, created_by, updated_by, tenant_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$11,$12) returning *`,
+      [id, clientId, input.operationType, input.title, input.detail ?? null, input.status ?? 'OPEN', input.priority ?? 'NORMAL', input.dueAt ?? null, input.scheduledAt ?? null, JSON.stringify(input.metadata ?? {}), actorId, tenantId],
     );
     await db.query(
       'insert into consultant_client_operation_idempotency(actor_id,idempotency_key,operation_id) values ($1,$2,$3)',
       [actorId, idempotencyKey, id],
     );
     await db.query(
-      `insert into consultant_client_operation_audit(id,operation_id,client_id,actor_id,action,after_state)
-       values ($1,$2,$3,$4,'CREATED',$5::jsonb)`,
-      [randomUUID(), id, clientId, actorId, JSON.stringify(mapOperation(inserted.rows[0]))],
+      `insert into consultant_client_operation_audit(id,operation_id,client_id,actor_id,action,after_state,tenant_id)
+       values ($1,$2,$3,$4,'CREATED',$5::jsonb,$6)`,
+      [randomUUID(), id, clientId, actorId, JSON.stringify(mapOperation(inserted.rows[0])), tenantId],
     );
     await db.query('commit');
     return { operation: mapOperation(inserted.rows[0]), replayed: false };
@@ -118,6 +120,7 @@ export const updateClientOperation = async (clientId: string, operationId: strin
   const db = await pool.connect();
   try {
     await db.query('begin');
+    const tenantId = await resolveTrustedTenantForActorAndClientWrite(actorId, clientId, 'client_operation_update', db);
     const current = await db.query('select * from consultant_client_operations where id=$1 and client_id=$2 and deleted_at is null for update', [operationId, clientId]);
     if (!current.rows[0]) { await db.query('rollback'); return { kind: 'not_found' as const }; }
     if (Number(current.rows[0].version) !== expectedVersion) { await db.query('rollback'); return { kind: 'conflict' as const, current: mapOperation(current.rows[0]) }; }
@@ -132,9 +135,9 @@ export const updateClientOperation = async (clientId: string, operationId: strin
       [operationId, clientId, patch.title ?? null, patch.detail ?? null, nextStatus, patch.priority ?? null, patch.dueAt ?? null, patch.scheduledAt ?? null, patch.metadata ? JSON.stringify(patch.metadata) : null, actorId],
     );
     await db.query(
-      `insert into consultant_client_operation_audit(id,operation_id,client_id,actor_id,action,before_state,after_state)
-       values ($1,$2,$3,$4,'UPDATED',$5::jsonb,$6::jsonb)`,
-      [randomUUID(), operationId, clientId, actorId, JSON.stringify(mapOperation(current.rows[0])), JSON.stringify(mapOperation(updated.rows[0]))],
+      `insert into consultant_client_operation_audit(id,operation_id,client_id,actor_id,action,before_state,after_state,tenant_id)
+       values ($1,$2,$3,$4,'UPDATED',$5::jsonb,$6::jsonb,$7)`,
+      [randomUUID(), operationId, clientId, actorId, JSON.stringify(mapOperation(current.rows[0])), JSON.stringify(mapOperation(updated.rows[0])), tenantId],
     );
     await db.query('commit');
     return { kind: 'updated' as const, operation: mapOperation(updated.rows[0]) };

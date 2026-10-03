@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
+import { resolveTrustedTenantForClientWrite } from '../tenancy/tenant-write-authority.js';
 
 export type HealthObservationInput = {
   metricType: string;
@@ -75,6 +76,7 @@ const buildSyncKey = (owner: ClientOwnershipContext, observation: HealthObservat
   ].join(':');
 
 export const ingestHealthObservations = async (owner: ClientOwnershipContext, observations: HealthObservationInput[]) => {
+  const tenantId = await resolveTrustedTenantForClientWrite(owner, 'health_observation_ingest');
   const accepted: HealthObservationRecord[] = [];
   const duplicate: Array<{ syncKey: string; metricType: string }> = [];
   const rejected: Array<{ metricType: string; reason: string }> = [];
@@ -134,9 +136,9 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
         insert into health_observations (
           id, user_id, client_id, metric_type, value, unit, measured_at, source_provider,
           source_record_id, sync_key, quality_status, source_metadata,start_at,end_at,timezone_offset_minutes,
-          provider_updated_at,provider_version,content_hash
+          provider_updated_at,provider_version,content_hash,tenant_id
         )
-        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
         on conflict (client_id, sync_key) do nothing
         returning *
       `,
@@ -154,7 +156,7 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
         observation.qualityStatus ?? 'accepted',
         observation.sourceMetadata ?? null,observation.startAtISO ?? null,observation.endAtISO ?? null,
         observation.timezoneOffsetMinutes ?? null,observation.providerUpdatedAtISO ?? null,
-        observation.providerVersion ?? null,contentHash
+        observation.providerVersion ?? null,contentHash,tenantId
       ]
     );
 

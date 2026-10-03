@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { resolveTrustedTenantForCareCaseWrite } from '../tenancy/tenant-write-authority.js';
 import { pool } from '../../db/pool.js';
 import type {
   ClientOwnershipContext,
@@ -351,6 +352,11 @@ export const createOrUpdateDietPlanDraft = async (input: {
 }) => {
   const existingPlan = await getDietPlanByCareCaseId(input.careCaseId);
   const timestamp = nowIso();
+  const tenantId = await resolveTrustedTenantForCareCaseWrite(
+    input.careCaseId,
+    input.generatedBy,
+    'diet_plan_write',
+  );
 
   // Regeneration of an editable draft must not advance the plan pointer. The
   // explicit option selections are version-owned, so replacing the version here
@@ -442,11 +448,11 @@ export const createOrUpdateDietPlanDraft = async (input: {
         insert into diet_plans (
           id, care_case_id, user_id, consultant_id, current_version_id, latest_published_version_id,
           plan_status, readiness_score, template_version, approved_by, approved_at, published_at, archived_at,
-          source_snapshot, status, version, created_at, updated_at, deleted_at
+          source_snapshot, status, version, created_at, updated_at, deleted_at, tenant_id
         ) values (
           $1, $2, $3, $4, null, null,
           'draft', $5, $6, null, null, null, null,
-          $7::jsonb, 'active', 1, $8, $8, null
+          $7::jsonb, 'active', 1, $8, $8, null, $9
         )
         returning *
       `,
@@ -459,6 +465,7 @@ export const createOrUpdateDietPlanDraft = async (input: {
         input.templateVersion,
         JSON.stringify(input.sourceSnapshot),
         timestamp,
+        tenantId,
       ],
     );
     plan = mapDietPlan(insertedPlan.rows[0]);
@@ -472,9 +479,10 @@ export const createOrUpdateDietPlanDraft = async (input: {
       insert into diet_plan_versions (
         id, diet_plan_id, version_number, generated_by, content, source_snapshot, content_summary,
         lifecycle_status, review_notes, exported_doc_path, exported_pdf_path, status, created_at, updated_at, deleted_at
+        , tenant_id
       ) values (
         $1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb,
-        'draft', null, null, null, 'active', $8, $8, null
+        'draft', null, null, null, 'active', $8, $8, null, $9
       )
       returning *
     `,
@@ -487,6 +495,7 @@ export const createOrUpdateDietPlanDraft = async (input: {
       JSON.stringify(input.sourceSnapshot),
       JSON.stringify(input.contentSummary),
       timestamp,
+      tenantId,
     ],
   );
 
@@ -581,7 +590,7 @@ export const createDietPlanDraftVersion = async (input: {
   try {
   await client.query('begin');
   const lockedPlan = await client.query(
-    `select current_version_id from diet_plans where id = $1 and deleted_at is null for update`,
+    `select current_version_id, tenant_id from diet_plans where id = $1 and deleted_at is null for update`,
     [input.dietPlanId],
   );
   if (!lockedPlan.rows[0]) throw Object.assign(new Error('DIET_PLAN_NOT_FOUND'), { code: 'DIET_PLAN_NOT_FOUND' });
@@ -596,10 +605,11 @@ export const createDietPlanDraftVersion = async (input: {
       insert into diet_plan_versions (
         id, diet_plan_id, version_number, generated_by, content, source_snapshot, content_summary,
         lifecycle_status, review_notes, exported_doc_path, exported_pdf_path, status, created_at, updated_at, deleted_at
+        , tenant_id
       )
       values (
         $1, $8, (select version_number from next_number), $2, $3::jsonb, $4::jsonb, $5::jsonb,
-        'draft', $6, null, null, 'active', $7, $7, null
+        'draft', $6, null, null, 'active', $7, $7, null, $9
       )
       returning *
     `,
@@ -612,6 +622,7 @@ export const createDietPlanDraftVersion = async (input: {
       input.reviewNotes ?? null,
       timestamp,
       input.dietPlanId,
+      lockedPlan.rows[0].tenant_id,
     ],
   );
   const updatedPlan = await client.query(
@@ -724,8 +735,8 @@ export const updateDietPlanLifecycle = async (input: {
 
   if (input.reviewEventType) {
     await pool.query(
-      `insert into diet_plan_review_events (id, diet_plan_id, diet_plan_version_id, actor_user_id, event_type, comment)
-       values ($1, $2, $3, $4, $5, $6)`,
+      `insert into diet_plan_review_events (id, diet_plan_id, diet_plan_version_id, actor_user_id, event_type, comment, tenant_id)
+       select $1, $2, $3, $4, $5, $6, tenant_id from diet_plans where id=$2 and deleted_at is null`,
       [crypto.randomUUID(), input.dietPlanId, input.currentVersionId, actorUserId, input.reviewEventType, input.reviewComment ?? null],
     );
   }
@@ -789,9 +800,10 @@ export const publishApprovedDietPlanVersion = async (input: {
     }
 
     await client.query(
-      `insert into diet_plan_review_events (id, diet_plan_id, diet_plan_version_id, actor_user_id, event_type, comment)
-       select $1, $2, $3, $4, 'published', null
-       where not exists (
+      `insert into diet_plan_review_events (id, diet_plan_id, diet_plan_version_id, actor_user_id, event_type, comment, tenant_id)
+       select $1, $2, $3, $4, 'published', null, plan.tenant_id
+       from diet_plans plan
+       where plan.id=$2 and plan.deleted_at is null and not exists (
          select 1 from diet_plan_review_events
          where diet_plan_id = $2 and diet_plan_version_id = $3 and event_type = 'published'
        )`,

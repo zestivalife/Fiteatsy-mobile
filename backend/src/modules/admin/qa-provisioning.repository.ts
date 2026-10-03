@@ -4,6 +4,7 @@ import { createOrResolveClientForAccount } from '../client/client.repository.js'
 import { createOrUpdateHealthProfile, createCareCaseIfMissing } from '../platform/platform.store.js';
 import type { ClientOwnershipContext } from '../platform/platform.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
+import { resolveActiveTenantContextForUserId } from '../tenancy/tenant-context.js';
 
 type QaRole = 'user' | 'consultant' | 'senior_consultant' | 'admin';
 
@@ -273,18 +274,21 @@ export const resetQaOnboarding = async (input: { actorUserId: string; userId: st
 };
 
 export const createQaAssignment = async (input: { actorUserId: string; consultantUserId: string; clientUserId: string; reason: string }) => {
+  const tenant = await resolveActiveTenantContextForUserId(input.clientUserId);
+  if (!tenant) throw new Error('TENANT_CONTEXT_REQUIRED');
   const result = await pool.query(
     `insert into consultant_client_assignments
-      (id, consultant_user_id, client_user_id, created_by_user_id)
-     select $1, c.id, u.id, $4
+      (id, consultant_user_id, client_user_id, created_by_user_id, tenant_id)
+     select $1, c.id, u.id, $4, $5
        from users c cross join users u
+       join fiteatsy_clients fc on fc.account_user_id = u.id and fc.tenant_id = $5
       where c.id = $2 and u.id = $3
         and c.deleted_at is null and u.deleted_at is null
         and c.account_purpose = 'QA_TEST' and u.account_purpose = 'QA_TEST'
         and lower(c.role) in ('consultant', 'provider', 'dietician', 'senior_consultant')
         and lower(u.role) = 'user'
      returning id, consultant_user_id, client_user_id, status, scope, created_at`,
-    [crypto.randomUUID(), input.consultantUserId, input.clientUserId, input.actorUserId]
+    [crypto.randomUUID(), input.consultantUserId, input.clientUserId, input.actorUserId, tenant.tenantId]
   );
   if (!result.rowCount) return null;
   const assignment = result.rows[0];

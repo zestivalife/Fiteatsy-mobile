@@ -140,3 +140,24 @@ test('Senior review queue scopes plans, versions and review events to the active
   assert.match(service,/nutrition\.senior-review-queue/);
   assert.match(service,/allowSeniorAuthority/);
 });
+
+test('external tenant writes use explicit trusted authority instead of the Zestiva trigger',()=>{
+  const authority=read('backend/src/modules/tenancy/tenant-write-authority.ts');
+  const clients=read('backend/src/modules/client/client.repository.ts');
+  const platform=read('backend/src/modules/platform/platform.store.ts');
+  const assignments=read('backend/src/modules/professional-assignments/professional-assignments.repository.ts');
+  const qaAssignments=read('backend/src/modules/admin/qa-provisioning.repository.ts');
+  const client360=read('backend/src/modules/consultants/client360.repository.ts');
+  const health=read('backend/src/modules/health/health-observations.repository.ts');
+  const biomarkers=read('backend/src/modules/biomarkers/biomarkers.repository.ts');
+  const nutrition=read('backend/src/modules/nutrition/nutrition.store.ts');
+  const notifications=read('backend/src/modules/platform/platform.store.ts');
+  const photos=read('backend/src/modules/grievances/grievances.repository.ts');
+  const consent=read('backend/src/modules/consultant-access/consultant-access.repository.ts');
+  assert.match(authority,/TENANT_RESOURCE_MISMATCH/);
+  for(const source of [clients,platform,assignments,qaAssignments,client360,health,biomarkers,nutrition,notifications,photos,consent]){
+    assert.match(source,/tenant_id/);
+  }
+  assert.match(nutrition,/resolveTrustedTenantForCareCaseWrite/);
+  assert.match(consent,/relationship\.tenant_id/);
+});

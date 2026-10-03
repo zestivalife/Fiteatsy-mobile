@@ -157,8 +157,9 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
       `update consultant_client_assignments
           set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, updated_at = now()
         where client_user_id = $1 and product = 'FITEATSY' and status = 'active'
+          and tenant_id = $3
         returning *`,
-      [input.clientUserId, input.actorUserId],
+      [input.clientUserId, input.actorUserId, tenant.tenantId],
     );
     for (const row of previous.rows) {
       await connection.query(
@@ -174,6 +175,7 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
      select $1, professional.id, client.id, $2, 'FITEATSY', $4, $5, $7
        from users professional join users client on client.id = $3
        join fiteatsy_clients fc on fc.account_user_id = client.id and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
+         and fc.tenant_id = $7
       where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
         and lower(coalesce(professional.status, '')) = 'active'
         and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
