@@ -4,7 +4,10 @@
   "sealDocument": "docs/governance/CONSULTANT_DIET_PLAN_ENGINEERING_SEAL.md",
   "acceptedImplementation": {
     "backendSha": "0fc45e318216b19487f580c34d14092aef3b71b0",
-    "frontendSha": "587179495c63ed23504bcb637964350ef7327efa"
+    "frontendSha": "587179495c63ed23504bcb637964350ef7327efa",
+    "p0_1MultiTenantApplicationSha": "2d879832bbaa426a88df8e1a058668a628a14a56",
+    "p0_1ProductionRuntimeSha": "2d879832bbaa426a88df8e1a058668a628a14a56",
+    "p0_1DatabaseMigrationVersion": "0084_multi_tenant_contract.sql"
   },
   "verification": {
     "productionAcceptance": "PASS",
@@ -31,7 +34,23 @@
     { "id": "CONSULTANT_EXPLICIT_PUBLISH", "status": "FROZEN_PROTECTED" },
     { "id": "CLIENT_PUBLISHED_VERSION", "status": "FROZEN_PROTECTED" },
     { "id": "BACKEND_RUNTIME_SHA_PARITY", "status": "FROZEN_PROTECTED" },
-    { "id": "FRONTEND_RUNTIME_SHA_PARITY", "status": "FROZEN_PROTECTED" }
+    { "id": "FRONTEND_RUNTIME_SHA_PARITY", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_MODEL", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_MEMBERSHIP_AUTHORITY", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_RESOURCE_SCOPE", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_WRITE_AUTHORITY", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_PARENT_CHILD_INTEGRITY", "status": "FROZEN_PROTECTED" },
+    { "id": "CROSS_TENANT_ISOLATION", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_REPORT_ISOLATION", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_FILE_ISOLATION", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_DIET_REVIEW_ISOLATION", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_SEARCH_ISOLATION", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_COUNT_ISOLATION", "status": "FROZEN_PROTECTED" },
+    { "id": "TENANT_AUDIT_SCOPE", "status": "FROZEN_PROTECTED" },
+    { "id": "PLATFORM_GLOBAL_AUTHORITY", "status": "FROZEN_PROTECTED" },
+    { "id": "ZESTIVA_MIGRATION_COMPATIBILITY", "status": "FROZEN_PROTECTED" },
+    { "id": "QA_AUTH_ACCEPTANCE_PATH", "status": "FROZEN_PROTECTED" },
+    { "id": "DATABASE_MIGRATION_GOVERNANCE", "status": "FROZEN_PROTECTED" }
   ],
   "regressionOwnership": [
     "tests/backend/consultant-access-lifecycle-contract.test.ts",
@@ -43,6 +62,10 @@
     "nuetra-frontend/tests/client-roster-failure-contract.test.mjs",
     "nuetra-frontend/tests/client360-contract.test.mjs",
     "nuetra-frontend/tests/senior-diet-plan-review.test.mjs",
-    "nuetra-frontend/tests/runtime-build-identity.test.mjs"
+    "nuetra-frontend/tests/runtime-build-identity.test.mjs",
+    "tests/backend/database-migration-startup-governance.test.ts",
+    "tests/backend/multi-tenant-contract.test.ts",
+    "tests/api/qa-provisioning.api.test.ts",
+    "backend/src/jobs/run-common-food-production-e2e.ts"
   ]
 }

@@ -17,6 +17,16 @@ Seal document: [Consultant Diet Plan Engineering Seal](./CONSULTANT_DIET_PLAN_EN
 
 Governance commits created after acceptance document the freeze only. They do not replace or change the accepted production implementation SHAs above.
 
+### P0.1 Multi-Tenant Architecture
+
+- Accepted application SHA: `2d879832bbaa426a88df8e1a058668a628a14a56`
+- Production runtime SHA: `2d879832bbaa426a88df8e1a058668a628a14a56`
+- Database migration version: `0084_multi_tenant_contract.sql`
+- Production acceptance: `PASS`
+- Data-loss evidence: `UNKNOWN`
+- Engineering seal: `ACTIVE`
+- Seal record: [P0.1 Multi-Tenant Engineering Seal](./P0_1_MULTI_TENANT_ENGINEERING_SEAL.md)
+
 ## Frozen protected features
 
 | Feature ID | Status | Permanent regression ownership |
@@ -40,6 +50,22 @@ Governance commits created after acceptance document the freeze only. They do no
 | `CLIENT_PUBLISHED_VERSION` | `FROZEN_PROTECTED` | [`tests/backend/simple-consultant-approval-workflow.test.ts`](../../tests/backend/simple-consultant-approval-workflow.test.ts), [`tests/database/diet-lifecycle-quality.database.test.ts`](../../tests/database/diet-lifecycle-quality.database.test.ts) |
 | `BACKEND_RUNTIME_SHA_PARITY` | `FROZEN_PROTECTED` | Exact-SHA CI and production `/v1/version` acceptance evidence |
 | `FRONTEND_RUNTIME_SHA_PARITY` | `FROZEN_PROTECTED` | Frontend: `nuetra-frontend/tests/runtime-build-identity.test.mjs` |
+| `TENANT_MODEL` | `FROZEN_PROTECTED` | Multi-tenant contract and isolated PostgreSQL verification |
+| `TENANT_MEMBERSHIP_AUTHORITY` | `FROZEN_PROTECTED` | Membership authority and QA provisioning regressions |
+| `TENANT_RESOURCE_SCOPE` | `FROZEN_PROTECTED` | Tenant contract tests and production QA smoke |
+| `TENANT_WRITE_AUTHORITY` | `FROZEN_PROTECTED` | Explicit tenant-write coverage and database verification |
+| `TENANT_PARENT_CHILD_INTEGRITY` | `FROZEN_PROTECTED` | Relational tenant-integrity verification |
+| `CROSS_TENANT_ISOLATION` | `FROZEN_PROTECTED` | Bidirectional Tenant A/B isolation matrix |
+| `TENANT_REPORT_ISOLATION` | `FROZEN_PROTECTED` | Report authorization contracts; runtime read remains an evidence gate |
+| `TENANT_FILE_ISOLATION` | `FROZEN_PROTECTED` | File/storage authorization contracts; runtime read remains an evidence gate |
+| `TENANT_DIET_REVIEW_ISOLATION` | `FROZEN_PROTECTED` | Governed Common Food and review lifecycle smoke |
+| `TENANT_SEARCH_ISOLATION` | `FROZEN_PROTECTED` | Tenant-scoped search verification |
+| `TENANT_COUNT_ISOLATION` | `FROZEN_PROTECTED` | Tenant-scoped count verification |
+| `TENANT_AUDIT_SCOPE` | `FROZEN_PROTECTED` | Tenant-aware operational diagnostics |
+| `PLATFORM_GLOBAL_AUTHORITY` | `FROZEN_PROTECTED` | Explicit platform-authority contract |
+| `ZESTIVA_MIGRATION_COMPATIBILITY` | `FROZEN_PROTECTED` | Legacy Zestiva fallback and upgrade verification |
+| `QA_AUTH_ACCEPTANCE_PATH` | `FROZEN_PROTECTED` | QA provisioning and governed production smoke |
+| `DATABASE_MIGRATION_GOVERNANCE` | `FROZEN_PROTECTED` | Explicit migration command plus read-only startup readiness |
 
 ## Change control
 
