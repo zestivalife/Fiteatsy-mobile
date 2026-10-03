@@ -95,7 +95,15 @@ export const provisionQaIdentity = async (input: {
           code: 'QA_IDENTITY_CONFLICT'
         });
       }
-      const user = mapUser(existing.rows[0]);
+      const reactivated = await client.query(
+        `update users
+            set status = 'active', updated_at = now(), version = version + 1
+          where id = $1 and account_purpose = 'QA_TEST' and deleted_at is null
+          returning id, name, email_normalized, mobile_number_normalized, role, status, account_purpose, created_at`,
+        [existing.rows[0].id],
+      );
+      if (!reactivated.rowCount) throw new Error('QA_IDENTITY_REACTIVATION_FAILED');
+      const user = mapUser(reactivated.rows[0]);
       await ensureCanonicalZestivaMembership(
         user.id,
         input.role === 'user'

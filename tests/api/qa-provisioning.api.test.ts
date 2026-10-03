@@ -74,6 +74,48 @@ test('normal users cannot access QA provisioning endpoints', async () => {
   assert.equal(reset.response.status, 403);
 });
 
+test('reprovisioning a deactivated QA identity atomically restores its user and tenant membership', async () => {
+  const admin = await createAuthenticatedSession(server.baseUrl, {
+    name: 'QA Reactivation Admin', email: `qa-reactivation-admin-${Date.now()}@example.com`
+  });
+  await pool.query('update users set role = \'admin\' where id = $1', [admin.current.body.accountId]);
+  const suffix = Date.now();
+  const request = {
+    name: 'Reactivated QA Consultant',
+    email: `reactivated-qa-consultant-${suffix}@example.com`,
+    mobileNumber: '+919876543297',
+    role: 'consultant',
+    reason: 'Tenant reactivation regression acceptance'
+  };
+
+  const created = await postJson(server.baseUrl, '/v1/admin/qa-identities', request, { headers: authHeaders(admin.token) });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const userId = created.body.user.id;
+  const deactivated = await postJson(server.baseUrl, `/v1/admin/qa-identities/${userId}/deactivate`, {
+    reason: 'Exercise governed QA reactivation'
+  }, { headers: authHeaders(admin.token) });
+  assert.equal(deactivated.response.status, 200);
+  await pool.query("update tenant_memberships set status = 'suspended', updated_at = now() where user_id = $1", [userId]);
+
+  const reprovisioned = await postJson(server.baseUrl, '/v1/admin/qa-identities', request, { headers: authHeaders(admin.token) });
+  assert.equal(reprovisioned.response.status, 200, JSON.stringify(reprovisioned.body));
+  assert.equal(reprovisioned.body.user.status, 'active');
+  assert.equal(reprovisioned.body.identityReused, true);
+
+  const state = await pool.query(
+    `select users.status as user_status, membership.status as membership_status, membership.tenant_role
+       from users
+       join tenant_memberships membership on membership.user_id = users.id
+      where users.id = $1`,
+    [userId]
+  );
+  assert.deepEqual(state.rows[0], {
+    user_status: 'active',
+    membership_status: 'active',
+    tenant_role: 'CONSULTANT'
+  });
+});
+
 test('admin resets only QA client onboarding state while preserving identity and session', async () => {
   const admin = await createAuthenticatedSession(server.baseUrl, {
     name: 'Reset Admin', email: `reset-admin-${Date.now()}@example.com`
