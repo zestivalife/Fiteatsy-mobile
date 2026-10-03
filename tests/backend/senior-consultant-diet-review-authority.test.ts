@@ -6,6 +6,7 @@ const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrit
 const store = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.store.ts', import.meta.url), 'utf8');
 const routes = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.routes.ts', import.meta.url), 'utf8');
 const server = readFileSync(new URL('../../backend/src/server.ts', import.meta.url), 'utf8');
+const productionE2E = readFileSync(new URL('../../backend/src/jobs/run-common-food-production-e2e.ts', import.meta.url), 'utf8');
 
 const functionSlice = (startMarker: string, endMarker: string) => {
   const start = service.indexOf(startMarker);
@@ -106,4 +107,13 @@ test('approval and publication remain distinct lifecycle operations', () => {
   assert.match(approve, /lifecycle: 'approved'/);
   assert.doesNotMatch(approve, /lifecycle: 'published'/);
   assert.doesNotMatch(approve, /publishConsultantDietPlan/);
+});
+
+test('production acceptance follows canonical Senior review authority and Consultant publication', () => {
+  assert.match(productionE2E, /tokens\.senior,'POST',`\/v1\/consultants\/diet-plan-reviews\/\$\{planId\}\/request-changes`/);
+  assert.match(productionE2E, /versionId:submitted\.body\.version\.id/);
+  assert.match(productionE2E, /tokens\.senior,'POST',`\/v1\/consultants\/diet-plan-reviews\/\$\{planId\}\/approve`/);
+  assert.match(productionE2E, /versionId:resubmitted\.body\.version\.id/);
+  assert.match(productionE2E, /tokens\.consultant,'POST',`\$\{vegBase\}\/diet-plans\/\$\{planId\}\/publish`/);
+  assert.doesNotMatch(productionE2E, /tokens\.senior,'POST',`\$\{vegBase\}\/diet-plans\/\$\{planId\}\/(?:request-changes|approve|publish)`/);
 });

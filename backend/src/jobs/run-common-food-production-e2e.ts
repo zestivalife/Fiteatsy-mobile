@@ -175,7 +175,7 @@ const main = async () => {
   const review=queue.body.reviews.find((x:Json)=>x.plan?.id===planId||x.dietPlan?.id===planId||x.id===planId);
   assert(review || queue.body.reviews.length>0,'SENIOR_REVIEW_QUEUE_EMPTY');
   currentPhase = 'REQUEST_CHANGES';
-  const changes=await ok(tokens.senior,'POST',`${vegBase}/diet-plans/${planId}/request-changes`,{comment:'QA v17.6: verify one serving and resubmit.'});
+  const changes=await ok(tokens.senior,'POST',`/v1/consultants/diet-plan-reviews/${planId}/request-changes`,{versionId:submitted.body.version.id,comment:'QA v17.6: verify one serving and resubmit.'});
   currentPhase = 'REVISE';
   const revised=changes;
   currentPhase = 'REVISE_COMMON_FOOD_OPTION';
@@ -183,11 +183,11 @@ const main = async () => {
   currentPhase = 'RESUBMIT';
   const resubmitted=await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/submit-review`,{});
   currentPhase = 'APPROVE';
-  const approved=await ok(tokens.senior,'POST',`${vegBase}/diet-plans/${planId}/approve`,{});
+  const approved=await ok(tokens.senior,'POST',`/v1/consultants/diet-plan-reviews/${planId}/approve`,{versionId:resubmitted.body.version.id});
   currentPhase = 'PUBLISH';
-  const published=await ok(tokens.senior,'POST',`${vegBase}/diet-plans/${planId}/publish`,{approvedVersionId:approved.body.version.id});
+  const published=await ok(tokens.consultant,'POST',`${vegBase}/diet-plans/${planId}/publish`,{approvedVersionId:approved.body.version.id});
   currentPhase = 'DOCX';
-  const docx=await ok(tokens.senior,'GET',`${vegBase}/diet-plans/${planId}/download`);
+  const docx=await ok(tokens.consultant,'GET',`${vegBase}/diet-plans/${planId}/download`);
   assert(docx.bytes.length>1000 && (docx.headers.get('content-type')??'').includes('officedocument'), 'DOCX_INVALID');
   const clientRead=await ok(tokens.vegetarian,'GET','/v1/platform/nutrition-plan');
   assert(clientRead.body.plan.id===planId && clientRead.body.version.id===published.body.version.id,'CLIENT_PUBLISHED_PARITY_FAILED');
