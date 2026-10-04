@@ -15,6 +15,12 @@ import {
   listConsultantMedicationExceptions,
   listConsultantClients
 } from './consultants.service.js';
+import {
+  completeExternalConsultantOnboarding,
+  ExternalSignupProvisionError,
+  getExternalConsultantOnboarding,
+  updateExternalConsultantOnboarding
+} from '../external-signup/external-signup.repository.js';
 
 export const consultantsRouter = Router();
 
@@ -31,6 +37,55 @@ const requireConsultantAccount = (req: Request, res: Response, next: NextFunctio
 
 consultantsRouter.use(requireAuthenticatedAccount);
 consultantsRouter.use(requireConsultantAccount);
+
+const externalOnboardingUpdateSchema = z.object({
+  version: z.number().int().positive(),
+  consultantName: z.string().trim().min(2).max(120).optional(),
+  professionalTitle: z.string().trim().max(120).nullable().optional(),
+  speciality: z.string().trim().max(120).nullable().optional(),
+  practiceName: z.string().trim().max(160).nullable().optional(),
+  country: z.string().trim().length(2).optional(),
+  timezone: z.string().trim().min(3).max(80).optional(),
+  contactInformation: z.record(z.string(), z.unknown()).optional(),
+  professionalDetails: z.record(z.string(), z.unknown()).optional(),
+  acceptTerms: z.boolean().optional()
+}).strict();
+
+const onboardingError = (res: Response, error: unknown) => {
+  const typed = error as ExternalSignupProvisionError;
+  return res.status(typed.status ?? 500).json({
+    error: typed.code ?? 'EXTERNAL_ONBOARDING_FAILED',
+    message: typed.status ? typed.message : 'Consultant onboarding could not be completed.'
+  });
+};
+
+consultantsRouter.get('/onboarding', async (req, res) => {
+  try {
+    const onboarding = await getExternalConsultantOnboarding(getAuthenticatedAccount(req).accountId);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ onboarding });
+  } catch (error) { return onboardingError(res, error); }
+});
+
+consultantsRouter.patch('/onboarding', async (req, res) => {
+  const parsed = externalOnboardingUpdateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_ONBOARDING_INPUT', details: parsed.error.flatten() });
+  try {
+    const onboarding = await updateExternalConsultantOnboarding(getAuthenticatedAccount(req).accountId, parsed.data);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ onboarding });
+  } catch (error) { return onboardingError(res, error); }
+});
+
+consultantsRouter.post('/onboarding/complete', async (req, res) => {
+  const parsed = z.object({ version: z.number().int().positive() }).strict().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_ONBOARDING_INPUT', details: parsed.error.flatten() });
+  try {
+    const onboarding = await completeExternalConsultantOnboarding(getAuthenticatedAccount(req).accountId, parsed.data.version);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ onboarding });
+  } catch (error) { return onboardingError(res, error); }
+});
 
 const clientDirectoryQuerySchema = z.object({
   q: z.string().trim().max(120).optional(),

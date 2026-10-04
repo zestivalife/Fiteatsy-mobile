@@ -89,3 +89,41 @@ No orphan tenant can be created in Fiteatsy. A verified user whose remote provis
 
 Implementation must remain additive, purpose-bound, idempotent, replay-protected, and covered by existing Zestiva and P0.1 isolation regressions. The Consultant frontend must be developed from its protected P0.1 branch in a clean worktree, not the dirty local checkout.
 
+## External client product model
+
+External SaaS clients are tenant-owned `CLIENT_RECORD` resources. They are not
+required to become authenticated Fiteatsy application users, tenant members, or
+Consultant Dashboard users. A later secure browser intake may grant a short-lived,
+limited `INTAKE_ACCESS` scoped to one tenant, one client record, permitted intake
+actions, expiry, and status. It must never grant staff membership or workspace access.
+
+P0.2 authenticates and onboards only the external Consultant or practice owner:
+
+`verified consultant -> canonical SaaS user -> tenant -> OWNER membership -> practitioner profile -> consultant onboarding -> dashboard`
+
+Client creation, browser intake, health-profile mapping, report upload, manual data
+entry, subscriptions, and practice teams are deliberately deferred. The existing
+Zestiva/Fiteatsy client and mobile-health flow remains unchanged and governed by the
+P0.1 frozen tenant authority.
+
+## P0.2 source disposition
+
+| Component | Required for external Consultant | Assumes client is an app user | Decision | P0.1 impact |
+|---|---:|---:|---|---:|
+| Public signup, verification, recovery | Yes | No | Keep | No |
+| Delegated tenant/OWNER/profile provisioning | Yes | No | Keep | No |
+| Consultant JWT bridge | Yes | No | Keep and enforce account status | No |
+| Consultant onboarding read/update/complete | Yes | No | Add | No |
+| Consultant dashboard routing gate | Yes | No | Add | No |
+| Mobile client signup/onboarding | No | Yes | Exclude from P0.2 | No |
+| Client HealthKit/Health Connect identity | No | Yes | Exclude from P0.2 | No |
+
+## Subsequent module roadmap
+
+- P0.3 External Client Management
+- P0.4 Secure Client Intake Link and responsive Web Intake Portal
+- P0.5 Client 360 Mapping and Health Profile Intake Integration
+- P0.6 Client Report and Document Upload using governed storage
+- P0.7 Consultant Manual Client Data Entry
+- P0.8 Subscription Plans, Entitlements and Billing
+- P0.9 Practice Team Management

@@ -3,7 +3,12 @@ import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { migrateDatabase } from '../../backend/src/db/migrator.js';
 import { pool } from '../../backend/src/db/pool.js';
-import { provisionExternalConsultant } from '../../backend/src/modules/external-signup/external-signup.repository.js';
+import {
+  completeExternalConsultantOnboarding,
+  getExternalConsultantOnboarding,
+  provisionExternalConsultant,
+  updateExternalConsultantOnboarding
+} from '../../backend/src/modules/external-signup/external-signup.repository.js';
 
 test('external signup provisions two isolated tenants with exactly one active OWNER each', async () => {
   await migrateDatabase();
@@ -86,4 +91,39 @@ test('external signup provisions two isolated tenants with exactly one active OW
     [`auth-a-${suffix}`, first.userId, first.tenantId],
   );
   assert.deepEqual(persisted.rows[0], { signups: 1, users: 1, tenants: 1, owners: 1 });
+
+  const initialOnboarding = await getExternalConsultantOnboarding(String(first.userId));
+  assert.equal(initialOnboarding.workspaceReady, false);
+  const updatedOnboarding = await updateExternalConsultantOnboarding(String(first.userId), {
+    version: initialOnboarding.version,
+    consultantName: 'External Consultant A',
+    professionalTitle: 'Consultant',
+    speciality: 'Nutrition',
+    country: 'IN',
+    timezone: 'Asia/Kolkata',
+    contactInformation: { preferredContact: 'email' },
+    professionalDetails: { registrationAuthority: 'QA' },
+    acceptTerms: true
+  });
+  const completedOnboarding = await completeExternalConsultantOnboarding(String(first.userId), updatedOnboarding.version);
+  assert.equal(completedOnboarding.status, 'READY');
+  assert.equal(completedOnboarding.workspaceReady, true);
+
+  const ready = await pool.query<{ signup_state: string; workspace_ready: boolean }>(
+    `select s.signup_state,o.workspace_ready from external_consultant_signups s
+       join external_consultant_onboarding o on o.signup_id=s.id where s.auth_identity_id=$1`,
+    [`auth-a-${suffix}`]
+  );
+  assert.deepEqual(ready.rows[0], { signup_state: 'READY', workspace_ready: true });
+
+  const clients = await pool.query<{ count: number }>(
+    `select count(*)::int as count
+       from tenant_memberships
+      where tenant_id=$1
+        and tenant_role='CLIENT'
+        and status='active'
+        and removed_at is null`,
+    [first.tenantId]
+  );
+  assert.equal(clients.rows[0].count, 0, 'P0.2 must not create a client or require a Fiteatsy client account');
 });

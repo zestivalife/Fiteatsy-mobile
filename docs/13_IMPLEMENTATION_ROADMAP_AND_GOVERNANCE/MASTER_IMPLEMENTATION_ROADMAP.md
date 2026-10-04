@@ -132,6 +132,15 @@ Recommended implementation decomposition after definition approval:
 
 ## M4 — Core Backend / API Stabilisation
 
+### P0 external Consultant SaaS sequence
+
+P0.1 seals multi-tenant authority. P0.2 covers external Consultant signup,
+authentication, OWNER membership and Consultant onboarding only. External clients
+remain tenant-owned care recipients and do not require Fiteatsy application users.
+Delivery then proceeds through P0.3 client management, P0.4 secure browser intake,
+P0.5 Client 360 mapping, P0.6 governed reports/documents, P0.7 manual client data,
+P0.8 billing/entitlements and P0.9 practice teams.
+
 Goal:
 Remove remaining demo/in-memory authority from capabilities required by launch.
 
