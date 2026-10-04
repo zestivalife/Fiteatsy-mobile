@@ -62,4 +62,28 @@ test('external signup provisions two isolated tenants with exactly one active OW
     actorReference: `auth-a-${suffix}`,
   });
   assert.deepEqual(replay, first);
+
+  const normalizedReplay = await provisionExternalConsultant({
+    authIdentityId: `auth-a-${suffix}`,
+    name: 'External Consultant A',
+    email: `  EXTERNAL-A-${suffix}@EXAMPLE.TEST  `,
+    accountType: 'INDEPENDENT_CONSULTANT',
+    professionalTitle: 'Consultant',
+    speciality: 'Nutrition',
+    country: 'IN',
+    timezone: 'Asia/Kolkata',
+    idempotencyKey: `signup-a-${suffix}`,
+    actorReference: `auth-a-${suffix}`,
+  });
+  assert.deepEqual(normalizedReplay, first);
+
+  const persisted = await pool.query<{ signups: number; users: number; tenants: number; owners: number }>(
+    `select
+       (select count(*)::int from external_consultant_signups where auth_identity_id=$1) as signups,
+       (select count(*)::int from users where id=$2) as users,
+       (select count(*)::int from tenants where id=$3) as tenants,
+       (select count(*)::int from tenant_memberships where tenant_id=$3 and user_id=$2 and tenant_role='OWNER' and status='active' and removed_at is null) as owners`,
+    [`auth-a-${suffix}`, first.userId, first.tenantId],
+  );
+  assert.deepEqual(persisted.rows[0], { signups: 1, users: 1, tenants: 1, owners: 1 });
 });

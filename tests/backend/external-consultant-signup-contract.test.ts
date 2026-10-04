@@ -51,6 +51,21 @@ test('external mobile identities use the frozen digits-only canonical format', (
   assert.equal(canonicalExternalMobile(undefined), null);
 });
 
+test('external signup migration and repository share the canonical normalized identity columns', () => {
+  const migration = read('backend/src/db/migrations/0085_external_consultant_signup.sql');
+  const repository = read('backend/src/modules/external-signup/external-signup.repository.ts');
+
+  for (const column of ['email_normalized', 'mobile_number_normalized']) {
+    assert.match(migration, new RegExp(`\\b${column}\\b`));
+    assert.match(repository, new RegExp(`\\b${column}\\b`));
+  }
+
+  assert.doesNotMatch(migration, /\bnormalized_email\b|\bnormalized_mobile_number\b/);
+  assert.doesNotMatch(repository, /\bnormalized_email\b|\bnormalized_mobile_number\b/);
+  assert.match(migration, /external_consultant_signups_email_unique[\s\S]*lower\(email_normalized\)/);
+  assert.match(migration, /external_consultant_signups_mobile_unique[\s\S]*mobile_number_normalized/);
+});
+
 test('owner membership replay persists the canonical existing membership id', () => {
   const repository = read('backend/src/modules/external-signup/external-signup.repository.ts');
   assert.match(repository, /select id from tenant_memberships where tenant_id=\$1 and user_id=\$2/);

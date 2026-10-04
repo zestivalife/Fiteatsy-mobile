@@ -27,8 +27,8 @@ type SignupRow = {
   id: string;
   auth_identity_id: string;
   fiteatsy_user_id: string | null;
-  normalized_email: string | null;
-  normalized_mobile_number: string | null;
+  email_normalized: string | null;
+  mobile_number_normalized: string | null;
   account_type: ExternalAccountType;
   signup_state: ExternalSignupState;
   tenant_id: string | null;
@@ -85,7 +85,7 @@ const transition = async (client: PoolClient, row: SignupRow, next: ExternalSign
 };
 
 const validateIdentityBinding = (row: SignupRow, input: ExternalSignupProvisionInput) => {
-  if (row.account_type !== input.accountType || row.normalized_email !== canonicalEmail(input.email) || row.normalized_mobile_number !== canonicalExternalMobile(input.mobileNumber)) {
+  if (row.account_type !== input.accountType || row.email_normalized !== canonicalEmail(input.email) || row.mobile_number_normalized !== canonicalExternalMobile(input.mobileNumber)) {
     throw new ExternalSignupProvisionError('AUTH_IDENTITY_BINDING_CONFLICT', 409, 'The verified auth identity is already bound to different signup attributes.');
   }
 };
@@ -96,7 +96,7 @@ async function ensureSignupAndUser(client: PoolClient, input: ExternalSignupProv
     const id = crypto.randomUUID();
     const inserted = await client.query<SignupRow>(
       `insert into external_consultant_signups(
-         id,auth_identity_id,normalized_email,normalized_mobile_number,account_type,signup_state,idempotency_key,created_by_reference
+         id,auth_identity_id,email_normalized,mobile_number_normalized,account_type,signup_state,idempotency_key,created_by_reference
        ) values($1,$2,$3,$4,$5,'VERIFIED',$6,$7) returning *`,
       [id, input.authIdentityId, canonicalEmail(input.email), canonicalExternalMobile(input.mobileNumber), input.accountType, input.idempotencyKey, input.actorReference]
     );
