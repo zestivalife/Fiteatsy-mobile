@@ -7,6 +7,7 @@ import { issueQaAdminSessionHandoff } from '../auth/qa-session-handoff.js';
 import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, recordQaIdentityReuse, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
 import { bulkSetFoodAuthorisation, listFoodAuthorisation } from './common-food-admin.service.js';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
+import { provisionExternalConsultant } from '../external-signup/external-signup.repository.js';
 
 export const delegatedRouter = Router();
 
@@ -32,6 +33,20 @@ const foodAuthorisationBulkSchema = z.object({
   status: z.enum(['AUTHORISED', 'NOT_AUTHORISED']),
   reason: z.string().trim().max(240).optional()
 });
+const externalConsultantProvisionSchema = z.object({
+  authIdentityId: z.string().trim().min(1).max(180),
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(180).optional(),
+  mobileNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/).optional(),
+  accountType: z.enum(['INDEPENDENT_CONSULTANT', 'PRACTICE_OWNER']),
+  professionalTitle: z.string().trim().max(120).optional(),
+  speciality: z.string().trim().max(120).optional(),
+  practiceName: z.string().trim().max(160).optional(),
+  country: z.string().trim().length(2).default('IN'),
+  timezone: z.string().trim().min(3).max(80).default('Asia/Kolkata')
+}).refine((value) => Boolean(value.email || value.mobileNumber), {
+  message: 'A verified email address or mobile number is required.'
+});
 
 const actorId = (req: Request) => {
   const value = (req as Request & { delegatedAuthority?: { sub?: string } }).delegatedAuthority?.sub;
@@ -48,6 +63,28 @@ const delegatedAdminAccount = (req: Request) => ({
   accountId: actorId(req),
   user: { role: 'platform_owner' }
 } as AuthenticatedAccount);
+
+delegatedRouter.post(
+  '/external-consultant-signups/provision',
+  requireDelegatedAuthority('fiteatsy.external.signup.provision', 'external_consultant_signup', 'consultant_auth_service'),
+  async (req, res) => {
+    const idempotencyKey = req.header('idempotency-key')?.trim();
+    if (!idempotencyKey) return res.status(400).json({ error: 'IDEMPOTENCY_KEY_REQUIRED', message: 'A non-empty idempotency key is required.' });
+    const parsed = externalConsultantProvisionSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+    try {
+      const value = await provisionExternalConsultant({
+        ...parsed.data,
+        idempotencyKey,
+        actorReference: actorId(req)
+      });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(value.state === 'ONBOARDING_IN_PROGRESS' ? 201 : 200).json(value);
+    } catch (error) {
+      return respondError(res, error, 'EXTERNAL_CONSULTANT_PROVISIONING_FAILED');
+    }
+  }
+);
 
 delegatedRouter.get('/food-authorisation', requireDelegatedAuthority('fiteatsy.food.authorisation.manage', 'food_authorisation', 'platform_owner'), async (req, res) => {
   const parsed = foodAuthorisationQuerySchema.safeParse(req.query);

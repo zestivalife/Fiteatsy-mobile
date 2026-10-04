@@ -355,6 +355,20 @@ const ensureConsultantDashboardBridgeUser = async (input: {
     const client = await pool.connect();
     try {
       await client.query('begin');
+      const externalSignup = await client.query<{
+        fiteatsy_user_id: string;
+        tenant_id: string;
+      }>(
+        `select fiteatsy_user_id,tenant_id
+           from external_consultant_signups
+          where auth_identity_id=$1
+            and fiteatsy_user_id is not null
+            and tenant_id is not null
+          for update`,
+        [input.bridgeUserId],
+      );
+      const externalOwner = externalSignup.rows[0] ?? null;
+      const resolvedUserId = externalOwner?.fiteatsy_user_id ?? input.bridgeUserId;
       const existing = await client.query(
         `
           select *
@@ -365,7 +379,7 @@ const ensureConsultantDashboardBridgeUser = async (input: {
           for update
           limit 1
         `,
-        [input.bridgeUserId, input.bridgeEmail],
+        [resolvedUserId, externalOwner ? null : input.bridgeEmail],
       );
 
       const timestamp = now().toISOString();
@@ -374,6 +388,9 @@ const ensureConsultantDashboardBridgeUser = async (input: {
       const resolvedName = input.bridgeName?.trim() || [firstName, lastName].filter(Boolean).join(' ') || input.bridgeEmail || 'Consultant Dashboard User';
 
       if (existing.rowCount === 0) {
+        if (externalOwner) {
+          throw new Error('External Consultant provisioning is incomplete: linked Fiteatsy user is missing.');
+        }
         const inserted = await client.query(
           `
             insert into users (
@@ -398,11 +415,7 @@ const ensureConsultantDashboardBridgeUser = async (input: {
           `,
           [input.bridgeUserId, resolvedName, firstName, lastName, input.bridgeEmail, timestamp, input.bridgeRole],
         );
-        await ensureCanonicalZestivaMembership(
-          String(inserted.rows[0].id),
-          input.bridgeRole === 'senior_consultant' ? 'SENIOR_CONSULTANT' : 'CONSULTANT',
-          client,
-        );
+        await ensureCanonicalZestivaMembership(String(inserted.rows[0].id), input.bridgeRole === 'senior_consultant' ? 'SENIOR_CONSULTANT' : 'CONSULTANT', client);
         await client.query('commit');
         return mapUser(inserted.rows[0]);
       }
@@ -426,11 +439,19 @@ const ensureConsultantDashboardBridgeUser = async (input: {
         `,
         [String(existing.rows[0].id), resolvedName, firstName, lastName, input.bridgeEmail, input.bridgeRole, timestamp],
       );
-      await ensureCanonicalZestivaMembership(
-        String(updated.rows[0].id),
-        input.bridgeRole === 'senior_consultant' ? 'SENIOR_CONSULTANT' : 'CONSULTANT',
-        client,
-      );
+      if (externalOwner) {
+        const membership = await client.query(
+          `select 1
+             from tenant_memberships
+            where tenant_id=$1 and user_id=$2 and tenant_role='OWNER' and status='active' and removed_at is null`,
+          [externalOwner.tenant_id, String(updated.rows[0].id)],
+        );
+        if (membership.rowCount !== 1) {
+          throw new Error('External Consultant provisioning is incomplete: active OWNER membership is required.');
+        }
+      } else {
+        await ensureCanonicalZestivaMembership(String(updated.rows[0].id), input.bridgeRole === 'senior_consultant' ? 'SENIOR_CONSULTANT' : 'CONSULTANT', client);
+      }
       await client.query('commit');
       return mapUser(updated.rows[0]);
     } catch (error) {
