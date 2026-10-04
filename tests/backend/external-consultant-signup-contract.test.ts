@@ -66,6 +66,18 @@ test('external signup migration and repository share the canonical normalized id
   assert.match(migration, /external_consultant_signups_mobile_unique[\s\S]*mobile_number_normalized/);
 });
 
+test('mobile OTP migration preserves existing signup records and installs the canonical lifecycle', () => {
+  const migration = read('backend/src/db/migrations/0087_external_consultant_mobile_otp.sql');
+  const stateMachine = read('backend/src/modules/external-signup/external-signup.state-machine.ts');
+  for (const state of ['OTP_PENDING', 'MOBILE_VERIFIED', 'OTP_EXPIRED']) {
+    assert.match(migration, new RegExp(state));
+    assert.match(stateMachine, new RegExp(state));
+  }
+  assert.match(migration, /when 'VERIFICATION_PENDING' then 'OTP_PENDING'/);
+  assert.match(migration, /when 'VERIFIED' then 'MOBILE_VERIFIED'/);
+  assert.match(migration, /when 'VERIFICATION_EXPIRED' then 'OTP_EXPIRED'/);
+});
+
 test('owner membership replay persists the canonical existing membership id', () => {
   const repository = read('backend/src/modules/external-signup/external-signup.repository.ts');
   assert.match(repository, /select id from tenant_memberships where tenant_id=\$1 and user_id=\$2/);

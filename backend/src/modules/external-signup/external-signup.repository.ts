@@ -110,11 +110,11 @@ async function ensureSignupAndUser(client: PoolClient, input: ExternalSignupProv
     const inserted = await client.query<SignupRow>(
       `insert into external_consultant_signups(
          id,auth_identity_id,email_normalized,mobile_number_normalized,account_type,signup_state,idempotency_key,created_by_reference
-       ) values($1,$2,$3,$4,$5,'VERIFIED',$6,$7) returning *`,
+       ) values($1,$2,$3,$4,$5,'MOBILE_VERIFIED',$6,$7) returning *`,
       [id, input.authIdentityId, canonicalEmail(input.email), canonicalExternalMobile(input.mobileNumber), input.accountType, input.idempotencyKey, input.actorReference]
     );
     row = inserted.rows[0];
-    await recordEvent(client, row.id, null, 'VERIFIED', input.actorReference, { accountType: input.accountType });
+    await recordEvent(client, row.id, null, 'MOBILE_VERIFIED', input.actorReference, { accountType: input.accountType });
   } else {
     validateIdentityBinding(row, input);
   }
@@ -132,7 +132,7 @@ async function ensureSignupAndUser(client: PoolClient, input: ExternalSignupProv
     );
     row = updated.rows[0];
   }
-  if (row.signup_state === 'VERIFIED') row = await transition(client, row, 'ACCOUNT_CREATED', input.actorReference);
+  if (row.signup_state === 'MOBILE_VERIFIED') row = await transition(client, row, 'ACCOUNT_CREATED', input.actorReference);
   return row;
 }
 
