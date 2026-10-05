@@ -42,10 +42,12 @@ const externalConsultantProvisionSchema = z.object({
   professionalTitle: z.string().trim().max(120).optional(),
   speciality: z.string().trim().max(120).optional(),
   practiceName: z.string().trim().max(160).optional(),
+  contactVerification: z.enum(['VERIFIED_MOBILE', 'UNVERIFIED_SIGNUP']).default('VERIFIED_MOBILE'),
+  professionalDetails: z.record(z.unknown()).optional(),
   country: z.string().trim().length(2).default('IN'),
   timezone: z.string().trim().min(3).max(80).default('Asia/Kolkata')
 }).refine((value) => Boolean(value.email || value.mobileNumber), {
-  message: 'A verified email address or mobile number is required.'
+  message: 'An email address or mobile number is required.'
 });
 
 const actorId = (req: Request) => {

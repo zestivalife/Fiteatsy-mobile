@@ -24,6 +24,8 @@ test('external signup provisions two isolated tenants with exactly one active OW
     timezone: 'Asia/Kolkata',
     idempotencyKey: `signup-a-${suffix}`,
     actorReference: `auth-a-${suffix}`,
+    contactVerification: 'UNVERIFIED_SIGNUP',
+    professionalDetails: { professionalRole: 'DIETITIAN_NUTRITIONIST', yearsExperience: 5, activeClientRange: '0' },
   });
   const second = await provisionExternalConsultant({
     authIdentityId: `auth-b-${suffix}`,
@@ -42,6 +44,16 @@ test('external signup provisions two isolated tenants with exactly one active OW
   assert.equal(second.state, 'ONBOARDING_IN_PROGRESS');
   assert.equal(first.workspaceReady, false);
   assert.equal(second.workspaceReady, false);
+
+  const directState = await pool.query<{ signup_state: string; email_verified_at: Date | null; mobile_verified_at: Date | null }>(
+    `select s.signup_state,u.email_verified_at,u.mobile_verified_at
+       from external_consultant_signups s join users u on u.id=s.fiteatsy_user_id
+      where s.auth_identity_id=$1`,
+    [`auth-a-${suffix}`]
+  );
+  assert.equal(directState.rows[0].signup_state, 'ONBOARDING_IN_PROGRESS');
+  assert.equal(directState.rows[0].email_verified_at, null);
+  assert.equal(directState.rows[0].mobile_verified_at, null);
 
   const memberships = await pool.query<{ tenant_id: string; user_id: string; count: number }>(
     `select tenant_id::text,user_id,count(*)::int as count
