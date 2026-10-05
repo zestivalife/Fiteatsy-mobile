@@ -46,10 +46,12 @@ const externalConsultantProvisionSchema = z.object({
   professionalTitle: z.string().trim().max(120).optional(),
   speciality: z.string().trim().max(120).optional(),
   practiceName: z.string().trim().max(160).optional(),
+  contactVerification: z.enum(['VERIFIED_MOBILE', 'UNVERIFIED_SIGNUP']).default('VERIFIED_MOBILE'),
+  professionalDetails: z.record(z.unknown()).optional(),
   country: z.string().trim().length(2).default('IN'),
   timezone: z.string().trim().min(3).max(80).default('Asia/Kolkata')
 }).refine((value) => Boolean(value.email || value.mobileNumber), {
-  message: 'A verified email address or mobile number is required.'
+  message: 'An email address or mobile number is required.'
 });
 const professionalAssignmentSchema = z.object({ clientUserId: z.string().uuid(), professionalUserId: z.string().uuid(), professionalType: z.enum(['CONSULTANT', 'PRACTITIONER', 'MENTOR']), relationshipType: z.string().trim().min(2).max(80), reason: z.string().trim().max(240).optional(), allowReassignment: z.boolean().optional().default(false) }).strict();
 const professionalAssignmentBatchSchema = professionalAssignmentSchema.omit({ clientUserId: true }).extend({ clientUserIds: z.array(z.string().uuid()).min(1).max(100).transform((values) => [...new Set(values)]) }).strict();

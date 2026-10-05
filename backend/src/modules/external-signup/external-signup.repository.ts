@@ -17,6 +17,8 @@ export type ExternalSignupProvisionInput = {
   professionalTitle?: string;
   speciality?: string;
   practiceName?: string;
+  contactVerification?: 'VERIFIED_MOBILE' | 'UNVERIFIED_SIGNUP';
+  professionalDetails?: Record<string, unknown>;
   country: string;
   timezone: string;
   idempotencyKey: string;
@@ -104,17 +106,20 @@ const validateIdentityBinding = (row: SignupRow, input: ExternalSignupProvisionI
 };
 
 async function ensureSignupAndUser(client: PoolClient, input: ExternalSignupProvisionInput) {
+  const contactVerification = input.contactVerification ?? 'VERIFIED_MOBILE';
   let row = await selectSignup(client, input.authIdentityId, true);
   if (!row) {
     const id = crypto.randomUUID();
     const inserted = await client.query<SignupRow>(
       `insert into external_consultant_signups(
          id,auth_identity_id,email_normalized,mobile_number_normalized,account_type,signup_state,idempotency_key,created_by_reference
-       ) values($1,$2,$3,$4,$5,'MOBILE_VERIFIED',$6,$7) returning *`,
-      [id, input.authIdentityId, canonicalEmail(input.email), canonicalExternalMobile(input.mobileNumber), input.accountType, input.idempotencyKey, input.actorReference]
+       ) values($1,$2,$3,$4,$5,$6,$7,$8) returning *`,
+      [id, input.authIdentityId, canonicalEmail(input.email), canonicalExternalMobile(input.mobileNumber), input.accountType,
+        contactVerification === 'UNVERIFIED_SIGNUP' ? 'REGISTRATION_ACCEPTED' : 'MOBILE_VERIFIED',
+        input.idempotencyKey, input.actorReference]
     );
     row = inserted.rows[0];
-    await recordEvent(client, row.id, null, 'MOBILE_VERIFIED', input.actorReference, { accountType: input.accountType });
+    await recordEvent(client, row.id, null, row.signup_state, input.actorReference, { accountType: input.accountType });
   } else {
     validateIdentityBinding(row, input);
   }
@@ -123,8 +128,11 @@ async function ensureSignupAndUser(client: PoolClient, input: ExternalSignupProv
     const userId = `ext_${crypto.randomUUID()}`;
     await client.query(
       `insert into users(id,name,email_normalized,mobile_number_normalized,email_verified_at,mobile_verified_at,role,status)
-       values($1,$2,$3,$4,case when $3::text is null then null else now() end,case when $4::text is null then null else now() end,'external_owner','active')`,
-      [userId, input.name.trim(), canonicalEmail(input.email), canonicalExternalMobile(input.mobileNumber)]
+       values($1,$2,$3,$4,
+         case when $5='VERIFIED_MOBILE' and $3::text is not null then now() else null end,
+         case when $5='VERIFIED_MOBILE' and $4::text is not null then now() else null end,
+         'external_owner','active')`,
+      [userId, input.name.trim(), canonicalEmail(input.email), canonicalExternalMobile(input.mobileNumber), contactVerification]
     );
     const updated = await client.query<SignupRow>(
       `update external_consultant_signups set fiteatsy_user_id=$2,updated_at=now() where id=$1 returning *`,
@@ -132,7 +140,7 @@ async function ensureSignupAndUser(client: PoolClient, input: ExternalSignupProv
     );
     row = updated.rows[0];
   }
-  if (row.signup_state === 'MOBILE_VERIFIED') row = await transition(client, row, 'ACCOUNT_CREATED', input.actorReference);
+  if (row.signup_state === 'MOBILE_VERIFIED' || row.signup_state === 'REGISTRATION_ACCEPTED') row = await transition(client, row, 'ACCOUNT_CREATED', input.actorReference);
   return row;
 }
 
@@ -200,7 +208,7 @@ async function ensureProfileAndOnboarding(client: PoolClient, row: SignupRow, in
         input.country,
         input.timezone,
         JSON.stringify({ email: canonicalEmail(input.email), mobileNumber: canonicalExternalMobile(input.mobileNumber) }),
-        JSON.stringify({}),
+        JSON.stringify(input.professionalDetails ?? {}),
         JSON.stringify(input.accountType === 'PRACTICE_OWNER'
           ? ['PROFESSIONAL_PROFILE', 'PRACTICE_DETAILS', 'TERMS_ACCEPTANCE']
           : ['PROFESSIONAL_PROFILE', 'TERMS_ACCEPTANCE']),
@@ -230,7 +238,7 @@ const response = (row: SignupRow) => ({
 });
 
 export async function provisionExternalConsultant(input: ExternalSignupProvisionInput) {
-  if (!input.email && !input.mobileNumber) throw new ExternalSignupProvisionError('VERIFIED_CONTACT_REQUIRED', 422, 'A verified email address or mobile number is required.');
+  if (!input.email && !input.mobileNumber) throw new ExternalSignupProvisionError('CONTACT_REQUIRED', 422, 'An email address or mobile number is required.');
   const client = await pool.connect();
   try {
     await client.query('begin');

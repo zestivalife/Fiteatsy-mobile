@@ -19,10 +19,25 @@ const happyPath = [
   'READY'
 ] as const;
 
+const directRegistrationPath = [
+  'REGISTRATION_ACCEPTED',
+  'ACCOUNT_CREATED',
+  'TENANT_CREATED',
+  'PROFILE_PENDING',
+  'ONBOARDING_IN_PROGRESS',
+  'READY'
+] as const;
+
 test('external signup accepts every governed forward transition', () => {
   for (let index = 0; index < happyPath.length - 1; index += 1) {
     assert.equal(canTransitionExternalSignup(happyPath[index], happyPath[index + 1]), true);
     assert.doesNotThrow(() => assertExternalSignupTransition(happyPath[index], happyPath[index + 1]));
+  }
+});
+
+test('external signup accepts CAPTCHA-protected direct registration without OTP', () => {
+  for (let index = 0; index < directRegistrationPath.length - 1; index += 1) {
+    assert.equal(canTransitionExternalSignup(directRegistrationPath[index], directRegistrationPath[index + 1]), true);
   }
 });
 

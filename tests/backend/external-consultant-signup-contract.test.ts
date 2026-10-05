@@ -78,6 +78,18 @@ test('mobile OTP migration preserves existing signup records and installs the ca
   assert.match(migration, /when 'VERIFICATION_EXPIRED' then 'OTP_EXPIRED'/);
 });
 
+test('direct registration migration adds the governed state without removing OTP compatibility', () => {
+  const migration = read('backend/src/db/migrations/0088_external_consultant_direct_registration.sql');
+  const stateMachine = read('backend/src/modules/external-signup/external-signup.state-machine.ts');
+  const routes = read('backend/src/modules/admin/delegated.routes.ts');
+  assert.match(migration, /REGISTRATION_ACCEPTED/);
+  assert.match(migration, /OTP_PENDING/);
+  assert.match(migration, /MOBILE_VERIFIED/);
+  assert.match(stateMachine, /REGISTRATION_ACCEPTED/);
+  assert.match(routes, /UNVERIFIED_SIGNUP/);
+  assert.match(routes, /professionalDetails/);
+});
+
 test('owner membership replay persists the canonical existing membership id', () => {
   const repository = read('backend/src/modules/external-signup/external-signup.repository.ts');
   assert.match(repository, /select id from tenant_memberships where tenant_id=\$1 and user_id=\$2/);
