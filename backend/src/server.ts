@@ -33,6 +33,7 @@ import { scheduleHealthRecalculationProcessor } from './jobs/process-health-reca
 import { adminGrievancesRouter, grievancesRouter, profilePhotoRouter } from './modules/grievances/grievances.routes.js';
 import { preferencesRouter } from './modules/preferences/preferences.routes.js';
 import { requireAuthenticatedAccount } from './modules/auth/auth.middleware.js';
+import { externalClientsRouter } from './modules/external-clients/external-clients.routes.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -70,6 +71,7 @@ const REGISTERED_ROUTE_GROUPS = [
   ,'/v1/preferences'
   ,'/v1/grievances'
   ,'/v1/admin/grievances'
+  ,'/v1/external/clients'
 ];
 
 const logStartupRoutes = () => {
@@ -172,6 +174,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/reports', reportsRouter);
   app.use('/v1/health', healthRouter);
   app.use('/v1/biomarkers', biomarkersRouter);
+  app.use('/v1/external/clients', externalClientsRouter);
   app.use('/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment);
   app.use('/v1/consultants', consultantClient360Router);
   app.use('/v1/consultants', consultantsRouter);
