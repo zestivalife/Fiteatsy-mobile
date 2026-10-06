@@ -1,0 +1,9 @@
+import { Router } from 'express';import { getAuthenticatedAccount,requireAuthenticatedAccount } from '../auth/auth.middleware.js';import { ExternalClientError } from './external-clients.repository.js';import { createExternalClientInvitation,getCurrentExternalClientInvitation,openExternalClientInvitation,regenerateExternalClientInvitation,revokeExternalClientInvitation } from './external-client-invitations.repository.js';
+const handle=(res:any,error:unknown)=>error instanceof ExternalClientError?res.status(error.status).json({error:error.code,message:error.message}):res.status(500).json({error:'EXTERNAL_CLIENT_INVITATION_FAILED',message:'Unable to process invitation.'});
+export const externalClientInvitationsRouter=Router({mergeParams:true});externalClientInvitationsRouter.use(requireAuthenticatedAccount);
+const clientId=(req:any)=>String(req.params.clientId);
+externalClientInvitationsRouter.post('/',async(req,res)=>{try{return res.status(201).json(await createExternalClientInvitation(getAuthenticatedAccount(req),clientId(req)));}catch(e){return handle(res,e);}});
+externalClientInvitationsRouter.get('/current',async(req,res)=>{try{return res.json({invitation:await getCurrentExternalClientInvitation(getAuthenticatedAccount(req),clientId(req))});}catch(e){return handle(res,e);}});
+externalClientInvitationsRouter.post('/revoke',async(req,res)=>{try{return res.json({invitation:await revokeExternalClientInvitation(getAuthenticatedAccount(req),clientId(req))});}catch(e){return handle(res,e);}});
+externalClientInvitationsRouter.post('/regenerate',async(req,res)=>{try{return res.status(201).json(await regenerateExternalClientInvitation(getAuthenticatedAccount(req),clientId(req)));}catch(e){return handle(res,e);}});
+export const externalIntakeRouter=Router();externalIntakeRouter.get('/:token',async(req,res)=>{try{return res.json(await openExternalClientInvitation(req.params.token));}catch(e){return handle(res,e);}});

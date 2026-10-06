@@ -77,6 +77,13 @@ export const env = {
   get port() {
     return resolvePort();
   },
+  get externalClientInvitationTtlDays() {
+    const value = Number(process.env.EXTERNAL_CLIENT_INVITATION_TTL_DAYS?.trim() || 7);
+    return Number.isInteger(value) && value >= 1 && value <= 30 ? value : 7;
+  },
+  get externalClientIntakeBaseUrl() {
+    return (process.env.EXTERNAL_CLIENT_INTAKE_BASE_URL?.trim() || 'https://consultant.nuetra.in/intake').replace(/\/+$/, '');
+  },
   get databaseUrl() {
     return resolveDatabaseUrl();
   },

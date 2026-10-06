@@ -34,6 +34,7 @@ import { adminGrievancesRouter, grievancesRouter, profilePhotoRouter } from './m
 import { preferencesRouter } from './modules/preferences/preferences.routes.js';
 import { requireAuthenticatedAccount } from './modules/auth/auth.middleware.js';
 import { externalClientsRouter } from './modules/external-clients/external-clients.routes.js';
+import { externalClientInvitationsRouter, externalIntakeRouter } from './modules/external-clients/external-client-invitations.routes.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -72,6 +73,7 @@ const REGISTERED_ROUTE_GROUPS = [
   ,'/v1/grievances'
   ,'/v1/admin/grievances'
   ,'/v1/external/clients'
+  ,'/v1/external/intake'
 ];
 
 const logStartupRoutes = () => {
@@ -174,6 +176,8 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/reports', reportsRouter);
   app.use('/v1/health', healthRouter);
   app.use('/v1/biomarkers', biomarkersRouter);
+  app.use('/v1/external/intake', externalIntakeRouter);
+  app.use('/v1/external/clients/:clientId/invitations', externalClientInvitationsRouter);
   app.use('/v1/external/clients', externalClientsRouter);
   app.use('/v1/consultants/clients/:clientId',requireAuthenticatedAccount,requireConsultantClientAssignment);
   app.use('/v1/consultants', consultantClient360Router);
