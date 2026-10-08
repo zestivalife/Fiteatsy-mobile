@@ -125,6 +125,21 @@ async function ensureSignupAndUser(client: PoolClient, input: ExternalSignupProv
   }
 
   if (!row.fiteatsy_user_id) {
+    const existingIdentity = await client.query<{ id: string }>(
+      `select id from users
+        where deleted_at is null
+          and (($1::text is not null and lower(email_normalized)=lower($1))
+            or ($2::text is not null and mobile_number_normalized=$2))
+        limit 1`,
+      [canonicalEmail(input.email), canonicalExternalMobile(input.mobileNumber)]
+    );
+    if (existingIdentity.rows[0]) {
+      throw new ExternalSignupProvisionError(
+        'EXTERNAL_IDENTITY_ALREADY_EXISTS',
+        409,
+        'An account already exists. Sign in to continue.'
+      );
+    }
     const userId = `ext_${crypto.randomUUID()}`;
     await client.query(
       `insert into users(id,name,email_normalized,mobile_number_normalized,email_verified_at,mobile_verified_at,role,status)
@@ -249,6 +264,17 @@ export async function provisionExternalConsultant(input: ExternalSignupProvision
     return response(row);
   } catch (error) {
     await client.query('rollback');
+    const databaseError = error as { code?: string; constraint?: string };
+    if (databaseError.code === '23505' && (
+      databaseError.constraint === 'users_email_normalized_unique'
+      || databaseError.constraint === 'users_mobile_number_normalized_unique'
+    )) {
+      throw new ExternalSignupProvisionError(
+        'EXTERNAL_IDENTITY_ALREADY_EXISTS',
+        409,
+        'An account already exists. Sign in to continue.'
+      );
+    }
     throw error;
   } finally {
     client.release();

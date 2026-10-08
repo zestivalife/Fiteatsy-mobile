@@ -5,10 +5,48 @@ import { migrateDatabase } from '../../backend/src/db/migrator.js';
 import { pool } from '../../backend/src/db/pool.js';
 import {
   completeExternalConsultantOnboarding,
+  ExternalSignupProvisionError,
   getExternalConsultantOnboarding,
   provisionExternalConsultant,
   updateExternalConsultantOnboarding
 } from '../../backend/src/modules/external-signup/external-signup.repository.js';
+
+test('external signup rejects an existing backend identity without partial workspace records', async () => {
+  await migrateDatabase();
+  const suffix = randomUUID();
+  const email = `existing-${suffix}@example.test`;
+  await pool.query(
+    `insert into users(id,name,email_normalized,role,status) values($1,$2,$3,'external_owner','active')`,
+    [`existing-${suffix}`, 'Existing Account', email]
+  );
+
+  await assert.rejects(
+    provisionExternalConsultant({
+      authIdentityId: `auth-conflict-${suffix}`,
+      name: 'Duplicate Account',
+      email,
+      mobileNumber: `919${suffix.replace(/-/g, '').slice(0, 9)}`,
+      accountType: 'PRACTICE_OWNER',
+      practiceName: 'Conflict Practice',
+      country: 'IN',
+      timezone: 'Asia/Kolkata',
+      idempotencyKey: `signup-conflict-${suffix}`,
+      actorReference: `auth-conflict-${suffix}`,
+      contactVerification: 'UNVERIFIED_SIGNUP'
+    }),
+    (error: unknown) => error instanceof ExternalSignupProvisionError
+      && error.code === 'EXTERNAL_IDENTITY_ALREADY_EXISTS'
+      && error.status === 409
+  );
+
+  const partial = await pool.query<{ signups: number; tenants: number }>(
+    `select
+       (select count(*)::int from external_consultant_signups where auth_identity_id=$1) signups,
+       (select count(*)::int from tenants where name=$2) tenants`,
+    [`auth-conflict-${suffix}`, 'Conflict Practice']
+  );
+  assert.deepEqual(partial.rows[0], { signups: 0, tenants: 0 });
+});
 
 test('external signup provisions two isolated tenants with exactly one active OWNER each', async () => {
   await migrateDatabase();
