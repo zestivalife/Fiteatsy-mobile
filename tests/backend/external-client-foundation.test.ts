@@ -5,3 +5,9 @@ test('same-tenant duplicate contacts are rejected',()=>{assert.match(migration,/
 test('reads and mutations derive and enforce tenant scope',()=>{assert.match(repository,/resolveActiveTenantContext\(account\)/);assert.match(repository,/tenant_id=\$1/);assert.match(repository,/where id=\$1 and tenant_id=\$2/);assert.match(repository,/tenantType==='ZESTIVA_INTERNAL'/);});
 test('manual creation has explicit lifecycle, provenance, and audit',()=>{assert.match(repository,/'ACTIVE','NOT_STARTED','CONSULTANT_ENTERED'/);assert.match(migration,/CLIENT_CREATED.*CLIENT_UPDATED.*CLIENT_STATUS_CHANGED/);assert.match(routes,/post\('\/'/);assert.match(routes,/patch\('\/:id'/);});
 test('dashboard session scope narrowly admits external clients',()=>{assert.match(auth,/externalClientRouteAllowed/);assert.match(auth,/startsWith\('\/v1\/external\/clients'\)/);});
+test('dashboard session scope admits only GET auth me for canonical tenant resolution',()=>{
+  assert.match(auth,/tenantContextRouteAllowed = req\.method === 'GET'/);
+  assert.match(auth,/\^\\\/v1\\\/auth\\\/me\(\?:\$\|\[\?#\]\)/);
+  assert.match(auth,/!tenantContextRouteAllowed/);
+  assert.doesNotMatch(auth,/startsWith\('\/v1\/auth'\)/);
+});
