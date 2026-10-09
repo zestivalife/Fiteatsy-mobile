@@ -8,6 +8,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 const repository = read('backend/src/modules/admin/qa-provisioning.repository.ts');
 const routes = read('backend/src/modules/admin/delegated.routes.ts');
 const auth = read('backend/src/modules/auth/auth.repository.ts');
+const consultants = read('backend/src/modules/consultants/consultants.repository.ts');
 const migration = read('backend/src/db/migrations/0094_inhouse_governed_qa_identity_links.sql');
 
 const roles = ['user','consultant','provider','dietician','senior_consultant','practitioner','mentor','admin','super_admin','platform_owner'];
@@ -46,6 +47,12 @@ test('auth role aliases normalize to canonical governed application roles', () =
   assert.match(auth, /role === 'organization_admin'\) return 'admin'/);
   assert.match(auth, /role === 'member'\) return 'user'/);
   assert.match(auth, /normalizeConsultantDashboardBridgeRole\(/);
+});
+
+test('client backfill excludes the complete canonical staff role matrix', () => {
+  for (const role of ['consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor', 'admin', 'super_admin', 'platform_owner']) {
+    assert.match(consultants, new RegExp(`['"]${role}['"]`));
+  }
 });
 
 test('provisioning surface is delegated, purpose-bound and platform-owner-only', () => {

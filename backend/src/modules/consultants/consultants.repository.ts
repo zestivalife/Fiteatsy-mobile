@@ -223,7 +223,17 @@ export type ConsultantClientSyncDiagnostics = {
   activeHealthProfiles: number;
 };
 
-const AUTHENTICATED_USER_EXCLUSION_ROLES = ['consultant', 'practitioner', 'admin', 'super_admin'];
+const AUTHENTICATED_USER_EXCLUSION_ROLES = [
+  'consultant',
+  'provider',
+  'dietician',
+  'senior_consultant',
+  'practitioner',
+  'mentor',
+  'admin',
+  'super_admin',
+  'platform_owner',
+];
 const PUBLISHED_REPORT_STATUSES = ['PUBLISHED', 'PARTIALLY_VALIDATED'];
 
 const toIso = (value: unknown) => {
