@@ -42,6 +42,12 @@ test('auth me serialises governed staff bridge sessions without a client row', (
   assert.match(authRoutes, /:\s*null,/);
 });
 
+test('auth role aliases normalize to canonical governed application roles', () => {
+  assert.match(auth, /role === 'organization_admin'\) return 'admin'/);
+  assert.match(auth, /role === 'member'\) return 'user'/);
+  assert.match(auth, /normalizeConsultantDashboardBridgeRole\(/);
+});
+
 test('provisioning surface is delegated, purpose-bound and platform-owner-only', () => {
   assert.match(routes, /qa-inhouse-identities\/provision/);
   assert.match(routes, /fiteatsy\.qa\.identity\.create', 'qa_provisioning', 'platform_owner'/);

@@ -63,6 +63,12 @@ const CONSULTANT_DASHBOARD_BRIDGE_ROLES = new Set([
   'practitioner', 'mentor', 'admin', 'super_admin', 'platform_owner'
 ]);
 
+const normalizeConsultantDashboardBridgeRole = (role: string | null) => {
+  if (role === 'organization_admin') return 'admin';
+  if (role === 'member') return 'user';
+  return role;
+};
+
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const normalizeMobileNumber = (mobileNumber: string) => normalizeCanonicalPhoneNumber(mobileNumber);
 const getIndianNationalMobileNumber = (mobileNumber: string) => {
@@ -897,7 +903,9 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
   const bridgePayload = bridge.payload ?? unsafePayload;
   const bridgeUserId = typeof bridgePayload?.sub === 'string' ? bridgePayload.sub : tokenUserId;
   const bridgeDiagnostics = getConsultantDashboardJwtDiagnostics(token, bridge);
-  const bridgeRole = readStringClaim(bridgePayload, ['role', 'user_role'])?.toLowerCase() ?? null;
+  const bridgeRole = normalizeConsultantDashboardBridgeRole(
+    readStringClaim(bridgePayload, ['role', 'user_role'])?.toLowerCase() ?? null,
+  );
   const bridgeEmail = typeof bridgePayload?.email === 'string' ? normalizeEmail(bridgePayload.email) : null;
   const bridgeName = readStringClaim(bridgePayload, ['name', 'full_name', 'display_name']);
   const bridgeFirstName = readStringClaim(bridgePayload, ['first_name', 'firstName', 'given_name']);
