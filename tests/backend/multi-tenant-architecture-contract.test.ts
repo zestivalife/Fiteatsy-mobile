@@ -151,10 +151,15 @@ test('contract migration closes ownership, uniqueness and relational tenant boun
 
 test('platform-global authority is explicit and cannot manufacture tenant membership',()=>{
   const authority=read('backend/src/modules/tenancy/platform-authority.ts');
+  const assignments=read('backend/src/modules/professional-assignments/professional-assignments.routes.ts');
   assert.match(authority,/PLATFORM_GLOBAL_ROLES/);
+  assert.match(authority,/ZESTIVA_INTERNAL/);
+  assert.match(authority,/senior_consultant/);
   assert.match(authority,/PLATFORM_AUTHORITY_REQUIRED/);
   assert.match(authority,/never manufactures membership/);
   assert.doesNotMatch(authority,/insert into tenant_memberships/i);
+  assert.match(assignments,/resolveActiveTenantContext\(account\)/);
+  assert.match(assignments,/tenantContext\?\.tenantType/);
 });
 
 test('new mobile, dashboard and governed QA identities receive explicit canonical membership before tenant writes',()=>{
