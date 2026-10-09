@@ -58,7 +58,10 @@ export type AuthenticatedAccount = {
 };
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const CONSULTANT_DASHBOARD_BRIDGE_ROLES = new Set(['consultant', 'provider', 'dietician', 'senior_consultant']);
+const CONSULTANT_DASHBOARD_BRIDGE_ROLES = new Set([
+  'user', 'consultant', 'provider', 'dietician', 'senior_consultant',
+  'practitioner', 'mentor', 'admin', 'super_admin', 'platform_owner'
+]);
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const normalizeMobileNumber = (mobileNumber: string) => normalizeCanonicalPhoneNumber(mobileNumber);
@@ -355,6 +358,17 @@ const ensureConsultantDashboardBridgeUser = async (input: {
     const client = await pool.connect();
     try {
       await client.query('begin');
+      const qaLink = await client.query<{ application_user_id: string; canonical_role: string }>(
+        `select application_user_id,canonical_role
+           from inhouse_qa_identity_links
+          where auth_identity_id=$1 and status='active' and classification='GOVERNED_QA_INHOUSE'
+          for update`,
+        [input.bridgeUserId],
+      );
+      const explicitQaLink = qaLink.rows[0] ?? null;
+      if (explicitQaLink && explicitQaLink.canonical_role !== input.bridgeRole) {
+        throw Object.assign(new Error('Governed QA identity role does not match the canonical application link.'), { code: 'QA_IDENTITY_ROLE_MISMATCH' });
+      }
       const externalSignup = await client.query<{
         fiteatsy_user_id: string;
         tenant_id: string;
@@ -368,7 +382,7 @@ const ensureConsultantDashboardBridgeUser = async (input: {
         [input.bridgeUserId],
       );
       const externalOwner = externalSignup.rows[0] ?? null;
-      const resolvedUserId = externalOwner?.fiteatsy_user_id ?? input.bridgeUserId;
+      const resolvedUserId = explicitQaLink?.application_user_id ?? externalOwner?.fiteatsy_user_id ?? input.bridgeUserId;
       const existing = await client.query(
         `
           select *
@@ -379,7 +393,7 @@ const ensureConsultantDashboardBridgeUser = async (input: {
           for update
           limit 1
         `,
-        [resolvedUserId, externalOwner ? null : input.bridgeEmail],
+        [resolvedUserId, explicitQaLink || externalOwner ? null : input.bridgeEmail],
       );
 
       const timestamp = now().toISOString();
@@ -388,6 +402,7 @@ const ensureConsultantDashboardBridgeUser = async (input: {
       const resolvedName = input.bridgeName?.trim() || [firstName, lastName].filter(Boolean).join(' ') || input.bridgeEmail || 'Consultant Dashboard User';
 
       if (existing.rowCount === 0) {
+        if (explicitQaLink) throw new Error('Governed QA application identity link is orphaned.');
         if (externalOwner) {
           throw new Error('External Consultant provisioning is incomplete: linked Fiteatsy user is missing.');
         }
@@ -439,7 +454,11 @@ const ensureConsultantDashboardBridgeUser = async (input: {
         `,
         [String(existing.rows[0].id), resolvedName, firstName, lastName, input.bridgeEmail, input.bridgeRole, timestamp],
       );
-      if (externalOwner) {
+      if (explicitQaLink) {
+        if (String(updated.rows[0].account_purpose) !== 'QA_TEST') {
+          throw Object.assign(new Error('Governed QA link cannot target a production user.'), { code: 'QA_LINK_TARGET_NOT_QA' });
+        }
+      } else if (externalOwner) {
         const membership = await client.query(
           `select 1
              from tenant_memberships

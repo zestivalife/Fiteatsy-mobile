@@ -6,7 +6,14 @@ import type { ClientOwnershipContext } from '../platform/platform.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 import { ensureCanonicalZestivaMembership, resolveActiveTenantContextForUserId } from '../tenancy/tenant-context.js';
 
-type QaRole = 'user' | 'consultant' | 'senior_consultant' | 'admin';
+export type QaRole = 'user' | 'consultant' | 'provider' | 'dietician' | 'senior_consultant' | 'practitioner' | 'mentor' | 'admin' | 'super_admin' | 'platform_owner';
+
+const tenantRoleForQaRole = (role: QaRole) => {
+  if (role === 'user') return 'CLIENT';
+  if (role === 'senior_consultant') return 'SENIOR_CONSULTANT';
+  if (role === 'super_admin' || role === 'platform_owner') return null;
+  return 'CONSULTANT';
+};
 
 const mapUser = (row: Record<string, unknown>) => ({
   id: String(row.id),
@@ -65,6 +72,8 @@ export const provisionQaIdentity = async (input: {
   mobileNumber: string;
   role: QaRole;
   reason: string;
+  authIdentityId?: string;
+  fixtureKey?: string;
 }) => {
   const normalizedEmail = input.email.trim().toLowerCase();
   const normalizedMobileNumber = normalizeCanonicalPhoneNumber(input.mobileNumber);
@@ -104,17 +113,20 @@ export const provisionQaIdentity = async (input: {
       );
       if (!reactivated.rowCount) throw new Error('QA_IDENTITY_REACTIVATION_FAILED');
       const user = mapUser(reactivated.rows[0]);
-      await ensureCanonicalZestivaMembership(
-        user.id,
-        input.role === 'user'
-          ? 'CLIENT'
-          : input.role === 'senior_consultant'
-            ? 'SENIOR_CONSULTANT'
-            : input.role === 'admin'
-              ? 'STAFF'
-              : 'CONSULTANT',
-        client,
-      );
+      const tenantRole = input.role === 'admin' ? 'STAFF' : tenantRoleForQaRole(input.role);
+      if (tenantRole) await ensureCanonicalZestivaMembership(user.id, tenantRole, client);
+      if (input.authIdentityId && input.fixtureKey) {
+        await client.query(
+          `insert into inhouse_qa_identity_links
+             (id,fixture_key,auth_identity_id,application_user_id,canonical_role,status,created_by_reference)
+           values($1,$2,$3,$4,$5,'active',$6)
+           on conflict (fixture_key) do update set updated_at=now()
+           where inhouse_qa_identity_links.auth_identity_id=excluded.auth_identity_id
+             and inhouse_qa_identity_links.application_user_id=excluded.application_user_id
+             and inhouse_qa_identity_links.canonical_role=excluded.canonical_role`,
+          [crypto.randomUUID(), input.fixtureKey, input.authIdentityId, user.id, input.role, input.actorReference ?? 'governed-qa-provisioner']
+        );
+      }
       await client.query('commit');
       await recordQaIdentityReuse({
         actorUserId: input.actorUserId,
@@ -134,17 +146,16 @@ export const provisionQaIdentity = async (input: {
       [crypto.randomUUID(), input.name.trim(), normalizedEmail, normalizedMobileNumber, input.role]
     );
     const user = mapUser(inserted.rows[0]);
-    await ensureCanonicalZestivaMembership(
-      user.id,
-      input.role === 'user'
-        ? 'CLIENT'
-        : input.role === 'senior_consultant'
-          ? 'SENIOR_CONSULTANT'
-          : input.role === 'admin'
-            ? 'STAFF'
-            : 'CONSULTANT',
-      client,
-    );
+    const tenantRole = input.role === 'admin' ? 'STAFF' : tenantRoleForQaRole(input.role);
+    if (tenantRole) await ensureCanonicalZestivaMembership(user.id, tenantRole, client);
+    if (input.authIdentityId && input.fixtureKey) {
+      await client.query(
+        `insert into inhouse_qa_identity_links
+          (id,fixture_key,auth_identity_id,application_user_id,canonical_role,status,created_by_reference)
+         values($1,$2,$3,$4,$5,'active',$6)`,
+        [crypto.randomUUID(), input.fixtureKey, input.authIdentityId, user.id, input.role, input.actorReference ?? 'governed-qa-provisioner']
+      );
+    }
     await client.query('commit');
     await audit({ actorUserId: input.actorUserId, actorReference: input.actorReference, targetUserId: user.id, action: 'QAIdentityCreated', accountPurpose: 'QA_TEST', role: input.role, reason: input.reason });
 

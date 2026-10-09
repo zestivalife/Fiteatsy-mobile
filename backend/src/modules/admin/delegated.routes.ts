@@ -18,6 +18,11 @@ const identitySchema = z.object({
   reason: z.string().trim().min(3).max(240),
 });
 const qaAdminIdentitySchema = identitySchema.strict();
+const inhouseQaIdentitySchema = identitySchema.extend({
+  authIdentityId: z.string().uuid(),
+  fixtureKey: z.string().trim().regex(/^inhouse-[a-z0-9-]{3,80}$/),
+  role: z.enum(['user','consultant','provider','dietician','senior_consultant','practitioner','mentor','admin','super_admin','platform_owner'])
+}).strict();
 const assignmentSchema = z.object({ consultantUserId: z.string().trim().min(1), clientUserId: z.string().trim().min(1), reason: z.string().trim().min(3).max(240) });
 const reasonSchema = z.object({ reason: z.string().trim().min(3).max(240) });
 const foodAuthorisationQuerySchema = z.object({
@@ -85,6 +90,40 @@ delegatedRouter.post(
     } catch (error) {
       return respondError(res, error, 'EXTERNAL_CONSULTANT_PROVISIONING_FAILED');
     }
+  }
+);
+
+delegatedRouter.post(
+  '/qa-inhouse-identities/provision',
+  requireDelegatedAuthority('fiteatsy.qa.identity.create', 'qa_provisioning', 'platform_owner'),
+  async (req, res) => {
+    const idempotencyKey = req.header('idempotency-key')?.trim();
+    if (!idempotencyKey) return res.status(400).json({ error: 'IDEMPOTENCY_KEY_REQUIRED' });
+    const parsed = inhouseQaIdentitySchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+    try {
+      const delegatedActorId = actorId(req);
+      const result = await executeDelegatedIdempotently({
+        operation: `qa_inhouse_identity_provision:${parsed.data.role}`,
+        key: idempotencyKey,
+        execute: () => provisionQaIdentity({
+          ...parsed.data,
+          reason: correlationReason(req, parsed.data.reason),
+          actorUserId: null,
+          actorReference: delegatedActorId,
+        })
+      });
+      const reused = result.replayed || result.value.identityReused;
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(reused ? 200 : 201).json({
+        authIdentityId: parsed.data.authIdentityId,
+        applicationUserId: result.value.user.id,
+        fixtureKey: parsed.data.fixtureKey,
+        role: result.value.user.role,
+        classification: 'GOVERNED_QA_INHOUSE',
+        idempotentReplay: reused,
+      });
+    } catch (error) { return respondError(res, error, 'QA_INHOUSE_IDENTITY_PROVISIONING_FAILED'); }
   }
 );
 
