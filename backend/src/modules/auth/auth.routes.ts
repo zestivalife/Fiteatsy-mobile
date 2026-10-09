@@ -216,10 +216,13 @@ authRouter.get('/me', requireAuthenticatedAccount, async (req, res) => {
     sessionExpiresAtISO: account.sessionExpiresAtISO,
     qaSession: account.qaSession,
     currentTenant,
-    client: {
+    // Consultant-dashboard bridge sessions represent staff identities and do
+    // not have a first-party client row. Keep /auth/me total for both account
+    // shapes instead of crashing the process while serialising staff sessions.
+    client: account.client ? {
       fiteatsyClientId: account.client.fiteatsyClientId,
       status: account.client.status
-    },
+    } : null,
     user: {
       id: account.user.id,
       name: account.user.name,

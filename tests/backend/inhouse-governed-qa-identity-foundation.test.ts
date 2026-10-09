@@ -36,6 +36,12 @@ test('JWT bridge gives explicit governed QA linkage precedence without email dep
   assert.match(auth, /explicitQaLink \|\| externalOwner \? null : input\.bridgeEmail/);
 });
 
+test('auth me serialises governed staff bridge sessions without a client row', () => {
+  const authRoutes = read('backend/src/modules/auth/auth.routes.ts');
+  assert.match(authRoutes, /client:\s*account\.client\s*\?/);
+  assert.match(authRoutes, /:\s*null,/);
+});
+
 test('provisioning surface is delegated, purpose-bound and platform-owner-only', () => {
   assert.match(routes, /qa-inhouse-identities\/provision/);
   assert.match(routes, /fiteatsy\.qa\.identity\.create', 'qa_provisioning', 'platform_owner'/);
