@@ -223,17 +223,9 @@ export type ConsultantClientSyncDiagnostics = {
   activeHealthProfiles: number;
 };
 
-const AUTHENTICATED_USER_EXCLUSION_ROLES = [
-  'consultant',
-  'provider',
-  'dietician',
-  'senior_consultant',
-  'practitioner',
-  'mentor',
-  'admin',
-  'super_admin',
-  'platform_owner',
-];
+const AUTHENTICATED_USER_EXCLUSION_ROLES = ['consultant', 'practitioner', 'admin', 'super_admin'];
+const ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL =
+  "and lower(coalesce(u.role, 'user')) not in ('provider', 'dietician', 'senior_consultant', 'mentor', 'platform_owner')";
 const PUBLISHED_REPORT_STATUSES = ['PUBLISHED', 'PARTIALLY_VALIDATED'];
 
 const toIso = (value: unknown) => {
@@ -317,6 +309,7 @@ const eligibleUserPredicate = `
   u.deleted_at is null
   and lower(coalesce(u.status, '')) = 'active'
   and lower(coalesce(u.role, 'user')) not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
+  ${ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL}
 `;
 
 // A canonical mobile client can later receive an operational role without
@@ -329,6 +322,7 @@ const consultantVisibleUserPredicate = `
   and lower(coalesce(u.status, '')) = 'active'
   and (
     lower(coalesce(u.role, 'user')) not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
+    ${ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL}
     or exists (
       select 1
       from consultant_client_assignments role_client_assignment
