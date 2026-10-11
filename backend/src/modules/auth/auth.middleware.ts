@@ -12,6 +12,18 @@ const readBearerToken = (req: Request) => {
   return match?.[1]?.trim() || null;
 };
 
+const CLIENT_DASHBOARD_SELF_READ_ROUTES = new Set([
+  '/v1/platform/nutrition-plan',
+  '/v1/platform/nutrition-plan/status',
+  '/v1/platform/nutrition-plan/today',
+]);
+
+export const isClientDashboardSelfReadAllowed = (method: string, originalUrl: string, role: string | null) => {
+  if (method.toUpperCase() !== 'GET' || String(role ?? '').toLowerCase() !== 'user') return false;
+  const path = originalUrl.split(/[?#]/, 1)[0];
+  return CLIENT_DASHBOARD_SELF_READ_ROUTES.has(path);
+};
+
 export const requireAuthenticatedAccount = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = readBearerToken(req);
@@ -30,7 +42,8 @@ export const requireAuthenticatedAccount = async (req: Request, res: Response, n
     const seniorAllocationRouteAllowed = req.originalUrl.startsWith('/v1/professional-assignments')
       && ['senior_consultant', 'admin', 'super_admin', 'platform_owner'].includes(String(account.user.role ?? '').toLowerCase());
     const externalClientRouteAllowed = req.originalUrl.startsWith('/v1/external/clients');
-    if (account.authProvider === 'consultant_dashboard' && !req.originalUrl.startsWith('/v1/consultants') && !tenantContextRouteAllowed && !consultantWorkspaceRouteAllowed && !seniorAllocationRouteAllowed && !externalClientRouteAllowed) {
+    const clientSelfReadAllowed = isClientDashboardSelfReadAllowed(req.method, req.originalUrl, account.user.role);
+    if (account.authProvider === 'consultant_dashboard' && !req.originalUrl.startsWith('/v1/consultants') && !tenantContextRouteAllowed && !consultantWorkspaceRouteAllowed && !seniorAllocationRouteAllowed && !externalClientRouteAllowed && !clientSelfReadAllowed) {
       return res.status(403).json({
         error: 'EXTERNAL_SESSION_SCOPE_NOT_ALLOWED',
         message: 'This dashboard session is not authorised for the requested API.'

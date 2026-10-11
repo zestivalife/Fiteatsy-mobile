@@ -260,3 +260,14 @@ test('consultant bridge accepts access tokens and rejects refresh tokens for das
     tokenType: String(refresh.payload?.type).toLowerCase()
   }), false);
 });
+
+test('consultant bridge accepts the normalized client role', () => {
+  assert.equal(isValidConsultantDashboardBridgePayload({
+    expiryResult: 'valid',
+    userId: 'governed-client',
+    role: 'user',
+    status: 'ACTIVE',
+    credentialStatus: 'PERMANENT',
+    tokenType: 'access'
+  }), true);
+});

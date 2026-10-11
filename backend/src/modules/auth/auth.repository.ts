@@ -946,6 +946,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     bridgeFirstName,
     bridgeLastName,
   });
+  const bridgedClient = await resolveCurrentClientForAccount(bridgedUser.id);
 
   console.info('CONSULTANT_SESSION_DEBUG', {
     tokenUserId: bridgeUserId,
@@ -966,7 +967,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     authProvider: 'consultant_dashboard',
     qaSession: null,
     user: bridgedUser,
-    client: undefined as unknown as PersistedClient
+    client: bridgedClient
   };
 };
 
