@@ -17,8 +17,9 @@ export const parseReferenceRange = (value?: string | null) => {
   return { min: null, max: null, text: source || null };
 };
 
-export const resolveObservationDate = (input: { reportDate?: string | null; documentDate?: string | null; uploadedAt: string | Date }) => {
+export const resolveObservationDate = (input: { sampleDate?: string | null; reportDate?: string | null; documentDate?: string | null; uploadedAt: string | Date }) => {
   const candidates = [
+    { value: input.sampleDate, source: 'SAMPLE_DATE' as const },
     { value: input.reportDate, source: 'REPORT_DATE' as const },
     { value: input.documentDate, source: 'DOCUMENT_METADATA' as const },
     { value: input.uploadedAt, source: 'UPLOAD_FALLBACK' as const },
@@ -37,7 +38,7 @@ export const mapExternalBiomarker = (parameter: ParsedParameter, index: number, 
   const explicitlyMapped = Boolean(parameter.canonicalBiomarkerId) || canonicalName !== canonicalBiomarkerName(rawName) || known.has(canonicalName);
   const canonicalId = explicitlyMapped ? (parameter.canonicalBiomarkerId || slug(canonicalName)) : null;
   const range = parseReferenceRange(parameter.referenceRange);
-  const observed = resolveObservationDate({ reportDate: analysis.reportDate, documentDate: document.document_date, uploadedAt: document.uploaded_at });
+  const observed = resolveObservationDate({ sampleDate: (analysis as ReportAnalysisResult & { sampleCollectionDate?: string | null }).sampleCollectionDate, reportDate: analysis.reportDate, documentDate: document.document_date, uploadedAt: document.uploaded_at });
   const rawValue = String(parameter.value);
   const rowIdentity = crypto.createHash('sha256').update([index, rawName, rawValue, parameter.unit, parameter.referenceRange, observed.date].join('|')).digest('hex');
   return {
