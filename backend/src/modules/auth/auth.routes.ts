@@ -207,6 +207,13 @@ authRouter.post('/signup/verify-otp', async (req, res) => {
   }
 });
 
+export const toAuthMeClient = (client: ReturnType<typeof getAuthenticatedAccount>['client'] | null | undefined) => client
+  ? {
+      fiteatsyClientId: client.fiteatsyClientId,
+      status: client.status
+    }
+  : null;
+
 authRouter.get('/me', requireAuthenticatedAccount, async (req, res) => {
   const account = getAuthenticatedAccount(req);
   const currentTenant = await resolveActiveTenantContext(account);
@@ -216,10 +223,7 @@ authRouter.get('/me', requireAuthenticatedAccount, async (req, res) => {
     sessionExpiresAtISO: account.sessionExpiresAtISO,
     qaSession: account.qaSession,
     currentTenant,
-    client: {
-      fiteatsyClientId: account.client.fiteatsyClientId,
-      status: account.client.status
-    },
+    client: toAuthMeClient(account.client),
     user: {
       id: account.user.id,
       name: account.user.name,
