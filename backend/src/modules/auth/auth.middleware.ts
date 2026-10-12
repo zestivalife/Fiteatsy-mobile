@@ -12,6 +12,18 @@ const readBearerToken = (req: Request) => {
   return match?.[1]?.trim() || null;
 };
 
+export const isConsultantDashboardRouteAllowed = (originalUrl: string, role: string | null | undefined) => {
+  const consultantWorkspaceRouteAllowed = /^\/v1\/clients\/[^/]+\/workspace(?:$|[?#/])/.test(originalUrl);
+  const seniorAllocationRouteAllowed = originalUrl.startsWith('/v1/professional-assignments')
+    && ['senior_consultant', 'admin', 'super_admin', 'platform_owner'].includes(String(role ?? '').toLowerCase());
+
+  return originalUrl.startsWith('/v1/auth/me')
+    || originalUrl.startsWith('/v1/consultants')
+    || consultantWorkspaceRouteAllowed
+    || seniorAllocationRouteAllowed
+    || originalUrl.startsWith('/v1/external/clients');
+};
+
 export const requireAuthenticatedAccount = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = readBearerToken(req);
@@ -24,11 +36,7 @@ export const requireAuthenticatedAccount = async (req: Request, res: Response, n
       return res.status(401).json({ error: 'INVALID_SESSION', message: 'Session token is invalid, expired, or revoked.' });
     }
 
-    const consultantWorkspaceRouteAllowed = /^\/v1\/clients\/[^/]+\/workspace(?:$|[?#/])/.test(req.originalUrl);
-    const seniorAllocationRouteAllowed = req.originalUrl.startsWith('/v1/professional-assignments')
-      && ['senior_consultant', 'admin', 'super_admin', 'platform_owner'].includes(String(account.user.role ?? '').toLowerCase());
-    const externalClientRouteAllowed = req.originalUrl.startsWith('/v1/external/clients');
-    if (account.authProvider === 'consultant_dashboard' && !req.originalUrl.startsWith('/v1/consultants') && !consultantWorkspaceRouteAllowed && !seniorAllocationRouteAllowed && !externalClientRouteAllowed) {
+    if (account.authProvider === 'consultant_dashboard' && !isConsultantDashboardRouteAllowed(req.originalUrl, account.user.role)) {
       return res.status(403).json({
         error: 'EXTERNAL_SESSION_SCOPE_NOT_ALLOWED',
         message: 'This dashboard session is not authorised for the requested API.'
