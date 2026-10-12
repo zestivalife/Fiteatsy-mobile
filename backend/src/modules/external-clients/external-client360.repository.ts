@@ -3,7 +3,7 @@ import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { pool } from '../../db/pool.js';
 import { resolveActiveTenantContext } from '../tenancy/tenant-context.js';
 import { ExternalClientError } from './external-clients.repository.js';
-import { INTAKE_SECTIONS } from './external-client-intake.repository.js';
+import { INTAKE_SECTIONS, intakeRequiredState } from './external-client-intake.repository.js';
 
 const authority = async (account: AuthenticatedAccount, clientId: string) => {
   const tenant = await resolveActiveTenantContext(account);
@@ -14,7 +14,7 @@ const authority = async (account: AuthenticatedAccount, clientId: string) => {
 };
 const sourceLabel = (source: string) => source === 'CLIENT_SELF_REPORTED' ? 'Self-reported' : source === 'CONSULTANT_ENTERED' ? 'Entered by Consultant' : source === 'LAB_REPORT' ? 'From uploaded report' : 'System-derived';
 const withSource = (value: unknown, source: string, updatedAt: unknown) => ({ value: value ?? null, source, sourceLabel: sourceLabel(source), updatedAt });
-const age = (dob: unknown) => { if (!dob) return null; const born = new Date(String(dob)); const now = new Date(); let years = now.getUTCFullYear() - born.getUTCFullYear(); if (now.getUTCMonth() < born.getUTCMonth() || (now.getUTCMonth() === born.getUTCMonth() && now.getUTCDate() < born.getUTCDate())) years--; return years >= 0 ? years : null; };
+const age = (dob: unknown) => { const match=typeof dob==='string'?dob.match(/^(\d{4})-(\d{2})-(\d{2})/):null;if(!match)return null;const born=new Date(Date.UTC(Number(match[1]),Number(match[2])-1,Number(match[3])));if(Number.isNaN(born.getTime())||born.getUTCFullYear()!==Number(match[1])||born.getUTCMonth()!==Number(match[2])-1||born.getUTCDate()!==Number(match[3]))return null;const now = new Date(); let years = now.getUTCFullYear() - born.getUTCFullYear(); if (now.getUTCMonth() < born.getUTCMonth() || (now.getUTCMonth() === born.getUTCMonth() && now.getUTCDate() < born.getUTCDate())) years--; return years >= 0 ? years : null; };
 
 const project = async (account: AuthenticatedAccount, clientId: string) => {
   const scoped = await authority(account, clientId);
@@ -32,8 +32,8 @@ const project = async (account: AuthenticatedAccount, clientId: string) => {
     sections[row.section] = { ...(sections[row.section] || {}), [row.field_key]: row.value };
     provenance[row.section] = { ...(provenance[row.section] || {}), [row.field_key]: { source: row.provenance, sourceLabel: sourceLabel(row.provenance), updatedAt: row.created_at } };
   }
-  const applicable = sections.aboutYou?.gender === 'FEMALE' ? INTAKE_SECTIONS : INTAKE_SECTIONS.filter((section) => section !== 'womensHealth');
-  const missingSections = applicable.filter((section) => !sections[section] || Object.keys(sections[section]).length === 0);
+  const requiredState = intakeRequiredState(sections);
+  const missingSections = Object.entries(requiredState).filter(([, complete]) => !complete).map(([field]) => field);
   const completion = Math.max(0, Math.min(100, intake?.completion_percent || 0));
   const measurements = sections.measurements || {};
   const height = Number(measurements.height); const weight = Number(measurements.weight);
