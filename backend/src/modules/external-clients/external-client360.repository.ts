@@ -3,7 +3,7 @@ import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { pool } from '../../db/pool.js';
 import { resolveActiveTenantContext } from '../tenancy/tenant-context.js';
 import { ExternalClientError } from './external-clients.repository.js';
-import { INTAKE_SECTIONS, intakeRequiredState } from './external-client-intake.repository.js';
+import { calculateCompletion, externalDietMissingFields, INTAKE_SECTIONS, intakeRequiredState } from './external-client-intake.repository.js';
 
 const authority = async (account: AuthenticatedAccount, clientId: string) => {
   const tenant = await resolveActiveTenantContext(account);
@@ -34,16 +34,17 @@ const project = async (account: AuthenticatedAccount, clientId: string) => {
   }
   const requiredState = intakeRequiredState(sections);
   const missingSections = Object.entries(requiredState).filter(([, complete]) => !complete).map(([field]) => field);
-  const completion = Math.max(0, Math.min(100, intake?.completion_percent || 0));
+  const missingRequiredFields = externalDietMissingFields(sections);
+  const completion = calculateCompletion(sections);
   const measurements = sections.measurements || {};
-  const height = Number(measurements.height); const weight = Number(measurements.weight);
-  const bmi = height > 0 && weight > 0 && measurements.heightUnit === 'cm' && measurements.weightUnit === 'kg' ? Number((weight / ((height / 100) ** 2)).toFixed(2)) : null;
+  const height = Number(measurements.heightCm); const weight = Number(measurements.weightKg);
+  const bmi = height > 0 && weight > 0 ? Number((weight / ((height / 100) ** 2)).toFixed(2)) : null;
   const latest = Math.max(new Date(scoped.client.updated_at).getTime(), intake?.last_saved_at ? new Date(intake.last_saved_at).getTime() : 0, ...documentsResult.rows.map((document) => new Date(document.uploaded_at).getTime()));
   const basic = sections.basicProfile || {};
   const basicMeta = (field: string) => provenance.basicProfile?.[field] || { source: 'CONSULTANT_ENTERED', updatedAt: scoped.client.updated_at };
   const sourced = (field: string, fallback: unknown) => { const meta = basicMeta(field); return withSource(basic[field] ?? fallback, meta.source, meta.updatedAt); };
   return {
-    overview: { name: [basic.firstName ?? scoped.client.first_name, basic.lastName ?? scoped.client.last_name].filter(Boolean).join(' '), age: age(basic.dateOfBirth ?? scoped.client.date_of_birth), gender: basic.gender ?? scoped.client.gender, primaryContact: basic.mobile ?? basic.email ?? scoped.client.mobile ?? scoped.client.email, status: scoped.client.status, intakeStatus: scoped.client.intake_state, profileCompleteness: completion, missingSections, primaryGoal: sections.goals?.primaryGoal ?? null, dietPreference: sections.nutrition?.dietPreference ?? null, latestUpdatedAt: new Date(latest).toISOString(), documentCount: documentsResult.rowCount, latestWeight: measurements.weight ?? null },
+    overview: { name: [basic.firstName ?? scoped.client.first_name, basic.lastName ?? scoped.client.last_name].filter(Boolean).join(' '), age: age(basic.dateOfBirth ?? scoped.client.date_of_birth), gender: basic.gender ?? scoped.client.gender, primaryContact: basic.mobile ?? basic.email ?? scoped.client.mobile ?? scoped.client.email, status: scoped.client.status, intakeStatus: scoped.client.intake_state, profileCompleteness: completion, missingSections, missingRequiredFields, dietPlanEligible: missingRequiredFields.length===0, primaryGoal: sections.goals?.primaryGoal ?? null, dietPreference: sections.nutrition?.dietPreference ?? null, latestUpdatedAt: new Date(latest).toISOString(), documentCount: documentsResult.rowCount, latestWeight: measurements.weightKg ?? null },
     basicProfile: { firstName: sourced('firstName', scoped.client.first_name), lastName: sourced('lastName', scoped.client.last_name), mobile: sourced('mobile', scoped.client.mobile), email: sourced('email', scoped.client.email), dateOfBirth: sourced('dateOfBirth', scoped.client.date_of_birth), gender: sourced('gender', scoped.client.gender) },
     sections, provenance,
     derived: bmi === null ? {} : { bmi: withSource(bmi, 'SYSTEM_DERIVED', intake?.last_saved_at) },
@@ -78,4 +79,16 @@ export const updateExternalClient360 = async (account: AuthenticatedAccount, cli
     await db.query('commit');
     return project(account, clientId);
   } catch (error) { await db.query('rollback'); throw error; } finally { db.release(); }
+};
+
+export const updateExternalDietEligibility = async (account:AuthenticatedAccount,clientId:string,input:{values:Record<string,unknown>})=>{
+  const scoped=await authority(account,clientId);
+  const current=await project(account,clientId);
+  const missing=current.overview.missingRequiredFields as Array<{code:string;section:string;field:string;label:string;consultantCanEdit:boolean}>;
+  const allowed=new Map(missing.filter(field=>field.consultantCanEdit).map(field=>[field.code,field]));
+  if(!Object.keys(input.values).length||Object.keys(input.values).some(code=>!allowed.has(code)))throw new ExternalClientError('INVALID_MISSING_FIELD_UPDATE',400,'Only currently missing editable fields may be updated.');
+  const entries=Object.entries(input.values).map(([code,value])=>{const field=allowed.get(code)!;if(code==='CURRENT_WEIGHT'&&!(Number(value)>0))throw new ExternalClientError('INVALID_CURRENT_WEIGHT',400,'Enter a valid current weight.');if(code!=='CURRENT_WEIGHT'&&!(typeof value==='string'&&value.trim()))throw new ExternalClientError('MISSING_REQUIRED_VALUE',400,`${field.label} is required.`);return{field,value};});
+  const db=await pool.connect();
+  try{await db.query('begin');for(const {field,value} of entries){await db.query('update external_client_profile_overrides set superseded_at=now() where tenant_id=$1 and client_id=$2 and section=$3 and field_key=$4 and superseded_at is null',[scoped.tenantId,clientId,field.section,field.field]);await db.query('insert into external_client_profile_overrides(id,tenant_id,client_id,section,field_key,value,provenance,actor_user_id) values($1,$2,$3,$4,$5,$6::jsonb,\'CONSULTANT_ENTERED\',$7)',[crypto.randomUUID(),scoped.tenantId,clientId,field.section,field.field,JSON.stringify(value),account.user.id]);}await db.query('insert into external_client_audit_events(id,tenant_id,client_id,actor_user_id,event_type,metadata) values($1,$2,$3,$4,\'CLIENT_REQUIRED_INFORMATION_COMPLETED\',$5::jsonb)',[crypto.randomUUID(),scoped.tenantId,clientId,account.user.id,JSON.stringify({fields:entries.map(({field})=>field.code)})]);await db.query('commit');}catch(error){await db.query('rollback');throw error;}finally{db.release();}
+  return project(account,clientId);
 };

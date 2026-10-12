@@ -38,12 +38,20 @@ const resolveAuthority=async(db:any,rawToken:string,write=true):Promise<Authorit
 };
 const audit=(db:any,a:Authority,event:string,metadata:Record<string,unknown>={})=>db.query(`insert into external_client_audit_events(id,tenant_id,client_id,actor_user_id,event_type,metadata) values($1,$2,$3,null,$4,$5::jsonb)`,[crypto.randomUUID(),a.tenantId,a.clientId,event,JSON.stringify({invitationId:a.invitationId,...metadata})]);
 const present=(value:unknown)=>typeof value==='string'?value.trim().length>0:value!==null&&value!==undefined;
+export const EXTERNAL_DIET_REQUIRED_FIELDS = [
+  {code:'PRIMARY_GOAL',section:'goals',field:'primaryGoal',label:'Primary goal',control:'PILL_SINGLE',consultantCanEdit:true,clientCanEdit:true},
+  {code:'DIET_PREFERENCE',section:'nutrition',field:'dietPreference',label:'Primary diet preference',control:'PILL_SINGLE',consultantCanEdit:true,clientCanEdit:true},
+  {code:'CURRENT_WEIGHT',section:'measurements',field:'weightKg',label:'Current weight',control:'STRUCTURED_NUMBER',unit:'kg',consultantCanEdit:true,clientCanEdit:true},
+] as const;
 export const intakeRequiredState=(sections:any)=>({
   firstName:present(sections?.aboutYou?.firstName),lastName:present(sections?.aboutYou?.lastName),
   gender:present(sections?.aboutYou?.gender),
   contact:present(sections?.aboutYou?.mobile)||present(sections?.aboutYou?.email),
   primaryGoal:present(sections?.goals?.primaryGoal),
+  dietPreference:present(sections?.nutrition?.dietPreference),
+  currentWeight:Number(sections?.measurements?.weightKg)>0,
 });
+export const externalDietMissingFields=(sections:any)=>EXTERNAL_DIET_REQUIRED_FIELDS.filter(field=>field.code==='CURRENT_WEIGHT'?!(Number(sections?.[field.section]?.[field.field])>0):!present(sections?.[field.section]?.[field.field]));
 export const calculateCompletion=(sections:any)=>{const state=intakeRequiredState(sections);const required=Object.values(state);return Math.max(0,Math.min(100,Math.floor(required.filter(Boolean).length*100/required.length)));};
 export const normaliseExternalIntakeSection=(section:IntakeSection,payload:Record<string,unknown>)=>{
   const value=JSON.parse(JSON.stringify(payload||{}));
@@ -68,7 +76,7 @@ export const normaliseExternalIntakeSection=(section:IntakeSection,payload:Recor
   }
   return value;
 };
-const map=(row:any,documents:any[]=[])=>({status:row.status,currentSection:row.current_section,completionPercent:row.completion_percent,sections:row.sections||{},provenance:row.provenance,startedAt:row.started_at,lastSavedAt:row.last_saved_at,submittedAt:row.submitted_at,consentVersion:row.consent_version,consentedAt:row.consented_at,documents:documents.map(d=>({id:d.id,category:d.category,fileName:d.original_filename,mimeType:d.mime_type,fileSize:d.file_size_bytes,provenance:d.source,processingStatus:d.processing_status||'UPLOADED',createdAt:d.uploaded_at}))});
+const map=(row:any,documents:any[]=[])=>({status:row.status,currentSection:row.current_section,completionPercent:calculateCompletion(row.sections||{}),sections:row.sections||{},missingRequiredFields:externalDietMissingFields(row.sections||{}),provenance:row.provenance,startedAt:row.started_at,lastSavedAt:row.last_saved_at,submittedAt:row.submitted_at,consentVersion:row.consent_version,consentedAt:row.consented_at,documents:documents.map(d=>({id:d.id,category:d.category,fileName:d.original_filename,mimeType:d.mime_type,fileSize:d.file_size_bytes,provenance:d.source,processingStatus:d.processing_status||'UPLOADED',createdAt:d.uploaded_at}))});
 const getOrCreate=async(db:any,a:Authority)=>{
   const existing=await db.query(`select * from external_client_intakes where invitation_id=$1 and tenant_id=$2 and client_id=$3 for update`,[a.invitationId,a.tenantId,a.clientId]);
   if(existing.rowCount)return existing.rows[0];
