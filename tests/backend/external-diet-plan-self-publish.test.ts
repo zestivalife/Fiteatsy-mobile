@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { buildExternalDietFoodContext } from '../../backend/src/modules/external-clients/external-diet-plans.repository.js';
 import { commonFoodCatalogue } from '../../backend/src/modules/nutrition/common-food-consultant.service.js';
 import { generateMealCombinations, MEAL_HEADS } from '../../backend/src/modules/nutrition/common-food-engine.js';
+import { generateExternalDietPlanDocument, readGeneratedDietPlanDocumentXml } from '../../backend/src/modules/nutrition/nutrition.document.js';
 
 const migration=readFileSync(new URL('../../backend/src/db/migrations/0095_external_diet_plan_self_publish.sql',import.meta.url),'utf8');
 const repository=readFileSync(new URL('../../backend/src/modules/external-clients/external-diet-plans.repository.ts',import.meta.url),'utf8');
@@ -41,4 +45,32 @@ test('external food context passes governed diet and safety exclusions into the 
   assert.deepEqual(context.allergies,['PEANUTS']);
   assert.deepEqual(context.intolerances,['DAIRY']);
   for(const exclusion of ['JAIN','NO_ONION_GARLIC','ONION','GARLIC','ROOT_VEGETABLE'])assert.ok(context.avoids.includes(exclusion));
+});
+
+test('external DOCX reuses the canonical seven-meal diet-chart template with exact governed options',async()=>{
+  const context=buildExternalDietFoodContext({nutrition:{dietPreference:'VEGETARIAN',restrictions:[],intolerances:[]},allergiesFamilyHistory:{foodAllergies:[]}});
+  const ratios=[.06,.18,.08,.28,.1,.24,.06];
+  const proteinRatios=[.04,.18,.08,.3,.1,.24,.06];
+  const meals=MEAL_HEADS.map((mealHead,index)=>({mealHead,options:generateMealCombinations({foods:commonFoodCatalogue,context,mealHead,target:{kcal:2100*ratios[index],protein:120*proteinRatios[index],kcalTolerance:105,proteinTolerance:5},limit:5,semanticV1:true}).options}));
+  assert.ok(meals.every(meal=>meal.options.length===5));
+  const document=await generateExternalDietPlanDocument({
+    client:{display_name:'Governed QA Client',date_of_birth:'1990-01-01',gender:'FEMALE',sections:{goals:{primaryGoal:'Sustainable fat loss'},nutrition:{dietPreference:'VEGETARIAN',regionalCuisine:'Maharashtrian'},allergiesFamilyHistory:{foodAllergies:[]}}},
+    practiceName:'Governed QA Practice',
+    preparedBy:'QA External Consultant',
+    plan:{created_at:'2026-10-10T00:00:00.000Z'},
+    version:{version:3,created_at:'2026-10-10T00:00:00.000Z',plan_snapshot:{dailyTargets:{calories:2100,protein:120},meals}},
+  });
+  assert.ok(document.buffer.length>10000);
+  assert.match(document.filename,/governed-qa-client_Diet_Plan_2026-10-10\.docx/);
+  const outputDirectory=await mkdtemp(path.join(os.tmpdir(),'external-diet-docx-'));
+  const outputPath=path.join(outputDirectory,document.filename);
+  await writeFile(outputPath,document.buffer);
+  const xml=await readGeneratedDietPlanDocumentXml(outputPath);
+  assert.doesNotMatch(xml,/\{\{[a-z0-9_]+\}\}/i);
+  assert.match(xml,/Governed QA Client/);
+  assert.match(xml,/Governed QA Practice/);
+  assert.match(xml,/QA External Consultant/);
+  for(const meal of meals)for(const option of meal.options)assert.match(xml,new RegExp(option.clientTitle.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+  assert.doesNotMatch(xml,/Senior Consultant|submitted for review/i);
+  await rm(outputDirectory,{recursive:true,force:true});
 });
