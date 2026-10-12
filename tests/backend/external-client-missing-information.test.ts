@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { calculateCompletion, externalDietMissingFields } from '../../backend/src/modules/external-clients/external-client-intake.repository.js';
+
+const auditMigration=readFileSync(new URL('../../backend/src/db/migrations/0097_external_missing_information_audit.sql',import.meta.url),'utf8');
 
 const base={aboutYou:{firstName:'QA',lastName:'Client',gender:'FEMALE',mobile:'+919700000000'}};
 
@@ -21,4 +24,9 @@ test('invalid weight remains missing and never becomes a plausible completed val
   const sections={...base,goals:{primaryGoal:'WEIGHT_MANAGEMENT'},nutrition:{dietPreference:'VEGETARIAN'},measurements:{weightKg:0}};
   assert.deepEqual(externalDietMissingFields(sections).map(field=>field.code),['CURRENT_WEIGHT']);
   assert.ok(calculateCompletion(sections)<100);
+});
+
+test('production audit constraint accepts focused missing-information completion',()=>{
+  assert.match(auditMigration,/CLIENT_REQUIRED_INFORMATION_COMPLETED/);
+  assert.match(auditMigration,/external_client_audit_events_event_type_check/);
 });
