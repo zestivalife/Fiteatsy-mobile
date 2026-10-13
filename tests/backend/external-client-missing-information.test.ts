@@ -46,3 +46,10 @@ test('Save and Recheck finalises only an already-consented complete intake',()=>
   assert.match(repository,/external_clients set intake_state='COMPLETED'/);
   assert.match(repository,/status=case when status in \('INVITED','INTAKE_STARTED'\) then 'INTAKE_COMPLETED' else status end/);
 });
+
+test('client consent submission honours consultant overrides without changing an active client lifecycle',()=>{
+  const repository=readFileSync(new URL('../../backend/src/modules/external-clients/external-client-intake.repository.ts',import.meta.url),'utf8');
+  assert.match(repository,/select section,field_key,value from external_client_profile_overrides/);
+  assert.match(repository,/externalDietMissingFields\(effectiveSections\)\.length/);
+  assert.match(repository,/status=case when status in \('INVITED','INTAKE_STARTED'\) then 'INTAKE_COMPLETED' else status end/);
+});
