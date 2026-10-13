@@ -14,7 +14,7 @@ const repository=readFileSync(new URL('../../backend/src/modules/external-client
 const routes=readFileSync(new URL('../../backend/src/modules/external-clients/external-clients.routes.ts',import.meta.url),'utf8');
 
 test('external diet plans remain tenant/client scoped and versioned',()=>{assert.match(migration,/tenant_id uuid not null/);assert.match(migration,/foreign key \(client_id, tenant_id\)/);assert.match(migration,/unique \(plan_id, version\)/);assert.match(migration,/external_diet_plan_one_published_version/);});
-test('authority excludes the frozen internal tenant and requires owner or consultant',()=>{assert.match(repository,/tenantType==='ZESTIVA_INTERNAL'/);assert.match(repository,/OWNER','CONSULTANT/);assert.match(repository,/CLIENT_INTAKE_REQUIRED/);});
+test('authority excludes the frozen internal tenant and requires owner or consultant without intake gates',()=>{assert.match(repository,/tenantType==='ZESTIVA_INTERNAL'/);assert.match(repository,/OWNER','CONSULTANT/);assert.doesNotMatch(repository,/CLIENT_INTAKE_REQUIRED/);assert.doesNotMatch(repository,/CONSENT_REQUIRED/);});
 test('generation reuses governed Common Food and enforces seven heads with five options',()=>{assert.match(repository,/commonFoodCatalogue/);assert.match(repository,/generateMealCombinations/);assert.match(repository,/MEAL_HEADS\.map/);assert.match(repository,/generated\.options\.length<5/);assert.match(repository,/count!==35/);});
 test('Jain and legacy string intake values normalize deterministically',()=>{const context=buildExternalDietFoodContext({nutrition:{dietPreference:'VEGETARIAN',restrictions:['JAIN'],breakfast:'Poha',lunch:['Dal rice']},allergiesFamilyHistory:{foodAllergies:['PEANUT']}});assert.equal(context.diet,'VEGETARIAN');assert.deepEqual(context.preferences,['Poha','Dal rice']);assert.ok(context.avoids.includes('ONION'));assert.ok(context.avoids.includes('GARLIC'));assert.deepEqual(context.allergies,['PEANUT']);});
 test('external publish path is direct and does not invoke Senior review',()=>{assert.match(routes,/diet-plan\/publish/);assert.match(repository,/status='PUBLISHED'/);assert.doesNotMatch(repository,/senior|reviewer|submitted_for_review/i);});
@@ -45,6 +45,15 @@ test('external food context passes governed diet and safety exclusions into the 
   assert.deepEqual(context.allergies,['PEANUTS']);
   assert.deepEqual(context.intolerances,['DAIRY']);
   for(const exclusion of ['JAIN','NO_ONION_GARLIC','ONION','GARLIC','ROOT_VEGETABLE'])assert.ok(context.avoids.includes(exclusion));
+});
+
+test('missing diet and allergy answers are explicit and use external-only safe catalogue context',()=>{
+  const context=buildExternalDietFoodContext({nutrition:{}}) as any;
+  assert.equal(context.diet,'VEGAN');
+  assert.equal(context.dietPreferenceProvided,false);
+  assert.equal(context.allergyInformationProvided,false);
+  assert.ok(context.warnings.includes('DIET_PREFERENCE_NOT_PROVIDED_SAFE_VEGAN_CATALOGUE'));
+  assert.ok(context.warnings.includes('ALLERGY_INFORMATION_NOT_PROVIDED'));
 });
 
 test('external DOCX reuses the canonical seven-meal diet-chart template with exact governed options',async()=>{

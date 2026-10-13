@@ -52,14 +52,19 @@ export const intakeRequiredState=(sections:any)=>({
   currentWeight:Number(sections?.measurements?.weightKg)>0,
 });
 export const externalDietMissingFields=(sections:any)=>EXTERNAL_DIET_REQUIRED_FIELDS.filter(field=>field.code==='CURRENT_WEIGHT'?!(Number(sections?.[field.section]?.[field.field])>0):!present(sections?.[field.section]?.[field.field]));
-export type ExternalDietEligibilityReason='REQUIRED_FIELDS_MISSING'|'CONSENT_REQUIRED'|'INTAKE_NOT_COMPLETED';
+export type ExternalDietEligibilityWarning='REQUIRED_FIELDS_MISSING'|'CONSENT_PENDING'|'INTAKE_NOT_SUBMITTED'|'DIET_PREFERENCE_NOT_PROVIDED'|'PRIMARY_GOAL_NOT_PROVIDED'|'CURRENT_WEIGHT_NOT_PROVIDED'|'ALLERGY_INFORMATION_NOT_PROVIDED';
 export const deriveExternalDietEligibility=(sections:any,lifecycle:{consentedAt:unknown;intakeStatus:unknown;clientIntakeState:unknown})=>{
   const missingRequiredFields=externalDietMissingFields(sections);
-  const reasons:ExternalDietEligibilityReason[]=[];
-  if(missingRequiredFields.length)reasons.push('REQUIRED_FIELDS_MISSING');
-  if(!lifecycle.consentedAt)reasons.push('CONSENT_REQUIRED');
-  if(lifecycle.intakeStatus!=='COMPLETED'||lifecycle.clientIntakeState!=='COMPLETED')reasons.push('INTAKE_NOT_COMPLETED');
-  return{eligible:reasons.length===0,reasons,missingRequiredFields};
+  const warnings:ExternalDietEligibilityWarning[]=[];
+  if(missingRequiredFields.length)warnings.push('REQUIRED_FIELDS_MISSING');
+  if(missingRequiredFields.some(field=>field.code==='DIET_PREFERENCE'))warnings.push('DIET_PREFERENCE_NOT_PROVIDED');
+  if(missingRequiredFields.some(field=>field.code==='PRIMARY_GOAL'))warnings.push('PRIMARY_GOAL_NOT_PROVIDED');
+  if(missingRequiredFields.some(field=>field.code==='CURRENT_WEIGHT'))warnings.push('CURRENT_WEIGHT_NOT_PROVIDED');
+  const allergy=sections?.allergiesFamilyHistory;
+  if(!allergy||(!present(allergy.hasAllergies)&&!Array.isArray(allergy.foodAllergies)))warnings.push('ALLERGY_INFORMATION_NOT_PROVIDED');
+  if(!lifecycle.consentedAt)warnings.push('CONSENT_PENDING');
+  if(lifecycle.intakeStatus!=='COMPLETED'||lifecycle.clientIntakeState!=='COMPLETED')warnings.push('INTAKE_NOT_SUBMITTED');
+  return{eligible:true,reasons:[],warnings,missingRequiredFields};
 };
 export const calculateCompletion=(sections:any)=>{const state=intakeRequiredState(sections);const required=Object.values(state);return Math.max(0,Math.min(100,Math.floor(required.filter(Boolean).length*100/required.length)));};
 export const normaliseExternalIntakeSection=(section:IntakeSection,payload:Record<string,unknown>)=>{

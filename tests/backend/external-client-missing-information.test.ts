@@ -31,12 +31,34 @@ test('production audit constraint accepts focused missing-information completion
   assert.match(auditMigration,/external_client_audit_events_event_type_check/);
 });
 
-test('zero missing fields never bypasses consent or canonical intake completion',()=>{
+test('external diet authoring treats incomplete profile, consent, and intake as warnings',()=>{
   const sections={...base,goals:{primaryGoal:'WEIGHT_MANAGEMENT'},nutrition:{dietPreference:'VEGETARIAN'},measurements:{weightKg:72.4}};
-  assert.deepEqual(deriveExternalDietEligibility(sections,{consentedAt:null,intakeStatus:'IN_PROGRESS',clientIntakeState:'IN_PROGRESS'}),{
-    eligible:false,reasons:['CONSENT_REQUIRED','INTAKE_NOT_COMPLETED'],missingRequiredFields:[],
-  });
+  const decision=deriveExternalDietEligibility(sections,{consentedAt:null,intakeStatus:'IN_PROGRESS',clientIntakeState:'IN_PROGRESS'});
+  assert.equal(decision.eligible,true);
+  assert.deepEqual(decision.reasons,[]);
+  assert.deepEqual(decision.missingRequiredFields,[]);
+  assert.ok(decision.warnings.includes('CONSENT_PENDING'));
+  assert.ok(decision.warnings.includes('INTAKE_NOT_SUBMITTED'));
   assert.equal(deriveExternalDietEligibility(sections,{consentedAt:new Date(),intakeStatus:'COMPLETED',clientIntakeState:'COMPLETED'}).eligible,true);
+});
+
+test('missing diet context remains visible but never blocks external authoring',()=>{
+  const decision=deriveExternalDietEligibility(base,{consentedAt:null,intakeStatus:'IN_PROGRESS',clientIntakeState:'IN_PROGRESS'});
+  assert.equal(decision.eligible,true);
+  assert.ok(decision.warnings.includes('DIET_PREFERENCE_NOT_PROVIDED'));
+  assert.ok(decision.warnings.includes('PRIMARY_GOAL_NOT_PROVIDED'));
+  assert.ok(decision.warnings.includes('CURRENT_WEIGHT_NOT_PROVIDED'));
+  assert.ok(decision.warnings.includes('ALLERGY_INFORMATION_NOT_PROVIDED'));
+});
+
+test('partial profile and missing optional reports or womens-health never block external authoring',()=>{
+  const partial={aboutYou:base.aboutYou,measurements:{weightKg:72.4}};
+  const decision=deriveExternalDietEligibility(partial,{consentedAt:null,intakeStatus:'IN_PROGRESS',clientIntakeState:'IN_PROGRESS'});
+  assert.equal(calculateCompletion(partial),71);
+  assert.equal(decision.eligible,true);
+  assert.deepEqual(decision.reasons,[]);
+  assert.equal('reportsDocuments' in partial,false);
+  assert.equal('womensHealth' in partial,false);
 });
 
 test('Save and Recheck finalises only an already-consented complete intake',()=>{
