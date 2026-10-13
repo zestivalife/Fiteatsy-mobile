@@ -18,6 +18,22 @@ test('authority excludes the frozen internal tenant and requires owner or consul
 test('generation reuses governed Common Food and enforces seven heads with five options',()=>{assert.match(repository,/commonFoodCatalogue/);assert.match(repository,/generateMealCombinations/);assert.match(repository,/MEAL_HEADS\.map/);assert.match(repository,/generated\.options\.length<5/);assert.match(repository,/count!==35/);});
 test('Jain and legacy string intake values normalize deterministically',()=>{const context=buildExternalDietFoodContext({nutrition:{dietPreference:'VEGETARIAN',restrictions:['JAIN'],breakfast:'Poha',lunch:['Dal rice']},allergiesFamilyHistory:{foodAllergies:['PEANUT']}});assert.equal(context.diet,'VEGETARIAN');assert.deepEqual(context.preferences,['Poha','Dal rice']);assert.ok(context.avoids.includes('ONION'));assert.ok(context.avoids.includes('GARLIC'));assert.deepEqual(context.allergies,['PEANUT']);});
 test('external publish path is direct and does not invoke Senior review',()=>{assert.match(routes,/diet-plan\/publish/);assert.match(repository,/status='PUBLISHED'/);assert.doesNotMatch(repository,/senior|reviewer|submitted_for_review/i);});
+test('external authoring adapter exposes shared canonical search and scoped snapshot mutations',()=>{
+  assert.match(routes,/\/:id\/common-foods/);
+  assert.match(routes,/diet-plans\/:planId\/common-food\/options/);
+  assert.match(repository,/eligibleCommonFoods\(commonFoodCatalogue,context,input\.mealHead\)/);
+  assert.match(repository,/validateManualCombination/);
+  assert.match(repository,/ctx\.plan\.id!==planId/);
+  assert.match(repository,/ctx\.version\.id!==input\.expectedPlanVersionId/);
+  assert.match(repository,/Exactly five options are required for every meal/);
+});
+
+test('external snapshot mutations preserve version-bound canonical ids, servings and nutrition',()=>{
+  assert.match(repository,/foodId:item\.foodId,servingId:item\.servingId,multiplier:Number\(item\.multiplier\)/);
+  assert.match(repository,/components:validated\.components,nutrition:validated\.nutrition/);
+  assert.match(repository,/snapshotVersion:Number\(original\.snapshotVersion\|\|0\)\+1/);
+  assert.match(repository,/update external_diet_plan_versions set plan_snapshot/);
+});
 
 test('external generation returns real shared canonical foods and governed nutrition snapshots',()=>{
   const context=buildExternalDietFoodContext({nutrition:{dietPreference:'VEGETARIAN',restrictions:[],intolerances:[]},allergiesFamilyHistory:{foodAllergies:[]}});
