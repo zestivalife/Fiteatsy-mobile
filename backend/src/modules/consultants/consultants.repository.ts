@@ -538,6 +538,14 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
         limit 1
       ) c on true
       where ${eligibleUserPredicate}
+        and exists (
+          select 1
+          from tenant_memberships membership
+          join tenants tenant on tenant.id = membership.tenant_id
+          where membership.user_id = u.id
+            and membership.status = 'active'
+            and tenant.status = 'active'
+        )
         and (
           c.id is null
           or c.deleted_at is not null

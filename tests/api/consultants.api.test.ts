@@ -526,6 +526,38 @@ test('consultant discovery backfills missing client records for registered users
   assert.equal(integrity.rows[0].orphan_health_total, 0);
 });
 
+test('consultant discovery skips eligible users without governed tenant ownership', async () => {
+  const orphanAccountId = crypto.randomUUID();
+  const registeredAt = new Date().toISOString();
+  await pool.query(
+    `insert into users (
+       id, name, email_normalized, mobile_number_normalized,
+       email_verified_at, mobile_verified_at, status, version,
+       last_login_at, created_at, updated_at
+     ) values ($1, $2, $3, $4, $5, $5, 'active', 1, $5, $5, $5)`,
+    [
+      orphanAccountId,
+      'Governance Orphan Fixture',
+      `governance-orphan-${Date.now()}@example.com`,
+      `9198${String(Date.now()).slice(-8)}`,
+      registeredAt
+    ]
+  );
+
+  const consultant = await createConsultantSession();
+  const response = await getJson(server.baseUrl, '/v1/consultants/clients', {
+    headers: authHeaders(consultant.token)
+  });
+
+  assert.equal(response.response.status, 200);
+  assert.deepEqual(response.body.clients, []);
+  const projection = await pool.query(
+    'select count(*)::int as total from fiteatsy_clients where account_user_id = $1',
+    [orphanAccountId]
+  );
+  assert.equal(projection.rows[0].total, 0);
+});
+
 test('consultant discovery repairs inactive client mappings and preserves client ids', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Inactive Mapping Client',
