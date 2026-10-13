@@ -35,6 +35,32 @@ test('external snapshot mutations preserve version-bound canonical ids, servings
   assert.match(repository,/update external_diet_plan_versions set plan_snapshot/);
 });
 
+test('historical versions remain exact, tenant scoped and downloadable through the canonical generator',()=>{
+  assert.match(routes,/diet-plan\/history/);
+  assert.match(routes,/diet-plan\/versions\/:versionId/);
+  assert.match(routes,/diet-plan\/versions\/:versionId\/download/);
+  assert.match(repository,/v\.tenant_id=\$2 and v\.client_id=\$3/);
+  assert.match(repository,/generateExternalDietPlanDocument/);
+  assert.match(repository,/plan_snapshot/);
+});
+
+test('historical duplication creates a new draft without updating the source snapshot',()=>{
+  assert.match(routes,/diet-plan\/versions\/:versionId\/duplicate/);
+  assert.match(repository,/coalesce\(max\(version\),0\)/);
+  assert.match(repository,/insert into external_diet_plan_versions/);
+  assert.match(repository,/status='DRAFT',current_version=\$1/);
+  assert.doesNotMatch(repository,/update external_diet_plan_versions set plan_snapshot=.*sourceVersionId/);
+});
+
+test('version comparison exposes clinical target, food and serving inputs without raw JSON diff',()=>{
+  assert.match(routes,/diet-plan\/compare/);
+  assert.match(repository,/targets:\{calories:/);
+  assert.match(repository,/protein:/);
+  assert.match(repository,/options:\{added:/);
+  assert.match(repository,/removed:/);
+  assert.match(repository,/changed:/);
+});
+
 test('external generation returns real shared canonical foods and governed nutrition snapshots',()=>{
   const context=buildExternalDietFoodContext({nutrition:{dietPreference:'VEGETARIAN',restrictions:[],intolerances:[]},allergiesFamilyHistory:{foodAllergies:[]}});
   const ratios=[.06,.18,.08,.28,.1,.24,.06];
