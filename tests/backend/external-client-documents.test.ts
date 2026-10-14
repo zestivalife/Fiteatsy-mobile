@@ -7,3 +7,10 @@ test('metadata is mutable while ownership, origin and storage authority are immu
 test('archive, audit, processing boundary and no extraction are explicit',()=>{for(const contract of ["status='ARCHIVED'",'CLIENT_DOCUMENT_UPLOADED','CLIENT_DOCUMENT_METADATA_UPDATED','CLIENT_DOCUMENT_ARCHIVED','DocumentReadyForProcessing','NOT_REQUESTED'])assert.ok(repo.includes(contract)||migration.includes(contract));assert.doesNotMatch(repo,/ocr|extractBiomarker|diagnos/i);});
 test('API exposes canonical upload, list, metadata, edit, archive and download',()=>{for(const contract of ["post('/:id/documents'","get('/:id/documents'","get('/:id/documents/:documentId'","patch('/:id/documents/:documentId'","delete('/:id/documents/:documentId'","get('/:id/documents/:documentId/download'"])assert.ok(routes.includes(contract));});
 test('all upload entry points preserve provenance, deduplicate, and enter one extractor',()=>{assert.match(intake,/source:'CLIENT_SELF_REPORTED'/);assert.match(repo,/source:'CONSULTANT_UPLOADED'/);assert.match(repo,/content_hash=\$3/);assert.match(intake,/processExternalClientReportForIntake/);assert.match(repo,/processExternalClientReportForIntake/);assert.match(repo,/already been uploaded for this client/);});
+
+test('report processing terminal timestamp exists for both success and failure paths',()=>{
+  const completionMigration=readFileSync(new URL('../../backend/src/db/migrations/0100_external_document_processing_completion.sql',import.meta.url),'utf8');
+  const biomarkerRepo=readFileSync(new URL('../../backend/src/modules/external-clients/external-biomarkers.repository.ts',import.meta.url),'utf8');
+  assert.match(completionMigration,/add column if not exists processing_completed_at timestamptz/);
+  assert.equal((biomarkerRepo.match(/processing_completed_at=now\(\)/g)||[]).length,2);
+});
