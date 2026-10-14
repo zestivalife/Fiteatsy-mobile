@@ -8,6 +8,18 @@ test('archive, audit, processing boundary and no extraction are explicit',()=>{f
 test('API exposes canonical upload, list, metadata, edit, archive and download',()=>{for(const contract of ["post('/:id/documents'","get('/:id/documents'","get('/:id/documents/:documentId'","patch('/:id/documents/:documentId'","delete('/:id/documents/:documentId'","get('/:id/documents/:documentId/download'"])assert.ok(routes.includes(contract));});
 test('all upload entry points preserve provenance, deduplicate, and enter one extractor',()=>{assert.match(intake,/source:'CLIENT_SELF_REPORTED'/);assert.match(repo,/source:'CONSULTANT_UPLOADED'/);assert.match(repo,/content_hash=\$3/);assert.match(intake,/processExternalClientReportForIntake/);assert.match(repo,/processExternalClientReportForIntake/);assert.match(repo,/already been uploaded for this client/);});
 
+test('document storage reference casts the UUID id to text without ambiguous parameter inference',()=>{
+  assert.match(repo,/\$1::text/);
+  assert.doesNotMatch(repo,/file_size_bytes,storage_reference[\s\S]*\$10,\$1,\$11/);
+});
+
+test('upload failures use a report-specific safe contract and preserve correlation',()=>{
+  assert.match(routes,/handleDocumentUpload/);
+  assert.match(routes,/DOCUMENT_UPLOAD_FAILED/);
+  assert.match(routes,/Report upload failed\. Please try again\./);
+  assert.match(routes,/EXTERNAL_DOCUMENT_UPLOAD_FAILED/);
+});
+
 test('report processing terminal timestamp exists for both success and failure paths',()=>{
   const completionMigration=readFileSync(new URL('../../backend/src/db/migrations/0100_external_document_processing_completion.sql',import.meta.url),'utf8');
   const biomarkerRepo=readFileSync(new URL('../../backend/src/modules/external-clients/external-biomarkers.repository.ts',import.meta.url),'utf8');
