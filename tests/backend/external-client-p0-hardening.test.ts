@@ -8,12 +8,13 @@ const intake=fs.readFileSync(new URL('../../backend/src/modules/external-clients
 const client360=fs.readFileSync(new URL('../../backend/src/modules/external-clients/external-client360.repository.ts',import.meta.url),'utf8');
 const intakeRoutes=fs.readFileSync(new URL('../../backend/src/modules/external-clients/external-client-invitations.routes.ts',import.meta.url),'utf8');
 const clientRoutes=fs.readFileSync(new URL('../../backend/src/modules/external-clients/external-clients.routes.ts',import.meta.url),'utf8');
+const documents=fs.readFileSync(new URL('../../backend/src/modules/external-clients/external-client-documents.repository.ts',import.meta.url),'utf8');
 
 test('report processing schema matches runtime retry contract',()=>{
   assert.match(migration,/processing_attempts integer not null default 0/);
   assert.match(migration,/processing_started_at timestamptz/);
   for(const state of ['QUEUED','PROCESSING','EXTRACTED','REVIEW_REQUIRED','CONFIRMED','FAILED','NOT_APPLICABLE'])assert.match(migration,new RegExp(`'${state}'`));
-  assert.match(intake,/category==='LAB_REPORT'\?'QUEUED':'NOT_APPLICABLE'/);
+  assert.match(documents,/category==='LAB_REPORT'\?'QUEUED':'NOT_APPLICABLE'/);
   assert.ok(migration.indexOf("set processing_status = 'QUEUED'")<migration.indexOf('add constraint external_client_document_processing_check'));
 });
 
