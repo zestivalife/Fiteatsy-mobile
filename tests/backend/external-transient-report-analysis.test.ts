@@ -45,3 +45,10 @@ test('repeat save is idempotent and does not create duplicate observations',()=>
   assert.match(repository,/status==='CONFIRMED'\)return\{status:'CONFIRMED',savedCount:run\.rows\[0\]\.confirmed_count\|\|0,rejectedCount:run\.rows\[0\]\.rejected_count\|\|0,filePersisted:false,alreadySaved:true\}/);
   assert.match(migration,/unique\s*\(tenant_id,client_id,analysis_id,row_identity\)/i);
 });
+
+test('confirmed unmapped markers remain visible and receive stable external history identities',()=>{
+  assert.doesNotMatch(repository,/canonical_biomarker_id is not null/);
+  assert.match(repository,/external_unmapped:/);
+  assert.match(repository,/externalBiomarkerIdentitySql/);
+  assert.match(repository,/canonicalBiomarkerId:externalBiomarkerIdentity\(row\)/);
+});
