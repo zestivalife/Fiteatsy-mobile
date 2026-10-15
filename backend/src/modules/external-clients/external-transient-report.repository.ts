@@ -1,12 +1,12 @@
 import crypto from 'node:crypto';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
-import { redisCommand } from '../auth/otp-store.js';
 import { pool } from '../../db/pool.js';
 import { resolveActiveTenantContext } from '../tenancy/tenant-context.js';
 import { analyzeReportBuffer } from '../reports/reports.service.js';
 import { ExternalClientError } from './external-clients.repository.js';
 import { mapExternalBiomarker } from './external-biomarker.domain.js';
 import { validateExternalDocumentFile } from './external-client-documents.repository.js';
+import { externalReportReviewRedisCommand as redisCommand } from './external-report-review-store.js';
 
 const PROCESSING_VERSION='external-transient-biomarker-v1';
 const REVIEW_TTL_SECONDS=2*60*60;
