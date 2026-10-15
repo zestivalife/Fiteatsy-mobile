@@ -2,6 +2,8 @@ export const PLATFORM_GLOBAL_ROLES = ['platform_owner', 'super_admin'] as const;
 
 export type PlatformGlobalRole = typeof PLATFORM_GLOBAL_ROLES[number];
 
+const IN_HOUSE_TENANT_TYPE = 'ZESTIVA_INTERNAL';
+
 export const isPlatformGlobalRole = (role: string | null | undefined): role is PlatformGlobalRole =>
   PLATFORM_GLOBAL_ROLES.includes(String(role ?? '').trim().toLowerCase() as PlatformGlobalRole);
 
@@ -10,8 +12,13 @@ export const isPlatformGlobalRole = (role: string | null | undefined): role is P
 export const assertPlatformOperationAuthority = (
   role: string | null | undefined,
   operationAllowed: boolean,
+  tenantType?: string | null,
 ) => {
-  if (!isPlatformGlobalRole(role) || !operationAllowed) {
+  const normalizedRole = String(role ?? '').trim().toLowerCase();
+  const isInHouseSeniorConsultant =
+    normalizedRole === 'senior_consultant'
+    && String(tenantType ?? '').trim().toUpperCase() === IN_HOUSE_TENANT_TYPE;
+  if ((!isPlatformGlobalRole(role) && !isInHouseSeniorConsultant) || !operationAllowed) {
     throw new Error('PLATFORM_AUTHORITY_REQUIRED');
   }
   return true;

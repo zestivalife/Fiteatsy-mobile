@@ -224,6 +224,8 @@ export type ConsultantClientSyncDiagnostics = {
 };
 
 const AUTHENTICATED_USER_EXCLUSION_ROLES = ['consultant', 'practitioner', 'admin', 'super_admin'];
+const ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL =
+  "and lower(coalesce(u.role, 'user')) not in ('provider', 'dietician', 'senior_consultant', 'mentor', 'platform_owner')";
 const PUBLISHED_REPORT_STATUSES = ['PUBLISHED', 'PARTIALLY_VALIDATED'];
 
 const toIso = (value: unknown) => {
@@ -307,6 +309,7 @@ const eligibleUserPredicate = `
   u.deleted_at is null
   and lower(coalesce(u.status, '')) = 'active'
   and lower(coalesce(u.role, 'user')) not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
+  ${ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL}
 `;
 
 // A canonical mobile client can later receive an operational role without
@@ -319,6 +322,7 @@ const consultantVisibleUserPredicate = `
   and lower(coalesce(u.status, '')) = 'active'
   and (
     lower(coalesce(u.role, 'user')) not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
+    ${ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL}
     or exists (
       select 1
       from consultant_client_assignments role_client_assignment
@@ -538,6 +542,14 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
         limit 1
       ) c on true
       where ${eligibleUserPredicate}
+        and exists (
+          select 1
+          from tenant_memberships membership
+          join tenants tenant on tenant.id = membership.tenant_id
+          where membership.user_id = u.id
+            and membership.status = 'active'
+            and tenant.status = 'active'
+        )
         and (
           c.id is null
           or c.deleted_at is not null

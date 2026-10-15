@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
 import { assertPlatformOperationAuthority } from '../tenancy/platform-authority.js';
+import { resolveActiveTenantContext } from '../tenancy/tenant-context.js';
 import { createProfessionalAssignment, discoverClientsForAssignment, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, revokeProfessionalAssignment, type ProfessionalType } from './professional-assignments.repository.js';
 
 export const professionalAssignmentsRouter = Router();
@@ -11,9 +12,15 @@ professionalAssignmentsRouter.use(requireAuthenticatedAccount);
 export const canManageProfessionalAssignments = (role: string | null | undefined) => ['admin', 'super_admin', 'platform_owner', 'senior_consultant', 'care_operations'].includes(String(role).toLowerCase());
 const assignmentSchema = z.object({ clientUserId: z.string().min(1), professionalUserId: z.string().min(1), professionalType: z.enum(['CONSULTANT', 'PRACTITIONER', 'MENTOR']), relationshipType: z.string().trim().min(2).max(80), reason: z.string().trim().max(240).optional() });
 
+const assertProfessionalDiscoveryAuthority = async (req: Parameters<typeof getAuthenticatedAccount>[0]) => {
+  const account = getAuthenticatedAccount(req);
+  const tenantContext = await resolveActiveTenantContext(account);
+  return assertPlatformOperationAuthority(account.user.role, true, tenantContext?.tenantType);
+};
+
 professionalAssignmentsRouter.get('/clients/search', async (req, res) => {
   try {
-    assertPlatformOperationAuthority(getAuthenticatedAccount(req).user.role, true);
+    await assertProfessionalDiscoveryAuthority(req);
   } catch {
     return res.status(403).json({ error: 'PLATFORM_AUTHORITY_REQUIRED' });
   }
@@ -37,7 +44,7 @@ professionalAssignmentsRouter.get('/clients/pool', async (req, res) => {
 
 professionalAssignmentsRouter.get('/professionals', async (req, res) => {
   try {
-    assertPlatformOperationAuthority(getAuthenticatedAccount(req).user.role, true);
+    await assertProfessionalDiscoveryAuthority(req);
   } catch {
     return res.status(403).json({ error: 'PLATFORM_AUTHORITY_REQUIRED' });
   }
