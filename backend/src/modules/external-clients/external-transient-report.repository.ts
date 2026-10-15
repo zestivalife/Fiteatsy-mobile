@@ -20,7 +20,7 @@ const rawReviewFields=(item:any)=>({rowIdentity:item.rowIdentity,canonicalId:ite
 type AnalysisScope={tenantId:string;clientId:string;actorId:string|null;uploadSource:'CLIENT_SELF_REPORTED'|'CONSULTANT_UPLOADED'};
 const analyzeForScope=async(context:AnalysisScope,input:{fileName:string;mimeType:string;buffer:Buffer})=>{
   const valid=validateExternalDocumentFile(input);const fileHash=digest(input.buffer);
-  const duplicate=await pool.query("select id from external_transient_report_analyses where tenant_id=$1 and client_id=$2 and file_sha256=$3 and status='CONFIRMED'",[context.tenantId,context.clientId,fileHash]);
+  const duplicate=await pool.query("select id from external_transient_report_analyses where tenant_id=$1 and client_id=$2 and file_sha256=$3 and status='CONFIRMED' and confirmed_count+rejected_count>=extracted_count",[context.tenantId,context.clientId,fileHash]);
   if(duplicate.rowCount)throw new ExternalClientError('REPORT_DUPLICATE',409,'This report has already been analyzed for this client.');
   const analysisId=crypto.randomUUID();const reviewToken=crypto.randomBytes(32).toString('base64url');
   await pool.query("insert into external_transient_report_analyses(id,tenant_id,client_id,file_sha256,source_filename,mime_type,file_size_bytes,upload_source,uploaded_by_user_id,processing_version,review_token_hash,status) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'PROCESSING')",[analysisId,context.tenantId,context.clientId,fileHash,valid.fileName,valid.mimeType,input.buffer.length,context.uploadSource,context.actorId,PROCESSING_VERSION,digest(reviewToken)]);

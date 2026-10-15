@@ -52,3 +52,7 @@ test('confirmed unmapped markers remain visible and receive stable external hist
   assert.match(repository,/externalBiomarkerIdentitySql/);
   assert.match(repository,/canonicalBiomarkerId:externalBiomarkerIdentity\(row\)/);
 });
+
+test('historical partial saves can be re-analysed while complete reports remain duplicate protected',()=>{
+  assert.match(repository,/status='CONFIRMED' and confirmed_count\+rejected_count>=extracted_count/);
+});
