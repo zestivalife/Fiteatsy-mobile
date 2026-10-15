@@ -40,3 +40,8 @@ test('new endpoints are external-client scoped and preserve legacy endpoints',()
   assert.match(intakeRoutes,/\/:token\/report-analyses/);
   assert.match(repository,/CLIENT_SELF_REPORTED/);
 });
+
+test('repeat save is idempotent and does not create duplicate observations',()=>{
+  assert.match(repository,/status==='CONFIRMED'\)return\{status:'CONFIRMED',savedCount:run\.rows\[0\]\.confirmed_count\|\|0,rejectedCount:run\.rows\[0\]\.rejected_count\|\|0,filePersisted:false,alreadySaved:true\}/);
+  assert.match(migration,/unique\s*\(tenant_id,client_id,analysis_id,row_identity\)/i);
+});
