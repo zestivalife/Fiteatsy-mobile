@@ -10,6 +10,7 @@ const routes=readFileSync(new URL('../../backend/src/modules/external-clients/ex
 test('migration is additive and External-only',()=>{
   assert.match(migration,/create table external_health_records/);
   assert.match(migration,/create table external_profile_evidence_reviews/);
+  assert.doesNotMatch(migration,/analysis_date::date/);
   assert.doesNotMatch(migration,/alter table|external_diet|common_food|biomarker_observations|zestiva_internal/i);
 });
 

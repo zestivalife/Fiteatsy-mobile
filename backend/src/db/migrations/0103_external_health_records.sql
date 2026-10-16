@@ -23,7 +23,7 @@ create table external_health_records (
   updated_at timestamptz not null default now()
 );
 create index external_health_records_scope_idx
-  on external_health_records(tenant_id,client_id,coalesce(sample_date,report_date,analysis_date::date) desc,created_at desc);
+  on external_health_records(tenant_id,client_id,sample_date desc,report_date desc,analysis_date desc,created_at desc);
 
 create table external_profile_evidence_reviews (
   id uuid primary key,
