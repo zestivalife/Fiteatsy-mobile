@@ -8,6 +8,7 @@ import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, recordQa
 import { bulkSetFoodAuthorisation, listFoodAuthorisation } from './common-food-admin.service.js';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { provisionExternalConsultant } from '../external-signup/external-signup.repository.js';
+import { deactivateExternalQaPractice, EXTERNAL_QA_PROFESSIONS, provisionExternalQaPractice } from './external-qa-practice.repository.js';
 
 export const delegatedRouter = Router();
 
@@ -49,6 +50,17 @@ const externalConsultantProvisionSchema = z.object({
 }).refine((value) => Boolean(value.email || value.mobileNumber), {
   message: 'An email address or mobile number is required.'
 });
+const externalQaPracticeSchema = z.object({
+  fixtureKey: z.string().trim().min(12).max(96),
+  authIdentityId: z.string().trim().min(1).max(180),
+  professionCode: z.enum(EXTERNAL_QA_PROFESSIONS),
+  tenantName: z.string().trim().min(3).max(160),
+  consultantDisplayName: z.string().trim().min(2).max(120),
+  consultantEmail: z.string().trim().email().max(180),
+  clientCount: z.number().int().min(1).max(5).default(1),
+  specialisation: z.string().trim().max(120).optional(),
+  seedProfile: z.record(z.unknown()).optional()
+}).strict();
 
 const actorId = (req: Request) => {
   const value = (req as Request & { delegatedAuthority?: { sub?: string } }).delegatedAuthority?.sub;
@@ -87,6 +99,25 @@ delegatedRouter.post(
     }
   }
 );
+
+delegatedRouter.post('/qa-external-practices', requireDelegatedAuthority('fiteatsy.qa.external_practice.create', 'qa_external_practice', 'platform_owner'), async (req, res) => {
+  const idempotencyKey = req.header('idempotency-key')?.trim();
+  if (!idempotencyKey) return res.status(400).json({ error: 'IDEMPOTENCY_KEY_REQUIRED' });
+  const parsed = externalQaPracticeSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const value = await provisionExternalQaPractice({ ...parsed.data, actorReference: actorId(req), idempotencyKey });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(value.idempotentReplay ? 200 : 201).json(value);
+  } catch (error) { return respondError(res, error, 'QA_EXTERNAL_PRACTICE_PROVISIONING_FAILED'); }
+});
+
+delegatedRouter.post('/qa-external-practices/:fixtureKey/deactivate', requireDelegatedAuthority('fiteatsy.qa.external_practice.deactivate', 'qa_external_practice', 'platform_owner'), async (req, res) => {
+  const parsed = reasonSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try { return res.json(await deactivateExternalQaPractice(String(req.params.fixtureKey), actorId(req), parsed.data.reason)); }
+  catch (error) { return respondError(res, error, 'QA_EXTERNAL_PRACTICE_DEACTIVATION_FAILED'); }
+});
 
 delegatedRouter.get('/food-authorisation', requireDelegatedAuthority('fiteatsy.food.authorisation.manage', 'food_authorisation', 'platform_owner'), async (req, res) => {
   const parsed = foodAuthorisationQuerySchema.safeParse(req.query);
