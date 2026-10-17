@@ -10,6 +10,7 @@ import { issueTemporaryLoginPin } from '../auth/auth.service.js';
 import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
 import { createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from '../professional-assignments/professional-assignments.repository.js';
 import { assignmentValidationDetails, professionalAssignmentBatchSchema, professionalAssignmentSchema } from '../professional-assignments/professional-assignment.contract.js';
+import { deactivateExternalQaPractice, EXTERNAL_QA_PROFESSIONS, provisionExternalQaPractice } from './external-qa-practice.repository.js';
 
 export const delegatedRouter = Router();
 
@@ -22,6 +23,17 @@ const identitySchema = z.object({
 const qaAdminIdentitySchema = identitySchema.strict();
 const assignmentSchema = z.object({ consultantUserId: z.string().trim().min(1), clientUserId: z.string().trim().min(1), reason: z.string().trim().min(3).max(240) });
 const reasonSchema = z.object({ reason: z.string().trim().min(3).max(240) });
+const externalQaPracticeSchema = z.object({
+  fixtureKey: z.string().trim().min(12).max(96),
+  authIdentityId: z.string().trim().min(1).max(180),
+  professionCode: z.enum(EXTERNAL_QA_PROFESSIONS),
+  tenantName: z.string().trim().min(3).max(160),
+  consultantDisplayName: z.string().trim().min(2).max(120),
+  consultantEmail: z.string().trim().email().max(180),
+  clientCount: z.number().int().min(1).max(5).default(1),
+  specialisation: z.string().trim().max(120).optional(),
+  seedProfile: z.record(z.unknown()).optional()
+}).strict();
 
 const actorId = (req: Request) => {
   const value = (req as Request & { delegatedAuthority?: { sub?: string } }).delegatedAuthority?.sub;
@@ -34,6 +46,30 @@ const respondError = (res: Response, error: unknown, fallback: string) => {
   return res.status(typed.status ?? 500).json({ error: typed.code ?? fallback, message: typed.status ? typed.message : 'Fiteatsy operation could not be completed.' });
 };
 const correlationReason = (req: Request, reason: string) => `${reason} [correlation:${req.header('x-correlation-id') || 'unavailable'}]`;
+
+delegatedRouter.post('/qa-external-practices', requireDelegatedAuthority('fiteatsy.qa.external_practice.create', 'qa_external_practice', 'platform_owner'), async (req, res) => {
+  const idempotencyKey = req.header('idempotency-key')?.trim();
+  if (!idempotencyKey) return res.status(400).json({ error: 'IDEMPOTENCY_KEY_REQUIRED' });
+  const parsed = externalQaPracticeSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const value = await provisionExternalQaPractice({ ...parsed.data, actorReference: actorId(req), idempotencyKey });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(value.idempotentReplay ? 200 : 201).json(value);
+  } catch (error) {
+    return respondError(res, error, 'QA_EXTERNAL_PRACTICE_PROVISIONING_FAILED');
+  }
+});
+
+delegatedRouter.post('/qa-external-practices/:fixtureKey/deactivate', requireDelegatedAuthority('fiteatsy.qa.external_practice.deactivate', 'qa_external_practice', 'platform_owner'), async (req, res) => {
+  const parsed = reasonSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    return res.json(await deactivateExternalQaPractice(String(req.params.fixtureKey), actorId(req), parsed.data.reason));
+  } catch (error) {
+    return respondError(res, error, 'QA_EXTERNAL_PRACTICE_DEACTIVATION_FAILED');
+  }
+});
 
 delegatedRouter.get('/intake-leads', requireDelegatedAuthority('fiteatsy.leads.read', 'lead_management', 'platform_owner'), async (req, res) => {
   try {
