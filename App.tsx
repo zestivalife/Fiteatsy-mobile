@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Text, TextInput } from 'react-native';
+import { AppState, Text, TextInput } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -15,11 +15,12 @@ import { AppNavigation } from './src/navigation/AppNavigation';
 import { AppProvider, useAppContext } from './src/state/AppContext';
 import { getThemeColors } from './src/design/tokens';
 import './src/services/wearableBackgroundSync';
+import { runConfiguredHealthLifecycleSync } from './src/services/healthLifecycleSync';
 
 let hasConfiguredGlobalFont = false;
 
 const Root = () => {
-  const { themeMode } = useAppContext();
+  const { themeMode, authSession, wellness, setWellness, addWearableSyncData } = useAppContext();
   const palette = getThemeColors(themeMode);
 
   useEffect(() => {
@@ -27,6 +28,34 @@ const Root = () => {
     GlobalText.defaultProps = GlobalText.defaultProps ?? {};
     GlobalText.defaultProps.style = [{ fontFamily: 'Exo_400Regular', color: palette.textPrimary }, GlobalText.defaultProps.style];
   }, [palette.textPrimary]);
+
+  useEffect(() => {
+    const clientId = authSession?.client.fiteatsyClientId;
+    if (!clientId) return;
+    const sync = () => {
+      void runConfiguredHealthLifecycleSync({
+        fiteatsyClientId: clientId,
+        wellness,
+        trigger: 'FOREGROUND_RESUME'
+      }).then((result) => {
+        if (!result) return;
+        addWearableSyncData(result.payload);
+        setWellness(result.wellness);
+      }).catch((error) => {
+        console.info('[HealthLifecycle] sync deferred', {
+          errorCode: error instanceof Error ? error.message.slice(0, 100) : 'unknown_error'
+        });
+      });
+    };
+    sync();
+    let previous = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (next) => {
+      const resumed = previous !== 'active' && next === 'active';
+      previous = next;
+      if (resumed) sync();
+    });
+    return () => subscription.remove();
+  }, [addWearableSyncData, authSession?.client.fiteatsyClientId, setWellness, wellness]);
 
   return (
     <>

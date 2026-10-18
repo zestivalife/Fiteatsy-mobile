@@ -11,7 +11,12 @@ const CONFIG_KEY = '@fiteatsy/wearable-background-config';
 const RETRY_KEY = '@fiteatsy/wearable-retry-state';
 const MAX_RETRIES = 5;
 
-type BackgroundConfig = { connectionId: string; provider: GovernedProvider; appId: HealthAppId };
+export type BackgroundConfig = {
+  connectionId: string;
+  provider: GovernedProvider;
+  appId: HealthAppId;
+  fiteatsyClientId: string;
+};
 type RetryState = { attempts: number; nextAttemptAt: number; safeErrorCode: string };
 
 const neutralWellness: WellnessSnapshot = { focusMinutes:0,breathingMinutes:0,movementMinutes:0,hydrationLiters:0,
@@ -47,6 +52,18 @@ if (!TaskManager.isTaskDefined(TASK)) {
 export const registerWearableBackgroundSync = async (config: BackgroundConfig) => {
   await AsyncStorage.setItem(CONFIG_KEY, JSON.stringify(config));
   if (!(await TaskManager.isTaskRegisteredAsync(TASK))) await BackgroundTask.registerTaskAsync(TASK, { minimumInterval: 60 });
+};
+
+export const getWearableBackgroundConfig = async (): Promise<BackgroundConfig | null> => {
+  const raw = await AsyncStorage.getItem(CONFIG_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<BackgroundConfig>;
+    if (!parsed.connectionId || !parsed.provider || !parsed.appId || !parsed.fiteatsyClientId) return null;
+    return parsed as BackgroundConfig;
+  } catch {
+    return null;
+  }
 };
 
 export const unregisterWearableBackgroundSync = async () => {

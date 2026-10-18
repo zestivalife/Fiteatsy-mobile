@@ -112,7 +112,7 @@ test('POST /v1/health/observations:batch persists client-owned observations and 
   assert.equal(listed.body.items[0].userId, undefined);
 });
 
-test('health ingestion preserves Health Connect provenance and rejects unsafe observations atomically', async () => {
+test('health ingestion preserves Health Connect provenance and reports unsafe observations per record', async () => {
   const session = await createAuthenticatedSession(server.baseUrl);
   await grantHealthConnectConsent(session.token);
   const measuredAtISO = new Date(Date.now() - 60_000).toISOString();
@@ -165,8 +165,11 @@ test('health ingestion preserves Health Connect provenance and rejects unsafe ob
     const response = await postJson(server.baseUrl, '/v1/health/observations:batch', {
       observations: [{ sourceProvider: 'health_connect', ...observation }]
     }, { headers: authHeaders(session.token) });
-    assert.equal(response.response.status, 400);
-    assert.equal(response.body.error, 'INVALID_HEALTH_OBSERVATION');
+    assert.equal(response.response.status, 200);
+    assert.equal(response.body.accepted, 0);
+    assert.equal(response.body.rejected, 1);
+    assert.equal(response.body.rejections[0].index, 0);
+    assert.equal(response.body.rejections[0].metricType, observation.metricType);
   }
 });
 

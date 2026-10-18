@@ -208,12 +208,11 @@ healthRouter.post('/observations:batch', async (req, res) => {
   const account = getAuthenticatedAccount(req);
   const owner = currentOwner(account);
   const invalid = parsed.data.observations
-    .map((observation, index) => ({ index, reason: validateObservation(observation) }))
+    .map((observation, index) => ({ index, metricType: observation.metricType, reason: validateObservation(observation) }))
     .filter((item) => item.reason != null);
-  if (invalid.length) {
-    return res.status(400).json({ error: 'INVALID_HEALTH_OBSERVATION', details: invalid });
-  }
-  const providers = [...new Set(parsed.data.observations.map((item) => item.sourceProvider))];
+  const invalidIndexes = new Set(invalid.map((item) => item.index));
+  const validObservations = parsed.data.observations.filter((_, index) => !invalidIndexes.has(index));
+  const providers = [...new Set(validObservations.map((item) => item.sourceProvider))];
   for (const provider of providers) {
     const governed = ['apple_health','apple-health'].includes(provider) ? 'APPLE_HEALTH'
       : ['health_connect','health-connect','google_health_connect'].includes(provider) ? 'HEALTH_CONNECT' : null;
@@ -221,17 +220,22 @@ healthRouter.post('/observations:batch', async (req, res) => {
       return res.status(403).json({ error: 'ACTIVE_WEARABLE_CONSENT_REQUIRED', provider: governed });
     }
   }
-  const result = await ingestHealthObservations(owner, parsed.data.observations);
+  const result = validObservations.length
+    ? await ingestHealthObservations(owner, validObservations)
+    : { accepted: [], duplicate: [], rejected: [], updated: 0, deleted: 0 };
   const scores = await calculateHealthScores(owner);
   return res.status(200).json({
     accepted: result.accepted.length,
     duplicate: result.duplicate.length,
-    rejected: result.rejected.length,
+    rejected: result.rejected.length + invalid.length,
     updated: result.updated,
     deleted: result.deleted,
     items: result.accepted.map((item) => toObservationDto(item, account.client.fiteatsyClientId)),
     duplicates: result.duplicate,
-    rejections: result.rejected,
+    rejections: [
+      ...invalid.map(({ index, metricType, reason }) => ({ index, metricType, reason })),
+      ...result.rejected
+    ],
     intelligence: {
       recalculated: true,
       scores: scores.map((score) => ({

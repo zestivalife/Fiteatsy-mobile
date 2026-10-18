@@ -104,7 +104,7 @@ export const getLatestHealthObservations = (limit = 10) =>
     `/v1/health/observations?limit=${encodeURIComponent(String(limit))}`
   );
 
-export const runHealthSync = async (
+const runHealthSyncInternal = async (
   appId: HealthAppId,
   previousWellness: WellnessSnapshot,
   governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY' }
@@ -126,7 +126,9 @@ export const runHealthSync = async (
     if (run) await finishWearableSyncRun(run.id, { status: rejected ? 'PARTIAL' : 'SUCCESS', recordsRead: observations.length,
       recordsUploaded: observations.length, recordsInserted: accepted, recordsDuplicates: duplicate, recordsUpdated: updated, recordsDeleted: deleted });
     const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors;
-    if (governed && anchors) await Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
+    // Never advance a native cursor past a record that the canonical backend
+    // rejected. The next run must be able to read and reconcile that record.
+    if (governed && anchors && rejected === 0) await Promise.all(Object.entries(anchors).map(([metricScope, checkpoint]) =>
       commitWearableCheckpoint({ connectionId:governed.connectionId,provider:governed.provider,metricScope,
         ...(governed.provider === 'HEALTH_CONNECT' ? { cursorValue: checkpoint } : { anchorValue: checkpoint }),
         backfillComplete:true })));
@@ -140,4 +142,18 @@ export const runHealthSync = async (
       safeErrorSummary:'Wearable synchronization could not complete.' }).catch(() => undefined);
     throw error;
   }
+};
+
+let activeHealthSync: Promise<HealthSyncResult> | null = null;
+
+/** Single-flight across setup, app-open, foreground and background triggers. */
+export const runHealthSync = (
+  appId: HealthAppId,
+  previousWellness: WellnessSnapshot,
+  governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY' }
+): Promise<HealthSyncResult> => {
+  if (activeHealthSync) return activeHealthSync;
+  activeHealthSync = runHealthSyncInternal(appId, previousWellness, governed)
+    .finally(() => { activeHealthSync = null; });
+  return activeHealthSync;
 };

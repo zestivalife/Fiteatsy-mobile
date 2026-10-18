@@ -33,12 +33,16 @@ const toIso = (ms: number) => new Date(ms).toISOString();
 const permissionList: Permission[] = [
   { accessType: 'read', recordType: 'Steps' },
   { accessType: 'read', recordType: 'SleepSession' },
+  { accessType: 'read', recordType: 'HeartRate' },
   { accessType: 'read', recordType: 'RestingHeartRate' },
   { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
   { accessType: 'read', recordType: 'ExerciseSession' },
   { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
   { accessType: 'read', recordType: 'Weight' },
-  { accessType: 'read', recordType: 'Distance' }
+  { accessType: 'read', recordType: 'Distance' },
+  { accessType: 'read', recordType: 'Hydration' },
+  { accessType: 'read', recordType: 'OxygenSaturation' },
+  { accessType: 'read', recordType: 'RespiratoryRate' }
 ];
 
 const metricPermissionMap = {
@@ -121,12 +125,16 @@ const summarizePermissions = (granted: Array<Permission>): HealthConnectPermissi
   const permissionStates = {
     Steps: hasPermission(grantedSet, 'Steps'),
     SleepSession: hasPermission(grantedSet, 'SleepSession'),
+    HeartRate: hasPermission(grantedSet, 'HeartRate'),
     RestingHeartRate: hasPermission(grantedSet, 'RestingHeartRate'),
     HeartRateVariabilityRmssd: hasPermission(grantedSet, 'HeartRateVariabilityRmssd'),
     ExerciseSession: hasPermission(grantedSet, 'ExerciseSession'),
     ActiveCaloriesBurned: hasPermission(grantedSet, 'ActiveCaloriesBurned'),
     Weight: hasPermission(grantedSet, 'Weight'),
-    Distance: hasPermission(grantedSet, 'Distance')
+    Distance: hasPermission(grantedSet, 'Distance'),
+    Hydration: hasPermission(grantedSet, 'Hydration'),
+    OxygenSaturation: hasPermission(grantedSet, 'OxygenSaturation'),
+    RespiratoryRate: hasPermission(grantedSet, 'RespiratoryRate')
   };
 
   return {
@@ -250,12 +258,16 @@ const getHealthConnectRuntimeDiagnosticsInternal = async (): Promise<HealthConne
   const permissionStates = {
     Steps: toGranted('Steps'),
     SleepSession: toGranted('SleepSession'),
+    HeartRate: toGranted('HeartRate'),
     RestingHeartRate: toGranted('RestingHeartRate'),
     HeartRateVariabilityRmssd: toGranted('HeartRateVariabilityRmssd'),
     ExerciseSession: toGranted('ExerciseSession'),
     ActiveCaloriesBurned: toGranted('ActiveCaloriesBurned'),
     Weight: toGranted('Weight'),
-    Distance: toGranted('Distance')
+    Distance: toGranted('Distance'),
+    Hydration: toGranted('Hydration'),
+    OxygenSaturation: toGranted('OxygenSaturation'),
+    RespiratoryRate: toGranted('RespiratoryRate')
   };
 
   const end = toIso(now());

@@ -357,8 +357,12 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
         grantedScopes: persistedGrantedScopes, backgroundSyncEnabled: grantedScopes.length > 0 });
       setConnectionId(connection.id);
       shouldStartInitialSyncRef.current = Platform.OS === 'ios' && grantedScopes.length > 0;
-      if (grantedScopes.length > 0) await registerWearableBackgroundSync({ connectionId:connection.id,provider,
-        appId:Platform.OS === 'ios' ? 'apple-health' : 'health-connect' });
+      if (grantedScopes.length > 0 && authSession?.client.fiteatsyClientId) await registerWearableBackgroundSync({
+        connectionId: connection.id,
+        provider,
+        appId: Platform.OS === 'ios' ? 'apple-health' : 'health-connect',
+        fiteatsyClientId: authSession.client.fiteatsyClientId
+      });
       applyPermissionState(permission);
     } catch (permissionError) {
       const message = permissionError instanceof Error ? permissionError.message : 'health_permission_failed';
@@ -378,7 +382,7 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       inFlightRef.current = false;
       setIsRunning(false);
     }
-  }, [applyPermissionState]);
+  }, [applyPermissionState, authSession?.client.fiteatsyClientId]);
 
   const runRecoveryConnection = useCallback(async () => {
     if (inFlightRef.current) {
