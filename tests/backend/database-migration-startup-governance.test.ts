@@ -7,6 +7,7 @@ import {
 } from '../../backend/src/server.js';
 import {
   evaluateDatabaseSchemaStatus,
+  prepareMigrationSql,
   type DatabaseSchemaStatus
 } from '../../backend/src/db/migrator.js';
 
@@ -101,4 +102,19 @@ test('the explicit migration command remains separate from API startup', () => {
   ) as { scripts: Record<string, string> };
   assert.equal(packageJson.scripts['db:migrate'], 'tsx src/db/migrator.ts');
   assert.equal(packageJson.scripts.start, 'node dist/server.js');
+});
+
+test('the governed runner owns historical transaction boundaries during replay', () => {
+  const prepared = prepareMigrationSql('0001_example.sql', 'begin;\ncreate table example(id uuid);\ncommit;');
+  assert.doesNotMatch(prepared, /^\s*(begin|commit)\s*;/im);
+  assert.match(prepared, /create table example/);
+});
+
+test('health-record replay uses an immutable timezone-independent index expression', () => {
+  const prepared = prepareMigrationSql(
+    '0104_external_health_records.sql',
+    'create index sample on external_health_records(coalesce(sample_date,report_date,analysis_date::date));'
+  );
+  assert.match(prepared, /\(analysis_date at time zone 'UTC'\)::date/);
+  assert.doesNotMatch(prepared, /analysis_date::date/);
 });

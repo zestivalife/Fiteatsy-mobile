@@ -8,6 +8,7 @@ const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '
 const MIGRATION_LOCK_NAMESPACE = 20260730;
 const MIGRATION_LOCK_KEY = 11;
 const LEGACY_PROFESSIONAL_SNAPSHOT_FILE = '0036_professional_identity_snapshot_backfill.sql';
+const EXTERNAL_HEALTH_RECORDS_FILE = '0104_external_health_records.sql';
 const LEGACY_PROFESSIONAL_SNAPSHOT_USER_IDS = [
   '0e65d616-b96e-4fc5-8d36-a2f33cd81c89',
   '3bc788d8-795d-4ecb-bded-e120b33ed554',
@@ -48,6 +49,24 @@ export const readMigrationFiles = async () => {
     .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
     .map((entry) => entry.name)
     .sort((left, right) => left.localeCompare(right));
+};
+
+export const prepareMigrationSql = (file: string, sql: string) => {
+  // The migrator owns the transaction so schema changes and the ledger insert
+  // commit or roll back together, including immutable historical files that
+  // contain standalone transaction delimiters.
+  let prepared = sql.replace(/^\s*(?:begin|commit)\s*;\s*$/gim, '');
+  if (file === EXTERNAL_HEALTH_RECORDS_FILE) {
+    // timestamptz::date is STABLE because it depends on the session timezone
+    // and therefore cannot be used in a PostgreSQL index expression. Keep the
+    // applied migration immutable while making fresh-database replay explicit
+    // and timezone-independent.
+    prepared = prepared.replace(
+      'coalesce(sample_date,report_date,analysis_date::date)',
+      "coalesce(sample_date,report_date,(analysis_date at time zone 'UTC')::date)"
+    );
+  }
+  return prepared;
 };
 
 const acquireMigrationLock = async (client: PoolClient) => {
@@ -125,7 +144,7 @@ const applyMigrations = async (): Promise<MigrationReport> => {
     const files = await readMigrationFiles();
     for (const file of files) {
       if (appliedVersions.has(file)) continue;
-      const sql = await fs.readFile(path.join(MIGRATIONS_DIR, file), 'utf8');
+      const sql = prepareMigrationSql(file, await fs.readFile(path.join(MIGRATIONS_DIR, file), 'utf8'));
       await client.query('begin');
       try {
         await ensureSchemaMigrationsTable(client);
