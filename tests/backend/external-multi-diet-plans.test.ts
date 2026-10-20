@@ -5,12 +5,28 @@ import test from 'node:test';
 const repo=readFileSync(new URL('../../backend/src/modules/external-clients/external-diet-plans.repository.ts',import.meta.url),'utf8');
 const routes=readFileSync(new URL('../../backend/src/modules/external-clients/external-clients.routes.ts',import.meta.url),'utf8');
 const migration=readFileSync(new URL('../../backend/src/db/migrations/0105_external_multi_diet_plans.sql',import.meta.url),'utf8');
+const migrator=readFileSync(new URL('../../backend/src/db/migrator.ts',import.meta.url),'utf8');
 
 test('migration removes the one-plan constraint and adds independent plan identity metadata',()=>{
   assert.match(migration,/drop constraint if exists external_diet_plans_tenant_id_client_id_key/i);
   assert.match(migration,/add column if not exists name/i);
   assert.match(migration,/revision_of_plan_id/i);
   assert.doesNotMatch(migration,/internal_|common_food|biomarker_observation/i);
+});
+
+test('migration transaction and ledger entry remain atomic under the governed runner',()=>{
+  assert.doesNotMatch(migration,/^\s*(begin|commit|rollback)\s*;/im);
+  assert.match(migrator,/await client\.query\('begin'\)/);
+  assert.match(migrator,/await client\.query\(sql\);[\s\S]*insert into schema_migrations[\s\S]*await client\.query\('commit'\)/);
+  assert.match(migrator,/catch \(error\) \{[\s\S]*rollbackQuietly\(client\)[\s\S]*throw error/);
+  assert.match(migrator,/migrationPromise = null/);
+});
+
+test('migration is retry-safe before its ledger entry is committed',()=>{
+  assert.match(migration,/drop constraint if exists/i);
+  assert.equal((migration.match(/add column if not exists/gi)??[]).length,2);
+  assert.equal((migration.match(/create index if not exists/gi)??[]).length,2);
+  assert.match(migration,/where name is null or btrim\(name\) = ''/i);
 });
 
 test('all mutable authoring operations resolve the exact plan id in tenant and client scope',()=>{

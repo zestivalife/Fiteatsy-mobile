@@ -1,5 +1,3 @@
-begin;
-
 alter table external_diet_plans
   drop constraint if exists external_diet_plans_tenant_id_client_id_key;
 
@@ -22,5 +20,3 @@ create index if not exists external_diet_plan_client_updated
 create index if not exists external_diet_plan_revision_lineage
   on external_diet_plans(revision_of_plan_id)
   where revision_of_plan_id is not null;
-
-commit;
