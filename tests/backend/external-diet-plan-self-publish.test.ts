@@ -23,7 +23,8 @@ test('external authoring adapter exposes shared canonical search and scoped snap
   assert.match(routes,/diet-plans\/:planId\/common-food\/options/);
   assert.match(repository,/eligibleCommonFoods\(commonFoodCatalogue,context,input\.mealHead\)/);
   assert.match(repository,/validateManualCombination/);
-  assert.match(repository,/ctx\.plan\.id!==planId/);
+  assert.match(repository,/and \(\$3::uuid is null or id=\$3\)/);
+  assert.match(repository,/draftContext\(account,clientId,planId\)/);
   assert.match(repository,/ctx\.version\.id!==input\.expectedPlanVersionId/);
   assert.match(repository,/Exactly five options are required for every meal/);
 });
