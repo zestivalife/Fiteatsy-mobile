@@ -19,6 +19,8 @@ const shouldSkipExternalOtpDelivery = () => {
   return environment === 'test';
 };
 
+const shouldLogOtpLocally = () => env.environment.toLowerCase() === 'development' && !env.pingmateApiKey;
+
 const logDeliveryResult = (challengeId: string, userId: string | null | undefined, result: OtpDeliveryResult) => {
   console.info('OTP delivery result', {
     challengeId,
@@ -52,6 +54,17 @@ export const NotificationService = {
         provider: TEST_PROVIDER_NAME,
         latencyMs: 0
       } satisfies OtpDeliveryResult;
+      logDeliveryResult(input.challengeId, input.userId, result);
+      return result;
+    }
+
+    if (shouldLogOtpLocally()) {
+      const result = {
+        status: 'skipped',
+        provider: 'local-dev-log',
+        latencyMs: 0
+      } satisfies OtpDeliveryResult;
+      console.info(`[LOCAL DEV OTP] challenge=${input.challengeId} mobile=${input.mobileNumber} otp=${input.otp}`);
       logDeliveryResult(input.challengeId, input.userId, result);
       return result;
     }
