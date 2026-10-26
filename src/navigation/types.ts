@@ -54,6 +54,7 @@ export type RootStackParamList = {
   Sessions: undefined;
   Cycle: undefined;
   ConnectedMetrics: undefined;
+  HealthData: undefined;
   HealthSyncDebug: undefined;
   ReportsChat: { reportName: string; reportId: string; reportParameters: ReportParameter[] };
   NutritionPlan: undefined;

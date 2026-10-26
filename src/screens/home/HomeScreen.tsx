@@ -338,6 +338,7 @@ export const HomeScreen = () => {
                 onPress={() => { void openAssist(); }}
               />
               <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable')} />
+              <ActionPill label="Health Data" Icon={HealthDataActionIcon} onPress={() => navigation.navigate('HealthData')} />
               <ActionPill label="Health Reports" Icon={ReportsActionIcon} onPress={() => navigation.navigate('Reports')} />
               <ActionPill label="Cycle" Icon={CycleActionIcon} onPress={() => navigation.navigate('Cycle')} />
             </View>
@@ -416,6 +417,10 @@ const RecoveryTrend = ({ values, hasData }: { values: number[]; hasData: boolean
 
 const ReportsActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
   <Ionicons name="document-text-outline" size={Math.min(Number(width), Number(height))} color="#FFFFFF" />
+);
+
+const HealthDataActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
+  <Ionicons name="heart-outline" size={Math.min(Number(width), Number(height))} color="#FFFFFF" />
 );
 
 const CycleActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
@@ -779,9 +784,10 @@ const styles = StyleSheet.create({
     lineHeight: 13
   },
   actionRow: {
-    height: 36,
+    minHeight: 36,
     marginTop: -1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-start',
     alignItems: 'center',
     gap: 8

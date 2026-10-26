@@ -168,7 +168,7 @@ const requestAppleHealthPermissionsInternal = async (): Promise<AppleHealthPermi
 export const requestAppleHealthPermissions = () =>
   runHealthConnectOperation('REQUESTING_PERMISSION', requestAppleHealthPermissionsInternal);
 
-const syncFromAppleHealthInternal = async (): Promise<WearableSyncPayload> => {
+const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boolean } = {}): Promise<WearableSyncPayload> => {
   const healthKit = loadHealthKit();
   await ensureAvailable(healthKit);
 
@@ -238,7 +238,7 @@ const syncFromAppleHealthInternal = async (): Promise<WearableSyncPayload> => {
       []
     );
     return buckets
-      .filter((bucket) => bucket.startDate && bucket.endDate && bucket.endDate.getTime() <= currentHourStart)
+      .filter((bucket) => bucket.startDate && bucket.endDate && (options.includeCurrentHour || bucket.endDate.getTime() <= currentHourStart))
       .map((bucket) => ({
         start: bucket.startDate as Date,
         end: bucket.endDate as Date,
@@ -255,7 +255,7 @@ const syncFromAppleHealthInternal = async (): Promise<WearableSyncPayload> => {
     metricType: 'steps',
     value: bucket.total,
     unit: 'count',
-    measuredAt: bucket.end,
+    measuredAt: options.includeCurrentHour ? new Date(Math.min(bucket.end.getTime(), nowMs)) : bucket.end,
     recordType: 'StepCount',
     sourceRecordId: `steps:${bucket.start.toISOString()}`,
     start: bucket.start,
@@ -358,7 +358,7 @@ const syncFromAppleHealthInternal = async (): Promise<WearableSyncPayload> => {
     metricType: 'active_energy',
     value: bucket.total,
     unit: 'kcal',
-    measuredAt: bucket.end,
+    measuredAt: options.includeCurrentHour ? new Date(Math.min(bucket.end.getTime(), nowMs)) : bucket.end,
     recordType: 'ActiveEnergyBurned',
     sourceRecordId: `active_energy:${bucket.start.toISOString()}`,
     start: bucket.start,
@@ -393,7 +393,7 @@ const syncFromAppleHealthInternal = async (): Promise<WearableSyncPayload> => {
     metricType: 'distance',
     value: bucket.total,
     unit: 'm',
-    measuredAt: bucket.end,
+    measuredAt: options.includeCurrentHour ? new Date(Math.min(bucket.end.getTime(), nowMs)) : bucket.end,
     recordType: 'DistanceWalkingRunning',
     sourceRecordId: `distance:${bucket.start.toISOString()}`,
     start: bucket.start,
@@ -448,9 +448,9 @@ const syncFromAppleHealthInternal = async (): Promise<WearableSyncPayload> => {
   };
 };
 
-export const syncFromAppleHealth = () =>
+export const syncFromAppleHealth = (options: { includeCurrentHour?: boolean } = {}) =>
   runHealthConnectOperation(
     'SYNCING',
-    syncFromAppleHealthInternal,
+    () => syncFromAppleHealthInternal(options),
     (payload) => Object.values(payload.dataQuality.connectedMetrics ?? {}).includes('read_failed') ? 'PARTIAL_SUCCESS' : 'SUCCESS'
   );

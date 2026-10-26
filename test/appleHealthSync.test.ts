@@ -155,6 +155,24 @@ describe('Apple Health sync', () => {
     expect(first.observations?.filter((o) => o.metricType === 'steps')).toHaveLength(2);
   });
 
+  it('includes the current partial hour only for a live display read', async () => {
+    const currentBucket = {
+      startDate: new Date(Date.UTC(2026, 9, 26, 9, 0, 0)),
+      endDate: new Date(Date.UTC(2026, 9, 26, 10, 0, 0)),
+      sumQuantity: { unit: 'count', quantity: 99 },
+      sources: []
+    };
+    mockHealthKit.queryStatisticsCollectionForQuantity.mockImplementation(async (identifier: string) =>
+      identifier.endsWith('StepCount') ? [completedHour(1, 700), currentBucket] : []
+    );
+
+    const syncPayload = await syncFromAppleHealth();
+    const livePayload = await syncFromAppleHealth({ includeCurrentHour: true });
+
+    expect(syncPayload.observations?.filter((item) => item.metricType === 'steps')).toHaveLength(1);
+    expect(livePayload.observations?.filter((item) => item.metricType === 'steps')).toHaveLength(2);
+  });
+
   it('reports a partial result instead of failing when one metric cannot be read', async () => {
     mockHealthKit.queryWorkoutSamples.mockRejectedValue(new Error('boom'));
     const payload = await syncFromAppleHealth();

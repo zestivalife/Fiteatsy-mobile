@@ -85,7 +85,7 @@ export const SignInScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen>
+    <Screen scroll keyboardAware>
       <View style={styles.container}>
         <View style={[styles.heroCard, { backgroundColor: themeColors.card, borderColor: themeColors.stroke }]}>
           <Text style={[styles.kicker, { color: themeColors.blue }]}>Existing User Login</Text>

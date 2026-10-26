@@ -95,7 +95,7 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
   );
 
   return (
-    <Screen>
+    <Screen scroll keyboardAware>
       <View style={styles.container}>
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
           <Text style={[styles.kicker, { color: palette.blue }]}>Security</Text>

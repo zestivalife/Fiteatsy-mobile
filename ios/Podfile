@@ -59,5 +59,44 @@ target 'Fiteatsy' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+
+    # Xcode 26's Clang rejects fmt 11's C++20 consteval format checks when fmt
+    # is compiled as part of React Native. fmt supports C++17, which keeps its
+    # equivalent checks on the compatible constexpr path.
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'fmt'
+
+      target.build_configurations.each do |build_config|
+        build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+      end
+    end
+
+    fmt_base_header = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'base.h')
+    if File.exist?(fmt_base_header)
+      contents = File.read(fmt_base_header)
+      detection = '#if !defined(__cpp_lib_is_constant_evaluated)'
+      workaround = <<~CPP.chomp
+        #if defined(__apple_build_version__) && __apple_build_version__ >= 17000000L
+        #  define FMT_USE_CONSTEVAL 0
+        #elif !defined(__cpp_lib_is_constant_evaluated)
+      CPP
+      if contents.include?(detection)
+        File.chmod(0644, fmt_base_header)
+        File.write(fmt_base_header, contents.sub(detection, workaround))
+      end
+    end
+
+    # Xcode 26 turns glog's nested includes into inferred submodule imports,
+    # which Clang rejects inside namespace google. Keep glog as one module.
+    glog_module_map = File.join(installer.sandbox.root, 'Target Support Files', 'glog', 'glog.modulemap')
+    if File.exist?(glog_module_map)
+      module_map = File.read(glog_module_map)
+      module_map = module_map.gsub(/^\s*module \* \{ export \* \}\n/, '')
+      module_map = module_map.sub(
+        '  export *',
+        "  exclude header \"glog/log_severity.h\"\n  exclude header \"glog/vlog_is_on.h\"\n\n  export *"
+      )
+      File.write(glog_module_map, module_map)
+    end
   end
 end
