@@ -1,6 +1,7 @@
 import { Linking, Platform } from 'react-native';
 import { WearableSyncPayload } from '../types';
 import { apiFetch, postJson } from './apiClient';
+import { syncFromAppleHealth } from './appleHealthService';
 import { syncFromHealthConnect } from './healthConnectService';
 
 export type HealthAppId = 'apple-health' | 'health-connect' | 'google-fit' | 'samsung-health' | 'fitbit';
@@ -66,7 +67,12 @@ export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<Wearab
     return syncFromHealthConnect();
   }
 
-  throw new Error('apple_health_native_reader_not_available');
+  // iOS: source-of-truth sync reads directly from HealthKit.
+  if (platform === 'ios' && appId === 'apple-health') {
+    return syncFromAppleHealth();
+  }
+
+  throw new Error('health_app_not_supported_on_platform');
 };
 
 export const openHealthConnectPlayStore = async () => {

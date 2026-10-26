@@ -71,6 +71,13 @@
       "expo-document-picker",
       "@react-native-community/datetimepicker",
       "react-native-health-connect",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Fiteatsy reads your steps, sleep, heart rate, HRV, workouts, energy, weight and distance from Apple Health to calculate your recovery and wellness insights. Fiteatsy never writes to Apple Health.",
+          "NSHealthUpdateUsageDescription": false
+        }
+      ],
       "./plugins/withHealthConnectPermissionDelegate",
       "expo-video",
       "./plugins/withFrozenSplashBridge"
