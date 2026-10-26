@@ -21,7 +21,9 @@ export const getLiveHealthWindows = (nowMs = Date.now()) => {
   dayStart.setHours(0, 0, 0, 0);
   const sleepStart = new Date(nowMs);
   sleepStart.setHours(18, 0, 0, 0);
-  if (sleepStart.getTime() > nowMs) sleepStart.setDate(sleepStart.getDate() - 1);
+  // A sleep day starts at 6 PM on the previous calendar day. Always using the
+  // previous day keeps last night's sleep visible after 6 PM the following day.
+  sleepStart.setDate(sleepStart.getDate() - 1);
   return { dayStart, sleepStart, endDate };
 };
 

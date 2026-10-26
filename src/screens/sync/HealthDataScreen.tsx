@@ -14,10 +14,22 @@ import type { HealthObservationDraft, WearableSyncPayload } from '../../types';
 type HealthDataRow = {
   key: string;
   label: string;
+  period: string;
   value: string;
   status: string;
   source?: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  accent: string;
 };
+
+const APPLE_HEALTH_COLORS = {
+  activity: '#FF6B35',
+  distance: '#32D74B',
+  energy: '#FF453A',
+  sleep: '#7D7AFF',
+  heart: '#FF375F',
+  hrv: '#FF2D55'
+} as const;
 
 const sumMetric = (observations: HealthObservationDraft[], metricType: string) => {
   const values = observations.filter((item) => item.metricType === metricType).map((item) => item.value);
@@ -53,26 +65,32 @@ const buildRows = (payload: WearableSyncPayload): HealthDataRow[] => {
   const row = (
     key: string,
     label: string,
+    period: string,
     value: number | null | undefined,
     unit: string,
     status: string,
     source?: string,
-    decimals = 1
+    decimals = 1,
+    icon: HealthDataRow['icon'] = 'heart-outline',
+    accent: string = APPLE_HEALTH_COLORS.heart
   ): HealthDataRow => ({
     key,
     label,
-    value: value == null ? 'No accessible data' : `${formatNumber(value, decimals)} ${unit}`.trim(),
+    period,
+    value: value == null ? 'No Data' : `${formatNumber(value, decimals)} ${unit}`.trim(),
     status,
-    source
+    source,
+    icon,
+    accent
   });
 
   return [
-    row('steps', 'Steps · 12:00 AM to now', steps, 'steps', statusLabel(payload, 'steps'), sourceFor(observations, 'steps'), 0),
-    row('distance', 'Walking + running distance · 12:00 AM to now', distance == null ? null : distance / 1000, 'km', statusLabel(payload, 'distance'), sourceFor(observations, 'distance'), 2),
-    row('energy', 'Active energy · 12:00 AM to now', activeEnergy, 'kcal', statusLabel(payload, 'calories'), sourceFor(observations, 'active_energy'), 0),
-    row('sleep', 'Sleep · 6:00 PM to now', payload.metrics.sleepHours, 'hr', statusLabel(payload, 'sleep'), sourceFor(observations, 'sleep_minutes'), 1),
-    row('heart', 'Resting heart rate · 12:00 AM to now', payload.metrics.heartRateAvg, 'bpm', statusLabel(payload, 'heart_rate'), sourceFor(observations, 'resting_heart_rate'), 0),
-    row('hrv', 'HRV · 12:00 AM to now', payload.metrics.hrvMs, 'ms', statusLabel(payload, 'hrv'), sourceFor(observations, 'hrv_ms'), 1)
+    row('steps', 'Steps', '12:00 AM – Now', steps, 'steps', statusLabel(payload, 'steps'), sourceFor(observations, 'steps'), 0, 'footsteps-outline', APPLE_HEALTH_COLORS.activity),
+    row('distance', 'Walking + Running Distance', '12:00 AM – Now', distance == null ? null : distance / 1000, 'km', statusLabel(payload, 'distance'), sourceFor(observations, 'distance'), 2, 'walk-outline', APPLE_HEALTH_COLORS.distance),
+    row('energy', 'Active Energy', '12:00 AM – Now', activeEnergy, 'kcal', statusLabel(payload, 'calories'), sourceFor(observations, 'active_energy'), 1, 'flame-outline', APPLE_HEALTH_COLORS.energy),
+    row('sleep', 'Sleep', 'Yesterday 6:00 PM – Now', payload.metrics.sleepHours, 'hr', statusLabel(payload, 'sleep'), sourceFor(observations, 'sleep_minutes'), 1, 'bed-outline', APPLE_HEALTH_COLORS.sleep),
+    row('heart', 'Resting Heart Rate', '12:00 AM – Now', payload.metrics.heartRateAvg, 'bpm', statusLabel(payload, 'heart_rate'), sourceFor(observations, 'resting_heart_rate'), 0, 'heart-outline', APPLE_HEALTH_COLORS.heart),
+    row('hrv', 'Heart Rate Variability', '12:00 AM – Now', payload.metrics.hrvMs, 'ms', statusLabel(payload, 'hrv'), sourceFor(observations, 'hrv_ms'), 1, 'pulse-outline', APPLE_HEALTH_COLORS.hrv)
   ];
 };
 
@@ -129,9 +147,13 @@ export const HealthDataScreen = () => {
         </View>
       </View>
 
-      <View style={[styles.notice, { backgroundColor: palette.blueSoft, borderColor: palette.blue }]}>
-        <Ionicons name="shield-checkmark-outline" size={22} color={palette.blue} />
-        <Text style={[styles.noticeText, { color: palette.textPrimary }]}>Read-only device data. Pull down or tap Refresh to read again.</Text>
+      <View style={[styles.notice, { backgroundColor: palette.card }]}>
+        <View style={styles.healthIcon}><Ionicons name="heart" size={20} color="#FF2D55" /></View>
+        <View style={styles.noticeCopy}>
+          <Text style={[styles.noticeTitle, { color: palette.textPrimary }]}>Apple Health</Text>
+          <Text style={[styles.noticeText, { color: palette.textSecondary }]}>Read-only data from this iPhone</Text>
+        </View>
+        <Ionicons name="checkmark-circle" size={22} color={palette.success} />
       </View>
 
       {!isConnected ? (
@@ -165,12 +187,19 @@ export const HealthDataScreen = () => {
       ) : (
         <View style={styles.list}>
           {rows.map((item) => (
-            <View key={item.key} style={[styles.metricCard, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
+            <View key={item.key} style={[styles.metricCard, { backgroundColor: palette.card }]}>
               <View style={styles.metricTopRow}>
-                <Text style={[styles.metricLabel, { color: palette.textSecondary }]}>{item.label}</Text>
-                <Text style={[styles.status, { color: item.status === 'synced' ? palette.success : palette.textMuted }]}>{item.status}</Text>
+                <View style={styles.metricIdentity}>
+                  <Ionicons name={item.icon} size={20} color={item.accent} />
+                  <Text style={[styles.metricLabel, { color: item.accent }]}>{item.label}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
               </View>
               <Text style={[styles.metricValue, { color: palette.textPrimary }]}>{item.value}</Text>
+              <View style={styles.metricFooter}>
+                <Text style={[styles.period, { color: palette.textSecondary }]}>{item.period}</Text>
+                <Text style={[styles.status, { color: item.status === 'synced' ? palette.success : palette.textMuted }]}>{item.status}</Text>
+              </View>
               {item.source ? <Text style={[styles.source, { color: palette.textMuted }]}>Source: {item.source}</Text> : null}
             </View>
           ))}
@@ -201,8 +230,11 @@ const styles = StyleSheet.create({
   headingCopy: { flex: 1 },
   title: typography.title,
   subtitle: { ...typography.subtext, marginTop: spacing.xxs },
-  notice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
-  noticeText: { ...typography.bodySmall, flex: 1 },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg, padding: spacing.md, borderRadius: 16 },
+  healthIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  noticeCopy: { flex: 1 },
+  noticeTitle: { ...typography.label, fontWeight: '700' },
+  noticeText: typography.bodySmall,
   centerState: { minHeight: 240, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   stateText: typography.bodySmall,
   errorCard: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: spacing.xs },
@@ -213,12 +245,15 @@ const styles = StyleSheet.create({
   connectBody: { ...typography.bodySmall, marginTop: spacing.xs, textAlign: 'center' },
   connectButton: { width: '100%', minHeight: 52, marginTop: spacing.lg, paddingHorizontal: spacing.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   platformNote: { ...typography.subtext, marginTop: spacing.sm, textAlign: 'center' },
-  list: { marginTop: spacing.lg, gap: spacing.sm },
-  metricCard: { padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
+  list: { marginTop: spacing.lg, gap: 12 },
+  metricCard: { minHeight: 154, padding: 20, borderRadius: 22 },
   metricTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  metricLabel: typography.label,
+  metricIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metricLabel: { ...typography.label, fontWeight: '700' },
   status: { ...typography.badge, textTransform: 'capitalize' },
-  metricValue: { ...typography.metric, marginTop: spacing.xs },
+  metricValue: { ...typography.metric, fontSize: 34, lineHeight: 42, marginTop: spacing.lg },
+  metricFooter: { marginTop: spacing.xs, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  period: typography.subtext,
   source: { ...typography.subtext, marginTop: spacing.xxs },
   refreshButton: { minHeight: 52, marginTop: spacing.lg, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   refreshText: { ...typography.button, color: '#FFFFFF' },

@@ -92,6 +92,13 @@ describe('Apple Health reader helpers', () => {
     expect(windows.sleepStart.getDate()).toBe(25);
     expect(windows.endDate.getTime()).toBe(now.getTime());
   });
+
+  it('keeps last night in the sleep window after 6 PM today', () => {
+    const now = new Date(2026, 9, 26, 22, 59, 0);
+    const windows = getLiveHealthWindows(now.getTime());
+    expect(windows.sleepStart.getHours()).toBe(18);
+    expect(windows.sleepStart.getDate()).toBe(25);
+  });
 });
 
 describe('Apple Health sync', () => {
