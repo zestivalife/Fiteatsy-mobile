@@ -77,7 +77,7 @@ export const syncConnectedHealthApp = async (appId: HealthAppId): Promise<Wearab
 
 /** Reads current on-device data for display only; it does not ingest records into the backend. */
 export const readCurrentHealthData = async (): Promise<WearableSyncPayload> => {
-  if (Platform.OS === 'ios') return syncFromAppleHealth({ includeCurrentHour: true });
+  if (Platform.OS === 'ios') return syncFromAppleHealth({ includeCurrentHour: true, liveDisplay: true });
   if (Platform.OS === 'android') return syncFromHealthConnect();
   throw new Error('health_data_not_supported_on_platform');
 };

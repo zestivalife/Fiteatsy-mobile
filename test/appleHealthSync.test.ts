@@ -17,6 +17,7 @@ import {
   APPLE_HEALTH_READ_TYPES,
   buildAppleObservation,
   durationToMinutes,
+  getLiveHealthWindows,
   selectPrimarySleepSamples,
   syncFromAppleHealth
 } from '../src/services/appleHealthService';
@@ -80,6 +81,16 @@ describe('Apple Health reader helpers', () => {
     });
     expect(observation?.sourceMetadata?.device).toEqual({ manufacturer: undefined, model: 'Apple Watch' });
     expect(observation?.sourceMetadata?.originalValue).toBe(58.456);
+  });
+
+  it('builds device-local midnight and most-recent-6-PM live windows', () => {
+    const now = new Date(2026, 9, 26, 9, 30, 0);
+    const windows = getLiveHealthWindows(now.getTime());
+    expect(windows.dayStart.getHours()).toBe(0);
+    expect(windows.dayStart.getMinutes()).toBe(0);
+    expect(windows.sleepStart.getHours()).toBe(18);
+    expect(windows.sleepStart.getDate()).toBe(25);
+    expect(windows.endDate.getTime()).toBe(now.getTime());
   });
 });
 
@@ -167,10 +178,26 @@ describe('Apple Health sync', () => {
     );
 
     const syncPayload = await syncFromAppleHealth();
-    const livePayload = await syncFromAppleHealth({ includeCurrentHour: true });
+    const livePayload = await syncFromAppleHealth({ includeCurrentHour: true, liveDisplay: true });
 
     expect(syncPayload.observations?.filter((item) => item.metricType === 'steps')).toHaveLength(1);
     expect(livePayload.observations?.filter((item) => item.metricType === 'steps')).toHaveLength(2);
+  });
+
+  it('requests today for live activity and the most recent 6 PM for live sleep', async () => {
+    await syncFromAppleHealth({ includeCurrentHour: true, liveDisplay: true });
+
+    const stepsCall = mockHealthKit.queryStatisticsCollectionForQuantity.mock.calls.find(
+      ([identifier]) => identifier.endsWith('StepCount')
+    );
+    const sleepCall = mockHealthKit.queryCategorySamples.mock.calls[0];
+    const heartCall = mockHealthKit.queryQuantitySamples.mock.calls.find(
+      ([identifier]) => identifier.endsWith('RestingHeartRate')
+    );
+    expect(stepsCall?.[4].filter.date.startDate.getHours()).toBe(0);
+    expect(sleepCall[1].filter.date.startDate.getHours()).toBe(18);
+    expect(heartCall?.[1].filter.date.startDate.getHours()).toBe(0);
+    expect(stepsCall?.[4].filter.date.endDate.getTime()).toBe(Date.now());
   });
 
   it('reports a partial result instead of failing when one metric cannot be read', async () => {

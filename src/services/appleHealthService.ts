@@ -10,6 +10,21 @@ const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 export const APPLE_HEALTH_OPERATION_TIMEOUT_MS = 30_000;
 
+export type AppleHealthReadOptions = {
+  includeCurrentHour?: boolean;
+  liveDisplay?: boolean;
+};
+
+export const getLiveHealthWindows = (nowMs = Date.now()) => {
+  const endDate = new Date(nowMs);
+  const dayStart = new Date(nowMs);
+  dayStart.setHours(0, 0, 0, 0);
+  const sleepStart = new Date(nowMs);
+  sleepStart.setHours(18, 0, 0, 0);
+  if (sleepStart.getTime() > nowMs) sleepStart.setDate(sleepStart.getDate() - 1);
+  return { dayStart, sleepStart, endDate };
+};
+
 const STEPS = 'HKQuantityTypeIdentifierStepCount';
 const RESTING_HEART_RATE = 'HKQuantityTypeIdentifierRestingHeartRate';
 const HRV_SDNN = 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN';
@@ -168,7 +183,7 @@ const requestAppleHealthPermissionsInternal = async (): Promise<AppleHealthPermi
 export const requestAppleHealthPermissions = () =>
   runHealthConnectOperation('REQUESTING_PERMISSION', requestAppleHealthPermissionsInternal);
 
-const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boolean } = {}): Promise<WearableSyncPayload> => {
+const syncFromAppleHealthInternal = async (options: AppleHealthReadOptions = {}): Promise<WearableSyncPayload> => {
   const healthKit = loadHealthKit();
   await ensureAvailable(healthKit);
 
@@ -192,6 +207,7 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
   const failedMetrics: string[] = [];
   const observations: HealthObservationDraft[] = [];
   const nowMs = Date.now();
+  const liveWindows = getLiveHealthWindows(nowMs);
   const addObservation = (input: ObservationInput) => {
     const observation = buildAppleObservation(input, nowMs);
     if (observation) observations.push(observation);
@@ -212,6 +228,7 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
   };
 
   const dateFilter = (windowMs: number) => ({ date: { startDate: new Date(nowMs - windowMs), endDate: new Date(nowMs) } });
+  const dateFilterFrom = (startDate: Date) => ({ date: { startDate, endDate: new Date(nowMs) } });
   const currentHourStart = Math.floor(nowMs / HOUR) * HOUR;
 
   /**
@@ -223,9 +240,12 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
     metric: keyof ConnectedMetrics,
     identifier: Parameters<HealthKitModule['queryStatisticsCollectionForQuantity']>[0],
     unit: string,
-    windowMs: number
+    windowMs: number,
+    liveStartDate?: Date
   ) => {
-    const anchor = new Date(Math.floor((nowMs - windowMs) / HOUR) * HOUR);
+    const filter = liveStartDate ? dateFilterFrom(liveStartDate) : dateFilter(windowMs);
+    const anchorMs = liveStartDate?.getTime() ?? nowMs - windowMs;
+    const anchor = new Date(Math.floor(anchorMs / HOUR) * HOUR);
     const buckets = await guarded(
       metric,
       () => healthKit.queryStatisticsCollectionForQuantity(
@@ -233,7 +253,7 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
         ['cumulativeSum'],
         anchor,
         { hour: 1 },
-        { filter: dateFilter(windowMs), unit: unit as never }
+        { filter, unit: unit as never }
       ),
       []
     );
@@ -248,8 +268,8 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
       .filter((bucket) => bucket.total > 0);
   };
 
-  // Steps — last 24h
-  const stepBuckets = await readHourlySums('steps', STEPS, 'count', DAY);
+  // Steps — live display uses local midnight through now; backend sync keeps its existing 24h window.
+  const stepBuckets = await readHourlySums('steps', STEPS, 'count', DAY, options.liveDisplay ? liveWindows.dayStart : undefined);
   const stepCount = sum(stepBuckets.map((bucket) => bucket.total));
   stepBuckets.forEach((bucket) => addObservation({
     metricType: 'steps',
@@ -264,10 +284,10 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
   }));
   if (stepCount > 0) markStatus('steps', 'synced');
 
-  // Sleep — last 48h, asleep stages from the primary source only
+  // Sleep — live display uses the most recent local 6 PM through now.
   const sleepSamples = await guarded(
     'sleep',
-    () => healthKit.queryCategorySamples(SLEEP, { limit: 0, ascending: true, filter: dateFilter(2 * DAY) }),
+    () => healthKit.queryCategorySamples(SLEEP, { limit: 0, ascending: true, filter: options.liveDisplay ? dateFilterFrom(liveWindows.sleepStart) : dateFilter(2 * DAY) }),
     []
   );
   const primarySleep = selectPrimarySleepSamples(sleepSamples.map((sample) => ({ ...sample, value: Number(sample.value) })));
@@ -286,10 +306,10 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
   }));
   if (sleepMinutes > 0) markStatus('sleep', 'synced');
 
-  // Resting heart rate — last 7d
+  // Resting heart rate — live display uses local midnight through now.
   const restingSamples = await guarded(
     'heart_rate',
-    () => healthKit.queryQuantitySamples(RESTING_HEART_RATE, { limit: 0, ascending: true, unit: 'count/min', filter: dateFilter(7 * DAY) }),
+    () => healthKit.queryQuantitySamples(RESTING_HEART_RATE, { limit: 0, ascending: true, unit: 'count/min', filter: options.liveDisplay ? dateFilterFrom(liveWindows.dayStart) : dateFilter(7 * DAY) }),
     []
   );
   const hrValues = restingSamples.map((sample) => sample.quantity).filter((value) => value > 0);
@@ -308,10 +328,10 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
   const heartRateAvg = avg(hrValues);
   if (heartRateAvg != null) markStatus('heart_rate', 'synced');
 
-  // HRV — last 7d. Apple reports SDNN (Health Connect reports RMSSD); recordType tells the backend which.
+  // HRV — live display uses local midnight through now. Apple reports SDNN.
   const hrvSamples = await guarded(
     'hrv',
-    () => healthKit.queryQuantitySamples(HRV_SDNN, { limit: 0, ascending: true, unit: 'ms', filter: dateFilter(7 * DAY) }),
+    () => healthKit.queryQuantitySamples(HRV_SDNN, { limit: 0, ascending: true, unit: 'ms', filter: options.liveDisplay ? dateFilterFrom(liveWindows.dayStart) : dateFilter(7 * DAY) }),
     []
   );
   const hrvValues = hrvSamples.map((sample) => sample.quantity).filter((value) => value > 0);
@@ -351,8 +371,8 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
   }));
   if (workoutMinutes > 0) markStatus('workouts', 'synced');
 
-  // Active energy — last 7d
-  const energyBuckets = await readHourlySums('calories', ACTIVE_ENERGY, 'kcal', 7 * DAY);
+  // Active energy — live display uses local midnight through now.
+  const energyBuckets = await readHourlySums('calories', ACTIVE_ENERGY, 'kcal', 7 * DAY, options.liveDisplay ? liveWindows.dayStart : undefined);
   const caloriesKcal = energyBuckets.length ? sum(energyBuckets.map((bucket) => bucket.total)) : null;
   energyBuckets.forEach((bucket) => addObservation({
     metricType: 'active_energy',
@@ -387,8 +407,8 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
   }));
   if (weightSamples.length) markStatus('weight', 'synced');
 
-  // Distance — last 7d
-  const distanceBuckets = await readHourlySums('distance', DISTANCE, 'm', 7 * DAY);
+  // Walking/running distance — live display uses local midnight through now.
+  const distanceBuckets = await readHourlySums('distance', DISTANCE, 'm', 7 * DAY, options.liveDisplay ? liveWindows.dayStart : undefined);
   distanceBuckets.forEach((bucket) => addObservation({
     metricType: 'distance',
     value: bucket.total,
@@ -448,7 +468,7 @@ const syncFromAppleHealthInternal = async (options: { includeCurrentHour?: boole
   };
 };
 
-export const syncFromAppleHealth = (options: { includeCurrentHour?: boolean } = {}) =>
+export const syncFromAppleHealth = (options: AppleHealthReadOptions = {}) =>
   runHealthConnectOperation(
     'SYNCING',
     () => syncFromAppleHealthInternal(options),

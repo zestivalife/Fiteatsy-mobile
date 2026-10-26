@@ -49,8 +49,6 @@ const buildRows = (payload: WearableSyncPayload): HealthDataRow[] => {
   const steps = sumMetric(observations, 'steps');
   const activeEnergy = sumMetric(observations, 'active_energy');
   const distance = sumMetric(observations, 'distance');
-  const workouts = sumMetric(observations, 'workout_minutes');
-  const weight = latestMetric(observations, 'weight');
 
   const row = (
     key: string,
@@ -69,17 +67,12 @@ const buildRows = (payload: WearableSyncPayload): HealthDataRow[] => {
   });
 
   return [
-    row('steps', 'Steps · last 24 hours', steps, 'steps', statusLabel(payload, 'steps'), sourceFor(observations, 'steps'), 0),
-    row('distance', 'Walking + running distance · last 7 days', distance == null ? null : distance / 1000, 'km', statusLabel(payload, 'distance'), sourceFor(observations, 'distance'), 2),
-    row('energy', 'Active energy · last 7 days', activeEnergy, 'kcal', statusLabel(payload, 'calories'), sourceFor(observations, 'active_energy'), 0),
-    row('workouts', 'Workout time · last 7 days', workouts ?? payload.metrics.workoutMinutes, 'min', statusLabel(payload, 'workouts'), sourceFor(observations, 'workout_minutes'), 0),
-    row('sleep', 'Sleep · last 48 hours', payload.metrics.sleepHours, 'hr', statusLabel(payload, 'sleep'), sourceFor(observations, 'sleep_minutes'), 1),
-    row('heart', 'Resting heart rate · last 7 days', payload.metrics.heartRateAvg, 'bpm', statusLabel(payload, 'heart_rate'), sourceFor(observations, 'resting_heart_rate'), 0),
-    row('hrv', 'Heart rate variability · last 7 days', payload.metrics.hrvMs, 'ms', statusLabel(payload, 'hrv'), sourceFor(observations, 'hrv_ms'), 1),
-    row('weight', 'Latest weight · last 7 days', weight?.value, weight?.unit ?? 'kg', statusLabel(payload, 'weight'), sourceFor(observations, 'weight'), 1),
-    row('hydration', 'Hydration', payload.metrics.hydrationLiters, 'L', 'unsupported', undefined, 2),
-    row('spo2', 'Blood oxygen', payload.metrics.spo2Pct, '%', statusLabel(payload, 'spo2'), undefined, 1),
-    row('respiratory', 'Respiratory rate', payload.metrics.respiratoryRateBrpm, 'breaths/min', statusLabel(payload, 'respiratory_rate'), undefined, 1)
+    row('steps', 'Steps · 12:00 AM to now', steps, 'steps', statusLabel(payload, 'steps'), sourceFor(observations, 'steps'), 0),
+    row('distance', 'Walking + running distance · 12:00 AM to now', distance == null ? null : distance / 1000, 'km', statusLabel(payload, 'distance'), sourceFor(observations, 'distance'), 2),
+    row('energy', 'Active energy · 12:00 AM to now', activeEnergy, 'kcal', statusLabel(payload, 'calories'), sourceFor(observations, 'active_energy'), 0),
+    row('sleep', 'Sleep · 6:00 PM to now', payload.metrics.sleepHours, 'hr', statusLabel(payload, 'sleep'), sourceFor(observations, 'sleep_minutes'), 1),
+    row('heart', 'Resting heart rate · 12:00 AM to now', payload.metrics.heartRateAvg, 'bpm', statusLabel(payload, 'heart_rate'), sourceFor(observations, 'resting_heart_rate'), 0),
+    row('hrv', 'HRV · 12:00 AM to now', payload.metrics.hrvMs, 'ms', statusLabel(payload, 'hrv'), sourceFor(observations, 'hrv_ms'), 1)
   ];
 };
 
