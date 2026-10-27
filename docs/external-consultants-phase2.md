@@ -34,3 +34,9 @@ Rotate keys by publishing the new public key/key ID first, switching the signer 
 ## Known release gates
 
 Production activation requires real staging service URLs, managed signing keys, migrated PostgreSQL, Redis-backed replay protection, and a complete cross-application E2E run. Mobile UI/build success alone is not production acceptance.
+
+## Canonical nutrition completion
+
+Approved external plans are ingested through `POST /v1/internal/external-consultant-access/:userId/diet-plans` using a 60-second, connection-bound delegated assertion. The endpoint requires `DIET_PLANS` consent, validates the complete Fiteatsy nutrition contract, and rejects meal components that do not reference active verified catalogue foods.
+
+Source system, connection, plan, and source-version identities are retained on canonical plan records, making retries idempotent. Plans from different consultants remain independent. An explicit client selection made through `PUT /v1/internal/external-consultant-access/:userId/diet-plans/active` drives the existing daily schedule, diary, and adherence engine.

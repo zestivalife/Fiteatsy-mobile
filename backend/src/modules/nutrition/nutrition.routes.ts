@@ -147,7 +147,7 @@ const optionalGuidanceSchema = z.object({
   cravings: z.object({ sweet: z.array(guidanceItemSchema), salty: z.array(guidanceItemSchema), crunchy: z.array(guidanceItemSchema), spicy: z.array(guidanceItemSchema) }),
 });
 
-const nutritionPlanContentSchema: z.ZodType<NutritionPlanContent> = z.object({
+export const nutritionPlanContentSchema: z.ZodType<NutritionPlanContent> = z.object({
   nutritionSnapshot: z.object({
     client: z.string(),
     age: z.number().nullable(),

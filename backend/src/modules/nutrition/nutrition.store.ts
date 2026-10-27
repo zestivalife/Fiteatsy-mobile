@@ -293,13 +293,17 @@ export const getLatestPublishedDietPlanByClientId = async (owner: ClientOwnershi
       select dp.*
       from care_cases cc
       join diet_plans dp on dp.care_case_id = cc.id
+      left join client_active_diet_plan_selections selection
+        on selection.care_case_id = cc.id
+       and selection.user_id = cc.user_id
+       and selection.diet_plan_id = dp.id
       where cc.client_id = $1
         and cc.user_id = $2
         and cc.deleted_at is null
         and dp.deleted_at is null
         and dp.status = 'active'
         and dp.latest_published_version_id is not null
-      order by dp.published_at desc nulls last, dp.updated_at desc
+      order by (selection.id is not null) desc, dp.published_at desc nulls last, dp.updated_at desc
       limit 1
     `,
     [owner.clientId, owner.accountId],
