@@ -35,6 +35,7 @@ import { preferencesRouter } from './modules/preferences/preferences.routes.js';
 import { requireAuthenticatedAccount } from './modules/auth/auth.middleware.js';
 import { externalClientsRouter } from './modules/external-clients/external-clients.routes.js';
 import { externalClientInvitationsRouter, externalIntakeRouter } from './modules/external-clients/external-client-invitations.routes.js';
+import { externalConsultantAccessRouter } from './modules/external-consultants/external-consultant-access.routes.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -74,6 +75,7 @@ const REGISTERED_ROUTE_GROUPS = [
   ,'/v1/admin/grievances'
   ,'/v1/external/clients'
   ,'/v1/external/intake'
+  ,'/v1/internal/external-consultant-access'
 ];
 
 const logStartupRoutes = () => {
@@ -199,6 +201,7 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/profile', profileRouter);
   app.use('/v1/profile', profilePhotoRouter);
   app.use('/v1/preferences', preferencesRouter);
+  app.use('/v1/internal/external-consultant-access', externalConsultantAccessRouter);
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message });
