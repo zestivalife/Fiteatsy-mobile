@@ -89,7 +89,7 @@ export const SignInScreen = ({ navigation }: Props) => {
       <View style={styles.container}>
         <View style={[styles.heroCard, { backgroundColor: themeColors.card, borderColor: themeColors.stroke }]}>
           <Text style={[styles.kicker, { color: themeColors.blue }]}>Existing User Login</Text>
-          <Text style={[styles.title, { color: darkTextStrong }]}>Login with your temporary 6 digit PIN.</Text>
+          <Text style={[styles.title, { color: darkTextStrong }]}>Login with your temporary 6 digit Login PIN.</Text>
           <Text style={[styles.subTitle, { color: darkTextStrong }]}>
             OTP remains available, but PIN login helps while WhatsApp delivery is unstable.
           </Text>
@@ -103,7 +103,7 @@ export const SignInScreen = ({ navigation }: Props) => {
             onChangeText={(value) => setNationalNumber(getPhoneDigits(value))}
             maxLength={14}
           />
-          <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>6 digit PIN</Text>
+          <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>6 digit Login PIN</Text>
           <TextInput
             value={pin}
             onChangeText={(value) => setPin(value.replace(/\D/g, '').slice(0, PIN_LENGTH))}

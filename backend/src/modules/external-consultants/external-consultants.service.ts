@@ -4,6 +4,7 @@ import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 
 const REQUEST_TIMEOUT_MS = 12_000;
 const ASSERTION_TTL_SECONDS = 120;
+export const CONSULTANT_CONNECTION_ASSERTION_PURPOSE = 'consultant_connection';
 
 export class ExternalConsultantError extends Error {
   constructor(
@@ -35,6 +36,7 @@ export const createFiteatsyIdentityAssertion = (account: AuthenticatedAccount, n
     aud: env.externalConsultantsAssertionAudience,
     sub: account.user.id,
     actor_type: 'FITEATSY_USER',
+    purpose: CONSULTANT_CONNECTION_ASSERTION_PURPOSE,
     iat: nowSeconds,
     exp: nowSeconds + ASSERTION_TTL_SECONDS,
     jti: crypto.randomUUID(),

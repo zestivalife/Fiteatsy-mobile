@@ -37,6 +37,7 @@ export type ExternalDietPlan = { id: string; plan_id: string; plan_version: numb
 export type ExternalAppointment = { id: string; appointment_id: string; title: string; starts_at: string; ends_at: string; status: string; created_at: string };
 
 export const CONSENT_VERSION = 'external-consultant-v1';
+export const CONSULTANT_CONNECTION_PIN_PURPOSE = 'CONSULTANT_CONNECTION_PIN' as const;
 
 const idempotencyKey = () => {
   const random = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0');
@@ -44,10 +45,13 @@ const idempotencyKey = () => {
 };
 
 export const getExternalConsultantFeatureStatus = () => apiFetch<{ enabled: boolean }>('/v1/external-consultants/feature-status');
-export const previewExternalConsultant = (pin: string) => postJson<ConnectionPreview>('/v1/external-consultants/preview', { pin });
+export const previewExternalConsultant = (pin: string) => postJson<ConnectionPreview>('/v1/external-consultants/preview', {
+  pin,
+  purpose: CONSULTANT_CONNECTION_PIN_PURPOSE,
+});
 export const connectExternalConsultant = (pin: string, acceptedScopes: ConsultantScope[], key = idempotencyKey()) =>
   postJson<{ connection_id: string; state: string; consented_scopes: ConsultantScope[] }>('/v1/external-consultants/redeem', {
-    pin, acceptedScopes, consentVersion: CONSENT_VERSION, idempotencyKey: key
+    pin, purpose: CONSULTANT_CONNECTION_PIN_PURPOSE, acceptedScopes, consentVersion: CONSENT_VERSION, idempotencyKey: key
   });
 export const listExternalConsultants = () => apiFetch<{ connections: ExternalConsultantConnection[] }>('/v1/external-consultants');
 export const getExternalConsultant = (id: string) => apiFetch<{ connection: ExternalConsultantConnection }>(`/v1/external-consultants/${encodeURIComponent(id)}`);

@@ -4,6 +4,7 @@ import { apiFetch, postJson } from '../src/services/apiClient';
 
 import {
   CONSENT_VERSION,
+  CONSULTANT_CONNECTION_PIN_PURPOSE,
   connectExternalConsultant,
   disconnectExternalConsultant,
   listExternalConsultants,
@@ -20,7 +21,7 @@ describe('external consultant mobile bridge', () => {
   it('previews without redeeming or persisting the PIN', async () => {
     mockPostJson.mockResolvedValue({ requested_scopes: ['PROFILE'] });
     await previewExternalConsultant('123456');
-    expect(mockPostJson).toHaveBeenCalledWith('/v1/external-consultants/preview', { pin: '123456' });
+    expect(mockPostJson).toHaveBeenCalledWith('/v1/external-consultants/preview', { pin: '123456', purpose: CONSULTANT_CONNECTION_PIN_PURPOSE });
     expect(mockApiFetch).not.toHaveBeenCalled();
   });
 
@@ -28,7 +29,7 @@ describe('external consultant mobile bridge', () => {
     mockPostJson.mockResolvedValue({ connection_id: 'connection-1' });
     await connectExternalConsultant('123456', ['PROFILE', 'DIET_PLANS']);
     const [, body] = mockPostJson.mock.calls[0];
-    expect(body).toMatchObject({ pin: '123456', acceptedScopes: ['PROFILE', 'DIET_PLANS'], consentVersion: CONSENT_VERSION });
+    expect(body).toMatchObject({ pin: '123456', purpose: CONSULTANT_CONNECTION_PIN_PURPOSE, acceptedScopes: ['PROFILE', 'DIET_PLANS'], consentVersion: CONSENT_VERSION });
     expect(body.idempotencyKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(body.userId).toBeUndefined();
   });
