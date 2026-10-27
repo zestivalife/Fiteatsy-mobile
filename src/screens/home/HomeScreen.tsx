@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -8,7 +8,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
 import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
-import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
 import ProgressDonutChartAsset from '../../assets/fiteatsy-home/progress-donut-chart.svg';
 import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-inactive.svg';
@@ -24,14 +23,15 @@ import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
-import { getMySubscription } from '../../services/subscriptionService';
 import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
 import {
   getHealthScoreHistory,
   getHealthScoreSummary,
   type HealthScoreSummary
 } from '../../services/healthIntelligenceService';
-import type { Medication, MedicationLogStatus } from '../../types';
+import type { Medication, MedicationLogStatus, WearableSyncPayload } from '../../types';
+import { readCurrentHealthData } from '../../services/healthAppService';
+import { buildSevenDayHealthHistory, calculateHealthStreak } from '../../services/healthHistoryService';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import { resolveClientFirstName } from '../../utils/clientIdentity';
 import {
@@ -132,44 +132,12 @@ export const HomeScreen = () => {
   const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
   const [healthSummary, setHealthSummary] = useState<HealthScoreSummary | null>(null);
   const [recoveryTrend, setRecoveryTrend] = useState<number[]>([]);
+  const [deviceHealth, setDeviceHealth] = useState<WearableSyncPayload | null>(null);
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
   );
   const sessionToken = authSession?.sessionToken;
   const hasAuthSession = Boolean(authSession);
-
-  const openAssist = useCallback(async () => {
-    try {
-      const subscription = await getMySubscription();
-      const hasAssist = subscription.entitlements.AI_ASSIST?.value === true;
-
-      if (['PENDING', 'PAYMENT_PENDING', 'PROCESSING'].includes(subscription.status)) {
-        navigation.navigate('SubscriptionPaymentPlaceholder', {
-          status: subscription.status as 'PENDING' | 'PAYMENT_PENDING' | 'PROCESSING',
-          returnDestination: 'AssistHub'
-        });
-        return;
-      }
-
-      if (subscription.status === 'PAYMENT_FAILED') {
-        navigation.navigate('SubscriptionPaymentPlaceholder', { status: 'PAYMENT_FAILED', returnDestination: 'AssistHub' });
-        return;
-      }
-
-      if (hasAssist && ['ACTIVE', 'EXPIRING_SOON', 'CANCELLED'].includes(subscription.status)) {
-        navigation.navigate('AssistHub');
-        return;
-      }
-
-      navigation.navigate('SubscriptionPlans', {
-        source: 'assist',
-        requiredEntitlement: 'AI_ASSIST',
-        returnDestination: 'AssistHub'
-      });
-    } catch {
-      Alert.alert('Subscription unavailable', 'We could not check Assist access right now. Please try again.');
-    }
-  }, [navigation]);
 
   const refreshPss10Context = useCallback(async () => {
     if (!hasAuthSession || !sessionToken) {
@@ -237,6 +205,7 @@ export const HomeScreen = () => {
       void refreshPss10Context();
       void refreshDailyNutrition();
       void refreshHealthScores();
+      void readCurrentHealthData().then(setDeviceHealth).catch(() => setDeviceHealth(null));
     }, [refreshDailyNutrition, refreshHealthScores, refreshPss10Context])
   );
   useEffect(
@@ -248,6 +217,7 @@ export const HomeScreen = () => {
   );
 
   const nutritionScore = normalizeScore(dailyNutrition?.nutritionScore ?? null);
+  const deviceHistory = useMemo(() => buildSevenDayHealthHistory(deviceHealth), [deviceHealth]);
   const metrics: RecoveryMetric[] = [
     {
       key: 'calm',
@@ -288,7 +258,7 @@ export const HomeScreen = () => {
     {
       key: 'sleep',
       label: 'Sleep',
-      score: normalizeScore(healthSummary?.energyBalanceScore ?? healthSummary?.sleepScore),
+      score: normalizeScore(healthSummary?.energyBalanceScore ?? healthSummary?.sleepScore ?? deviceHistory.at(-1)?.sleepScore),
       color: '#0F80FF',
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
@@ -296,9 +266,14 @@ export const HomeScreen = () => {
     }
   ];
   const displayMetrics = metrics;
-  const trendValues = recoveryTrend;
-  const hasTrendData = trendValues.length > 0;
-  const recoveryCoreScore = normalizeScore(healthSummary?.recoveryScore);
+  const deviceTrend = deviceHistory.map((day) => day.recoveryScore ?? 0);
+  const trendValues = deviceTrend.some((value) => value > 0) ? deviceTrend : recoveryTrend;
+  const trendLabels = deviceTrend.some((value) => value > 0)
+    ? deviceHistory.map((day) => new Date(`${day.dateKey}T12:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' }))
+    : trendDays;
+  const hasTrendData = trendValues.some((value) => value > 0);
+  const recoveryCoreScore = normalizeScore(healthSummary?.recoveryScore ?? deviceHistory.at(-1)?.recoveryScore);
+  const healthStreak = calculateHealthStreak(deviceHistory);
 
   const selected = selectedMetric === 'recovery'
     ? { label: 'Recovery Core', score: recoveryCoreScore, color: '#D5062D' }
@@ -313,13 +288,10 @@ export const HomeScreen = () => {
           <View style={styles.referenceFrame}>
             <HomeHeader
               name={resolveClientFirstName(authSession?.user.name)}
-              onSearch={() => navigation.navigate('Search')}
-              onAdd={() => navigation.navigate('Leadership')}
-              onNotifications={() => navigation.navigate('Notifications')}
               onProfile={() => navigation.navigate('Profile')}
             />
 
-            <RecoveryTrend values={trendValues} hasData={hasTrendData} />
+            <RecoveryTrend values={trendValues} labels={trendLabels} hasData={hasTrendData} streak={healthStreak} />
 
             <RecoveryPanel
               metrics={displayMetrics}
@@ -333,12 +305,11 @@ export const HomeScreen = () => {
 
             <View style={styles.actionRow}>
               <ActionPill
-                label="Assist"
+                label="Plans"
                 Icon={AssistIcon}
-                onPress={() => { void openAssist(); }}
+                onPress={() => navigation.navigate('SubscriptionPlans', { source: 'subscription_management' })}
               />
-              <ActionPill label="Sync" Icon={WearableSyncIcon} onPress={() => navigation.navigate('SyncWearable')} />
-              <ActionPill label="Health Data" Icon={HealthDataActionIcon} onPress={() => navigation.navigate('HealthData')} />
+              <ActionPill label="My Fitness" Icon={HealthDataActionIcon} onPress={() => navigation.navigate('HealthData')} />
               <ActionPill label="Health Reports" Icon={ReportsActionIcon} onPress={() => navigation.navigate('Reports')} />
               <ActionPill label="Cycle" Icon={CycleActionIcon} onPress={() => navigation.navigate('Cycle')} />
             </View>
@@ -360,23 +331,14 @@ export const HomeScreen = () => {
 
 const HomeHeader = ({
   name,
-  onSearch,
-  onAdd,
-  onNotifications,
   onProfile
 }: {
   name: string;
-  onSearch: () => void;
-  onAdd: () => void;
-  onNotifications: () => void;
   onProfile: () => void;
 }) => (
   <View style={styles.header}>
     <Text style={styles.headerGreeting} numberOfLines={1}>Hi!, {name}</Text>
     <View style={styles.headerActions}>
-      <HeaderIcon icon="search-outline" onPress={onSearch} />
-      <HeaderIcon icon="trophy-outline" onPress={onAdd} />
-      <HeaderIcon icon="notifications-outline" onPress={onNotifications} badge="9" />
       <Pressable onPress={onProfile} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Open profile">
         <Ionicons name="person-outline" size={23} color="#EDF3EE" />
       </Pressable>
@@ -384,22 +346,12 @@ const HomeHeader = ({
   </View>
 );
 
-const HeaderIcon = ({ icon, onPress, badge }: { icon: keyof typeof Ionicons.glyphMap; onPress: () => void; badge?: string }) => (
-  <Pressable onPress={onPress} style={styles.headerIcon} accessibilityRole="button">
-    <Ionicons name={icon} size={22} color="#F4F7F4" />
-    {badge ? (
-      <View style={styles.headerBadge}>
-        <Text style={styles.headerBadgeText}>{badge}</Text>
-      </View>
-    ) : null}
-  </Pressable>
-);
-
-const RecoveryTrend = ({ values, hasData }: { values: number[]; hasData: boolean }) => (
+const RecoveryTrend = ({ values, labels, hasData, streak }: { values: number[]; labels: string[]; hasData: boolean; streak: number }) => (
   <View style={styles.trendCard}>
-    <Text style={styles.trendTitle}>Your 7 day’s Recovery Trend</Text>
+    <Text style={styles.trendTitle}>Your 7-Day Recovery Trend</Text>
+    <Text style={styles.trendDay}>{streak > 0 ? `${streak}-day health streak` : 'Sync daily to begin your streak'}</Text>
     <View style={styles.trendRow}>
-      {trendDays.map((day, index) => {
+      {labels.map((day, index) => {
         const value = values[index] ?? 0;
         const tone = trendTone(hasData ? value : 0);
         return (
@@ -457,6 +409,8 @@ const RecoveryPanel = ({
     inputRange: [0, 100],
     outputRange: [SCORE_ARC_CIRCUMFERENCE, 0]
   });
+  const starScale = scoreArcProgress.interpolate({ inputRange: [0, 100], outputRange: [0.88, 1.04] });
+  const starOpacity = scoreArcProgress.interpolate({ inputRange: [0, 100], outputRange: [0.38, 1] });
   const [arcStart, arcEnd] = arcGradientForMetric(selectedMetric);
 
   useEffect(() => {
@@ -470,9 +424,12 @@ const RecoveryPanel = ({
   return (
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
-        <View style={styles.starShadow} pointerEvents="none">
+        <Animated.View
+          style={[styles.starShadow, { opacity: starOpacity, transform: [{ scale: starScale }], shadowColor: selectedColor }]}
+          pointerEvents="none"
+        >
           <RecoveryStarAsset width={406} height={492} pointerEvents="none" />
-        </View>
+        </Animated.View>
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
         {selectedScore != null ? (
           <Svg
@@ -787,7 +744,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
     marginTop: -1,
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     justifyContent: 'flex-start',
     alignItems: 'center',
     gap: 8

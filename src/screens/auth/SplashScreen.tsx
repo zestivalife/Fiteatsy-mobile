@@ -83,7 +83,15 @@ export const SplashScreen = ({ navigation }: Props) => {
       return;
     }
     if (progress?.phase === 'connect') {
-      transitionTo(() => navigation.replace('SyncWearable'));
+      transitionTo(() => navigation.replace('OnboardingCalendar'));
+      return;
+    }
+    if (progress?.phase === 'calendar') {
+      transitionTo(() => navigation.replace('OnboardingCalendar'));
+      return;
+    }
+    if (progress?.phase === 'ready') {
+      transitionTo(() => navigation.replace('OnboardingReady'));
       return;
     }
     if (onboardingStatus === 'NOT_STARTED' || onboardingResumeStep === 'basics') {

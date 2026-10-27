@@ -14,7 +14,6 @@ const searchableItems: Array<{ label: string; route: keyof RootStackParamList; k
   { label: 'Breathing Session', route: 'BreathingSession', keywords: 'calm stress recovery' },
   { label: 'Movement Routine', route: 'MovementSession', keywords: 'activity exercise workout' },
   { label: 'Hydration Tracker', route: 'HydrationSession', keywords: 'water drink' },
-  { label: 'Wearable Sync', route: 'SyncWearable', keywords: 'health connect watch device' },
   { label: 'Health Reports', route: 'Reports', keywords: 'wellness biomarker pdf analysis' },
   { label: 'Nutrition Plan', route: 'NutritionPlan', keywords: 'diet meals food' },
   { label: 'Medication Tracker', route: 'MedicationCalendar', keywords: 'medicine reminder adherence' },
@@ -39,7 +38,7 @@ export const SearchScreen = () => {
   }, [query]);
 
   return (
-    <Screen>
+    <Screen keyboardAware>
       <View style={styles.header}>
         <Text style={[styles.title, { color: darkTextStrong }]}>Search</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Close search" style={[styles.closeButton, { borderColor: palette.stroke, backgroundColor: palette.cardMuted }]} onPress={() => navigation.goBack()}>

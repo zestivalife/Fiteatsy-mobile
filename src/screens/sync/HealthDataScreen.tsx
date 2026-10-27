@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { getThemeColors, radius, spacing, typography } from '../../design/tokens';
-import type { RootStackParamList } from '../../navigation/types';
 import { readCurrentHealthData } from '../../services/healthAppService';
+import { requestAppleHealthPermissions } from '../../services/appleHealthService';
+import { requestHealthConnectPermissionsOnly } from '../../services/healthConnectService';
+import { runHealthSync } from '../../services/healthSyncManager';
 import { useAppContext } from '../../state/AppContext';
 import type { HealthObservationDraft, WearableSyncPayload } from '../../types';
 
@@ -20,6 +20,7 @@ type HealthDataRow = {
   source?: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   accent: string;
+  section: 'Activity' | 'Sleep' | 'Heart & Vitals' | 'Body & Mind';
 };
 
 const APPLE_HEALTH_COLORS = {
@@ -30,6 +31,13 @@ const APPLE_HEALTH_COLORS = {
   heart: '#FF375F',
   hrv: '#FF2D55'
 } as const;
+
+const sectionForKey = (key: string): HealthDataRow['section'] => {
+  if (['steps', 'distance', 'energy', 'exercise', 'workout'].includes(key)) return 'Activity';
+  if (key.startsWith('sleep')) return 'Sleep';
+  if (['heart', 'resting-heart', 'hrv', 'oxygen', 'respiratory'].includes(key)) return 'Heart & Vitals';
+  return 'Body & Mind';
+};
 
 const sumMetric = (observations: HealthObservationDraft[], metricType: string) => {
   const values = observations.filter((item) => item.metricType === metricType).map((item) => item.value);
@@ -81,22 +89,40 @@ const buildRows = (payload: WearableSyncPayload): HealthDataRow[] => {
     status,
     source,
     icon,
-    accent
+    accent,
+    section: sectionForKey(key)
   });
 
   return [
     row('steps', 'Steps', '12:00 AM – Now', steps, 'steps', statusLabel(payload, 'steps'), sourceFor(observations, 'steps'), 0, 'footsteps-outline', APPLE_HEALTH_COLORS.activity),
     row('distance', 'Walking + Running Distance', '12:00 AM – Now', distance == null ? null : distance / 1000, 'km', statusLabel(payload, 'distance'), sourceFor(observations, 'distance'), 2, 'walk-outline', APPLE_HEALTH_COLORS.distance),
     row('energy', 'Active Energy', '12:00 AM – Now', activeEnergy, 'kcal', statusLabel(payload, 'calories'), sourceFor(observations, 'active_energy'), 1, 'flame-outline', APPLE_HEALTH_COLORS.energy),
+    row('exercise', 'Exercise', '12:00 AM – Now', sumMetric(observations, 'active_minutes'), 'min', statusLabel(payload, 'workouts'), sourceFor(observations, 'active_minutes'), 0, 'fitness-outline', '#FF9F0A'),
+    row('workout', 'Workouts', '12:00 AM – Now', sumMetric(observations, 'workout_minutes'), 'min', statusLabel(payload, 'workouts'), sourceFor(observations, 'workout_minutes'), 0, 'barbell-outline', '#BF5AF2'),
     row('sleep', 'Sleep', 'Yesterday 6:00 PM – Now', payload.metrics.sleepHours, 'hr', statusLabel(payload, 'sleep'), sourceFor(observations, 'sleep_minutes'), 1, 'bed-outline', APPLE_HEALTH_COLORS.sleep),
-    row('heart', 'Resting Heart Rate', '12:00 AM – Now', payload.metrics.heartRateAvg, 'bpm', statusLabel(payload, 'heart_rate'), sourceFor(observations, 'resting_heart_rate'), 0, 'heart-outline', APPLE_HEALTH_COLORS.heart),
-    row('hrv', 'Heart Rate Variability', '12:00 AM – Now', payload.metrics.hrvMs, 'ms', statusLabel(payload, 'hrv'), sourceFor(observations, 'hrv_ms'), 1, 'pulse-outline', APPLE_HEALTH_COLORS.hrv)
+    row('sleep-core', 'Core Sleep', 'Last sleep window', sumMetric(observations, 'sleep_core_minutes'), 'min', statusLabel(payload, 'sleep'), sourceFor(observations, 'sleep_core_minutes'), 0, 'moon-outline', '#64D2FF'),
+    row('sleep-deep', 'Deep Sleep', 'Last sleep window', sumMetric(observations, 'sleep_deep_minutes'), 'min', statusLabel(payload, 'sleep'), sourceFor(observations, 'sleep_deep_minutes'), 0, 'moon', '#5E5CE6'),
+    row('sleep-rem', 'REM Sleep', 'Last sleep window', sumMetric(observations, 'sleep_rem_minutes'), 'min', statusLabel(payload, 'sleep'), sourceFor(observations, 'sleep_rem_minutes'), 0, 'cloudy-night-outline', '#BF5AF2'),
+    row('heart', 'Heart Rate', 'Latest today', latestMetric(observations, 'heart_rate')?.value, 'bpm', statusLabel(payload, 'heart_rate'), sourceFor(observations, 'heart_rate'), 0, 'heart', APPLE_HEALTH_COLORS.heart),
+    row('resting-heart', 'Resting Heart Rate', '12:00 AM – Now', payload.metrics.heartRateAvg, 'bpm', statusLabel(payload, 'heart_rate'), sourceFor(observations, 'resting_heart_rate'), 0, 'heart-outline', APPLE_HEALTH_COLORS.heart),
+    row('hrv', 'Heart Rate Variability', '12:00 AM – Now', payload.metrics.hrvMs, 'ms', statusLabel(payload, 'hrv'), sourceFor(observations, 'hrv_ms'), 1, 'pulse-outline', APPLE_HEALTH_COLORS.hrv),
+    row('oxygen', 'Blood Oxygen', 'Latest 7 days', payload.metrics.spo2Pct, '%', statusLabel(payload, 'spo2'), sourceFor(observations, 'spo2_pct'), 1, 'water-outline', '#30D5C8'),
+    row('respiratory', 'Respiratory Rate', 'Latest 7 days', payload.metrics.respiratoryRateBrpm, 'brpm', statusLabel(payload, 'respiratory_rate'), sourceFor(observations, 'respiratory_rate_brpm'), 1, 'analytics-outline', '#64D2FF'),
+    row('weight', 'Weight', 'Latest 7 days', latestMetric(observations, 'weight')?.value, 'kg', statusLabel(payload, 'weight'), sourceFor(observations, 'weight'), 1, 'scale-outline', '#FFD60A'),
+    row('mindfulness', 'Mindful Minutes', 'Latest 7 days', sumMetric(observations, 'mindfulness_minutes'), 'min', statusLabel(payload, 'stress'), sourceFor(observations, 'mindfulness_minutes'), 0, 'leaf-outline', '#32D74B')
   ];
 };
 
 export const HealthDataScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'HealthData'>>();
-  const { themeMode, selectedDeviceId, wearableSyncData } = useAppContext();
+  const {
+    themeMode,
+    selectedDeviceId,
+    wearableSyncData,
+    addWearableSyncData,
+    setSelectedDeviceId,
+    wellness,
+    setWellness
+  } = useAppContext();
   const palette = getThemeColors(themeMode);
   const healthAppId = Platform.OS === 'ios' ? 'apple-health' : 'health-connect';
   const healthAppName = Platform.OS === 'ios' ? 'Apple Health' : 'Google Health';
@@ -107,6 +133,7 @@ export const HealthDataScreen = () => {
   const [loading, setLoading] = useState(isConnected);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
   const loadHealthData = useCallback(async (manual = false) => {
     manual ? setRefreshing(true) : setLoading(true);
@@ -120,6 +147,32 @@ export const HealthDataScreen = () => {
       setRefreshing(false);
     }
   }, []);
+
+  const connectHealthData = useCallback(async () => {
+    if (connecting) return;
+    setConnecting(true);
+    setError(null);
+    try {
+      if (Platform.OS === 'ios') {
+        await requestAppleHealthPermissions();
+      } else if (Platform.OS === 'android') {
+        const permission = await requestHealthConnectPermissionsOnly();
+        if (permission.grantedCount === 0) throw new Error('Health access was not granted.');
+      } else {
+        throw new Error('Health data is not supported on this device.');
+      }
+
+      const result = await runHealthSync(healthAppId, wellness);
+      addWearableSyncData(result.payload);
+      setSelectedDeviceId(healthAppId);
+      setWellness(result.wellness);
+      setPayload(result.payload);
+    } catch (connectError) {
+      setError(connectError instanceof Error ? connectError.message : 'Health access could not be completed.');
+    } finally {
+      setConnecting(false);
+    }
+  }, [addWearableSyncData, connecting, healthAppId, setSelectedDeviceId, setWellness, wellness]);
 
   useEffect(() => {
     if (isConnected) {
@@ -165,13 +218,15 @@ export const HealthDataScreen = () => {
           <Text style={[styles.connectBody, { color: palette.textSecondary }]}>Connect your health app to securely read the health records you choose to share.</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Sync with ${healthAppName}`}
-            onPress={() => navigation.navigate('SyncWearable', { autoSync: true })}
+            accessibilityLabel={`Connect ${healthAppName}`}
+            disabled={connecting}
+            onPress={() => { void connectHealthData(); }}
             style={({ pressed }) => [styles.connectButton, { backgroundColor: palette.blue, opacity: pressed ? 0.7 : 1 }]}
           >
-            <Ionicons name="sync" size={20} color="#FFFFFF" />
-            <Text style={styles.refreshText}>Sync with {healthAppName}</Text>
+            {connecting ? <ActivityIndicator color="#FFFFFF" /> : <Ionicons name="link-outline" size={20} color="#FFFFFF" />}
+            <Text style={styles.refreshText}>{connecting ? 'Connecting…' : `Connect ${healthAppName}`}</Text>
           </Pressable>
+          {error ? <Text style={[styles.connectError, { color: palette.danger }]}>{error}</Text> : null}
           {Platform.OS === 'android' ? <Text style={[styles.platformNote, { color: palette.textMuted }]}>Uses Health Connect on this Android device.</Text> : null}
         </View>
       ) : loading ? (
@@ -186,8 +241,10 @@ export const HealthDataScreen = () => {
         </View>
       ) : (
         <View style={styles.list}>
-          {rows.map((item) => (
-            <View key={item.key} style={[styles.metricCard, { backgroundColor: palette.card }]}>
+          {rows.map((item, index) => (
+            <React.Fragment key={item.key}>
+            {index === 0 || rows[index - 1]?.section !== item.section ? <Text style={[styles.sectionTitle, { color: palette.textSecondary }]}>{item.section.toUpperCase()}</Text> : null}
+            <View style={[styles.metricCard, { backgroundColor: palette.card }]}>
               <View style={styles.metricTopRow}>
                 <View style={styles.metricIdentity}>
                   <Ionicons name={item.icon} size={20} color={item.accent} />
@@ -202,6 +259,7 @@ export const HealthDataScreen = () => {
               </View>
               {item.source ? <Text style={[styles.source, { color: palette.textMuted }]}>Source: {item.source}</Text> : null}
             </View>
+            </React.Fragment>
           ))}
         </View>
       )}
@@ -245,7 +303,9 @@ const styles = StyleSheet.create({
   connectBody: { ...typography.bodySmall, marginTop: spacing.xs, textAlign: 'center' },
   connectButton: { width: '100%', minHeight: 52, marginTop: spacing.lg, paddingHorizontal: spacing.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   platformNote: { ...typography.subtext, marginTop: spacing.sm, textAlign: 'center' },
+  connectError: { ...typography.bodySmall, marginTop: spacing.sm, textAlign: 'center' },
   list: { marginTop: spacing.lg, gap: 12 },
+  sectionTitle: { ...typography.label, letterSpacing: 1.1, marginLeft: 6, marginTop: 8 },
   metricCard: { minHeight: 154, padding: 20, borderRadius: 22 },
   metricTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   metricIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },

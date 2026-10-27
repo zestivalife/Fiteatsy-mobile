@@ -94,8 +94,8 @@ export const OnboardingAssessmentScreen = ({ navigation, route }: Props) => {
     const sleepScore = sleep.quality === 'Excellent' ? 5 : sleep.quality === 'Good' ? 4 : sleep.quality === 'Fair' ? 3 : sleep.quality === 'Poor' ? 2 : 1;
     void submitCheckIn({ mood: moodScore as 1 | 2 | 3 | 4 | 5, energy: Math.max(1, 6 - stress) as 1 | 2 | 3 | 4 | 5, sleepQuality: sleepScore as 1 | 2 | 3 | 4 | 5, stressLevel: stress });
     setMood(moodScore >= 4 ? '🙂' : moodScore === 3 ? '😐' : '☹️');
-    void setOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId, { phase: 'connect', step: 1, lifestyle });
-    navigation.navigate('SyncWearable');
+    void setOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId, { phase: 'calendar', step: 1, lifestyle });
+    navigation.navigate('OnboardingCalendar');
   };
 
   return <OnboardingShell key={step} phase={phase} step={phaseStep} total={4} onBack={back} direction={direction} action={<OnboardingAction title="Continue" onPress={next} />}>
