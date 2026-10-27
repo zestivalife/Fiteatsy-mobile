@@ -532,7 +532,6 @@ export const listReports = async (owner: { userId: string; clientId: string }) =
       from health_reports
       where user_id = $1
         and client_id = $2
-        and processing_status in ('PUBLISHED', 'PARTIALLY_VALIDATED')
         and deleted_at is null
       order by created_at desc
     `,
@@ -548,7 +547,6 @@ export const countReports = async (owner: { userId: string; clientId: string }) 
       from health_reports
       where user_id = $1
         and client_id = $2
-        and processing_status in ('PUBLISHED', 'PARTIALLY_VALIDATED')
         and deleted_at is null
     `,
     [owner.userId, owner.clientId]

@@ -377,6 +377,15 @@ test('image report without a configured vision provider is safely gated instead 
   assert.equal(analyzedBody.score, null);
   assert.equal(analyzedBody.qualityGate.canPublish, false);
   assert.match(analyzedBody.qualityGate.reasons.join(' '), /Unsupported|Only 0 biomarkers/);
+
+  const list = await getJson(server.baseUrl, '/v1/reports?limit=50', {
+    headers: authHeaders(session.token)
+  });
+  assert.equal(list.response.status, 200);
+  assert.equal(list.body.total, 1);
+  assert.equal(list.body.items.length, 1);
+  assert.equal(list.body.items[0].id, analyzedBody.reportId);
+  assert.equal(list.body.items[0].status, 'INSUFFICIENT_DATA');
 });
 
 test('POST /v1/reports/analyze returns 400 without a file', async () => {
