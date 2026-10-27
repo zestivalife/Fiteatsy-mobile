@@ -74,7 +74,8 @@ describe('premium app-level video intro contract', () => {
       'SignIn',
       'FoodPreferences',
       'OnboardingAssessment',
-      'SyncWearable',
+      'OnboardingCalendar',
+      'OnboardingReady',
       'OnboardingBasics',
       'Main'
     ]) {

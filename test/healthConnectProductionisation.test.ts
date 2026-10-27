@@ -93,25 +93,22 @@ describe('Health Connect D2 production contracts', () => {
     expect(sync).toContain('getGrantedPermissions()');
   });
 
-  it('bounds native calls and requires an explicit user sync action', () => {
-    const screen = read('src/screens/sync/SyncWearableScreen.tsx');
+  it('bounds native calls and requires an explicit user health connection action', () => {
+    const screen = read('src/screens/sync/HealthDataScreen.tsx');
     const home = read('src/screens/home/HomeScreen.tsx');
     expect(service).toContain('HEALTH_CONNECT_OPERATION_TIMEOUT_MS = 30_000');
     expect(service).toContain('withHealthConnectTimeout');
     expect(service).toMatch(/runHealthConnectOperation\(\s*'SYNCING'/);
-    expect(screen).not.toContain('getSdkStatus');
-    expect(screen).toContain("withHealthConnectTimeout(runHealthSync(appId, wellness))");
-    expect(screen).not.toContain('route.params?.autoSync');
-    expect(screen).toMatch(/requestHealthPermission[\s\S]*if \(inFlightRef\.current\) \{\s*return;\s*\}/);
-    expect(home).toContain("navigation.navigate('SyncWearable')");
-    expect(home).not.toContain("navigation.navigate('SyncWearable', { autoSync: true })");
+    expect(screen).toContain('runHealthSync(healthAppId, wellness)');
+    expect(screen).toContain('requestHealthConnectPermissionsOnly()');
+    expect(screen).toContain('requestAppleHealthPermissions()');
+    expect(home).not.toContain('SyncWearable');
+    expect(home).not.toContain('label="Sync"');
   });
 
-  it('settles failures into retryable UI instead of unlocked insights', () => {
-    const screen = read('src/screens/sync/SyncWearableScreen.tsx');
-    expect(screen).toMatch(/stage === 'failed'\s*\? 'Try Again'/);
-    expect(screen).not.toContain("stage === 'failed' || stage === 'insufficient_data'");
-    expect(screen).toContain("setStage('failed')");
-    expect(screen).toContain('setIsRunning(false)');
+  it('settles connection failures into an actionable health-data error', () => {
+    const screen = read('src/screens/sync/HealthDataScreen.tsx');
+    expect(screen).toContain("setError(connectError instanceof Error ? connectError.message");
+    expect(screen).toContain('setConnecting(false)');
   });
 });

@@ -11,15 +11,14 @@ import { clearOnboardingRuntimeProgress } from '../../services/onboardingRuntime
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingReady'>;
 
 export const OnboardingReadyScreen = ({ navigation }: Props) => {
-  const { onboarding, assessment, wearableSetupCompleted, setWearableSetupCompleted, authSession } = useAppContext();
+  const { onboarding, assessment, authSession } = useAppContext();
   const reveal = useRef(new Animated.Value(0)).current;
   useEffect(() => { Animated.timing(reveal, { toValue: 1, duration: 500, useNativeDriver: true }).start(); }, [reveal]);
   const healthReady = Boolean(onboarding?.dateOfBirthISO && onboarding?.gender);
   const recoveryReady = Boolean(assessment?.completedAtISO);
   const nutritionReady = Boolean(onboarding?.primaryGoal || onboarding?.healthGoals.length);
-  const healthConnected = onboarding?.wearablePreference === 'sync';
   const consultantReady = Boolean(onboarding?.assignedConsultantId);
-  const enter = () => { void clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId); setWearableSetupCompleted(true); navigation.reset({ index: 0, routes: [{ name: 'Main' }] }); };
+  const enter = () => { void clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId); navigation.reset({ index: 0, routes: [{ name: 'Main' }] }); };
 
   return <OnboardingShell phase="READY" step={1} total={1} onBack={() => navigation.goBack()} scroll action={<View><OnboardingAction title="Enter Fiteatsy" onPress={enter} /><OnboardingAction title="Review my answers" secondary onPress={() => navigation.navigate('OnboardingBasics')} /></View>}>
     <Animated.View style={[styles.hero, { opacity: reveal, transform: [{ scale: reveal.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
@@ -30,13 +29,12 @@ export const OnboardingReadyScreen = ({ navigation }: Props) => {
       <Status icon="person-outline" label="Health profile" status={healthReady ? 'Ready' : 'Needs attention'} tone="green" />
       <Status icon="pulse-outline" label="Recovery baseline" status={recoveryReady ? 'Ready' : 'Needs attention'} tone="green" />
       <Status icon="heart-outline" label="Nutrition profile" status={nutritionReady ? 'Ready' : 'Needs attention'} tone="green" />
-      <Status icon="wifi-outline" label="Health data" status={healthConnected ? 'Connected' : wearableSetupCompleted ? 'Skipped' : 'Not connected'} tone="cyan" />
       <Status icon="star-outline" label="Consultant matching" status={consultantReady ? 'Ready' : 'Pending'} tone="yellow" />
     </View>
   </OnboardingShell>;
 };
 
-const toneMap = { green: colors.success, cyan: colors.blue, yellow: '#FFBE25' };
+const toneMap = { green: colors.success, yellow: '#FFBE25' };
 const Status = ({ icon, label, status, tone }: { icon: keyof typeof Ionicons.glyphMap; label: string; status: string; tone: keyof typeof toneMap }) => {
   const accent = toneMap[tone];
   return <View style={[styles.status, { borderColor: `${accent}55`, backgroundColor: `${accent}0A` }]}><View style={[styles.icon, { backgroundColor: `${accent}16` }]}><Ionicons name={icon} size={20} color={accent} /></View><Text style={styles.statusLabel}>{label}</Text><Text style={[styles.badge, { color: accent, backgroundColor: `${accent}16` }]}>{status}</Text></View>;
