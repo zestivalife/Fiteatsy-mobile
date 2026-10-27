@@ -62,6 +62,9 @@ import { CycleInsightsScreen } from '../screens/cycle/CycleInsightsScreen';
 import { CycleNotificationsScreen } from '../screens/cycle/CycleNotificationsScreen';
 import { Pss10AssessmentScreen } from '../screens/assessments/Pss10AssessmentScreen';
 import { useAppContext } from '../state/AppContext';
+import { MyConsultantsScreen } from '../screens/consultants/MyConsultantsScreen';
+import { ConnectConsultantScreen } from '../screens/consultants/ConnectConsultantScreen';
+import { ConsultantConnectionDetailsScreen } from '../screens/consultants/ConsultantConnectionDetailsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -158,6 +161,9 @@ export const AppNavigation = () => {
         <Stack.Screen name="MyIssueDetail" component={MyIssueDetailScreen} />
         <Stack.Screen name="ConnectedMetrics" component={CanonicalConnectedMetricsScreen} />
         {__DEV__ ? <Stack.Screen name="HealthSyncDebug" component={CanonicalHealthSyncDebugScreen} /> : null}
+        <Stack.Screen name="MyConsultants" component={MyConsultantsScreen} />
+        <Stack.Screen name="ConnectConsultant" component={ConnectConsultantScreen} />
+        <Stack.Screen name="ConsultantConnectionDetails" component={ConsultantConnectionDetailsScreen} />
         <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
         <Stack.Screen name="ReportComparison" component={ReportComparisonScreen} />

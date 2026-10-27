@@ -29,6 +29,7 @@ export const ProfileScreen=({navigation}:Props)=>{
     <ProfileSection label="Account"><ProfileRow icon="person-outline" color="#35B8D0" title="My Profile" subtitle="Personal details and health information" onPress={()=>navigation.navigate('MyProfile')}/><ProfileRow icon="restaurant-outline" color="#FF9F0A" title="Food Preferences" subtitle="Diet type, likes and restrictions" onPress={()=>navigation.navigate('FoodPreferences',{mode:'profile'})}/></ProfileSection>
     <ProfileSection label="Health connections">
       <ProfileRow icon="heart-outline" color="#FF375F" title="Connected Health" subtitle={onboarding?.wearablePreference==='sync'?'Health connection configured':'Manage health connection'} onPress={()=>navigation.navigate('ConnectedHealth')}/>
+      <ProfileRow icon="people-outline" color="#35B8D0" title="My Consultants" subtitle="Connect and manage your consultants" onPress={()=>navigation.navigate('MyConsultants')}/>
       {__DEV__ ? (
         <ProfileRow icon="bug-outline" color="#FF9F0A" title="Health Sync Debug" onPress={()=>navigation.navigate('HealthSyncDebug')}/>
       ) : null}
