@@ -55,16 +55,18 @@ describe('Onboarding V2 contract', () => {
     expect(splash).toContain("progress?.phase === 'food'");
     expect(splash).toContain("progress?.phase === 'recovery'");
     expect(splash).toContain("progress?.phase === 'connect'");
+    expect(splash).toContain("progress?.phase === 'calendar'");
+    expect(splash).toContain("progress?.phase === 'ready'");
     expect(assessment).toContain("phase: step <= 4 ? 'lifestyle' : 'recovery'");
+    expect(assessment).toContain("phase: 'calendar'");
+    expect(assessment).not.toContain('SyncWearable');
     expect(ready).toContain('clearOnboardingRuntimeProgress');
   });
 
   it('keeps platform connectivity and consultant readiness truthful', () => {
-    const sync = read('src/screens/sync/SyncWearableScreen.tsx');
     const ready = read('src/screens/onboarding/OnboardingReadyScreen.tsx');
-    expect(sync).toContain("Platform.OS === 'android'");
-    expect(sync).toContain("Platform.OS === 'ios'");
-    expect(sync).toContain('Apple Health · read-only access');
+    expect(ready).not.toContain('Health data');
+    expect(ready).not.toContain('wearableSetupCompleted');
     expect(ready).toContain("Boolean(onboarding?.assignedConsultantId)");
     expect(ready).toContain("consultantReady ? 'Ready' : 'Pending'");
   });

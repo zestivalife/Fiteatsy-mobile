@@ -11,7 +11,7 @@ export type OnboardingLifestyleDraft = {
 
 export type OnboardingRuntimeProgress = {
   version: 2;
-  phase: 'lifestyle' | 'food' | 'recovery' | 'connect' | 'ready';
+  phase: 'lifestyle' | 'food' | 'recovery' | 'connect' | 'calendar' | 'ready';
   step: number;
   lifestyle?: OnboardingLifestyleDraft;
   foodDraft?: FoodPreferenceProfile;
