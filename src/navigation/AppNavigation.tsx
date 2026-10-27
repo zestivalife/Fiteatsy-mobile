@@ -15,8 +15,6 @@ import { FoodPreferencesScreen } from '../screens/onboarding/FoodPreferencesScre
 import { SignInScreen } from '../screens/auth/SignInScreen';
 import { SignUpScreen } from '../screens/auth/SignUpScreen';
 import { ChangePinScreen } from '../screens/auth/ChangePinScreen';
-import { SyncWearableScreen } from '../screens/sync/SyncWearableScreen';
-import { SyncSuccessScreen } from '../screens/sync/SyncSuccessScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { TrackerScreen } from '../screens/home/TrackerScreen';
 import { TrackerDetailScreen } from '../screens/home/TrackerDetailScreen';
@@ -58,6 +56,9 @@ import { FamilyDashboardScreen } from '../screens/family/FamilyDashboardScreen';
 import { FamilyMemberDetailScreen } from '../screens/family/FamilyMemberDetailScreen';
 import { Pss10AssessmentScreen } from '../screens/assessments/Pss10AssessmentScreen';
 import { useAppContext } from '../state/AppContext';
+import { MyConsultantsScreen } from '../screens/consultants/MyConsultantsScreen';
+import { ConnectConsultantScreen } from '../screens/consultants/ConnectConsultantScreen';
+import { ConsultantConnectionDetailsScreen } from '../screens/consultants/ConsultantConnectionDetailsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -124,8 +125,6 @@ export const AppNavigation = () => {
         <Stack.Screen name="SignIn" component={SignInScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="ChangePin" component={ChangePinScreen} />
-        <Stack.Screen name="SyncWearable" component={SyncWearableScreen} />
-        <Stack.Screen name="SyncSuccess" component={SyncSuccessScreen} />
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="TrackerDetail" component={TrackerDetailScreen} />
         <Stack.Screen name="FocusSession" component={FocusScreen} />
@@ -147,6 +146,9 @@ export const AppNavigation = () => {
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="ConnectedMetrics" component={ConnectedMetricsScreen} />
         <Stack.Screen name="HealthData" component={HealthDataScreen} />
+        <Stack.Screen name="MyConsultants" component={MyConsultantsScreen} />
+        <Stack.Screen name="ConnectConsultant" component={ConnectConsultantScreen} />
+        <Stack.Screen name="ConsultantConnectionDetails" component={ConsultantConnectionDetailsScreen} />
         {__DEV__ ? <Stack.Screen name="HealthSyncDebug" component={HealthSyncDebugScreen} /> : null}
         <Stack.Screen name="ReportsChat" component={ReportsChatScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />

@@ -14,6 +14,9 @@ export type DelegatedAuthority = {
   purpose: string;
   actor_type: string;
   tenant_id?: string;
+  connection_id?: string;
+  fiteatsy_user_id?: string;
+  scopes?: string[];
 };
 
 export class DelegatedAuthorityError extends Error {

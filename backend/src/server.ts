@@ -25,6 +25,8 @@ import { delegatedRouter } from './modules/admin/delegated.routes.js';
 import { paymentsRouter, razorpayWebhookRouter, subscriptionsRouter } from './modules/subscriptions/subscriptions.routes.js';
 import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.service.js';
 import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
+import { externalConsultantsRouter } from './modules/external-consultants/external-consultants.routes.js';
+import { externalConsultantAccessRouter } from './modules/external-consultants/external-consultant-access.routes.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -58,7 +60,9 @@ const REGISTERED_ROUTE_GROUPS = [
   '/v1/platform/medications',
   '/v1/platform/nutrition-plan',
   '/v1/assessments',
-  '/v1/profile'
+  '/v1/profile',
+  '/v1/external-consultants',
+  '/v1/internal/external-consultant-access'
 ];
 
 const logStartupRoutes = () => {
@@ -162,6 +166,8 @@ export const createApp = (options: CreateAppOptions = {}) => {
   app.use('/v1/platform', platformNutritionRouter);
   app.use('/v1/assessments', assessmentsRouter);
   app.use('/v1/profile', profileRouter);
+  app.use('/v1/external-consultants', externalConsultantsRouter);
+  app.use('/v1/internal/external-consultant-access', externalConsultantAccessRouter);
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message });

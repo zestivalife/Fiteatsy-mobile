@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import { useAppContext } from '../../state/AppContext';
 import { formatConsultantAvailability, formatDobLabel, getConsultantProfile } from '../../utils/healthProfile';
 import { buildHealthProfileCompletion } from '../../utils/healthProfileCompletion';
 import { resolveClientName } from '../../utils/clientIdentity';
+import { getExternalConsultantFeatureStatus } from '../../services/externalConsultantService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
@@ -25,11 +26,11 @@ const formatDate = (iso: string | null | undefined) => {
 const personalInfoOptions: AssessmentGender[] = ['Male', 'Female', 'Prefer not to say'];
 
 export const ProfileScreen = ({ navigation }: Props) => {
+  const [externalConsultantsEnabled, setExternalConsultantsEnabled] = useState(false);
   const {
     onboarding,
     setOnboarding,
     themeMode,
-    setThemeMode,
     logout,
     devices,
     selectedDeviceId,
@@ -60,6 +61,9 @@ export const ProfileScreen = ({ navigation }: Props) => {
   useFocusEffect(
     useCallback(() => {
       void retryPendingHealthProfileSync();
+      void getExternalConsultantFeatureStatus()
+        .then(({ enabled }) => setExternalConsultantsEnabled(enabled))
+        .catch(() => setExternalConsultantsEnabled(false));
     }, [retryPendingHealthProfileSync])
   );
 
@@ -77,9 +81,9 @@ export const ProfileScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll contentStyle={styles.screenContent}>
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: palette.textPrimary }]}>Fiteatsy Care Profile</Text>
+        <Text style={[styles.title, { color: palette.textPrimary }]}>Profile</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close profile"
@@ -90,14 +94,24 @@ export const ProfileScreen = ({ navigation }: Props) => {
         </Pressable>
       </View>
 
-      <Card>
+      <View style={styles.identityHeader}>
+        <View style={styles.identityAvatar}>
+          <Text style={styles.identityAvatarText}>{clientName.slice(0, 1).toUpperCase()}</Text>
+        </View>
+        <Text style={[styles.identityName, { color: palette.textPrimary }]}>{clientName}</Text>
+        <Text style={[styles.identityDetail, { color: palette.textSecondary }]}>{onboarding?.careTrack ?? 'Foundational Recovery Care'}</Text>
+      </View>
+
+      <ProfileSectionLabel icon="heart-outline" label="HEALTH SUMMARY" color="#FF4F7B" />
+      <Card style={styles.groupCard}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Health Profile Completion</Text>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Completion</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfile ? `${healthProfile.completionPercent}%` : clientBootstrap.profile.status === 'ERROR' ? 'Unavailable' : 'Loading'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Nutrition Profile Readiness</Text><Text style={[styles.value, { color: healthProfile?.isAiReady ? '#59BE08' : '#F0B44C' }]}>{healthProfile ? `${healthProfile.readinessPercent}%` : clientBootstrap.profile.status === 'ERROR' ? 'Unavailable' : 'Loading'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Missing</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfile ? healthProfile.missingItems.slice(0, 3).join(', ') || 'Nothing important missing' : clientBootstrap.profile.status === 'ERROR' ? 'Could not load profile' : 'Loading profile'}</Text></View>
       </Card>
 
-      <Card>
+      <ProfileSectionLabel icon="card-outline" label="MEMBERSHIP" color="#A87CFF" />
+      <Card style={styles.groupCard}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Subscription</Text>
         <Text style={[styles.valueSecondary, { color: palette.textSecondary }]}>
           Manage your Fiteatsy plan, premium access, and payment history from the backend-controlled subscription centre.
@@ -115,7 +129,8 @@ export const ProfileScreen = ({ navigation }: Props) => {
         </Pressable>
       </Card>
 
-      <Card>
+      <ProfileSectionLabel icon="person-outline" label="ABOUT YOU" color="#46C9FF" />
+      <Card style={styles.groupCard}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Member Profile</Text>
         <Text style={[styles.valuePrimary, { color: palette.textPrimary }]}>{clientName}</Text>
         <Text style={[styles.valueSecondary, { color: palette.textSecondary }]}>{onboarding?.careTrack ?? 'Foundational Recovery Care'}</Text>
@@ -125,7 +140,7 @@ export const ProfileScreen = ({ navigation }: Props) => {
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Member Since</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{formatDate(authSession?.user.createdAtISO)}</Text></View>
       </Card>
 
-      <Card>
+      <Card style={styles.groupCard}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Personal Information</Text>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Date of Birth</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.dateOfBirthISO ? formatDobLabel(onboarding.dateOfBirthISO) : 'Not set'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Calculated Age</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.calculatedAge ? `${onboarding.calculatedAge} yrs` : 'Not set'}</Text></View>
@@ -153,7 +168,19 @@ export const ProfileScreen = ({ navigation }: Props) => {
         </View>
       </Card>
 
-      <Card>
+      <ProfileSectionLabel icon="people-outline" label="YOUR CARE TEAM" color="#59E735" />
+      {externalConsultantsEnabled ? (
+        <Card style={styles.groupCard}>
+          <Pressable accessibilityRole="button" style={styles.securityRow} onPress={() => navigation.navigate('MyConsultants')}>
+            <View>
+              <Text style={[styles.securityTitle, { color: palette.textPrimary }]}>My Consultants</Text>
+              <Text style={[styles.securitySubtitle, { color: palette.textSecondary }]}>Connect by PIN and manage shared access</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={palette.textSecondary} />
+          </Pressable>
+        </Card>
+      ) : null}
+      <Card style={styles.groupCard}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Consultant Assignment</Text>
         <View style={styles.consultantHeader}>
           <View style={[styles.consultantAvatar, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]}>
@@ -175,7 +202,8 @@ export const ProfileScreen = ({ navigation }: Props) => {
         </View>
       </Card>
 
-      <Card>
+      <ProfileSectionLabel icon="sparkles-outline" label="WELLNESS" color="#FFB52E" />
+      <Card style={styles.groupCard}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Assessment Summary</Text>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Mood</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{assessment?.mood ?? 'Not completed'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Stress Level</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{assessment ? `${assessment.stressLevel}/5` : 'Not completed'}</Text></View>
@@ -183,14 +211,15 @@ export const ProfileScreen = ({ navigation }: Props) => {
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Voice Reflection</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{assessment?.voiceReflection ?? 'Not completed'}</Text></View>
       </Card>
 
-      <Card>
+      <Card style={styles.groupCard}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Care Preferences</Text>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Wearable Mode</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.wearablePreference ?? 'manual'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Schedule Sync</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.calendarProvider ?? 'None'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Notifications</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{onboarding?.notificationPermissionGranted ? 'Enabled' : 'Disabled'}</Text></View>
       </Card>
 
-      <Card>
+      <ProfileSectionLabel icon="pulse-outline" label="CONNECTED HEALTH" color="#FF4F7B" />
+      <Card style={styles.groupCard}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Health Sync</Text>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Connected Device</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{connectedDevice ? `${connectedDevice.brand} ${connectedDevice.model}` : 'Not connected'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Total Syncs</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{wearableSyncData.length}</Text></View>
@@ -216,7 +245,8 @@ export const ProfileScreen = ({ navigation }: Props) => {
         ) : null}
       </Card>
 
-      <Card>
+      <ProfileSectionLabel icon="settings-outline" label="SETTINGS" color="#8F96A3" />
+      <Card style={styles.groupCard}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Preferences</Text>
         <Pressable accessibilityRole="button" style={styles.securityRow} onPress={() => navigation.navigate('FoodPreferences', { mode: 'profile' })}>
           <View>
@@ -232,29 +262,6 @@ export const ProfileScreen = ({ navigation }: Props) => {
           </View>
           <Ionicons name="chevron-forward" size={16} color={palette.textSecondary} />
         </Pressable>
-        <View style={styles.row}>
-          <Text style={[styles.label, { color: palette.textSecondary }]}>Theme</Text>
-          <View style={styles.themeSwitchWrap}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Set dark theme"
-              accessibilityState={{ selected: themeMode === 'dark' }}
-              style={[styles.themeChip, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }, themeMode === 'dark' && styles.themeChipActive]}
-              onPress={() => setThemeMode('dark')}
-            >
-              <Text style={[styles.themeChipText, { color: palette.textPrimary }, themeMode === 'dark' && styles.themeChipTextActive]}>Dark</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Set light theme"
-              accessibilityState={{ selected: themeMode === 'light' }}
-              style={[styles.themeChip, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }, themeMode === 'light' && styles.themeChipActive]}
-              onPress={() => setThemeMode('light')}
-            >
-              <Text style={[styles.themeChipText, { color: palette.textPrimary }, themeMode === 'light' && styles.themeChipTextActive]}>Light</Text>
-            </Pressable>
-          </View>
-        </View>
       </Card>
 
       <Pressable
@@ -273,15 +280,38 @@ export const ProfileScreen = ({ navigation }: Props) => {
   );
 };
 
+const ProfileSectionLabel = ({
+  icon,
+  label,
+  color
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  color: string;
+}) => (
+  <View style={styles.groupLabelRow}>
+    <View style={[styles.groupLabelIcon, { backgroundColor: `${color}1F` }]}>
+      <Ionicons name={icon} size={15} color={color} />
+    </View>
+    <Text style={[styles.groupLabel, { color }]}>{label}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
+  screenContent: {
+    paddingBottom: 144
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12
+    marginBottom: 18
   },
   title: {
-    ...typography.screenTitle
+    fontFamily: 'Exo_700Bold',
+    fontSize: 34,
+    letterSpacing: -1.1,
+    lineHeight: 41
   },
   closeButton: {
     width: 44,
@@ -292,6 +322,65 @@ const styles = StyleSheet.create({
     borderColor: colors.stroke,
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  identityHeader: {
+    alignItems: 'center',
+    marginBottom: 28
+  },
+  identityAvatar: {
+    alignItems: 'center',
+    backgroundColor: '#59E735',
+    borderRadius: 43,
+    height: 86,
+    justifyContent: 'center',
+    marginBottom: 12,
+    width: 86
+  },
+  identityAvatarText: {
+    color: '#071006',
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 34,
+    lineHeight: 41
+  },
+  identityName: {
+    fontFamily: 'Exo_700Bold',
+    fontSize: 22,
+    lineHeight: 28
+  },
+  identityDetail: {
+    fontFamily: 'Exo_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 3
+  },
+  groupLabelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 7,
+    marginLeft: 6,
+    marginTop: 8
+  },
+  groupLabelIcon: {
+    alignItems: 'center',
+    borderRadius: 8,
+    height: 28,
+    justifyContent: 'center',
+    width: 28
+  },
+  groupLabel: {
+    fontFamily: 'Exo_500Medium',
+    fontSize: 12,
+    letterSpacing: 0.7,
+    lineHeight: 17
+  },
+  groupCard: {
+    backgroundColor: '#111016',
+    borderColor: '#2A2932',
+    borderRadius: 18,
+    marginBottom: 16,
+    shadowOpacity: 0,
+    elevation: 0
   },
   sectionTitle: {
     ...typography.cardTitle,

@@ -19,8 +19,6 @@ export type RootStackParamList = {
   SignIn: undefined;
   SignUp: undefined;
   ChangePin: { force?: boolean } | undefined;
-  SyncWearable: { autoSync?: boolean } | undefined;
-  SyncSuccess: { deviceName: string };
   Main: undefined;
   FocusSession: undefined;
   BreathingSession: undefined;
@@ -56,6 +54,9 @@ export type RootStackParamList = {
   ConnectedMetrics: undefined;
   HealthData: undefined;
   HealthSyncDebug: undefined;
+  MyConsultants: undefined;
+  ConnectConsultant: undefined;
+  ConsultantConnectionDetails: { connectionId: string };
   ReportsChat: { reportName: string; reportId: string; reportParameters: ReportParameter[] };
   NutritionPlan: undefined;
   NutritionExperience: undefined;
