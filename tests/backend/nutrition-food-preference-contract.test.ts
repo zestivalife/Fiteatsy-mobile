@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { NUTRITION_MEAL_SEQUENCE, type NutritionPlanContent, type NutritionMealSlot } from '../../backend/src/modules/platform/platform.types.js';
 import type { FoodPreferenceProfile } from '../../backend/src/modules/nutrition/food-preferences.service.js';
 import { assertDietPlanRespectsFoodPreferences, assertDietPlanReviewContentComplete, selectDiverseMealOptions } from '../../backend/src/modules/nutrition/nutrition.service.js';
@@ -149,6 +150,13 @@ test('candidate selection keeps within-meal families distinct after the cross-me
 
 test('an empty verified catalogue result stays empty instead of fabricating a fallback', () => {
   assert.deepEqual(selectDiverseMealOptions([], new Set<string>()), []);
+});
+
+test('verified catalogue reads production eligibility from governed versions', () => {
+  const source = readFileSync(new URL('../../backend/src/modules/nutrition/food-preferences.service.ts', import.meta.url), 'utf8');
+  assert.match(source, /food_knowledge_versions governed_version/);
+  assert.match(source, /governed_version\.production_eligible = true/);
+  assert.doesNotMatch(source, /governed\.production_eligible/);
 });
 
 test('canonical nutrition plan retains exactly seven ordered meal heads', () => {

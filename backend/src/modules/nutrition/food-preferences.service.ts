@@ -93,6 +93,13 @@ export const listVerifiedFoodCatalogue = async (query: string, limit = 30, offse
             and governed_version.production_eligible = true
             and governed.client_consumable = true
             and governed.food_type <> 'INGREDIENT_ONLY'
+            and exists (
+              select 1 from food_knowledge_versions governed_version
+              where governed_version.food_id = governed.food_id
+                and governed_version.verification_status = 'verified'
+                and governed_version.production_eligible = true
+                and governed_version.retired_at is null
+            )
         )
         and ($1 = '' or lower(display_name) like '%' || lower($1) || '%'
           or lower(canonical_name) like '%' || lower($1) || '%'
