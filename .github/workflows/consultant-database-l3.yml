@@ -88,6 +88,9 @@ jobs:
       - name: Install locked mobile dependencies
         run: npm ci
 
+      - name: Build production container from Railway repository context
+        run: docker build --tag fiteatsy-backend:${REQUESTED_SHA} --file backend/Dockerfile .
+
       - name: Validate mobile application review candidate
         run: |
           npx tsc --noEmit
@@ -96,6 +99,32 @@ jobs:
 
       - name: Apply production migrations to ephemeral PostgreSQL
         run: npm --prefix backend run db:migrate
+
+      - name: Start production container and verify health
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker run --detach --network host \
+            --env NODE_ENV=test \
+            --env PORT=8080 \
+            --env DATABASE_URL="$DATABASE_URL" \
+            --env GIT_COMMIT="$REQUESTED_SHA" \
+            fiteatsy-backend:"$REQUESTED_SHA")"
+          cleanup() {
+            docker logs "$container_id" || true
+            docker rm --force "$container_id" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/health | grep --quiet '"ok":true'; then
+              curl --fail --silent http://127.0.0.1:8080/v1/version | grep --quiet "$REQUESTED_SHA"
+              echo "PRODUCTION_CONTAINER_HEALTH: PASS"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Production container did not become healthy" >&2
+          exit 1
 
       - name: Build production importer artifact
         run: npm --prefix backend run build
