@@ -36,6 +36,19 @@ export const requireAuthenticatedAccount = async (req: Request, res: Response, n
       return res.status(401).json({ error: 'INVALID_SESSION', message: 'Session token is invalid, expired, or revoked.' });
     }
 
+    const pinSetupRouteAllowed = req.originalUrl.startsWith('/v1/auth/create-pin')
+      || req.originalUrl.startsWith('/v1/auth/change-pin')
+      || req.originalUrl.startsWith('/v1/auth/me')
+      || req.originalUrl.startsWith('/v1/auth/logout');
+    if (account.authProvider === 'fiteatsy' && (account.requiresPinSetup || account.requiresPinChange) && !pinSetupRouteAllowed) {
+      return res.status(428).json({
+        error: account.requiresPinSetup ? 'LOGIN_PIN_SETUP_REQUIRED' : 'LOGIN_PIN_CHANGE_REQUIRED',
+        message: account.requiresPinSetup
+          ? 'Create your personal Login PIN before continuing.'
+          : 'Replace the temporary Login PIN before continuing.'
+      });
+    }
+
     if (account.authProvider === 'consultant_dashboard' && !isConsultantDashboardRouteAllowed(req.originalUrl, account.user.role)) {
       return res.status(403).json({
         error: 'EXTERNAL_SESSION_SCOPE_NOT_ALLOWED',

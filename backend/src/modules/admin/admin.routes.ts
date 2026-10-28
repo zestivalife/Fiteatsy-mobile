@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { assignRoleAsAdmin, getAdminStatus } from './admin.service.js';
+import { listFiteatsyIntakeLeads } from './admin.repository.js';
+import { issueTemporaryLoginPin } from '../auth/auth.service.js';
 import { assignQaClient, deactivateQa, getQaAssignmentsForAdmin, getQaIdentityForAdmin, issueQaSession, provisionQa, resetQaClientOnboarding, revokeQaClientAssignment } from './qa-provisioning.service.js';
 import { addAdminCommonFoodAlias, addAdminCommonFoodServing, bulkSetFoodAuthorisation, CommonFoodAdminError, inspectAdminCommonFood, listAdminCommonFoodAudit, listAdminCommonFoods, listFoodAuthorisation, removeAdminCommonFoodAlias, setAdminCommonFoodMeal, setAdminCommonFoodRole, setAdminCommonFoodServingState, setAdminCommonFoodState } from './common-food-admin.service.js';
 import { getConsultantAccessReconciliation } from '../consultant-access/consultant-access.repository.js';
@@ -29,6 +31,14 @@ const qaAssignmentSchema = z.object({ consultantUserId: z.string().trim().min(1)
 const qaRevokeSchema = z.object({ reason: z.string().trim().min(3).max(240) });
 
 adminRouter.use(requireAuthenticatedAccount);
+const assertSuperAdmin = (req: import('express').Request, res: import('express').Response) => {
+  const role = String(getAuthenticatedAccount(req).user.role ?? '').toLowerCase();
+  if (!['admin', 'super_admin', 'platform_owner'].includes(role)) {
+    res.status(403).json({ error: 'SUPER_ADMIN_REQUIRED', message: 'Super Admin authority is required.' });
+    return false;
+  }
+  return true;
+};
 const adminReason=z.string().trim().min(3).max(240);
 const adminError=(res:import('express').Response,error:unknown)=>{if(error instanceof CommonFoodAdminError)return res.status(error.statusCode).json({error:error.code,message:error.message});throw error;};
 adminRouter.get('/food-authorisation',async(req,res)=>{const parsed=z.object({search:z.string().trim().optional(),category:z.string().optional(),status:z.enum(['PENDING','AUTHORISED','NOT_AUTHORISED']).optional(),nutritionCompleteness:z.enum(['COMPLETE','INCOMPLETE']).optional(),limit:z.coerce.number().int().min(1).max(100).default(25),offset:z.coerce.number().int().min(0).default(0)}).safeParse(req.query);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{return res.json(await listFoodAuthorisation(getAuthenticatedAccount(req),parsed.data));}catch(e){return adminError(res,e);}});
@@ -66,6 +76,29 @@ adminRouter.get('/consultant-access/reconciliation', async (req, res) => {
   const admin = await getAdminStatus(getAuthenticatedAccount(req));
   if (!admin.ok) return res.status(admin.status).json({ error: admin.error, message: admin.message });
   return res.status(200).json({ reconciliation: await getConsultantAccessReconciliation() });
+});
+
+adminRouter.get('/intake-leads', async (req, res) => {
+  if (!assertSuperAdmin(req, res)) return;
+  return res.status(200).json({ leads: await listFiteatsyIntakeLeads() });
+});
+
+adminRouter.post('/users/:userId/temporary-login-pin', async (req, res) => {
+  if (!assertSuperAdmin(req, res)) return;
+  const parsed = z.object({ reason: z.string().trim().min(3).max(240) }).strict().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const actor = getAuthenticatedAccount(req);
+    const result = await issueTemporaryLoginPin(actor.user.id, req.params.userId, {
+      userAgent: req.header('user-agent') ?? null,
+      ipAddress: req.ip || null
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(201).json({ ...result, displayOnce: true });
+  } catch (error) {
+    const typed = error as { code?: string; message?: string };
+    return res.status(typed.code === 'PIN_USER_NOT_FOUND' ? 404 : 500).json({ error: typed.code ?? 'PIN_ISSUE_FAILED', message: typed.message });
+  }
 });
 
 
