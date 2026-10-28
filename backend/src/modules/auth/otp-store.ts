@@ -19,6 +19,7 @@ const memoryRateLimits = new Map<string, number[]>();
 
 const isTestRuntime = () => env.environment.toLowerCase() === 'test' || process.execArgv.some((arg) => arg.includes('--test'));
 const challengeKey = (id: string) => `fiteatsy:otp:challenge:${id}`;
+const verificationLockKey = (id: string) => `fiteatsy:otp:verify-lock:${id}`;
 const mobileKey = (mobile: string) => `fiteatsy:otp:mobile:${mobile}`;
 const rateKey = (mobile: string) => `fiteatsy:otp:rate:${mobile}`;
 
@@ -117,6 +118,37 @@ export const otpStore = {
   async delete(challengeId: string) {
     if (isTestRuntime()) memoryChallenges.delete(challengeId);
     else await redisCommand(['DEL', challengeKey(challengeId)]);
+  },
+  async claimVerification(challengeId: string, ttlMs: number) {
+    if (isTestRuntime()) {
+      const challenge = memoryChallenges.get(challengeId);
+      if (!challenge || challenge.verified) return false;
+      challenge.verified = true;
+      memoryChallenges.set(challengeId, challenge);
+      return true;
+    }
+    const result = await redisCommand([
+      'SET', verificationLockKey(challengeId), 'claimed', 'NX', 'PX', String(ttlMs)
+    ]);
+    return result === 'OK';
+  },
+  async releaseVerification(challengeId: string) {
+    if (isTestRuntime()) {
+      const challenge = memoryChallenges.get(challengeId);
+      if (challenge) {
+        challenge.verified = false;
+        memoryChallenges.set(challengeId, challenge);
+      }
+      return;
+    }
+    await redisCommand(['DEL', verificationLockKey(challengeId)]);
+  },
+  async completeVerification(challengeId: string) {
+    if (isTestRuntime()) {
+      memoryChallenges.delete(challengeId);
+      return;
+    }
+    await redisCommand(['DEL', challengeKey(challengeId), verificationLockKey(challengeId)]);
   },
   async getActiveId(mobile: string) {
     if (isTestRuntime()) {

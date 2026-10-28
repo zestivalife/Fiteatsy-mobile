@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { countClients } from '../../backend/src/modules/client/client.repository.js';
+import { pool } from '../../backend/src/db/pool.js';
 import { setOtpGeneratorForTests } from '../../backend/src/modules/auth/auth.service.js';
 import { getJson, postJson } from '../helpers/http.js';
 import { authHeaders } from '../helpers/auth.js';
@@ -89,6 +90,24 @@ test('POST /v1/auth/signup/verify-otp issues a persisted session and GET /v1/aut
   assert.match(verified.body.user.id, /^[0-9a-f-]{36}$/i);
   assert.notEqual(verified.body.user.id, 'asha@example.com');
 
+  const tenantState = await pool.query(
+    `select t.slug, t.tenant_type, tm.tenant_role, tm.status as membership_status,
+            c.tenant_id = tm.tenant_id as tenant_matches
+       from fiteatsy_clients c
+       join tenants t on t.id = c.tenant_id
+       join tenant_memberships tm on tm.tenant_id = c.tenant_id and tm.user_id = c.account_user_id
+      where c.account_user_id = $1`,
+    [verified.body.user.id]
+  );
+  assert.equal(tenantState.rowCount, 1);
+  assert.deepEqual(tenantState.rows[0], {
+    slug: 'zestiva',
+    tenant_type: 'ZESTIVA_INTERNAL',
+    tenant_role: 'CLIENT',
+    membership_status: 'active',
+    tenant_matches: true
+  });
+
   const me = await getJson(server.baseUrl, '/v1/auth/me', {
     headers: authHeaders(verified.body.sessionToken)
   });
@@ -100,6 +119,44 @@ test('POST /v1/auth/signup/verify-otp issues a persisted session and GET /v1/aut
   assert.match(me.body.client.fiteatsyClientId, /^fc_[a-f0-9]{32}$/i);
   assert.equal(me.body.client.status, 'active');
   assert.equal('id' in me.body.client, false);
+});
+
+test('OTP registration rolls back cleanly and returns a safe retryable error when tenant resolution fails', async () => {
+  const created = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
+    name: 'Tenant Failure Test',
+    email: 'tenant-failure@example.com',
+    mobileNumber: '+919876543219'
+  });
+  await pool.query("update tenants set status = 'inactive' where slug = 'zestiva'");
+  try {
+    const failed = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+      challengeId: created.body.challengeId,
+      otp: TEST_OTP
+    });
+    assert.equal(failed.response.status, 503);
+    assert.equal(failed.body.error, 'AUTH_REGISTRATION_UNAVAILABLE');
+    assert.match(failed.body.correlationId, /^[0-9a-f-]{36}$/i);
+    assert.equal(JSON.stringify(failed.body).includes('tenant_id'), false);
+    assert.equal(JSON.stringify(failed.body).includes('violates not-null constraint'), false);
+
+    const orphanCounts = await pool.query(
+      `select
+         (select count(*)::int from users where email_normalized = $1) as users,
+         (select count(*)::int from auth_sessions s join users u on u.id=s.user_id where u.email_normalized = $1) as sessions,
+         (select count(*)::int from fiteatsy_clients c join users u on u.id=c.account_user_id where u.email_normalized = $1) as clients`,
+      ['tenant-failure@example.com']
+    );
+    assert.deepEqual(orphanCounts.rows[0], { users: 0, sessions: 0, clients: 0 });
+  } finally {
+    await pool.query("update tenants set status = 'active' where slug = 'zestiva'");
+  }
+
+  const retried = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+    challengeId: created.body.challengeId,
+    otp: TEST_OTP
+  });
+  assert.equal(retried.response.status, 200);
+  assert.match(retried.body.sessionToken, /^[-_a-z0-9]+$/i);
 });
 
 test('PIN login bootstraps existing OTP users with default PIN and requires PIN change', async () => {
