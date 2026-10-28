@@ -46,7 +46,10 @@ databaseTest('FITEATSY-CATALOGUE-SUCCESSOR-IMPORT-POLICY-v1', async () => {
   const clientId = crypto.randomUUID();
   const profileId = crypto.randomUUID();
   await pool.query(`insert into users (id,name,email_normalized,role) values ($1,'Successor Client',$2,'client')`, [userId, `${userId}@example.test`]);
-  await pool.query(`insert into fiteatsy_clients (id,fiteatsy_client_id,account_user_id) values ($1,$2,$3)`, [clientId, `fc_successor_${Date.now()}`, userId]);
+  await pool.query(
+    `insert into fiteatsy_clients (id,fiteatsy_client_id,account_user_id,tenant_id) values ($1,$2,$3,$4)`,
+    [clientId, `fc_successor_${Date.now()}`, userId, '00000000-0000-4000-8000-000000000001'],
+  );
   await pool.query(`insert into health_profiles (id,user_id,client_id,gender,diet_type) values ($1,$2,$3,'Female','vegetarian')`, [profileId, userId, clientId]);
   const careCase = await createCareCaseIfMissing({ clientId, accountId: userId }, profileId);
   const planId = crypto.randomUUID();

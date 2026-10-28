@@ -65,12 +65,13 @@ test('createOrResolveClientForAccount reactivates stale client mappings and pres
         id,
         fiteatsy_client_id,
         account_user_id,
+        tenant_id,
         status,
         version,
         created_at,
         updated_at,
         deleted_at
-      ) values ($1, $2, $3, 'inactive', 3, $4, $4, $4)
+      ) values ($1, $2, $3, '00000000-0000-4000-8000-000000000001', 'inactive', 3, $4, $4, $4)
     `,
     ['11111111-1111-1111-1111-111111111111', 'fc_existingpreserved1234567890abcdef', 'stale-client-user', timestamp]
   );
