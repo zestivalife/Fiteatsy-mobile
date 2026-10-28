@@ -9,6 +9,8 @@ const pinSchema = z.string().trim().transform((value) => value.replace(/\s/g, ''
 const previewSchema = z.object({ pin: pinSchema }).strict();
 const redeemSchema = z.object({
   pin: pinSchema,
+  consentVersion: z.literal('external-consultant-v1'),
+  acceptedScopes: z.array(z.enum(['PROFILE', 'HEALTH_SUMMARY', 'MEASUREMENTS', 'BIOMARKERS', 'DIET_PLANS', 'APPOINTMENTS'])).min(1),
   idempotencyKey: z.string().uuid(),
 }).strict();
 const activePlanSchema = z.object({ publicationId: z.string().uuid() }).strict();
@@ -31,7 +33,10 @@ externalConsultantsRouter.post('/preview', async (req, res, next) => {
   const parsed = previewSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: 'INVALID_PIN_FORMAT', message: 'Enter the complete Connection PIN.' });
   try {
-    const data = await requestExternalConsultantApi(getAuthenticatedAccount(req), '/api/v1/fiteatsy-connections/preview', { method: 'POST', body: parsed.data });
+    const data = await requestExternalConsultantApi(getAuthenticatedAccount(req), '/api/v1/fiteatsy-connections/preview', {
+      method: 'POST',
+      body: { pin: parsed.data.pin, purpose: 'CONSULTANT_CONNECTION_PIN' },
+    });
     return res.status(200).json(data);
   } catch (error) { return handle(res, next, error); }
 });
@@ -43,7 +48,12 @@ externalConsultantsRouter.post('/redeem', async (req, res, next) => {
     const data = await requestExternalConsultantApi(getAuthenticatedAccount(req), '/api/v1/fiteatsy-connections/redeem', {
       method: 'POST',
       idempotencyKey: parsed.data.idempotencyKey,
-      body: { pin: parsed.data.pin },
+      body: {
+        pin: parsed.data.pin,
+        purpose: 'CONSULTANT_CONNECTION_PIN',
+        consent_version: parsed.data.consentVersion,
+        accepted_scopes: parsed.data.acceptedScopes,
+      },
     });
     return res.status(201).json(data);
   } catch (error) { return handle(res, next, error); }

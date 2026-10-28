@@ -35,6 +35,7 @@ export const createFiteatsyIdentityAssertion = (account: AuthenticatedAccount, n
     aud: env.externalConsultantsAssertionAudience,
     sub: account.user.id,
     actor_type: 'FITEATSY_USER',
+    purpose: 'consultant_connection',
     iat: nowSeconds,
     exp: nowSeconds + ASSERTION_TTL_SECONDS,
     jti: crypto.randomUUID(),
