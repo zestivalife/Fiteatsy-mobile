@@ -1,4 +1,4 @@
-import { getJson, postJson } from './http.js';
+import { getJson, postJson, putJson } from './http.js';
 import { setOtpGeneratorForTests } from '../../backend/src/modules/auth/auth.service.js';
 
 let authSequence = 0;
@@ -27,6 +27,14 @@ export const createAuthenticatedSession = async (
     otp
   });
   const token = String(verified.body.sessionToken);
+  const pin = await putJson(baseUrl, '/v1/auth/create-pin', {
+    newPin: '654320'
+  }, {
+    headers: authHeaders(token)
+  });
+  if (pin.response.status !== 201) {
+    throw new Error(`Unable to complete test Login PIN setup: ${JSON.stringify(pin.body)}`);
+  }
   const current = await getJson(baseUrl, '/v1/auth/me', {
     headers: authHeaders(token)
   });
