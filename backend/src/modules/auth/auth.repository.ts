@@ -545,7 +545,9 @@ export const resolveVerifiedAccountIdentity = async (input: {
         `insert into health_profiles (
            id, user_id, client_id, status, version, created_at, updated_at
          ) values ($1, $2, $3, 'active', 1, $4, $4)
-         on conflict (client_id) where deleted_at is null do nothing`,
+         on conflict (client_id)
+         where client_id is not null and deleted_at is null and status = 'active'
+         do nothing`,
         [crypto.randomUUID(), user.id, resolvedClient.id, timestamp]
       );
       const issuedSession = sessionMetadata
