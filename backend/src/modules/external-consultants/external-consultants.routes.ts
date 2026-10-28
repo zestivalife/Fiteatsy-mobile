@@ -9,8 +9,6 @@ const pinSchema = z.string().trim().transform((value) => value.replace(/\s/g, ''
 const previewSchema = z.object({ pin: pinSchema }).strict();
 const redeemSchema = z.object({
   pin: pinSchema,
-  consentVersion: z.string().trim().min(1).max(40),
-  acceptedScopes: z.array(z.enum(['PROFILE', 'HEALTH_SUMMARY', 'MEASUREMENTS', 'BIOMARKERS', 'DIET_PLANS', 'APPOINTMENTS'])).min(1),
   idempotencyKey: z.string().uuid(),
 }).strict();
 const activePlanSchema = z.object({ publicationId: z.string().uuid() }).strict();
@@ -45,7 +43,7 @@ externalConsultantsRouter.post('/redeem', async (req, res, next) => {
     const data = await requestExternalConsultantApi(getAuthenticatedAccount(req), '/api/v1/fiteatsy-connections/redeem', {
       method: 'POST',
       idempotencyKey: parsed.data.idempotencyKey,
-      body: { pin: parsed.data.pin, consent_version: parsed.data.consentVersion, accepted_scopes: parsed.data.acceptedScopes },
+      body: { pin: parsed.data.pin },
     });
     return res.status(201).json(data);
   } catch (error) { return handle(res, next, error); }

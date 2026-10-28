@@ -51,6 +51,8 @@ export type AuthenticatedAccount = {
   sessionExpiresAtISO: string;
   token: string;
   authProvider: 'fiteatsy' | 'consultant_dashboard';
+  requiresPinSetup: boolean;
+  requiresPinChange: boolean;
   user: PersistedAuthUser;
   client: PersistedClient;
   qaSession: null | { fixtureSetId: string; purpose: string; role: 'consultant' | 'senior_consultant' };
@@ -310,6 +312,8 @@ const rowToAuthenticatedAccount = async (
     sessionExpiresAtISO: input.sessionExpiresAtISO,
     token: input.token,
     authProvider: 'fiteatsy',
+    requiresPinSetup: row.pin_hash == null,
+    requiresPinChange: Boolean(row.force_pin_change),
     qaSession: row.qa_fixture_set_id == null ? null : {
       fixtureSetId: String(row.qa_fixture_set_id),
       purpose: String(row.qa_purpose),
@@ -468,6 +472,9 @@ export const resolveVerifiedAccountIdentity = async (input: {
   name: string;
   email: string;
   mobileNumber: string;
+}, sessionMetadata?: {
+  userAgent?: string | null;
+  ipAddress?: string | null;
 }) => {
   const normalizedEmail = normalizeEmail(input.email);
   const normalizedMobileNumber = normalizeMobileNumber(input.mobileNumber);
@@ -533,10 +540,22 @@ export const resolveVerifiedAccountIdentity = async (input: {
       }
 
       const resolvedClient = await createOrResolveClientForAccount(user.id, client);
+      const timestamp = now().toISOString();
+      await client.query(
+        `insert into health_profiles (
+           id, user_id, client_id, status, version, created_at, updated_at
+         ) values ($1, $2, $3, 'active', 1, $4, $4)
+         on conflict (client_id) where deleted_at is null do nothing`,
+        [crypto.randomUUID(), user.id, resolvedClient.id, timestamp]
+      );
+      const issuedSession = sessionMetadata
+        ? await createAuthSessionWithClient(client, user.id, sessionMetadata)
+        : null;
       await client.query('commit');
       return {
         user,
-        client: resolvedClient
+        client: resolvedClient,
+        issuedSession
       };
     } catch (error) {
       await client.query('rollback');
@@ -752,7 +771,7 @@ export const recordPinFailure = async (
 
 export const createAuthEvent = async (input: {
   userId?: string | null;
-  event: 'PIN_LOGIN_FAILED' | 'PIN_LOGIN_SUCCESS' | 'PIN_CHANGED';
+  event: 'PIN_LOGIN_FAILED' | 'PIN_LOGIN_SUCCESS' | 'PIN_CHANGED' | 'PIN_INITIALIZED' | 'TEMPORARY_LOGIN_PIN_ISSUED';
   metadata?: Record<string, unknown>;
   userAgent?: string | null;
   ipAddress?: string | null;
@@ -802,6 +821,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
         u.last_login_at as user_last_login_at,
         u.email_verified_at,
         u.mobile_verified_at
+        ,u.pin_hash
       from auth_sessions s
       join users u on u.id = s.user_id
       where s.token_hash = $1
@@ -904,6 +924,8 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString(),
     token,
     authProvider: 'consultant_dashboard',
+    requiresPinSetup: false,
+    requiresPinChange: false,
     qaSession: null,
     user: bridgedUser,
     client: undefined as unknown as PersistedClient

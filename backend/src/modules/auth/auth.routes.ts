@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import {
   createOtpChallenge,
+  createInitialPin,
   changePin,
   loginWithPin,
   resendOtpChallenge,
@@ -11,6 +12,7 @@ import {
 } from './auth.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from './auth.middleware.js';
 import { revokeAuthSession } from './auth.repository.js';
+import { findUserByIdForPin } from './auth.repository.js';
 import {
   assertQaHandoffExchangeRate,
   exchangeQaAdminSessionHandoff,
@@ -47,6 +49,14 @@ const changePinSchema = z.object({
   path: ['confirmNewPin']
 });
 
+const createPinSchema = z.object({
+  newPin: z.string().trim().regex(/^[0-9]{6}$/),
+  confirmNewPin: z.string().trim().regex(/^[0-9]{6}$/)
+}).strict().refine((value) => value.newPin === value.confirmNewPin, {
+  message: 'PIN confirmation does not match.',
+  path: ['confirmNewPin']
+});
+
 const qaSessionHandoffExchangeSchema = z.object({
   code: z.string().trim().min(40).max(120),
   targetUserId: z.string().uuid(),
@@ -65,9 +75,10 @@ const toHttpStatus = (code: OtpDomainError['code']): number => {
   if (code === 'OTP_INVALID') return 401;
   if (code === 'OTP_DELIVERY_FAILED') return 502;
   if (code === 'AUTH_CONTACT_CONFLICT') return 409;
+  if (code === 'AUTH_REGISTRATION_UNAVAILABLE') return 503;
   if (code === 'PIN_USER_NOT_FOUND' || code === 'PIN_INVALID') return 401;
   if (code === 'PIN_LOCKED') return 423;
-  if (code === 'PIN_REUSE_NOT_ALLOWED') return 409;
+  if (code === 'PIN_REUSE_NOT_ALLOWED' || code === 'PIN_ALREADY_CONFIGURED') return 409;
   if (code === 'OTP_RESEND_NOT_READY' || code === 'OTP_TOO_MANY_ATTEMPTS' || code === 'OTP_RATE_LIMITED') return 429;
   return 400;
 };
@@ -198,20 +209,29 @@ authRouter.post('/signup/verify-otp', async (req, res) => {
     return res.status(200).json(result);
   } catch (error) {
     const domainError = error as OtpDomainError;
+    const correlationId = crypto.randomUUID();
+    res.setHeader('X-Correlation-Id', correlationId);
+    if (domainError.code === 'AUTH_REGISTRATION_UNAVAILABLE') {
+      console.error('OTP registration transaction failed.', { correlationId });
+    }
     return res.status(toHttpStatus(domainError.code)).json({
       error: domainError.code,
       message: domainError.message,
-      retryAfterSec: domainError.retryAfterSec ?? undefined
+      retryAfterSec: domainError.retryAfterSec ?? undefined,
+      correlationId
     });
   }
 });
 
-authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
+authRouter.get('/me', requireAuthenticatedAccount, async (req, res) => {
   const account = getAuthenticatedAccount(req);
+  const pinUser = await findUserByIdForPin(account.user.id);
   return res.status(200).json({
     accountId: account.accountId,
     sessionId: account.sessionId,
     sessionExpiresAtISO: account.sessionExpiresAtISO,
+    requiresPinSetup: !pinUser?.pinHash,
+    requiresPinChange: Boolean(pinUser?.forcePinChange),
     qaSession: account.qaSession,
     client: {
       fiteatsyClientId: account.client.fiteatsyClientId,
@@ -227,6 +247,22 @@ authRouter.get('/me', requireAuthenticatedAccount, (req, res) => {
       createdAtISO: account.user.createdAtISO
     }
   });
+});
+
+authRouter.put('/create-pin', requireAuthenticatedAccount, async (req, res) => {
+  const parsed = createPinSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(validationErrorResponse(parsed.error));
+  try {
+    const account = getAuthenticatedAccount(req);
+    const result = await createInitialPin(account.user.id, { newPin: parsed.data.newPin }, {
+      userAgent: req.header('user-agent') ?? null,
+      ipAddress: req.ip || null
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    const domainError = error as OtpDomainError;
+    return res.status(toHttpStatus(domainError.code)).json({ error: domainError.code, message: domainError.message });
+  }
 });
 
 authRouter.put('/change-pin', requireAuthenticatedAccount, async (req, res) => {
