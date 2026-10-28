@@ -28,7 +28,8 @@ export const createAuthenticatedSession = async (
   });
   const token = String(verified.body.sessionToken);
   const pin = await putJson(baseUrl, '/v1/auth/create-pin', {
-    newPin: '654320'
+    newPin: '654320',
+    confirmNewPin: '654320'
   }, {
     headers: authHeaders(token)
   });
