@@ -859,6 +859,43 @@ export const getRegisteredConsultantClientProfileContext = async (
   };
 };
 
+export const getRegisteredClientProfileContextByAccountId = async (
+  accountId: string
+): Promise<ConsultantClientProfileContext | null> => {
+  const result = await pool.query(
+    `${protectedClientSelect}
+      and u.id = $6
+      order by hp.updated_at desc nulls last
+      limit 1
+    `,
+    [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, accountId]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    accountId: String(row.account_user_id),
+    internalClientId: String(row.internal_client_id),
+    profile: {
+      client: {
+        id: String(row.fiteatsy_client_id), name: String(row.name),
+        email: row.email_normalized == null ? null : String(row.email_normalized),
+        mobile: null, mobileNumberMasked: maskMobileNumber(row.mobile_number_normalized),
+        registrationDate: new Date(String(row.registered_at)).toISOString(), status: String(row.client_status),
+        accountStatus: String(row.account_status), dob: toIso(row.date_of_birth_iso), age: toNumberOrNull(row.age),
+        gender: row.gender == null ? null : String(row.gender)
+      },
+      onboarding: mapOnboardingProjection(row),
+      healthProfile: { biomarkerStatus: null, reportsCount: Number(row.reports_count ?? 0), lastHealthUpdate: toIso(row.last_health_update), profileCompleted: profileCompleted(row) }
+    },
+    calculationInput: {
+      age: toNumberOrNull(row.age), gender: row.gender == null ? null : String(row.gender),
+      heightCm: toNumberOrNull(row.height_cm), weightKg: toNumberOrNull(row.current_weight_kg),
+      waistCm: toNumberOrNull(row.waist_cm), hipCm: toNumberOrNull(row.hip_cm), neckCm: toNumberOrNull(row.neck_cm),
+      activityLevel: row.activity_level == null ? null : String(row.activity_level)
+    }
+  };
+};
+
 export const listValidatedBiomarkerSummaryForClient = async (
   internalClientId: string,
   accountId: string
