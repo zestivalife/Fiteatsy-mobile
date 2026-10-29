@@ -8,9 +8,18 @@ export const postgresUuidSchema = z.string().trim().regex(
   'Must be a canonical PostgreSQL UUID.',
 );
 
+// External consultants are mirrored into Fiteatsy with an immutable, namespaced
+// identity. It is a real users.id value (and FK target), not a UUID alias. Keep
+// the accepted shape narrow so arbitrary legacy text can never become an
+// assignment target.
+export const professionalIdentitySchema = z.string().trim().regex(
+  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ext_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
+  'Must be a canonical Fiteatsy professional identity.',
+);
+
 export const professionalAssignmentSchema = z.object({
   clientUserId: postgresUuidSchema,
-  professionalUserId: postgresUuidSchema,
+  professionalUserId: professionalIdentitySchema,
   professionalType: z.enum(['CONSULTANT', 'PRACTITIONER', 'MENTOR']),
   relationshipType: z.string().trim().min(2).max(80),
   reason: z.string().trim().max(240).optional(),

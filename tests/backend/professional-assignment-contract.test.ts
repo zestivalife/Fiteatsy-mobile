@@ -3,11 +3,13 @@ import test from 'node:test';
 import {
   assignmentValidationDetails,
   postgresUuidSchema,
+  professionalIdentitySchema,
   professionalAssignmentBatchSchema,
 } from '../../backend/src/modules/professional-assignments/professional-assignment.contract.js';
 
 const legacyPostgresUuid = '11111111-1111-f111-1111-111111111111';
 const rfcUuid = '22222222-2222-4222-8222-222222222222';
+const externalProfessionalId = 'ext_330a4fa0-731b-4162-bcb9-bf4e21e6a014';
 
 const validPayload = {
   clientUserIds: [legacyPostgresUuid],
@@ -23,6 +25,17 @@ test('canonical PostgreSQL UUID identities round-trip without changing IDs', () 
   const parsed = professionalAssignmentBatchSchema.parse(validPayload);
   assert.deepEqual(parsed.clientUserIds, [legacyPostgresUuid]);
   assert.equal(parsed.professionalUserId, rfcUuid);
+});
+
+test('namespaced external consultant identities remain strict assignment targets', () => {
+  assert.equal(professionalIdentitySchema.safeParse(externalProfessionalId).success, true);
+  assert.equal(professionalIdentitySchema.safeParse(`external_${rfcUuid}`).success, false);
+  assert.equal(professionalIdentitySchema.safeParse('ext_not-a-uuid').success, false);
+  const parsed = professionalAssignmentBatchSchema.parse({
+    ...validPayload,
+    professionalUserId: externalProfessionalId,
+  });
+  assert.equal(parsed.professionalUserId, externalProfessionalId);
 });
 
 test('batch payload rejects malformed client and professional identities', () => {
