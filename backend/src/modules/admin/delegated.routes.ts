@@ -5,7 +5,7 @@ import { requireDelegatedAuthority } from '../auth/delegated-authority.middlewar
 import { executeDelegatedIdempotently } from './delegated-operation-idempotency.js';
 import { issueQaAdminSessionHandoff } from '../auth/qa-session-handoff.js';
 import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, recordQaIdentityReuse, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
-import { listFiteatsyIntakeLeads } from './admin.repository.js';
+import { diagnoseFiteatsyIntakeLeadSearch, listFiteatsyIntakeLeads } from './admin.repository.js';
 import { issueTemporaryLoginPin } from '../auth/auth.service.js';
 import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
 import { createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from '../professional-assignments/professional-assignments.repository.js';
@@ -35,9 +35,27 @@ const respondError = (res: Response, error: unknown, fallback: string) => {
 };
 const correlationReason = (req: Request, reason: string) => `${reason} [correlation:${req.header('x-correlation-id') || 'unavailable'}]`;
 
-delegatedRouter.get('/intake-leads', requireDelegatedAuthority('fiteatsy.leads.read', 'lead_management', 'platform_owner'), async (_req, res) => {
+delegatedRouter.get('/intake-leads', requireDelegatedAuthority('fiteatsy.leads.read', 'lead_management', 'platform_owner'), async (req, res) => {
   try {
-    return res.status(200).json({ leads: await listFiteatsyIntakeLeads() });
+    const parsed = z.object({
+      q: z.string().trim().max(180).default(''),
+      status: z.enum(['all', 'active', 'inactive']).default('all'),
+      order: z.enum(['asc', 'desc']).default('desc'),
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(1).max(100).default(20)
+    }).safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+    const result = await listFiteatsyIntakeLeads({
+      query: parsed.data.q,
+      status: parsed.data.status,
+      order: parsed.data.order,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize
+    });
+    const diagnostic = result.pagination.total === 0 && parsed.data.q
+      ? await diagnoseFiteatsyIntakeLeadSearch(parsed.data.q)
+      : null;
+    return res.status(200).json({ ...result, diagnostic });
   } catch (error) { return respondError(res, error, 'FITEATSY_LEADS_FAILED'); }
 });
 

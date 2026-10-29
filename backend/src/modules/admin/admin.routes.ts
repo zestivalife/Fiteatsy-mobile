@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { assignRoleAsAdmin, getAdminStatus } from './admin.service.js';
-import { listFiteatsyIntakeLeads } from './admin.repository.js';
+import { diagnoseFiteatsyIntakeLeadSearch, listFiteatsyIntakeLeads } from './admin.repository.js';
 import { issueTemporaryLoginPin } from '../auth/auth.service.js';
 import { assignQaClient, deactivateQa, getQaAssignmentsForAdmin, getQaIdentityForAdmin, issueQaSession, provisionQa, resetQaClientOnboarding, revokeQaClientAssignment } from './qa-provisioning.service.js';
 import { addAdminCommonFoodAlias, addAdminCommonFoodServing, CommonFoodAdminError, inspectAdminCommonFood, listAdminCommonFoodAudit, listAdminCommonFoods, removeAdminCommonFoodAlias, setAdminCommonFoodMeal, setAdminCommonFoodRole, setAdminCommonFoodServingState, setAdminCommonFoodState } from './common-food-admin.service.js';
@@ -71,7 +71,25 @@ adminRouter.get('/status', async (req, res) => {
 
 adminRouter.get('/intake-leads', async (req, res) => {
   if (!assertSuperAdmin(req, res)) return;
-  return res.status(200).json({ leads: await listFiteatsyIntakeLeads() });
+  const parsed = z.object({
+    q: z.string().trim().max(180).default(''),
+    status: z.enum(['all', 'active', 'inactive']).default('all'),
+    order: z.enum(['asc', 'desc']).default('desc'),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20)
+  }).safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  const result = await listFiteatsyIntakeLeads({
+    query: parsed.data.q,
+    status: parsed.data.status,
+    order: parsed.data.order,
+    page: parsed.data.page,
+    pageSize: parsed.data.pageSize
+  });
+  const diagnostic = result.pagination.total === 0 && parsed.data.q
+    ? await diagnoseFiteatsyIntakeLeadSearch(parsed.data.q)
+    : null;
+  return res.status(200).json({ ...result, diagnostic });
 });
 
 adminRouter.post('/users/:userId/temporary-login-pin', async (req, res) => {
