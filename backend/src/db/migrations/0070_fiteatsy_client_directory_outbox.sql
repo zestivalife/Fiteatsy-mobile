@@ -8,7 +8,7 @@ create table if not exists fiteatsy_client_directory_outbox (
     'FITEATSY_USER_DEACTIVATED',
     'FITEATSY_USER_DELETED'
   )),
-  aggregate_user_id uuid not null references users(id) on delete restrict,
+  aggregate_user_id text not null references users(id) on delete restrict,
   source_version integer not null check (source_version > 0),
   schema_version integer not null default 1 check (schema_version = 1),
   payload jsonb not null,
@@ -34,7 +34,7 @@ create table if not exists fiteatsy_client_directory_sync_state (
   reconciliation_started_at timestamptz,
   last_successful_delivery_at timestamptz,
   last_successful_reconciliation_at timestamptz,
-  last_reconciliation_user_id uuid,
+  last_reconciliation_user_id text,
   last_source_count integer check (last_source_count is null or last_source_count >= 0),
   last_excluded_count integer check (last_excluded_count is null or last_excluded_count >= 0),
   last_duplicate_mobile_count integer check (last_duplicate_mobile_count is null or last_duplicate_mobile_count >= 0),

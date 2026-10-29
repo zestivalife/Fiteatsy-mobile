@@ -183,7 +183,7 @@ export const reconcileClientDirectoryOutbox = async () => {
           lower(coalesce(u.role,'user')) in ('user','client')
           or exists (select 1 from fiteatsy_client_directory_outbox prior where prior.aggregate_user_id=u.id)
         )
-        and ($1::uuid is null or u.id > $1::uuid)
+        and ($1::text is null or u.id > $1::text)
       order by u.id limit $2`,
     [checkpoint, RECONCILIATION_BATCH_SIZE],
   );
@@ -224,7 +224,7 @@ export const reconcileClientDirectoryOutbox = async () => {
   await connection.query(
     `update fiteatsy_client_directory_sync_state
         set last_reconciliation_user_id=$1,
-            last_successful_reconciliation_at=case when $1::uuid is null then now() else last_successful_reconciliation_at end,
+            last_successful_reconciliation_at=case when $1::text is null then now() else last_successful_reconciliation_at end,
             last_source_count=coalesce($2,last_source_count),
             last_excluded_count=coalesce($3,last_excluded_count),
             last_duplicate_mobile_count=coalesce($4,last_duplicate_mobile_count),
