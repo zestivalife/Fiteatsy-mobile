@@ -5,6 +5,7 @@ import test from 'node:test';
 const repository = readFileSync(new URL('../../backend/src/modules/professional-assignments/professional-assignments.repository.ts', import.meta.url), 'utf8');
 const routes = readFileSync(new URL('../../backend/src/modules/professional-assignments/professional-assignments.routes.ts', import.meta.url), 'utf8');
 const delegatedRoutes = readFileSync(new URL('../../backend/src/modules/admin/delegated.routes.ts', import.meta.url), 'utf8');
+const assignmentContract = readFileSync(new URL('../../backend/src/modules/professional-assignments/professional-assignment.contract.ts', import.meta.url), 'utf8');
 const delegatedAuthority = readFileSync(new URL('../../backend/src/modules/auth/delegated-authority.ts', import.meta.url), 'utf8');
 const actorMigration = readFileSync(new URL('../../backend/src/db/migrations/0069_delegated_assignment_actor_attribution.sql', import.meta.url), 'utf8');
 
@@ -34,7 +35,13 @@ test('multi-client assignment is one atomic transaction and rejects partial elig
   assert.match(repository, /eligibleClients\.rowCount !== input\.clientUserIds\.length/);
   assert.match(repository, /const conflicts = input\.clientUserIds/);
   assert.match(routes, /professionalAssignmentsRouter\.post\('\/batch'/);
-  assert.match(routes, /z\.array\(z\.string\(\)\.uuid\(\)\)\.min\(1\)\.max\(100\)/);
+  assert.match(routes, /professionalAssignmentBatchSchema/);
+});
+
+test('professional and client must share an active tenant membership', () => {
+  assert.match(repository, /professional_membership\.tenant_id = fc\.tenant_id/);
+  assert.match(repository, /professional_membership\.user_id = \$2/);
+  assert.match(repository, /lower\(coalesce\(professional_membership\.status, ''\)\) = 'active'/);
 });
 
 test('eligible-client queries exclude deleted and inactive records and mask contacts', () => {
@@ -71,7 +78,7 @@ test('delegated assignment surface covers reads, atomic batch, reassignment and 
   assert.match(delegatedRoutes, /professional-assignments\/clients\/pool/);
   assert.match(delegatedRoutes, /professional-assignments\/professionals/);
   assert.match(delegatedRoutes, /professional-assignments\/batch/);
-  assert.match(delegatedRoutes, /allowReassignment/);
+  assert.match(assignmentContract, /allowReassignment/);
   assert.match(delegatedRoutes, /REASSIGNMENT_CONFIRMATION_REQUIRED/);
 });
 

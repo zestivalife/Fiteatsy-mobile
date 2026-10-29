@@ -221,6 +221,10 @@ export const createProfessionalAssignment = async (input: AssignmentActor & { cl
      select $1, professional.id, client.id, $2, $7, 'FITEATSY', $4, $5
        from users professional join users client on client.id = $3
        join fiteatsy_clients fc on fc.account_user_id = client.id and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
+       join tenant_memberships professional_membership
+         on professional_membership.user_id = professional.id
+        and professional_membership.tenant_id = fc.tenant_id
+        and lower(coalesce(professional_membership.status, '')) = 'active'
       where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
         and lower(coalesce(professional.status, '')) = 'active'
         and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
@@ -266,9 +270,13 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
          from users client
          join fiteatsy_clients fc on fc.account_user_id = client.id
           and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
+         join tenant_memberships professional_membership
+           on professional_membership.user_id = $2
+          and professional_membership.tenant_id = fc.tenant_id
+          and lower(coalesce(professional_membership.status, '')) = 'active'
         where client.id = any($1::uuid[]) and client.deleted_at is null
           and lower(coalesce(client.status, '')) = 'active'`,
-      [input.clientUserIds],
+      [input.clientUserIds, input.professionalUserId],
     );
     if (eligibleClients.rowCount !== input.clientUserIds.length) {
       await connection.query('rollback');

@@ -9,6 +9,7 @@ import { listFiteatsyIntakeLeads } from './admin.repository.js';
 import { issueTemporaryLoginPin } from '../auth/auth.service.js';
 import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
 import { createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from '../professional-assignments/professional-assignments.repository.js';
+import { assignmentValidationDetails, professionalAssignmentBatchSchema, professionalAssignmentSchema } from '../professional-assignments/professional-assignment.contract.js';
 
 export const delegatedRouter = Router();
 
@@ -21,8 +22,6 @@ const identitySchema = z.object({
 const qaAdminIdentitySchema = identitySchema.strict();
 const assignmentSchema = z.object({ consultantUserId: z.string().trim().min(1), clientUserId: z.string().trim().min(1), reason: z.string().trim().min(3).max(240) });
 const reasonSchema = z.object({ reason: z.string().trim().min(3).max(240) });
-const professionalAssignmentSchema = z.object({ clientUserId: z.string().uuid(), professionalUserId: z.string().uuid(), professionalType: z.enum(['CONSULTANT', 'PRACTITIONER', 'MENTOR']), relationshipType: z.string().trim().min(2).max(80), reason: z.string().trim().max(240).optional(), allowReassignment: z.boolean().optional().default(false) }).strict();
-const professionalAssignmentBatchSchema = professionalAssignmentSchema.omit({ clientUserId: true }).extend({ clientUserIds: z.array(z.string().uuid()).min(1).max(100).transform((values) => [...new Set(values)]) }).strict();
 
 const actorId = (req: Request) => {
   const value = (req as Request & { delegatedAuthority?: { sub?: string } }).delegatedAuthority?.sub;
@@ -172,7 +171,7 @@ delegatedRouter.get('/professional-assignments', requireDelegatedAuthority('fite
 
 delegatedRouter.post('/professional-assignments', requireDelegatedAuthority('fiteatsy.client.assign', 'client_assignment', 'platform_owner'), async (req, res) => {
   const parsed = professionalAssignmentSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', message: 'Assignment request contains invalid fields.', details: assignmentValidationDetails(parsed.error) });
   try {
     const actorReference = `zestiva:${actorId(req)}`;
     const result = await executeDelegatedIdempotently({ operation: 'professional_assignment', key: req.header('idempotency-key') || '', execute: async () => {
@@ -189,7 +188,7 @@ delegatedRouter.post('/professional-assignments', requireDelegatedAuthority('fit
 
 delegatedRouter.post('/professional-assignments/batch', requireDelegatedAuthority('fiteatsy.client.assign', 'client_assignment', 'platform_owner'), async (req, res) => {
   const parsed = professionalAssignmentBatchSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', message: 'Assignment request contains invalid fields.', details: assignmentValidationDetails(parsed.error) });
   try {
     const actorReference = `zestiva:${actorId(req)}`;
     const result = await executeDelegatedIdempotently({ operation: 'professional_assignment_batch', key: req.header('idempotency-key') || '', execute: async () => {
