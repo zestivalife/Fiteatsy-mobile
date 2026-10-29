@@ -8,6 +8,7 @@ import {
 } from '../client/client.repository.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 import { ensureCanonicalZestivaMembership } from '../tenancy/tenant-context.js';
+import { enqueueClientDirectoryEvent } from '../client-directory/client-directory-sync.service.js';
 
 type Queryable = Pick<PoolClient, 'query'>;
 
@@ -526,6 +527,7 @@ export const resolveVerifiedAccountIdentity = async (input: {
       }
 
       let user: PersistedAuthUser;
+      const isNewRegistration = candidates.length === 0;
       if (candidates.length === 0) {
         const id = crypto.randomUUID();
         const timestamp = now().toISOString();
@@ -586,6 +588,12 @@ export const resolveVerifiedAccountIdentity = async (input: {
       const issuedSession = sessionMetadata
         ? await createAuthSessionWithClient(client, user.id, sessionMetadata)
         : null;
+      await enqueueClientDirectoryEvent(
+        client,
+        isNewRegistration ? 'FITEATSY_USER_REGISTERED' : 'FITEATSY_USER_VERIFIED',
+        user,
+        resolvedClient,
+      );
       await client.query('commit');
       return {
         user,

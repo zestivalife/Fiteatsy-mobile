@@ -37,6 +37,7 @@ import { externalClientsRouter } from './modules/external-clients/external-clien
 import { externalClientInvitationsRouter, externalIntakeRouter } from './modules/external-clients/external-client-invitations.routes.js';
 import { externalConsultantsRouter } from './modules/external-consultants/external-consultants.routes.js';
 import { externalConsultantAccessRouter } from './modules/external-consultants/external-consultant-access.routes.js';
+import { scheduleClientDirectorySync } from './modules/client-directory/client-directory-sync.service.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -251,6 +252,7 @@ export const initializeBackend = async (options: InitializeBackendOptions = {}) 
   if (options.scheduleJobs ?? true) {
     scheduleDeletedReportPurge();
     scheduleHealthRecalculationProcessor();
+    scheduleClientDirectorySync();
   }
 };
 
