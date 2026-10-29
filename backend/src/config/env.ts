@@ -58,6 +58,7 @@ const resolvePort = () => {
 const resolveEnvironment = () => readNodeEnv() || readEnvironmentName() || 'development';
 
 const resolveGitCommit = () =>
+  process.env.RELEASE_GIT_COMMIT_SHA?.trim() ||
   process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
   process.env.GIT_COMMIT?.trim() ||
   'unknown';
