@@ -266,7 +266,10 @@ export type FiteatsyIntakeLeadFilters = {
 };
 
 export const listFiteatsyIntakeLeads = async (filters: FiteatsyIntakeLeadFilters) => {
-  const mobileQuery = filters.query.replace(/[^0-9]/g, '');
+  const rawMobileQuery = filters.query.replace(/[^0-9]/g, '');
+  const mobileQuery = rawMobileQuery.length === 12 && rawMobileQuery.startsWith('91')
+    ? rawMobileQuery.slice(2)
+    : rawMobileQuery;
   const offset = (filters.page - 1) * filters.pageSize;
   const parameters = [filters.query, mobileQuery, filters.status];
   const [result, countResult] = await Promise.all([
