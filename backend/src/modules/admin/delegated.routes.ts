@@ -8,6 +8,11 @@ import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, recordQa
 import { bulkSetFoodAuthorisation, listFoodAuthorisation } from './common-food-admin.service.js';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { provisionExternalConsultant } from '../external-signup/external-signup.repository.js';
+import { diagnoseFiteatsyIntakeLeadSearch, listFiteatsyIntakeLeads } from './admin.repository.js';
+import { issueTemporaryLoginPin } from '../auth/auth.service.js';
+import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
+import { createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from '../professional-assignments/professional-assignments.repository.js';
+import { assignmentValidationDetails, professionalAssignmentBatchSchema, professionalAssignmentSchema } from '../professional-assignments/professional-assignment.contract.js';
 
 export const delegatedRouter = Router();
 
@@ -92,6 +97,48 @@ delegatedRouter.get('/food-authorisation', requireDelegatedAuthority('fiteatsy.f
   try {
     return res.json(await listFoodAuthorisation(delegatedAdminAccount(req), parsed.data));
   } catch (error) { return respondError(res, error, 'FOOD_AUTHORISATION_LIST_FAILED'); }
+});
+
+delegatedRouter.get('/intake-leads', requireDelegatedAuthority('fiteatsy.leads.read', 'lead_management', 'platform_owner'), async (req, res) => {
+  try {
+    const parsed = z.object({
+      q: z.string().trim().max(180).default(''),
+      status: z.enum(['all', 'active', 'inactive']).default('all'),
+      order: z.enum(['asc', 'desc']).default('desc'),
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(1).max(100).default(20)
+    }).safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+    const result = await listFiteatsyIntakeLeads({
+      query: parsed.data.q,
+      status: parsed.data.status,
+      order: parsed.data.order,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize
+    });
+    const diagnostic = result.pagination.total === 0 && parsed.data.q
+      ? await diagnoseFiteatsyIntakeLeadSearch(parsed.data.q)
+      : null;
+    return res.status(200).json({ ...result, diagnostic });
+  } catch (error) { return respondError(res, error, 'FITEATSY_LEADS_FAILED'); }
+});
+
+delegatedRouter.post('/users/:userId/temporary-login-pin', requireDelegatedAuthority('fiteatsy.login_pin.issue', 'login_pin_recovery', 'platform_owner'), async (req, res) => {
+  const parsed = reasonSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const result = await executeDelegatedIdempotently({
+      operation: 'temporary_login_pin_issue',
+      key: req.header('idempotency-key') || '',
+      execute: () => issueTemporaryLoginPin(actorId(req), String(req.params.userId), {
+        userAgent: req.header('user-agent') ?? null,
+        ipAddress: req.ip || null,
+      }),
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, displayOnce: true, idempotentReplay: result.replayed });
+  } catch (error) { return respondError(res, error, 'PIN_ISSUE_FAILED'); }
 });
 
 delegatedRouter.post('/food-authorisation/bulk', requireDelegatedAuthority('fiteatsy.food.authorisation.manage', 'food_authorisation', 'platform_owner'), async (req, res) => {
