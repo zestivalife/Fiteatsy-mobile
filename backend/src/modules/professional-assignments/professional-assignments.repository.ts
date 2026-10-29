@@ -78,12 +78,14 @@ const mapProfessional = (row: { id?: unknown; name?: unknown; first_name?: unkno
   };
 };
 
-const audit = async (input: { assignmentId: string; action: string; actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string }) => {
+type AssignmentActor = { actorUserId: string | null; actorReference?: string | null };
+
+const audit = async (input: AssignmentActor & { assignmentId: string; action: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string }) => {
   await pool.query(
     `insert into professional_assignment_audit_events
-      (id, assignment_id, action, actor_user_id, client_user_id, professional_user_id, professional_type, relationship_type, reason)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [crypto.randomUUID(), input.assignmentId, input.action, input.actorUserId, input.clientUserId, input.professionalUserId, input.professionalType, input.relationshipType, input.reason ?? null]
+      (id, assignment_id, action, actor_user_id, actor_reference, client_user_id, professional_user_id, professional_type, relationship_type, reason)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [crypto.randomUUID(), input.assignmentId, input.action, input.actorUserId, input.actorReference ?? null, input.clientUserId, input.professionalUserId, input.professionalType, input.relationshipType, input.reason ?? null]
   );
 };
 
@@ -179,7 +181,7 @@ export const discoverProfessionalsForAssignment = async (professionalType?: Prof
   return result.rows.map(mapProfessional);
 };
 
-export const createProfessionalAssignment = async (input: { actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string; allowReassignment?: boolean }) => {
+export const createProfessionalAssignment = async (input: AssignmentActor & { clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string; allowReassignment?: boolean }) => {
   const connection = await pool.connect();
   try {
     await connection.query('begin');
@@ -200,23 +202,23 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
     }
     const previous = await connection.query(
       `update consultant_client_assignments
-          set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, updated_at = now()
+          set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, revoked_by_actor_reference = $3, updated_at = now()
         where client_user_id = $1 and product = 'FITEATSY' and status = 'active'
         returning *`,
-      [input.clientUserId, input.actorUserId],
+      [input.clientUserId, input.actorUserId, input.actorReference ?? null],
     );
     for (const row of previous.rows) {
       await connection.query(
         `insert into professional_assignment_audit_events
-          (id, assignment_id, action, actor_user_id, client_user_id, professional_user_id, professional_type, relationship_type, reason)
-         values ($1, $2, 'REASSIGNED', $3, $4, $5, $6, $7, $8)`,
-        [crypto.randomUUID(), row.id, input.actorUserId, input.clientUserId, row.consultant_user_id, row.professional_type, row.relationship_type, input.reason ?? 'Client reassigned'],
+          (id, assignment_id, action, actor_user_id, actor_reference, client_user_id, professional_user_id, professional_type, relationship_type, reason)
+         values ($1, $2, 'REASSIGNED', $3, $4, $5, $6, $7, $8, $9)`,
+        [crypto.randomUUID(), row.id, input.actorUserId, input.actorReference ?? null, input.clientUserId, row.consultant_user_id, row.professional_type, row.relationship_type, input.reason ?? 'Client reassigned'],
       );
     }
     const result = await connection.query(
     `insert into consultant_client_assignments
-      (id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
-     select $1, professional.id, client.id, $2, 'FITEATSY', $4, $5
+      (id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
+     select $1, professional.id, client.id, $2, $7, 'FITEATSY', $4, $5
        from users professional join users client on client.id = $3
        join fiteatsy_clients fc on fc.account_user_id = client.id and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
       where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
@@ -225,15 +227,15 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
      on conflict (consultant_user_id, client_user_id, scope) where status = 'active'
      do update set updated_at = now()
      returning *`,
-      [crypto.randomUUID(), input.actorUserId, input.clientUserId, input.professionalType, input.relationshipType, input.professionalUserId]
+      [crypto.randomUUID(), input.actorUserId, input.clientUserId, input.professionalType, input.relationshipType, input.professionalUserId, input.actorReference ?? null]
     );
     if (!result.rowCount) { await connection.query('rollback'); return null; }
   const row = result.rows[0];
     await connection.query(
       `insert into professional_assignment_audit_events
-        (id, assignment_id, action, actor_user_id, client_user_id, professional_user_id, professional_type, relationship_type, reason)
-       values ($1, $2, 'CREATED', $3, $4, $5, $6, $7, $8)`,
-      [crypto.randomUUID(), row.id, input.actorUserId, input.clientUserId, input.professionalUserId, input.professionalType, input.relationshipType, input.reason ?? null],
+        (id, assignment_id, action, actor_user_id, actor_reference, client_user_id, professional_user_id, professional_type, relationship_type, reason)
+       values ($1, $2, 'CREATED', $3, $4, $5, $6, $7, $8, $9)`,
+      [crypto.randomUUID(), row.id, input.actorUserId, input.actorReference ?? null, input.clientUserId, input.professionalUserId, input.professionalType, input.relationshipType, input.reason ?? null],
     );
     await connection.query('commit');
     return row;
@@ -245,7 +247,7 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
   }
 };
 
-export const createProfessionalAssignmentsBatch = async (input: { actorUserId: string; clientUserIds: string[]; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string; allowReassignment?: boolean }) => {
+export const createProfessionalAssignmentsBatch = async (input: AssignmentActor & { clientUserIds: string[]; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string; allowReassignment?: boolean }) => {
   const connection = await pool.connect();
   try {
     await connection.query('begin');
@@ -300,34 +302,34 @@ export const createProfessionalAssignmentsBatch = async (input: { actorUserId: s
       if (activeAssignment) {
         const previous = await connection.query(
           `update consultant_client_assignments
-              set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, updated_at = now()
+              set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, revoked_by_actor_reference = $3, updated_at = now()
             where client_user_id = $1 and product = 'FITEATSY' and status = 'active'
             returning *`,
-          [clientUserId, input.actorUserId],
+          [clientUserId, input.actorUserId, input.actorReference ?? null],
         );
         for (const row of previous.rows) {
           await connection.query(
             `insert into professional_assignment_audit_events
-              (id, assignment_id, action, actor_user_id, client_user_id, professional_user_id, professional_type, relationship_type, reason)
-             values ($1, $2, 'REASSIGNED', $3, $4, $5, $6, $7, $8)`,
-            [crypto.randomUUID(), row.id, input.actorUserId, clientUserId, row.consultant_user_id, row.professional_type, row.relationship_type, input.reason ?? 'Client reassigned'],
+              (id, assignment_id, action, actor_user_id, actor_reference, client_user_id, professional_user_id, professional_type, relationship_type, reason)
+             values ($1, $2, 'REASSIGNED', $3, $4, $5, $6, $7, $8, $9)`,
+            [crypto.randomUUID(), row.id, input.actorUserId, input.actorReference ?? null, clientUserId, row.consultant_user_id, row.professional_type, row.relationship_type, input.reason ?? 'Client reassigned'],
           );
         }
       }
       const assignmentId = crypto.randomUUID();
       const created = await connection.query(
         `insert into consultant_client_assignments
-          (id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
-         values ($1, $2, $3, $4, 'FITEATSY', $5, $6)
+          (id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
+         values ($1, $2, $3, $4, $7, 'FITEATSY', $5, $6)
          returning *`,
-        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId, input.professionalType, input.relationshipType],
+        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId, input.professionalType, input.relationshipType, input.actorReference ?? null],
       );
       const row = created.rows[0] as Record<string, unknown>;
       await connection.query(
         `insert into professional_assignment_audit_events
-          (id, assignment_id, action, actor_user_id, client_user_id, professional_user_id, professional_type, relationship_type, reason)
-         values ($1, $2, 'CREATED', $3, $4, $5, $6, $7, $8)`,
-        [crypto.randomUUID(), assignmentId, input.actorUserId, clientUserId, input.professionalUserId, input.professionalType, input.relationshipType, input.reason ?? null],
+          (id, assignment_id, action, actor_user_id, actor_reference, client_user_id, professional_user_id, professional_type, relationship_type, reason)
+         values ($1, $2, 'CREATED', $3, $4, $5, $6, $7, $8, $9)`,
+        [crypto.randomUUID(), assignmentId, input.actorUserId, input.actorReference ?? null, clientUserId, input.professionalUserId, input.professionalType, input.relationshipType, input.reason ?? null],
       );
       assignments.push(row);
     }
@@ -355,11 +357,11 @@ export const listProfessionalAssignments = async (professionalUserId?: string) =
   return result.rows;
 };
 
-export const revokeProfessionalAssignment = async (assignmentId: string, actorUserId: string, reason?: string) => {
-  const result = await pool.query(`update consultant_client_assignments set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, updated_at = now() where id = $1 and product = 'FITEATSY' and status = 'active' returning *`, [assignmentId, actorUserId]);
+export const revokeProfessionalAssignment = async (assignmentId: string, actorUserId: string | null, reason?: string, actorReference?: string | null) => {
+  const result = await pool.query(`update consultant_client_assignments set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, revoked_by_actor_reference = $3, updated_at = now() where id = $1 and product = 'FITEATSY' and status = 'active' returning *`, [assignmentId, actorUserId, actorReference ?? null]);
   if (!result.rowCount) return null;
   const row = result.rows[0];
-  await audit({ assignmentId, action: 'REVOKED', actorUserId, clientUserId: String(row.client_user_id), professionalUserId: String(row.consultant_user_id), professionalType: String(row.professional_type) as ProfessionalType, relationshipType: String(row.relationship_type), reason });
+  await audit({ assignmentId, action: 'REVOKED', actorUserId, actorReference, clientUserId: String(row.client_user_id), professionalUserId: String(row.consultant_user_id), professionalType: String(row.professional_type) as ProfessionalType, relationshipType: String(row.relationship_type), reason });
   return row;
 };
 

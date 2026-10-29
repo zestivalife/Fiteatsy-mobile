@@ -7,6 +7,8 @@ import { issueQaAdminSessionHandoff } from '../auth/qa-session-handoff.js';
 import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, recordQaIdentityReuse, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
 import { listFiteatsyIntakeLeads } from './admin.repository.js';
 import { issueTemporaryLoginPin } from '../auth/auth.service.js';
+import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
+import { createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from '../professional-assignments/professional-assignments.repository.js';
 
 export const delegatedRouter = Router();
 
@@ -19,6 +21,8 @@ const identitySchema = z.object({
 const qaAdminIdentitySchema = identitySchema.strict();
 const assignmentSchema = z.object({ consultantUserId: z.string().trim().min(1), clientUserId: z.string().trim().min(1), reason: z.string().trim().min(3).max(240) });
 const reasonSchema = z.object({ reason: z.string().trim().min(3).max(240) });
+const professionalAssignmentSchema = z.object({ clientUserId: z.string().uuid(), professionalUserId: z.string().uuid(), professionalType: z.enum(['CONSULTANT', 'PRACTITIONER', 'MENTOR']), relationshipType: z.string().trim().min(2).max(80), reason: z.string().trim().max(240).optional(), allowReassignment: z.boolean().optional().default(false) }).strict();
+const professionalAssignmentBatchSchema = professionalAssignmentSchema.omit({ clientUserId: true }).extend({ clientUserIds: z.array(z.string().uuid()).min(1).max(100).transform((values) => [...new Set(values)]) }).strict();
 
 const actorId = (req: Request) => {
   const value = (req as Request & { delegatedAuthority?: { sub?: string } }).delegatedAuthority?.sub;
@@ -141,6 +145,71 @@ delegatedRouter.delete('/client-assignments/:assignmentId', requireDelegatedAuth
     if (!result) return res.status(404).json({ error: 'ASSIGNMENT_NOT_FOUND', message: 'Assignment was not found or is already revoked.' });
     return res.status(200).json({ assignment: result });
   } catch (error) { return respondError(res, error, 'QA_ASSIGNMENT_REVOKE_FAILED'); }
+});
+
+delegatedRouter.get('/professional-assignments/clients/pool', requireDelegatedAuthority('fiteatsy.client.assignment.read', 'client_assignment', 'platform_owner'), async (req, res) => {
+  try {
+    await ensureRegisteredClientsForEligibleUsers();
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    const assignmentFilter = typeof req.query.assignment === 'string' && ['all', 'unassigned', 'assigned'].includes(req.query.assignment) ? req.query.assignment as 'all' | 'unassigned' | 'assigned' : 'all';
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    return res.status(200).json({ clients: await listClientAllocationPool({ query, limit, offset, assignmentFilter, professionalUserId: '' }) });
+  } catch (error) { return respondError(res, error, 'ASSIGNMENT_CLIENT_LIST_FAILED'); }
+});
+
+delegatedRouter.get('/professional-assignments/professionals', requireDelegatedAuthority('fiteatsy.client.assignment.read', 'client_assignment', 'platform_owner'), async (req, res) => {
+  try {
+    const type = typeof req.query.type === 'string' && ['CONSULTANT', 'PRACTITIONER', 'MENTOR'].includes(req.query.type) ? req.query.type as ProfessionalType : undefined;
+    return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type) });
+  } catch (error) { return respondError(res, error, 'ASSIGNMENT_PROFESSIONAL_LIST_FAILED'); }
+});
+
+delegatedRouter.get('/professional-assignments', requireDelegatedAuthority('fiteatsy.client.assignment.read', 'client_assignment', 'platform_owner'), async (_req, res) => {
+  try { return res.status(200).json({ assignments: await listProfessionalAssignments() }); }
+  catch (error) { return respondError(res, error, 'ASSIGNMENT_LIST_FAILED'); }
+});
+
+delegatedRouter.post('/professional-assignments', requireDelegatedAuthority('fiteatsy.client.assign', 'client_assignment', 'platform_owner'), async (req, res) => {
+  const parsed = professionalAssignmentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const actorReference = `zestiva:${actorId(req)}`;
+    const result = await executeDelegatedIdempotently({ operation: 'professional_assignment', key: req.header('idempotency-key') || '', execute: async () => {
+      const assignment = await createProfessionalAssignment({ ...parsed.data, actorUserId: null, actorReference });
+      if (!assignment) throw Object.assign(new Error('The client or professional is not an eligible active Fiteatsy identity.'), { status: 400, code: 'INVALID_ASSIGNMENT_TARGET' });
+      return { assignment };
+    }});
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+  } catch (error) {
+    if (error instanceof ReassignmentRequiredError) return res.status(409).json({ error: 'REASSIGNMENT_CONFIRMATION_REQUIRED', currentAssignment: error.currentAssignment });
+    return respondError(res, error, 'ASSIGNMENT_CREATE_FAILED');
+  }
+});
+
+delegatedRouter.post('/professional-assignments/batch', requireDelegatedAuthority('fiteatsy.client.assign', 'client_assignment', 'platform_owner'), async (req, res) => {
+  const parsed = professionalAssignmentBatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const actorReference = `zestiva:${actorId(req)}`;
+    const result = await executeDelegatedIdempotently({ operation: 'professional_assignment_batch', key: req.header('idempotency-key') || '', execute: async () => {
+      const assignments = await createProfessionalAssignmentsBatch({ ...parsed.data, actorUserId: null, actorReference });
+      if (!assignments) throw Object.assign(new Error('One or more assignment targets are not eligible active Fiteatsy identities.'), { status: 400, code: 'INVALID_ASSIGNMENT_TARGET' });
+      return { assignments };
+    }});
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+  } catch (error) {
+    if (error instanceof ReassignmentRequiredError) return res.status(409).json({ error: 'REASSIGNMENT_CONFIRMATION_REQUIRED', currentAssignment: error.currentAssignment });
+    return respondError(res, error, 'ASSIGNMENT_BATCH_FAILED');
+  }
+});
+
+delegatedRouter.delete('/professional-assignments/:assignmentId', requireDelegatedAuthority('fiteatsy.client.assignment.revoke', 'client_assignment', 'platform_owner'), async (req, res) => {
+  try {
+    const assignment = await revokeProfessionalAssignment(String(req.params.assignmentId), null, typeof req.body?.reason === 'string' ? req.body.reason : undefined, `zestiva:${actorId(req)}`);
+    if (!assignment) return res.status(404).json({ error: 'ASSIGNMENT_NOT_FOUND' });
+    return res.status(200).json({ assignment });
+  } catch (error) { return respondError(res, error, 'ASSIGNMENT_REVOKE_FAILED'); }
 });
 
 delegatedRouter.post('/qa-identities/:userId/deactivate', requireDelegatedAuthority('fiteatsy.qa.identity.deactivate', 'qa_provisioning'), async (req, res) => {
