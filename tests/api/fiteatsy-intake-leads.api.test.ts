@@ -34,7 +34,7 @@ test('eligible registration supports authoritative name, email and Indian mobile
       headers: authHeaders(admin.token)
     });
     assert.equal(response.response.status, 200);
-    assert.equal(response.body.pagination.total, 1);
+    assert.equal(response.body.pagination.total, 1, `expected one lead for search ${JSON.stringify(query)}`);
     assert.equal(response.body.leads[0].userId, lead.current.body.accountId);
     assert.equal(response.body.diagnostic, null);
   }
