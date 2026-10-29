@@ -155,4 +155,7 @@ export const env = {
   get externalConsultantsAssertionAudience() {
     return process.env.EXTERNAL_FITEATSY_ASSERTION_AUDIENCE?.trim() || 'practice-operations-service';
   },
+  get clientDirectorySyncEnabled() {
+    return process.env.FITEATSY_CLIENT_DIRECTORY_SYNC_ENABLED?.trim().toLowerCase() === 'true';
+  },
 };

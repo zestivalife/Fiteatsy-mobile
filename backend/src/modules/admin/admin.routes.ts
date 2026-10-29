@@ -6,6 +6,7 @@ import { diagnoseFiteatsyIntakeLeadSearch, listFiteatsyIntakeLeads } from './adm
 import { issueTemporaryLoginPin } from '../auth/auth.service.js';
 import { assignQaClient, deactivateQa, getQaAssignmentsForAdmin, getQaIdentityForAdmin, issueQaSession, provisionQa, resetQaClientOnboarding, revokeQaClientAssignment } from './qa-provisioning.service.js';
 import { addAdminCommonFoodAlias, addAdminCommonFoodServing, CommonFoodAdminError, inspectAdminCommonFood, listAdminCommonFoodAudit, listAdminCommonFoods, removeAdminCommonFoodAlias, setAdminCommonFoodMeal, setAdminCommonFoodRole, setAdminCommonFoodServingState, setAdminCommonFoodState } from './common-food-admin.service.js';
+import { getClientDirectorySyncStatus, reconcileClientDirectoryOutbox, replayDeadLetteredClientDirectoryEvents } from '../client-directory/client-directory-sync.service.js';
 
 export const adminRouter = Router();
 
@@ -108,6 +109,23 @@ adminRouter.post('/users/:userId/temporary-login-pin', async (req, res) => {
     const typed = error as { code?: string; message?: string };
     return res.status(typed.code === 'PIN_USER_NOT_FOUND' ? 404 : 500).json({ error: typed.code ?? 'PIN_ISSUE_FAILED', message: typed.message });
   }
+});
+
+adminRouter.get('/client-directory-sync', async (req, res) => {
+  if (!assertSuperAdmin(req, res)) return;
+  return res.status(200).json(await getClientDirectorySyncStatus());
+});
+
+adminRouter.post('/client-directory-sync/reconcile', async (req, res) => {
+  if (!assertSuperAdmin(req, res)) return;
+  return res.status(202).json(await reconcileClientDirectoryOutbox());
+});
+
+adminRouter.post('/client-directory-sync/replay', async (req, res) => {
+  if (!assertSuperAdmin(req, res)) return;
+  const parsed = z.object({ limit: z.number().int().min(1).max(500).default(100) }).strict().safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  return res.status(202).json(await replayDeadLetteredClientDirectoryEvents(parsed.data.limit));
 });
 
 
