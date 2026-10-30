@@ -274,7 +274,7 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
            on professional_membership.user_id = $2
           and professional_membership.tenant_id = fc.tenant_id
           and lower(coalesce(professional_membership.status, '')) = 'active'
-        where client.id = any($1::uuid[]) and client.deleted_at is null
+        where client.id = any($1::text[]) and client.deleted_at is null
           and lower(coalesce(client.status, '')) = 'active'`,
       [input.clientUserIds, input.professionalUserId],
     );
@@ -284,7 +284,7 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
     }
     const current = await connection.query(
       `select * from consultant_client_assignments
-        where client_user_id = any($1::uuid[]) and product = 'FITEATSY' and status = 'active'
+        where client_user_id = any($1::text[]) and product = 'FITEATSY' and status = 'active'
         order by client_user_id, updated_at desc for update`,
       [input.clientUserIds],
     );

@@ -31,7 +31,9 @@ test('assignment mutation is atomic and preserves prior records', () => {
 
 test('multi-client assignment is one atomic transaction and rejects partial eligibility', () => {
   assert.match(repository, /createProfessionalAssignmentsBatch/);
-  assert.match(repository, /client\.id = any\(\$1::uuid\[\]\)/);
+  assert.match(repository, /client\.id = any\(\$1::text\[\]\)/);
+  assert.match(repository, /client_user_id = any\(\$1::text\[\]\)/);
+  assert.doesNotMatch(repository, /(?:client\.id|client_user_id) = any\(\$1::uuid\[\]\)/);
   assert.match(repository, /eligibleClients\.rowCount !== input\.clientUserIds\.length/);
   assert.match(repository, /const conflicts = input\.clientUserIds/);
   assert.match(routes, /professionalAssignmentsRouter\.post\('\/batch'/);
