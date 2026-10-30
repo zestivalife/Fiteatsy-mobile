@@ -226,6 +226,10 @@ export type ConsultantClientSyncDiagnostics = {
 const AUTHENTICATED_USER_EXCLUSION_ROLES = ['consultant', 'practitioner', 'admin', 'super_admin'];
 const ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL =
   "and lower(coalesce(u.role, 'user')) not in ('provider', 'dietician', 'senior_consultant', 'mentor', 'platform_owner')";
+// Client conversion is intentionally allow-listed. A deny-list can silently
+// turn a newly introduced workforce role into a client, which would expose
+// that identity to assignment and care workflows.
+const CLIENT_ACCOUNT_ROLES = ['user', 'client'];
 const PUBLISHED_REPORT_STATUSES = ['PUBLISHED', 'PARTIALLY_VALIDATED'];
 
 const toIso = (value: unknown) => {
@@ -308,8 +312,7 @@ const mapOnboardingProjection = (row: Record<string, unknown>): ConsultantOnboar
 const eligibleUserPredicate = `
   u.deleted_at is null
   and lower(coalesce(u.status, '')) = 'active'
-  and lower(coalesce(u.role, 'user')) not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
-  ${ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL}
+  and lower(coalesce(u.role, 'user')) in (${CLIENT_ACCOUNT_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
 `;
 
 // A canonical mobile client can later receive an operational role without
@@ -321,8 +324,7 @@ const consultantVisibleUserPredicate = `
   u.deleted_at is null
   and lower(coalesce(u.status, '')) = 'active'
   and (
-    lower(coalesce(u.role, 'user')) not in (${AUTHENTICATED_USER_EXCLUSION_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
-    ${ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL}
+    lower(coalesce(u.role, 'user')) in (${CLIENT_ACCOUNT_ROLES.map((_, index) => `$${index + 1}`).join(', ')})
     or exists (
       select 1
       from consultant_client_assignments role_client_assignment
@@ -511,7 +513,7 @@ export const getConsultantClientSyncDiagnostics = async (): Promise<ConsultantCl
         and lower(coalesce(hp.status, '')) = 'active'
       where ${eligibleUserPredicate}
     `,
-    [...AUTHENTICATED_USER_EXCLUSION_ROLES]
+    [...CLIENT_ACCOUNT_ROLES]
   );
   const row = result.rows[0] ?? {};
   return {
@@ -557,7 +559,7 @@ export const ensureRegisteredClientsForEligibleUsers = async () => {
         )
       order by u.created_at asc
     `,
-    [...AUTHENTICATED_USER_EXCLUSION_ROLES]
+    [...CLIENT_ACCOUNT_ROLES]
   );
 
   for (const row of result.rows) {
@@ -716,13 +718,14 @@ export const listAssignedConsultantClientContexts = async (
         and exists (
           select 1 from consultant_client_assignments cap003
           where cap003.client_user_id = u.id
-            and cap003.consultant_user_id = $${AUTHENTICATED_USER_EXCLUSION_ROLES.length + 1}
+            and cap003.consultant_user_id = $${CLIENT_ACCOUNT_ROLES.length + 1}
+            and cap003.product = 'FITEATSY'
             and cap003.professional_type = 'CONSULTANT'
             and ${consultantAssignmentSqlPredicate('cap003')}
         )
       order by u.name asc, u.created_at desc
     `,
-    [...AUTHENTICATED_USER_EXCLUSION_ROLES, consultantAccountId]
+    [...CLIENT_ACCOUNT_ROLES, consultantAccountId]
   );
 
   return result.rows.map((row) => ({
@@ -812,8 +815,8 @@ export const getRegisteredConsultantClientProfileContext = async (
       limit 1
     `,
     consultantAccountId
-      ? [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId, consultantAccountId, professionalType]
-      : [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId]
+      ? [...CLIENT_ACCOUNT_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId, consultantAccountId, professionalType]
+      : [...CLIENT_ACCOUNT_ROLES, PUBLISHED_REPORT_STATUSES, publicClientId]
   );
 
   const row = result.rows[0];
@@ -868,7 +871,7 @@ export const getRegisteredClientProfileContextByAccountId = async (
       order by hp.updated_at desc nulls last
       limit 1
     `,
-    [...AUTHENTICATED_USER_EXCLUSION_ROLES, PUBLISHED_REPORT_STATUSES, accountId]
+    [...CLIENT_ACCOUNT_ROLES, PUBLISHED_REPORT_STATUSES, accountId]
   );
   const row = result.rows[0];
   if (!row) return null;

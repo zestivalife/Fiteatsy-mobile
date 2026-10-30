@@ -30,5 +30,11 @@ COPY --from=build /app/backend/src/modules/nutrition/food-curation/data ./dist/m
 COPY --from=build /app/backend/src/modules/nutrition/catalogue/data/PAN_India_Food_Master_Per_100g.xlsx ./dist/catalogue-import/src/modules/nutrition/catalogue/data/PAN_India_Food_Master_Per_100g.xlsx
 COPY --from=build /app/backend/dist/db/migrations ./dist/catalogue-import/src/db/migrations
 
+RUN test -f ./dist/server.js \
+  && test -f ./dist/db/migrations/0068_fiteatsy_client_tenant_integrity.sql \
+  && test -f ./dist/db/migrations/0071_assignable_fiteatsy_identity_backfill.sql \
+  && test -f ./dist/catalogue-import/src/modules/nutrition/catalogue/data/PAN_India_Food_Master_Per_100g.xlsx \
+  && test -d ./dist/modules/nutrition/food-curation/data
+
 EXPOSE 8080
 CMD ["npm", "start"]
