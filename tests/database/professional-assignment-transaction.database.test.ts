@@ -5,7 +5,10 @@ import { migrateDatabase, resetMigrationStateForTests } from '../../backend/src/
 import { getPool } from '../../backend/src/db/pool.js';
 import {
   createProfessionalAssignmentsBatch,
+  createSeniorDelegatedAssignmentsBatch,
+  listProfessionalAssignments,
   ReassignmentRequiredError,
+  revokeSeniorDelegatedAssignment,
 } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
 
 const databaseTest = process.env.DATABASE_URL ? test : test.skip;
@@ -123,5 +126,102 @@ databaseTest('batch assignment uses text-backed canonical identities atomically'
     await pool.query('delete from tenant_memberships where user_id = any($1::text[])', [[clientA, clientB, isolatedClient, professionalA, professionalB]]);
     await pool.query('delete from users where id = any($1::text[])', [[clientA, clientB, isolatedClient, professionalA, professionalB]]);
     await pool.query('delete from tenants where id = any($1::uuid[])', [[tenantId, otherTenantId]]);
+  }
+});
+
+databaseTest('senior delegation preserves supervision and scopes delivery management', async () => {
+  resetMigrationStateForTests();
+  await migrateDatabase();
+  const pool = getPool();
+  const tenantId = randomUUID();
+  const clientId = randomUUID();
+  const seniorId = randomUUID();
+  const otherSeniorId = randomUUID();
+  const internalId = randomUUID();
+  const replacementId = randomUUID();
+  const externalId = `ext_${randomUUID()}`;
+
+  try {
+    await pool.query(
+      `insert into tenants (id, name, slug, tenant_type, status)
+       values ($1, 'Delegation Test', $2, 'EXTERNAL_PRACTICE', 'active')`,
+      [tenantId, `delegation-${tenantId}`],
+    );
+    for (const [id, name, role] of [
+      [clientId, 'Delegation Client', 'user'],
+      [seniorId, 'Supervising Senior', 'senior_consultant'],
+      [otherSeniorId, 'Other Senior', 'senior_consultant'],
+      [internalId, 'Internal Delivery Consultant', 'consultant'],
+      [replacementId, 'Replacement Delivery Consultant', 'consultant'],
+      [externalId, 'External Consultant', 'consultant'],
+    ] as const) {
+      await pool.query(
+        `insert into users (id, name, role, status, account_purpose)
+         values ($1, $2, $3, 'active', 'QA_TEST')`,
+        [id, name, role],
+      );
+      await pool.query(
+        `insert into tenant_memberships
+          (id, tenant_id, user_id, tenant_role, status, joined_at, created_at, updated_at)
+         values ($1, $2, $3, $4, 'active', now(), now(), now())`,
+        [randomUUID(), tenantId, id, role === 'user' ? 'CLIENT' : 'CONSULTANT'],
+      );
+    }
+    await pool.query(
+      `insert into fiteatsy_clients (id, tenant_id, fiteatsy_client_id, account_user_id, status)
+       values ($1, $2, $3, $4, 'active')`,
+      [randomUUID(), tenantId, `delegation-client-${clientId}`, clientId],
+    );
+    const supervision = await createProfessionalAssignmentsBatch({
+      actorUserId: seniorId,
+      clientUserIds: [clientId],
+      professionalUserId: seniorId,
+      professionalType: 'CONSULTANT',
+      relationshipType: 'CLIENT_CARE',
+    });
+    assert.equal(supervision?.length, 1);
+
+    const delegated = await createSeniorDelegatedAssignmentsBatch({
+      actorUserId: seniorId,
+      clientUserIds: [clientId],
+      professionalUserId: internalId,
+      reason: 'QA delivery delegation',
+    });
+    assert.equal(delegated?.length, 1);
+
+    const active = await pool.query(
+      `select consultant_user_id, relationship_type from consultant_client_assignments
+        where client_user_id=$1 and status='active' order by relationship_type`,
+      [clientId],
+    );
+    assert.deepEqual(active.rows, [
+      { consultant_user_id: seniorId, relationship_type: 'CLIENT_CARE' },
+      { consultant_user_id: internalId, relationship_type: 'DELEGATED_CLIENT_CARE' },
+    ]);
+    assert.equal(await createSeniorDelegatedAssignmentsBatch({ actorUserId: otherSeniorId, clientUserIds: [clientId], professionalUserId: replacementId }), null);
+    assert.equal(await createSeniorDelegatedAssignmentsBatch({ actorUserId: seniorId, clientUserIds: [clientId], professionalUserId: externalId }), null);
+    await assert.rejects(
+      createSeniorDelegatedAssignmentsBatch({ actorUserId: seniorId, clientUserIds: [clientId], professionalUserId: replacementId }),
+      ReassignmentRequiredError,
+    );
+
+    const seniorView = await listProfessionalAssignments(seniorId, true);
+    assert.equal(seniorView.filter((row) => row.client_user_id === clientId).length, 2);
+    assert.equal(await revokeSeniorDelegatedAssignment(String(delegated?.[0]?.id), otherSeniorId), null);
+    assert.ok(await revokeSeniorDelegatedAssignment(String(delegated?.[0]?.id), seniorId, 'QA cleanup'));
+
+    const remaining = await pool.query(
+      `select consultant_user_id, relationship_type from consultant_client_assignments
+        where client_user_id=$1 and status='active'`,
+      [clientId],
+    );
+    assert.deepEqual(remaining.rows, [{ consultant_user_id: seniorId, relationship_type: 'CLIENT_CARE' }]);
+  } finally {
+    await pool.query('delete from professional_assignment_audit_events where client_user_id=$1', [clientId]);
+    await pool.query('delete from consultant_client_assignments where client_user_id=$1', [clientId]);
+    await pool.query('delete from fiteatsy_clients where account_user_id=$1', [clientId]);
+    await pool.query('delete from tenant_memberships where user_id = any($1::text[])', [[clientId, seniorId, otherSeniorId, internalId, replacementId, externalId]]);
+    await pool.query('delete from users where id = any($1::text[])', [[clientId, seniorId, otherSeniorId, internalId, replacementId, externalId]]);
+    await pool.query('delete from tenants where id=$1', [tenantId]);
   }
 });

@@ -26,6 +26,7 @@ COPY --from=build /app/dist/db/migrations ./dist/catalogue-import/src/db/migrati
 
 RUN test -f ./dist/server.js \
   && test -f ./dist/db/migrations/0068_fiteatsy_client_tenant_integrity.sql \
+  && test -f ./dist/db/migrations/0071_assignable_fiteatsy_identity_backfill.sql \
   && test -f ./dist/catalogue-import/src/modules/nutrition/catalogue/data/PAN_India_Food_Master_Per_100g.xlsx \
   && test -d ./dist/modules/nutrition/food-curation/data
 

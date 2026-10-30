@@ -121,6 +121,7 @@ export const discoverClientsForAssignment = async (query: string, limit: number,
           order by subscriptions.expires_at desc limit 1
        ) subscription on true
       where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active'
+        and lower(coalesce(u.role, 'user')) in ('user', 'client')
         and ($1 = '' or lower(u.name) like '%' || lower($1) || '%' or lower(coalesce(u.email_normalized, '')) like '%' || lower($1) || '%' or (regexp_replace($1, '[^0-9]', '', 'g') <> '' and regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g') like '%' || regexp_replace($1, '[^0-9]', '', 'g') || '%'))
         and ($5 = 'all' or ($5 = 'unassigned' and active_assignment.id is null) or ($5 = 'assigned' and active_assignment.id is not null) or ($5 = 'mine' and active_assignment.consultant_user_id = $4))
       order by u.created_at desc limit $2 offset $3`,
@@ -129,7 +130,7 @@ export const discoverClientsForAssignment = async (query: string, limit: number,
   return result.rows.map(mapAssignmentClient);
 };
 
-export const listClientAllocationPool = async (input: { query: string; limit: number; offset: number; assignmentFilter: 'all' | 'unassigned' | 'assigned' | 'mine'; professionalUserId: string }) => {
+export const listClientAllocationPool = async (input: { query: string; limit: number; offset: number; assignmentFilter: 'all' | 'unassigned' | 'assigned' | 'mine'; professionalUserId: string; supervisorOnly?: boolean }) => {
   const result = await pool.query(
     `select c.fiteatsy_client_id, u.id as user_id, u.name, u.email_normalized, u.mobile_number_normalized, u.status, u.account_purpose, u.created_at,
             case when coalesce(hp.food_preference_profile, '{}'::jsonb) = '{}'::jsonb then 'NOT_PROVIDED' else 'AVAILABLE' end as food_preference_status,
@@ -161,24 +162,174 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
           order by subscriptions.expires_at desc limit 1
        ) subscription on true
       where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active'
+        and lower(coalesce(u.role, 'user')) in ('user', 'client')
         and ($1 = '' or lower(u.name) like '%' || lower($1) || '%' or lower(coalesce(u.email_normalized, '')) like '%' || lower($1) || '%' or (regexp_replace($1, '[^0-9]', '', 'g') <> '' and regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g') like '%' || regexp_replace($1, '[^0-9]', '', 'g') || '%'))
         and ($5 = 'all' or ($5 = 'unassigned' and active_assignment.id is null) or ($5 = 'assigned' and active_assignment.id is not null) or ($5 = 'mine' and active_assignment.consultant_user_id = $4))
+        and ($6::boolean = false or exists (
+          select 1 from consultant_client_assignments supervisor_assignment
+           where supervisor_assignment.client_user_id = u.id
+             and supervisor_assignment.consultant_user_id = $4
+             and supervisor_assignment.product = 'FITEATSY'
+             and supervisor_assignment.relationship_type = 'CLIENT_CARE'
+             and supervisor_assignment.status = 'active'
+        ))
       order by u.created_at desc limit $2 offset $3`,
-    [input.query.trim(), input.limit, input.offset, input.professionalUserId, input.assignmentFilter],
+    [input.query.trim(), input.limit, input.offset, input.professionalUserId, input.assignmentFilter, input.supervisorOnly === true],
   );
   return result.rows.map(mapAssignmentClient);
 };
 
-export const discoverProfessionalsForAssignment = async (professionalType?: ProfessionalType) => {
+export const discoverProfessionalsForAssignment = async (professionalType?: ProfessionalType, internalDeliveryOnly = false) => {
   const result = await pool.query(
     `select id, name, first_name, last_name, email_normalized, role, status from users
       where deleted_at is null and lower(coalesce(status, '')) = 'active'
         and lower(coalesce(role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
         and ($1::text is null or upper(case when lower(role) in ('provider', 'dietician', 'senior_consultant') then 'CONSULTANT' else role end) = $1)
+        and ($2::boolean = false or (left(id, 4) <> 'ext_' and lower(role) in ('consultant', 'provider', 'dietician')))
       order by name asc`,
-    [professionalType ?? null]
+    [professionalType ?? null, internalDeliveryOnly]
   );
   return result.rows.map(mapProfessional);
+};
+
+export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentActor & {
+  clientUserIds: string[];
+  professionalUserId: string;
+  reason?: string;
+  allowReassignment?: boolean;
+}) => {
+  if (!input.actorUserId || input.professionalUserId.startsWith('ext_')) return null;
+  const connection = await pool.connect();
+  try {
+    await connection.query('begin');
+    const target = await connection.query(
+      `select id from users
+        where id = $1 and deleted_at is null and lower(coalesce(status, '')) = 'active'
+          and lower(coalesce(role, '')) in ('consultant', 'provider', 'dietician')`,
+      [input.professionalUserId],
+    );
+    if (!target.rowCount) { await connection.query('rollback'); return null; }
+
+    const eligible = await connection.query(
+      `select client.id
+         from users client
+         join fiteatsy_clients fc on fc.account_user_id = client.id
+          and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
+         join consultant_client_assignments supervisor
+          on supervisor.client_user_id = client.id
+         and supervisor.consultant_user_id = $2
+         and supervisor.product = 'FITEATSY'
+         and supervisor.relationship_type = 'CLIENT_CARE'
+         and supervisor.status = 'active'
+         join tenant_memberships target_membership
+          on target_membership.user_id = $3
+         and target_membership.tenant_id = fc.tenant_id
+         and lower(coalesce(target_membership.status, '')) = 'active'
+         and lower(coalesce(target_membership.tenant_role, '')) in ('consultant', 'provider', 'dietician')
+        where client.id = any($1::text[]) and client.deleted_at is null
+          and lower(coalesce(client.status, '')) = 'active'
+          and lower(coalesce(client.role, 'user')) in ('user', 'client')`,
+      [input.clientUserIds, input.actorUserId, input.professionalUserId],
+    );
+    if (eligible.rowCount !== input.clientUserIds.length) { await connection.query('rollback'); return null; }
+
+    const existing = await connection.query(
+      `select * from consultant_client_assignments
+        where client_user_id = any($1::text[]) and product = 'FITEATSY'
+          and relationship_type = 'DELEGATED_CLIENT_CARE' and status = 'active'
+        order by client_user_id, updated_at desc for update`,
+      [input.clientUserIds],
+    );
+    const existingByClient = new Map<string, Record<string, unknown>>();
+    for (const row of existing.rows as Record<string, unknown>[]) {
+      if (!existingByClient.has(String(row.client_user_id))) existingByClient.set(String(row.client_user_id), row);
+    }
+    const conflicts = input.clientUserIds
+      .map((clientUserId) => existingByClient.get(clientUserId))
+      .filter((row): row is Record<string, unknown> => row !== undefined && String(row.consultant_user_id) !== input.professionalUserId);
+    if (conflicts.length && !input.allowReassignment) throw new ReassignmentRequiredError({ conflicts });
+
+    const assignments: Record<string, unknown>[] = [];
+    for (const clientUserId of input.clientUserIds) {
+      const current = existingByClient.get(clientUserId);
+      if (current && String(current.consultant_user_id) === input.professionalUserId) {
+        assignments.push(current);
+        continue;
+      }
+      if (current) {
+        const revoked = await connection.query(
+          `update consultant_client_assignments
+              set status='revoked', ends_at=now(), revoked_at=now(), revoked_by_user_id=$2, updated_at=now()
+            where id=$1 and status='active' returning *`,
+          [current.id, input.actorUserId],
+        );
+        for (const row of revoked.rows) {
+          await connection.query(
+            `insert into professional_assignment_audit_events
+              (id, assignment_id, action, actor_user_id, client_user_id, professional_user_id, professional_type, relationship_type, reason)
+             values ($1,$2,'REASSIGNED',$3,$4,$5,'CONSULTANT','DELEGATED_CLIENT_CARE',$6)`,
+            [crypto.randomUUID(), row.id, input.actorUserId, clientUserId, row.consultant_user_id, input.reason ?? 'Senior Consultant reassigned delivery'],
+          );
+        }
+      }
+      const assignmentId = crypto.randomUUID();
+      const created = await connection.query(
+        `insert into consultant_client_assignments
+          (id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
+         values ($1,$2,$3,$4,'FITEATSY','CONSULTANT','DELEGATED_CLIENT_CARE') returning *`,
+        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId],
+      );
+      await connection.query(
+        `insert into professional_assignment_audit_events
+          (id, assignment_id, action, actor_user_id, client_user_id, professional_user_id, professional_type, relationship_type, reason)
+         values ($1,$2,'DELEGATED',$3,$4,$5,'CONSULTANT','DELEGATED_CLIENT_CARE',$6)`,
+        [crypto.randomUUID(), assignmentId, input.actorUserId, clientUserId, input.professionalUserId, input.reason ?? null],
+      );
+      assignments.push(created.rows[0] as Record<string, unknown>);
+    }
+    await connection.query('commit');
+    return assignments;
+  } catch (error) {
+    await connection.query('rollback');
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+export const createSeniorDelegatedAssignment = async (input: AssignmentActor & {
+  clientUserId: string;
+  professionalUserId: string;
+  reason?: string;
+  allowReassignment?: boolean;
+}) => {
+  const rows = await createSeniorDelegatedAssignmentsBatch({
+    ...input,
+    clientUserIds: [input.clientUserId],
+  });
+  return rows?.[0] ?? null;
+};
+
+export const revokeSeniorDelegatedAssignment = async (assignmentId: string, seniorUserId: string, reason?: string) => {
+  const result = await pool.query(
+    `update consultant_client_assignments delegated
+        set status='revoked', ends_at=now(), revoked_at=now(), revoked_by_user_id=$2, updated_at=now()
+      where delegated.id=$1 and delegated.product='FITEATSY'
+        and delegated.relationship_type='DELEGATED_CLIENT_CARE' and delegated.status='active'
+        and exists (
+          select 1 from consultant_client_assignments supervisor
+           where supervisor.client_user_id=delegated.client_user_id
+             and supervisor.consultant_user_id=$2
+             and supervisor.product='FITEATSY'
+             and supervisor.relationship_type='CLIENT_CARE'
+             and supervisor.status='active'
+        ) returning delegated.*`,
+    [assignmentId, seniorUserId],
+  );
+  if (!result.rowCount) return null;
+  const row = result.rows[0];
+  await audit({ assignmentId, action: 'DELEGATION_REVOKED', actorUserId: seniorUserId, clientUserId: String(row.client_user_id), professionalUserId: String(row.consultant_user_id), professionalType: 'CONSULTANT', relationshipType: 'DELEGATED_CLIENT_CARE', reason });
+  return row;
 };
 
 export const createProfessionalAssignment = async (input: AssignmentActor & { clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string; allowReassignment?: boolean }) => {
@@ -227,6 +378,8 @@ export const createProfessionalAssignment = async (input: AssignmentActor & { cl
         and lower(coalesce(professional_membership.status, '')) = 'active'
       where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
         and lower(coalesce(professional.status, '')) = 'active'
+        and lower(coalesce(client.status, '')) = 'active'
+        and lower(coalesce(client.role, 'user')) in ('user', 'client')
         and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
      on conflict (consultant_user_id, client_user_id, scope) where status = 'active'
      do update set updated_at = now()
@@ -275,7 +428,8 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
           and professional_membership.tenant_id = fc.tenant_id
           and lower(coalesce(professional_membership.status, '')) = 'active'
         where client.id = any($1::text[]) and client.deleted_at is null
-          and lower(coalesce(client.status, '')) = 'active'`,
+          and lower(coalesce(client.status, '')) = 'active'
+          and lower(coalesce(client.role, 'user')) in ('user', 'client')`,
       [input.clientUserIds, input.professionalUserId],
     );
     if (eligibleClients.rowCount !== input.clientUserIds.length) {
@@ -351,16 +505,27 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
   }
 };
 
-export const listProfessionalAssignments = async (professionalUserId?: string) => {
+export const listProfessionalAssignments = async (professionalUserId?: string, includeSupervisedDelegations = false) => {
   const result = await pool.query(
     `select a.*, c.fiteatsy_client_id, client.name as client_name, professional.name as professional_name
        from consultant_client_assignments a
        join users client on client.id = a.client_user_id
        join users professional on professional.id = a.consultant_user_id
        join fiteatsy_clients c on c.account_user_id = client.id
-      where a.product = 'FITEATSY' and ($1::text is null or a.consultant_user_id = $1)
+      where a.product = 'FITEATSY' and (
+        $1::text is null
+        or a.consultant_user_id = $1
+        or ($2::boolean = true and a.relationship_type = 'DELEGATED_CLIENT_CARE' and exists (
+          select 1 from consultant_client_assignments supervisor
+           where supervisor.client_user_id = a.client_user_id
+             and supervisor.consultant_user_id = $1
+             and supervisor.product = 'FITEATSY'
+             and supervisor.relationship_type = 'CLIENT_CARE'
+             and supervisor.status = 'active'
+        ))
+      )
       order by a.updated_at desc`,
-    [professionalUserId ?? null]
+    [professionalUserId ?? null, includeSupervisedDelegations]
   );
   return result.rows;
 };

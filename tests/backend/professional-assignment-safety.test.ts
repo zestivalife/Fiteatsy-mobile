@@ -52,6 +52,26 @@ test('eligible-client queries exclude deleted and inactive records and mask cont
   assert.match(repository, /lower\(coalesce\(u\.status, ''\)\) = 'active'/);
   assert.match(repository, /maskedEmail: maskEmail/);
   assert.match(repository, /maskedMobileNumber: maskMobile/);
+  assert.match(repository, /lower\(coalesce\((?:u|client)\.role, 'user'\)\) in \('user', 'client'\)/);
+});
+
+test('Senior Consultant delegation preserves supervision and is limited to internal delivery consultants', () => {
+  assert.match(repository, /createSeniorDelegatedAssignmentsBatch/);
+  assert.match(repository, /supervisor\.consultant_user_id = \$2/);
+  assert.match(repository, /supervisor\.relationship_type = 'CLIENT_CARE'/);
+  assert.match(repository, /relationship_type = 'DELEGATED_CLIENT_CARE'/);
+  assert.match(repository, /input\.professionalUserId\.startsWith\('ext_'\)/);
+  assert.match(repository, /lower\(coalesce\(role, ''\)\) in \('consultant', 'provider', 'dietician'\)/);
+  assert.match(repository, /target_membership\.tenant_role[\s\S]+\('consultant', 'provider', 'dietician'\)/);
+  assert.match(routes, /createSeniorDelegatedAssignmentsBatch/);
+  assert.match(routes, /clients\/search[\s\S]+supervisorOnly: true/);
+});
+
+test('Senior Consultant can revoke only a delegated assignment beneath an active supervision assignment', () => {
+  assert.match(repository, /revokeSeniorDelegatedAssignment/);
+  assert.match(repository, /delegated\.relationship_type='DELEGATED_CLIENT_CARE'/);
+  assert.match(repository, /supervisor\.consultant_user_id=\$2/);
+  assert.match(routes, /revokeSeniorDelegatedAssignment/);
 });
 
 test('only authorised operational roles can mutate assignments', () => {
