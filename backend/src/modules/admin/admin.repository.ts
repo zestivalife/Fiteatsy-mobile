@@ -157,36 +157,27 @@ export const findActiveVerifiedUserIdByMobile = async (mobile: string) => {
 };
 
 export const FITEATSY_INTAKE_LEADS_QUERY = `
-    with mobile_users as (
-      select source.*,
+    with client_records as (
+      select u.*,
+             c.fiteatsy_client_id,
              case
-               when length(source.mobile_digits) = 12 and left(source.mobile_digits, 2) = '91' then right(source.mobile_digits, 10)
-               else source.mobile_digits
+               when length(regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g')) = 12
+                and left(regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g'), 2) = '91'
+               then right(regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g'), 10)
+               else regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g')
              end as verified_mobile_key
-        from (
-          select u.*, regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g') as mobile_digits
-           from users u
-           where u.deleted_at is null
-             and lower(coalesce(u.role, 'user')) in ('user', 'client')
-        ) source
-       where length(source.mobile_digits) between 10 and 15
-    ), unique_mobile_users as (
-      select mobile_users.*,
-             row_number() over (
-               partition by verified_mobile_key
-               order by created_at desc, id desc
-             ) as mobile_identity_rank
-        from mobile_users
+        from fiteatsy_clients c
+        join users u on u.id = c.account_user_id
+       where c.deleted_at is null and u.deleted_at is null
     )
-    select u.id as user_id, c.fiteatsy_client_id, u.name, u.email_normalized,
-           u.verified_mobile_key as mobile_number_normalized,
+    select u.id as user_id, u.fiteatsy_client_id, u.name, u.email_normalized,
+           u.verified_mobile_key as mobile_number_normalized, u.role,
            u.created_at, u.status, u.pin_hash is not null as has_login_pin,
            active_assignment.id as assignment_id,
            active_assignment.consultant_user_id,
            professional.name as consultant_name,
            professional.role as consultant_role
-      from unique_mobile_users u
-      left join fiteatsy_clients c on c.account_user_id = u.id and c.deleted_at is null
+      from client_records u
       left join lateral (
         select a.id, a.consultant_user_id
           from consultant_client_assignments a
@@ -194,8 +185,7 @@ export const FITEATSY_INTAKE_LEADS_QUERY = `
          order by a.updated_at desc limit 1
       ) active_assignment on true
       left join users professional on professional.id = active_assignment.consultant_user_id
-     where u.mobile_identity_rank = 1
-       and (
+     where (
          $1::text = ''
          or lower(coalesce(u.name, '')) like concat('%', lower($1), '%')
          or lower(coalesce(u.email_normalized, '')) like concat('%', lower($1), '%')
@@ -210,28 +200,18 @@ export const FITEATSY_INTAKE_LEADS_QUERY = `
   `;
 
 const FITEATSY_INTAKE_LEADS_COUNT_QUERY = `
-  with mobile_users as (
-    select source.*,
-           case
-             when length(source.mobile_digits) = 12 and left(source.mobile_digits, 2) = '91' then right(source.mobile_digits, 10)
-             else source.mobile_digits
-           end as verified_mobile_key
-      from (
-        select u.*, regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g') as mobile_digits
-          from users u
-         where u.deleted_at is null
-           and lower(coalesce(u.role, 'user')) in ('user', 'client')
-      ) source
-     where length(source.mobile_digits) between 10 and 15
-  ), unique_mobile_users as (
-    select mobile_users.*,
-           row_number() over (partition by verified_mobile_key order by created_at desc, id desc) as mobile_identity_rank
-      from mobile_users
+  with client_records as (
+    select u.*,
+           case when length(regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g')) = 12
+                  and left(regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g'), 2) = '91'
+                then right(regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g'), 10)
+                else regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g') end as verified_mobile_key
+      from fiteatsy_clients c join users u on u.id = c.account_user_id
+     where c.deleted_at is null and u.deleted_at is null
   )
   select count(*)::int as total
-    from unique_mobile_users u
-   where u.mobile_identity_rank = 1
-     and (
+    from client_records u
+   where (
        $1::text = ''
        or lower(coalesce(u.name, '')) like concat('%', lower($1), '%')
        or lower(coalesce(u.email_normalized, '')) like concat('%', lower($1), '%')
@@ -249,6 +229,10 @@ export const mapFiteatsyIntakeLead = (row: Record<string, unknown>) => ({
     registeredAtISO: new Date(String(row.created_at)).toISOString(),
     leadStatus: row.assignment_id ? 'ASSIGNED' : 'NEW',
     loginPinStatus: row.has_login_pin ? 'CONFIGURED' : 'SETUP_REQUIRED',
+    accountRole: String(row.role ?? 'user').toLowerCase(),
+    assignable: ['user', 'client'].includes(String(row.role ?? 'user').toLowerCase()),
+    permanentlyDeletable: ['user', 'client'].includes(String(row.role ?? 'user').toLowerCase()),
+    protectionReason: ['user', 'client'].includes(String(row.role ?? 'user').toLowerCase()) ? null : 'WORKFORCE_OR_ADMIN_IDENTITY',
     assignment: row.assignment_id ? {
       assignmentId: String(row.assignment_id),
       consultantUserId: String(row.consultant_user_id),
