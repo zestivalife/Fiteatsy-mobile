@@ -121,7 +121,6 @@ export const discoverClientsForAssignment = async (query: string, limit: number,
           order by subscriptions.expires_at desc limit 1
        ) subscription on true
       where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active'
-        and lower(coalesce(u.role, 'user')) in ('user', 'client')
         and ($1 = '' or lower(u.name) like '%' || lower($1) || '%' or lower(coalesce(u.email_normalized, '')) like '%' || lower($1) || '%' or (regexp_replace($1, '[^0-9]', '', 'g') <> '' and regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g') like '%' || regexp_replace($1, '[^0-9]', '', 'g') || '%'))
         and ($5 = 'all' or ($5 = 'unassigned' and active_assignment.id is null) or ($5 = 'assigned' and active_assignment.id is not null) or ($5 = 'mine' and active_assignment.consultant_user_id = $4))
       order by u.created_at desc limit $2 offset $3`,
@@ -162,7 +161,6 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
           order by subscriptions.expires_at desc limit 1
        ) subscription on true
       where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active'
-        and lower(coalesce(u.role, 'user')) in ('user', 'client')
         and ($1 = '' or lower(u.name) like '%' || lower($1) || '%' or lower(coalesce(u.email_normalized, '')) like '%' || lower($1) || '%' or (regexp_replace($1, '[^0-9]', '', 'g') <> '' and regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g') like '%' || regexp_replace($1, '[^0-9]', '', 'g') || '%'))
         and ($5 = 'all' or ($5 = 'unassigned' and active_assignment.id is null) or ($5 = 'assigned' and active_assignment.id is not null) or ($5 = 'mine' and active_assignment.consultant_user_id = $4))
         and ($6::boolean = false or exists (
@@ -227,8 +225,7 @@ export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentAct
          and lower(coalesce(target_membership.status, '')) = 'active'
          and lower(coalesce(target_membership.tenant_role, '')) in ('consultant', 'provider', 'dietician')
         where client.id = any($1::text[]) and client.deleted_at is null
-          and lower(coalesce(client.status, '')) = 'active'
-          and lower(coalesce(client.role, 'user')) in ('user', 'client')`,
+          and lower(coalesce(client.status, '')) = 'active'`,
       [input.clientUserIds, input.actorUserId, input.professionalUserId],
     );
     if (eligible.rowCount !== input.clientUserIds.length) { await connection.query('rollback'); return null; }
@@ -379,7 +376,6 @@ export const createProfessionalAssignment = async (input: AssignmentActor & { cl
       where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
         and lower(coalesce(professional.status, '')) = 'active'
         and lower(coalesce(client.status, '')) = 'active'
-        and lower(coalesce(client.role, 'user')) in ('user', 'client')
         and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
      on conflict (consultant_user_id, client_user_id, scope) where status = 'active'
      do update set updated_at = now()
@@ -428,8 +424,7 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
           and professional_membership.tenant_id = fc.tenant_id
           and lower(coalesce(professional_membership.status, '')) = 'active'
         where client.id = any($1::text[]) and client.deleted_at is null
-          and lower(coalesce(client.status, '')) = 'active'
-          and lower(coalesce(client.role, 'user')) in ('user', 'client')`,
+          and lower(coalesce(client.status, '')) = 'active'`,
       [input.clientUserIds, input.professionalUserId],
     );
     if (eligibleClients.rowCount !== input.clientUserIds.length) {
