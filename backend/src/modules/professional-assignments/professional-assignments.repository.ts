@@ -210,7 +210,7 @@ export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentAct
     if (!target.rowCount) { await connection.query('rollback'); return null; }
 
     const eligible = await connection.query(
-      `select client.id
+      `select client.id, fc.tenant_id
          from users client
          join fiteatsy_clients fc on fc.account_user_id = client.id
           and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
@@ -230,6 +230,9 @@ export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentAct
       [input.clientUserIds, input.actorUserId, input.professionalUserId],
     );
     if (eligible.rowCount !== input.clientUserIds.length) { await connection.query('rollback'); return null; }
+    const tenantByClient = new Map<string, string>(
+      eligible.rows.map((row) => [String(row.id), String(row.tenant_id)]),
+    );
 
     const existing = await connection.query(
       `select * from consultant_client_assignments
@@ -273,9 +276,9 @@ export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentAct
       const assignmentId = crypto.randomUUID();
       const created = await connection.query(
         `insert into consultant_client_assignments
-          (id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
-         values ($1,$2,$3,$4,'FITEATSY','CONSULTANT','DELEGATED_CLIENT_CARE') returning *`,
-        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId],
+          (id, tenant_id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
+         values ($1,$5,$2,$3,$4,'FITEATSY','CONSULTANT','DELEGATED_CLIENT_CARE') returning *`,
+        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId, tenantByClient.get(clientUserId)],
       );
       await connection.query(
         `insert into professional_assignment_audit_events
@@ -366,8 +369,8 @@ export const createProfessionalAssignment = async (input: AssignmentActor & { cl
     }
     const result = await connection.query(
     `insert into consultant_client_assignments
-      (id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
-     select $1, professional.id, client.id, $2, $7, 'FITEATSY', $4, $5
+      (id, tenant_id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
+     select $1, fc.tenant_id, professional.id, client.id, $2, $7, 'FITEATSY', $4, $5
        from users professional join users client on client.id = $3
        join fiteatsy_clients fc on fc.account_user_id = client.id and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
        join tenant_memberships professional_membership
@@ -416,7 +419,7 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
       return null;
     }
     const eligibleClients = await connection.query(
-      `select client.id
+      `select client.id, fc.tenant_id
          from users client
          join fiteatsy_clients fc on fc.account_user_id = client.id
           and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
@@ -432,6 +435,9 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
       await connection.query('rollback');
       return null;
     }
+    const tenantByClient = new Map<string, string>(
+      eligibleClients.rows.map((row) => [String(row.id), String(row.tenant_id)]),
+    );
     const current = await connection.query(
       `select * from consultant_client_assignments
         where client_user_id = any($1::text[]) and product = 'FITEATSY' and status = 'active'
@@ -477,10 +483,10 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
       const assignmentId = crypto.randomUUID();
       const created = await connection.query(
         `insert into consultant_client_assignments
-          (id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
-         values ($1, $2, $3, $4, $7, 'FITEATSY', $5, $6)
+          (id, tenant_id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
+         values ($1, $8, $2, $3, $4, $7, 'FITEATSY', $5, $6)
          returning *`,
-        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId, input.professionalType, input.relationshipType, input.actorReference ?? null],
+        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId, input.professionalType, input.relationshipType, input.actorReference ?? null, tenantByClient.get(clientUserId)],
       );
       const row = created.rows[0] as Record<string, unknown>;
       await connection.query(

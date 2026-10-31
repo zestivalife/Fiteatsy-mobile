@@ -100,7 +100,7 @@ databaseTest('batch assignment uses text-backed canonical identities atomically'
     assert.equal(mixedEligibility, null);
 
     const active = await pool.query(
-      `select client_user_id, consultant_user_id
+      `select client_user_id, consultant_user_id, tenant_id
          from consultant_client_assignments
         where client_user_id = any($1::text[]) and status = 'active'
         order by client_user_id`,
@@ -108,6 +108,7 @@ databaseTest('batch assignment uses text-backed canonical identities atomically'
     );
     assert.equal(active.rowCount, 2);
     assert.ok(active.rows.every((row) => row.consultant_user_id === professionalA));
+    assert.ok(active.rows.every((row) => row.tenant_id === tenantId));
 
     const audit = await pool.query(
       `select action, actor_user_id, actor_reference
@@ -190,13 +191,13 @@ databaseTest('senior delegation preserves supervision and scopes delivery manage
     assert.equal(delegated?.length, 1);
 
     const active = await pool.query(
-      `select consultant_user_id, relationship_type from consultant_client_assignments
+      `select consultant_user_id, relationship_type, tenant_id from consultant_client_assignments
         where client_user_id=$1 and status='active' order by relationship_type`,
       [clientId],
     );
     assert.deepEqual(active.rows, [
-      { consultant_user_id: seniorId, relationship_type: 'CLIENT_CARE' },
-      { consultant_user_id: internalId, relationship_type: 'DELEGATED_CLIENT_CARE' },
+      { consultant_user_id: seniorId, relationship_type: 'CLIENT_CARE', tenant_id: tenantId },
+      { consultant_user_id: internalId, relationship_type: 'DELEGATED_CLIENT_CARE', tenant_id: tenantId },
     ]);
     assert.equal(await createSeniorDelegatedAssignmentsBatch({ actorUserId: otherSeniorId, clientUserIds: [clientId], professionalUserId: replacementId }), null);
     assert.equal(await createSeniorDelegatedAssignmentsBatch({ actorUserId: seniorId, clientUserIds: [clientId], professionalUserId: externalId }), null);
@@ -211,11 +212,11 @@ databaseTest('senior delegation preserves supervision and scopes delivery manage
     assert.ok(await revokeSeniorDelegatedAssignment(String(delegated?.[0]?.id), seniorId, 'QA cleanup'));
 
     const remaining = await pool.query(
-      `select consultant_user_id, relationship_type from consultant_client_assignments
+      `select consultant_user_id, relationship_type, tenant_id from consultant_client_assignments
         where client_user_id=$1 and status='active'`,
       [clientId],
     );
-    assert.deepEqual(remaining.rows, [{ consultant_user_id: seniorId, relationship_type: 'CLIENT_CARE' }]);
+    assert.deepEqual(remaining.rows, [{ consultant_user_id: seniorId, relationship_type: 'CLIENT_CARE', tenant_id: tenantId }]);
   } finally {
     await pool.query('delete from professional_assignment_audit_events where client_user_id=$1', [clientId]);
     await pool.query('delete from consultant_client_assignments where client_user_id=$1', [clientId]);

@@ -275,9 +275,17 @@ export const resetQaOnboarding = async (input: { actorUserId: string; userId: st
 export const createQaAssignment = async (input: { actorUserId: string; consultantUserId: string; clientUserId: string; reason: string }) => {
   const result = await pool.query(
     `insert into consultant_client_assignments
-      (id, consultant_user_id, client_user_id, created_by_user_id)
-     select $1, c.id, u.id, $4
+      (id, tenant_id, consultant_user_id, client_user_id, created_by_user_id)
+     select $1, fc.tenant_id, c.id, u.id, $4
        from users c cross join users u
+       join fiteatsy_clients fc
+         on fc.account_user_id = u.id
+        and fc.deleted_at is null
+        and lower(coalesce(fc.status, '')) = 'active'
+       join tenant_memberships consultant_membership
+         on consultant_membership.user_id = c.id
+        and consultant_membership.tenant_id = fc.tenant_id
+        and lower(coalesce(consultant_membership.status, '')) = 'active'
       where c.id = $2 and u.id = $3
         and c.deleted_at is null and u.deleted_at is null
         and c.account_purpose = 'QA_TEST' and u.account_purpose = 'QA_TEST'
