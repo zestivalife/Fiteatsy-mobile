@@ -443,7 +443,7 @@ const listClientSelect = `
     where hr.user_id = u.id
       and hr.client_id = c.id
       and hr.deleted_at is null
-      and hr.processing_status = any($5)
+      and hr.processing_status = any($${CLIENT_ACCOUNT_ROLES.length + 1})
   ) report_stats on true
   left join lateral (
     select
@@ -599,9 +599,9 @@ export const listRegisteredConsultantClients = async (consultantAccountId?: stri
           exists (
             select 1 from consultant_client_assignments cap003
             where cap003.client_user_id = u.id
-              and cap003.consultant_user_id = $6
+              and cap003.consultant_user_id = $${CLIENT_ACCOUNT_ROLES.length + 2}
               and cap003.product = 'FITEATSY'
-              and cap003.professional_type = $7
+              and cap003.professional_type = $${CLIENT_ACCOUNT_ROLES.length + 3}
               and cap003.status = 'active'
           )
         )
@@ -691,9 +691,9 @@ export const getRegisteredConsultantClientProfileContext = async (
           exists (
             select 1 from consultant_client_assignments cap003
             where cap003.client_user_id = u.id
-              and cap003.consultant_user_id = $7
+              and cap003.consultant_user_id = $${CLIENT_ACCOUNT_ROLES.length + 3}
               and cap003.product = 'FITEATSY'
-              and cap003.professional_type = $8
+              and cap003.professional_type = $${CLIENT_ACCOUNT_ROLES.length + 4}
               and cap003.status = 'active'
           )
         )
@@ -701,7 +701,7 @@ export const getRegisteredConsultantClientProfileContext = async (
     : '';
   const result = await pool.query(
     `${listClientSelect}
-      and c.fiteatsy_client_id = $6
+      and c.fiteatsy_client_id = $${CLIENT_ACCOUNT_ROLES.length + 2}
       ${assignmentClause}
       order by hp.updated_at desc nulls last
       limit 1
@@ -759,7 +759,7 @@ export const getRegisteredClientProfileContextByAccountId = async (
 ): Promise<ConsultantClientProfileContext | null> => {
   const result = await pool.query(
     `${listClientSelect}
-      and u.id = $6
+      and u.id = $${CLIENT_ACCOUNT_ROLES.length + 2}
       order by hp.updated_at desc nulls last
       limit 1
     `,
