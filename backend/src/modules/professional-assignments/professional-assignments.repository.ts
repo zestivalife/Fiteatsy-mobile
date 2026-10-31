@@ -108,8 +108,8 @@ export const discoverClientsForAssignment = async (query: string, limit: number,
        ) hp on true
        left join lateral (
            select a.id, a.consultant_user_id, a.created_at, coalesce(nullif(trim(concat_ws(' ', professional.first_name, professional.last_name)), ''), professional.name) as professional_name, professional.role as professional_role
-           from consultant_client_assignments a
-           join users professional on professional.id = a.consultant_user_id
+          from consultant_client_assignments a
+          join users professional on professional.id = a.consultant_user_id
           where a.client_user_id = u.id and a.status = 'active' and a.product = 'FITEATSY'
           order by a.updated_at desc limit 1
        ) active_assignment on true
@@ -148,9 +148,10 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
        ) hp on true
        left join lateral (
            select a.id, a.consultant_user_id, a.created_at, coalesce(nullif(trim(concat_ws(' ', professional.first_name, professional.last_name)), ''), professional.name) as professional_name, professional.role as professional_role
-           from consultant_client_assignments a
-           join users professional on professional.id = a.consultant_user_id
+          from consultant_client_assignments a
+          join users professional on professional.id = a.consultant_user_id
           where a.client_user_id = u.id and a.status = 'active' and a.product = 'FITEATSY'
+            and a.relationship_type = case when $6::boolean then 'DELEGATED_CLIENT_CARE' else 'CLIENT_CARE' end
           order by a.updated_at desc limit 1
        ) active_assignment on true
        left join lateral (
