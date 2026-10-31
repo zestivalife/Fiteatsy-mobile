@@ -1,11 +1,28 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
-import { createOrResolveClientForAccount } from '../client/client.repository.js';
+import { createOrResolveClientForAccount, resolveFiteatsyHomeTenantId } from '../client/client.repository.js';
 import { createOrUpdateHealthProfile, createCareCaseIfMissing } from '../platform/platform.store.js';
 import type { ClientOwnershipContext } from '../platform/platform.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 
 type QaRole = 'user' | 'consultant' | 'senior_consultant' | 'admin';
+
+const ensureQaProfessionalMembership = async (userId: string, role: QaRole) => {
+  if (!['consultant', 'senior_consultant'].includes(role)) return;
+  const tenantId = await resolveFiteatsyHomeTenantId();
+  const timestamp = new Date().toISOString();
+  await pool.query(
+    `insert into tenant_memberships (
+       id, tenant_id, user_id, tenant_role, status, joined_at, created_at, updated_at
+     ) values ($1, $2, $3, 'CONSULTANT', 'active', $4, $4, $4)
+     on conflict (tenant_id, user_id) do update
+       set tenant_role = 'CONSULTANT',
+           status = 'active',
+           removed_at = null,
+           updated_at = excluded.updated_at`,
+    [crypto.randomUUID(), tenantId, userId, timestamp]
+  );
+};
 
 const mapUser = (row: Record<string, unknown>) => ({
   id: String(row.id),
@@ -104,6 +121,7 @@ export const provisionQaIdentity = async (input: {
         reason: input.reason
       });
       const clientRecord = input.role === 'user' ? await createOrResolveClientForAccount(user.id) : null;
+      await ensureQaProfessionalMembership(user.id, input.role);
       return { user, client: clientRecord, identityReused: true };
     }
     const inserted = await client.query(
@@ -118,6 +136,7 @@ export const provisionQaIdentity = async (input: {
     await audit({ actorUserId: input.actorUserId, actorReference: input.actorReference, targetUserId: user.id, action: 'QAIdentityCreated', accountPurpose: 'QA_TEST', role: input.role, reason: input.reason });
 
     const clientRecord = input.role === 'user' ? await createOrResolveClientForAccount(user.id) : null;
+    await ensureQaProfessionalMembership(user.id, input.role);
     if (clientRecord) {
       const owner: ClientOwnershipContext = { accountId: user.id, clientId: clientRecord.id };
       const profile = await createOrUpdateHealthProfile(owner, {});

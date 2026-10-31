@@ -36,6 +36,18 @@ test('admin provisions QA client and consultant, issues governed sessions, and r
   assert.equal(consultant.response.status, 201, JSON.stringify(consultant.body));
   assert.equal(client.body.user.accountPurpose, 'QA_TEST');
   assert.equal(consultant.body.user.role, 'consultant');
+  const sharedTenant = await pool.query(
+    `select professional_membership.tenant_id
+       from tenant_memberships professional_membership
+       join fiteatsy_clients client
+         on client.account_user_id = $2
+        and client.tenant_id = professional_membership.tenant_id
+        and client.deleted_at is null
+      where professional_membership.user_id = $1
+        and lower(professional_membership.status) = 'active'`,
+    [consultant.body.user.id, client.body.user.id]
+  );
+  assert.equal(sharedTenant.rowCount, 1);
 
   const arbitraryAdmin = await postJson(server.baseUrl, '/v1/admin/qa-identities', {
     name: 'Forbidden Generic Admin', email: `forbidden-admin-${suffix}@example.com`, mobileNumber: '+919876543298', role: 'admin', reason: 'Must remain delegated-only'
