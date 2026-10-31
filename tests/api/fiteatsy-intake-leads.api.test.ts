@@ -75,13 +75,16 @@ test('inactive filtering works and soft-deleted accounts remain excluded', async
   assert.ok(!response.body.leads.some((item: { userId: string }) => item.userId === deleted.current.body.accountId));
 });
 
-test('excluded administrator identity returns an authorised diagnostic without exposing the account', async () => {
+test('canonical administrator client identity remains visible but protected from client actions', async () => {
   const admin = await createAdmin();
   const response = await getJson(server.baseUrl, '/v1/admin/intake-leads?q=9700001001&page=1&pageSize=20', { headers: authHeaders(admin.token) });
   assert.equal(response.response.status, 200);
-  assert.equal(response.body.leads.length, 0);
-  assert.equal(response.body.diagnostic.code, 'ACCOUNT_ROLE_EXCLUDED');
-  assert.equal(JSON.stringify(response.body.diagnostic).includes(admin.current.body.accountId), false);
+  assert.equal(response.body.leads.length, 1);
+  assert.equal(response.body.leads[0].userId, admin.current.body.accountId);
+  assert.equal(response.body.leads[0].assignable, false);
+  assert.equal(response.body.leads[0].permanentlyDeletable, false);
+  assert.equal(response.body.leads[0].protectionReason, 'WORKFORCE_OR_ADMIN_IDENTITY');
+  assert.equal(response.body.diagnostic, null);
 });
 
 test('normal users cannot access lead discovery diagnostics', async () => {

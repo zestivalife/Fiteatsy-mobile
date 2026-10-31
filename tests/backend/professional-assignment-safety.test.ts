@@ -46,13 +46,14 @@ test('professional and client must share an active tenant membership', () => {
   assert.match(repository, /lower\(coalesce\(professional_membership\.status, ''\)\) = 'active'/);
 });
 
-test('eligible-client queries exclude deleted and inactive records and mask contacts', () => {
+test('eligible-client queries require active canonical mappings, exclude deleted accounts and mask contacts', () => {
   assert.match(repository, /c\.deleted_at is null/);
+  assert.match(repository, /lower\(coalesce\(c\.status, ''\)\) = 'active'/);
   assert.match(repository, /u\.deleted_at is null/);
   assert.match(repository, /lower\(coalesce\(u\.status, ''\)\) = 'active'/);
   assert.match(repository, /maskedEmail: maskEmail/);
   assert.match(repository, /maskedMobileNumber: maskMobile/);
-  assert.match(repository, /lower\(coalesce\((?:u|client)\.role, 'user'\)\) in \('user', 'client'\)/);
+  assert.doesNotMatch(repository, /lower\(coalesce\((?:u|client)\.role, 'user'\)\) in \('user', 'client'\)/);
 });
 
 test('Senior Consultant delegation preserves supervision and is limited to internal delivery consultants', () => {
