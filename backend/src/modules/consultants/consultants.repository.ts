@@ -673,6 +673,42 @@ export const listAssignedConsultantClientContexts = async (
   }));
 };
 
+export const listAssignedExternalConsultantClientReferences = async (
+  consultantAccountId: string
+): Promise<Array<{ accountId: string; publicClientId: string }>> => {
+  const result = await pool.query(
+    `
+      select distinct u.id as account_user_id, c.fiteatsy_client_id
+      from consultant_client_assignments assignment
+      join tenant_memberships professional_membership
+        on professional_membership.user_id = assignment.consultant_user_id
+        and professional_membership.tenant_id = assignment.tenant_id
+        and lower(coalesce(professional_membership.status, '')) = 'active'
+      join users u
+        on u.id = assignment.client_user_id
+        and u.deleted_at is null
+        and lower(coalesce(u.status, '')) = 'active'
+      join fiteatsy_clients c
+        on c.account_user_id = u.id
+        and c.tenant_id = assignment.tenant_id
+        and c.deleted_at is null
+        and lower(coalesce(c.status, '')) = 'active'
+      where assignment.consultant_user_id = $1
+        and assignment.product = 'FITEATSY'
+        and assignment.professional_type = 'CONSULTANT'
+        and assignment.relationship_type = 'CLIENT_CARE'
+        and assignment.status = 'active'
+      order by u.id
+    `,
+    [consultantAccountId]
+  );
+
+  return result.rows.map((row) => ({
+    accountId: String(row.account_user_id),
+    publicClientId: String(row.fiteatsy_client_id)
+  }));
+};
+
 export const getRegisteredConsultantClientProfile = async (
   publicClientId: string
 ): Promise<ConsultantClientProfileRecord | null> => {
