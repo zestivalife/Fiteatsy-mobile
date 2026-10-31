@@ -31,6 +31,7 @@ externalConsultantAccessRouter.get('/assignments/clients', requireDelegatedAutho
       clients: clients.map((client) => ({
         userId: client.accountId,
         clientId: client.publicClientId,
+        displayName: client.name,
         assignmentState: 'ACTIVE'
       }))
     });

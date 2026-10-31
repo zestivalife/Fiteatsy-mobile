@@ -675,10 +675,10 @@ export const listAssignedConsultantClientContexts = async (
 
 export const listAssignedExternalConsultantClientReferences = async (
   consultantAccountId: string
-): Promise<Array<{ accountId: string; publicClientId: string }>> => {
+): Promise<Array<{ accountId: string; publicClientId: string; name: string }>> => {
   const result = await pool.query(
     `
-      select distinct u.id as account_user_id, c.fiteatsy_client_id
+      select distinct u.id as account_user_id, c.fiteatsy_client_id, u.name
       from consultant_client_assignments assignment
       join tenant_memberships professional_membership
         on professional_membership.user_id = assignment.consultant_user_id
@@ -705,7 +705,8 @@ export const listAssignedExternalConsultantClientReferences = async (
 
   return result.rows.map((row) => ({
     accountId: String(row.account_user_id),
-    publicClientId: String(row.fiteatsy_client_id)
+    publicClientId: String(row.fiteatsy_client_id),
+    name: String(row.name)
   }));
 };
 
