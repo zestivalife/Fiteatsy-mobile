@@ -390,12 +390,23 @@ test('consultant client profile returns real onboarding fields only', async () =
       gender: 'Female',
       heightCm: 162,
       currentWeightKg: 61,
+      goalWeightKg: 56,
       waistCm: 78,
       hipCm: 94,
       neckCm: 32,
+      armCircumferenceCm: 27,
+      thighCircumferenceCm: 52,
+      calfCircumferenceCm: 34,
+      bodyFatPct: 28.4,
+      occupation: 'Product designer',
+      workingHoursLabel: '9 hours',
+      shiftType: 'Day',
+      workMode: 'Hybrid',
+      travelFrequency: 'Monthly',
       wellnessGoals: ['Improve energy'],
       activityLevel: 'Moderate',
       dietType: 'Vegetarian',
+      regionalCuisine: 'Maharashtrian',
       primaryConditions: ['Vitamin D deficiency'],
       sleepHours: 7,
       sleepGoalHours: 8,
@@ -405,10 +416,21 @@ test('consultant client profile returns real onboarding fields only', async () =
       exerciseFrequency: '3-4x/week',
       stressLevelLabel: 'Moderate',
       preferredCuisines: ['Maharashtrian', 'South Indian'],
+      foodsLiked: ['Poha', 'Idli'],
       foodAllergies: ['Peanuts'],
+      foodIntolerances: ['Lactose'],
       foodsDisliked: ['Bitter gourd'],
+      currentSupplements: ['Vitamin B12'],
+      wakeTime: '06:30',
+      breakfastTime: '08:00',
+      lunchTime: '13:00',
+      dinnerTime: '19:30',
+      sleepTime: '22:30',
       mealsPerDay: 3,
       waterIntakeLiters: 2.5,
+      outsideFoodFrequency: 'Weekly',
+      cookingAtHome: 'Usually',
+      whoCooks: 'Self',
       previousConditions: ['Anemia'],
       familyHistoryConditions: ['Diabetes'],
       currentMedicines: ['Vitamin D3'],
@@ -473,6 +495,43 @@ test('consultant client profile returns real onboarding fields only', async () =
   assert.equal(profile.body.onboarding.activityLevel, 'Moderate');
   assert.equal(profile.body.onboarding.dietPreference, 'Vegetarian');
   assert.deepEqual(profile.body.onboarding.medicalConditions, ['Vitamin D deficiency']);
+  assert.deepEqual(profile.body.onboarding.bodyComposition, {
+    goalWeightKg: 56,
+    waistCm: 78,
+    hipCm: 94,
+    neckCm: 32,
+    armCircumferenceCm: 27,
+    thighCircumferenceCm: 52,
+    calfCircumferenceCm: 34,
+    bodyFatPct: 28.4
+  });
+  assert.deepEqual(profile.body.onboarding.work, {
+    occupation: 'Product designer',
+    workingHours: '9 hours',
+    shiftType: 'Day',
+    workMode: 'Hybrid',
+    travelFrequency: 'Monthly'
+  });
+  assert.deepEqual(profile.body.onboarding.nutrition, {
+    dietaryPreference: 'Vegetarian',
+    regionalCuisine: 'Maharashtrian',
+    preferredCuisines: ['Maharashtrian', 'South Indian'],
+    foodsLiked: ['Poha', 'Idli'],
+    foodAllergies: ['Peanuts'],
+    foodIntolerances: ['Lactose'],
+    foodDislikes: ['Bitter gourd'],
+    supplements: ['Vitamin B12'],
+    wakeTime: '06:30',
+    breakfastTime: '08:00',
+    lunchTime: '13:00',
+    dinnerTime: '19:30',
+    sleepTime: '22:30',
+    mealFrequency: 3,
+    waterIntakeLiters: 2.5,
+    outsideFoodFrequency: 'Weekly',
+    cookingAtHome: 'Usually',
+    whoCooks: 'Self'
+  });
   assert.equal(profile.body.healthProfile.biomarkerStatus, null);
   assert.equal(profile.body.healthProfile.reportsCount, 0);
   assert.equal(profile.body.healthProfile.profileCompleted, true);

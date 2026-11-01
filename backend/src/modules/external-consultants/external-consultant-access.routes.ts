@@ -4,6 +4,7 @@ import { requireDelegatedAuthority } from '../auth/delegated-authority.middlewar
 import type { DelegatedAuthority } from '../auth/delegated-authority.js';
 import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSummaryForClient, listConsultantReportSummariesForClient, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
 import { getReportFile } from '../reports/reports.store.js';
+import { calculateHealthMetrics } from '../health/health-calculations.service.js';
 
 export const externalConsultantAccessRouter = Router();
 const authority = (req: Request) => (req as Request & { delegatedAuthority?: DelegatedAuthority }).delegatedAuthority;
@@ -32,6 +33,7 @@ externalConsultantAccessRouter.get('/:userId/health-context', requireDelegatedAu
       connectionId: auth.connection_id,
       profile: scopes.has('PROFILE') ? context.profile : null,
       measurements: scopes.has('MEASUREMENTS') ? context.calculationInput : null,
+      healthMetrics: scopes.has('MEASUREMENTS') ? calculateHealthMetrics(context.calculationInput) : null,
       reports,
       biomarkers,
       wearables,

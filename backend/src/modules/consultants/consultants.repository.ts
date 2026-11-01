@@ -17,6 +17,23 @@ type ConsultantOnboardingProjection = {
   activityLevel: string | null;
   dietPreference: string | null;
   medicalConditions: string[] | null;
+  bodyComposition: {
+    goalWeightKg: number | null;
+    waistCm: number | null;
+    hipCm: number | null;
+    neckCm: number | null;
+    armCircumferenceCm: number | null;
+    thighCircumferenceCm: number | null;
+    calfCircumferenceCm: number | null;
+    bodyFatPct: number | null;
+  };
+  work: {
+    occupation: string | null;
+    workingHours: string | null;
+    shiftType: string | null;
+    workMode: string | null;
+    travelFrequency: string | null;
+  };
   lifestyle: {
     sleepHours: number | null;
     sleepGoalHours: number | null;
@@ -28,11 +45,23 @@ type ConsultantOnboardingProjection = {
   };
   nutrition: {
     dietaryPreference: string | null;
+    regionalCuisine: string | null;
     preferredCuisines: string[];
+    foodsLiked: string[];
     foodAllergies: string[];
+    foodIntolerances: string[];
     foodDislikes: string[];
+    supplements: string[];
+    wakeTime: string | null;
+    breakfastTime: string | null;
+    lunchTime: string | null;
+    dinnerTime: string | null;
+    sleepTime: string | null;
     mealFrequency: number | null;
     waterIntakeLiters: number | null;
+    outsideFoodFrequency: string | null;
+    cookingAtHome: string | null;
+    whoCooks: string | null;
   };
   healthHistory: {
     diabetes: string | null;
@@ -282,6 +311,23 @@ const mapOnboardingProjection = (row: Record<string, unknown>): ConsultantOnboar
   activityLevel: row.activity_level == null ? null : String(row.activity_level),
   dietPreference: row.diet_type == null ? null : String(row.diet_type),
   medicalConditions: row.health_profile_id ? toStringArray(row.primary_conditions) : null,
+  bodyComposition: {
+    goalWeightKg: toNumberOrNull(row.goal_weight_kg),
+    waistCm: toNumberOrNull(row.waist_cm),
+    hipCm: toNumberOrNull(row.hip_cm),
+    neckCm: toNumberOrNull(row.neck_cm),
+    armCircumferenceCm: toNumberOrNull(row.arm_circumference_cm),
+    thighCircumferenceCm: toNumberOrNull(row.thigh_circumference_cm),
+    calfCircumferenceCm: toNumberOrNull(row.calf_circumference_cm),
+    bodyFatPct: toNumberOrNull(row.body_fat_pct)
+  },
+  work: {
+    occupation: row.occupation == null ? null : String(row.occupation),
+    workingHours: row.working_hours_label == null ? null : String(row.working_hours_label),
+    shiftType: row.shift_type == null ? null : String(row.shift_type),
+    workMode: row.work_mode == null ? null : String(row.work_mode),
+    travelFrequency: row.travel_frequency == null ? null : String(row.travel_frequency)
+  },
   lifestyle: {
     sleepHours: toNumberOrNull(row.sleep_hours),
     sleepGoalHours: toNumberOrNull(row.sleep_goal_hours),
@@ -293,11 +339,23 @@ const mapOnboardingProjection = (row: Record<string, unknown>): ConsultantOnboar
   },
   nutrition: {
     dietaryPreference: row.diet_type == null ? null : String(row.diet_type),
+    regionalCuisine: row.regional_cuisine == null ? null : String(row.regional_cuisine),
     preferredCuisines: toStringArray(row.preferred_cuisines),
+    foodsLiked: toStringArray(row.foods_liked),
     foodAllergies: toStringArray(row.food_allergies),
+    foodIntolerances: toStringArray(row.food_intolerances),
     foodDislikes: toStringArray(row.foods_disliked),
+    supplements: toStringArray(row.current_supplements),
+    wakeTime: row.wake_time == null ? null : String(row.wake_time),
+    breakfastTime: row.breakfast_time == null ? null : String(row.breakfast_time),
+    lunchTime: row.lunch_time == null ? null : String(row.lunch_time),
+    dinnerTime: row.dinner_time == null ? null : String(row.dinner_time),
+    sleepTime: row.sleep_time == null ? null : String(row.sleep_time),
     mealFrequency: toNumberOrNull(row.meals_per_day),
-    waterIntakeLiters: toNumberOrNull(row.water_intake_liters)
+    waterIntakeLiters: toNumberOrNull(row.water_intake_liters),
+    outsideFoodFrequency: row.outside_food_frequency == null ? null : String(row.outside_food_frequency),
+    cookingAtHome: row.cooking_at_home == null ? null : String(row.cooking_at_home),
+    whoCooks: row.who_cooks == null ? null : String(row.who_cooks)
   },
   healthHistory: {
     diabetes: row.diabetes_status == null ? null : String(row.diabetes_status),
@@ -364,16 +422,30 @@ const listClientSelect = `
     hp.gender,
     hp.height_cm,
     hp.current_weight_kg,
+    hp.goal_weight_kg,
     hp.waist_cm,
     hp.hip_cm,
     hp.neck_cm,
+    hp.arm_circumference_cm,
+    hp.thigh_circumference_cm,
+    hp.calf_circumference_cm,
+    hp.body_fat_pct,
+    hp.occupation,
+    hp.working_hours_label,
+    hp.shift_type,
+    hp.work_mode,
+    hp.travel_frequency,
     hp.wellness_goals,
     hp.activity_level,
     hp.diet_type,
+    hp.regional_cuisine,
     hp.primary_conditions,
     hp.preferred_cuisines,
+    hp.foods_liked,
     hp.food_allergies,
+    hp.food_intolerances,
     hp.foods_disliked,
+    hp.current_supplements,
     hp.current_medicines,
     hp.previous_conditions,
     hp.medical_notes,
@@ -384,6 +456,14 @@ const listClientSelect = `
     hp.sleep_quality_label,
     hp.water_intake_liters,
     hp.meals_per_day,
+    hp.wake_time,
+    hp.breakfast_time,
+    hp.lunch_time,
+    hp.dinner_time,
+    hp.sleep_time,
+    hp.outside_food_frequency,
+    hp.cooking_at_home,
+    hp.who_cooks,
     hp.smoking_status,
     hp.alcohol_frequency,
     hp.exercise_frequency,
