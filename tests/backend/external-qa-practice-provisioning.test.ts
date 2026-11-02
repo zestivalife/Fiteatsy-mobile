@@ -44,6 +44,13 @@ test('provisioning reuses canonical External models and creates synthetic client
   for (const forbidden of ['password_hash', 'jwt', 'refresh_token', 'ZESTIVA_INTERNAL']) assert.doesNotMatch(repository, new RegExp(forbidden, 'i'));
 });
 
+test('governed QA response preserves canonical membership authority identifiers', () => {
+  assert.match(repository, /ownerMembershipId/);
+  assert.match(repository, /onboardingId/);
+  assert.match(repository, /accountType/);
+  assert.match(repository, /join external_consultant_signups signup on signup\.id=qa\.signup_id/);
+});
+
 test('migration is additive audit lineage with archive cleanup and no client-core alteration', () => {
   assert.match(migration, /create table if not exists external_qa_practice_provisioning/);
   assert.match(migration, /create table if not exists external_qa_practice_audit_events/);

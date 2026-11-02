@@ -34,6 +34,8 @@ const projection = (row: Record<string, unknown>, replayed: boolean) => ({
   provisioningId: String(row.id), fixtureKey: String(row.fixture_key),
   authIdentityId: String(row.auth_identity_id), userId: String(row.fiteatsy_user_id),
   tenantId: String(row.tenant_id), professionCode: String(row.profession_code),
+  ownerMembershipId: String(row.owner_membership_id), onboardingId: String(row.onboarding_id),
+  accountType: String(row.account_type),
   clientIds: Array.isArray(row.created_client_ids) ? row.created_client_ids : [],
   status: String(row.status), provisioningSource: String(row.provisioning_source), idempotentReplay: replayed
 });
@@ -54,7 +56,13 @@ const assertQaInput = (input: ExternalQaPracticeInput) => {
 
 export async function provisionExternalQaPractice(input: ExternalQaPracticeInput) {
   assertQaInput(input);
-  const existing = await pool.query('select * from external_qa_practice_provisioning where fixture_key=$1', [input.fixtureKey]);
+  const existing = await pool.query(
+    `select qa.*, signup.owner_membership_id, signup.onboarding_id, signup.account_type
+       from external_qa_practice_provisioning qa
+       join external_consultant_signups signup on signup.id=qa.signup_id
+      where qa.fixture_key=$1`,
+    [input.fixtureKey]
+  );
   if (existing.rowCount) {
     const row = existing.rows[0];
     if (row.auth_identity_id !== input.authIdentityId || row.profession_code !== input.professionCode) {
@@ -121,7 +129,12 @@ export async function provisionExternalQaPractice(input: ExternalQaPracticeInput
         workspace.userId, JSON.stringify({ signupId: workspace.signupId, membershipId: workspace.ownerMembershipId, clientIds })]
     );
     await db.query('commit');
-    return projection(inserted.rows[0], false);
+    return projection({
+      ...inserted.rows[0],
+      owner_membership_id: workspace.ownerMembershipId,
+      onboarding_id: workspace.onboardingId,
+      account_type: workspace.accountType
+    }, false);
   } catch (error) {
     await db.query('rollback');
     throw error;
