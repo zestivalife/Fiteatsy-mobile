@@ -7,7 +7,24 @@ import { readPackagedSourceRevision } from './source-revision.js';
 const LOCAL_DATABASE_FALLBACK = 'postgres://postgres:postgres@localhost:5432/nuetra';
 const SERVICE_NAME = 'fiteatsy-backend';
 
-const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const resolvePackagedBackendRoot = (startDirectory: string) => {
+  let candidate = path.resolve(startDirectory);
+  while (true) {
+    if (
+      fs.existsSync(path.join(candidate, 'package.json')) &&
+      fs.existsSync(path.join(candidate, '.source-revision'))
+    ) {
+      return candidate;
+    }
+    const parent = path.dirname(candidate);
+    if (parent === candidate) {
+      throw new Error(`Unable to locate packaged backend root from ${startDirectory}.`);
+    }
+    candidate = parent;
+  }
+};
+
+const backendRoot = resolvePackagedBackendRoot(path.dirname(fileURLToPath(import.meta.url)));
 const packageJsonPath = path.join(backendRoot, 'package.json');
 const sourceRevisionPath = path.join(backendRoot, '.source-revision');
 
