@@ -98,7 +98,10 @@ jobs:
         run: npm --prefix backend run db:migrate
 
       - name: Build production importer artifact
-        run: npm --prefix backend run build
+        run: |
+          npm --prefix backend run provenance:write
+          npm --prefix backend run provenance:verify
+          npm --prefix backend run build
 
       - name: Validate and import immutable Batch 0 catalogue
         working-directory: backend

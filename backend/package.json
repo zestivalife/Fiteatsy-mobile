@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "provenance:write": "node ./scripts/write-source-revision.mjs",
+    "provenance:verify": "node ./scripts/verify-source-revision.mjs",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.catalogue-import.json && node ./scripts/copy-migrations.mjs",
     "db:migrate": "tsx src/db/migrator.ts",
     "nutrition:catalogue:generate": "node ./scripts/generate-usda-catalogue.mjs",

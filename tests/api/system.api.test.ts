@@ -85,7 +85,7 @@ test('GET /v1/version returns runtime metadata', async () => {
         assert.equal(body.service, 'fiteatsy-backend');
         assert.equal(body.version, '1.0.0');
         assert.equal(body.environment, 'staging');
-        assert.equal(body.git_commit, '94791be461c39ba41c6791955bdbf6d59bfc24a6');
+        assert.match(body.git_commit, /^[0-9a-f]{40}$/);
       } finally {
         await server.close();
       }
@@ -93,7 +93,7 @@ test('GET /v1/version returns runtime metadata', async () => {
   );
 });
 
-test('GET /v1/version prefers Railway deployment identity over a stale configured fallback', async () => {
+test('GET /v1/version ignores stale runtime revision variables', async () => {
   await withEnv(
     {
       NODE_ENV: 'production',
@@ -105,7 +105,9 @@ test('GET /v1/version prefers Railway deployment identity over a stale configure
       const { response, body } = await getJson(server.baseUrl, '/v1/version');
       try {
         assert.equal(response.status, 200);
-        assert.equal(body.git_commit, '94c199585f48853bbd288874328229340d923ac1');
+        assert.match(body.git_commit, /^[0-9a-f]{40}$/);
+        assert.notEqual(body.git_commit, '94c199585f48853bbd288874328229340d923ac1');
+        assert.notEqual(body.git_commit, '6e04e67899a4e187fe8e4032bc589f5a72fd88b8');
       } finally {
         await server.close();
       }

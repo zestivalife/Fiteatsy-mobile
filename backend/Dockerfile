@@ -6,9 +6,11 @@ COPY package*.json ./
 RUN npm ci
 
 COPY tsconfig.json tsconfig.catalogue-import.json ./
+COPY .source-revision ./
 COPY scripts ./scripts
 COPY src ./src
 
+RUN node ./scripts/verify-source-revision.mjs --format-only
 RUN npm run build
 RUN npm prune --omit=dev
 
@@ -18,6 +20,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package*.json ./
+COPY --from=build /app/.source-revision ./.source-revision
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src/modules/nutrition/food-curation/data ./dist/modules/nutrition/food-curation/data

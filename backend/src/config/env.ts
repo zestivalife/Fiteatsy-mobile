@@ -2,12 +2,14 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readPackagedSourceRevision } from './source-revision.js';
 
 const LOCAL_DATABASE_FALLBACK = 'postgres://postgres:postgres@localhost:5432/nuetra';
 const SERVICE_NAME = 'fiteatsy-backend';
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const packageJsonPath = path.join(backendRoot, 'package.json');
+const sourceRevisionPath = path.join(backendRoot, '.source-revision');
 
 const readPackageVersion = () => {
   try {
@@ -19,6 +21,7 @@ const readPackageVersion = () => {
 };
 
 const packageVersion = readPackageVersion();
+const packagedSourceRevision = readPackagedSourceRevision(sourceRevisionPath);
 
 const readNodeEnv = () => process.env.NODE_ENV?.trim() || '';
 
@@ -57,11 +60,6 @@ const resolvePort = () => {
 
 const resolveEnvironment = () => readNodeEnv() || readEnvironmentName() || 'development';
 
-const resolveGitCommit = () =>
-  process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
-  process.env.GIT_COMMIT?.trim() ||
-  'unknown';
-
 export const env = {
   get serviceName() {
     return SERVICE_NAME;
@@ -73,7 +71,7 @@ export const env = {
     return resolveEnvironment();
   },
   get gitCommit() {
-    return resolveGitCommit();
+    return packagedSourceRevision;
   },
   get port() {
     return resolvePort();
