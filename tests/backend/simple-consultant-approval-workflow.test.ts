@@ -14,11 +14,12 @@ const account = (role: string) => ({
   user: { id: `${role}-user`, role },
 }) as AuthenticatedAccount;
 
-test('only Senior Consultant and platform authority roles can approve or publish', () => {
+test('assigned consultants and platform authority roles can approve or publish', () => {
   assert.equal(canApproveOrPublishDietPlan(account('senior_consultant')), true);
   assert.equal(canApproveOrPublishDietPlan(account('platform_owner')), true);
   assert.equal(canApproveOrPublishDietPlan(account('admin')), true);
-  assert.equal(canApproveOrPublishDietPlan(account('consultant')), false);
+  assert.equal(canApproveOrPublishDietPlan(account('consultant')), true);
+  assert.equal(canApproveOrPublishDietPlan(account('dietician')), true);
 });
 
 test('publication allows the assigned Consultant but denies wrong or unassigned Consultants', () => {
@@ -37,9 +38,9 @@ test('only the exact approved version is publishable and repeat publication is i
   };
 
   assert.equal(assertPublishVersionEligibility({ ...base, requestedVersionLifecycle: 'approved' }), 'publish');
-  assert.throws(() => assertPublishVersionEligibility({ ...base, requestedVersionLifecycle: 'draft' }), /exact Senior-Consultant-approved version/);
-  assert.throws(() => assertPublishVersionEligibility({ ...base, requestedVersionLifecycle: 'submitted_for_review' }), /exact Senior-Consultant-approved version/);
-  assert.throws(() => assertPublishVersionEligibility({ ...base, requestedVersionLifecycle: 'changes_requested' }), /exact Senior-Consultant-approved version/);
+  assert.throws(() => assertPublishVersionEligibility({ ...base, requestedVersionLifecycle: 'draft' }), /exact consultant-approved version/);
+  assert.throws(() => assertPublishVersionEligibility({ ...base, requestedVersionLifecycle: 'submitted_for_review' }), /exact consultant-approved version/);
+  assert.throws(() => assertPublishVersionEligibility({ ...base, requestedVersionLifecycle: 'changes_requested' }), /exact consultant-approved version/);
   assert.throws(() => assertPublishVersionEligibility({ ...base, requestedVersionDietPlanId: 'plan-2', requestedVersionLifecycle: 'approved' }), /does not belong/);
   assert.equal(assertPublishVersionEligibility({ ...base, latestPublishedVersionId: 'version-1', requestedVersionLifecycle: 'published' }), 'already_published');
 });
@@ -82,6 +83,8 @@ test('client delivery stays active on the published version while a newer draft 
 });
 
 test('diet plan review lifecycle permits only the intended transitions', () => {
+  assert.doesNotThrow(() => assertLifecycleTransition('draft', 'approved'));
+  assert.doesNotThrow(() => assertLifecycleTransition('changes_requested', 'approved'));
   assert.doesNotThrow(() => assertLifecycleTransition('draft', 'submitted_for_review'));
   assert.doesNotThrow(() => assertLifecycleTransition('submitted_for_review', 'changes_requested'));
   assert.doesNotThrow(() => assertLifecycleTransition('changes_requested', 'submitted_for_review'));

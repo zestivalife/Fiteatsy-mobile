@@ -42,6 +42,14 @@ test('governed signup maps the authenticated subject to its assignment identity'
   );
 });
 
+test('signed Auth application identity takes precedence without cross-service database access', async () => {
+  const authenticated = await account('8');
+  assert.deepEqual(
+    await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id, 'ext-governed-consultant'),
+    { status: 'RESOLVED', applicationUserId: 'ext-governed-consultant', source: 'AUTH_TOKEN', tenantId: null },
+  );
+});
+
 test('native identity remains authoritative when no governed link exists', async () => {
   const authenticated = await account('3');
   assert.deepEqual(

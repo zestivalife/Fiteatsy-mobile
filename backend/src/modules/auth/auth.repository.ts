@@ -47,6 +47,8 @@ export type PinAuthUser = PersistedAuthUser & {
 
 export type AuthenticatedAccount = {
   accountId: string;
+  /** Governed Fiteatsy application identity asserted by the signed Auth token. */
+  applicationUserId?: string;
   sessionId: string;
   sessionExpiresAtISO: string;
   token: string;
@@ -834,11 +836,12 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
       expiryResult: 'valid'
     });
 
-    return rowToAuthenticatedAccount(row, {
+    const account = await rowToAuthenticatedAccount(row, {
       token,
       sessionId: String(row.id),
       sessionExpiresAtISO: new Date(String(row.expires_at)).toISOString()
     });
+    return { ...account, applicationUserId: account.accountId };
   }
 
   const bridge = verifyConsultantDashboardJwt(token);
@@ -852,6 +855,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
   const bridgeLastName = readStringClaim(bridgePayload, ['last_name', 'lastName', 'family_name']);
   const bridgeStatus = readStringClaim(bridgePayload, ['status', 'account_status'])?.toUpperCase() ?? null;
   const bridgeType = readStringClaim(bridgePayload, ['type', 'token_type', 'tokenType', 'typ'])?.toLowerCase() ?? null;
+  const bridgeApplicationUserId = readStringClaim(bridgePayload, ['fiteatsy_user_id', 'application_user_id']);
   const credentialStatus =
     readStringClaim(bridgePayload, ['credential_status', 'credentialStatus'])?.toUpperCase() ?? null;
 
@@ -900,6 +904,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
 
   return {
     accountId: bridgedUser.id,
+    applicationUserId: bridgeApplicationUserId ?? undefined,
     sessionId: `consultant-dashboard:${bridgeUserId}`,
     sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString(),
     token,

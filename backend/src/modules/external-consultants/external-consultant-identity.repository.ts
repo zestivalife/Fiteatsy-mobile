@@ -1,7 +1,7 @@
 import { pool } from '../../db/pool.js';
 
 export type ConsultantIdentityResolution =
-  | { status: 'RESOLVED'; applicationUserId: string; source: 'EXTERNAL_CONSULTANT_SIGNUP' | 'NATIVE_ACCOUNT'; tenantId: string | null }
+  | { status: 'RESOLVED'; applicationUserId: string; source: 'AUTH_TOKEN' | 'EXTERNAL_CONSULTANT_SIGNUP' | 'NATIVE_ACCOUNT'; tenantId: string | null }
   | { status: 'AMBIGUOUS'; applicationUserId: null; source: 'EXTERNAL_CONSULTANT_SIGNUP'; tenantId: null }
   | { status: 'INACTIVE'; applicationUserId: null; source: 'EXTERNAL_CONSULTANT_SIGNUP'; tenantId: null };
 
@@ -9,7 +9,11 @@ export type ConsultantIdentityResolution =
 export const resolveConsultantApplicationIdentity = async (
   authIdentityId: string,
   nativeAccountId: string,
+  governedApplicationUserId?: string,
 ): Promise<ConsultantIdentityResolution> => {
+  if (governedApplicationUserId) {
+    return { status: 'RESOLVED', applicationUserId: governedApplicationUserId, source: 'AUTH_TOKEN', tenantId: null };
+  }
   const schema = await pool.query<{ available: boolean }>(
     "select to_regclass('public.external_consultant_signups') is not null as available",
   );

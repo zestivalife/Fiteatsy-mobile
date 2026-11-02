@@ -37,7 +37,7 @@ export async function resolveClientMealGenerationContext(input:{account:Authenti
   catch (error) { if(error instanceof Error&&error.message==='AMBIGUOUS_CLIENT_IDENTITY')throw new CommonFoodApiError('AMBIGUOUS_CLIENT_IDENTITY',409);throw error; }
   if(!identity)throw new CommonFoodApiError('CLIENT_IDENTITY_NOT_FOUND',404);
   const canonicalClientId=identity.fiteatsyClientId;
-  const consultantIdentity=await resolveConsultantApplicationIdentity(input.account.user.id,input.account.accountId);
+  const consultantIdentity=await resolveConsultantApplicationIdentity(input.account.user.id,input.account.accountId,input.account.applicationUserId);
   if(consultantIdentity.status==='AMBIGUOUS')throw new CommonFoodApiError('AMBIGUOUS_CONSULTANT_IDENTITY',409);
   if(consultantIdentity.status==='INACTIVE')throw new CommonFoodApiError('CONSULTANT_IDENTITY_INACTIVE',403);
   if(!await canAccessConsultantNutritionClient(canonicalClientId,input.account,{allowSeniorAuthority:true,resolvedConsultantId:consultantIdentity.applicationUserId}))throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);

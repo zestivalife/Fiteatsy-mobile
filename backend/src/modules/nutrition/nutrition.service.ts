@@ -90,10 +90,13 @@ const professionalTypeForNutritionAccount = (account: AuthenticatedAccount) =>
   account.user.role?.toLowerCase() === 'practitioner' ? 'PRACTITIONER' : 'CONSULTANT';
 
 export const canApproveOrPublishDietPlan = (account: AuthenticatedAccount) =>
+  [...CONSULTANT_DIET_WORKFLOW_ROLES, 'admin', 'superuser', 'platform_owner'].includes(account.user.role?.toLowerCase() ?? '');
+
+const hasCrossConsultantReviewAuthority = (account: AuthenticatedAccount) =>
   ['senior_consultant', 'admin', 'superuser', 'platform_owner'].includes(account.user.role?.toLowerCase() ?? '');
 
 export const canPublishAssignedDietPlan = (account: AuthenticatedAccount, hasActiveCanonicalAssignment: boolean) =>
-  canApproveOrPublishDietPlan(account) ||
+  hasCrossConsultantReviewAuthority(account) ||
   (isConsultantRole(account) && hasActiveCanonicalAssignment);
 
 const unique = (values: Array<string | null | undefined>) =>
@@ -1689,10 +1692,10 @@ export const canAccessConsultantNutritionClient = async (
   options: { allowSeniorAuthority?: boolean; resolvedConsultantId?: string } = {},
 ) => {
   if (!isConsultantRole(account)) return false;
-  const useSeniorAuthority = options.allowSeniorAuthority === true && canApproveOrPublishDietPlan(account);
+  const useSeniorAuthority = options.allowSeniorAuthority === true && hasCrossConsultantReviewAuthority(account);
   const identity = options.resolvedConsultantId
     ? { status: 'RESOLVED' as const, applicationUserId: options.resolvedConsultantId }
-    : await resolveConsultantApplicationIdentity(account.user.id, account.accountId);
+    : await resolveConsultantApplicationIdentity(account.user.id, account.accountId, account.applicationUserId);
   if (identity.status !== 'RESOLVED') return false;
   const context = await getRegisteredConsultantClientProfileContext(
     publicClientId,
@@ -1710,9 +1713,9 @@ export const assertLifecycleTransition = (
 ) => {
   const current = currentLifecycle ?? 'draft';
   const allowedTransitions: Record<DietPlanVersionRecord['lifecycleStatus'], DietPlanVersionRecord['lifecycleStatus'][]> = {
-    draft: ['draft', 'submitted_for_review'],
+    draft: ['draft', 'submitted_for_review', 'approved'],
     submitted_for_review: ['submitted_for_review', 'changes_requested', 'approved'],
-    changes_requested: ['draft', 'submitted_for_review'],
+    changes_requested: ['draft', 'submitted_for_review', 'approved'],
     approved: ['published'],
     published: ['archived'],
     archived: [],
@@ -1743,7 +1746,7 @@ export const assertPublishVersionEligibility = (input: {
     return 'already_published' as const;
   }
   if (input.requestedVersionLifecycle !== 'approved') {
-    throw new NutritionPlanWorkflowError('DIET_PLAN_VERSION_NOT_APPROVED', 'Only the exact Senior-Consultant-approved version can be published.', 409);
+    throw new NutritionPlanWorkflowError('DIET_PLAN_VERSION_NOT_APPROVED', 'Only the exact consultant-approved version can be published.', 409);
   }
   return 'publish' as const;
 };
@@ -1783,8 +1786,8 @@ const getWorkspaceContext = async (
   options: { allowSeniorAuthority?: boolean } = {},
 ) => {
   if (!isConsultantRole(account)) return null;
-  const useSeniorAuthority = options.allowSeniorAuthority === true && canApproveOrPublishDietPlan(account);
-  const identity = await resolveConsultantApplicationIdentity(account.user.id, account.accountId);
+  const useSeniorAuthority = options.allowSeniorAuthority === true && hasCrossConsultantReviewAuthority(account);
+  const identity = await resolveConsultantApplicationIdentity(account.user.id, account.accountId, account.applicationUserId);
   if (identity.status !== 'RESOLVED') return null;
   const context = await getRegisteredConsultantClientProfileContext(
     publicClientId,
@@ -2430,7 +2433,7 @@ export const requestConsultantDietPlanChanges = async (
   dietPlanId: string,
   comment: string,
 ) => {
-  if (!canApproveOrPublishDietPlan(account)) {
+  if (!hasCrossConsultantReviewAuthority(account)) {
     throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can request changes.', 403);
   }
   const workspace = await getWorkspaceContext(publicClientId, account, { allowSeniorAuthority: true });
@@ -2452,7 +2455,7 @@ export const requestConsultantDietPlanChanges = async (
 };
 
 export const getSeniorConsultantDietPlanReviewQueue = async (account: AuthenticatedAccount) => {
-  if (!canApproveOrPublishDietPlan(account)) {
+  if (!hasCrossConsultantReviewAuthority(account)) {
     throw new NutritionPlanWorkflowError('ROLE_NOT_ALLOWED', 'Only a Senior Consultant can access the review queue.', 403);
   }
   const reviews = await listDietPlanReviewQueue(account.qaSession?.fixtureSetId);
@@ -2480,20 +2483,10 @@ export const approveConsultantDietPlan = async (
   dietPlanId: string,
 ) => {
   if (!isConsultantRole(account)) return null;
-  if (!canApproveOrPublishDietPlan(account)) {
-    throw new NutritionPlanWorkflowError(
-      'ROLE_NOT_ALLOWED',
-      'Only Senior Consultants can approve nutrition plans.',
-      403,
-    );
-  }
-  const workspace = await getWorkspaceContext(publicClientId, account, { allowSeniorAuthority: true });
+  const workspace = await getWorkspaceContext(publicClientId, account);
   if (!workspace) return null;
   const plan = await getDietPlanById(dietPlanId);
   if (!plan || plan.careCaseId !== workspace.careCase?.id || !plan.currentVersionId) return null;
-  if (plan.consultantId === account.accountId) {
-    throw new NutritionPlanWorkflowError('SELF_APPROVAL_NOT_ALLOWED', 'A Consultant cannot approve their own diet plan.', 403);
-  }
   const currentVersion = await getCurrentDietPlanVersion(plan.id);
   if (!currentVersion) return null;
   assertDietPlanVersionReviewComplete(currentVersion);
