@@ -491,6 +491,7 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
       );
     }
     if (definition.assigned) {
+      let expectedActiveAssignmentId: string | undefined;
       if (definition.reassign) {
         const historical = await createProfessionalAssignment({
           actorUserId: senior.current.body.accountId,
@@ -499,12 +500,14 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
           professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Historical cohort assignment'
         });
         assert.notEqual(historical, null);
+        expectedActiveAssignmentId = String(historical.id);
       }
       const assignment = await createProfessionalAssignment({
         actorUserId: senior.current.body.accountId,
         clientUserId: session.current.body.accountId,
         professionalUserId: consultant.current.body.accountId,
-        professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Whole-population lifecycle matrix'
+        professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Whole-population lifecycle matrix',
+        expectedActiveAssignmentId,
       });
       assert.notEqual(assignment, null);
     }
