@@ -122,6 +122,35 @@ export const getClientByFiteatsyClientId = async (
   return mapClient(result.rows[0]);
 };
 
+/**
+ * Resolve an externally supplied client identifier at the Fiteatsy boundary.
+ *
+ * Connected products historically persisted the account user UUID while the
+ * consultant APIs expose the opaque `fc_…` identifier. Both identify the same
+ * Fiteatsy client, but callers must never guess or transform one into the
+ * other. The database is the authoritative mapping and inactive/deleted
+ * clients fail closed.
+ */
+export const resolveActiveClientIdentity = async (
+  clientIdentifier: string,
+  db: Queryable = pool,
+): Promise<PersistedClient | null> => {
+  const result = await db.query(
+    `
+      select *
+      from fiteatsy_clients
+      where deleted_at is null
+        and lower(coalesce(status, '')) = 'active'
+        and (fiteatsy_client_id = $1 or account_user_id::text = $1)
+      limit 2
+    `,
+    [clientIdentifier],
+  );
+  if (result.rowCount === 0) return null;
+  if (result.rowCount !== 1) throw new Error('AMBIGUOUS_CLIENT_IDENTITY');
+  return mapClient(result.rows[0]);
+};
+
 export const createOrResolveClientForAccount = async (
   accountUserId: string,
   db: Queryable = pool
