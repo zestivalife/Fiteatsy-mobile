@@ -19,6 +19,7 @@ import { applyFoodUnblockV1731Aliases, createFoodUnblockV1731Foods } from './foo
 import { applyUsdaActivationV1732B2Aliases, createUsdaActivationV1732B2Foods } from './food-usda-activation-v17-32b2.js';
 import { applyUsdaActivationV1733A2Aliases, createUsdaActivationV1733A2Foods } from './food-usda-activation-v17-33a2.js';
 import { resolveActiveClientIdentity } from '../client/client.repository.js';
+import { resolveConsultantApplicationIdentity } from '../external-consultants/external-consultant-identity.repository.js';
 
 const catalogue=JSON.parse(readFileSync(new URL('./catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json',import.meta.url),'utf8')) as {foods:CatalogueFood[]};
 const p0Verification=JSON.parse(readFileSync(new URL('./food-curation/data/p0_food_verification_v17_29.json',import.meta.url),'utf8')) as {decisions:Array<{sourceRecordId:string;referenceItemId:string;canonicalName:string;aliases:string[];category:string;sourceMapping:{fdcId:number}|null;generatorEligible:boolean;componentEligible:boolean}>};
@@ -36,7 +37,10 @@ export async function resolveClientMealGenerationContext(input:{account:Authenti
   catch (error) { if(error instanceof Error&&error.message==='AMBIGUOUS_CLIENT_IDENTITY')throw new CommonFoodApiError('AMBIGUOUS_CLIENT_IDENTITY',409);throw error; }
   if(!identity)throw new CommonFoodApiError('CLIENT_IDENTITY_NOT_FOUND',404);
   const canonicalClientId=identity.fiteatsyClientId;
-  if(!await canAccessConsultantNutritionClient(canonicalClientId,input.account,{allowSeniorAuthority:true}))throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);
+  const consultantIdentity=await resolveConsultantApplicationIdentity(input.account.user.id,input.account.accountId);
+  if(consultantIdentity.status==='AMBIGUOUS')throw new CommonFoodApiError('AMBIGUOUS_CONSULTANT_IDENTITY',409);
+  if(consultantIdentity.status==='INACTIVE')throw new CommonFoodApiError('CONSULTANT_IDENTITY_INACTIVE',403);
+  if(!await canAccessConsultantNutritionClient(canonicalClientId,input.account,{allowSeniorAuthority:true,resolvedConsultantId:consultantIdentity.applicationUserId}))throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);
   const [registered,prefs,latest]=await Promise.all([getRegisteredConsultantClientProfileContext(canonicalClientId),getFoodPreferenceProfile(canonicalClientId),getConsultantLatestDietPlan(canonicalClientId,input.account)]);
   if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404);
   if(!latest)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
@@ -46,7 +50,7 @@ export async function resolveClientMealGenerationContext(input:{account:Authenti
   const mealTargets=Object.fromEntries(MEAL_HEADS.map(head=>{const section=(content.mealPlan as unknown as Record<string,{target?:{calories:number|null;proteinGrams:number|null;caloriesBand?:{min:number|null;max:number|null};proteinBand?:{min:number|null;max:number|null}}}>)[sectionByHead[head]];return [head,{kcal:section?.target?.calories??0,protein:section?.target?.proteinGrams??0,kcalTolerance:Math.max(1,((section?.target?.caloriesBand?.max??0)-(section?.target?.caloriesBand?.min??0))/2||50),proteinTolerance:Math.max(1,((section?.target?.proteinBand?.max??0)-(section?.target?.proteinBand?.min??0))/2||10)} satisfies MealTarget]})) as Record<MealHead,MealTarget>;
   const restrictions=p?.restrictions??[];
   const context:ClientFoodContext={diet,allergies:restrictions.filter(x=>/allerg/i.test(x)),intolerances:restrictions.filter(x=>/intoler/i.test(x)),avoids:[...(p?.foodsAvoided??[]),...(p?.avoidedFoodIds??[])],clinicalExclusions:[],dislikes:[...(p?.foodsDisliked??[]),...(p?.dislikedFoodIds??[])],preferences:[...(p?.foodsLiked??[]),...(p?.likedFoodIds??[]),...(p?.cuisines??[])]};
-  return {clientId:canonicalClientId,requestedClientId:input.clientId,accountUserId:identity.accountUserId,internalClientId:registered.internalClientId,consultantId:input.account.accountId,plan:latest.plan,planVersion:latest.version,context,dailyTargets:{calories:daily.calories??null,protein:daily.protein??null,carbohydrate:daily.carbohydrates??null,fat:daily.fat??null},mealTargets,supported:diet!=='VEGAN',capability:diet==='VEGAN'?{code:'VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED',reason:'GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED'}:{code:'SUPPORTED',reason:null}};
+  return {clientId:canonicalClientId,requestedClientId:input.clientId,accountUserId:identity.accountUserId,internalClientId:registered.internalClientId,consultantId:consultantIdentity.applicationUserId,authenticatedConsultantId:input.account.accountId,plan:latest.plan,planVersion:latest.version,context,dailyTargets:{calories:daily.calories??null,protein:daily.protein??null,carbohydrate:daily.carbohydrates??null,fat:daily.fat??null},mealTargets,supported:diet!=='VEGAN',capability:diet==='VEGAN'?{code:'VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED',reason:'GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED'}:{code:'SUPPORTED',reason:null}};
 }
 
 type FoodSearchQuery={scope?:'ALL'|'RECOMMENDED';mealHead?:MealHead;search?:string;category?:string;family?:string;referenceState?:string;nutritionStatus?:'REFERENCE_ONLY'|'NUTRITION_PENDING'|'NUTRITION_VERIFIED';generatorEligibility?:'ELIGIBLE'|'INELIGIBLE';entityType?:string;componentRole?:ComponentRole;dietClass?:string;proteinMin?:number;proteinMax?:number;caloriesMin?:number;caloriesMax?:number;limit:number;offset:number};

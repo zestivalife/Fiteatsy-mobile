@@ -50,6 +50,7 @@ import { CALORIE_MACRO_ALLOCATION_CONFIG, CALORIE_MACRO_ALLOCATION_METHODOLOGY_V
 import { freezeCombinationOptionsForLifecycle, listCombinationOptions } from './common-food-consultant.repository.js';
 import { MEAL_HEADS as COMMON_FOOD_MEAL_HEADS } from './common-food-engine.js';
 import { isQaFixtureEntity } from '../admin/qa-provisioning.repository.js';
+import { resolveConsultantApplicationIdentity } from '../external-consultants/external-consultant-identity.repository.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
@@ -1685,13 +1686,17 @@ const contentSummaryFromContent = (content: NutritionPlanContent): DietPlanVersi
 export const canAccessConsultantNutritionClient = async (
   publicClientId: string,
   account: AuthenticatedAccount,
-  options: { allowSeniorAuthority?: boolean } = {},
+  options: { allowSeniorAuthority?: boolean; resolvedConsultantId?: string } = {},
 ) => {
   if (!isConsultantRole(account)) return false;
   const useSeniorAuthority = options.allowSeniorAuthority === true && canApproveOrPublishDietPlan(account);
+  const identity = options.resolvedConsultantId
+    ? { status: 'RESOLVED' as const, applicationUserId: options.resolvedConsultantId }
+    : await resolveConsultantApplicationIdentity(account.user.id, account.accountId);
+  if (identity.status !== 'RESOLVED') return false;
   const context = await getRegisteredConsultantClientProfileContext(
     publicClientId,
-    useSeniorAuthority ? undefined : account.accountId,
+    useSeniorAuthority ? undefined : identity.applicationUserId,
     professionalTypeForNutritionAccount(account),
   );
   if (!context) return false;
@@ -1779,9 +1784,11 @@ const getWorkspaceContext = async (
 ) => {
   if (!isConsultantRole(account)) return null;
   const useSeniorAuthority = options.allowSeniorAuthority === true && canApproveOrPublishDietPlan(account);
+  const identity = await resolveConsultantApplicationIdentity(account.user.id, account.accountId);
+  if (identity.status !== 'RESOLVED') return null;
   const context = await getRegisteredConsultantClientProfileContext(
     publicClientId,
-    useSeniorAuthority ? undefined : account.accountId,
+    useSeniorAuthority ? undefined : identity.applicationUserId,
     professionalTypeForNutritionAccount(account),
   );
   if (!context) return null;
@@ -1812,6 +1819,8 @@ const getWorkspaceContext = async (
     access: {
       source: useSeniorAuthority ? 'senior_consultant_authority' as const : 'cap003_professional_assignment' as const,
       assignedToRequestor: !useSeniorAuthority,
+      consultantApplicationUserId: identity.applicationUserId,
+      consultantIdentitySource: identity.source,
     },
     healthProfile,
     nutritionProfile,
