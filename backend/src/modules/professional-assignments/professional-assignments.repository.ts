@@ -141,6 +141,43 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
   const connection = await pool.connect();
   try {
     await connection.query('begin');
+    const targets = await connection.query(
+      `select professional.id as professional_user_id, client.id as client_user_id
+         from users professional
+         join users client on client.id = $1
+         join fiteatsy_clients fc on fc.account_user_id = client.id
+          and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
+        where professional.id = $2
+          and professional.deleted_at is null and client.deleted_at is null
+          and lower(coalesce(professional.status, '')) = 'active'
+          and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
+        for update of professional, client, fc`,
+      [input.clientUserId, input.professionalUserId],
+    );
+    if (!targets.rowCount) { await connection.query('rollback'); return null; }
+
+    const active = await connection.query(
+      `select * from consultant_client_assignments
+        where client_user_id = $1 and product = 'FITEATSY' and status = 'active'
+        order by created_at asc
+        for update`,
+      [input.clientUserId],
+    );
+    const existing = active.rows.find((row) =>
+      String(row.consultant_user_id) === input.professionalUserId
+      && String(row.professional_type) === input.professionalType
+      && String(row.relationship_type) === input.relationshipType
+    );
+    if (existing) {
+      await connection.query(
+        `insert into professional_assignment_audit_events
+          (id, assignment_id, action, actor_user_id, client_user_id, professional_user_id, professional_type, relationship_type, reason)
+         values ($1, $2, 'IDEMPOTENT_REPLAY', $3, $4, $5, $6, $7, $8)`,
+        [crypto.randomUUID(), existing.id, input.actorUserId, input.clientUserId, input.professionalUserId, input.professionalType, input.relationshipType, input.reason ?? null],
+      );
+      await connection.query('commit');
+      return existing;
+    }
     const previous = await connection.query(
       `update consultant_client_assignments
           set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, updated_at = now()
@@ -159,12 +196,7 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
     const result = await connection.query(
     `insert into consultant_client_assignments
       (id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
-     select $1, professional.id, client.id, $2, 'FITEATSY', $4, $5
-       from users professional join users client on client.id = $3
-       join fiteatsy_clients fc on fc.account_user_id = client.id and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
-      where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
-        and lower(coalesce(professional.status, '')) = 'active'
-        and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
+     values ($1, $6, $3, $2, 'FITEATSY', $4, $5)
      on conflict (consultant_user_id, client_user_id, scope) where status = 'active'
      do update set updated_at = now()
      returning *`,

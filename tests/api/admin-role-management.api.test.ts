@@ -272,6 +272,49 @@ test('consultant can access client list after admin role assignment', async () =
   assert.equal(list.body.clients[0].name, 'QA Real Client');
 });
 
+test('repeating the same professional assignment is idempotent and audited', async () => {
+  const admin = await createAuthenticatedSession(server.baseUrl, {
+    name: 'QA Idempotent Assignment Admin',
+    email: `qa-idempotent-assignment-admin-${Date.now()}@example.com`
+  });
+  const consultant = await createAuthenticatedSession(server.baseUrl, {
+    name: 'QA Idempotent Assignment Consultant',
+    email: `qa-idempotent-assignment-consultant-${Date.now()}@example.com`
+  });
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'QA Idempotent Assignment Client',
+    email: `qa-idempotent-assignment-client-${Date.now()}@example.com`
+  });
+  await promoteRole(admin.current.body.accountId, 'admin');
+  await promoteRole(consultant.current.body.accountId, 'consultant');
+
+  const input = {
+    actorUserId: admin.current.body.accountId,
+    clientUserId: client.current.body.accountId,
+    professionalUserId: consultant.current.body.accountId,
+    professionalType: 'CONSULTANT' as const,
+    relationshipType: 'CLIENT_CARE',
+    reason: 'Verify idempotent authoritative assignment'
+  };
+  const first = await createProfessionalAssignment(input);
+  const replay = await createProfessionalAssignment(input);
+
+  assert.notEqual(first, null);
+  assert.equal(replay?.id, first?.id);
+  const active = await pool.query(
+    `select id from consultant_client_assignments
+      where consultant_user_id = $1 and client_user_id = $2 and status = 'active'`,
+    [consultant.current.body.accountId, client.current.body.accountId]
+  );
+  assert.equal(active.rowCount, 1);
+  const audit = await pool.query(
+    `select action from professional_assignment_audit_events
+      where assignment_id = $1 order by created_at`,
+    [first?.id]
+  );
+  assert.deepEqual(audit.rows.map((row) => row.action), ['CREATED', 'IDEMPOTENT_REPLAY']);
+});
+
 test('senior allocation pool uses the active client mapping for a dual-role mobile registrant', async () => {
   const senior = await createAuthenticatedSession(server.baseUrl, {
     name: 'Senior Client Allocator',
