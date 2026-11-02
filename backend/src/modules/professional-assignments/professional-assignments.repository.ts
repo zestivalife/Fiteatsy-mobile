@@ -4,6 +4,13 @@ import { pool } from '../../db/pool.js';
 export const PROFESSIONAL_TYPES = ['CONSULTANT', 'PRACTITIONER', 'MENTOR'] as const;
 export type ProfessionalType = typeof PROFESSIONAL_TYPES[number];
 
+export class ProfessionalAssignmentConflictError extends Error {
+  readonly code = 'ACTIVE_ASSIGNMENT_CONFLICT';
+  constructor(readonly activeAssignmentId: string) {
+    super('The client already has a different active professional assignment. Explicit reassignment is required.');
+  }
+}
+
 const GENERIC_PROFESSIONAL_NAMES = new Set([
   'consultant dashboard user',
   'consultant',
@@ -137,18 +144,34 @@ export const discoverProfessionalsForAssignment = async (professionalType?: Prof
   return result.rows.map(mapProfessional);
 };
 
-export const createProfessionalAssignment = async (input: { actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string }) => {
+export const createProfessionalAssignment = async (input: { actorUserId: string; clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string; expectedActiveAssignmentId?: string }) => {
   const connection = await pool.connect();
   try {
     await connection.query('begin');
-    const previous = await connection.query(
-      `update consultant_client_assignments
-          set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, updated_at = now()
+    const active = await connection.query(
+      `select * from consultant_client_assignments
         where client_user_id = $1 and product = 'FITEATSY' and status = 'active'
-        returning *`,
-      [input.clientUserId, input.actorUserId],
+        order by updated_at desc for update`,
+      [input.clientUserId],
     );
-    for (const row of previous.rows) {
+    if (active.rowCount && active.rows.every((row) => String(row.consultant_user_id) === input.professionalUserId && String(row.professional_type) === input.professionalType)) {
+      await connection.query('commit');
+      return active.rows[0];
+    }
+    const conflicting = active.rows[0];
+    if (conflicting && input.expectedActiveAssignmentId !== String(conflicting.id)) {
+      throw new ProfessionalAssignmentConflictError(String(conflicting.id));
+    }
+    if (conflicting) {
+      const previous = await connection.query(
+        `update consultant_client_assignments
+            set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, updated_at = now()
+          where id = $1 and product = 'FITEATSY' and status = 'active'
+          returning *`,
+        [input.expectedActiveAssignmentId, input.actorUserId],
+      );
+      if (previous.rowCount !== 1) throw new ProfessionalAssignmentConflictError(String(conflicting.id));
+      const row = previous.rows[0];
       await connection.query(
         `insert into professional_assignment_audit_events
           (id, assignment_id, action, actor_user_id, client_user_id, professional_user_id, professional_type, relationship_type, reason)

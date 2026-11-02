@@ -6,6 +6,7 @@ import {
   countClients,
   createOrResolveClientForAccount,
   getClientByFiteatsyClientId,
+  resolveActiveClientIdentity,
   resolveCurrentClientForAccount
 } from '../../backend/src/modules/client/client.repository.js';
 import { resolveVerifiedAccountIdentity } from '../../backend/src/modules/auth/auth.repository.js';
@@ -16,6 +17,33 @@ const CLIENT_MIGRATION_FILE = '0002_m3a_client_identity_foundation.sql';
 
 test.beforeEach(async () => {
   await resetBackendStateForTests();
+});
+
+test('active client identity resolves both the account UUID and canonical public id', async () => {
+  const resolved = await resolveVerifiedAccountIdentity({
+    name: 'Connected Client',
+    email: 'connected-client@example.com',
+    mobileNumber: '+919876543297'
+  });
+
+  const byAccount = await resolveActiveClientIdentity(resolved.user.id);
+  const byPublicId = await resolveActiveClientIdentity(resolved.client.fiteatsyClientId);
+
+  assert.equal(byAccount?.id, resolved.client.id);
+  assert.equal(byPublicId?.id, resolved.client.id);
+  assert.equal(byAccount?.fiteatsyClientId, resolved.client.fiteatsyClientId);
+});
+
+test('active client identity fails closed for inactive and missing mappings', async () => {
+  const resolved = await resolveVerifiedAccountIdentity({
+    name: 'Inactive Connected Client',
+    email: 'inactive-connected-client@example.com',
+    mobileNumber: '+919876543296'
+  });
+  await pool.query("update fiteatsy_clients set status = 'inactive' where id = $1", [resolved.client.id]);
+
+  assert.equal(await resolveActiveClientIdentity(resolved.user.id), null);
+  assert.equal(await resolveActiveClientIdentity('fc_missing'), null);
 });
 
 test('client repository creates a stable one-to-one client identity for a verified account', async () => {
