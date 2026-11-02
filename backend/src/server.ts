@@ -27,6 +27,7 @@ import { bootstrapInitialAdminFromEnvironment } from './modules/admin/admin.serv
 import { scheduleDeletedReportPurge } from './jobs/purge-deleted-reports.js';
 import { externalConsultantsRouter } from './modules/external-consultants/external-consultants.routes.js';
 import { externalConsultantAccessRouter } from './modules/external-consultants/external-consultant-access.routes.js';
+import { scheduleClientDirectorySync } from './modules/client-directory/client-directory-sync.service.js';
 
 type CreateAppOptions = {
   readinessCheck?: () => Promise<boolean>;
@@ -193,6 +194,7 @@ export const initializeBackend = async () => {
     console.log('Initial admin bootstrap completed.');
   }
   scheduleDeletedReportPurge();
+  scheduleClientDirectorySync();
 };
 
 export const startServer = async () => {

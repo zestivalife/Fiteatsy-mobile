@@ -25,6 +25,10 @@ const provision = async (adminToken: string, role: 'user' | 'consultant' | 'seni
     reason: 'Authenticated common-food source acceptance',
   }, { headers: authHeaders(adminToken) });
   assert.equal(session.response.status, 201, JSON.stringify(session.body));
+  const pin = await putJson(server.baseUrl, '/v1/auth/create-pin', {
+    newPin: '654320', confirmNewPin: '654320',
+  }, { headers: authHeaders(session.body.token) });
+  assert.equal(pin.response.status, 201, JSON.stringify(pin.body));
   return { ...created.body, token: session.body.token as string };
 };
 

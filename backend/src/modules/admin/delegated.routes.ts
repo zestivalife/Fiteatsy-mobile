@@ -5,6 +5,12 @@ import { requireDelegatedAuthority } from '../auth/delegated-authority.middlewar
 import { executeDelegatedIdempotently } from './delegated-operation-idempotency.js';
 import { issueQaAdminSessionHandoff } from '../auth/qa-session-handoff.js';
 import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, recordQaIdentityReuse, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
+import { diagnoseFiteatsyIntakeLeadSearch, listFiteatsyIntakeLeads } from './admin.repository.js';
+import { issueTemporaryLoginPin } from '../auth/auth.service.js';
+import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
+import { createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from '../professional-assignments/professional-assignments.repository.js';
+import { assignmentValidationDetails, professionalAssignmentBatchSchema, professionalAssignmentSchema } from '../professional-assignments/professional-assignment.contract.js';
+import { deactivateExternalQaPractice, EXTERNAL_QA_PROFESSIONS, provisionExternalQaPractice } from './external-qa-practice.repository.js';
 
 export const delegatedRouter = Router();
 
@@ -17,6 +23,17 @@ const identitySchema = z.object({
 const qaAdminIdentitySchema = identitySchema.strict();
 const assignmentSchema = z.object({ consultantUserId: z.string().trim().min(1), clientUserId: z.string().trim().min(1), reason: z.string().trim().min(3).max(240) });
 const reasonSchema = z.object({ reason: z.string().trim().min(3).max(240) });
+const externalQaPracticeSchema = z.object({
+  fixtureKey: z.string().trim().min(12).max(96),
+  authIdentityId: z.string().trim().min(1).max(180),
+  professionCode: z.enum(EXTERNAL_QA_PROFESSIONS),
+  tenantName: z.string().trim().min(3).max(160),
+  consultantDisplayName: z.string().trim().min(2).max(120),
+  consultantEmail: z.string().trim().email().max(180),
+  clientCount: z.number().int().min(1).max(5).default(1),
+  specialisation: z.string().trim().max(120).optional(),
+  seedProfile: z.record(z.unknown()).optional()
+}).strict();
 
 const actorId = (req: Request) => {
   const value = (req as Request & { delegatedAuthority?: { sub?: string } }).delegatedAuthority?.sub;
@@ -29,6 +46,72 @@ const respondError = (res: Response, error: unknown, fallback: string) => {
   return res.status(typed.status ?? 500).json({ error: typed.code ?? fallback, message: typed.status ? typed.message : 'Fiteatsy operation could not be completed.' });
 };
 const correlationReason = (req: Request, reason: string) => `${reason} [correlation:${req.header('x-correlation-id') || 'unavailable'}]`;
+
+delegatedRouter.post('/qa-external-practices', requireDelegatedAuthority('fiteatsy.qa.external_practice.create', 'qa_external_practice', 'platform_owner'), async (req, res) => {
+  const idempotencyKey = req.header('idempotency-key')?.trim();
+  if (!idempotencyKey) return res.status(400).json({ error: 'IDEMPOTENCY_KEY_REQUIRED' });
+  const parsed = externalQaPracticeSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const value = await provisionExternalQaPractice({ ...parsed.data, actorReference: actorId(req), idempotencyKey });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(value.idempotentReplay ? 200 : 201).json(value);
+  } catch (error) {
+    return respondError(res, error, 'QA_EXTERNAL_PRACTICE_PROVISIONING_FAILED');
+  }
+});
+
+delegatedRouter.post('/qa-external-practices/:fixtureKey/deactivate', requireDelegatedAuthority('fiteatsy.qa.external_practice.deactivate', 'qa_external_practice', 'platform_owner'), async (req, res) => {
+  const parsed = reasonSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    return res.json(await deactivateExternalQaPractice(String(req.params.fixtureKey), actorId(req), parsed.data.reason));
+  } catch (error) {
+    return respondError(res, error, 'QA_EXTERNAL_PRACTICE_DEACTIVATION_FAILED');
+  }
+});
+
+delegatedRouter.get('/intake-leads', requireDelegatedAuthority('fiteatsy.leads.read', 'lead_management', 'platform_owner'), async (req, res) => {
+  try {
+    const parsed = z.object({
+      q: z.string().trim().max(180).default(''),
+      status: z.enum(['all', 'active', 'inactive']).default('all'),
+      order: z.enum(['asc', 'desc']).default('desc'),
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(1).max(100).default(20)
+    }).safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+    const result = await listFiteatsyIntakeLeads({
+      query: parsed.data.q,
+      status: parsed.data.status,
+      order: parsed.data.order,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize
+    });
+    const diagnostic = result.pagination.total === 0 && parsed.data.q
+      ? await diagnoseFiteatsyIntakeLeadSearch(parsed.data.q)
+      : null;
+    return res.status(200).json({ ...result, diagnostic });
+  } catch (error) { return respondError(res, error, 'FITEATSY_LEADS_FAILED'); }
+});
+
+delegatedRouter.post('/users/:userId/temporary-login-pin', requireDelegatedAuthority('fiteatsy.login_pin.issue', 'login_pin_recovery', 'platform_owner'), async (req, res) => {
+  const parsed = reasonSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const result = await executeDelegatedIdempotently({
+      operation: 'temporary_login_pin_issue',
+      key: req.header('idempotency-key') || '',
+      execute: () => issueTemporaryLoginPin(actorId(req), String(req.params.userId), {
+        userAgent: req.header('user-agent') ?? null,
+        ipAddress: req.ip || null,
+      }),
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, displayOnce: true, idempotentReplay: result.replayed });
+  } catch (error) { return respondError(res, error, 'PIN_ISSUE_FAILED'); }
+});
 
 delegatedRouter.post('/qa-clients', requireDelegatedAuthority('fiteatsy.qa.identity.create', 'qa_provisioning'), async (req, res) => {
   const parsed = identitySchema.safeParse(req.body);
@@ -115,6 +198,71 @@ delegatedRouter.delete('/client-assignments/:assignmentId', requireDelegatedAuth
     if (!result) return res.status(404).json({ error: 'ASSIGNMENT_NOT_FOUND', message: 'Assignment was not found or is already revoked.' });
     return res.status(200).json({ assignment: result });
   } catch (error) { return respondError(res, error, 'QA_ASSIGNMENT_REVOKE_FAILED'); }
+});
+
+delegatedRouter.get('/professional-assignments/clients/pool', requireDelegatedAuthority('fiteatsy.client.assignment.read', 'client_assignment', 'platform_owner'), async (req, res) => {
+  try {
+    await ensureRegisteredClientsForEligibleUsers();
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    const assignmentFilter = typeof req.query.assignment === 'string' && ['all', 'unassigned', 'assigned'].includes(req.query.assignment) ? req.query.assignment as 'all' | 'unassigned' | 'assigned' : 'all';
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    return res.status(200).json({ clients: await listClientAllocationPool({ query, limit, offset, assignmentFilter, professionalUserId: '' }) });
+  } catch (error) { return respondError(res, error, 'ASSIGNMENT_CLIENT_LIST_FAILED'); }
+});
+
+delegatedRouter.get('/professional-assignments/professionals', requireDelegatedAuthority('fiteatsy.client.assignment.read', 'client_assignment', 'platform_owner'), async (req, res) => {
+  try {
+    const type = typeof req.query.type === 'string' && ['CONSULTANT', 'PRACTITIONER', 'MENTOR'].includes(req.query.type) ? req.query.type as ProfessionalType : undefined;
+    return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type) });
+  } catch (error) { return respondError(res, error, 'ASSIGNMENT_PROFESSIONAL_LIST_FAILED'); }
+});
+
+delegatedRouter.get('/professional-assignments', requireDelegatedAuthority('fiteatsy.client.assignment.read', 'client_assignment', 'platform_owner'), async (_req, res) => {
+  try { return res.status(200).json({ assignments: await listProfessionalAssignments() }); }
+  catch (error) { return respondError(res, error, 'ASSIGNMENT_LIST_FAILED'); }
+});
+
+delegatedRouter.post('/professional-assignments', requireDelegatedAuthority('fiteatsy.client.assign', 'client_assignment', 'platform_owner'), async (req, res) => {
+  const parsed = professionalAssignmentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', message: 'Assignment request contains invalid fields.', details: assignmentValidationDetails(parsed.error) });
+  try {
+    const actorReference = `zestiva:${actorId(req)}`;
+    const result = await executeDelegatedIdempotently({ operation: 'professional_assignment', key: req.header('idempotency-key') || '', execute: async () => {
+      const assignment = await createProfessionalAssignment({ ...parsed.data, actorUserId: null, actorReference });
+      if (!assignment) throw Object.assign(new Error('The client or professional is not an eligible active Fiteatsy identity.'), { status: 400, code: 'INVALID_ASSIGNMENT_TARGET' });
+      return { assignment };
+    }});
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+  } catch (error) {
+    if (error instanceof ReassignmentRequiredError) return res.status(409).json({ error: 'REASSIGNMENT_CONFIRMATION_REQUIRED', currentAssignment: error.currentAssignment });
+    return respondError(res, error, 'ASSIGNMENT_CREATE_FAILED');
+  }
+});
+
+delegatedRouter.post('/professional-assignments/batch', requireDelegatedAuthority('fiteatsy.client.assign', 'client_assignment', 'platform_owner'), async (req, res) => {
+  const parsed = professionalAssignmentBatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', message: 'Assignment request contains invalid fields.', details: assignmentValidationDetails(parsed.error) });
+  try {
+    const actorReference = `zestiva:${actorId(req)}`;
+    const result = await executeDelegatedIdempotently({ operation: 'professional_assignment_batch', key: req.header('idempotency-key') || '', execute: async () => {
+      const assignments = await createProfessionalAssignmentsBatch({ ...parsed.data, actorUserId: null, actorReference });
+      if (!assignments) throw Object.assign(new Error('One or more assignment targets are not eligible active Fiteatsy identities.'), { status: 400, code: 'INVALID_ASSIGNMENT_TARGET' });
+      return { assignments };
+    }});
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+  } catch (error) {
+    if (error instanceof ReassignmentRequiredError) return res.status(409).json({ error: 'REASSIGNMENT_CONFIRMATION_REQUIRED', currentAssignment: error.currentAssignment });
+    return respondError(res, error, 'ASSIGNMENT_BATCH_FAILED');
+  }
+});
+
+delegatedRouter.delete('/professional-assignments/:assignmentId', requireDelegatedAuthority('fiteatsy.client.assignment.revoke', 'client_assignment', 'platform_owner'), async (req, res) => {
+  try {
+    const assignment = await revokeProfessionalAssignment(String(req.params.assignmentId), null, typeof req.body?.reason === 'string' ? req.body.reason : undefined, `zestiva:${actorId(req)}`);
+    if (!assignment) return res.status(404).json({ error: 'ASSIGNMENT_NOT_FOUND' });
+    return res.status(200).json({ assignment });
+  } catch (error) { return respondError(res, error, 'ASSIGNMENT_REVOKE_FAILED'); }
 });
 
 delegatedRouter.post('/qa-identities/:userId/deactivate', requireDelegatedAuthority('fiteatsy.qa.identity.deactivate', 'qa_provisioning'), async (req, res) => {

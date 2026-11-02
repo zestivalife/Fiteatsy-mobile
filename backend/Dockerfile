@@ -27,5 +27,10 @@ COPY --from=build /app/src/modules/nutrition/food-curation/data ./dist/modules/n
 COPY --from=build /app/src/modules/nutrition/catalogue/data/PAN_India_Food_Master_Per_100g.xlsx ./dist/catalogue-import/src/modules/nutrition/catalogue/data/PAN_India_Food_Master_Per_100g.xlsx
 COPY --from=build /app/dist/db/migrations ./dist/catalogue-import/src/db/migrations
 
+RUN test -f ./dist/server.js \
+  && test -f ./dist/db/migrations/0068_fiteatsy_client_tenant_integrity.sql \
+  && test -f ./dist/catalogue-import/src/modules/nutrition/catalogue/data/PAN_India_Food_Master_Per_100g.xlsx \
+  && test -d ./dist/modules/nutrition/food-curation/data
+
 EXPOSE 8080
 CMD ["npm", "start"]
