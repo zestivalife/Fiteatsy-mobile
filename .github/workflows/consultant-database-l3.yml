@@ -88,6 +88,11 @@ jobs:
       - name: Install locked mobile dependencies
         run: npm ci
 
+      - name: Prepare immutable backend source revision
+        run: |
+          npm --prefix backend run provenance:write
+          npm --prefix backend run provenance:verify
+
       - name: Validate mobile application review candidate
         run: |
           npx tsc --noEmit
@@ -99,7 +104,6 @@ jobs:
 
       - name: Build production importer artifact
         run: |
-          npm --prefix backend run provenance:write
           npm --prefix backend run provenance:verify
           npm --prefix backend run build
 
