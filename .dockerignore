@@ -18,6 +18,8 @@ docs
 mobile
 scripts
 tests
+!backend/scripts
+!backend/scripts/**
 
 *.log
 .env

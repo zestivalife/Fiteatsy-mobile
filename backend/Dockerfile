@@ -2,13 +2,13 @@ FROM node:22-bookworm-slim AS build
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm ci
 
-COPY tsconfig.json tsconfig.catalogue-import.json ./
-COPY .source-revision ./
-COPY scripts ./scripts
-COPY src ./src
+COPY backend/tsconfig.json backend/tsconfig.catalogue-import.json ./
+COPY backend/.source-revision ./
+COPY backend/scripts ./scripts
+COPY backend/src ./src
 
 RUN node ./scripts/verify-source-revision.mjs --format-only
 RUN npm run build
@@ -19,7 +19,7 @@ FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY package*.json ./
+COPY backend/package*.json ./
 COPY --from=build /app/.source-revision ./.source-revision
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

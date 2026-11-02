@@ -94,7 +94,7 @@ jobs:
           npm --prefix backend run provenance:verify
 
       - name: Build production container from Railway repository context
-        run: docker build --tag fiteatsy-backend:${REQUESTED_SHA} --file backend/Dockerfile backend
+        run: docker build --tag fiteatsy-backend:${REQUESTED_SHA} --file backend/Dockerfile .
 
       - name: Validate mobile application review candidate
         run: |
