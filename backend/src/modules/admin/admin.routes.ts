@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { assignRoleAsAdmin, getAdminStatus } from './admin.service.js';
@@ -30,6 +31,14 @@ const qaAssignmentSchema = z.object({ consultantUserId: z.string().trim().min(1)
 const qaRevokeSchema = z.object({ reason: z.string().trim().min(3).max(240) });
 
 adminRouter.use(requireAuthenticatedAccount);
+const assertSuperAdmin = (req: Request, res: Response) => {
+  const role = String(getAuthenticatedAccount(req).user.role ?? '').toLowerCase();
+  if (!['admin', 'super_admin', 'platform_owner'].includes(role)) {
+    res.status(403).json({ error: 'ADMIN_AUTHORITY_REQUIRED', message: 'Administrative authority is required.' });
+    return false;
+  }
+  return true;
+};
 const adminReason=z.string().trim().min(3).max(240);
 const adminError=(res:import('express').Response,error:unknown)=>{if(error instanceof CommonFoodAdminError)return res.status(error.statusCode).json({error:error.code,message:error.message});throw error;};
 adminRouter.get('/common-foods',async(req,res)=>{const parsed=z.object({active:z.enum(['true','false']).transform(x=>x==='true').optional(),category:z.string().optional(),family:z.string().optional(),sourcePolicy:z.string().optional(),generatorEligible:z.enum(['true','false']).transform(x=>x==='true').optional(),mealHead:z.string().optional()}).safeParse(req.query);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT'});try{return res.json(await listAdminCommonFoods(getAuthenticatedAccount(req),parsed.data));}catch(e){return adminError(res,e);}});

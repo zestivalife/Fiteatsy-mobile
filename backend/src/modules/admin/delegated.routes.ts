@@ -5,8 +5,6 @@ import { requireDelegatedAuthority } from '../auth/delegated-authority.middlewar
 import { executeDelegatedIdempotently } from './delegated-operation-idempotency.js';
 import { issueQaAdminSessionHandoff } from '../auth/qa-session-handoff.js';
 import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, recordQaIdentityReuse, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
-import { bulkSetFoodAuthorisation, listFoodAuthorisation } from './common-food-admin.service.js';
-import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { provisionExternalConsultant } from '../external-signup/external-signup.repository.js';
 import { diagnoseFiteatsyIntakeLeadSearch, listFiteatsyIntakeLeads } from './admin.repository.js';
 import { issueTemporaryLoginPin } from '../auth/auth.service.js';
@@ -24,19 +22,6 @@ const identitySchema = z.object({
 const qaAdminIdentitySchema = identitySchema.strict();
 const assignmentSchema = z.object({ consultantUserId: z.string().trim().min(1), clientUserId: z.string().trim().min(1), reason: z.string().trim().min(3).max(240) });
 const reasonSchema = z.object({ reason: z.string().trim().min(3).max(240) });
-const foodAuthorisationQuerySchema = z.object({
-  search: z.string().trim().optional(),
-  category: z.string().optional(),
-  status: z.enum(['PENDING', 'AUTHORISED', 'NOT_AUTHORISED']).optional(),
-  nutritionCompleteness: z.enum(['COMPLETE', 'INCOMPLETE']).optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(25),
-  offset: z.coerce.number().int().min(0).default(0)
-});
-const foodAuthorisationBulkSchema = z.object({
-  foodIds: z.array(z.string().min(1)).min(1).max(1000),
-  status: z.enum(['AUTHORISED', 'NOT_AUTHORISED']),
-  reason: z.string().trim().max(240).optional()
-});
 const externalConsultantProvisionSchema = z.object({
   authIdentityId: z.string().trim().min(1).max(180),
   name: z.string().trim().min(2).max(120),
@@ -67,10 +52,6 @@ const respondError = (res: Response, error: unknown, fallback: string) => {
   return res.status(typed.status ?? 500).json({ error: typed.code ?? fallback, message: typed.status ? typed.message : 'Fiteatsy operation could not be completed.' });
 };
 const correlationReason = (req: Request, reason: string) => `${reason} [correlation:${req.header('x-correlation-id') || 'unavailable'}]`;
-const delegatedAdminAccount = (req: Request) => ({
-  accountId: actorId(req),
-  user: { role: 'platform_owner' }
-} as AuthenticatedAccount);
 
 delegatedRouter.post(
   '/external-consultant-signups/provision',
@@ -93,14 +74,6 @@ delegatedRouter.post(
     }
   }
 );
-
-delegatedRouter.get('/food-authorisation', requireDelegatedAuthority('fiteatsy.food.authorisation.manage', 'food_authorisation', 'platform_owner'), async (req, res) => {
-  const parsed = foodAuthorisationQuerySchema.safeParse(req.query);
-  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT' });
-  try {
-    return res.json(await listFoodAuthorisation(delegatedAdminAccount(req), parsed.data));
-  } catch (error) { return respondError(res, error, 'FOOD_AUTHORISATION_LIST_FAILED'); }
-});
 
 delegatedRouter.get('/intake-leads', requireDelegatedAuthority('fiteatsy.leads.read', 'lead_management', 'platform_owner'), async (req, res) => {
   try {
@@ -142,14 +115,6 @@ delegatedRouter.post('/users/:userId/temporary-login-pin', requireDelegatedAutho
     res.setHeader('Referrer-Policy', 'no-referrer');
     return res.status(result.replayed ? 200 : 201).json({ ...result.value, displayOnce: true, idempotentReplay: result.replayed });
   } catch (error) { return respondError(res, error, 'PIN_ISSUE_FAILED'); }
-});
-
-delegatedRouter.post('/food-authorisation/bulk', requireDelegatedAuthority('fiteatsy.food.authorisation.manage', 'food_authorisation', 'platform_owner'), async (req, res) => {
-  const parsed = foodAuthorisationBulkSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT' });
-  try {
-    return res.json(await bulkSetFoodAuthorisation(delegatedAdminAccount(req), parsed.data));
-  } catch (error) { return respondError(res, error, 'FOOD_AUTHORISATION_UPDATE_FAILED'); }
 });
 
 delegatedRouter.post('/qa-clients', requireDelegatedAuthority('fiteatsy.qa.identity.create', 'qa_provisioning'), async (req, res) => {
