@@ -287,8 +287,10 @@ test('dietician bridge role reaches Common Food through governed identity and le
     );
     await ensureActiveTenantMembership(assignmentPrincipal, tenantId, 'CONSULTANT');
     await pool.query(
-      `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
-       values(gen_random_uuid(),$1,$2,'READY',$3)`,
+      `insert into external_consultant_signups(
+         id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,signup_state,
+         tenant_id,idempotency_key,created_by_reference
+       ) values(gen_random_uuid(),$1,$2,$1 || '@qa.invalid','INDEPENDENT_CONSULTANT','READY',$3,gen_random_uuid()::text,'database-test')`,
       [authenticatedSubject, assignmentPrincipal, tenantId],
     );
     await pool.query(

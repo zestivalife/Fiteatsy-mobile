@@ -32,8 +32,8 @@ test('governed signup maps the authenticated subject to its assignment identity'
   const legacy = await account('2');
   const tenantId = '11111111-1111-4111-8111-111111111111';
   await pool.query(
-    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
-     values(gen_random_uuid(),$1,$2,'READY',$3)`,
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,signup_state,tenant_id,idempotency_key,created_by_reference)
+     values(gen_random_uuid(),$1,$2,$1 || '@qa.invalid','INDEPENDENT_CONSULTANT','READY',$3,gen_random_uuid()::text,'database-test')`,
     [authenticated.user.id, legacy.user.id, tenantId],
   );
 
@@ -55,8 +55,8 @@ test('production-shaped governed identity takes precedence over the same-subject
     [authenticatedSubject, assignmentPrincipal, clientId],
   );
   await pool.query(
-    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
-     values(gen_random_uuid(),$1,$2,'READY',$3)`,
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,signup_state,tenant_id,idempotency_key,created_by_reference)
+     values(gen_random_uuid(),$1,$2,$1 || '@qa.invalid','INDEPENDENT_CONSULTANT','READY',$3,gen_random_uuid()::text,'database-test')`,
     [authenticatedSubject, assignmentPrincipal, tenantId],
   );
   await pool.query(
@@ -95,13 +95,13 @@ test('native identity remains authoritative when no governed link exists', async
   );
 });
 
-test('inactive and ambiguous governed identities fail closed', async () => {
+test('inactive governed identities fail closed and duplicate mappings are schema-rejected', async () => {
   const authenticated = await account('4');
   const inactive = await account('5');
   await pool.query("update users set status='inactive' where id=$1", [inactive.user.id]);
   await pool.query(
-    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state)
-     values(gen_random_uuid(),$1,$2,'READY')`,
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,signup_state,idempotency_key,created_by_reference)
+     values(gen_random_uuid(),$1,$2,$1 || '@qa.invalid','INDEPENDENT_CONSULTANT','READY',gen_random_uuid()::text,'database-test')`,
     [authenticated.user.id, inactive.user.id],
   );
   assert.equal((await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id)).status, 'INACTIVE');
@@ -110,11 +110,15 @@ test('inactive and ambiguous governed identities fail closed', async () => {
   const first = await account('6');
   const second = await account('7');
   await pool.query(
-    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state)
-     values(gen_random_uuid(),$1,$2,'READY'),(gen_random_uuid(),$1,$3,'READY')`,
-    [authenticated.user.id, first.user.id, second.user.id],
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,signup_state,idempotency_key,created_by_reference)
+     values(gen_random_uuid(),$1,$2,$1 || '@qa.invalid','INDEPENDENT_CONSULTANT','READY',gen_random_uuid()::text,'database-test')`,
+    [authenticated.user.id, first.user.id],
   );
-  assert.equal((await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id)).status, 'AMBIGUOUS');
+  await assert.rejects(pool.query(
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,signup_state,idempotency_key,created_by_reference)
+     values(gen_random_uuid(),$1,$2,$1 || '-duplicate@qa.invalid','INDEPENDENT_CONSULTANT','READY',gen_random_uuid()::text,'database-test')`,
+    [authenticated.user.id, second.user.id],
+  ));
 });
 
 test('revoked, tenant-mismatched and invalid JWT identities fail closed', async () => {
@@ -122,8 +126,8 @@ test('revoked, tenant-mismatched and invalid JWT identities fail closed', async 
   const linked = await account('10');
   const tenantId = '22222222-2222-4222-8222-222222222222';
   await pool.query(
-    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
-     values(gen_random_uuid(),$1,$2,'REVOKED',$3)`,
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,signup_state,tenant_id,idempotency_key,created_by_reference)
+     values(gen_random_uuid(),$1,$2,$1 || '@qa.invalid','INDEPENDENT_CONSULTANT','CANCELLED',$3,gen_random_uuid()::text,'database-test')`,
     [authenticated.user.id, linked.user.id, tenantId],
   );
   assert.equal(
@@ -133,8 +137,8 @@ test('revoked, tenant-mismatched and invalid JWT identities fail closed', async 
 
   await pool.query('truncate table external_consultant_signups cascade');
   await pool.query(
-    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
-     values(gen_random_uuid(),$1,$2,'READY',$3)`,
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,signup_state,tenant_id,idempotency_key,created_by_reference)
+     values(gen_random_uuid(),$1,$2,$1 || '@qa.invalid','INDEPENDENT_CONSULTANT','READY',$3,gen_random_uuid()::text,'database-test')`,
     [authenticated.user.id, linked.user.id, tenantId],
   );
   assert.equal(
