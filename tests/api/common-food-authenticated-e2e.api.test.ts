@@ -221,7 +221,8 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
 
       const clientPlan = await getJson(server.baseUrl, '/v1/platform/nutrition-plan', { headers: authHeaders(client.token) });
       assert.equal(clientPlan.response.status, 200, JSON.stringify(clientPlan.body));
-      assert.equal(clientPlan.body.status, 'active');
+      assert.equal(clientPlan.body.plan.planStatus, 'published');
+      assert.equal(clientPlan.body.version.lifecycleStatus, 'published');
       assert.equal(clientPlan.body.version.id, approved.body.version.id);
       assert.equal(clientPlan.body.version.commonFoodOptions.length, 35);
       assert.equal(new Set(clientPlan.body.version.commonFoodOptions.map((option: { mealHead: string }) => option.mealHead)).size, 7);
