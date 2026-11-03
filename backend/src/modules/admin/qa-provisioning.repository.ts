@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
-import { createOrResolveClientForAccount } from '../client/client.repository.js';
+import { createOrResolveClientForAccount, ensureActiveTenantMembership, resolveFiteatsyHomeTenantId } from '../client/client.repository.js';
 import { createOrUpdateHealthProfile, createCareCaseIfMissing } from '../platform/platform.store.js';
 import type { ClientOwnershipContext } from '../platform/platform.types.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
@@ -103,7 +103,9 @@ export const provisionQaIdentity = async (input: {
         role: input.role,
         reason: input.reason
       });
-      const clientRecord = input.role === 'user' ? await createOrResolveClientForAccount(user.id) : null;
+      const tenantId = await resolveFiteatsyHomeTenantId();
+      await ensureActiveTenantMembership(user.id, tenantId, input.role === 'user' ? 'CLIENT' : input.role === 'admin' ? 'ADMIN' : 'CONSULTANT');
+      const clientRecord = input.role === 'user' ? await createOrResolveClientForAccount(user.id, pool, tenantId) : null;
       return { user, client: clientRecord, identityReused: true };
     }
     const inserted = await client.query(
@@ -117,7 +119,9 @@ export const provisionQaIdentity = async (input: {
     await client.query('commit');
     await audit({ actorUserId: input.actorUserId, actorReference: input.actorReference, targetUserId: user.id, action: 'QAIdentityCreated', accountPurpose: 'QA_TEST', role: input.role, reason: input.reason });
 
-    const clientRecord = input.role === 'user' ? await createOrResolveClientForAccount(user.id) : null;
+    const tenantId = await resolveFiteatsyHomeTenantId();
+    await ensureActiveTenantMembership(user.id, tenantId, input.role === 'user' ? 'CLIENT' : input.role === 'admin' ? 'ADMIN' : 'CONSULTANT');
+    const clientRecord = input.role === 'user' ? await createOrResolveClientForAccount(user.id, pool, tenantId) : null;
     if (clientRecord) {
       const owner: ClientOwnershipContext = { accountId: user.id, clientId: clientRecord.id };
       const profile = await createOrUpdateHealthProfile(owner, {});
@@ -275,15 +279,25 @@ export const resetQaOnboarding = async (input: { actorUserId: string; userId: st
 export const createQaAssignment = async (input: { actorUserId: string; consultantUserId: string; clientUserId: string; reason: string }) => {
   const result = await pool.query(
     `insert into consultant_client_assignments
-      (id, consultant_user_id, client_user_id, created_by_user_id)
-     select $1, c.id, u.id, $4
+      (id, tenant_id, consultant_user_id, client_user_id, created_by_user_id)
+     select $1, fc.tenant_id, c.id, u.id, $4
        from users c cross join users u
+       join fiteatsy_clients fc on fc.account_user_id = u.id
+        and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
+       join tenant_memberships consultant_membership
+         on consultant_membership.user_id = c.id
+        and consultant_membership.tenant_id = fc.tenant_id
+        and lower(coalesce(consultant_membership.status, '')) = 'active'
+       join tenant_memberships client_membership
+         on client_membership.user_id = u.id
+        and client_membership.tenant_id = fc.tenant_id
+        and lower(coalesce(client_membership.status, '')) = 'active'
       where c.id = $2 and u.id = $3
         and c.deleted_at is null and u.deleted_at is null
         and c.account_purpose = 'QA_TEST' and u.account_purpose = 'QA_TEST'
         and lower(c.role) in ('consultant', 'provider', 'dietician', 'senior_consultant')
         and lower(u.role) = 'user'
-     returning id, consultant_user_id, client_user_id, status, scope, created_at`,
+     returning id, tenant_id, consultant_user_id, client_user_id, status, scope, created_at`,
     [crypto.randomUUID(), input.consultantUserId, input.clientUserId, input.actorUserId]
   );
   if (!result.rowCount) return null;

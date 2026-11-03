@@ -64,17 +64,23 @@ export const resolveFiteatsyHomeTenantId = async (db: Queryable = pool) => {
   return String(result.rows[0].id);
 };
 
-const ensureClientMembership = async (accountUserId: string, tenantId: string, db: Queryable) => {
+export const ensureActiveTenantMembership = async (
+  accountUserId: string,
+  tenantId: string,
+  tenantRole: 'CLIENT' | 'CONSULTANT' | 'ADMIN',
+  db: Queryable = pool,
+) => {
   const timestamp = new Date().toISOString();
   await db.query(
     `insert into tenant_memberships (
        id, tenant_id, user_id, tenant_role, status, joined_at, created_at, updated_at
-     ) values ($1, $2, $3, 'CLIENT', 'active', $4, $4, $4)
+     ) values ($1, $2, $3, $4, 'active', $5, $5, $5)
      on conflict (tenant_id, user_id) do update
        set status = 'active',
+           tenant_role = excluded.tenant_role,
            removed_at = null,
            updated_at = excluded.updated_at`,
-    [crypto.randomUUID(), tenantId, accountUserId, timestamp]
+    [crypto.randomUUID(), tenantId, accountUserId, tenantRole, timestamp]
   );
 };
 
@@ -200,7 +206,7 @@ export const createOrResolveClientForAccount = async (
   resolvedTenantId?: string
 ): Promise<PersistedClient> => {
   const tenantId = resolvedTenantId ?? await resolveFiteatsyHomeTenantId(db);
-  await ensureClientMembership(accountUserId, tenantId, db);
+  await ensureActiveTenantMembership(accountUserId, tenantId, 'CLIENT', db);
   const existing = await getClientByAccountUserIdAnyStatus(accountUserId, db);
   if (existing) {
     assertClientTenant(existing, tenantId);

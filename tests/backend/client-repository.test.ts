@@ -5,7 +5,9 @@ import { pool } from '../../backend/src/db/pool.js';
 import {
   countClients,
   createOrResolveClientForAccount,
+  ensureActiveTenantMembership,
   getClientByFiteatsyClientId,
+  resolveFiteatsyHomeTenantId,
   resolveActiveClientIdentity,
   resolveCurrentClientForAccount
 } from '../../backend/src/modules/client/client.repository.js';
@@ -68,6 +70,7 @@ test('client repository creates a stable one-to-one client identity for a verifi
 
 test('createOrResolveClientForAccount reactivates stale client mappings and preserves public ids', async () => {
   const timestamp = new Date().toISOString();
+  const tenantId = await resolveFiteatsyHomeTenantId();
   await pool.query(
     `
       insert into users (
@@ -86,11 +89,13 @@ test('createOrResolveClientForAccount reactivates stale client mappings and pres
     `,
     ['stale-client-user', 'Stale Client User', 'stale-client@example.com', syntheticOperationalPhone(1), timestamp]
   );
+  await ensureActiveTenantMembership('stale-client-user', tenantId, 'CLIENT');
 
   await pool.query(
     `
       insert into fiteatsy_clients (
         id,
+        tenant_id,
         fiteatsy_client_id,
         account_user_id,
         status,
@@ -98,9 +103,9 @@ test('createOrResolveClientForAccount reactivates stale client mappings and pres
         created_at,
         updated_at,
         deleted_at
-      ) values ($1, $2, $3, 'inactive', 3, $4, $4, $4)
+      ) values ($1, $2, $3, $4, 'inactive', 3, $5, $5, $5)
     `,
-    ['11111111-1111-1111-1111-111111111111', 'fc_existingpreserved1234567890abcdef', 'stale-client-user', timestamp]
+    ['11111111-1111-1111-1111-111111111111', tenantId, 'fc_existingpreserved1234567890abcdef', 'stale-client-user', timestamp]
   );
 
   const resolved = await createOrResolveClientForAccount('stale-client-user');

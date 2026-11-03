@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { pool } from '../../backend/src/db/pool.js';
 import { resolveVerifiedAccountIdentity } from '../../backend/src/modules/auth/auth.repository.js';
 import {
+  ensureActiveTenantMembership,
+  resolveFiteatsyHomeTenantId,
+} from '../../backend/src/modules/client/client.repository.js';
+import {
   createProfessionalAssignment,
   ProfessionalAssignmentConflictError,
 } from '../../backend/src/modules/professional-assignments/professional-assignments.repository.js';
@@ -19,6 +23,10 @@ const account = async (suffix: string, role: string) => {
     mobileNumber: `+9198100000${suffix.padStart(2, '0')}`,
   });
   await pool.query('update users set role = $2 where id = $1', [value.user.id, role]);
+  if (role === 'dietician' || role === 'consultant') {
+    const tenantId = await resolveFiteatsyHomeTenantId();
+    await ensureActiveTenantMembership(value.user.id, tenantId, 'CONSULTANT');
+  }
   return value;
 };
 

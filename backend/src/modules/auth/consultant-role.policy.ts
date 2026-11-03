@@ -1,4 +1,4 @@
-const CONSULTANT_DIET_WORKFLOW_ROLE_VALUES = [
+export const CONSULTANT_DIET_WORKFLOW_ROLE_VALUES = [
   'consultant',
   'provider',
   'dietician',

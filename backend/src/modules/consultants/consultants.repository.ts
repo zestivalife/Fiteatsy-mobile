@@ -1,5 +1,6 @@
 import { pool } from '../../db/pool.js';
 import { createOrResolveClientForAccount } from '../client/client.repository.js';
+import { CONSULTANT_DIET_WORKFLOW_ROLE_VALUES } from '../auth/consultant-role.policy.js';
 import type { HealthCalculationInput, HealthMetrics } from '../health/health-calculations.service.js';
 import {
   compareBiomarkerObservations,
@@ -265,7 +266,13 @@ export type ConsultantClientSyncDiagnostics = {
   activeHealthProfiles: number;
 };
 
-const AUTHENTICATED_USER_EXCLUSION_ROLES = ['consultant', 'practitioner', 'admin', 'super_admin'];
+const AUTHENTICATED_USER_EXCLUSION_ROLES = [
+  ...CONSULTANT_DIET_WORKFLOW_ROLE_VALUES,
+  'practitioner',
+  'mentor',
+  'admin',
+  'super_admin',
+];
 const PUBLISHED_REPORT_STATUSES = ['PUBLISHED', 'PARTIALLY_VALIDATED'];
 
 const toIso = (value: unknown) => {

@@ -149,11 +149,19 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
   try {
     await connection.query('begin');
     const targets = await connection.query(
-      `select professional.id as professional_user_id, client.id as client_user_id
+      `select professional.id as professional_user_id, client.id as client_user_id, fc.tenant_id
          from users professional
          join users client on client.id = $1
          join fiteatsy_clients fc on fc.account_user_id = client.id
           and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
+         join tenant_memberships professional_membership
+           on professional_membership.user_id = professional.id
+          and professional_membership.tenant_id = fc.tenant_id
+          and lower(coalesce(professional_membership.status, '')) = 'active'
+         join tenant_memberships client_membership
+           on client_membership.user_id = client.id
+          and client_membership.tenant_id = fc.tenant_id
+          and lower(coalesce(client_membership.status, '')) = 'active'
         where professional.id = $2
           and professional.deleted_at is null and client.deleted_at is null
           and lower(coalesce(professional.status, '')) = 'active'
@@ -165,9 +173,9 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
 
     const active = await connection.query(
       `select * from consultant_client_assignments
-        where client_user_id = $1 and product = 'FITEATSY' and status = 'active'
+        where client_user_id = $1 and tenant_id = $2 and product = 'FITEATSY' and status = 'active'
         order by updated_at desc for update`,
-      [input.clientUserId],
+      [input.clientUserId, targets.rows[0].tenant_id],
     );
     const existing = active.rows.find((row) =>
       String(row.consultant_user_id) === input.professionalUserId
@@ -207,12 +215,12 @@ export const createProfessionalAssignment = async (input: { actorUserId: string;
     }
     const result = await connection.query(
     `insert into consultant_client_assignments
-      (id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
-     values ($1, $6, $3, $2, 'FITEATSY', $4, $5)
+      (id, tenant_id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
+     values ($1, $7, $6, $3, $2, 'FITEATSY', $4, $5)
      on conflict (consultant_user_id, client_user_id, scope) where status = 'active'
      do update set updated_at = now()
      returning *`,
-      [crypto.randomUUID(), input.actorUserId, input.clientUserId, input.professionalType, input.relationshipType, input.professionalUserId]
+      [crypto.randomUUID(), input.actorUserId, input.clientUserId, input.professionalType, input.relationshipType, input.professionalUserId, targets.rows[0].tenant_id]
     );
     if (!result.rowCount) { await connection.query('rollback'); return null; }
   const row = result.rows[0];
