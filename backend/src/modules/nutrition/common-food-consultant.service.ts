@@ -39,6 +39,7 @@ export async function resolveClientMealGenerationContext(input:{account:Authenti
   const canonicalClientId=identity.fiteatsyClientId;
   const consultantIdentity=await resolveConsultantApplicationIdentity(input.account.user.id,input.account.accountId,input.account.applicationUserId);
   if(consultantIdentity.status==='AMBIGUOUS')throw new CommonFoodApiError('AMBIGUOUS_CONSULTANT_IDENTITY',409);
+  if(consultantIdentity.status==='TENANT_MISMATCH')throw new CommonFoodApiError('CONSULTANT_IDENTITY_TENANT_MISMATCH',403);
   if(consultantIdentity.status==='INACTIVE')throw new CommonFoodApiError('CONSULTANT_IDENTITY_INACTIVE',403);
   if(!await canAccessConsultantNutritionClient(canonicalClientId,input.account,{allowSeniorAuthority:true,resolvedConsultantId:consultantIdentity.applicationUserId}))throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);
   const [registered,prefs,latest]=await Promise.all([getRegisteredConsultantClientProfileContext(canonicalClientId),getFoodPreferenceProfile(canonicalClientId),getConsultantLatestDietPlan(canonicalClientId,input.account)]);

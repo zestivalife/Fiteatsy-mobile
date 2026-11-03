@@ -42,11 +42,47 @@ test('governed signup maps the authenticated subject to its assignment identity'
   );
 });
 
-test('signed Auth application identity takes precedence without cross-service database access', async () => {
+test('production-shaped governed identity takes precedence over the same-subject JWT application identity', async () => {
+  const authenticatedSubject = 'b1fe3d8e-ebba-4326-9e5a-e18c94e6d055';
+  const assignmentPrincipal = 'ext_330a4fa0-731b-4162-bcb9-bf4e21e6a014';
+  const assignmentId = 'da89a376-04ac-406e-b5d1-137e8ddf0fa0';
+  const clientId = '773fcfff-c3c4-49a2-8b38-7d424403bdc2';
+  const tenantId = 'ae871d83-f5ae-484f-8def-1ff7d4b5880c';
+  await pool.query(
+    `insert into users(id,name,role,status)
+     values($1,'External Test','consultant','active'),($2,'Legacy assignment principal','consultant','active'),($3,'Kirti fixture','client','active')`,
+    [authenticatedSubject, assignmentPrincipal, clientId],
+  );
+  await pool.query(
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
+     values(gen_random_uuid(),$1,$2,'READY',$3)`,
+    [authenticatedSubject, assignmentPrincipal, tenantId],
+  );
+  await pool.query(
+    `insert into consultant_client_assignments(
+       id,consultant_user_id,client_user_id,status,scope,product,professional_type,relationship_type,tenant_id
+     ) values($1,$2,$3,'active','client_care','FITEATSY','CONSULTANT','CLIENT_CARE','00000000-0000-4000-8000-000000000001')`,
+    [assignmentId, assignmentPrincipal, clientId],
+  );
+
+  const resolved = await resolveConsultantApplicationIdentity(authenticatedSubject, authenticatedSubject, authenticatedSubject, tenantId);
+  assert.deepEqual(
+    resolved,
+    { status: 'RESOLVED', applicationUserId: assignmentPrincipal, source: 'EXTERNAL_CONSULTANT_SIGNUP', tenantId },
+  );
+  const assignment = await pool.query(
+    `select id from consultant_client_assignments
+      where id=$1 and consultant_user_id=$2 and client_user_id=$3 and status='active'`,
+    [assignmentId, resolved.applicationUserId, clientId],
+  );
+  assert.equal(assignment.rowCount, 1);
+});
+
+test('a valid JWT application identity is used only when no governed mapping exists', async () => {
   const authenticated = await account('8');
   assert.deepEqual(
-    await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id, 'ext-governed-consultant'),
-    { status: 'RESOLVED', applicationUserId: 'ext-governed-consultant', source: 'AUTH_TOKEN', tenantId: null },
+    await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id, authenticated.user.id),
+    { status: 'RESOLVED', applicationUserId: authenticated.user.id, source: 'AUTH_TOKEN', tenantId: null },
   );
 });
 
@@ -78,4 +114,36 @@ test('inactive and ambiguous governed identities fail closed', async () => {
     [authenticated.user.id, first.user.id, second.user.id],
   );
   assert.equal((await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id)).status, 'AMBIGUOUS');
+});
+
+test('revoked, tenant-mismatched and invalid JWT identities fail closed', async () => {
+  const authenticated = await account('9');
+  const linked = await account('10');
+  const tenantId = '22222222-2222-4222-8222-222222222222';
+  await pool.query(
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
+     values(gen_random_uuid(),$1,$2,'REVOKED',$3)`,
+    [authenticated.user.id, linked.user.id, tenantId],
+  );
+  assert.equal(
+    (await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id, authenticated.user.id, tenantId)).status,
+    'INACTIVE',
+  );
+
+  await pool.query('truncate table external_consultant_signups');
+  await pool.query(
+    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
+     values(gen_random_uuid(),$1,$2,'READY',$3)`,
+    [authenticated.user.id, linked.user.id, tenantId],
+  );
+  assert.equal(
+    (await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id, authenticated.user.id, '33333333-3333-4333-8333-333333333333')).status,
+    'TENANT_MISMATCH',
+  );
+
+  await pool.query('truncate table external_consultant_signups');
+  assert.equal(
+    (await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id, 'missing-application-principal')).status,
+    'INACTIVE',
+  );
 });
