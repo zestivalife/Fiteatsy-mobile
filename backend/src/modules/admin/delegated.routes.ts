@@ -10,6 +10,7 @@ import { diagnoseFiteatsyIntakeLeadSearch, listFiteatsyIntakeLeads } from './adm
 import { issueTemporaryLoginPin } from '../auth/auth.service.js';
 import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
 import { createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from '../professional-assignments/professional-assignments.repository.js';
+import { professionalAssignmentBatchSchema, professionalAssignmentSchema } from '../professional-assignments/professional-assignment.schemas.js';
 
 export const delegatedRouter = Router();
 
@@ -38,8 +39,6 @@ const externalConsultantProvisionSchema = z.object({
 }).refine((value) => Boolean(value.email || value.mobileNumber), {
   message: 'An email address or mobile number is required.'
 });
-const professionalAssignmentSchema = z.object({ clientUserId: z.string().uuid(), professionalUserId: z.string().uuid(), professionalType: z.enum(['CONSULTANT', 'PRACTITIONER', 'MENTOR']), relationshipType: z.string().trim().min(2).max(80), reason: z.string().trim().max(240).optional(), allowReassignment: z.boolean().optional().default(false) }).strict();
-const professionalAssignmentBatchSchema = professionalAssignmentSchema.omit({ clientUserId: true }).extend({ clientUserIds: z.array(z.string().uuid()).min(1).max(100).transform((values) => [...new Set(values)]) }).strict();
 
 const actorId = (req: Request) => {
   const value = (req as Request & { delegatedAuthority?: { sub?: string } }).delegatedAuthority?.sub;

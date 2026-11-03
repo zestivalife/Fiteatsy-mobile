@@ -7,6 +7,7 @@ const routes = readFileSync(new URL('../../backend/src/modules/professional-assi
 const delegatedRoutes = readFileSync(new URL('../../backend/src/modules/admin/delegated.routes.ts', import.meta.url), 'utf8');
 const delegatedAuthority = readFileSync(new URL('../../backend/src/modules/auth/delegated-authority.ts', import.meta.url), 'utf8');
 const actorMigration = readFileSync(new URL('../../backend/src/db/migrations/0069_delegated_assignment_actor_attribution.sql', import.meta.url), 'utf8');
+const schemas = readFileSync(new URL('../../backend/src/modules/professional-assignments/professional-assignment.schemas.ts', import.meta.url), 'utf8');
 
 test('same-consultant retries are idempotent', () => {
   assert.match(repository, /consultant_user_id\) === input\.professionalUserId/);
@@ -30,11 +31,11 @@ test('assignment mutation is atomic and preserves prior records', () => {
 
 test('multi-client assignment is one atomic transaction and rejects partial eligibility', () => {
   assert.match(repository, /createProfessionalAssignmentsBatch/);
-  assert.match(repository, /client\.id = any\(\$1::uuid\[\]\)/);
+  assert.match(repository, /client\.id = any\(\$1::text\[\]\)/);
   assert.match(repository, /eligibleClients\.rowCount !== input\.clientUserIds\.length/);
   assert.match(repository, /const conflicts = input\.clientUserIds/);
   assert.match(routes, /professionalAssignmentsRouter\.post\('\/batch'/);
-  assert.match(routes, /z\.array\(z\.string\(\)\.uuid\(\)\)\.min\(1\)\.max\(100\)/);
+  assert.match(schemas, /z\.array\(applicationUserIdSchema\)\.min\(1\)\.max\(100\)/);
 });
 
 test('eligible-client queries exclude deleted and inactive records and mask contacts', () => {
@@ -71,7 +72,7 @@ test('delegated assignment surface covers reads, atomic batch, reassignment and 
   assert.match(delegatedRoutes, /professional-assignments\/clients\/pool/);
   assert.match(delegatedRoutes, /professional-assignments\/professionals/);
   assert.match(delegatedRoutes, /professional-assignments\/batch/);
-  assert.match(delegatedRoutes, /allowReassignment/);
+  assert.match(schemas, /allowReassignment/);
   assert.match(delegatedRoutes, /REASSIGNMENT_CONFIRMATION_REQUIRED/);
 });
 

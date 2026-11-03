@@ -294,7 +294,7 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
          join users professional on professional.id = $2 and professional.deleted_at is null and lower(coalesce(professional.status, '')) = 'active'
          join tenant_memberships pm on pm.user_id = professional.id and pm.tenant_id = fc.tenant_id and lower(pm.status) = 'active'
          join tenant_memberships cm on cm.user_id = client.id and cm.tenant_id = fc.tenant_id and lower(cm.status) = 'active'
-        where client.id = any($1::uuid[]) and client.deleted_at is null
+        where client.id = any($1::text[]) and client.deleted_at is null
           and lower(coalesce(client.status, '')) = 'active'
           and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')`,
       [input.clientUserIds, input.professionalUserId],
@@ -305,7 +305,7 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
     }
     const current = await connection.query(
       `select * from consultant_client_assignments
-        where client_user_id = any($1::uuid[]) and product = 'FITEATSY' and status = 'active'
+        where client_user_id = any($1::text[]) and product = 'FITEATSY' and status = 'active'
         order by client_user_id, updated_at desc for update`,
       [input.clientUserIds],
     );
