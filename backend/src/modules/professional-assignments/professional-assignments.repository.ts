@@ -181,7 +181,7 @@ export const discoverProfessionalsForAssignment = async (professionalType?: Prof
   return result.rows.map(mapProfessional);
 };
 
-export const createProfessionalAssignment = async (input: AssignmentActor & { clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string; allowReassignment?: boolean }) => {
+export const createProfessionalAssignment = async (input: AssignmentActor & { clientUserId: string; professionalUserId: string; professionalType: ProfessionalType; relationshipType: string; reason?: string; allowReassignment?: boolean; expectedActiveAssignmentId?: string }) => {
   const connection = await pool.connect();
   try {
     await connection.query('begin');
@@ -209,10 +209,21 @@ export const createProfessionalAssignment = async (input: AssignmentActor & { cl
     );
     const activeAssignment = current.rows[0] as Record<string, unknown> | undefined;
     if (activeAssignment && String(activeAssignment.consultant_user_id) === input.professionalUserId) {
+      await connection.query(
+        `insert into professional_assignment_audit_events
+          (id, assignment_id, action, actor_user_id, actor_reference, client_user_id, professional_user_id, professional_type, relationship_type, reason)
+         values ($1, $2, 'IDEMPOTENT_REPLAY', $3, $4, $5, $6, $7, $8, $9)`,
+        [crypto.randomUUID(), activeAssignment.id, input.actorUserId, input.actorReference ?? null, input.clientUserId, input.professionalUserId, input.professionalType, input.relationshipType, input.reason ?? null],
+      );
       await connection.query('commit');
       return activeAssignment;
     }
-    if (activeAssignment && !input.allowReassignment) {
+    const expectedAssignmentMatches = Boolean(
+      activeAssignment
+      && input.expectedActiveAssignmentId
+      && String(activeAssignment.id) === input.expectedActiveAssignmentId,
+    );
+    if (activeAssignment && !input.allowReassignment && !expectedAssignmentMatches) {
       await connection.query('rollback');
       throw new ReassignmentRequiredError(activeAssignment);
     }
