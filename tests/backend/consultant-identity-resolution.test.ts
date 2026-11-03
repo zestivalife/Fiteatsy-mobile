@@ -4,6 +4,7 @@ import { pool } from '../../backend/src/db/pool.js';
 import { resolveVerifiedAccountIdentity } from '../../backend/src/modules/auth/auth.repository.js';
 import { resolveConsultantApplicationIdentity } from '../../backend/src/modules/external-consultants/external-consultant-identity.repository.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
+import { resolveFiteatsyHomeTenantId } from '../../backend/src/modules/client/client.repository.js';
 
 test.beforeEach(async () => {
   await resetBackendStateForTests();
@@ -47,7 +48,7 @@ test('production-shaped governed identity takes precedence over the same-subject
   const assignmentPrincipal = 'ext_330a4fa0-731b-4162-bcb9-bf4e21e6a014';
   const assignmentId = 'da89a376-04ac-406e-b5d1-137e8ddf0fa0';
   const clientId = '773fcfff-c3c4-49a2-8b38-7d424403bdc2';
-  const tenantId = 'ae871d83-f5ae-484f-8def-1ff7d4b5880c';
+  const tenantId = await resolveFiteatsyHomeTenantId();
   await pool.query(
     `insert into users(id,name,role,status)
      values($1,'External Test','consultant','active'),($2,'Legacy assignment principal','consultant','active'),($3,'Kirti fixture','client','active')`,
@@ -60,9 +61,9 @@ test('production-shaped governed identity takes precedence over the same-subject
   );
   await pool.query(
     `insert into consultant_client_assignments(
-       id,consultant_user_id,client_user_id,status,scope,product,professional_type,relationship_type
-     ) values($1,$2,$3,'active','client_care','FITEATSY','CONSULTANT','CLIENT_CARE')`,
-    [assignmentId, assignmentPrincipal, clientId],
+       id,tenant_id,consultant_user_id,client_user_id,status,scope,product,professional_type,relationship_type
+     ) values($1,$2,$3,$4,'active','client_care','FITEATSY','CONSULTANT','CLIENT_CARE')`,
+    [assignmentId, tenantId, assignmentPrincipal, clientId],
   );
 
   const resolved = await resolveConsultantApplicationIdentity(authenticatedSubject, authenticatedSubject, authenticatedSubject, tenantId);

@@ -5,6 +5,7 @@ import { pool } from '../../backend/src/db/pool.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson, patchJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
+import { ensureActiveTenantMembership } from '../../backend/src/modules/client/client.repository.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
@@ -247,13 +248,14 @@ test('dietician bridge role reaches Common Food through governed identity and le
   const authenticatedSubject = 'b1fe3d8e-ebba-4326-9e5a-e18c94e6d055';
   const assignmentPrincipal = 'ext_330a4fa0-731b-4162-bcb9-bf4e21e6a014';
   const assignmentId = 'da89a376-04ac-406e-b5d1-137e8ddf0fa0';
-  const tenantId = 'ae871d83-f5ae-484f-8def-1ff7d4b5880c';
   const wrongTenantId = '33333333-3333-4333-8333-333333333333';
 
   try {
     const client = await createAuthenticatedSession(server.baseUrl, { name: 'Kirti route fixture' });
     const publicClientId = String(client.current.body.client.fiteatsyClientId);
     const clientUserId = String(client.current.body.accountId);
+    const tenantResult = await pool.query('select tenant_id from fiteatsy_clients where account_user_id=$1', [clientUserId]);
+    const tenantId = String(tenantResult.rows[0].tenant_id);
     const health = await patchJson(server.baseUrl, '/v1/platform/health-profile', {
       dateOfBirthISO: '1982-01-01T00:00:00.000Z',
       gender: 'Female',
@@ -283,6 +285,7 @@ test('dietician bridge role reaches Common Food through governed identity and le
        values($1,'Legacy dietician assignment principal','dietician','active')`,
       [assignmentPrincipal],
     );
+    await ensureActiveTenantMembership(assignmentPrincipal, tenantId, 'CONSULTANT');
     await pool.query(
       `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
        values(gen_random_uuid(),$1,$2,'READY',$3)`,
@@ -290,9 +293,9 @@ test('dietician bridge role reaches Common Food through governed identity and le
     );
     await pool.query(
       `insert into consultant_client_assignments(
-         id,consultant_user_id,client_user_id,status,scope,product,professional_type,relationship_type
-       ) values($1,$2,$3,'active','client_care','FITEATSY','CONSULTANT','CLIENT_CARE')`,
-      [assignmentId, assignmentPrincipal, clientUserId],
+         id,tenant_id,consultant_user_id,client_user_id,status,scope,product,professional_type,relationship_type
+       ) values($1,$2,$3,$4,'active','client_care','FITEATSY','CONSULTANT','CLIENT_CARE')`,
+      [assignmentId, tenantId, assignmentPrincipal, clientUserId],
     );
 
     const tokenForTenant = (resolvedTenantId: string, role = 'dietician') => signConsultantDashboardJwt(jwtSecret, {
