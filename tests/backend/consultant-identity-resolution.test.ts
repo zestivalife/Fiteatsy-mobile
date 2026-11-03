@@ -60,8 +60,8 @@ test('production-shaped governed identity takes precedence over the same-subject
   );
   await pool.query(
     `insert into consultant_client_assignments(
-       id,consultant_user_id,client_user_id,status,scope,product,professional_type,relationship_type,tenant_id
-     ) values($1,$2,$3,'active','client_care','FITEATSY','CONSULTANT','CLIENT_CARE','00000000-0000-4000-8000-000000000001')`,
+       id,consultant_user_id,client_user_id,status,scope,product,professional_type,relationship_type
+     ) values($1,$2,$3,'active','client_care','FITEATSY','CONSULTANT','CLIENT_CARE')`,
     [assignmentId, assignmentPrincipal, clientId],
   );
 
