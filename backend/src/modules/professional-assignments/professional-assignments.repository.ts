@@ -259,7 +259,7 @@ export const createProfessionalAssignment = async (input: AssignmentActor & { cl
       where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
         and lower(coalesce(professional.status, '')) = 'active'
         and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
-     on conflict (consultant_user_id, client_user_id, scope) where status = 'active'
+     on conflict (tenant_id, consultant_user_id, client_user_id, scope) where status = 'active'
      do update set updated_at = now()
      returning *`,
       [crypto.randomUUID(), input.actorUserId, input.clientUserId, input.professionalType, input.relationshipType, input.professionalUserId, input.actorReference ?? null]
