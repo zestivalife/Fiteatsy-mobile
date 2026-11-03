@@ -51,6 +51,7 @@ import { freezeCombinationOptionsForLifecycle, listCombinationOptions } from './
 import { MEAL_HEADS as COMMON_FOOD_MEAL_HEADS } from './common-food-engine.js';
 import { isQaFixtureEntity } from '../admin/qa-provisioning.repository.js';
 import { resolveConsultantApplicationIdentity } from '../external-consultants/external-consultant-identity.repository.js';
+import { CONSULTANT_DIET_WORKFLOW_ROLES, isConsultantDietWorkflowRole } from '../auth/consultant-role.policy.js';
 
 const TEMPLATE_VERSION = '2Zestiva_Premium_Personalised_Diet_Plan_Template_v0.2_Compact';
 const MAX_MEAL_OPTIONS_PER_SECTION = 5;
@@ -81,16 +82,23 @@ export class NutritionPlanWorkflowError extends Error {
   }
 }
 
-const CONSULTANT_DIET_WORKFLOW_ROLES = ['consultant', 'provider', 'dietician', 'senior_consultant'];
-
 const isConsultantRole = (account: AuthenticatedAccount) =>
-  CONSULTANT_DIET_WORKFLOW_ROLES.includes(account.user.role?.toLowerCase() ?? '');
+  isConsultantDietWorkflowRole(account.user.role);
 
 const professionalTypeForNutritionAccount = (account: AuthenticatedAccount) =>
   account.user.role?.toLowerCase() === 'practitioner' ? 'PRACTITIONER' : 'CONSULTANT';
 
+const resolveNutritionConsultantIdentity = (account: AuthenticatedAccount) =>
+  resolveConsultantApplicationIdentity(
+    account.authSubjectId ?? account.user.id,
+    account.accountId,
+    account.applicationUserId,
+    account.tenantId,
+  );
+
 export const canApproveOrPublishDietPlan = (account: AuthenticatedAccount) =>
-  [...CONSULTANT_DIET_WORKFLOW_ROLES, 'admin', 'superuser', 'platform_owner'].includes(account.user.role?.toLowerCase() ?? '');
+  CONSULTANT_DIET_WORKFLOW_ROLES.has(account.user.role?.toLowerCase() ?? '') ||
+  ['admin', 'superuser', 'platform_owner'].includes(account.user.role?.toLowerCase() ?? '');
 
 const hasCrossConsultantReviewAuthority = (account: AuthenticatedAccount) =>
   ['senior_consultant', 'admin', 'superuser', 'platform_owner'].includes(account.user.role?.toLowerCase() ?? '');
@@ -1695,7 +1703,7 @@ export const canAccessConsultantNutritionClient = async (
   const useSeniorAuthority = options.allowSeniorAuthority === true && hasCrossConsultantReviewAuthority(account);
   const identity = options.resolvedConsultantId
     ? { status: 'RESOLVED' as const, applicationUserId: options.resolvedConsultantId }
-    : await resolveConsultantApplicationIdentity(account.user.id, account.accountId, account.applicationUserId);
+    : await resolveNutritionConsultantIdentity(account);
   if (identity.status !== 'RESOLVED') return false;
   const context = await getRegisteredConsultantClientProfileContext(
     publicClientId,
@@ -1787,7 +1795,7 @@ const getWorkspaceContext = async (
 ) => {
   if (!isConsultantRole(account)) return null;
   const useSeniorAuthority = options.allowSeniorAuthority === true && hasCrossConsultantReviewAuthority(account);
-  const identity = await resolveConsultantApplicationIdentity(account.user.id, account.accountId, account.applicationUserId);
+  const identity = await resolveNutritionConsultantIdentity(account);
   if (identity.status !== 'RESOLVED') return null;
   const context = await getRegisteredConsultantClientProfileContext(
     publicClientId,

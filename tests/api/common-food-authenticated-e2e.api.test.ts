@@ -8,6 +8,14 @@ import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
+const encodeJwtPart = (value: Record<string, unknown>) => Buffer.from(JSON.stringify(value)).toString('base64url');
+const signConsultantDashboardJwt = (secret: string, payload: Record<string, unknown>) => {
+  const header = encodeJwtPart({ alg: 'HS256', typ: 'JWT' });
+  const body = encodeJwtPart(payload);
+  const signature = crypto.createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
+  return `${header}.${body}.${signature}`;
+};
+
 test.before(async () => { server = await startTestServer(); });
 test.after(async () => { await server?.close(); });
 test.beforeEach(async () => { await resetTestState(); });
@@ -169,5 +177,150 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     }, { headers: authHeaders(consultant.token) });
     assert.equal(stale.response.status, 409, JSON.stringify(stale.body));
     assert.equal(stale.body.error, 'STALE_PLAN_VERSION');
+  }
+});
+
+test('dietician bridge role reaches Common Food through governed identity and legacy assignment', async () => {
+  const jwtSecret = 'common-food-dietician-route-test-secret';
+  const previousJwtSecret = process.env.AUTH_SERVICE_JWT_SECRET_KEY;
+  const previousSuccessTracing = process.env.COMMON_FOOD_AUTHORIZATION_TRACE_SUCCESS;
+  process.env.AUTH_SERVICE_JWT_SECRET_KEY = jwtSecret;
+  process.env.COMMON_FOOD_AUTHORIZATION_TRACE_SUCCESS = 'true';
+
+  const authenticatedSubject = 'b1fe3d8e-ebba-4326-9e5a-e18c94e6d055';
+  const assignmentPrincipal = 'ext_330a4fa0-731b-4162-bcb9-bf4e21e6a014';
+  const assignmentId = 'da89a376-04ac-406e-b5d1-137e8ddf0fa0';
+  const tenantId = 'ae871d83-f5ae-484f-8def-1ff7d4b5880c';
+  const wrongTenantId = '33333333-3333-4333-8333-333333333333';
+
+  try {
+    const client = await createAuthenticatedSession(server.baseUrl, { name: 'Kirti route fixture' });
+    const publicClientId = String(client.current.body.client.fiteatsyClientId);
+    const clientUserId = String(client.current.body.accountId);
+    const health = await patchJson(server.baseUrl, '/v1/platform/health-profile', {
+      dateOfBirthISO: '1982-01-01T00:00:00.000Z',
+      gender: 'Female',
+      heightCm: 165,
+      currentWeightKg: 65,
+      activityLevel: 'Moderate',
+      wellnessGoals: ['Maintain health'],
+      dietType: 'vegetarian',
+      mealsPerDay: 7,
+      waterIntakeLiters: 2.5,
+    }, { headers: authHeaders(client.token) });
+    assert.equal(health.response.status, 200, JSON.stringify(health.body));
+
+    await pool.query(`
+      create table if not exists external_consultant_signups (
+        id uuid primary key,
+        auth_identity_id text not null,
+        fiteatsy_user_id text references users(id) on delete restrict,
+        signup_state text not null,
+        tenant_id uuid,
+        updated_at timestamptz not null default now()
+      )
+    `);
+    await pool.query('truncate table external_consultant_signups');
+    await pool.query(
+      `insert into users(id,name,role,status)
+       values($1,'Legacy dietician assignment principal','dietician','active')`,
+      [assignmentPrincipal],
+    );
+    await pool.query(
+      `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
+       values(gen_random_uuid(),$1,$2,'READY',$3)`,
+      [authenticatedSubject, assignmentPrincipal, tenantId],
+    );
+    await pool.query(
+      `insert into consultant_client_assignments(
+         id,consultant_user_id,client_user_id,status,scope,product,professional_type,relationship_type
+       ) values($1,$2,$3,'active','client_care','FITEATSY','CONSULTANT','CLIENT_CARE')`,
+      [assignmentId, assignmentPrincipal, clientUserId],
+    );
+
+    const tokenForTenant = (resolvedTenantId: string, role = 'dietician') => signConsultantDashboardJwt(jwtSecret, {
+      sub: authenticatedSubject,
+      application_user_id: authenticatedSubject,
+      tenant_id: resolvedTenantId,
+      role,
+      status: 'ACTIVE',
+      credential_status: 'PERMANENT',
+      type: 'access',
+      exp: Math.floor(Date.now() / 1000) + 600,
+    });
+
+    const tenantDenied = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, {
+      headers: authHeaders(tokenForTenant(wrongTenantId)),
+    });
+    assert.equal(tenantDenied.response.status, 403, JSON.stringify(tenantDenied.body));
+    assert.equal(tenantDenied.body.error, 'CONSULTANT_IDENTITY_TENANT_MISMATCH');
+
+    const unassignedClient = await createAuthenticatedSession(server.baseUrl, { name: 'Unassigned Common Food client' });
+    const unassignedPublicClientId = String(unassignedClient.current.body.client.fiteatsyClientId);
+    const unassigned = await getJson(server.baseUrl, `/v1/consultants/clients/${unassignedPublicClientId}/common-foods`, {
+      headers: authHeaders(tokenForTenant(tenantId)),
+    });
+    assert.equal(unassigned.response.status, 403, JSON.stringify(unassigned.body));
+    assert.equal(unassigned.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
+
+    const unrelatedRole = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, {
+      headers: authHeaders(client.token),
+    });
+    assert.equal(unrelatedRole.response.status, 403, JSON.stringify(unrelatedRole.body));
+    assert.equal(unrelatedRole.body.error, 'ROLE_NOT_ALLOWED');
+
+    const dieticianToken = tokenForTenant(tenantId);
+    const draft = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/draft`, {}, {
+      headers: authHeaders(dieticianToken),
+    });
+    assert.equal(draft.response.status, 201, JSON.stringify(draft.body));
+
+    const traceEvents: Array<Record<string, unknown>> = [];
+    const originalInfo = console.info;
+    console.info = (message?: unknown, details?: unknown, ...rest: unknown[]) => {
+      if (message === 'COMMON_FOOD_AUTHORIZATION_TRACE' && details && typeof details === 'object') {
+        traceEvents.push(details as Record<string, unknown>);
+      }
+      originalInfo(message, details, ...rest);
+    };
+    let commonFoods;
+    try {
+      commonFoods = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods?scope=ALL&search=ash%20gourd`, {
+        headers: {
+          ...authHeaders(dieticianToken),
+          'x-request-id': 'common-food-dietician-route-test',
+        },
+      });
+    } finally {
+      console.info = originalInfo;
+    }
+
+    assert.equal(commonFoods.response.status, 200, JSON.stringify(commonFoods.body));
+    assert.equal(commonFoods.response.headers.get('x-request-id'), 'common-food-dietician-route-test');
+    assert.ok(commonFoods.body.items.length > 0, JSON.stringify(commonFoods.body));
+    assert.equal(traceEvents.length, 1, JSON.stringify(traceEvents));
+    assert.deepEqual(traceEvents[0], {
+      requestId: 'common-food-dietician-route-test',
+      method: 'GET',
+      route: '/v1/consultants/clients/:clientId/common-foods',
+      status: 200,
+      errorCode: null,
+      jwtSubject: authenticatedSubject,
+      effectiveUserId: authenticatedSubject,
+      role: 'dietician',
+      jwtApplicationIdentity: authenticatedSubject,
+      governedConsultantIdentity: assignmentPrincipal,
+      requestedClientId: publicClientId,
+      canonicalClientId: publicClientId,
+      jwtTenantId: tenantId,
+      governedTenantId: tenantId,
+      activeAssignmentId: assignmentId,
+      failedAuthorizationPredicate: null,
+    });
+  } finally {
+    if (previousJwtSecret === undefined) delete process.env.AUTH_SERVICE_JWT_SECRET_KEY;
+    else process.env.AUTH_SERVICE_JWT_SECRET_KEY = previousJwtSecret;
+    if (previousSuccessTracing === undefined) delete process.env.COMMON_FOOD_AUTHORIZATION_TRACE_SUCCESS;
+    else process.env.COMMON_FOOD_AUTHORIZATION_TRACE_SUCCESS = previousSuccessTracing;
   }
 });

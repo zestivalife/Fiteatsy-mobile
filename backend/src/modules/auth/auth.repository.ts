@@ -7,6 +7,7 @@ import {
   type PersistedClient
 } from '../client/client.repository.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
+import { CONSULTANT_DIET_WORKFLOW_ROLES } from './consultant-role.policy.js';
 
 type Queryable = Pick<PoolClient, 'query'>;
 
@@ -47,8 +48,12 @@ export type PinAuthUser = PersistedAuthUser & {
 
 export type AuthenticatedAccount = {
   accountId: string;
+  /** Authenticated JWT subject before any local bridge-user resolution. */
+  authSubjectId?: string;
   /** Governed Fiteatsy application identity asserted by the signed Auth token. */
   applicationUserId?: string;
+  /** Tenant asserted by the verified consultant-dashboard access token. */
+  tenantId?: string;
   sessionId: string;
   sessionExpiresAtISO: string;
   token: string;
@@ -59,7 +64,7 @@ export type AuthenticatedAccount = {
 };
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const CONSULTANT_DASHBOARD_BRIDGE_ROLES = new Set(['consultant', 'provider', 'dietician', 'senior_consultant']);
+const CONSULTANT_DASHBOARD_BRIDGE_ROLES = CONSULTANT_DIET_WORKFLOW_ROLES;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const normalizeMobileNumber = (mobileNumber: string) => normalizeCanonicalPhoneNumber(mobileNumber);
@@ -841,7 +846,11 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
       sessionId: String(row.id),
       sessionExpiresAtISO: new Date(String(row.expires_at)).toISOString()
     });
-    return { ...account, applicationUserId: account.accountId };
+    return {
+      ...account,
+      authSubjectId: tokenUserId ?? account.accountId,
+      applicationUserId: account.accountId,
+    };
   }
 
   const bridge = verifyConsultantDashboardJwt(token);
@@ -856,6 +865,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
   const bridgeStatus = readStringClaim(bridgePayload, ['status', 'account_status'])?.toUpperCase() ?? null;
   const bridgeType = readStringClaim(bridgePayload, ['type', 'token_type', 'tokenType', 'typ'])?.toLowerCase() ?? null;
   const bridgeApplicationUserId = readStringClaim(bridgePayload, ['fiteatsy_user_id', 'application_user_id']);
+  const bridgeTenantId = readStringClaim(bridgePayload, ['tenant_id', 'tenantId']);
   const credentialStatus =
     readStringClaim(bridgePayload, ['credential_status', 'credentialStatus'])?.toUpperCase() ?? null;
 
@@ -904,7 +914,9 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
 
   return {
     accountId: bridgedUser.id,
+    authSubjectId: bridgeUserId,
     applicationUserId: bridgeApplicationUserId ?? undefined,
+    tenantId: bridgeTenantId ?? undefined,
     sessionId: `consultant-dashboard:${bridgeUserId}`,
     sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString(),
     token,

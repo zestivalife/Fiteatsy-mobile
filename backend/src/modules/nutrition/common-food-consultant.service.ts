@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import crypto from 'node:crypto';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
-import { getRegisteredConsultantClientProfileContext } from '../consultants/consultants.repository.js';
+import { getActiveConsultantClientAssignment, getRegisteredConsultantClientProfileContext } from '../consultants/consultants.repository.js';
 import { getFoodPreferenceProfile } from './food-preferences.service.js';
 import { canAccessConsultantNutritionClient, getConsultantLatestDietPlan, NutritionPlanWorkflowError } from './nutrition.service.js';
 import { createGovernedCommonFoodPopulation } from './common-food-population.js';
@@ -20,6 +20,7 @@ import { applyUsdaActivationV1732B2Aliases, createUsdaActivationV1732B2Foods } f
 import { applyUsdaActivationV1733A2Aliases, createUsdaActivationV1733A2Foods } from './food-usda-activation-v17-33a2.js';
 import { resolveActiveClientIdentity } from '../client/client.repository.js';
 import { resolveConsultantApplicationIdentity } from '../external-consultants/external-consultant-identity.repository.js';
+import { isConsultantDietWorkflowRole } from '../auth/consultant-role.policy.js';
 
 const catalogue=JSON.parse(readFileSync(new URL('./catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json',import.meta.url),'utf8')) as {foods:CatalogueFood[]};
 const p0Verification=JSON.parse(readFileSync(new URL('./food-curation/data/p0_food_verification_v17_29.json',import.meta.url),'utf8')) as {decisions:Array<{sourceRecordId:string;referenceItemId:string;canonicalName:string;aliases:string[];category:string;sourceMapping:{fdcId:number}|null;generatorEligible:boolean;componentEligible:boolean}>};
@@ -28,24 +29,90 @@ const foods=applyUsdaActivationV1733A2Aliases(applyUsdaActivationV1732B2Aliases(
 const sectionByHead:Record<MealHead,string>={EARLY_MORNING:'earlyMorning',BREAKFAST:'breakfast',MID_MORNING:'midMorningSnack',LUNCH:'lunch',EVENING_SNACK:'eveningSnack',DINNER:'dinner',BEDTIME:'bedtimeNutrition'};
 const dietMap={vegetarian:'VEGETARIAN',eggetarian:'EGG',non_vegetarian:'NON_VEGETARIAN',vegan:'VEGAN',jain:'VEGETARIAN'} as const;
 export class CommonFoodApiError extends Error{constructor(public code:string,public statusCode:number,message=code){super(message)}}
-const roleAllowed=(account:AuthenticatedAccount)=>['consultant','senior_consultant','admin','super_admin','platform_owner'].includes(String(account.user.role).toLowerCase());
+const roleAllowed=(account:AuthenticatedAccount)=>isConsultantDietWorkflowRole(account.user.role);
 
-export async function resolveClientMealGenerationContext(input:{account:AuthenticatedAccount;clientId:string;planId?:string;mealHead?:MealHead}){
-  if(!roleAllowed(input.account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
+export type CommonFoodAuthorizationTrace = {
+  requestId: string;
+  method: string;
+  route: string;
+};
+
+const logCommonFoodAuthorization = (input: {
+  trace?: CommonFoodAuthorizationTrace;
+  account: AuthenticatedAccount;
+  status: number;
+  errorCode: string | null;
+  failedPredicate: string | null;
+  requestedClientId: string;
+  canonicalClientId?: string | null;
+  governedConsultantId?: string | null;
+  governedTenantId?: string | null;
+  assignmentId?: string | null;
+}) => {
+  if (!input.trace) return;
+  if (input.status < 400 && process.env.COMMON_FOOD_AUTHORIZATION_TRACE_SUCCESS !== 'true') return;
+  console.info('COMMON_FOOD_AUTHORIZATION_TRACE', {
+    requestId: input.trace.requestId,
+    method: input.trace.method,
+    route: input.trace.route,
+    status: input.status,
+    errorCode: input.errorCode,
+    jwtSubject: input.account.authSubjectId ?? input.account.user.id,
+    effectiveUserId: input.account.accountId,
+    role: input.account.user.role ?? null,
+    jwtApplicationIdentity: input.account.applicationUserId ?? null,
+    governedConsultantIdentity: input.governedConsultantId ?? null,
+    requestedClientId: input.requestedClientId,
+    canonicalClientId: input.canonicalClientId ?? null,
+    jwtTenantId: input.account.tenantId ?? null,
+    governedTenantId: input.governedTenantId ?? null,
+    activeAssignmentId: input.assignmentId ?? null,
+    failedAuthorizationPredicate: input.failedPredicate,
+  });
+};
+
+export async function resolveClientMealGenerationContext(input:{account:AuthenticatedAccount;clientId:string;planId?:string;mealHead?:MealHead;trace?:CommonFoodAuthorizationTrace}){
+  if(!roleAllowed(input.account)){
+    logCommonFoodAuthorization({trace:input.trace,account:input.account,status:403,errorCode:'ROLE_NOT_ALLOWED',failedPredicate:'CONSULTANT_DIET_WORKFLOW_ROLE_REQUIRED',requestedClientId:input.clientId});
+    throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
+  }
   let identity;
   try { identity=await resolveActiveClientIdentity(input.clientId); }
-  catch (error) { if(error instanceof Error&&error.message==='AMBIGUOUS_CLIENT_IDENTITY')throw new CommonFoodApiError('AMBIGUOUS_CLIENT_IDENTITY',409);throw error; }
-  if(!identity)throw new CommonFoodApiError('CLIENT_IDENTITY_NOT_FOUND',404);
+  catch (error) {
+    if(error instanceof Error&&error.message==='AMBIGUOUS_CLIENT_IDENTITY'){
+      logCommonFoodAuthorization({trace:input.trace,account:input.account,status:409,errorCode:'AMBIGUOUS_CLIENT_IDENTITY',failedPredicate:'UNIQUE_ACTIVE_CLIENT_IDENTITY_REQUIRED',requestedClientId:input.clientId});
+      throw new CommonFoodApiError('AMBIGUOUS_CLIENT_IDENTITY',409);
+    }
+    throw error;
+  }
+  if(!identity){
+    logCommonFoodAuthorization({trace:input.trace,account:input.account,status:404,errorCode:'CLIENT_IDENTITY_NOT_FOUND',failedPredicate:'ACTIVE_CLIENT_IDENTITY_REQUIRED',requestedClientId:input.clientId});
+    throw new CommonFoodApiError('CLIENT_IDENTITY_NOT_FOUND',404);
+  }
   const canonicalClientId=identity.fiteatsyClientId;
-  const consultantIdentity=await resolveConsultantApplicationIdentity(input.account.user.id,input.account.accountId,input.account.applicationUserId);
-  if(consultantIdentity.status==='AMBIGUOUS')throw new CommonFoodApiError('AMBIGUOUS_CONSULTANT_IDENTITY',409);
-  if(consultantIdentity.status==='TENANT_MISMATCH')throw new CommonFoodApiError('CONSULTANT_IDENTITY_TENANT_MISMATCH',403);
-  if(consultantIdentity.status==='INACTIVE')throw new CommonFoodApiError('CONSULTANT_IDENTITY_INACTIVE',403);
-  if(!await canAccessConsultantNutritionClient(canonicalClientId,input.account,{allowSeniorAuthority:true,resolvedConsultantId:consultantIdentity.applicationUserId}))throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);
+  const consultantIdentity=await resolveConsultantApplicationIdentity(input.account.authSubjectId??input.account.user.id,input.account.accountId,input.account.applicationUserId,input.account.tenantId);
+  if(consultantIdentity.status==='AMBIGUOUS'){
+    logCommonFoodAuthorization({trace:input.trace,account:input.account,status:409,errorCode:'AMBIGUOUS_CONSULTANT_IDENTITY',failedPredicate:'UNIQUE_ACTIVE_GOVERNED_IDENTITY_REQUIRED',requestedClientId:input.clientId,canonicalClientId});
+    throw new CommonFoodApiError('AMBIGUOUS_CONSULTANT_IDENTITY',409);
+  }
+  if(consultantIdentity.status==='TENANT_MISMATCH'){
+    logCommonFoodAuthorization({trace:input.trace,account:input.account,status:403,errorCode:'CONSULTANT_IDENTITY_TENANT_MISMATCH',failedPredicate:'GOVERNED_IDENTITY_TENANT_MATCH_REQUIRED',requestedClientId:input.clientId,canonicalClientId});
+    throw new CommonFoodApiError('CONSULTANT_IDENTITY_TENANT_MISMATCH',403);
+  }
+  if(consultantIdentity.status==='INACTIVE'){
+    logCommonFoodAuthorization({trace:input.trace,account:input.account,status:403,errorCode:'CONSULTANT_IDENTITY_INACTIVE',failedPredicate:'ACTIVE_GOVERNED_IDENTITY_REQUIRED',requestedClientId:input.clientId,canonicalClientId});
+    throw new CommonFoodApiError('CONSULTANT_IDENTITY_INACTIVE',403);
+  }
+  const assignment=await getActiveConsultantClientAssignment(canonicalClientId,consultantIdentity.applicationUserId,'CONSULTANT');
+  if(!assignment||!await canAccessConsultantNutritionClient(canonicalClientId,input.account,{allowSeniorAuthority:true,resolvedConsultantId:consultantIdentity.applicationUserId})){
+    logCommonFoodAuthorization({trace:input.trace,account:input.account,status:403,errorCode:'CLIENT_ASSIGNMENT_REQUIRED',failedPredicate:assignment?'ASSIGNED_CLIENT_CONTEXT_REQUIRED':'ACTIVE_FITEATSY_CONSULTANT_ASSIGNMENT_REQUIRED',requestedClientId:input.clientId,canonicalClientId,governedConsultantId:consultantIdentity.applicationUserId,governedTenantId:consultantIdentity.tenantId,assignmentId:assignment?.id});
+    throw new CommonFoodApiError('CLIENT_ASSIGNMENT_REQUIRED',403);
+  }
   const [registered,prefs,latest]=await Promise.all([getRegisteredConsultantClientProfileContext(canonicalClientId),getFoodPreferenceProfile(canonicalClientId),getConsultantLatestDietPlan(canonicalClientId,input.account)]);
   if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404);
   if(!latest)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
   if(input.planId&&latest.plan.id!==input.planId)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
+  logCommonFoodAuthorization({trace:input.trace,account:input.account,status:200,errorCode:null,failedPredicate:null,requestedClientId:input.clientId,canonicalClientId,governedConsultantId:consultantIdentity.applicationUserId,governedTenantId:consultantIdentity.tenantId,assignmentId:assignment.id});
   const p=prefs?.profile; const diet=p?.dietType?dietMap[p.dietType]:'VEGETARIAN';
   const content=latest.version.content; const daily=content.dailyTargets;
   const mealTargets=Object.fromEntries(MEAL_HEADS.map(head=>{const section=(content.mealPlan as unknown as Record<string,{target?:{calories:number|null;proteinGrams:number|null;caloriesBand?:{min:number|null;max:number|null};proteinBand?:{min:number|null;max:number|null}}}>)[sectionByHead[head]];return [head,{kcal:section?.target?.calories??0,protein:section?.target?.proteinGrams??0,kcalTolerance:Math.max(1,((section?.target?.caloriesBand?.max??0)-(section?.target?.caloriesBand?.min??0))/2||50),proteinTolerance:Math.max(1,((section?.target?.proteinBand?.max??0)-(section?.target?.proteinBand?.min??0))/2||10)} satisfies MealTarget]})) as Record<MealHead,MealTarget>;
@@ -81,8 +148,8 @@ const referenceOperationalUse=(row:any)=>{
 };
 const referenceRoles=(categoryValue:string)=>{const category=categoryValue.toLowerCase();if(/vegetable|greens/.test(category))return ['VEGETABLE'];if(/pulse|legume|dal/.test(category))return ['PULSE','PROTEIN'];if(/grain|millet|staple/.test(category))return ['GRAIN','STARCH'];if(/fruit/.test(category))return ['FRUIT'];if(/dairy/.test(category))return ['DAIRY','PROTEIN'];if(/nut|seed/.test(category))return ['NUT_SEED'];if(/beverage|drink/.test(category))return ['BEVERAGE'];return [];};
 const countsBy=(items:any[],key:string)=>Object.entries(items.reduce((out,item)=>{const values=Array.isArray(item[key])?item[key]:[item[key]];for(const value of values.filter(Boolean))out[value]=(out[value]??0)+1;return out;},{} as Record<string,number>)).map(([value,count])=>({value,count})).sort((a,b)=>Number(b.count)-Number(a.count)||a.value.localeCompare(b.value));
-export async function searchCommonFoods(account:AuthenticatedAccount,clientId:string,q:FoodSearchQuery){
- const resolved=await resolveClientMealGenerationContext({account,clientId,mealHead:q.mealHead}); const term=(q.search??'').toLowerCase();
+export async function searchCommonFoods(account:AuthenticatedAccount,clientId:string,q:FoodSearchQuery,trace?:CommonFoodAuthorizationTrace){
+ const resolved=await resolveClientMealGenerationContext({account,clientId,mealHead:q.mealHead,trace}); const term=(q.search??'').toLowerCase();
  const eligibleIds=q.mealHead?new Set(eligibleCommonFoods(foods,resolved.context,q.mealHead).map(food=>food.id)):null;
  const safe=(f:CommonFood)=>f.active&&ontologyFor(f).clientFacing&&!f.allergens.some(x=>resolved.context.allergies.includes(x))&&!f.intolerances.some(x=>resolved.context.intolerances.includes(x))&&!f.avoidTags.some(x=>resolved.context.avoids.includes(x))&&!f.clinicalTags.some(x=>resolved.context.clinicalExclusions.includes(x));
  const recommended=(f:CommonFood)=>safe(f)&&f.generatorEligible&&f.clientConsumable&&(!eligibleIds||eligibleIds.has(f.id));

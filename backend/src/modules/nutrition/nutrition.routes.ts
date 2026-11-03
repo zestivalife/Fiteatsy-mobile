@@ -1,5 +1,6 @@
 import { type Response, Router } from 'express';
 import { promises as fs } from 'node:fs';
+import crypto from 'node:crypto';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import type { NutritionPlanContent } from '../platform/platform.types.js';
@@ -342,7 +343,15 @@ consultantNutritionRouter.get('/clients/:clientId/nutrition-intelligence', async
   return res.status(200).json(payload);
 });
 
-consultantNutritionRouter.get('/clients/:clientId/common-foods',async(req,res)=>{const parsed=commonFoodCatalogueQuerySchema.safeParse(req.query);if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT',details:parsed.error.flatten()});try{return res.status(200).json(await searchCommonFoods(getAuthenticatedAccount(req),req.params.clientId,parsed.data));}catch(e){return handleCommonFoodError(res,e);}});
+consultantNutritionRouter.get('/clients/:clientId/common-foods',async(req,res)=>{
+  const parsed=commonFoodCatalogueQuerySchema.safeParse(req.query);
+  if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT',details:parsed.error.flatten()});
+  const requestId=req.header('x-request-id')?.trim()||crypto.randomUUID();
+  res.setHeader('x-request-id',requestId);
+  try{
+    return res.status(200).json(await searchCommonFoods(getAuthenticatedAccount(req),req.params.clientId,parsed.data,{requestId,method:req.method,route:'/v1/consultants/clients/:clientId/common-foods'}));
+  }catch(e){return handleCommonFoodError(res,e);}
+});
 consultantNutritionRouter.get('/common-food/reports/generator-pool',async(req,res)=>{try{return res.json(getGeneratorPoolReport(getAuthenticatedAccount(req)))}catch(e){return handleCommonFoodError(res,e)}});
 consultantNutritionRouter.get('/common-food/reports/concentration',async(req,res)=>{try{return res.json(getGeneratorConcentrationReport(getAuthenticatedAccount(req)))}catch(e){return handleCommonFoodError(res,e)}});
 consultantNutritionRouter.get('/common-food/verification-queue',async(req,res)=>{try{return res.json(await getNutritionVerificationQueue(getAuthenticatedAccount(req)))}catch(e){return handleCommonFoodError(res,e)}});

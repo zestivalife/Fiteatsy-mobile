@@ -757,6 +757,38 @@ export const getRegisteredConsultantClientProfile = async (
   return context?.profile ?? null;
 };
 
+export const getActiveConsultantClientAssignment = async (
+  publicClientId: string,
+  consultantAccountId: string,
+  professionalType = 'CONSULTANT',
+) => {
+  const result = await pool.query(
+    `
+      select assignment.id
+      from consultant_client_assignments assignment
+      join fiteatsy_clients client
+        on client.account_user_id = assignment.client_user_id
+       and client.deleted_at is null
+       and lower(coalesce(client.status, '')) = 'active'
+      where client.fiteatsy_client_id = $1
+        and assignment.consultant_user_id = $2
+        and assignment.product = 'FITEATSY'
+        and assignment.professional_type = $3
+        and assignment.status = 'active'
+        and assignment.revoked_at is null
+        and (assignment.starts_at is null or assignment.starts_at <= now())
+        and (assignment.ends_at is null or assignment.ends_at > now())
+      order by assignment.created_at desc
+      limit 2
+    `,
+    [publicClientId, consultantAccountId, professionalType],
+  );
+  if (result.rowCount !== 1) return null;
+  return {
+    id: String(result.rows[0].id),
+  };
+};
+
 export const getRegisteredConsultantClientProfileContext = async (
   publicClientId: string,
   consultantAccountId?: string,
