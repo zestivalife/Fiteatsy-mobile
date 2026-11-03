@@ -17,6 +17,10 @@ import {
 import { listMealLibrarySlotsForTarget } from '../../backend/src/modules/nutrition/nutrition.library.store.js';
 import { assertDietPlanReviewContentComplete } from '../../backend/src/modules/nutrition/nutrition.service.js';
 import { generateDietPlanDocument, readGeneratedDietPlanDocumentXml } from '../../backend/src/modules/nutrition/nutrition.document.js';
+import {
+  ensureActiveTenantMembership,
+  resolveFiteatsyHomeTenantId,
+} from '../../backend/src/modules/client/client.repository.js';
 
 const mealLabels: Record<(typeof NUTRITION_MEAL_SEQUENCE)[number], string> = {
   earlyMorning: 'Early Morning', breakfast: 'Breakfast', midMorningSnack: 'Mid-Morning', lunch: 'Lunch',
@@ -51,9 +55,11 @@ test('database preserves exact 35-option identity through review, revision, appr
       ($3, 'Diet Test Senior', $6, 'senior_consultant')`,
     [clientUserId, consultantId, seniorId, `${clientUserId}@example.test`, `${consultantId}@example.test`, `${seniorId}@example.test`],
   );
+  const tenantId = await resolveFiteatsyHomeTenantId();
+  await ensureActiveTenantMembership(clientUserId, tenantId, 'CLIENT');
   await pool.query(
-    `insert into fiteatsy_clients (id, fiteatsy_client_id, account_user_id) values ($1, $2, $3)`,
-    [clientId, publicClientId, clientUserId],
+    `insert into fiteatsy_clients (id, tenant_id, fiteatsy_client_id, account_user_id) values ($1, $2, $3, $4)`,
+    [clientId, tenantId, publicClientId, clientUserId],
   );
   await pool.query(
     `insert into health_profiles (id, user_id, client_id, gender, diet_type) values ($1, $2, $3, 'Female', 'vegetarian')`,

@@ -14,6 +14,10 @@ import type { NutritionCatalogueManifest } from '../../backend/src/modules/nutri
 import { pool } from '../../backend/src/db/pool.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
 import { createCareCaseIfMissing } from '../../backend/src/modules/platform/platform.store.js';
+import {
+  ensureActiveTenantMembership,
+  resolveFiteatsyHomeTenantId,
+} from '../../backend/src/modules/client/client.repository.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 const databaseTest = databaseUrl ? test : test.skip;
@@ -46,7 +50,9 @@ databaseTest('FITEATSY-CATALOGUE-SUCCESSOR-IMPORT-POLICY-v1', async () => {
   const clientId = crypto.randomUUID();
   const profileId = crypto.randomUUID();
   await pool.query(`insert into users (id,name,email_normalized,role) values ($1,'Successor Client',$2,'client')`, [userId, `${userId}@example.test`]);
-  await pool.query(`insert into fiteatsy_clients (id,fiteatsy_client_id,account_user_id) values ($1,$2,$3)`, [clientId, `fc_successor_${Date.now()}`, userId]);
+  const tenantId = await resolveFiteatsyHomeTenantId();
+  await ensureActiveTenantMembership(userId, tenantId, 'CLIENT');
+  await pool.query(`insert into fiteatsy_clients (id,tenant_id,fiteatsy_client_id,account_user_id) values ($1,$2,$3,$4)`, [clientId, tenantId, `fc_successor_${Date.now()}`, userId]);
   await pool.query(`insert into health_profiles (id,user_id,client_id,gender,diet_type) values ($1,$2,$3,'Female','vegetarian')`, [profileId, userId, clientId]);
   const careCase = await createCareCaseIfMissing({ clientId, accountId: userId }, profileId);
   const planId = crypto.randomUUID();
