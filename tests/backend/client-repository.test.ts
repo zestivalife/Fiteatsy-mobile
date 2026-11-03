@@ -16,6 +16,8 @@ import { resetBackendStateForTests } from '../../backend/src/test-support/reset.
 import { syntheticOperationalPhone } from '../helpers/canonicalFixtures.js';
 
 const CLIENT_MIGRATION_FILE = '0002_m3a_client_identity_foundation.sql';
+const CLIENT_TENANT_MIGRATION_FILE = '0068_fiteatsy_client_tenant_integrity.sql';
+const ASSIGNMENT_TENANT_MIGRATION_FILE = '0072_assignment_tenant_integrity.sql';
 
 test.beforeEach(async () => {
   await resetBackendStateForTests();
@@ -139,7 +141,10 @@ test('migration backfills one client for an existing account and records the mig
   );
 
   await pool.query('drop table if exists fiteatsy_clients cascade');
-  await pool.query('delete from schema_migrations where version = $1', [CLIENT_MIGRATION_FILE]);
+  await pool.query(
+    'delete from schema_migrations where version = any($1::text[])',
+    [[CLIENT_MIGRATION_FILE, CLIENT_TENANT_MIGRATION_FILE, ASSIGNMENT_TENANT_MIGRATION_FILE]],
+  );
 
   resetMigrationStateForTests();
   await migrateDatabase();
