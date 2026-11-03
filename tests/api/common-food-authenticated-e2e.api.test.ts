@@ -373,7 +373,7 @@ test('dietician bridge role reaches Common Food through governed identity and le
       status: 200,
       errorCode: null,
       jwtSubject: authenticatedSubject,
-      effectiveUserId: authenticatedSubject,
+      effectiveUserId: assignmentPrincipal,
       role: 'dietician',
       jwtApplicationIdentity: authenticatedSubject,
       governedConsultantIdentity: assignmentPrincipal,
