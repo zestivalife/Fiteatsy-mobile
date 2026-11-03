@@ -638,6 +638,9 @@ export type NutritionPlanContent = {
   dailyTargets: {
     calories: number | null;
     protein: number | null;
+    carbohydrates?: number | null;
+    fat?: number | null;
+    fibre?: number | null;
     hydration: number | null;
     movement: string;
   };
@@ -712,6 +715,36 @@ export type PublishedNutritionPlan = {
       focusAreas: string[];
     };
     content: NutritionPlanContent;
+    commonFoodOptions?: Array<{
+      type: 'COMBINATION';
+      id: string;
+      mealHead: 'EARLY_MORNING' | 'BREAKFAST' | 'MID_MORNING' | 'LUNCH' | 'EVENING_SNACK' | 'DINNER' | 'BEDTIME';
+      summary: string;
+      components: Array<{
+        id?: string;
+        name: string;
+        serving: string;
+        multiplier: number;
+        grams?: number | null;
+        millilitres?: number | null;
+        nutrition?: {
+          kcal?: number | null;
+          protein?: number | null;
+          carbohydrate?: number | null;
+          fat?: number | null;
+          fibre?: number | null;
+        } | null;
+      }>;
+      nutrition?: {
+        kcal?: number | null;
+        protein?: number | null;
+        carbohydrate?: number | null;
+        fat?: number | null;
+        fibre?: number | null;
+      } | null;
+      optionHash?: string;
+      version?: number;
+    }>;
   };
   today: {
     todaysMeals: Array<{

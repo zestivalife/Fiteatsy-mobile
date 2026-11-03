@@ -168,6 +168,17 @@ export const ProfileScreen = ({ navigation }: Props) => {
         </View>
       </Card>
 
+      <ProfileSectionLabel icon="restaurant-outline" label="MY DIET PLAN" color="#59BE08" />
+      <Card style={styles.groupCard}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open My Diet Plan" style={styles.securityRow} onPress={() => navigation.navigate('NutritionPlan')}>
+          <View>
+            <Text style={[styles.securityTitle, { color: palette.textPrimary }]}>My Diet Plan</Text>
+            <Text style={[styles.securitySubtitle, { color: palette.textSecondary }]}>View your latest consultant-published meal plan</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={palette.textSecondary} />
+        </Pressable>
+      </Card>
+
       <ProfileSectionLabel icon="people-outline" label="YOUR CARE TEAM" color="#59E735" />
       {externalConsultantsEnabled ? (
         <Card style={styles.groupCard}>

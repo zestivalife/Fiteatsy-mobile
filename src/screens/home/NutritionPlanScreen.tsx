@@ -1,7 +1,7 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { AppBackButton } from '../../components/AppBackButton';
@@ -9,40 +9,40 @@ import { getThemeColors, spacing, radius, typography } from '../../design/tokens
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
 import { markNutritionMealConsumed } from '../../services/nutritionPlanService';
+import { CLIENT_DIET_MEALS, projectPublishedDietPlan } from '../../utils/publishedDietPlan';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const mealOrder = [
-  { key: 'earlyMorning', label: 'Early Morning' },
-  { key: 'breakfast', label: 'Breakfast' },
-  { key: 'midMorningSnack', label: 'Mid Morning Snack' },
-  { key: 'lunch', label: 'Lunch' },
-  { key: 'eveningSnack', label: 'Evening Snack' },
-  { key: 'dinner', label: 'Dinner' },
-  { key: 'bedtimeNutrition', label: 'Bedtime Nourishment' },
-] as const;
-
 export const NutritionPlanScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { themeMode, publishedNutritionPlan } = useAppContext();
+  const { themeMode, publishedNutritionPlan, refreshPublishedNutritionPlan, clientBootstrap } = useAppContext();
   const palette = getThemeColors(themeMode);
   const content = publishedNutritionPlan?.version.content;
+  const projection = publishedNutritionPlan ? projectPublishedDietPlan(publishedNutritionPlan) : null;
   const [mealLogState, setMealLogState] = React.useState<Record<string, 'idle' | 'saving' | 'saved'>>({});
   const [mealLogError, setMealLogError] = React.useState<string | null>(null);
+
+  useFocusEffect(React.useCallback(() => {
+    void refreshPublishedNutritionPlan();
+  }, [refreshPublishedNutritionPlan]));
 
   if (!publishedNutritionPlan || !content) {
     return (
       <Screen contentStyle={styles.screen}>
         <View style={styles.header}>
           <AppBackButton onPress={() => navigation.goBack()} iconOnly />
-          <Text style={[styles.headerTitle, { color: palette.textPrimary }]}>Nutrition Plan</Text>
+          <Text style={[styles.headerTitle, { color: palette.textPrimary }]}>My Diet Plan</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={[styles.emptyState, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
+          {clientBootstrap.nutrition.status === 'LOADING' ? <ActivityIndicator color={palette.blue} /> : null}
           <Text style={[styles.emptyTitle, { color: palette.textPrimary }]}>Your personalised nutrition plan is being prepared.</Text>
           <Text style={[styles.emptyBody, { color: palette.textMuted }]}>
-            Your consultant will publish your daily meals, hydration rhythm, and guidance here once review is complete.
+            {clientBootstrap.nutrition.status === 'ERROR'
+              ? 'Your published plan could not be refreshed. Check your connection and try again.'
+              : 'Your consultant will publish your daily meals and guidance here when the plan is ready.'}
           </Text>
+          {clientBootstrap.nutrition.status === 'ERROR' ? <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void refreshPublishedNutritionPlan()}><Text style={[styles.retryText, { color: palette.blue }]}>Try again</Text></Pressable> : null}
         </View>
       </Screen>
     );
@@ -52,30 +52,33 @@ export const NutritionPlanScreen = () => {
     <Screen contentStyle={styles.screen}>
       <View style={styles.header}>
         <AppBackButton onPress={() => navigation.goBack()} iconOnly />
-        <Text style={[styles.headerTitle, { color: palette.textPrimary }]}>Your Nutrition Plan</Text>
+        <Text style={[styles.headerTitle, { color: palette.textPrimary }]}>My Diet Plan</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={[styles.heroCard, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
-          <Text style={[styles.eyebrow, { color: palette.blue }]}>Published plan</Text>
+          <View style={styles.planStatusRow}><Text style={[styles.eyebrow, { color: palette.blue }]}>Published plan</Text><Text style={[styles.activeStatus, { color: palette.success }]}>{projection?.active ? 'ACTIVE' : 'PUBLISHED'}</Text></View>
           <Text style={[styles.heroTitle, { color: palette.textPrimary }]}>
-            {content.nutritionSnapshot.programmeName || 'Personalised care plan'}
+            {projection?.planName}
           </Text>
           <Text style={[styles.heroSub, { color: palette.textMuted }]}>
-            Focus: {content.nutritionSnapshot.personalisedPlanFocus || 'Daily meal consistency and recovery support'}
+            By {projection?.consultantName} · Version {projection?.versionNumber}
           </Text>
+          <Text style={[styles.publishedDate, { color: palette.textMuted }]}>Published {projection?.publishedAtISO ? new Date(projection.publishedAtISO).toLocaleDateString() : 'date unavailable'}</Text>
 
           <View style={styles.targetGrid}>
-            <MetricPill label="Calories" value={content.dailyTargets.calories != null ? `${content.dailyTargets.calories} kcal` : 'Pending'} palette={palette} />
-            <MetricPill label="Protein" value={content.dailyTargets.protein != null ? `${content.dailyTargets.protein} g` : 'Pending'} palette={palette} />
-            <MetricPill label="Hydration" value={content.dailyTargets.hydration != null ? `${content.dailyTargets.hydration} L` : 'Pending'} palette={palette} />
+            <MetricPill label="Calories" value={projection?.targets.calories != null ? `${projection.targets.calories} kcal` : 'Not set'} palette={palette} />
+            <MetricPill label="Protein" value={projection?.targets.protein != null ? `${projection.targets.protein} g` : 'Not set'} palette={palette} />
+            <MetricPill label="Carbohydrates" value={projection?.targets.carbohydrates != null ? `${projection.targets.carbohydrates} g` : 'Not set'} palette={palette} />
+            <MetricPill label="Fat" value={projection?.targets.fat != null ? `${projection.targets.fat} g` : 'Not set'} palette={palette} />
           </View>
         </View>
 
-        <SectionTitle title="Today’s meals" color={palette.textPrimary} />
-        {mealOrder.map(({ key, label }) => {
+        <SectionTitle title="Seven-meal plan" color={palette.textPrimary} />
+        {CLIENT_DIET_MEALS.map(({ key, label }) => {
           const section = content.mealPlan[key];
+          const options = projection?.meals[key] ?? [];
           return (
             <View key={key} style={[styles.sectionCard, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
               <View style={styles.sectionHead}>
@@ -85,20 +88,24 @@ export const NutritionPlanScreen = () => {
                 </View>
                 <Text style={[styles.sectionFocus, { color: palette.blue }]}>{section.focus}</Text>
               </View>
-              {section.options.map((option) => (
-                <View key={`${key}-${option.slot}-${option.meal}`} style={[styles.optionCard, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]}>
-                  <Text style={[styles.optionMeal, { color: palette.textPrimary }]}>{option.meal}</Text>
-                  <Text style={[styles.optionPortion, { color: palette.textMuted }]}>{option.portion}</Text>
-                  <Text style={[styles.optionNote, { color: palette.textSecondary }]}>{option.prepNote}</Text>
+              {options.length ? options.map((option, optionIndex) => (
+                <View key={`${key}-${option.id}`} style={[styles.optionCard, { backgroundColor: palette.cardMuted, borderColor: palette.stroke }]}>
+                  <Text style={[styles.optionMeal, { color: palette.textPrimary }]}>Option {optionIndex + 1} · {option.name}</Text>
+                  <Text style={[styles.optionPortion, { color: palette.textMuted }]}>{option.serving || 'Serving as directed'}</Text>
+                  {option.guidance ? <Text style={[styles.optionNote, { color: palette.textSecondary }]}>{option.guidance}</Text> : null}
                   <View style={styles.optionMetaRow}>
-                    <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.approxKcal != null ? `${option.approxKcal} kcal` : 'Calories flexible'}</Text>
-                    <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.proteinGrams != null ? `${option.proteinGrams} g protein` : 'Protein flexible'}</Text>
+                    <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.calories != null ? `${option.calories} kcal` : 'Calories not set'}</Text>
+                    <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.protein != null ? `P ${option.protein} g` : 'P —'}</Text>
+                    <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.carbohydrates != null ? `C ${option.carbohydrates} g` : 'C —'}</Text>
+                    <Text style={[styles.optionMeta, { color: palette.textMuted }]}>{option.fat != null ? `F ${option.fat} g` : 'F —'}</Text>
                   </View>
-                  {option.slot === 1 ? (
+                  {optionIndex === 0 ? (
                     <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Mark ${label} option ${optionIndex + 1} consumed`}
                       onPress={async () => {
                         if (!publishedNutritionPlan) return;
-                        const actionKey = `${key}-${option.slot}`;
+                        const actionKey = `${key}-${option.id}`;
                         setMealLogError(null);
                         setMealLogState((current) => ({ ...current, [actionKey]: 'saving' }));
                         try {
@@ -107,8 +114,8 @@ export const NutritionPlanScreen = () => {
                             versionId: publishedNutritionPlan.version.id,
                             mealKey: key,
                             mealLabel: label,
-                            mealName: option.meal,
-                            quantityLabel: option.portion,
+                            mealName: option.name,
+                            quantityLabel: option.serving,
                           });
                           setMealLogState((current) => ({ ...current, [actionKey]: 'saved' }));
                         } catch (error) {
@@ -119,32 +126,32 @@ export const NutritionPlanScreen = () => {
                       style={[
                         styles.consumeButton,
                         {
-                          backgroundColor: mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.successSoft : palette.card,
-                          borderColor: mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.success : palette.stroke,
+                          backgroundColor: mealLogState[`${key}-${option.id}`] === 'saved' ? palette.successSoft : palette.card,
+                          borderColor: mealLogState[`${key}-${option.id}`] === 'saved' ? palette.success : palette.stroke,
                         },
                       ]}
                     >
                       <Ionicons
-                        name={mealLogState[`${key}-${option.slot}`] === 'saved' ? 'checkmark-circle' : 'restaurant-outline'}
+                        name={mealLogState[`${key}-${option.id}`] === 'saved' ? 'checkmark-circle' : 'restaurant-outline'}
                         size={16}
-                        color={mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.success : palette.textPrimary}
+                        color={mealLogState[`${key}-${option.id}`] === 'saved' ? palette.success : palette.textPrimary}
                       />
                       <Text
                         style={[
                           styles.consumeButtonText,
-                          { color: mealLogState[`${key}-${option.slot}`] === 'saved' ? palette.success : palette.textPrimary },
+                          { color: mealLogState[`${key}-${option.id}`] === 'saved' ? palette.success : palette.textPrimary },
                         ]}
                       >
-                        {mealLogState[`${key}-${option.slot}`] === 'saving'
+                        {mealLogState[`${key}-${option.id}`] === 'saving'
                           ? 'Saving...'
-                          : mealLogState[`${key}-${option.slot}`] === 'saved'
+                          : mealLogState[`${key}-${option.id}`] === 'saved'
                             ? 'Marked consumed'
                             : 'Mark consumed'}
                       </Text>
                     </Pressable>
                   ) : null}
                 </View>
-              ))}
+              )) : <Text style={[styles.emptyMeal, { color: palette.textMuted }]}>No approved alternatives were published for this meal.</Text>}
             </View>
           );
         })}
@@ -262,6 +269,21 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1.1,
   },
+  planStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  activeStatus: {
+    ...typography.caption,
+    fontFamily: 'Exo_600SemiBold',
+    letterSpacing: 0.8,
+  },
+  publishedDate: {
+    ...typography.caption,
+    marginTop: spacing.xs,
+  },
   heroTitle: {
     ...typography.title,
     marginTop: spacing.xs,
@@ -346,6 +368,10 @@ const styles = StyleSheet.create({
   },
   optionMeta: {
     ...typography.caption,
+  },
+  emptyMeal: {
+    ...typography.body,
+    paddingVertical: spacing.md,
   },
   consumeButton: {
     marginTop: spacing.sm,
@@ -457,5 +483,13 @@ const styles = StyleSheet.create({
   emptyBody: {
     ...typography.body,
     marginTop: spacing.sm,
+  },
+  retryButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  retryText: {
+    ...typography.bodyStrong,
   },
 });

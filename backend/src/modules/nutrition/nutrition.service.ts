@@ -2687,6 +2687,32 @@ export const logNutritionMealConsumption = async (
   };
 };
 
+export const projectPublishedCommonFoodOption = (option: unknown) => {
+  const item = option as Record<string, unknown>;
+  const components = Array.isArray(item.components) ? item.components.map((component) => {
+    const value = component as Record<string, unknown>;
+    return {
+      id: value.componentId,
+      name: value.foodDisplayNameSnapshot,
+      serving: value.servingDisplayNameSnapshot,
+      multiplier: value.multiplier,
+      grams: value.grams,
+      millilitres: value.millilitres,
+      nutrition: value.nutrition,
+    };
+  }) : [];
+  return {
+    type: 'COMBINATION' as const,
+    id: item.combinationId,
+    mealHead: item.mealHead,
+    summary: components.map((component) => `${component.multiplier} × ${component.serving} ${component.name}`).join(' + '),
+    components,
+    nutrition: item.nutrition,
+    optionHash: item.optionHash,
+    version: item.snapshotVersion,
+  };
+};
+
 export const getPublishedDietPlanForClient = async (owner: ClientOwnershipContext) => {
   const payload = await getLatestPublishedDietPlanByClientId(owner);
   if (!payload) return null;
@@ -2695,11 +2721,7 @@ export const getPublishedDietPlanForClient = async (owner: ClientOwnershipContex
     version: {
       ...payload.version,
       content: sanitizePublishedNutritionPlanContent(payload.version.content),
-      commonFoodOptions: payload.version.commonFoodOptions.map((option) => {
-        const item=option as Record<string,unknown>;
-        const components=Array.isArray(item.components)?item.components.map((component)=>{const c=component as Record<string,unknown>;return {id:c.componentId,name:c.foodDisplayNameSnapshot,serving:c.servingDisplayNameSnapshot,multiplier:c.multiplier,grams:c.grams,millilitres:c.millilitres,nutrition:c.nutrition};}):[];
-        return {type:'COMBINATION',id:item.combinationId,summary:components.map((c)=>`${c.multiplier} × ${c.serving} ${c.name}`).join(' + '),components,nutrition:item.nutrition,optionHash:item.optionHash,version:item.snapshotVersion};
-      }),
+      commonFoodOptions: payload.version.commonFoodOptions.map(projectPublishedCommonFoodOption),
     },
   };
 };
