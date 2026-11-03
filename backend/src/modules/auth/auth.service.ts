@@ -432,6 +432,26 @@ export const changePin = async (
   return { ok: true };
 };
 
+export const issueTemporaryLoginPin = async (
+  actorUserId: string,
+  targetUserId: string,
+  metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
+) => {
+  const user = await findUserByIdForPin(targetUserId);
+  if (!user) throw asDomainError({ code: 'PIN_USER_NOT_FOUND', message: 'The Fiteatsy account was not found.' });
+  let temporaryPin = DEFAULT_PIN;
+  while (temporaryPin === DEFAULT_PIN) temporaryPin = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  await setUserPinHash(user.id, await bcrypt.hash(temporaryPin, PIN_BCRYPT_ROUNDS), { forcePinChange: true });
+  await createAuthEvent({
+    userId: user.id,
+    event: 'TEMPORARY_LOGIN_PIN_ISSUED',
+    metadata: { actorUserId },
+    userAgent: metadata.userAgent,
+    ipAddress: metadata.ipAddress
+  });
+  return { temporaryPin, forcePinChange: true as const };
+};
+
 export const resetOtpChallengesForTests = () => {
   otpStore.resetForTests();
   setOtpGeneratorForTests(null);

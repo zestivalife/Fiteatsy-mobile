@@ -2,13 +2,14 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
-import { createProfessionalAssignment, discoverClientsForAssignment, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ProfessionalAssignmentConflictError, revokeProfessionalAssignment, type ProfessionalType } from './professional-assignments.repository.js';
+import { createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverClientsForAssignment, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from './professional-assignments.repository.js';
 
 export const professionalAssignmentsRouter = Router();
 professionalAssignmentsRouter.use(requireAuthenticatedAccount);
 
 export const canManageProfessionalAssignments = (role: string | null | undefined) => ['admin', 'super_admin', 'platform_owner', 'senior_consultant', 'care_operations'].includes(String(role).toLowerCase());
-const assignmentSchema = z.object({ clientUserId: z.string().min(1), professionalUserId: z.string().min(1), professionalType: z.enum(['CONSULTANT', 'PRACTITIONER', 'MENTOR']), relationshipType: z.string().trim().min(2).max(80), reason: z.string().trim().max(240).optional(), expectedActiveAssignmentId: z.string().uuid().optional() });
+const assignmentSchema = z.object({ clientUserId: z.string().uuid(), professionalUserId: z.string().uuid(), professionalType: z.enum(['CONSULTANT', 'PRACTITIONER', 'MENTOR']), relationshipType: z.string().trim().min(2).max(80), reason: z.string().trim().max(240).optional(), allowReassignment: z.boolean().optional().default(false) });
+const assignmentBatchSchema = assignmentSchema.omit({ clientUserId: true }).extend({ clientUserIds: z.array(z.string().uuid()).min(1).max(100).transform((values) => [...new Set(values)]) });
 
 professionalAssignmentsRouter.get('/clients/search', async (req, res) => {
   if (!canManageProfessionalAssignments(getAuthenticatedAccount(req).user.role)) return res.status(403).json({ error: 'ASSIGNMENT_PERMISSION_REQUIRED' });
@@ -51,11 +52,26 @@ professionalAssignmentsRouter.post('/', async (req, res) => {
   try {
     assignment = await createProfessionalAssignment({ ...parsed.data, actorUserId: account.accountId, professionalType: parsed.data.professionalType as ProfessionalType });
   } catch (error) {
-    if (error instanceof ProfessionalAssignmentConflictError) return res.status(409).json({ error: error.code, activeAssignmentId: error.activeAssignmentId });
+    if (error instanceof ReassignmentRequiredError) return res.status(409).json({ error: 'REASSIGNMENT_CONFIRMATION_REQUIRED', currentAssignment: error.currentAssignment });
     throw error;
   }
   if (!assignment) return res.status(400).json({ error: 'INVALID_ASSIGNMENT_TARGET' });
   return res.status(201).json({ assignment });
+});
+
+professionalAssignmentsRouter.post('/batch', async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  if (!canManageProfessionalAssignments(account.user.role)) return res.status(403).json({ error: 'ASSIGNMENT_PERMISSION_REQUIRED' });
+  const parsed = assignmentBatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const assignments = await createProfessionalAssignmentsBatch({ ...parsed.data, actorUserId: account.accountId });
+    if (!assignments) return res.status(400).json({ error: 'INVALID_ASSIGNMENT_TARGET' });
+    return res.status(201).json({ assignments });
+  } catch (error) {
+    if (error instanceof ReassignmentRequiredError) return res.status(409).json({ error: 'REASSIGNMENT_CONFIRMATION_REQUIRED', currentAssignment: error.currentAssignment });
+    throw error;
+  }
 });
 
 professionalAssignmentsRouter.delete('/:assignmentId', async (req, res) => {

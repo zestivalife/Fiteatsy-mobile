@@ -36,13 +36,13 @@ test('tenant and OWNER membership are provisioned together without a Zestiva fal
   assert.doesNotMatch(repository, /ZESTIVA_TENANT_ID|ensureCanonicalZestivaMembership/);
 });
 
-test('external JWT bridge resolves canonical external OWNER while legacy bridge keeps Zestiva fallback', () => {
+test('external JWT bridge resolves canonical external OWNER while legacy identities retain their asserted subject', () => {
   const authRepository = read('backend/src/modules/auth/auth.repository.ts');
   assert.match(authRepository, /from external_consultant_signups/);
   assert.match(authRepository, /tenant_role='OWNER'/);
   assert.match(authRepository, /status='active'/);
   assert.match(authRepository, /if \(externalOwner\)/);
-  assert.match(authRepository, /else \{\s*await ensureCanonicalZestivaMembership/s);
+  assert.match(authRepository, /externalOwner\?\.fiteatsy_user_id \?\? input\.bridgeUserId/);
 });
 
 test('external mobile identities use the frozen digits-only canonical format', () => {

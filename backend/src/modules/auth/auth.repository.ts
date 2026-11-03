@@ -8,7 +8,6 @@ import {
 } from '../client/client.repository.js';
 import { normalizeCanonicalPhoneNumber } from '../../utils/phone.js';
 import { CONSULTANT_DIET_WORKFLOW_ROLES } from './consultant-role.policy.js';
-import { ensureCanonicalZestivaMembership } from '../tenancy/tenant-context.js';
 
 type Queryable = Pick<PoolClient, 'query'>;
 
@@ -362,13 +361,10 @@ const ensureConsultantDashboardBridgeUser = async (input: {
     const client = await pool.connect();
     try {
       await client.query('begin');
-      const externalSignup = await client.query<{
-        fiteatsy_user_id: string;
-        tenant_id: string;
-      }>(
-        `select fiteatsy_user_id,tenant_id
+      const externalSignup = await client.query<{ fiteatsy_user_id: string; tenant_id: string }>(
+        `select fiteatsy_user_id, tenant_id
            from external_consultant_signups
-          where auth_identity_id=$1
+          where auth_identity_id = $1
             and fiteatsy_user_id is not null
             and tenant_id is not null
           for update`,
@@ -395,9 +391,7 @@ const ensureConsultantDashboardBridgeUser = async (input: {
       const resolvedName = input.bridgeName?.trim() || [firstName, lastName].filter(Boolean).join(' ') || input.bridgeEmail || 'Consultant Dashboard User';
 
       if (existing.rowCount === 0) {
-        if (externalOwner) {
-          throw new Error('External Consultant provisioning is incomplete: linked Fiteatsy user is missing.');
-        }
+        if (externalOwner) throw new Error('External Consultant provisioning is incomplete: linked Fiteatsy user is missing.');
         const inserted = await client.query(
           `
             insert into users (
@@ -422,7 +416,6 @@ const ensureConsultantDashboardBridgeUser = async (input: {
           `,
           [input.bridgeUserId, resolvedName, firstName, lastName, input.bridgeEmail, timestamp, input.bridgeRole],
         );
-        await ensureCanonicalZestivaMembership(String(inserted.rows[0].id), input.bridgeRole === 'senior_consultant' ? 'SENIOR_CONSULTANT' : 'CONSULTANT', client);
         await client.query('commit');
         return mapUser(inserted.rows[0]);
       }
@@ -448,16 +441,11 @@ const ensureConsultantDashboardBridgeUser = async (input: {
       );
       if (externalOwner) {
         const membership = await client.query(
-          `select 1
-             from tenant_memberships
+          `select 1 from tenant_memberships
             where tenant_id=$1 and user_id=$2 and tenant_role='OWNER' and status='active' and removed_at is null`,
           [externalOwner.tenant_id, String(updated.rows[0].id)],
         );
-        if (membership.rowCount !== 1) {
-          throw new Error('External Consultant provisioning is incomplete: active OWNER membership is required.');
-        }
-      } else {
-        await ensureCanonicalZestivaMembership(String(updated.rows[0].id), input.bridgeRole === 'senior_consultant' ? 'SENIOR_CONSULTANT' : 'CONSULTANT', client);
+        if (membership.rowCount !== 1) throw new Error('External Consultant provisioning is incomplete: active OWNER membership is required.');
       }
       await client.query('commit');
       return mapUser(updated.rows[0]);
@@ -791,7 +779,7 @@ export const recordPinFailure = async (
 
 export const createAuthEvent = async (input: {
   userId?: string | null;
-  event: 'PIN_LOGIN_FAILED' | 'PIN_LOGIN_SUCCESS' | 'PIN_CHANGED';
+  event: 'PIN_LOGIN_FAILED' | 'PIN_LOGIN_SUCCESS' | 'PIN_CHANGED' | 'TEMPORARY_LOGIN_PIN_ISSUED';
   metadata?: Record<string, unknown>;
   userAgent?: string | null;
   ipAddress?: string | null;
