@@ -279,7 +279,7 @@ test('dietician bridge role reaches Common Food through governed identity and le
         updated_at timestamptz not null default now()
       )
     `);
-    await pool.query('truncate table external_consultant_tenant_memberships, external_consultant_signups');
+    await pool.query('truncate table external_consultant_signups cascade');
     await pool.query(
       `insert into users(id,name,role,status)
        values($1,'Legacy dietician assignment principal','dietician','active')`,

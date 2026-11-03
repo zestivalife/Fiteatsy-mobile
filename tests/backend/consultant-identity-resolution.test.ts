@@ -18,7 +18,7 @@ test.beforeEach(async () => {
       updated_at timestamptz not null default now()
     )
   `);
-  await pool.query('truncate table external_consultant_tenant_memberships, external_consultant_signups');
+  await pool.query('truncate table external_consultant_signups cascade');
 });
 
 const account = async (suffix: string) => resolveVerifiedAccountIdentity({
@@ -106,7 +106,7 @@ test('inactive and ambiguous governed identities fail closed', async () => {
   );
   assert.equal((await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id)).status, 'INACTIVE');
 
-  await pool.query('truncate table external_consultant_tenant_memberships, external_consultant_signups');
+  await pool.query('truncate table external_consultant_signups cascade');
   const first = await account('6');
   const second = await account('7');
   await pool.query(
@@ -131,7 +131,7 @@ test('revoked, tenant-mismatched and invalid JWT identities fail closed', async 
     'INACTIVE',
   );
 
-  await pool.query('truncate table external_consultant_tenant_memberships, external_consultant_signups');
+  await pool.query('truncate table external_consultant_signups cascade');
   await pool.query(
     `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state,tenant_id)
      values(gen_random_uuid(),$1,$2,'READY',$3)`,
@@ -142,7 +142,7 @@ test('revoked, tenant-mismatched and invalid JWT identities fail closed', async 
     'TENANT_MISMATCH',
   );
 
-  await pool.query('truncate table external_consultant_tenant_memberships, external_consultant_signups');
+  await pool.query('truncate table external_consultant_signups cascade');
   assert.equal(
     (await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id, 'missing-application-principal')).status,
     'INACTIVE',
