@@ -104,3 +104,16 @@ test('onboarding persists explicit resumable completion fields without marking t
   assert.match(migration, /practice_details_complete boolean not null/);
   assert.match(migration, /workspace_ready boolean not null default false/);
 });
+
+test('consultant onboarding HTTP routes remain connected to the governed repository lifecycle', () => {
+  const routes = read('backend/src/modules/consultants/consultants.routes.ts');
+
+  assert.match(routes, /consultantsRouter\.get\('\/onboarding'/);
+  assert.match(routes, /consultantsRouter\.patch\('\/onboarding'/);
+  assert.match(routes, /consultantsRouter\.post\('\/onboarding\/complete'/);
+  assert.match(routes, /getExternalConsultantOnboarding\(getAuthenticatedAccount\(req\)\.accountId\)/);
+  assert.match(routes, /updateExternalConsultantOnboarding\(getAuthenticatedAccount\(req\)\.accountId/);
+  assert.match(routes, /completeExternalConsultantOnboarding/);
+  assert.match(routes, /consultantsRouter\.use\(requireAuthenticatedAccount\)/);
+  assert.match(routes, /consultantsRouter\.use\(requireConsultantAccount\)/);
+});
