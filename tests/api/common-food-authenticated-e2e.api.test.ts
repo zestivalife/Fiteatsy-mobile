@@ -5,7 +5,6 @@ import { pool } from '../../backend/src/db/pool.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson, patchJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
-import { ensureActiveTenantMembership } from '../../backend/src/modules/client/client.repository.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 
@@ -285,13 +284,19 @@ test('dietician bridge role reaches Common Food through governed identity and le
        values($1,'Legacy dietician assignment principal','dietician','active')`,
       [assignmentPrincipal],
     );
-    await ensureActiveTenantMembership(assignmentPrincipal, tenantId, 'CONSULTANT');
+    const ownerMembershipId = crypto.randomUUID();
+    const membershipTimestamp = new Date().toISOString();
+    await pool.query(
+      `insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status,joined_at,created_at,updated_at)
+       values($1,$2,$3,'OWNER','active',$4,$4,$4)`,
+      [ownerMembershipId, tenantId, assignmentPrincipal, membershipTimestamp],
+    );
     await pool.query(
       `insert into external_consultant_signups(
          id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,signup_state,
-         tenant_id,idempotency_key,created_by_reference
-       ) values(gen_random_uuid(),$1,$2,$1 || '@qa.invalid','INDEPENDENT_CONSULTANT','READY',$3,gen_random_uuid()::text,'database-test')`,
-      [authenticatedSubject, assignmentPrincipal, tenantId],
+         tenant_id,owner_membership_id,idempotency_key,created_by_reference
+       ) values(gen_random_uuid(),$1,$2,$1 || '@qa.invalid','INDEPENDENT_CONSULTANT','READY',$3,$4,gen_random_uuid()::text,'database-test')`,
+      [authenticatedSubject, assignmentPrincipal, tenantId, ownerMembershipId],
     );
     await pool.query(
       `insert into consultant_client_assignments(
