@@ -157,8 +157,8 @@ async function ensureTenantAndOwner(client: PoolClient, row: SignupRow, input: E
       [tenantId, tenantName, safeSlug(tenantName, row.id), tenantType, row.fiteatsy_user_id, input.timezone, input.country]
     );
     await client.query(
-      `insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status)
-       values($1,$2,$3,'OWNER','active') on conflict(tenant_id,user_id) do update set tenant_role='OWNER',status='active',removed_at=null,updated_at=now()`,
+      `insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status,joined_at)
+       values($1,$2,$3,'OWNER','active',now()) on conflict(tenant_id,user_id) do update set tenant_role='OWNER',status='active',removed_at=null,updated_at=now()`,
       [membershipId, tenantId, row.fiteatsy_user_id]
     );
     const canonicalMembership = await client.query<{ id: string }>(

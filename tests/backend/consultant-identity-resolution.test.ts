@@ -19,6 +19,13 @@ test.beforeEach(async () => {
     )
   `);
   await pool.query('truncate table external_consultant_signups cascade');
+  await pool.query(
+    `insert into tenants(id,name,slug,tenant_type,status,country,currency)
+     values
+       ('11111111-1111-4111-8111-111111111111','Identity tenant one','identity-tenant-one','PRACTICE','active','IN','INR'),
+       ('22222222-2222-4222-8222-222222222222','Identity tenant two','identity-tenant-two','PRACTICE','active','IN','INR')
+     on conflict(id) do nothing`,
+  );
 });
 
 const account = async (suffix: string) => resolveVerifiedAccountIdentity({

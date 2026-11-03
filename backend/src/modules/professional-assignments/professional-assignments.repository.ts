@@ -12,7 +12,13 @@ export class ReassignmentRequiredError extends Error {
     this.name = 'ReassignmentRequiredError';
     this.currentAssignment = currentAssignment;
   }
+
+  get activeAssignmentId() {
+    return String(this.currentAssignment.id ?? '');
+  }
 }
+
+export const ProfessionalAssignmentConflictError = ReassignmentRequiredError;
 
 const GENERIC_PROFESSIONAL_NAMES = new Set([
   'consultant dashboard user',
