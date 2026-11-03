@@ -164,9 +164,12 @@ test('database preserves exact 35-option identity through review, revision, appr
   assert.equal(positions.length, 5);
   await unlink(document.outputPath);
 
-  const incomplete = structuredClone(revisedContent);
-  incomplete.mealPlan.dinner.options.pop();
-  assert.throws(() => assertDietPlanReviewContentComplete(incomplete), /exactly 5/);
+  const clinicallyCompleteMinimum = structuredClone(revisedContent);
+  for (const section of Object.values(clinicallyCompleteMinimum.mealPlan)) section.options = section.options.slice(0, 1);
+  assert.doesNotThrow(() => assertDietPlanReviewContentComplete(clinicallyCompleteMinimum));
+  const incomplete = structuredClone(clinicallyCompleteMinimum);
+  incomplete.mealPlan.dinner.options = [];
+  assert.throws(() => assertDietPlanReviewContentComplete(incomplete), /dinner: 1-5 saved options required/);
   const rawIngredient = structuredClone(revisedContent);
   rawIngredient.mealPlan.lunch.options[0] = { ...rawIngredient.mealPlan.lunch.options[0], id: `food:${ingredientId}` };
   assert.throws(() => assertDietPlanReviewContentComplete(rawIngredient), /client-consumable/);

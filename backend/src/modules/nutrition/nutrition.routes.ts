@@ -100,7 +100,7 @@ const mealSectionSchema = z.object({
   focus: z.string(),
   target: mealTargetSchema.optional(),
   recommendationSets: z.array(recommendationSetSchema).optional(),
-  options: z.array(mealOptionSchema),
+  options: z.array(mealOptionSchema).max(5),
   availableOptions: z.array(mealOptionSchema).optional(),
   availability: z.object({
     code: z.enum(['SUFFICIENT_DISTINCT_MEAL_OPTIONS', 'INSUFFICIENT_DISTINCT_MEAL_OPTIONS']),
@@ -250,7 +250,20 @@ const commonFoodCatalogueQuerySchema=z.object({scope:z.enum(['ALL','RECOMMENDED'
 const commonFoodGenerateSchema=z.object({mealHeads:z.array(mealHeadSchema).min(1).default([...MEAL_HEADS])});
 const commonFoodOptionSchema=z.object({mealHead:mealHeadSchema,components:z.array(commonFoodComponentSchema).min(1)});
 const commonFoodPersistSchema=commonFoodOptionSchema.extend({optionId:z.string().min(1).optional(),expectedPlanVersionId:z.string().uuid()});
-const commonFoodSelectionSchema=z.object({expectedPlanVersionId:z.string().uuid(),options:z.array(commonFoodOptionSchema.extend({optionId:z.string().min(1)})).length(35)}).strict();
+const commonFoodSelectionSchema=z.object({
+  expectedPlanVersionId:z.string().uuid(),
+  options:z.array(commonFoodOptionSchema.extend({optionId:z.string().min(1)})).max(MEAL_HEADS.length*5),
+}).strict().superRefine((value,context)=>{
+  const counts=new Map<string,number>();
+  const optionIds=new Set<string>();
+  value.options.forEach((option,index)=>{
+    const count=(counts.get(option.mealHead)??0)+1;
+    counts.set(option.mealHead,count);
+    if(count>5)context.addIssue({code:z.ZodIssueCode.custom,path:['options',index],message:`${option.mealHead} supports at most five draft options.`});
+    if(optionIds.has(option.optionId))context.addIssue({code:z.ZodIssueCode.custom,path:['options',index,'optionId'],message:'Draft option IDs must be unique.'});
+    optionIds.add(option.optionId);
+  });
+});
 const mutationBaseSchema=z.object({expectedPlanVersionId:z.string().uuid(),draft:z.object({mealHead:mealHeadSchema,components:z.array(commonFoodComponentSchema).min(1)}).optional()});
 const handleCommonFoodError=(res:Response,error:unknown)=>{if(error instanceof CommonFoodApiError)return res.status(error.statusCode).json({error:error.code,message:error.message});throw error;};
 

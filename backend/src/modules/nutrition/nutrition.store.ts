@@ -147,6 +147,7 @@ const mapDietPlanVersion = (row: Record<string, unknown>): DietPlanVersionRecord
   exportedPdfPath: row.exported_pdf_path == null ? null : String(row.exported_pdf_path),
   commonFoodOptions: Array.isArray(row.common_food_options) ? row.common_food_options : [],
   commonFoodSnapshotHash: row.common_food_snapshot_hash == null ? null : String(row.common_food_snapshot_hash),
+  commonFoodSelectionInitialized: row.common_food_selection_initialized === true,
   ...mapAuditFields(row),
 });
 
@@ -189,7 +190,7 @@ export const listDietPlanReviewQueue = async (qaFixtureSetId?: string) => {
             coalesce(nullif(trim(concat_ws(' ', consultant.first_name, consultant.last_name)), ''), consultant.name) as consultant_name,
             fiteatsy_client.fiteatsy_client_id as public_client_id,
             dpv.id as version_id, dpv.version_number, dpv.content, dpv.content_summary, dpv.lifecycle_status,
-            dpv.common_food_options, dpv.common_food_snapshot_hash,
+            dpv.common_food_options, dpv.common_food_snapshot_hash, dpv.common_food_selection_initialized,
             coalesce((select json_agg(json_build_object(
               'eventType', events.event_type,
               'comment', events.comment,
@@ -239,6 +240,7 @@ export const listDietPlanReviewQueue = async (qaFixtureSetId?: string) => {
       content: toRecord(row.content, {}),
       commonFoodOptions: Array.isArray(row.common_food_options) ? row.common_food_options : [],
       commonFoodSnapshotHash: row.common_food_snapshot_hash == null ? null : String(row.common_food_snapshot_hash),
+      commonFoodSelectionInitialized: row.common_food_selection_initialized === true,
       contentSummary: (() => {
         const summary = toRecord<Record<string, unknown>>(row.content_summary, {});
         const content = toRecord<Record<string, unknown>>(row.content, {});

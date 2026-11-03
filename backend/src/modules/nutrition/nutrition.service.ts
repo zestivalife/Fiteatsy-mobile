@@ -149,11 +149,41 @@ const canonicalReviewOptionIdentity = (option: NutritionMealSlot) => {
   return `meal:${lower(option.meal)}::${lower(option.portion)}`;
 };
 
+export const assertDietPlanDraftContentValid = (content: unknown) => {
+  const mealPlan = content && typeof content === 'object'
+    ? (content as Partial<NutritionPlanContent>).mealPlan
+    : null;
+  const failures: string[] = [];
+  for (const mealKey of NUTRITION_MEAL_SEQUENCE) {
+    const section = mealPlan && typeof mealPlan === 'object'
+      ? (mealPlan as Partial<NutritionPlanContent['mealPlan']>)[mealKey]
+      : null;
+    const options = Array.isArray(section?.options) ? section.options : [];
+    if (options.length > MAX_MEAL_OPTIONS_PER_SECTION) {
+      failures.push(`${mealKey}: at most ${MAX_MEAL_OPTIONS_PER_SECTION} draft options are allowed`);
+    }
+    const identities = new Set<string>();
+    options.forEach((option, index) => {
+      const identity = canonicalReviewOptionIdentity(option);
+      if (identities.has(identity)) failures.push(`${mealKey}: duplicate option ${index + 1}`);
+      identities.add(identity);
+    });
+  }
+  if (!mealPlan) failures.push('seven canonical meal sections are required');
+  if (failures.length > 0) {
+    throw new NutritionPlanWorkflowError(
+      'DIET_PLAN_DRAFT_INVALID',
+      `Correct the draft before saving: ${failures.join('; ')}.`,
+      422,
+    );
+  }
+};
+
 /**
- * A submitted review must be a complete, immutable clinical review unit.
- * Candidate availability may truthfully contain fewer than five items, but the
- * persisted Consultant selection must contain exactly five valid options for
- * every canonical meal head.
+ * Approval and publication require a complete, immutable clinical review unit.
+ * Drafts may contain zero to five options per meal. A clinically complete
+ * version has at least one valid option for every canonical meal head; five is
+ * a maximum, not a required target.
  */
 export const assertDietPlanReviewContentComplete = (content: unknown) => {
   const mealPlan = content && typeof content === 'object'
@@ -166,8 +196,8 @@ export const assertDietPlanReviewContentComplete = (content: unknown) => {
       ? (mealPlan as Partial<NutritionPlanContent['mealPlan']>)[mealKey]
       : null;
     const options = Array.isArray(section?.options) ? section.options : [];
-    if (options.length !== MAX_MEAL_OPTIONS_PER_SECTION) {
-      failures.push(`${mealKey}: exactly ${MAX_MEAL_OPTIONS_PER_SECTION} saved options required (received ${options.length})`);
+    if (options.length < 1 || options.length > MAX_MEAL_OPTIONS_PER_SECTION) {
+      failures.push(`${mealKey}: 1-${MAX_MEAL_OPTIONS_PER_SECTION} saved options required for approval (received ${options.length})`);
     }
 
     const identities = new Set<string>();
@@ -207,8 +237,8 @@ export const assertCommonFoodReviewOptionsComplete = (options: unknown[]) => {
   for (const mealHead of COMMON_FOOD_MEAL_HEADS) {
     const mealOptions = options.filter((option) => option && typeof option === 'object'
       && (option as Record<string, unknown>).mealHead === mealHead);
-    if (mealOptions.length !== MAX_MEAL_OPTIONS_PER_SECTION) {
-      failures.push(`${mealHead}: exactly ${MAX_MEAL_OPTIONS_PER_SECTION} saved options required (received ${mealOptions.length})`);
+    if (mealOptions.length < 1 || mealOptions.length > MAX_MEAL_OPTIONS_PER_SECTION) {
+      failures.push(`${mealHead}: 1-${MAX_MEAL_OPTIONS_PER_SECTION} saved options required for approval (received ${mealOptions.length})`);
     }
     const identities = new Set<string>();
     mealOptions.forEach((raw, index) => {
@@ -237,9 +267,20 @@ export const assertCommonFoodReviewOptionsComplete = (options: unknown[]) => {
   }
 };
 
-const assertDietPlanVersionReviewComplete = (version: { content: unknown; commonFoodOptions?: unknown[] }) => {
-  if ((version.commonFoodOptions?.length ?? 0) > 0) assertCommonFoodReviewOptionsComplete(version.commonFoodOptions!);
+const assertDietPlanVersionReviewComplete = (version: { content: unknown; commonFoodOptions?: unknown[]; commonFoodSelectionInitialized?: boolean }) => {
+  if (version.commonFoodSelectionInitialized || (version.commonFoodOptions?.length ?? 0) > 0) assertCommonFoodReviewOptionsComplete(version.commonFoodOptions ?? []);
   else assertDietPlanReviewContentComplete(version.content);
+};
+
+const freezeVersionForClinicalReview = async (planId: string, version: DietPlanVersionRecord) => {
+  if (!version.commonFoodSelectionInitialized) return version;
+  const frozen = await freezeCombinationOptionsForLifecycle(planId, version.id);
+  return {
+    ...version,
+    commonFoodOptions: frozen.options,
+    commonFoodSnapshotHash: frozen.snapshotHash,
+    commonFoodSelectionInitialized: true,
+  };
 };
 
 type NutritionMealPlanKey = keyof NutritionPlanContent['mealPlan'];
@@ -2108,7 +2149,9 @@ export const updateConsultantDietPlanDraft = async (
     );
   }
   const foodPreferences = await getFoodPreferenceProfile(publicClientId);
-  if (!input.allowIncompleteMealPlan) assertDietPlanReviewContentComplete(input.content);
+  assertDietPlanDraftContentValid(input.content);
+  // Draft persistence deliberately permits incomplete meal sections. Clinical
+  // completeness is enforced only by approval/submission and publication.
   assertDietPlanRespectsFoodPreferences(input.content, foodPreferences?.profile ?? null, workspace.healthProfile ?? null);
   const sourceSnapshot = buildSourceSnapshot({
     bmi: workspace.metrics.bmi.status === 'AVAILABLE' ? workspace.metrics.bmi.value : null,
@@ -2420,9 +2463,8 @@ export const submitConsultantDietPlanForReview = async (
   if (!plan || plan.careCaseId !== workspace.careCase.id || !plan.currentVersionId) return null;
   const version = await getCurrentDietPlanVersion(plan.id);
   if (!version) return null;
-  const frozenCommonFood = await freezeCombinationOptionsForLifecycle(plan.id, version.id);
-  if (frozenCommonFood.options.length > 0) assertCommonFoodReviewOptionsComplete(frozenCommonFood.options);
-  else assertDietPlanReviewContentComplete(version.content);
+  const reviewVersion = await freezeVersionForClinicalReview(plan.id, version);
+  assertDietPlanVersionReviewComplete(reviewVersion);
   await assertOptionalGuidanceValid(publicClientId, version.content);
   assertLifecycleTransition(version.lifecycleStatus, 'submitted_for_review');
   return updateDietPlanLifecycle({
@@ -2495,8 +2537,9 @@ export const approveConsultantDietPlan = async (
   if (!workspace) return null;
   const plan = await getDietPlanById(dietPlanId);
   if (!plan || plan.careCaseId !== workspace.careCase?.id || !plan.currentVersionId) return null;
-  const currentVersion = await getCurrentDietPlanVersion(plan.id);
-  if (!currentVersion) return null;
+  const editableVersion = await getCurrentDietPlanVersion(plan.id);
+  if (!editableVersion) return null;
+  const currentVersion = await freezeVersionForClinicalReview(plan.id, editableVersion);
   assertDietPlanVersionReviewComplete(currentVersion);
   const guidance = await assertOptionalGuidanceValid(publicClientId, currentVersion.content);
   assertLifecycleTransition(currentVersion.lifecycleStatus, 'approved');

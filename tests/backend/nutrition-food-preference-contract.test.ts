@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NUTRITION_MEAL_SEQUENCE, type NutritionPlanContent, type NutritionMealSlot } from '../../backend/src/modules/platform/platform.types.js';
 import type { FoodPreferenceProfile } from '../../backend/src/modules/nutrition/food-preferences.service.js';
-import { assertDietPlanRespectsFoodPreferences, assertDietPlanReviewContentComplete, selectDiverseMealOptions } from '../../backend/src/modules/nutrition/nutrition.service.js';
+import { assertDietPlanDraftContentValid, assertDietPlanRespectsFoodPreferences, assertDietPlanReviewContentComplete, selectDiverseMealOptions } from '../../backend/src/modules/nutrition/nutrition.service.js';
 import { isDietaryPatternCompatible } from '../../backend/src/modules/nutrition/nutrition.library.store.js';
 
 const profile = (overrides: Partial<FoodPreferenceProfile> = {}): FoodPreferenceProfile => ({
@@ -187,8 +187,10 @@ const completeReviewContent = (): NutritionPlanContent => {
   return { mealPlan } as NutritionPlanContent;
 };
 
-test('review content requires exactly five saved options for every canonical meal head', () => {
+test('review content requires one to five saved options for every canonical meal head', () => {
   const content = completeReviewContent();
+  assert.doesNotThrow(() => assertDietPlanReviewContentComplete(content));
+  for (const section of Object.values(content.mealPlan)) section.options = section.options.slice(0, 1);
   assert.doesNotThrow(() => assertDietPlanReviewContentComplete(content));
   content.mealPlan.lunch.options = [];
   assert.throws(
@@ -198,6 +200,19 @@ test('review content requires exactly five saved options for every canonical mea
       && (error as { message?: string }).message?.includes('lunch') === true
     ),
   );
+});
+
+test('draft content permits zero-to-five options per canonical meal head', () => {
+  const content = completeReviewContent();
+  for (const section of Object.values(content.mealPlan)) section.options = [];
+  content.mealPlan.breakfast.options = completeReviewContent().mealPlan.breakfast.options.slice(0, 1);
+  assert.doesNotThrow(() => assertDietPlanDraftContentValid(content));
+  content.mealPlan.breakfast.options = Array.from({ length: 6 }, (_, index) => ({
+    ...completeReviewContent().mealPlan.breakfast.options[index % 5],
+    id: `draft-${index}`,
+    slot: index + 1,
+  }));
+  assert.throws(() => assertDietPlanDraftContentValid(content), /at most 5 draft options/);
 });
 
 test('review content rejects template placeholders, duplicates and more than five selections', () => {

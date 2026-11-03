@@ -618,6 +618,7 @@ export type DietPlanVersionRecord = AuditFields & {
   exportedPdfPath: string | null;
   commonFoodOptions: unknown[];
   commonFoodSnapshotHash: string | null;
+  commonFoodSelectionInitialized: boolean;
 };
 
 export type ReportPipelineProgress = {

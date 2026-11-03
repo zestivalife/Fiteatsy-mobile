@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { assertExactCommonFoodSelection } from '../../backend/src/modules/nutrition/common-food-consultant.service.ts';
+import { assertDraftCommonFoodSelection } from '../../backend/src/modules/nutrition/common-food-consultant.service.ts';
 import { MEAL_HEADS, type MealHead } from '../../backend/src/modules/nutrition/common-food-engine.ts';
 
 const read=(path:string)=>readFileSync(new URL(path,import.meta.url),'utf8');
@@ -9,12 +9,13 @@ const selection=(counts:Partial<Record<MealHead,number>>={})=>MEAL_HEADS.flatMap
   Array.from({length:counts[head]??5},(_,index)=>({optionId:`${head}:${index}`,mealHead:head})),
 );
 
-test('v17.9 accepts one authoritative 7x5 selection and rejects the 22/35 regression',()=>{
- assert.doesNotThrow(()=>assertExactCommonFoodSelection(selection()));
- assert.throws(()=>assertExactCommonFoodSelection(selection({EARLY_MORNING:2,BREAKFAST:0,MID_MORNING:5,LUNCH:5,EVENING_SNACK:5,DINNER:5,BEDTIME:0})),/Exactly five distinct options/);
- assert.throws(()=>assertExactCommonFoodSelection(selection({BEDTIME:0})),/Exactly five distinct options/);
+test('v17.9 accepts zero-to-five draft options per meal and rejects duplicates or overflow',()=>{
+ assert.doesNotThrow(()=>assertDraftCommonFoodSelection(selection()));
+ assert.doesNotThrow(()=>assertDraftCommonFoodSelection(selection({EARLY_MORNING:2,BREAKFAST:0,MID_MORNING:5,LUNCH:5,EVENING_SNACK:5,DINNER:5,BEDTIME:0})));
+ assert.doesNotThrow(()=>assertDraftCommonFoodSelection(selection({BEDTIME:0})));
+ assert.throws(()=>assertDraftCommonFoodSelection(selection({BEDTIME:6})),/zero to five distinct options/);
  const duplicated=selection();duplicated[34]={...duplicated[34],optionId:duplicated[0].optionId};
- assert.throws(()=>assertExactCommonFoodSelection(duplicated),/Exactly five distinct options/);
+ assert.throws(()=>assertDraftCommonFoodSelection(duplicated),/zero to five distinct options/);
 });
 
 test('v17.9 migration is additive and separates candidate history from selected mappings',()=>{

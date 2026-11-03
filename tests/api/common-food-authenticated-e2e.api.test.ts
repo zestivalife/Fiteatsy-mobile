@@ -155,10 +155,38 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     const selectedOptions = generated.body.meals.flatMap((meal: { mealHead: string; options: Array<{ combinationId: string; components: Array<{ foodId: string; servingId: string; multiplier: number }> }> }) =>
       meal.options.map((option) => ({ optionId: option.combinationId, mealHead: meal.mealHead, components: option.components.map(({ foodId, servingId, multiplier }) => ({ foodId, servingId, multiplier })) })),
     );
+    const emptyDraft = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+      expectedPlanVersionId: draft.body.version.id, options: [],
+    }, { headers: authHeaders(consultant.token) });
+    assert.equal(emptyDraft.response.status, 200, JSON.stringify(emptyDraft.body));
+    assert.equal(emptyDraft.body.options.length, 0);
+
+    const oneOption = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+      expectedPlanVersionId: draft.body.version.id, options: selectedOptions.slice(0, 1),
+    }, { headers: authHeaders(consultant.token) });
+    assert.equal(oneOption.response.status, 200, JSON.stringify(oneOption.body));
+    assert.equal(oneOption.body.options.length, 1);
+    const oneOptionReloaded = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, { headers: authHeaders(consultant.token) });
+    assert.equal(oneOptionReloaded.response.status, 200, JSON.stringify(oneOptionReloaded.body));
+    assert.equal(oneOptionReloaded.body.options.length, 1);
+    if (index === 0) {
+      const incompleteApproval = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/approve`, {}, { headers: authHeaders(consultant.token) });
+      assert.equal(incompleteApproval.response.status, 409, JSON.stringify(incompleteApproval.body));
+      assert.equal(incompleteApproval.body.error, 'DIET_PLAN_REVIEW_CONTENT_INCOMPLETE');
+    }
+
     const partial = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
       expectedPlanVersionId: draft.body.version.id, options: selectedOptions.slice(0, 22),
     }, { headers: authHeaders(consultant.token) });
-    assert.equal(partial.response.status, 400, JSON.stringify(partial.body));
+    assert.equal(partial.response.status, 200, JSON.stringify(partial.body));
+    assert.equal(partial.body.options.length, 22);
+
+    const firstMeal = selectedOptions.filter((option: { mealHead: string }) => option.mealHead === 'EARLY_MORNING');
+    const overflow = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
+      expectedPlanVersionId: draft.body.version.id,
+      options: [...firstMeal, { ...firstMeal[0], optionId: `${firstMeal[0].optionId}-sixth` }],
+    }, { headers: authHeaders(consultant.token) });
+    assert.equal(overflow.response.status, 400, JSON.stringify(overflow.body));
 
     for (let cycle = 0; cycle < 2; cycle += 1) {
       const saved = await putJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/common-food/options`, {
@@ -177,6 +205,34 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     }, { headers: authHeaders(consultant.token) });
     assert.equal(stale.response.status, 409, JSON.stringify(stale.body));
     assert.equal(stale.body.error, 'STALE_PLAN_VERSION');
+
+    if (index === 0) {
+      const approved = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/approve`, {}, { headers: authHeaders(consultant.token) });
+      assert.equal(approved.response.status, 200, JSON.stringify(approved.body));
+      assert.equal(approved.body.version.lifecycleStatus, 'approved');
+      assert.equal(approved.body.plan.approvedBy, consultant.user.id);
+
+      const published = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/publish`, {
+        approvedVersionId: approved.body.version.id,
+      }, { headers: authHeaders(consultant.token) });
+      assert.equal(published.response.status, 200, JSON.stringify(published.body));
+      assert.equal(published.body.version.lifecycleStatus, 'published');
+      assert.equal(published.body.plan.latestPublishedVersionId, approved.body.version.id);
+
+      const clientPlan = await getJson(server.baseUrl, '/v1/platform/nutrition-plan', { headers: authHeaders(client.token) });
+      assert.equal(clientPlan.response.status, 200, JSON.stringify(clientPlan.body));
+      assert.equal(clientPlan.body.status, 'active');
+      assert.equal(clientPlan.body.version.id, approved.body.version.id);
+      assert.equal(clientPlan.body.version.commonFoodOptions.length, 35);
+      assert.equal(new Set(clientPlan.body.version.commonFoodOptions.map((option: { mealHead: string }) => option.mealHead)).size, 7);
+
+      const subsequentDraft = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/draft`, {}, { headers: authHeaders(consultant.token) });
+      assert.equal(subsequentDraft.response.status, 201, JSON.stringify(subsequentDraft.body));
+      assert.notEqual(subsequentDraft.body.version.id, approved.body.version.id);
+      const clientPlanAfterDraft = await getJson(server.baseUrl, '/v1/platform/nutrition-plan', { headers: authHeaders(client.token) });
+      assert.equal(clientPlanAfterDraft.response.status, 200, JSON.stringify(clientPlanAfterDraft.body));
+      assert.equal(clientPlanAfterDraft.body.version.id, approved.body.version.id);
+    }
   }
 });
 
