@@ -727,16 +727,20 @@ export const createCareCaseIfMissing = async (
     `
       insert into care_cases (
         id, user_id, client_id, health_profile_id, recovery_program_id, assigned_consultant_id, assigned_mentor_id,
-        current_stage, previous_stage, last_transition_at, status, version, created_at, updated_at, deleted_at, tenant_id
-      ) values (
-        $1, $2, $3, $4, $5, null, null,
-        $6, null, $7, 'active', 1, $7, $7, null,
-        (select tenant_id from fiteatsy_clients where id = $3 and account_user_id = $2 and deleted_at is null)
+        current_stage, previous_stage, last_transition_at, status, version, created_at, updated_at, deleted_at
       )
+      select
+        $1, $2, $3, $4, $5, null, null,
+        $6, null, $7, 'active', 1, $7, $7, null
+      from fiteatsy_clients
+      where id = $3
+        and account_user_id = $2
+        and deleted_at is null
       returning *
     `,
     [crypto.randomUUID(), owner.accountId, owner.clientId, healthProfileId, recoveryProgramId, stage, nowIso()]
   );
+  if (inserted.rowCount === 0) throw new Error('Client ownership could not be verified');
   return mapCareCase(inserted.rows[0]);
 };
 
