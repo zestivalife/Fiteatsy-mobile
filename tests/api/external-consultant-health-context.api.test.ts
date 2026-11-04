@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import test from 'node:test';
 import { resetDelegatedAuthorityReplayStoreForTests } from '../../backend/src/modules/auth/delegated-authority.js';
+import { createInitialPin } from '../../backend/src/modules/auth/auth.service.js';
 import { pss10Items } from '../../backend/src/modules/assessments/assessment-definitions.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson, postJson, putJson } from '../helpers/http.js';
@@ -43,8 +44,7 @@ test('delegated health context returns the persisted canonical food preferences 
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Delegated Health Client', email: `delegated-health-${Date.now()}@example.com`
   });
-  const pin = await putJson(server.baseUrl, '/v1/auth/create-pin', { newPin: '946281', confirmNewPin: '946281' }, { headers: authHeaders(client.token) });
-  assert.equal(pin.response.status, 201, JSON.stringify(pin.body));
+  await createInitialPin(client.current.body.user.id, { newPin: '946281' });
   const preferences = {
     dietType: 'non_vegetarian', proteins: ['Eggs', 'Chicken'], cuisines: ['Maharashtrian', 'North Indian'],
     foodsLiked: ['Poha'], foodsDisliked: ['Oats'], foodsAvoided: ['Mushroom'],
