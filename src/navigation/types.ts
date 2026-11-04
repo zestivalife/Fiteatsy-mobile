@@ -47,6 +47,7 @@ export type RootStackParamList = {
   Search: undefined;
   Notifications: undefined;
   Profile: undefined;
+  BodyMeasurements: undefined;
   Reports: undefined;
   ReportComparison: undefined;
   Sessions: undefined;

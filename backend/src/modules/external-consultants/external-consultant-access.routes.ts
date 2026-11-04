@@ -4,6 +4,7 @@ import { requireDelegatedAuthority } from '../auth/delegated-authority.middlewar
 import type { DelegatedAuthority } from '../auth/delegated-authority.js';
 import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSummaryForClient, listConsultantReportSummariesForClient, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
 import { getReportFile } from '../reports/reports.store.js';
+import { getFoodPreferenceProfile } from '../nutrition/food-preferences.service.js';
 
 export const externalConsultantAccessRouter = Router();
 const authority = (req: Request) => (req as Request & { delegatedAuthority?: DelegatedAuthority }).delegatedAuthority;
@@ -22,15 +23,17 @@ externalConsultantAccessRouter.get('/:userId/health-context', requireDelegatedAu
     const context = await getRegisteredClientProfileContextByAccountId(String(req.params.userId));
     if (!context) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'The connected Fiteatsy client was not found.' });
     const scopes = new Set(auth.scopes ?? []);
-    const [reports, biomarkers, wearables] = await Promise.all([
+    const [reports, biomarkers, wearables, foodPreferences] = await Promise.all([
       scopes.has('HEALTH_SUMMARY') ? listConsultantReportSummariesForClient(context.internalClientId, context.accountId, 100) : Promise.resolve([]),
       scopes.has('BIOMARKERS') ? listValidatedBiomarkerSummaryForClient(context.internalClientId, context.accountId) : Promise.resolve([]),
-      scopes.has('MEASUREMENTS') ? getConsultantWearableSummaryForClient(context.internalClientId, context.accountId) : Promise.resolve(null)
+      scopes.has('MEASUREMENTS') ? getConsultantWearableSummaryForClient(context.internalClientId, context.accountId) : Promise.resolve(null),
+      scopes.has('PROFILE') ? getFoodPreferenceProfile(context.profile.client.id) : Promise.resolve(null)
     ]);
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({
       connectionId: auth.connection_id,
       profile: scopes.has('PROFILE') ? context.profile : null,
+      foodPreferences,
       measurements: scopes.has('MEASUREMENTS') ? context.calculationInput : null,
       reports,
       biomarkers,

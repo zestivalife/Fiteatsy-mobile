@@ -109,6 +109,15 @@ export const ProfileScreen = ({ navigation }: Props) => {
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Nutrition Profile Readiness</Text><Text style={[styles.value, { color: healthProfile?.isAiReady ? '#59BE08' : '#F0B44C' }]}>{healthProfile ? `${healthProfile.readinessPercent}%` : clientBootstrap.profile.status === 'ERROR' ? 'Unavailable' : 'Loading'}</Text></View>
         <View style={styles.row}><Text style={[styles.label, { color: palette.textSecondary }]}>Missing</Text><Text style={[styles.value, { color: palette.textPrimary }]}>{healthProfile ? healthProfile.missingItems.slice(0, 3).join(', ') || 'Nothing important missing' : clientBootstrap.profile.status === 'ERROR' ? 'Could not load profile' : 'Loading profile'}</Text></View>
       </Card>
+      <Card style={styles.groupCard}>
+        <Pressable accessibilityRole="button" style={styles.securityRow} onPress={() => navigation.navigate('BodyMeasurements')}>
+          <View>
+            <Text style={[styles.securityTitle, { color: palette.textPrimary }]}>Body Measurements</Text>
+            <Text style={[styles.securitySubtitle, { color: palette.textSecondary }]}>View or update height, weight and body measurements</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={palette.textSecondary} />
+        </Pressable>
+      </Card>
 
       <ProfileSectionLabel icon="card-outline" label="MEMBERSHIP" color="#A87CFF" />
       <Card style={styles.groupCard}>
