@@ -1,4 +1,4 @@
-import { authenticatedApiFetch, authenticatedPostJson } from './apiClient';
+import { apiFetch, postJson } from './apiClient';
 
 export type ConsultantScope = 'PROFILE' | 'HEALTH_SUMMARY' | 'MEASUREMENTS' | 'BIOMARKERS' | 'DIET_PLANS' | 'APPOINTMENTS';
 
@@ -43,15 +43,17 @@ const idempotencyKey = () => {
   return `${random()}${random()}-${random()}-4${random().slice(1)}-${((8 + Math.floor(Math.random() * 4)).toString(16))}${random().slice(1)}-${random()}${random()}${random()}`;
 };
 
-export const getExternalConsultantFeatureStatus = () => authenticatedApiFetch<{ enabled: boolean }>('/v1/external-consultants/feature-status');
-export const previewExternalConsultant = (pin: string) => authenticatedPostJson<ConnectionPreview>('/v1/external-consultants/preview', { pin });
-export const connectExternalConsultant = (pin: string, acceptedScopes: ConsultantScope[], key = idempotencyKey()) =>
-  authenticatedPostJson<{ connection_id: string; state: string; consented_scopes: ConsultantScope[] }>('/v1/external-consultants/redeem', {
+const authHeaders = (sessionToken: string) => ({ Authorization: `Bearer ${sessionToken}` });
+
+export const getExternalConsultantFeatureStatus = (sessionToken: string) => apiFetch<{ enabled: boolean }>('/v1/external-consultants/feature-status', { headers: authHeaders(sessionToken) });
+export const previewExternalConsultant = (pin: string, sessionToken: string) => postJson<ConnectionPreview>('/v1/external-consultants/preview', { pin }, authHeaders(sessionToken));
+export const connectExternalConsultant = (pin: string, acceptedScopes: ConsultantScope[], sessionToken: string, key = idempotencyKey()) =>
+  postJson<{ connection_id: string; state: string; consented_scopes: ConsultantScope[] }>('/v1/external-consultants/redeem', {
     pin, acceptedScopes, consentVersion: CONSENT_VERSION, idempotencyKey: key
-  });
-export const listExternalConsultants = () => authenticatedApiFetch<{ connections: ExternalConsultantConnection[] }>('/v1/external-consultants');
-export const getExternalConsultant = (id: string) => authenticatedApiFetch<{ connection: ExternalConsultantConnection }>(`/v1/external-consultants/${encodeURIComponent(id)}`);
-export const getExternalDietPlans = (id: string) => authenticatedApiFetch<{ plans: ExternalDietPlan[] }>(`/v1/external-consultants/${encodeURIComponent(id)}/diet-plans`);
-export const selectExternalDietPlan = (connectionId: string, publicationId: string) => authenticatedApiFetch<{ publication_id: string; active: boolean; selected_at: string }>(`/v1/external-consultants/${encodeURIComponent(connectionId)}/diet-plans/active`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publicationId }) });
-export const getExternalAppointments = (id: string) => authenticatedApiFetch<{ appointments: ExternalAppointment[] }>(`/v1/external-consultants/${encodeURIComponent(id)}/appointments`);
-export const disconnectExternalConsultant = (id: string) => authenticatedApiFetch<{ connection_id: string; state: string }>(`/v1/external-consultants/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }, authHeaders(sessionToken));
+export const listExternalConsultants = (sessionToken: string) => apiFetch<{ connections: ExternalConsultantConnection[] }>('/v1/external-consultants', { headers: authHeaders(sessionToken) });
+export const getExternalConsultant = (id: string, sessionToken: string) => apiFetch<{ connection: ExternalConsultantConnection }>(`/v1/external-consultants/${encodeURIComponent(id)}`, { headers: authHeaders(sessionToken) });
+export const getExternalDietPlans = (id: string, sessionToken: string) => apiFetch<{ plans: ExternalDietPlan[] }>(`/v1/external-consultants/${encodeURIComponent(id)}/diet-plans`, { headers: authHeaders(sessionToken) });
+export const selectExternalDietPlan = (connectionId: string, publicationId: string, sessionToken: string) => apiFetch<{ publication_id: string; active: boolean; selected_at: string }>(`/v1/external-consultants/${encodeURIComponent(connectionId)}/diet-plans/active`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders(sessionToken) }, body: JSON.stringify({ publicationId }) });
+export const getExternalAppointments = (id: string, sessionToken: string) => apiFetch<{ appointments: ExternalAppointment[] }>(`/v1/external-consultants/${encodeURIComponent(id)}/appointments`, { headers: authHeaders(sessionToken) });
+export const disconnectExternalConsultant = (id: string, sessionToken: string) => apiFetch<{ connection_id: string; state: string }>(`/v1/external-consultants/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders(sessionToken) });

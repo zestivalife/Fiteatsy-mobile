@@ -1,6 +1,6 @@
-jest.mock('../src/services/apiClient', () => ({ authenticatedApiFetch: jest.fn(), authenticatedPostJson: jest.fn() }));
+jest.mock('../src/services/apiClient', () => ({ apiFetch: jest.fn(), postJson: jest.fn() }));
 
-import { authenticatedApiFetch, authenticatedPostJson } from '../src/services/apiClient';
+import { apiFetch, postJson } from '../src/services/apiClient';
 
 import {
   CONSENT_VERSION,
@@ -11,22 +11,22 @@ import {
   selectExternalDietPlan
 } from '../src/services/externalConsultantService';
 
-const mockApiFetch = authenticatedApiFetch as jest.Mock;
-const mockPostJson = authenticatedPostJson as jest.Mock;
+const mockApiFetch = apiFetch as jest.Mock;
+const mockPostJson = postJson as jest.Mock;
 
 describe('external consultant mobile bridge', () => {
   beforeEach(() => { mockApiFetch.mockReset(); mockPostJson.mockReset(); });
 
   it('previews without redeeming or persisting the PIN', async () => {
     mockPostJson.mockResolvedValue({ requested_scopes: ['PROFILE'] });
-    await previewExternalConsultant('123456');
-    expect(mockPostJson).toHaveBeenCalledWith('/v1/external-consultants/preview', { pin: '123456' });
+    await previewExternalConsultant('123456', 'session-token');
+    expect(mockPostJson).toHaveBeenCalledWith('/v1/external-consultants/preview', { pin: '123456' }, { Authorization: 'Bearer session-token' });
     expect(mockApiFetch).not.toHaveBeenCalled();
   });
 
   it('sends explicit consent and a replay-safe UUID without a client identity', async () => {
     mockPostJson.mockResolvedValue({ connection_id: 'connection-1' });
-    await connectExternalConsultant('123456', ['PROFILE', 'DIET_PLANS']);
+    await connectExternalConsultant('123456', ['PROFILE', 'DIET_PLANS'], 'session-token');
     const [, body] = mockPostJson.mock.calls[0];
     expect(body).toMatchObject({ pin: '123456', acceptedScopes: ['PROFILE', 'DIET_PLANS'], consentVersion: CONSENT_VERSION });
     expect(body.idempotencyKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
@@ -35,15 +35,15 @@ describe('external consultant mobile bridge', () => {
 
   it('keeps list and revocation connection-scoped', async () => {
     mockApiFetch.mockResolvedValue({ connections: [] });
-    await listExternalConsultants();
-    await disconnectExternalConsultant('connection A');
-    expect(mockApiFetch).toHaveBeenNthCalledWith(1, '/v1/external-consultants');
-    expect(mockApiFetch).toHaveBeenNthCalledWith(2, '/v1/external-consultants/connection%20A', { method: 'DELETE' });
+    await listExternalConsultants('session-token');
+    await disconnectExternalConsultant('connection A', 'session-token');
+    expect(mockApiFetch).toHaveBeenNthCalledWith(1, '/v1/external-consultants', { headers: { Authorization: 'Bearer session-token' } });
+    expect(mockApiFetch).toHaveBeenNthCalledWith(2, '/v1/external-consultants/connection%20A', { method: 'DELETE', headers: { Authorization: 'Bearer session-token' } });
   });
 
   it('selects an active diet plan through its owning connection', async () => {
     mockApiFetch.mockResolvedValue({ publication_id: '6c556ac7-ea4c-4a91-b2f3-b477e693380b', active: true });
-    await selectExternalDietPlan('connection A', '6c556ac7-ea4c-4a91-b2f3-b477e693380b');
+    await selectExternalDietPlan('connection A', '6c556ac7-ea4c-4a91-b2f3-b477e693380b', 'session-token');
     expect(mockApiFetch).toHaveBeenCalledWith('/v1/external-consultants/connection%20A/diet-plans/active', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ publicationId: '6c556ac7-ea4c-4a91-b2f3-b477e693380b' })

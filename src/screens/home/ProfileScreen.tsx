@@ -61,10 +61,11 @@ export const ProfileScreen = ({ navigation }: Props) => {
   useFocusEffect(
     useCallback(() => {
       void retryPendingHealthProfileSync();
-      void getExternalConsultantFeatureStatus()
+      if (!authSession?.sessionToken) return;
+      void getExternalConsultantFeatureStatus(authSession.sessionToken)
         .then(({ enabled }) => setExternalConsultantsEnabled(enabled))
         .catch(() => setExternalConsultantsEnabled(false));
-    }, [retryPendingHealthProfileSync])
+    }, [authSession?.sessionToken, retryPendingHealthProfileSync])
   );
 
   const updateGender = (gender: AssessmentGender) => {

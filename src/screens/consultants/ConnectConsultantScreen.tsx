@@ -16,12 +16,13 @@ const scopeCopy: Record<ConsultantScope, { title: string; detail: string }> = {
 const makeKey = () => `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, '0').slice(-12)}`;
 
 export const ConnectConsultantScreen = ({ navigation }: Props) => {
-  const { themeMode } = useAppContext(); const palette = getThemeColors(themeMode);
+  const { authSession, themeMode } = useAppContext(); const palette = getThemeColors(themeMode);
   const [pin, setPin] = useState(''); const [preview, setPreview] = useState<ConnectionPreview | null>(null); const [accepted, setAccepted] = useState<ConsultantScope[]>([]); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null); const replayKey = useRef(makeKey());
   useEffect(() => () => { setPin(''); setPreview(null); setAccepted([]); }, []);
   const normalized = useMemo(() => pin.replace(/\D/g, '').slice(0, 6), [pin]);
-  const review = async () => { setBusy(true); setError(null); try { const result = await previewExternalConsultant(normalized); setPreview(result); setAccepted(result.requested_scopes); } catch (reason) { setError(reason instanceof Error ? reason.message : 'PIN verification failed.'); } finally { setBusy(false); } };
-  const connect = async () => { if (!preview || accepted.length === 0) return; setBusy(true); setError(null); try { const result = await connectExternalConsultant(normalized, accepted, replayKey.current); setPin(''); setPreview(null); navigation.replace('ConsultantConnectionDetails', { connectionId: result.connection_id }); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Connection failed.'); } finally { setBusy(false); } };
+  useEffect(() => { if (!authSession?.sessionToken) navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] }); }, [authSession?.sessionToken, navigation]);
+  const review = async () => { const sessionToken = authSession?.sessionToken; if (!sessionToken) return; setBusy(true); setError(null); try { const result = await previewExternalConsultant(normalized, sessionToken); setPreview(result); setAccepted(result.requested_scopes); } catch (reason) { setError(reason instanceof Error ? reason.message : 'PIN verification failed.'); } finally { setBusy(false); } };
+  const connect = async () => { const sessionToken = authSession?.sessionToken; if (!preview || accepted.length === 0 || !sessionToken) return; setBusy(true); setError(null); try { const result = await connectExternalConsultant(normalized, accepted, sessionToken, replayKey.current); setPin(''); setPreview(null); navigation.replace('ConsultantConnectionDetails', { connectionId: result.connection_id }); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Connection failed.'); } finally { setBusy(false); } };
   const toggle = (scope: ConsultantScope) => setAccepted((current) => current.includes(scope) ? current.filter((item) => item !== scope) : [...current, scope]);
   const consultantName = preview?.consultant?.display_name || 'Consultant profile unavailable';
 

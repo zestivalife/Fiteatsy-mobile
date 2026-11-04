@@ -14,17 +14,18 @@ import { ExternalConsultantConnection, listExternalConsultants } from '../../ser
 type Props = NativeStackScreenProps<RootStackParamList, 'MyConsultants'>;
 
 export const MyConsultantsScreen = ({ navigation }: Props) => {
-  const { themeMode } = useAppContext();
+  const { authSession, themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
   const [items, setItems] = useState<ExternalConsultantConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    try { setItems((await listExternalConsultants()).connections); }
+    if (!authSession?.sessionToken) { navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] }); setLoading(false); return; }
+    try { setItems((await listExternalConsultants(authSession.sessionToken)).connections); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Consultants could not be loaded.'); }
     finally { setLoading(false); }
-  }, []);
+  }, [authSession?.sessionToken, navigation]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   return <Screen scroll contentStyle={styles.content}>
