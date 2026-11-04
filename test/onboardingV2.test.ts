@@ -44,6 +44,10 @@ describe('Onboarding V2 contract', () => {
     expect(flow).toContain("update('dairyPreference'");
     expect(flow).toContain("update('proteins'");
     expect(flow).toContain('verified foods selected');
+    expect(flow).not.toContain('Edit preferences');
+    expect(flow).toContain("title={saving ? 'Saving...' : 'Looks good'}");
+    expect(screen).toContain('Promise.allSettled');
+    expect(screen).toContain('response?.profile ??');
   });
 
   it('resumes the client-scoped canonical onboarding phase and step', () => {
@@ -57,6 +61,8 @@ describe('Onboarding V2 contract', () => {
     expect(splash).toContain("progress?.phase === 'connect'");
     expect(splash).toContain("progress?.phase === 'calendar'");
     expect(splash).toContain("progress?.phase === 'ready'");
+    expect(splash).toContain("if (onboardingStatus === 'COMPLETED')");
+    expect(splash.indexOf("if (onboardingStatus === 'COMPLETED')")).toBeLessThan(splash.indexOf("progress?.phase === 'connect'"));
     expect(assessment).toContain("phase: step <= 4 ? 'lifestyle' : 'recovery'");
     expect(assessment).toContain("phase: 'calendar'");
     expect(assessment).not.toContain('SyncWearable');

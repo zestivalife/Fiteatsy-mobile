@@ -74,11 +74,15 @@ export const SplashScreen = ({ navigation }: Props) => {
     }
 
     const progress = await getOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
-    if (onboardingStatus !== 'COMPLETED' && progress?.phase === 'food') {
+    if (onboardingStatus === 'COMPLETED') {
+      transitionTo(() => navigation.replace('Main'));
+      return;
+    }
+    if (progress?.phase === 'food') {
       transitionTo(() => navigation.replace('FoodPreferences', { mode: 'onboarding', lifestyle: progress.lifestyle }));
       return;
     }
-    if (onboardingStatus !== 'COMPLETED' && progress?.phase === 'recovery') {
+    if (progress?.phase === 'recovery') {
       transitionTo(() => navigation.replace('OnboardingAssessment', { startPhase: 'recovery', lifestyle: progress.lifestyle }));
       return;
     }
