@@ -52,6 +52,7 @@ describe('v17.37 application review acceptance contracts', () => {
     expect(store).toContain('account_user_id = $2');
     expect(store).toContain('fiteatsy_clients.tenant_id');
     expect(store).toContain("throw new Error('Client ownership could not be verified')");
+    expect(store).toContain("throw new Error('Notification client ownership could not be verified')");
   });
 
   it('exposes the complete canonical wellness goal domain with unique stable IDs', () => {

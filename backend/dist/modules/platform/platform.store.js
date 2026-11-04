@@ -872,12 +872,16 @@ export const createNotificationRecord = async (input) => {
     const createdAtISO = nowIso();
     const inserted = await pool.query(`
       insert into notifications (
-        id, user_id, client_id, care_case_id, channel, title, body, sent_at,
+        id, user_id, client_id, tenant_id, care_case_id, channel, title, body, sent_at,
         status, version, created_at, updated_at, deleted_at
-      ) values (
-        $1, $2, $3, $4, $5, $6, $7, $8,
-        'active', 1, $9, $9, null
       )
+      select
+        $1, $2, $3, fiteatsy_clients.tenant_id, $4, $5, $6, $7, $8,
+        'active', 1, $9, $9, null
+      from fiteatsy_clients
+      where id = $3
+        and account_user_id = $2
+        and deleted_at is null
       returning *
     `, [
         crypto.randomUUID(),
@@ -890,6 +894,8 @@ export const createNotificationRecord = async (input) => {
         input.sentAtISO,
         createdAtISO
     ]);
+    if (inserted.rowCount === 0)
+        throw new Error('Notification client ownership could not be verified');
     return mapNotification(inserted.rows[0]);
 };
 export const listNotificationsForClient = async (clientId) => {
