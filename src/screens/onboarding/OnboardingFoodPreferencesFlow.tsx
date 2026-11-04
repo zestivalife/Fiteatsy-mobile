@@ -76,10 +76,7 @@ export const OnboardingFoodPreferencesFlow = ({
   const skip = () => go(step + 1);
 
   const action = step === 4 ? (
-    <>
-      <OnboardingAction title={saving ? 'Saving...' : 'Looks good'} onPress={onSave} disabled={saving || !profile.dietType} />
-      <OnboardingAction title="Edit preferences" onPress={() => go(1)} secondary />
-    </>
+    <OnboardingAction title={saving ? 'Saving...' : 'Looks good'} onPress={onSave} disabled={saving || !profile.dietType} />
   ) : (
     <>
       <OnboardingAction title="Continue" onPress={() => go(step + 1)} disabled={step === 1 && !profile.dietType} />
