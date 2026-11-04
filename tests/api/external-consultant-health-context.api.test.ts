@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import test from 'node:test';
 import { resetDelegatedAuthorityReplayStoreForTests } from '../../backend/src/modules/auth/delegated-authority.js';
-import { createInitialPin } from '../../backend/src/modules/auth/auth.service.js';
 import { pss10Items } from '../../backend/src/modules/assessments/assessment-definitions.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson, postJson, putJson } from '../helpers/http.js';
@@ -44,7 +43,6 @@ test('delegated health context returns the persisted canonical food preferences 
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Delegated Health Client', email: `delegated-health-${Date.now()}@example.com`
   });
-  await createInitialPin(client.current.body.user.id, { newPin: '946281' });
   const preferences = {
     dietType: 'non_vegetarian', proteins: ['Eggs', 'Chicken'], cuisines: ['Maharashtrian', 'North Indian'],
     foodsLiked: ['Poha'], foodsDisliked: ['Oats'], foodsAvoided: ['Mushroom'],
