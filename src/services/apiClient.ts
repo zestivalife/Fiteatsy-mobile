@@ -133,7 +133,9 @@ export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Prom
     } catch {
       payload = null;
     }
-    if (response.status === 401 && accessTokenProvider?.()) unauthorizedHandler?.();
+    const sessionIsInvalid = response.status === 401
+      && (payload?.error === 'INVALID_SESSION' || payload?.error === 'SESSION_EXPIRED');
+    if (sessionIsInvalid && accessTokenProvider?.()) unauthorizedHandler?.();
     throw new ApiClientError(toErrorCode(response.status), payload?.message ?? 'Platform request failed.', response.status, payload?.error);
   }
 

@@ -61,6 +61,23 @@ describe('shared API bounded completion', () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
+  it('does not invalidate the client session for an upstream integration 401', async () => {
+    const onUnauthorized = jest.fn();
+    registerAccessTokenProvider(() => 'valid-client-session');
+    registerUnauthorizedHandler(onUnauthorized);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'UPSTREAM_AUTH_REQUIRED', message: 'Consultant integration authentication failed.' })
+    });
+
+    await expect(apiFetch('/v1/external-consultants')).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      serverCode: 'UPSTREAM_AUTH_REQUIRED'
+    });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
   it('never sends an authenticated request when the session token is absent', async () => {
     const onUnauthorized = jest.fn();
     registerAccessTokenProvider(() => null);
