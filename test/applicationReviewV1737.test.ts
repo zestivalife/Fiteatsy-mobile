@@ -50,6 +50,7 @@ describe('v17.37 application review acceptance contracts', () => {
     const store = read('backend/src/modules/platform/platform.store.ts');
     expect(store).toContain('from fiteatsy_clients');
     expect(store).toContain('account_user_id = $2');
+    expect(store).toContain('fiteatsy_clients.tenant_id');
     expect(store).toContain("throw new Error('Client ownership could not be verified')");
   });
 

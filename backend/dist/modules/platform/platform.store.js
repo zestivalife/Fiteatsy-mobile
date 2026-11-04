@@ -646,11 +646,11 @@ export const createCareCaseIfMissing = async (owner, healthProfileId, stage = 'n
     const recoveryProgramId = await createRecoveryProgramIfMissing(healthProfileId, stage);
     const inserted = await pool.query(`
       insert into care_cases (
-        id, user_id, client_id, health_profile_id, recovery_program_id, assigned_consultant_id, assigned_mentor_id,
+        id, user_id, client_id, tenant_id, health_profile_id, recovery_program_id, assigned_consultant_id, assigned_mentor_id,
         current_stage, previous_stage, last_transition_at, status, version, created_at, updated_at, deleted_at
       )
       select
-        $1, $2, $3, $4, $5, null, null,
+        $1, $2, $3, fiteatsy_clients.tenant_id, $4, $5, null, null,
         $6, null, $7, 'active', 1, $7, $7, null
       from fiteatsy_clients
       where id = $3
