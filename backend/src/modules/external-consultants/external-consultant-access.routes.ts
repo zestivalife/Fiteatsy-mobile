@@ -3,6 +3,8 @@ import type { Request } from 'express';
 import { requireDelegatedAuthority } from '../auth/delegated-authority.middleware.js';
 import type { DelegatedAuthority } from '../auth/delegated-authority.js';
 import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSummaryForClient, listConsultantReportSummariesForClient, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
+import { getLatestAssessmentResult, getLatestDraftSession } from '../assessments/assessments.repository.js';
+import { getFoodPreferenceProfile } from '../nutrition/food-preferences.service.js';
 import { getReportFile } from '../reports/reports.store.js';
 import { z } from 'zod';
 import { nutritionPlanContentSchema } from '../nutrition/nutrition.routes.js';
@@ -86,15 +88,28 @@ externalConsultantAccessRouter.get('/:userId/health-context', requireDelegatedAu
     const context = await getRegisteredClientProfileContextByAccountId(String(req.params.userId));
     if (!context) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'The connected Fiteatsy client was not found.' });
     const scopes = new Set(auth.scopes ?? []);
-    const [reports, biomarkers, wearables] = await Promise.all([
+    const owner = { accountId: context.accountId, clientId: context.internalClientId };
+    const [reports, biomarkers, wearables, foodPreferences, completedAssessment, draftAssessment] = await Promise.all([
       scopes.has('HEALTH_SUMMARY') ? listConsultantReportSummariesForClient(context.internalClientId, context.accountId, 100) : Promise.resolve([]),
       scopes.has('BIOMARKERS') ? listValidatedBiomarkerSummaryForClient(context.internalClientId, context.accountId) : Promise.resolve([]),
-      scopes.has('MEASUREMENTS') ? getConsultantWearableSummaryForClient(context.internalClientId, context.accountId) : Promise.resolve(null)
+      scopes.has('MEASUREMENTS') ? getConsultantWearableSummaryForClient(context.internalClientId, context.accountId) : Promise.resolve(null),
+      scopes.has('PROFILE') ? getFoodPreferenceProfile(context.profile.client.id) : Promise.resolve(null),
+      scopes.has('HEALTH_SUMMARY') ? getLatestAssessmentResult(owner) : Promise.resolve({ result: null, previousResult: null }),
+      scopes.has('HEALTH_SUMMARY') ? getLatestDraftSession(owner) : Promise.resolve(null)
     ]);
+    const latestAssessment = completedAssessment.result;
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({
       connectionId: auth.connection_id,
       profile: scopes.has('PROFILE') ? context.profile : null,
+      foodPreferences: scopes.has('PROFILE') ? foodPreferences : null,
+      assessment: scopes.has('HEALTH_SUMMARY') ? {
+        type: 'PSS10',
+        status: latestAssessment ? 'COMPLETED' : draftAssessment ? 'DRAFT' : 'NOT_STARTED',
+        completedAtISO: latestAssessment?.completedAtISO ?? null,
+        instrumentVersion: latestAssessment?.instrumentVersion ?? draftAssessment?.instrumentVersion ?? null,
+        result: latestAssessment
+      } : null,
       measurements: scopes.has('MEASUREMENTS') ? context.calculationInput : null,
       reports,
       biomarkers,
