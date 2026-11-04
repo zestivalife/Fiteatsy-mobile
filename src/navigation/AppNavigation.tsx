@@ -106,6 +106,7 @@ export const AppNavigation = () => {
   return (
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator
+        key={isAuthenticated ? 'authenticated' : 'unauthenticated'}
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',

@@ -92,6 +92,15 @@ export const API_REQUEST_TIMEOUT_MS = 15_000;
 
 type ApiRequestInit = RequestInit & { timeoutMs?: number };
 
+export const requireAccessToken = (): string => {
+  const token = accessTokenProvider?.();
+  if (!token) {
+    unauthorizedHandler?.();
+    throw new ApiClientError('UNAUTHORIZED', 'Your session has expired. Please sign in again.', 401, 'AUTH_REQUIRED');
+  }
+  return token;
+};
+
 export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Promise<T> => {
   const controller = new AbortController();
   const callerSignal = init.signal;
@@ -137,6 +146,19 @@ export const postJson = async <T>(path: string, body: unknown, headers?: Headers
     headers,
     body: JSON.stringify(body)
   });
+
+export const authenticatedApiFetch = async <T>(path: string, init: ApiRequestInit = {}): Promise<T> => {
+  const token = requireAccessToken();
+  return apiFetch<T>(path, {
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${token}` }
+  });
+};
+
+export const authenticatedPostJson = async <T>(path: string, body: unknown, headers?: HeadersInit) => {
+  const token = requireAccessToken();
+  return postJson<T>(path, body, { ...headers, Authorization: `Bearer ${token}` });
+};
 
 export const putJson = async <T>(path: string, body: unknown, headers?: HeadersInit) =>
   apiFetch<T>(path, {

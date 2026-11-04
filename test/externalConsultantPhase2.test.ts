@@ -1,6 +1,6 @@
-jest.mock('../src/services/apiClient', () => ({ apiFetch: jest.fn(), postJson: jest.fn() }));
+jest.mock('../src/services/apiClient', () => ({ authenticatedApiFetch: jest.fn(), authenticatedPostJson: jest.fn() }));
 
-import { apiFetch, postJson } from '../src/services/apiClient';
+import { authenticatedApiFetch, authenticatedPostJson } from '../src/services/apiClient';
 
 import {
   CONSENT_VERSION,
@@ -11,8 +11,8 @@ import {
   selectExternalDietPlan
 } from '../src/services/externalConsultantService';
 
-const mockApiFetch = apiFetch as jest.Mock;
-const mockPostJson = postJson as jest.Mock;
+const mockApiFetch = authenticatedApiFetch as jest.Mock;
+const mockPostJson = authenticatedPostJson as jest.Mock;
 
 describe('external consultant mobile bridge', () => {
   beforeEach(() => { mockApiFetch.mockReset(); mockPostJson.mockReset(); });

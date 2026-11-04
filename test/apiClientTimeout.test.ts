@@ -2,7 +2,7 @@ jest.mock('expo-constants', () => ({
   expoConfig: { extra: { apiBaseUrl: 'https://api.fiteatsy.test' } }
 }));
 
-import { apiFetch, registerAccessTokenProvider, registerUnauthorizedHandler } from '../src/services/apiClient';
+import { authenticatedApiFetch, apiFetch, registerAccessTokenProvider, registerUnauthorizedHandler } from '../src/services/apiClient';
 
 describe('shared API bounded completion', () => {
   const originalFetch = global.fetch;
@@ -59,5 +59,31 @@ describe('shared API bounded completion', () => {
 
     await expect(apiFetch('/v1/platform/health-profile')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('never sends an authenticated request when the session token is absent', async () => {
+    const onUnauthorized = jest.fn();
+    registerAccessTokenProvider(() => null);
+    registerUnauthorizedHandler(onUnauthorized);
+    global.fetch = jest.fn();
+
+    await expect(authenticatedApiFetch('/v1/external-consultants')).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      serverCode: 'AUTH_REQUIRED'
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('forces the current bearer token onto authenticated requests', async () => {
+    registerAccessTokenProvider(() => 'current-session-token');
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ connections: [] }) });
+
+    await authenticatedApiFetch('/v1/external-consultants', { headers: { Authorization: 'Bearer stale-token' } });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api.fiteatsy.test/v1/external-consultants',
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer current-session-token' }) })
+    );
   });
 });
