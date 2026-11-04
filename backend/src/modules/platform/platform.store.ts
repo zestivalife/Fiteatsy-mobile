@@ -756,7 +756,13 @@ export const createCareCaseIfMissing = async (
         current_stage, previous_stage, last_transition_at, status, version, created_at, updated_at, deleted_at, tenant_id
       ) values (
         $1, $2, $3, $4, $5, null, null,
-        $6, null, $7, 'active', 1, $7, $7, null, $8
+        $6, null, $7, 'active', 1, $7, $7, null,
+        (select tenant_id
+           from fiteatsy_clients
+          where id = $3
+            and account_user_id = $2
+            and tenant_id = $8
+            and deleted_at is null)
       )
       returning *
     `,
