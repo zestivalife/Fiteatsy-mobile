@@ -79,9 +79,8 @@ export const OnboardingFoodPreferencesFlow = ({
 
   const action = step === 4 ? (
     <>
-      <OnboardingAction title={saving ? 'Saving...' : 'Continue'} onPress={() => { Keyboard.dismiss(); onSave(); }} disabled={saving || !profile.dietType} />
+      <OnboardingAction title={saving ? 'Saving...' : 'Looks good'} onPress={() => { Keyboard.dismiss(); onSave(); }} disabled={saving || !profile.dietType} />
       <OnboardingAction title="Skip for now" onPress={() => { Keyboard.dismiss(); onSkip(); }} secondary />
-      <OnboardingAction title="Edit preferences" onPress={() => go(1)} secondary />
     </>
   ) : (
     <>

@@ -59,23 +59,24 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const completionStarted = useRef(false);
 
   useEffect(() => {
-    const load = async () => {
-      const progress = mode === 'onboarding' ? await getOnboardingRuntimeProgress(clientId) : null;
-      try {
-        const response = await getFoodPreferences();
-        const source = progress?.phase === 'food' && progress.foodDraft ? progress.foodDraft : response.profile;
-        setProfile({ ...emptyFoodPreferenceProfile(), ...source, likedFoodIds: source.likedFoodIds ?? [], dislikedFoodIds: source.dislikedFoodIds ?? [], avoidedFoodIds: source.avoidedFoodIds ?? [] });
+    Promise.allSettled([
+      getFoodPreferences(),
+      mode === 'onboarding' ? getOnboardingRuntimeProgress(clientId) : Promise.resolve(null)
+    ])
+      .then(([preferencesResult, progressResult]) => {
+        const progress = progressResult.status === 'fulfilled' ? progressResult.value : null;
+        const response = preferencesResult.status === 'fulfilled' ? preferencesResult.value : null;
+        const source = response?.profile ?? (progress?.phase === 'food' ? progress.foodDraft : null);
+        if (source) {
+          setProfile({ ...emptyFoodPreferenceProfile(), ...source, likedFoodIds: source.likedFoodIds ?? [], dislikedFoodIds: source.dislikedFoodIds ?? [], avoidedFoodIds: source.avoidedFoodIds ?? [] });
+        }
         if (progress?.phase === 'food') setInitialOnboardingStep(Math.max(1, Math.min(4, progress.step)));
-        setSavedAt(response.updatedAtISO);
-      } catch {
-        if (progress?.phase === 'food' && progress.foodDraft) setProfile(progress.foodDraft);
-        if (progress?.phase === 'food') setInitialOnboardingStep(Math.max(1, Math.min(4, progress.step)));
-        setError('Food preferences are temporarily unavailable. You can skip this step and update them later from Profile.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
+        if (response) setSavedAt(response.updatedAtISO);
+        if (preferencesResult.status === 'rejected') {
+          setError('Food preferences are temporarily unavailable. You can skip this step and update them later from Profile.');
+        }
+      })
+      .finally(() => setLoading(false));
   }, [clientId, mode]);
 
   useEffect(() => {
