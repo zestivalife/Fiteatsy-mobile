@@ -2,13 +2,15 @@ import { Router } from 'express';
 import type { Request } from 'express';
 import { requireDelegatedAuthority } from '../auth/delegated-authority.middleware.js';
 import type { DelegatedAuthority } from '../auth/delegated-authority.js';
-import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSummaryForClient, listConsultantReportSummariesForClient, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
+import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSummaryForClient, listAssignedConsultantClientContexts, listConsultantReportSummariesForClient, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
 import { getLatestAssessmentResult, getLatestDraftSession } from '../assessments/assessments.repository.js';
 import { getFoodPreferenceProfile } from '../nutrition/food-preferences.service.js';
 import { getReportFile } from '../reports/reports.store.js';
+import { resolveConsultantApplicationIdentity } from './external-consultant-identity.repository.js';
 
 export const externalConsultantAccessRouter = Router();
 const authority = (req: Request) => (req as Request & { delegatedAuthority?: DelegatedAuthority }).delegatedAuthority;
+const externalProfessionalIdPattern = /^ext_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const verifyTarget = (req: Request) => {
   const auth = authority(req);
@@ -16,6 +18,33 @@ const verifyTarget = (req: Request) => {
   if (!auth || auth.actor_type !== 'EXTERNAL_CONSULTANT' || auth.fiteatsy_user_id !== userId || !auth.connection_id || !auth.tenant_id) return null;
   return auth;
 };
+
+externalConsultantAccessRouter.get('/assignments/clients', requireDelegatedAuthority('fiteatsy.external.assignment.read', 'external_consultant_assignment_roster', 'EXTERNAL_CONSULTANT'), async (req, res, next) => {
+  const auth = authority(req);
+  if (!auth?.tenant_id || !externalProfessionalIdPattern.test(auth.sub)) {
+    return res.status(403).json({ error: 'DELEGATED_ASSIGNMENT_ACTOR_INVALID', message: 'The delegated consultant identity is invalid.' });
+  }
+  try {
+    const identity = await resolveConsultantApplicationIdentity(auth.sub.slice('ext_'.length), auth.sub);
+    if (identity.status !== 'RESOLVED') {
+      return res.status(403).json({ error: `CONSULTANT_IDENTITY_${identity.status}`, message: 'The delegated consultant identity is not active and unambiguous.' });
+    }
+    const clients = await listAssignedConsultantClientContexts(identity.applicationUserId);
+    res.setHeader('Cache-Control', 'no-store, private');
+    return res.status(200).json({
+      clients: clients.map((client) => ({
+        userId: client.accountId,
+        clientId: client.publicClientId,
+        displayName: client.name,
+        email: client.email,
+        mobile: client.mobileNumberMasked,
+        assignmentState: 'ACTIVE'
+      }))
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 externalConsultantAccessRouter.get('/:userId/health-context', requireDelegatedAuthority('fiteatsy.external.health.read', 'external_consultant_health'), async (req, res, next) => {
   const auth = verifyTarget(req);
