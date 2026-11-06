@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import crypto from 'node:crypto';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
-import { getRegisteredConsultantClientProfileContext, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
-import { getFoodPreferenceProfile } from './food-preferences.service.js';
+import { getRegisteredClientProfileContextByAccountId, getRegisteredConsultantClientProfileContext, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
+import { getFoodPreferenceProfile, type FoodPreferenceProfile } from './food-preferences.service.js';
 import { resolveConsultantNutritionClientAccess, NutritionPlanWorkflowError } from './nutrition.service.js';
 import { getCurrentDietPlanForClient } from './nutrition.store.js';
 import { createGovernedCommonFoodPopulation } from './common-food-population.js';
@@ -39,6 +39,11 @@ const dietMap={vegetarian:'VEGETARIAN',eggetarian:'EGG',non_vegetarian:'NON_VEGE
 export class CommonFoodApiError extends Error{constructor(public code:string,public statusCode:number,message=code){super(message)}}
 const roleAllowed=(account:AuthenticatedAccount)=>['consultant','senior_consultant','admin','super_admin','platform_owner'].includes(String(account.user.role).toLowerCase());
 const debugRoleAllowed=(account:AuthenticatedAccount)=>['admin','super_admin','platform_owner'].includes(String(account.user.role).toLowerCase());
+const foodContext=(profile:FoodPreferenceProfile|undefined):ClientFoodContext=>{
+  const diet=profile?.dietType?dietMap[profile.dietType]:'VEGETARIAN';
+  const restrictions=profile?.restrictions??[];
+  return {diet,allergies:restrictions.filter(x=>/allerg/i.test(x)),intolerances:restrictions.filter(x=>/intoler/i.test(x)),avoids:[...(profile?.foodsAvoided??[]),...(profile?.avoidedFoodIds??[])],clinicalExclusions:[],dislikes:[...(profile?.foodsDisliked??[]),...(profile?.dislikedFoodIds??[])],preferences:[...(profile?.foodsLiked??[]),...(profile?.likedFoodIds??[]),...(profile?.cuisines??[])]};
+};
 
 export async function resolveClientMealGenerationContext(input:{account:AuthenticatedAccount;clientId:string;planId?:string;mealHead?:MealHead}){
   if(!roleAllowed(input.account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
@@ -64,6 +69,22 @@ export async function resolveClientMealGenerationContext(input:{account:Authenti
   const context:ClientFoodContext={diet,allergies:restrictions.filter(x=>/allerg/i.test(x)),intolerances:restrictions.filter(x=>/intoler/i.test(x)),avoids:[...(p?.foodsAvoided??[]),...(p?.avoidedFoodIds??[])],clinicalExclusions:[],dislikes:[...(p?.foodsDisliked??[]),...(p?.dislikedFoodIds??[])],preferences:[...(p?.foodsLiked??[]),...(p?.likedFoodIds??[]),...(p?.cuisines??[])],biomarkerRules:biomarkerGeneration.activeRules};
   const generationSnapshot={clientId:input.clientId,assignedConsultantId:latest.plan.consultantId,requestingProfessionalId:input.account.accountId,healthProfile:registered.profile,biomarkers:biomarkerGeneration.snapshot,biomarkerRuleVersion:biomarkerGeneration.version,dietPreference:p?.dietType??null,foodPreferences:p??null,dailyTargets:{calories:daily.calories??null,protein:daily.protein??null,carbohydrate:daily.carbohydrates??null,fat:daily.fat??null},mealTargets:displayMealTargets,previousPlanContext:{scope:'SAME_CLIENT_ONLY' as const,usedForRanking:false,reason:'NO_GOVERNED_PREVIOUS_PLAN_ROTATION_RULE'}};
   return {clientId:input.clientId,internalClientId:registered.internalClientId,consultantId:input.account.accountId,plan:latest.plan,planVersion:latest.version,context,generationSnapshot,dailyTargets:generationSnapshot.dailyTargets,mealTargets,displayMealTargets,supported:diet!=='VEGAN',capability:diet==='VEGAN'?{code:'VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED',reason:'GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED'}:{code:'SUPPORTED',reason:null}};
+}
+
+export function resolveGovernedCommonFoodOption(context:ClientFoodContext,input:{mealHead:MealHead;components:Array<{foodId:string;servingId:string;multiplier:number}>;target:MealTarget}){
+ if(context.diet==='VEGAN')throw new CommonFoodApiError('VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED',422,'GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED');
+ if(new Set(input.components.map(component=>component.foodId)).size!==input.components.length)throw new CommonFoodApiError('DUPLICATE_COMPONENT',422,'A governed food can appear only once in an option.');
+ try{
+  const option=validateManualCombination({foods,context,mealHead:input.mealHead,components:input.components,target:input.target});
+  return {...option,mealHead:input.mealHead,optionHash:option.snapshotHash,calculationStatus:'AUTHORITATIVELY_RESOLVED' as const,clinicalApproval:false};
+ }catch(error){return governedValidationError(error);}
+}
+
+export async function resolveDelegatedCommonFoodOption(input:{accountId:string;mealHead:MealHead;components:Array<{foodId:string;servingId:string;multiplier:number}>;target:MealTarget}){
+ const registered=await getRegisteredClientProfileContextByAccountId(input.accountId);
+ if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404,'The connected Fiteatsy client was not found.');
+ const prefs=await getFoodPreferenceProfile(registered.profile.client.id);
+ return resolveGovernedCommonFoodOption(foodContext(prefs?.profile),input);
 }
 
 type FoodSearchQuery={scope?:'ALL'|'RECOMMENDED';mealHead?:MealHead;search?:string;category?:string;family?:string;referenceState?:string;nutritionStatus?:'REFERENCE_ONLY'|'NUTRITION_PENDING'|'NUTRITION_VERIFIED';generatorEligibility?:'ELIGIBLE'|'INELIGIBLE';entityType?:string;componentRole?:ComponentRole;dietClass?:string;proteinMin?:number;proteinMax?:number;caloriesMin?:number;caloriesMax?:number;limit:number;offset:number};
