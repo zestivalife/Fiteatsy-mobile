@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import crypto from 'node:crypto';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
-import { getRegisteredConsultantClientProfileContext } from '../consultants/consultants.repository.js';
-import { getFoodPreferenceProfile } from './food-preferences.service.js';
+import { getRegisteredClientProfileContextByAccountId, getRegisteredConsultantClientProfileContext } from '../consultants/consultants.repository.js';
+import { getFoodPreferenceProfile, type FoodPreferenceProfile } from './food-preferences.service.js';
 import { canAccessConsultantNutritionClient, getConsultantLatestDietPlan, NutritionPlanWorkflowError } from './nutrition.service.js';
 import { createGovernedCommonFoodPopulation } from './common-food-population.js';
 import { canonicalHash } from './food-curation/canonical-food-foundation.js';
@@ -27,6 +27,11 @@ const sectionByHead:Record<MealHead,string>={EARLY_MORNING:'earlyMorning',BREAKF
 const dietMap={vegetarian:'VEGETARIAN',eggetarian:'EGG',non_vegetarian:'NON_VEGETARIAN',vegan:'VEGAN',jain:'VEGETARIAN'} as const;
 export class CommonFoodApiError extends Error{constructor(public code:string,public statusCode:number,message=code){super(message)}}
 const roleAllowed=(account:AuthenticatedAccount)=>['consultant','senior_consultant','admin','super_admin','platform_owner'].includes(String(account.user.role).toLowerCase());
+const foodContext=(profile:FoodPreferenceProfile|undefined):ClientFoodContext=>{
+  const diet=profile?.dietType?dietMap[profile.dietType]:'VEGETARIAN';
+  const restrictions=profile?.restrictions??[];
+  return {diet,allergies:restrictions.filter(x=>/allerg/i.test(x)),intolerances:restrictions.filter(x=>/intoler/i.test(x)),avoids:[...(profile?.foodsAvoided??[]),...(profile?.avoidedFoodIds??[])],clinicalExclusions:[],dislikes:[...(profile?.foodsDisliked??[]),...(profile?.dislikedFoodIds??[])],preferences:[...(profile?.foodsLiked??[]),...(profile?.likedFoodIds??[]),...(profile?.cuisines??[])]};
+};
 
 export async function resolveClientMealGenerationContext(input:{account:AuthenticatedAccount;clientId:string;planId?:string;mealHead?:MealHead}){
   if(!roleAllowed(input.account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
@@ -35,12 +40,26 @@ export async function resolveClientMealGenerationContext(input:{account:Authenti
   if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404);
   if(!latest)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
   if(input.planId&&latest.plan.id!==input.planId)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
-  const p=prefs?.profile; const diet=p?.dietType?dietMap[p.dietType]:'VEGETARIAN';
+  const p=prefs?.profile; const context=foodContext(p); const diet=context.diet;
   const content=latest.version.content; const daily=content.dailyTargets;
   const mealTargets=Object.fromEntries(MEAL_HEADS.map(head=>{const section=(content.mealPlan as unknown as Record<string,{target?:{calories:number|null;proteinGrams:number|null;caloriesBand?:{min:number|null;max:number|null};proteinBand?:{min:number|null;max:number|null}}}>)[sectionByHead[head]];return [head,{kcal:section?.target?.calories??0,protein:section?.target?.proteinGrams??0,kcalTolerance:Math.max(1,((section?.target?.caloriesBand?.max??0)-(section?.target?.caloriesBand?.min??0))/2||50),proteinTolerance:Math.max(1,((section?.target?.proteinBand?.max??0)-(section?.target?.proteinBand?.min??0))/2||10)} satisfies MealTarget]})) as Record<MealHead,MealTarget>;
-  const restrictions=p?.restrictions??[];
-  const context:ClientFoodContext={diet,allergies:restrictions.filter(x=>/allerg/i.test(x)),intolerances:restrictions.filter(x=>/intoler/i.test(x)),avoids:[...(p?.foodsAvoided??[]),...(p?.avoidedFoodIds??[])],clinicalExclusions:[],dislikes:[...(p?.foodsDisliked??[]),...(p?.dislikedFoodIds??[])],preferences:[...(p?.foodsLiked??[]),...(p?.likedFoodIds??[]),...(p?.cuisines??[])]};
   return {clientId:input.clientId,internalClientId:registered.internalClientId,consultantId:input.account.accountId,plan:latest.plan,planVersion:latest.version,context,dailyTargets:{calories:daily.calories??null,protein:daily.protein??null,carbohydrate:daily.carbohydrates??null,fat:daily.fat??null},mealTargets,supported:diet!=='VEGAN',capability:diet==='VEGAN'?{code:'VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED',reason:'GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED'}:{code:'SUPPORTED',reason:null}};
+}
+
+export function resolveGovernedCommonFoodOption(context:ClientFoodContext,input:{mealHead:MealHead;components:Array<{foodId:string;servingId:string;multiplier:number}>;target:MealTarget}){
+ if(context.diet==='VEGAN')throw new CommonFoodApiError('VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED',422,'GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED');
+ if(new Set(input.components.map(component=>component.foodId)).size!==input.components.length)throw new CommonFoodApiError('DUPLICATE_COMPONENT',422,'A governed food can appear only once in an option.');
+ try{
+  const option=validateManualCombination({foods,context,mealHead:input.mealHead,components:input.components,target:input.target});
+  return {...option,mealHead:input.mealHead,optionHash:option.snapshotHash,calculationStatus:'AUTHORITATIVELY_RESOLVED' as const,clinicalApproval:false};
+ }catch(error){return governedValidationError(error);}
+}
+
+export async function resolveDelegatedCommonFoodOption(input:{accountId:string;mealHead:MealHead;components:Array<{foodId:string;servingId:string;multiplier:number}>;target:MealTarget}){
+ const registered=await getRegisteredClientProfileContextByAccountId(input.accountId);
+ if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404,'The connected Fiteatsy client was not found.');
+ const prefs=await getFoodPreferenceProfile(registered.profile.client.id);
+ return resolveGovernedCommonFoodOption(foodContext(prefs?.profile),input);
 }
 
 type FoodSearchQuery={scope?:'ALL'|'RECOMMENDED';mealHead?:MealHead;search?:string;category?:string;family?:string;referenceState?:string;nutritionStatus?:'REFERENCE_ONLY'|'NUTRITION_PENDING'|'NUTRITION_VERIFIED';generatorEligibility?:'ELIGIBLE'|'INELIGIBLE';entityType?:string;componentRole?:ComponentRole;dietClass?:string;proteinMin?:number;proteinMax?:number;caloriesMin?:number;caloriesMax?:number;limit:number;offset:number};

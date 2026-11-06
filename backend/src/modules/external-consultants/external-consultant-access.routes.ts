@@ -6,6 +6,8 @@ import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSumm
 import { getLatestAssessmentResult, getLatestDraftSession } from '../assessments/assessments.repository.js';
 import { getFoodPreferenceProfile } from '../nutrition/food-preferences.service.js';
 import { getReportFile } from '../reports/reports.store.js';
+import { z } from 'zod';
+import { CommonFoodApiError, resolveDelegatedCommonFoodOption } from '../nutrition/common-food-consultant.service.js';
 
 export const externalConsultantAccessRouter = Router();
 const authority = (req: Request) => (req as Request & { delegatedAuthority?: DelegatedAuthority }).delegatedAuthority;
@@ -16,6 +18,29 @@ const verifyTarget = (req: Request) => {
   if (!auth || auth.actor_type !== 'EXTERNAL_CONSULTANT' || auth.fiteatsy_user_id !== userId || !auth.connection_id || !auth.tenant_id) return null;
   return auth;
 };
+
+const mealHeadSchema=z.enum(['EARLY_MORNING','BREAKFAST','MID_MORNING','LUNCH','EVENING_SNACK','DINNER','BEDTIME']);
+const governedOptionSchema=z.object({
+  mealHead:mealHeadSchema,
+  components:z.array(z.object({foodId:z.string().min(1),servingId:z.string().min(1),multiplier:z.number().positive()})).min(1).max(12),
+  target:z.object({kcal:z.number().nonnegative(),protein:z.number().nonnegative(),kcalTolerance:z.number().positive(),proteinTolerance:z.number().positive()})
+}).strict();
+
+externalConsultantAccessRouter.post('/:userId/common-food/resolve-option', requireDelegatedAuthority('fiteatsy.external.diet.resolve', 'external_consultant_diet_option'), async (req, res, next) => {
+  const auth = verifyTarget(req);
+  if (!auth) return res.status(403).json({ error: 'DELEGATED_TARGET_MISMATCH', message: 'The delegated client target is invalid.' });
+  if (!(auth.scopes ?? []).includes('DIET_PLANS')) return res.status(403).json({ error: 'DIET_PLAN_CONSENT_REQUIRED', message: 'Active Diet Plans consent is required.' });
+  const parsed=governedOptionSchema.safeParse(req.body);
+  if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT',details:parsed.error.flatten()});
+  try{
+    const option=await resolveDelegatedCommonFoodOption({accountId:String(req.params.userId),...parsed.data});
+    res.setHeader('Cache-Control','no-store');
+    return res.status(200).json({connectionId:auth.connection_id,option});
+  }catch(error){
+    if(error instanceof CommonFoodApiError)return res.status(error.statusCode).json({error:error.code,message:error.message});
+    return next(error);
+  }
+});
 
 externalConsultantAccessRouter.get('/:userId/health-context', requireDelegatedAuthority('fiteatsy.external.health.read', 'external_consultant_health'), async (req, res, next) => {
   const auth = verifyTarget(req);
