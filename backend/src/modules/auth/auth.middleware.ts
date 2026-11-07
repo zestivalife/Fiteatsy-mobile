@@ -40,7 +40,11 @@ export const requireAuthenticatedAccount = async (req: Request, res: Response, n
       || req.originalUrl.startsWith('/v1/auth/change-pin')
       || req.originalUrl.startsWith('/v1/auth/me')
       || req.originalUrl.startsWith('/v1/auth/logout');
-    if (account.authProvider === 'fiteatsy' && (account.requiresPinSetup || account.requiresPinChange) && !pinSetupRouteAllowed) {
+    const isGovernedQaIdentity = account.user.accountPurpose === 'QA_TEST';
+    if (account.authProvider === 'fiteatsy'
+      && !isGovernedQaIdentity
+      && (account.requiresPinSetup || account.requiresPinChange)
+      && !pinSetupRouteAllowed) {
       return res.status(428).json({
         error: account.requiresPinSetup ? 'LOGIN_PIN_SETUP_REQUIRED' : 'LOGIN_PIN_CHANGE_REQUIRED',
         message: account.requiresPinSetup
