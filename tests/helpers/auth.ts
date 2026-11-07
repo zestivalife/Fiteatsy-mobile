@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { getJson, postJson } from './http.js';
+import { getJson, postJson, putJson } from './http.js';
 import { setOtpGeneratorForTests } from '../../backend/src/modules/auth/auth.service.js';
 
 let authSequence = 0;
@@ -30,6 +30,14 @@ export const createAuthenticatedSession = async (
   });
   assert.equal(verified.response.status, 200, JSON.stringify(verified.body));
   const token = String(verified.body.sessionToken);
+  const pin = '946281';
+  const pinCreated = await putJson(baseUrl, '/v1/auth/create-pin', {
+    newPin: pin,
+    confirmNewPin: pin
+  }, {
+    headers: authHeaders(token)
+  });
+  assert.equal(pinCreated.response.status, 200, JSON.stringify(pinCreated.body));
   const current = await getJson(baseUrl, '/v1/auth/me', {
     headers: authHeaders(token)
   });
