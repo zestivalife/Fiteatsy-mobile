@@ -20,6 +20,10 @@ jest.mock('../src/components/Screen', () => ({
 }));
 jest.mock('../src/state/AppContext', () => ({ useAppContext: () => ({ themeMode: 'dark' }) }));
 jest.mock('../src/utils/nutritionDate', () => ({ nutritionDate: () => '2026-11-07', subscribeToNutritionDay: () => () => undefined }));
+jest.mock('../src/services/nutritionLoadState', () => ({
+  classifyNutritionLoadError: () => 'SERVER_ERROR',
+  nutritionLoadCopy: () => ({ title: 'Unavailable', message: 'Unavailable', retryable: true }),
+}));
 
 const mockGetNutritionExperience = jest.fn();
 const mockLogNutritionEvent = jest.fn();
