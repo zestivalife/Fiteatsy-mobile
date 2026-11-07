@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request } from 'express';
 import { requireDelegatedAuthority } from '../auth/delegated-authority.middleware.js';
 import type { DelegatedAuthority } from '../auth/delegated-authority.js';
-import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSummaryForClient, listConsultantReportSummariesForClient, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
+import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSummaryForClient, listAssignedConsultantClientContexts, listConsultantReportSummariesForClient, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
 import { getLatestAssessmentResult, getLatestDraftSession } from '../assessments/assessments.repository.js';
 import { getFoodPreferenceProfile } from '../nutrition/food-preferences.service.js';
 import { getReportFile } from '../reports/reports.store.js';
@@ -14,6 +14,7 @@ import { resolveConsultantApplicationIdentity } from './external-consultant-iden
 
 export const externalConsultantAccessRouter = Router();
 const authority = (req: Request) => (req as Request & { delegatedAuthority?: DelegatedAuthority }).delegatedAuthority;
+const externalProfessionalIdPattern = /^ext_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const verifyTarget = (req: Request) => {
   const auth = authority(req);
