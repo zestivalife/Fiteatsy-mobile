@@ -38,8 +38,9 @@ describe('returning-user bootstrap and canonical Health Data Sync', () => {
 
   test('completed users ignore stale onboarding runtime progress', () => {
     const splash = read('src/screens/auth/SplashScreen.tsx');
-    expect(splash).toContain("onboardingStatus === 'COMPLETED'\n      ? null");
-    expect(splash).toContain("onboardingStatus !== 'COMPLETED' && progress?.phase === 'connect'");
+    expect(splash).toContain("if (onboardingStatus === 'COMPLETED')");
+    expect(splash.indexOf("if (onboardingStatus === 'COMPLETED')")).toBeLessThan(splash.indexOf('getOnboardingRuntimeProgress'));
+    expect(splash).toContain("progress?.phase === 'connect'");
     expect(splash).toContain("if (onboardingStatus === 'UNKNOWN')");
     expect(splash).toContain("navigation.replace('Main')");
     expect(splash).not.toContain("if (isAuthenticated && onboardingStatus === 'UNKNOWN') return");
