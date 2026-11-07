@@ -11,6 +11,9 @@ jest.mock('@react-navigation/native', () => ({
 }));
 jest.mock('@expo/vector-icons/Ionicons', () => 'Icon');
 jest.mock('@react-native-community/datetimepicker', () => 'DateTimePicker');
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(), setItem: jest.fn(), removeItem: jest.fn(),
+}));
 jest.mock('react-native-svg', () => ({ __esModule: true, default: 'Svg', Circle: 'Circle' }));
 jest.mock('../src/components/Screen', () => ({
   Screen: ({ children }: { children: React.ReactNode }) => {
@@ -43,6 +46,7 @@ test('mobile Nutrition renders exact consultant-published meals read-only', asyn
       dailyTargets: { calories: 1800, protein: 100, carbohydrates: null, fat: null, fibre: null, hydration: null }, supplementsAndClinicalNotes: [] } },
     meals: [
       { key: 'BREAKFAST', label: 'Breakfast', window: '08:00–09:00', state: 'PENDING', consumedAtISO: null, consumed: null,
+        selectedOptionId: 'breakfast-1',
         options: [{ id: 'breakfast-1', slot: 1, meal: 'Poha + curd', portion: '1 bowl · 100 g', approxKcal: 320, proteinGrams: 14, carbsGrams: 48, fatGrams: 8, fibreGrams: 6 }] },
     ],
     totals: { calories: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 }, remaining: { calories: 1800, protein: 100, carbs: null, fat: null, fibre: null },
@@ -55,8 +59,8 @@ test('mobile Nutrition renders exact consultant-published meals read-only', asyn
   await waitFor(() => expect(mockGetNutritionExperience).toHaveBeenCalled());
   await waitFor(() => expect(screen.getAllByText('Consultant plan').length).toBeGreaterThan(0));
   expect(screen.getByText('Poha + curd')).toBeTruthy();
-  expect(screen.getByText('1 bowl · 100 g · 320 kcal')).toBeTruthy();
-  expect(screen.getByText('P 14g · C 48g · F 8g · Fibre 6g')).toBeTruthy();
+  expect(screen.getByText('Serving: 1 bowl · 100 g')).toBeTruthy();
+  expect(screen.getByText('320 kcal · P 14g · C 48g · F 8g · Fibre 6g')).toBeTruthy();
   expect(screen.queryByText('My Pattern')).toBeNull();
   expect(screen.queryByText('What can I eat now?')).toBeNull();
   expect(mockLogNutritionEvent).not.toHaveBeenCalled();

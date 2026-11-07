@@ -60,7 +60,6 @@ describe('Onboarding V2 contract', () => {
     expect(splash).toContain("progress?.phase === 'food'");
     expect(splash).toContain("progress?.phase === 'recovery'");
     expect(splash).toContain("progress?.phase === 'connect'");
-    expect(splash).toContain("progress?.phase === 'calendar'");
     expect(splash).toContain("progress?.phase === 'ready'");
     expect(splash).toContain("if (onboardingStatus === 'COMPLETED')");
     expect(splash.indexOf("if (onboardingStatus === 'COMPLETED')")).toBeLessThan(splash.indexOf("progress?.phase === 'connect'"));

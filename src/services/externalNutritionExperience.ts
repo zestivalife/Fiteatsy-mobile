@@ -39,15 +39,8 @@ export const externalPlanToNutritionExperience = (publication: ExternalDietPlan,
   if (options.some(option => option.calculationStatus !== 'AUTHORITATIVELY_RESOLVED')) {
     throw new ApiClientError('VALIDATION_ERROR', 'The consultant-published nutrition plan is not authoritative.');
   }
-  const meals: NutritionMeal[] = MEALS.map(([key, label, window]) => ({
-    key,
-    label,
-    window,
-    state: 'PENDING',
-    consumedAtISO: null,
-    consumed: null,
-    selectedOptionId: null,
-    options: options.filter(option => option.mealHead === key).map((option, slot): NutritionOption => {
+  const meals: NutritionMeal[] = MEALS.map(([key, label, window]) => {
+    const mealOptions = options.filter(option => option.mealHead === key).map((option, slot): NutritionOption => {
       const nutrition = option.nutrition ?? {};
       return {
         id: text(option.id), slot: slot + 1, meal: text(option.title) || label,
@@ -55,8 +48,13 @@ export const externalPlanToNutritionExperience = (publication: ExternalDietPlan,
         proteinGrams: finite(nutrition.protein), carbsGrams: finite(nutrition.carbohydrate),
         fatGrams: finite(nutrition.fat), fibreGrams: finite(nutrition.fibre),
       };
-    }),
-  }));
+    });
+    return {
+      key, label, window, state: 'PENDING', consumedAtISO: null, consumed: null,
+      selectedOptionId: mealOptions[0]?.id ?? null,
+      options: mealOptions,
+    };
+  });
   const targets = content.targets ?? {};
   const calories = finite(targets.calories), protein = finite(targets.protein);
   const carbohydrates = finite(targets.carbohydrates), fat = finite(targets.fat), fibre = finite(targets.fibre);

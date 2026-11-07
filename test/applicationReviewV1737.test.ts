@@ -39,7 +39,8 @@ describe('v17.37 application review acceptance contracts', () => {
     const service = read('backend/src/modules/nutrition/food-preferences.service.ts');
     const screen = read('src/screens/onboarding/FoodPreferencesScreen.tsx');
     expect(service).toContain('jsonb_array_elements_text(aliases)');
-    expect(service).toContain('food_knowledge_generation_projection governed');
+    expect(service).toContain('food_knowledge_food_profiles governed');
+    expect(service).toContain('food_knowledge_versions governed_version');
     expect(service).toContain('governed.client_consumable = true');
     expect(service).toContain("governed.food_type <> 'INGREDIENT_ONLY'");
     expect(screen).toContain('Load more foods');

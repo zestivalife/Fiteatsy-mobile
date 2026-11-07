@@ -80,6 +80,10 @@ export const SplashScreen = ({ navigation }: Props) => {
       transitionTo(() => navigation.replace('HealthDataSync', { entryContext: 'ONBOARDING' }));
       return;
     }
+    if (progress?.phase === 'ready') {
+      transitionTo(() => navigation.replace('OnboardingReady'));
+      return;
+    }
     if (onboardingStatus === 'NOT_STARTED' || onboardingResumeStep === 'basics') {
       transitionTo(() => navigation.replace('OnboardingBasics'));
       return;

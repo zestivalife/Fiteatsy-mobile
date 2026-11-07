@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const route = readFileSync(new URL('../../backend/src/modules/external-consultants/external-consultant-access.routes.ts', import.meta.url), 'utf8');
 const repository = readFileSync(new URL('../../backend/src/modules/consultants/consultants.repository.ts', import.meta.url), 'utf8');
+const accessRepository = readFileSync(new URL('../../backend/src/modules/consultant-access/consultant-access.repository.ts', import.meta.url), 'utf8');
 
 test('assignment roster is registered with the exact delegated authority contract', () => {
   assert.match(route, /get\('\/assignments\/clients'/);
@@ -26,9 +27,10 @@ test('assignment lookup preserves product, role, status and client eligibility r
   const implementation = repository.slice(start, end);
   assert.match(implementation, /cap003\.consultant_user_id/);
   assert.match(implementation, /cap003\.client_user_id = u\.id/);
-  assert.match(implementation, /cap003\.product = 'FITEATSY'/);
   assert.match(implementation, /cap003\.professional_type = 'CONSULTANT'/);
-  assert.match(implementation, /cap003\.status = 'active'/);
+  assert.match(implementation, /consultantAssignmentSqlPredicate\('cap003'\)/);
+  assert.match(accessRepository, /\$\{assignment\}\.product = '\$\{CONSULTANT_ACCESS_PRODUCT\}'/);
+  assert.match(accessRepository, /\$\{assignment\}\.status = 'active'/);
   assert.match(implementation, /c\.deleted_at is null/);
 });
 
@@ -36,7 +38,7 @@ test('roster response uses the consumer contract and never fabricates connection
   assert.match(route, /userId: client\.accountId/);
   assert.match(route, /clientId: client\.publicClientId/);
   assert.match(route, /assignmentState: 'ACTIVE'/);
-  const assignmentHandler = route.slice(route.indexOf("get('/assignments/clients'"), route.indexOf("get('/:userId/health-context'"));
+  const assignmentHandler = route.slice(route.indexOf("get('/assignments/clients'"), route.indexOf("externalConsultantAccessRouter.post('/:userId/diet-plans'"));
   assert.doesNotMatch(assignmentHandler, /connectionId|consent|healthContext/);
   assert.match(assignmentHandler, /Cache-Control', 'no-store, private'/);
 });
