@@ -69,8 +69,42 @@ create table if not exists auth_sessions (
   ip_address text
 );
 
+create table if not exists tenants (
+  id uuid primary key,
+  name text not null,
+  slug text not null unique,
+  tenant_type text not null,
+  status text not null,
+  billing_owner_user_id text,
+  subscription_id text,
+  default_timezone text not null default 'Asia/Kolkata',
+  country text not null default 'IN',
+  currency text not null default 'INR',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+insert into tenants (id, name, slug, tenant_type, status)
+values ('00000000-0000-4000-8000-000000000001', 'Zestiva', 'zestiva', 'ZESTIVA_INTERNAL', 'active')
+on conflict (slug) do nothing;
+
+create table if not exists tenant_memberships (
+  id uuid primary key,
+  tenant_id uuid not null references tenants(id) on delete restrict,
+  user_id text not null references users(id) on delete restrict,
+  tenant_role text not null,
+  status text not null,
+  joined_at timestamptz not null,
+  invited_by text,
+  removed_at timestamptz,
+  created_at timestamptz not null,
+  updated_at timestamptz not null,
+  unique (tenant_id, user_id)
+);
+
 create table if not exists fiteatsy_clients (
   id text primary key,
+  tenant_id uuid not null references tenants(id) on delete restrict,
   fiteatsy_client_id text not null unique,
   account_user_id text not null unique references users(id) on delete cascade,
   status text not null default 'active',

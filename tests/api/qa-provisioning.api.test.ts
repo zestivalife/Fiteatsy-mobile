@@ -2,10 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pool } from '../../backend/src/db/pool.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
-import { getJson, postJson } from '../helpers/http.js';
+import { getJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
+
+const completeLoginPinSetup = async (token: string) => {
+  const result = await putJson(server.baseUrl, '/v1/auth/create-pin', {
+    newPin: '654320', confirmNewPin: '654320',
+  }, { headers: authHeaders(token) });
+  assert.equal(result.response.status, 201, JSON.stringify(result.body));
+};
 
 test.before(async () => { server = await startTestServer(); });
 test.after(async () => { await server?.close(); });
@@ -37,6 +44,7 @@ test('admin provisions QA client and consultant, issues governed sessions, and r
 
   const clientSession = await postJson(server.baseUrl, `/v1/admin/qa-identities/${client.body.user.id}/session`, { reason: 'Food preference acceptance' }, { headers: authHeaders(admin.token) });
   assert.equal(clientSession.response.status, 201);
+  await completeLoginPinSetup(clientSession.body.token);
   const me = await getJson(server.baseUrl, '/v1/auth/me', { headers: authHeaders(clientSession.body.token) });
   assert.equal(me.response.status, 200);
   assert.equal(me.body.user.id, client.body.user.id);
@@ -94,6 +102,7 @@ test('admin resets only QA client onboarding state while preserving identity and
   );
   const session = await postJson(server.baseUrl, `/v1/admin/qa-identities/${userId}/session`, { reason: 'Reset persistence verification' }, { headers: authHeaders(admin.token) });
   assert.equal(session.response.status, 201);
+  await completeLoginPinSetup(session.body.token);
   const bundle = await getJson(server.baseUrl, '/v1/platform/health-profile', { headers: authHeaders(session.body.token) });
   assert.equal(bundle.response.status, 200);
   await pool.query(
@@ -152,6 +161,7 @@ test('admin provisions a QA senior consultant with canonical role and governed s
   assert.equal(senior.body.user.role, 'senior_consultant');
   const session = await postJson(server.baseUrl, `/v1/admin/qa-identities/${senior.body.user.id}/session`, { reason: 'Senior review acceptance' }, { headers: authHeaders(admin.token) });
   assert.equal(session.response.status, 201);
+  await completeLoginPinSetup(session.body.token);
   const me = await getJson(server.baseUrl, '/v1/auth/me', { headers: authHeaders(session.body.token) });
   assert.equal(me.response.status, 200);
   assert.equal(me.body.user.id, senior.body.user.id);

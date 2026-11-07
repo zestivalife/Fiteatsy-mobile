@@ -52,8 +52,9 @@ test('database preserves exact 35-option identity through review, revision, appr
     [clientUserId, consultantId, seniorId, `${clientUserId}@example.test`, `${consultantId}@example.test`, `${seniorId}@example.test`],
   );
   await pool.query(
-    `insert into fiteatsy_clients (id, fiteatsy_client_id, account_user_id) values ($1, $2, $3)`,
-    [clientId, publicClientId, clientUserId],
+    `insert into fiteatsy_clients (id, fiteatsy_client_id, account_user_id, tenant_id)
+     values ($1, $2, $3, $4)`,
+    [clientId, publicClientId, clientUserId, '00000000-0000-4000-8000-000000000001'],
   );
   await pool.query(
     `insert into health_profiles (id, user_id, client_id, gender, diet_type) values ($1, $2, $3, 'Female', 'vegetarian')`,

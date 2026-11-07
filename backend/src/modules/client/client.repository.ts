@@ -6,6 +6,7 @@ type Queryable = Pick<PoolClient, 'query'>;
 
 export type PersistedClient = {
   id: string;
+  tenantId: string;
   fiteatsyClientId: string;
   accountUserId: string;
   status: string;
@@ -24,6 +25,7 @@ const toIso = (value: unknown) => {
 
 const mapClient = (row: Record<string, unknown>): PersistedClient => ({
   id: String(row.id),
+  tenantId: String(row.tenant_id),
   fiteatsyClientId: String(row.fiteatsy_client_id),
   accountUserId: String(row.account_user_id),
   status: String(row.status),
@@ -41,6 +43,47 @@ const isUniqueViolation = (error: unknown) =>
   'code' in error &&
   typeof (error as { code?: unknown }).code === 'string' &&
   (error as { code: string }).code === '23505';
+
+const FITEATSY_HOME_TENANT_SLUG = 'zestiva';
+
+export const resolveFiteatsyHomeTenantId = async (db: Queryable = pool) => {
+  const result = await db.query(
+    `select id::text as id
+       from tenants
+      where slug = $1
+        and tenant_type = 'ZESTIVA_INTERNAL'
+        and lower(status) = 'active'
+      limit 2`,
+    [FITEATSY_HOME_TENANT_SLUG]
+  );
+  if (result.rowCount !== 1) {
+    const error = new Error('Fiteatsy home tenant is unavailable.');
+    error.name = 'FITEATSY_TENANT_UNAVAILABLE';
+    throw error;
+  }
+  return String(result.rows[0].id);
+};
+
+const ensureClientMembership = async (accountUserId: string, tenantId: string, db: Queryable) => {
+  const timestamp = new Date().toISOString();
+  await db.query(
+    `insert into tenant_memberships (
+       id, tenant_id, user_id, tenant_role, status, joined_at, created_at, updated_at
+     ) values ($1, $2, $3, 'CLIENT', 'active', $4, $4, $4)
+     on conflict (tenant_id, user_id) do update
+       set status = 'active',
+           removed_at = null,
+           updated_at = excluded.updated_at`,
+    [crypto.randomUUID(), tenantId, accountUserId, timestamp]
+  );
+};
+
+const assertClientTenant = (client: PersistedClient, tenantId: string) => {
+  if (client.tenantId === tenantId) return;
+  const error = new Error('Client belongs to a different tenant.');
+  error.name = 'CLIENT_TENANT_MISMATCH';
+  throw error;
+};
 
 export const getClientByAccountUserId = async (
   accountUserId: string,
@@ -85,7 +128,7 @@ const getClientByAccountUserIdAnyStatus = async (
   return mapClient(result.rows[0]);
 };
 
-const reactivateClientRecord = async (clientId: string, db: Queryable = pool) => {
+const reactivateClientRecord = async (clientId: string, tenantId: string, db: Queryable = pool) => {
   const timestamp = new Date().toISOString();
   const result = await db.query(
     `
@@ -93,12 +136,12 @@ const reactivateClientRecord = async (clientId: string, db: Queryable = pool) =>
       set
         status = 'active',
         deleted_at = null,
-        updated_at = $2,
+        updated_at = $3,
         version = version + 1
-      where id = $1
+      where id = $1 and tenant_id = $2
       returning *
     `,
-    [clientId, timestamp]
+    [clientId, tenantId, timestamp]
   );
   if (result.rowCount === 0) return null;
   return mapClient(result.rows[0]);
@@ -124,12 +167,16 @@ export const getClientByFiteatsyClientId = async (
 
 export const createOrResolveClientForAccount = async (
   accountUserId: string,
-  db: Queryable = pool
+  db: Queryable = pool,
+  resolvedTenantId?: string
 ): Promise<PersistedClient> => {
+  const tenantId = resolvedTenantId ?? await resolveFiteatsyHomeTenantId(db);
+  await ensureClientMembership(accountUserId, tenantId, db);
   const existing = await getClientByAccountUserIdAnyStatus(accountUserId, db);
   if (existing) {
+    assertClientTenant(existing, tenantId);
     if (existing.deletedAtISO == null && existing.status.toLowerCase() === 'active') return existing;
-    const reactivated = await reactivateClientRecord(existing.id, db);
+    const reactivated = await reactivateClientRecord(existing.id, tenantId, db);
     if (reactivated) return reactivated;
   }
 
@@ -139,23 +186,25 @@ export const createOrResolveClientForAccount = async (
         `
           insert into fiteatsy_clients (
             id,
+            tenant_id,
             fiteatsy_client_id,
             account_user_id,
             status,
             version,
             created_at,
             updated_at
-          ) values ($1, $2, $3, 'active', 1, $4, $4)
+          ) values ($1, $2, $3, $4, 'active', 1, $5, $5)
           on conflict (account_user_id) do nothing
           returning *
         `,
-        [crypto.randomUUID(), buildClientPublicId(), accountUserId, new Date().toISOString()]
+        [crypto.randomUUID(), tenantId, buildClientPublicId(), accountUserId, new Date().toISOString()]
       );
       if (inserted.rowCount === 1) return mapClient(inserted.rows[0]);
       const resolved = await getClientByAccountUserIdAnyStatus(accountUserId, db);
       if (resolved) {
+        assertClientTenant(resolved, tenantId);
         if (resolved.deletedAtISO == null && resolved.status.toLowerCase() === 'active') return resolved;
-        const reactivated = await reactivateClientRecord(resolved.id, db);
+        const reactivated = await reactivateClientRecord(resolved.id, tenantId, db);
         if (reactivated) return reactivated;
       }
     } catch (error) {
@@ -166,8 +215,9 @@ export const createOrResolveClientForAccount = async (
 
   const resolved = await getClientByAccountUserIdAnyStatus(accountUserId, db);
   if (resolved) {
+    assertClientTenant(resolved, tenantId);
     if (resolved.deletedAtISO == null && resolved.status.toLowerCase() === 'active') return resolved;
-    const reactivated = await reactivateClientRecord(resolved.id, db);
+    const reactivated = await reactivateClientRecord(resolved.id, tenantId, db);
     if (reactivated) return reactivated;
   }
   throw new Error('Failed to create or resolve Fiteatsy client for account.');

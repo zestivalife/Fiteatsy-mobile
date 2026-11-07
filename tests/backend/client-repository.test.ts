@@ -13,6 +13,7 @@ import { resetBackendStateForTests } from '../../backend/src/test-support/reset.
 import { syntheticOperationalPhone } from '../helpers/canonicalFixtures.js';
 
 const CLIENT_MIGRATION_FILE = '0002_m3a_client_identity_foundation.sql';
+const CLIENT_TENANT_MIGRATION_FILE = '0068_fiteatsy_client_tenant_integrity.sql';
 
 test.beforeEach(async () => {
   await resetBackendStateForTests();
@@ -65,12 +66,13 @@ test('createOrResolveClientForAccount reactivates stale client mappings and pres
         id,
         fiteatsy_client_id,
         account_user_id,
+        tenant_id,
         status,
         version,
         created_at,
         updated_at,
         deleted_at
-      ) values ($1, $2, $3, 'inactive', 3, $4, $4, $4)
+      ) values ($1, $2, $3, '00000000-0000-4000-8000-000000000001', 'inactive', 3, $4, $4, $4)
     `,
     ['11111111-1111-1111-1111-111111111111', 'fc_existingpreserved1234567890abcdef', 'stale-client-user', timestamp]
   );
@@ -106,7 +108,10 @@ test('migration backfills one client for an existing account and records the mig
   );
 
   await pool.query('drop table if exists fiteatsy_clients cascade');
-  await pool.query('delete from schema_migrations where version = $1', [CLIENT_MIGRATION_FILE]);
+  await pool.query(
+    'delete from schema_migrations where version = any($1::text[])',
+    [[CLIENT_MIGRATION_FILE, CLIENT_TENANT_MIGRATION_FILE]]
+  );
 
   resetMigrationStateForTests();
   await migrateDatabase();
@@ -116,9 +121,14 @@ test('migration backfills one client for an existing account and records the mig
     'select version from schema_migrations where version = $1',
     [CLIENT_MIGRATION_FILE]
   );
+  const tenantMigrationRow = await pool.query(
+    'select version from schema_migrations where version = $1',
+    [CLIENT_TENANT_MIGRATION_FILE]
+  );
 
   assert.match(currentClient.fiteatsyClientId, /^fc_[a-f0-9]{32}$/i);
   assert.equal(currentClient.accountUserId, 'legacy-account-user');
   assert.equal(await countClients(), 1);
   assert.equal(migrationRow.rowCount, 1);
+  assert.equal(tenantMigrationRow.rowCount, 1);
 });

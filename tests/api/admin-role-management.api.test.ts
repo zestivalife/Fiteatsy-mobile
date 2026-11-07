@@ -461,7 +461,8 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
         actorUserId: senior.current.body.accountId,
         clientUserId: session.current.body.accountId,
         professionalUserId: consultant.current.body.accountId,
-        professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Whole-population lifecycle matrix'
+        professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Whole-population lifecycle matrix',
+        allowReassignment: definition.reassign === true,
       });
       assert.notEqual(assignment, null);
     }
