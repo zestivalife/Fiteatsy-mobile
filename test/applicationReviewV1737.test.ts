@@ -39,10 +39,18 @@ describe('v17.37 application review acceptance contracts', () => {
     const service = read('backend/src/modules/nutrition/food-preferences.service.ts');
     const screen = read('src/screens/onboarding/FoodPreferencesScreen.tsx');
     expect(service).toContain('jsonb_array_elements_text(aliases)');
+    expect(service).toContain('food_knowledge_generation_projection governed');
     expect(service).toContain('governed.client_consumable = true');
     expect(service).toContain("governed.food_type <> 'INGREDIENT_ONLY'");
     expect(screen).toContain('Load more foods');
     expect(screen).toContain('new Map([...current, ...response.items]');
+  });
+
+  it('keeps launch-time care-case creation tenant scoped', () => {
+    const store = read('backend/src/modules/platform/platform.store.ts');
+    expect(store).toContain('from fiteatsy_clients');
+    expect(store).toContain('account_user_id = $2');
+    expect(store).toContain("throw new Error('Client ownership could not be verified')");
   });
 
   it('exposes the complete canonical wellness goal domain with unique stable IDs', () => {

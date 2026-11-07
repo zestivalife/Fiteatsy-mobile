@@ -152,11 +152,11 @@ test('an empty verified catalogue result stays empty instead of fabricating a fa
   assert.deepEqual(selectDiverseMealOptions([], new Set<string>()), []);
 });
 
-test('verified catalogue reads production eligibility from governed versions', () => {
+test('verified catalogue preserves projection eligibility and confirms the active governed version', () => {
   const source = readFileSync(new URL('../../backend/src/modules/nutrition/food-preferences.service.ts', import.meta.url), 'utf8');
   assert.match(source, /food_knowledge_versions governed_version/);
   assert.match(source, /governed_version\.production_eligible = true/);
-  assert.doesNotMatch(source, /governed\.production_eligible/);
+  assert.match(source, /governed\.production_eligible = true/);
 });
 
 test('canonical nutrition plan retains exactly seven ordered meal heads', () => {

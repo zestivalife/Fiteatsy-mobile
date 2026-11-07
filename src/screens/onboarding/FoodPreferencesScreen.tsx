@@ -59,17 +59,24 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
   const completionStarted = useRef(false);
 
   useEffect(() => {
-    Promise.all([
+    Promise.allSettled([
       getFoodPreferences(),
       mode === 'onboarding' ? getOnboardingRuntimeProgress(clientId) : Promise.resolve(null)
     ])
-      .then(([response, progress]) => {
-        const source = progress?.phase === 'food' && progress.foodDraft ? progress.foodDraft : response.profile;
-        setProfile({ ...emptyFoodPreferenceProfile(), ...source, likedFoodIds: source.likedFoodIds ?? [], dislikedFoodIds: source.dislikedFoodIds ?? [], avoidedFoodIds: source.avoidedFoodIds ?? [] });
+      .then(([preferencesResult, progressResult]) => {
+        const progress = progressResult.status === 'fulfilled' ? progressResult.value : null;
+        const response = preferencesResult.status === 'fulfilled' ? preferencesResult.value : null;
+        const source = response?.profile ?? (progress?.phase === 'food' ? progress.foodDraft : null);
+        if (source) {
+          setProfile({ ...emptyFoodPreferenceProfile(), ...source, likedFoodIds: source.likedFoodIds ?? [], dislikedFoodIds: source.dislikedFoodIds ?? [], avoidedFoodIds: source.avoidedFoodIds ?? [] });
+        }
         if (progress?.phase === 'food') setInitialOnboardingStep(Math.max(1, Math.min(4, progress.step)));
-        setSavedAt(response.updatedAtISO);
+        if (response) setSavedAt(response.updatedAtISO);
+        if (preferencesResult.status === 'rejected') {
+          const requestError = preferencesResult.reason;
+          setError(requestError instanceof Error ? requestError.message : 'Unable to load food preferences.');
+        }
       })
-      .catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'Unable to load food preferences.'))
       .finally(() => setLoading(false));
   }, [clientId, mode]);
 

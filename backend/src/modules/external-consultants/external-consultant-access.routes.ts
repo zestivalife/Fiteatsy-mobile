@@ -2,16 +2,20 @@ import { Router } from 'express';
 import type { Request } from 'express';
 import { requireDelegatedAuthority } from '../auth/delegated-authority.middleware.js';
 import type { DelegatedAuthority } from '../auth/delegated-authority.js';
-import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSummaryForClient, listConsultantReportSummariesForClient, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
+import { getRegisteredClientProfileContextByAccountId, getConsultantWearableSummaryForClient, listAssignedConsultantClientContexts, listConsultantReportSummariesForClient, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
+import { getLatestAssessmentResult, getLatestDraftSession } from '../assessments/assessments.repository.js';
+import { getFoodPreferenceProfile } from '../nutrition/food-preferences.service.js';
 import { getReportFile } from '../reports/reports.store.js';
 import { z } from 'zod';
 import { nutritionPlanContentSchema } from '../nutrition/nutrition.routes.js';
 import { getCareCaseByClientId } from '../platform/platform.store.js';
 import { ingestExternalDietPlan, selectExternalDietPlan } from './external-diet-plan.store.js';
 import { CommonFoodApiError, resolveDelegatedCommonFoodOption } from '../nutrition/common-food-consultant.service.js';
+import { resolveConsultantApplicationIdentity } from './external-consultant-identity.repository.js';
 
 export const externalConsultantAccessRouter = Router();
 const authority = (req: Request) => (req as Request & { delegatedAuthority?: DelegatedAuthority }).delegatedAuthority;
+const externalProfessionalIdPattern = /^ext_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const verifyTarget = (req: Request) => {
   const auth = authority(req);
@@ -112,6 +116,33 @@ externalConsultantAccessRouter.put('/:userId/diet-plans/active', requireDelegate
   } catch (error) { return next(error); }
 });
 
+externalConsultantAccessRouter.get('/assignments/clients', requireDelegatedAuthority('fiteatsy.external.assignment.read', 'external_consultant_assignment_roster', 'EXTERNAL_CONSULTANT'), async (req, res, next) => {
+  const auth = authority(req);
+  if (!auth?.tenant_id || !externalProfessionalIdPattern.test(auth.sub)) {
+    return res.status(403).json({ error: 'DELEGATED_ASSIGNMENT_ACTOR_INVALID', message: 'The delegated consultant identity is invalid.' });
+  }
+  try {
+    const identity = await resolveConsultantApplicationIdentity(auth.sub.slice('ext_'.length), auth.sub);
+    if (identity.status !== 'RESOLVED') {
+      return res.status(403).json({ error: `CONSULTANT_IDENTITY_${identity.status}`, message: 'The delegated consultant identity is not active and unambiguous.' });
+    }
+    const clients = await listAssignedConsultantClientContexts(identity.applicationUserId);
+    res.setHeader('Cache-Control', 'no-store, private');
+    return res.status(200).json({
+      clients: clients.map((client) => ({
+        userId: client.accountId,
+        clientId: client.publicClientId,
+        displayName: client.name,
+        email: client.email,
+        mobile: client.mobileNumberMasked,
+        assignmentState: 'ACTIVE'
+      }))
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 externalConsultantAccessRouter.get('/:userId/health-context', requireDelegatedAuthority('fiteatsy.external.health.read', 'external_consultant_health'), async (req, res, next) => {
   const auth = verifyTarget(req);
   if (!auth) return res.status(403).json({ error: 'DELEGATED_TARGET_MISMATCH', message: 'The delegated client target is invalid.' });
@@ -119,15 +150,28 @@ externalConsultantAccessRouter.get('/:userId/health-context', requireDelegatedAu
     const context = await getRegisteredClientProfileContextByAccountId(String(req.params.userId));
     if (!context) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'The connected Fiteatsy client was not found.' });
     const scopes = new Set(auth.scopes ?? []);
-    const [reports, biomarkers, wearables] = await Promise.all([
+    const owner = { accountId: context.accountId, clientId: context.internalClientId };
+    const [reports, biomarkers, wearables, foodPreferences, completedAssessment, draftAssessment] = await Promise.all([
       scopes.has('HEALTH_SUMMARY') ? listConsultantReportSummariesForClient(context.internalClientId, context.accountId, 100) : Promise.resolve([]),
       scopes.has('BIOMARKERS') ? listValidatedBiomarkerSummaryForClient(context.internalClientId, context.accountId) : Promise.resolve([]),
-      scopes.has('MEASUREMENTS') ? getConsultantWearableSummaryForClient(context.internalClientId, context.accountId) : Promise.resolve(null)
+      scopes.has('MEASUREMENTS') ? getConsultantWearableSummaryForClient(context.internalClientId, context.accountId) : Promise.resolve(null),
+      scopes.has('PROFILE') ? getFoodPreferenceProfile(context.profile.client.id) : Promise.resolve(null),
+      scopes.has('HEALTH_SUMMARY') ? getLatestAssessmentResult(owner) : Promise.resolve({ result: null, previousResult: null }),
+      scopes.has('HEALTH_SUMMARY') ? getLatestDraftSession(owner) : Promise.resolve(null)
     ]);
+    const latestAssessment = completedAssessment.result;
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({
       connectionId: auth.connection_id,
       profile: scopes.has('PROFILE') ? context.profile : null,
+      foodPreferences: scopes.has('PROFILE') ? foodPreferences : null,
+      assessment: scopes.has('HEALTH_SUMMARY') ? {
+        type: 'PSS10',
+        status: latestAssessment ? 'COMPLETED' : draftAssessment ? 'DRAFT' : 'NOT_STARTED',
+        completedAtISO: latestAssessment?.completedAtISO ?? null,
+        instrumentVersion: latestAssessment?.instrumentVersion ?? draftAssessment?.instrumentVersion ?? null,
+        result: latestAssessment
+      } : null,
       measurements: scopes.has('MEASUREMENTS') ? context.calculationInput : null,
       reports,
       biomarkers,
