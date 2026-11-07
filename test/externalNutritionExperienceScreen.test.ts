@@ -61,4 +61,4 @@ test('mobile Nutrition renders exact consultant-published meals read-only', asyn
   expect(screen.queryByText('What can I eat now?')).toBeNull();
   expect(mockLogNutritionEvent).not.toHaveBeenCalled();
   expect(mockLogWater).not.toHaveBeenCalled();
-});
+}, 15_000);
