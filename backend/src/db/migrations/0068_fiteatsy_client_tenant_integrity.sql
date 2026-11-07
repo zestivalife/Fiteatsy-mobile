@@ -31,12 +31,12 @@ create table if not exists tenant_memberships (
   tenant_id uuid not null references tenants(id) on delete restrict,
   user_id text not null references users(id) on delete restrict,
   tenant_role text not null,
-  status text not null,
-  joined_at timestamptz not null,
+  status text not null default 'active',
+  joined_at timestamptz not null default now(),
   invited_by text,
   removed_at timestamptz,
-  created_at timestamptz not null,
-  updated_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   unique (tenant_id, user_id)
 );
 
