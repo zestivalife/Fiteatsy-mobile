@@ -37,7 +37,7 @@ export const createAuthenticatedSession = async (
   }, {
     headers: authHeaders(token)
   });
-  assert.equal(pinCreated.response.status, 200, JSON.stringify(pinCreated.body));
+  assert.equal(pinCreated.response.status, 201, JSON.stringify(pinCreated.body));
   const current = await getJson(baseUrl, '/v1/auth/me', {
     headers: authHeaders(token)
   });
