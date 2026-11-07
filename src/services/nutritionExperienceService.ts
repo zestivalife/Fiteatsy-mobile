@@ -1,5 +1,6 @@
 import { apiFetch, ApiClientError } from './apiClient';
 import { nutritionDate } from '../utils/nutritionDate';
+import { getActiveExternalNutritionExperience } from './externalNutritionExperience';
 
 const TRANSIENT_NUTRITION_STATUSES = new Set([502, 503, 504]);
 
@@ -52,6 +53,7 @@ export type NutritionMeal = {
 };
 
 export type NutritionExperience = {
+  delivery?: { source: 'FITEATSY_NATIVE' | 'EXTERNAL_CONSULTANT'; readOnly: boolean; publicationId?: string };
   plan: {
     id: string;
     templateVersion: string;
@@ -99,7 +101,15 @@ export type NutritionExperience = {
 
 export const getNutritionExperience = async (date?: string) => {
   const canonicalDate = date ?? nutritionDate();
-  const response = await nutritionFetch<NutritionExperience>(`/v1/platform/nutrition-experience?date=${encodeURIComponent(canonicalDate)}`);
+  let response: NutritionExperience;
+  try {
+    response = await getActiveExternalNutritionExperience(canonicalDate);
+  } catch (error) {
+    const noExternalPlan = error instanceof ApiClientError && error.code === 'NOT_FOUND'
+      && (error.serverCode === 'DIET_PLAN_NOT_FOUND' || error.serverCode === 'FEATURE_DISABLED');
+    if (!noExternalPlan) throw error;
+    response = await nutritionFetch<NutritionExperience>(`/v1/platform/nutrition-experience?date=${encodeURIComponent(canonicalDate)}`);
+  }
   if (!response?.plan?.id || !response?.version?.id || !Array.isArray(response.meals) || !response.version.content?.nutritionSnapshot) {
     throw new ApiClientError('VALIDATION_ERROR', 'The published nutrition plan response is malformed.');
   }
