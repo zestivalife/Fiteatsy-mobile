@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { nutritionPlanContentSchema } from '../nutrition/nutrition.routes.js';
 import { getCareCaseByClientId } from '../platform/platform.store.js';
 import { ingestExternalDietPlan, selectExternalDietPlan } from './external-diet-plan.store.js';
+import { resolveConsultantApplicationIdentity } from './external-consultant-identity.repository.js';
 
 export const externalConsultantAccessRouter = Router();
 const authority = (req: Request) => (req as Request & { delegatedAuthority?: DelegatedAuthority }).delegatedAuthority;
@@ -40,6 +41,33 @@ const externalPlanPublicationSchema = z.object({
 });
 
 const externalPlanSelectionSchema = z.object({ externalPlanId: z.string().trim().min(1).max(200) });
+
+externalConsultantAccessRouter.get('/assignments/clients', requireDelegatedAuthority('fiteatsy.external.assignment.read', 'external_consultant_assignment_roster', 'EXTERNAL_CONSULTANT'), async (req, res, next) => {
+  const auth = authority(req);
+  if (!auth?.tenant_id || !externalProfessionalIdPattern.test(auth.sub)) {
+    return res.status(403).json({ error: 'DELEGATED_ASSIGNMENT_ACTOR_INVALID', message: 'The delegated consultant identity is invalid.' });
+  }
+  try {
+    const identity = await resolveConsultantApplicationIdentity(auth.sub.slice('ext_'.length), auth.sub);
+    if (identity.status !== 'RESOLVED') {
+      return res.status(403).json({ error: `CONSULTANT_IDENTITY_${identity.status}`, message: 'The delegated consultant identity is not active and unambiguous.' });
+    }
+    const clients = await listAssignedConsultantClientContexts(identity.applicationUserId);
+    res.setHeader('Cache-Control', 'no-store, private');
+    return res.status(200).json({
+      clients: clients.map((client) => ({
+        userId: client.accountId,
+        clientId: client.publicClientId,
+        displayName: client.name,
+        email: client.email,
+        mobile: client.mobileNumberMasked,
+        assignmentState: 'ACTIVE'
+      }))
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 externalConsultantAccessRouter.post('/:userId/diet-plans', requireDelegatedAuthority('fiteatsy.external.diet.write', 'external_consultant_diet_plan'), async (req, res, next) => {
   const auth = verifyTarget(req);
