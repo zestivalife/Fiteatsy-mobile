@@ -41,7 +41,7 @@ test.beforeEach(async () => {
 
 test('delegated health context returns the persisted canonical food preferences and completed Fiteatsy assessment', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
-    name: 'Delegated Health Client', email: `delegated-health-${Date.now()}@example.com`
+    name: 'Delegated Health Client', email: `delegated-health-${Date.now()}@example.com`, setupPin: false
   });
   const pin = await putJson(server.baseUrl, '/v1/auth/create-pin', { newPin: '946281', confirmNewPin: '946281' }, { headers: authHeaders(client.token) });
   assert.equal(pin.response.status, 201, JSON.stringify(pin.body));

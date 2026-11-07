@@ -10,7 +10,7 @@ export const authHeaders = (token: string) => ({
 
 export const createAuthenticatedSession = async (
   baseUrl: string,
-  overrides: Partial<{ name: string; email: string; mobileNumber: string }> = {}
+  overrides: Partial<{ name: string; email: string; mobileNumber: string; setupPin: boolean }> = {}
 ) => {
   authSequence += 1;
   const suffix = `${Date.now()}-${authSequence}`;
@@ -30,14 +30,16 @@ export const createAuthenticatedSession = async (
   });
   assert.equal(verified.response.status, 200, JSON.stringify(verified.body));
   const token = String(verified.body.sessionToken);
-  const pin = '946281';
-  const pinCreated = await putJson(baseUrl, '/v1/auth/create-pin', {
-    newPin: pin,
-    confirmNewPin: pin
-  }, {
-    headers: authHeaders(token)
-  });
-  assert.equal(pinCreated.response.status, 201, JSON.stringify(pinCreated.body));
+  if (overrides.setupPin !== false) {
+    const pin = '946281';
+    const pinCreated = await putJson(baseUrl, '/v1/auth/create-pin', {
+      newPin: pin,
+      confirmNewPin: pin
+    }, {
+      headers: authHeaders(token)
+    });
+    assert.equal(pinCreated.response.status, 201, JSON.stringify(pinCreated.body));
+  }
   const current = await getJson(baseUrl, '/v1/auth/me', {
     headers: authHeaders(token)
   });
