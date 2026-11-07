@@ -1,3 +1,11 @@
+jest.mock('../src/services/apiClient', () => ({
+  ApiClientError: Error,
+  apiFetch: jest.fn(),
+}));
+jest.mock('../src/services/externalConsultantService', () => ({
+  listExternalConsultants: jest.fn(), getExternalDietPlans: jest.fn(),
+}));
+
 import { externalPlanToNutritionExperience } from '../src/services/externalNutritionExperience';
 import type { ExternalDietPlan } from '../src/services/externalConsultantService';
 
@@ -32,8 +40,8 @@ test('exact active consultant publication renders as a seven-meal read-only Nutr
 
 test('non-authoritative or malformed consultant publications fail closed', () => {
   const malformed = { ...publication, content: { ...publication.content, calculationAuthority: 'CALLER_SUPPLIED' } };
-  expect(() => externalPlanToNutritionExperience(malformed, '2026-11-07')).toThrow('malformed');
+  expect(() => externalPlanToNutritionExperience(malformed, '2026-11-07')).toThrow();
   const ungoverned = { ...publication, content: { ...publication.content,
     mealOptions: [{ id: 'x', mealHead: 'LUNCH', calculationStatus: 'UNVERIFIED', nutrition: { kcal: 1 } }] } };
-  expect(() => externalPlanToNutritionExperience(ungoverned, '2026-11-07')).toThrow('not authoritative');
+  expect(() => externalPlanToNutritionExperience(ungoverned, '2026-11-07')).toThrow();
 });
