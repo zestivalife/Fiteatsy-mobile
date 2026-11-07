@@ -66,6 +66,7 @@ export const NutritionExperienceScreen = () => {
   const [waterError, setWaterError] = React.useState<string | null>(null);
   const refresh = React.useCallback(async () => {
     setError(null);
+    setData(null);
     setLoadState('LOADING');
     try {
       setData(await getNutritionExperience(selectedDate));
@@ -168,6 +169,7 @@ export const NutritionExperienceScreen = () => {
     return <Screen contentStyle={styles.screen}><Text style={styles.title}>Nutrition</Text><View style={styles.card}><Text style={styles.section}>{copy.title}</Text><Text style={styles.body}>{copy.message}</Text>{copy.retryable ? <Pressable accessibilityRole="button" onPress={() => void refresh()}><Text style={styles.blue}>Try again</Text></Pressable> : null}</View></Screen>;
   }
   const pending = data.meals.filter(meal => meal.state === 'PENDING').length;
+  const isReadOnly = data.delivery?.readOnly === true;
   const hasRecommendationContext = data.meals.length > 0;
   const isToday = selectedDate === nutritionDate();
   const selectedLabel = isToday ? `Today, ${day()}` : new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -180,27 +182,28 @@ export const NutritionExperienceScreen = () => {
   };
 
   return <Screen scroll contentStyle={styles.screen}>
-    <View style={styles.topRow}><View style={styles.tabs}><SegmentedTabs tabs={[{ key: 'today', label: "Today's Plan" }, { key: 'pattern', label: 'My Pattern' }]} value={tab} onChange={(next) => { setTab(next); if (next === 'pattern' && !pattern) void getNutritionPattern(selectedDate).then(setPattern); }} /></View><Pressable accessibilityRole="button" accessibilityLabel="Select Nutrition date" onPress={() => { setDraftDate(new Date(`${selectedDate}T12:00:00`)); setShowCalendar(true); }} style={styles.calendar}><Ionicons name="calendar-outline" size={20} color={C.text} /></Pressable></View>
+    <View style={styles.topRow}><View style={styles.tabs}><SegmentedTabs tabs={isReadOnly ? [{ key: 'today', label: "Consultant Plan" }] : [{ key: 'today', label: "Today's Plan" }, { key: 'pattern', label: 'My Pattern' }]} value={tab} onChange={(next) => { setTab(next); if (next === 'pattern' && !pattern) void getNutritionPattern(selectedDate).then(setPattern); }} /></View>{!isReadOnly ? <Pressable accessibilityRole="button" accessibilityLabel="Select Nutrition date" onPress={() => { setDraftDate(new Date(`${selectedDate}T12:00:00`)); setShowCalendar(true); }} style={styles.calendar}><Ionicons name="calendar-outline" size={20} color={C.text} /></Pressable> : null}</View>
     <Text style={styles.date}>{selectedLabel}</Text>
     <Modal visible={showCalendar} transparent animationType="slide" onRequestClose={() => setShowCalendar(false)}><Pressable style={styles.backdrop} onPress={() => setShowCalendar(false)}><Pressable style={styles.pickerSheet} onPress={() => undefined}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Pressable onPress={() => setShowCalendar(false)}><Text style={styles.sheetCancel}>Cancel</Text></Pressable><Text style={styles.sheetTitle}>Select date</Text><Pressable onPress={() => { const nextDate = isoDay(draftDate); viewingToday.current = nextDate === nutritionDate(); setSelectedDate(nextDate); setPattern(null); setShowCalendar(false); }}><Text style={styles.sheetDone}>Done</Text></Pressable></View><DateTimePicker value={draftDate} mode="date" display="inline" maximumDate={new Date()} onChange={onDateChange} themeVariant="dark" /></Pressable></Pressable></Modal>
     {tab === 'pattern' ? <Pattern pattern={pattern} /> : <>
       {data.consultantNote ? <View style={styles.consultant}><View style={styles.info}><Ionicons name="information-circle-outline" size={25} color={C.blue} /></View><View style={styles.flex}><Text style={styles.consultantLabel}>FROM YOUR CONSULTANT</Text><Text style={styles.consultantText}>{data.consultantNote}</Text></View></View> : null}
       <View style={styles.planStrip}><View style={styles.pill}><Text style={styles.pillText}>Active plan</Text></View><Text style={styles.muted}>·</Text><Text numberOfLines={1} style={[styles.muted, styles.flex]}>{data.version.content.nutritionSnapshot.programmeName}</Text><Text style={styles.muted}>v{data.version.versionNumber}</Text></View>
+      {isReadOnly ? <View style={styles.balance}><Text style={styles.balanceBody}>This approved plan is published by your connected consultant. Tracking remains read-only in this view.</Text></View> : null}
       <Summary data={data} />
       <View style={styles.twoCol}>
-        <View style={[styles.card, styles.metric]}><Text style={[styles.label, styles.blue]}>WATER</Text><Text style={styles.value}>{data.water.litres.toFixed(1)} <Text style={styles.unit}>/ {data.water.targetLitres ?? '—'} L</Text></Text><Progress value={ratio(data.water.litres, data.water.targetLitres)} color={C.blue} /><Pressable disabled={busy || !isToday} onPress={() => { setWaterError(null); setShowWater(true); }} style={[styles.waterButton, !isToday && styles.disabled]}><Text style={styles.waterText}>{isToday ? '+ Add water' : 'History is read-only'}</Text></Pressable>{waterError ? <Text style={styles.errorText}>{waterError}</Text> : null}</View>
+        <View style={[styles.card, styles.metric]}><Text style={[styles.label, styles.blue]}>WATER</Text><Text style={styles.value}>{data.water.litres.toFixed(1)} <Text style={styles.unit}>/ {data.water.targetLitres ?? '—'} L</Text></Text><Progress value={ratio(data.water.litres, data.water.targetLitres)} color={C.blue} /><Pressable disabled={busy || !isToday || isReadOnly} onPress={() => { setWaterError(null); setShowWater(true); }} style={[styles.waterButton, (!isToday || isReadOnly) && styles.disabled]}><Text style={styles.waterText}>{isReadOnly ? 'Consultant plan' : isToday ? '+ Add water' : 'History is read-only'}</Text></Pressable>{waterError ? <Text style={styles.errorText}>{waterError}</Text> : null}</View>
         <View style={[styles.card, styles.metric]}><Text style={styles.label}>MEALS LOGGED</Text><Text style={styles.value}>{data.mealsFollowed} <Text style={styles.unit}>of {data.mealCount}</Text></Text><View style={styles.dots}>{data.meals.map(meal => <View key={meal.key} style={[styles.dot, { backgroundColor: meal.state === 'CONSUMED_APPROVED' ? C.green : meal.state === 'CONSUMED_OUT_OF_PLAN' || meal.state === 'SKIPPED' ? C.yellow : C.line }]} />)}</View><Text style={styles.muted}>{pending} pending{data.skippedCount ? ` · ${data.skippedCount} skipped` : ''}{data.outOfPlanCount ? ` · ${data.outOfPlanCount} out of plan` : ''}</Text></View>
       </View>
-      <QuickActions
+      {!isReadOnly ? <QuickActions
         onOpenRecommendation={isToday && hasRecommendationContext ? () => openRecommendation('what-can-eat-now') : undefined}
         onOpenEatingOut={isToday && hasRecommendationContext ? () => openRecommendation('eating-out') : undefined}
         onOpenCraving={isToday && hasRecommendationContext ? () => openRecommendation('craving') : undefined}
-      />
+      /> : null}
       <Balance data={data} />
       <PlannedActual data={data} />
       <Adherence data={data} />
       <Text style={styles.section}>TODAY'S MEALS</Text>
-      {data.meals.map(meal => <Meal key={meal.key} meal={meal} busy={busy || !isToday} onChoose={() => setSelected(meal)} onSkip={() => void updateMeal(meal, 'SKIPPED')} />)}
+      {data.meals.map(meal => <Meal key={meal.key} meal={meal} busy={busy || !isToday || isReadOnly} onChoose={() => setSelected(meal)} onSkip={() => void updateMeal(meal, 'SKIPPED')} />)}
       <Modal visible={selected != null} transparent animationType="slide" onRequestClose={() => setSelected(null)}><View style={styles.backdrop}><View style={styles.modal}><Text style={styles.modalTitle}>Choose your {selected?.label}</Text><Text style={styles.muted}>Consultant-approved options</Text><ScrollView contentContainerStyle={styles.options}>{selected?.options.map(option => <Pressable key={`${selected.key}-${option.id ?? option.slot}`} disabled={busy} onPress={() => void updateMeal(selected, 'CONSUMED_APPROVED', option)} style={styles.option}><Text style={styles.optionName}>{option.meal}</Text><Text style={styles.muted}>{option.portion} · {option.approxKcal ?? '—'} kcal · P {option.proteinGrams ?? '—'}g</Text></Pressable>)}</ScrollView><Pressable onPress={() => setSelected(null)} style={styles.cancel}><Text style={styles.body}>Cancel</Text></Pressable></View></View></Modal>
       <Modal visible={showWater} transparent animationType="slide" onRequestClose={() => setShowWater(false)}><Pressable style={styles.backdrop} onPress={() => setShowWater(false)}><Pressable style={styles.pickerSheet} onPress={() => undefined}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Pressable onPress={() => setShowWater(false)}><Text style={styles.sheetCancel}>Cancel</Text></Pressable><Text style={styles.sheetTitle}>Add water</Text><View style={styles.sheetHeaderSpacer} /></View><Text style={styles.waterPrompt}>How much water did you drink?</Text><View style={styles.waterAmounts}>{[.25, .5, .75, 1].map(amount => <Pressable key={amount} onPress={() => setWaterAmount(amount)} style={[styles.waterAmount, waterAmount === amount && styles.waterAmountActive]}><Text style={[styles.waterAmountText, waterAmount === amount && styles.waterAmountTextActive]}>{amount < 1 ? `${amount * 1000} ml` : '1 L'}</Text></Pressable>)}</View><Pressable disabled={busy} onPress={() => void saveWater()} style={[styles.saveWater, busy && styles.disabled]}><Text style={styles.saveWaterText}>{busy ? 'Adding…' : 'Add water'}</Text></Pressable></Pressable></Pressable></Modal>
       <RecommendationModal
