@@ -46,6 +46,7 @@ export const externalPlanToNutritionExperience = (publication: ExternalDietPlan,
     state: 'PENDING',
     consumedAtISO: null,
     consumed: null,
+    selectedOptionId: null,
     options: options.filter(option => option.mealHead === key).map((option, slot): NutritionOption => {
       const nutrition = option.nutrition ?? {};
       return {

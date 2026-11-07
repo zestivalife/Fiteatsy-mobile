@@ -26,7 +26,7 @@ const operationSchema = z.object({
   priority: z.enum(['LOW','NORMAL','HIGH','URGENT']).optional(),
   dueAt: z.string().datetime().nullable().optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 const updateSchema = operationSchema.partial().extend({ expectedVersion: z.number().int().positive() });
 

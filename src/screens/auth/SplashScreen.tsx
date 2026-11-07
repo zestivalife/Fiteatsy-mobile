@@ -76,7 +76,7 @@ export const SplashScreen = ({ navigation }: Props) => {
       transitionTo(() => navigation.replace('OnboardingAssessment', { startPhase: 'recovery', lifestyle: progress.lifestyle }));
       return;
     }
-    if (onboardingStatus !== 'COMPLETED' && progress?.phase === 'connect') {
+    if (progress?.phase === 'connect') {
       transitionTo(() => navigation.replace('HealthDataSync', { entryContext: 'ONBOARDING' }));
       return;
     }

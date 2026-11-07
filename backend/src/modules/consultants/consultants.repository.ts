@@ -863,7 +863,7 @@ export const getRegisteredClientProfileContextByAccountId = async (
   accountId: string
 ): Promise<ConsultantClientProfileContext | null> => {
   const result = await pool.query(
-    `${listClientSelect}
+    `${protectedClientSelect}
       and u.id = $6
       order by hp.updated_at desc nulls last
       limit 1
