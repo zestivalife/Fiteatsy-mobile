@@ -64,11 +64,19 @@ test('recommended eligibility joins catalogue IDs through source identity rather
 });
 
 test('Food Explorer cold context avoids the full Nutrition workspace projection', () => {
+  const searchStart = source.indexOf('export async function searchCommonFoods');
+  const searchEnd = source.indexOf('\nexport function ', searchStart);
+  const searchSource = source.slice(searchStart, searchEnd);
+
   assert.match(source, /getCurrentDietPlanForClient\(registered\.internalClientId,registered\.accountId\)/);
   assert.match(source, /getFoodPreferenceProfile\(input\.clientId,registered\.internalClientId\)/);
   assert.match(source, /const \[access,registered\]=await Promise\.all/);
   assert.match(source, /resolveConsultantNutritionClientAccess\(input\.clientId,input\.account\)/);
-  assert.match(source, /const \[prefs,latest,biomarkers\]=await Promise\.all/);
+  assert.match(source, /async function resolveClientCommonFoodContext/);
+  assert.match(source, /const \[prefs,biomarkers\]=await Promise\.all/);
+  assert.match(source, /const latest=await getCurrentDietPlanForClient/);
+  assert.match(searchSource, /resolveClientCommonFoodContext\(\{account,clientId\}\)/);
+  assert.doesNotMatch(searchSource, /resolveClientMealGenerationContext/);
   assert.match(nutritionService, /const context = await getRegisteredConsultantClientAccessContext\(/);
   assert.match(nutritionStore, /select row_to_json\(dp\) as plan, row_to_json\(dpv\) as version/);
 });
