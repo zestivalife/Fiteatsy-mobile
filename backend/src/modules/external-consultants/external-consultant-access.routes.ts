@@ -56,7 +56,7 @@ externalConsultantAccessRouter.post('/:userId/common-food/resolve-option', requi
   }
 });
 
-const externalPlanPublicationSchema = z.object({
+export const externalPlanPublicationSchema = z.object({
   externalPlanId: z.string().trim().min(1).max(200),
   externalVersion: z.string().trim().min(1).max(200),
   consultantId: z.string().trim().min(1).max(200),
