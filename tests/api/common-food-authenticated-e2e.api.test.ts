@@ -59,13 +59,14 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     assert.equal(denied.response.status, 403, JSON.stringify(denied.body));
     assert.equal(denied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 
+    const assignmentAuthorized = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, { headers: authHeaders(consultant.token) });
+    assert.equal(assignmentAuthorized.response.status, 200, JSON.stringify(assignmentAuthorized.body));
+
     const draft = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/draft`, {}, { headers: authHeaders(consultant.token) });
     assert.equal(draft.response.status, 201, JSON.stringify(draft.body));
     const planId = String(draft.body.plan?.id ?? '');
     assert.ok(planId, 'canonical diet-plan draft setup must return a plan id before Common Food access');
 
-    const assignmentAuthorized = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/common-foods`, { headers: authHeaders(consultant.token) });
-    assert.equal(assignmentAuthorized.response.status, 200, JSON.stringify(assignmentAuthorized.body));
     const grantedConsent = await putJson(server.baseUrl, '/v1/preferences/consultant-access', {
       assignmentId: assignment.body.assignment.id,
       status: 'GRANTED',

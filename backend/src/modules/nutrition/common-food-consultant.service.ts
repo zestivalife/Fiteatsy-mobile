@@ -46,7 +46,7 @@ const foodContext=(profile:FoodPreferenceProfile|undefined):ClientFoodContext=>{
   return {diet,allergies:restrictions.filter(x=>/allerg/i.test(x)),intolerances:restrictions.filter(x=>/intoler/i.test(x)),avoids:[...(profile?.foodsAvoided??[]),...(profile?.avoidedFoodIds??[])],clinicalExclusions:[],dislikes:[...(profile?.foodsDisliked??[]),...(profile?.dislikedFoodIds??[])],preferences:[...(profile?.foodsLiked??[]),...(profile?.likedFoodIds??[]),...(profile?.cuisines??[])]};
 };
 
-export async function resolveClientMealGenerationContext(input:{account:AuthenticatedAccount;clientId:string;planId?:string;mealHead?:MealHead}){
+async function resolveClientCommonFoodContext(input:{account:AuthenticatedAccount;clientId:string}){
   if(!canAccessConsultantClientApi(input.account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
   const [access,registered]=await Promise.all([
     resolveConsultantNutritionClientAccess(input.clientId,input.account),
@@ -54,20 +54,25 @@ export async function resolveClientMealGenerationContext(input:{account:Authenti
   ]);
   if(!access.authorized)throw new CommonFoodApiError(access.reason,403);
   if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404);
-  const [prefs,latest,biomarkers]=await Promise.all([
+  const [prefs,biomarkers]=await Promise.all([
     getFoodPreferenceProfile(input.clientId,registered.internalClientId),
-    getCurrentDietPlanForClient(registered.internalClientId,registered.accountId),
     listValidatedBiomarkerSummaryForClient(registered.internalClientId,registered.accountId),
   ]);
-  if(!latest)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
-  if(input.planId&&latest.plan.id!==input.planId)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
   const biomarkerGeneration=resolveBiomarkerGeneration(biomarkers);
   const p=prefs?.profile; const diet=p?.dietType?dietMap[p.dietType]:'VEGETARIAN';
+  const restrictions=p?.restrictions??[];
+  const context:ClientFoodContext={diet,allergies:restrictions.filter(x=>/allerg/i.test(x)),intolerances:restrictions.filter(x=>/intoler/i.test(x)),avoids:[...(p?.foodsAvoided??[]),...(p?.avoidedFoodIds??[])],clinicalExclusions:[],dislikes:[...(p?.foodsDisliked??[]),...(p?.dislikedFoodIds??[])],preferences:[...(p?.foodsLiked??[]),...(p?.likedFoodIds??[]),...(p?.cuisines??[])],biomarkerRules:biomarkerGeneration.activeRules};
+  return {registered,p,diet,biomarkerGeneration,context};
+}
+
+export async function resolveClientMealGenerationContext(input:{account:AuthenticatedAccount;clientId:string;planId?:string;mealHead?:MealHead}){
+  const {registered,p,diet,biomarkerGeneration,context}=await resolveClientCommonFoodContext(input);
+  const latest=await getCurrentDietPlanForClient(registered.internalClientId,registered.accountId);
+  if(!latest)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
+  if(input.planId&&latest.plan.id!==input.planId)throw new CommonFoodApiError('DIET_PLAN_NOT_FOUND',404);
   const content=latest.version.content; const daily=content.dailyTargets;
   const mealTargets=Object.fromEntries(MEAL_HEADS.map(head=>{const section=(content.mealPlan as unknown as Record<string,{target?:{calories:number|null;proteinGrams:number|null;caloriesBand?:{min:number|null;max:number|null};proteinBand?:{min:number|null;max:number|null}}}>)[sectionByHead[head]];const kcal=section?.target?.calories,protein=section?.target?.proteinGrams;return [head,{kcal:kcal??0,protein:protein??0,kcalTolerance:Math.max(1,((section?.target?.caloriesBand?.max??0)-(section?.target?.caloriesBand?.min??0))/2||50),proteinTolerance:Math.max(1,((section?.target?.proteinBand?.max??0)-(section?.target?.proteinBand?.min??0))/2||10),kcalTargetAvailable:kcal!=null&&Number.isFinite(kcal)&&kcal>0,proteinTargetAvailable:protein!=null&&Number.isFinite(protein)&&protein>0} satisfies MealTarget]})) as Record<MealHead,MealTarget>;
   const displayMealTargets=Object.fromEntries(MEAL_HEADS.map(head=>[head,{...mealTargets[head],kcal:mealTargets[head].kcalTargetAvailable?mealTargets[head].kcal:null,protein:mealTargets[head].proteinTargetAvailable?mealTargets[head].protein:null}])) as Record<MealHead,MealTarget & {kcal:number|null;protein:number|null}>;
-  const restrictions=p?.restrictions??[];
-  const context:ClientFoodContext={diet,allergies:restrictions.filter(x=>/allerg/i.test(x)),intolerances:restrictions.filter(x=>/intoler/i.test(x)),avoids:[...(p?.foodsAvoided??[]),...(p?.avoidedFoodIds??[])],clinicalExclusions:[],dislikes:[...(p?.foodsDisliked??[]),...(p?.dislikedFoodIds??[])],preferences:[...(p?.foodsLiked??[]),...(p?.likedFoodIds??[]),...(p?.cuisines??[])],biomarkerRules:biomarkerGeneration.activeRules};
   const generationSnapshot={clientId:input.clientId,assignedConsultantId:latest.plan.consultantId,requestingProfessionalId:input.account.accountId,healthProfile:registered.profile,biomarkers:biomarkerGeneration.snapshot,biomarkerRuleVersion:biomarkerGeneration.version,dietPreference:p?.dietType??null,foodPreferences:p??null,dailyTargets:{calories:daily.calories??null,protein:daily.protein??null,carbohydrate:daily.carbohydrates??null,fat:daily.fat??null},mealTargets:displayMealTargets,previousPlanContext:{scope:'SAME_CLIENT_ONLY' as const,usedForRanking:false,reason:'NO_GOVERNED_PREVIOUS_PLAN_ROTATION_RULE'}};
   return {clientId:input.clientId,internalClientId:registered.internalClientId,consultantId:input.account.accountId,plan:latest.plan,planVersion:latest.version,context,generationSnapshot,dailyTargets:generationSnapshot.dailyTargets,mealTargets,displayMealTargets,supported:diet!=='VEGAN',capability:diet==='VEGAN'?{code:'VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED',reason:'GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED'}:{code:'SUPPORTED',reason:null}};
 }
@@ -147,7 +152,7 @@ export async function refreshFoodExplorerProjection(){
 }
 export async function searchCommonFoods(account:AuthenticatedAccount,clientId:string,q:FoodSearchQuery){
  if(!canAccessConsultantClientApi(account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
- const resolved=await resolveClientMealGenerationContext({account,clientId,mealHead:q.mealHead});
+ const resolved=await resolveClientCommonFoodContext({account,clientId});
  const safe=(f:CommonFood)=>f.active&&!f.allergens.some(x=>resolved.context.allergies.includes(x))&&!f.intolerances.some(x=>resolved.context.intolerances.includes(x))&&!f.avoidTags.some(x=>resolved.context.avoids.includes(x))&&!f.clinicalTags.some(x=>resolved.context.clinicalExclusions.includes(x));
  const safeIds=new Set(foods.filter(safe).map(food=>food.id));const allowedIds=q.scope==='ALL'?undefined:(q.mealHead?eligibleCommonFoods(foods,resolved.context,q.mealHead):foods.filter(safe)).filter(food=>food.generatorEligible&&food.clientConsumable).map(food=>food.id);
  const result=await searchFoodExplorerProjection({...q,allowedIds});const summary=result.summary??{};if(!summary.projection_version)throw new CommonFoodApiError('FOOD_EXPLORER_PROJECTION_UNAVAILABLE',503);const allScope=q.scope==='ALL';
