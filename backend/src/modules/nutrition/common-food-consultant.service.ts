@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import crypto from 'node:crypto';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { getRegisteredClientProfileContextByAccountId, getRegisteredConsultantClientProfileContext, listValidatedBiomarkerSummaryForClient } from '../consultants/consultants.repository.js';
+import { canAccessConsultantClientApi } from '../consultants/consultants.service.js';
 import { getFoodPreferenceProfile, type FoodPreferenceProfile } from './food-preferences.service.js';
 import { resolveConsultantNutritionClientAccess, NutritionPlanWorkflowError } from './nutrition.service.js';
 import { getCurrentDietPlanForClient } from './nutrition.store.js';
@@ -46,7 +47,7 @@ const foodContext=(profile:FoodPreferenceProfile|undefined):ClientFoodContext=>{
 };
 
 export async function resolveClientMealGenerationContext(input:{account:AuthenticatedAccount;clientId:string;planId?:string;mealHead?:MealHead}){
-  if(!roleAllowed(input.account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
+  if(!canAccessConsultantClientApi(input.account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
   const [access,registered]=await Promise.all([
     resolveConsultantNutritionClientAccess(input.clientId,input.account),
     getRegisteredConsultantClientProfileContext(input.clientId),
@@ -145,7 +146,7 @@ export async function refreshFoodExplorerProjection(){
  return replaceFoodExplorerProjection([...records.values()]);
 }
 export async function searchCommonFoods(account:AuthenticatedAccount,clientId:string,q:FoodSearchQuery){
- if(!roleAllowed(account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
+ if(!canAccessConsultantClientApi(account))throw new CommonFoodApiError('ROLE_NOT_ALLOWED',403);
  const resolved=await resolveClientMealGenerationContext({account,clientId,mealHead:q.mealHead});
  const safe=(f:CommonFood)=>f.active&&!f.allergens.some(x=>resolved.context.allergies.includes(x))&&!f.intolerances.some(x=>resolved.context.intolerances.includes(x))&&!f.avoidTags.some(x=>resolved.context.avoids.includes(x))&&!f.clinicalTags.some(x=>resolved.context.clinicalExclusions.includes(x));
  const safeIds=new Set(foods.filter(safe).map(food=>food.id));const allowedIds=q.scope==='ALL'?undefined:(q.mealHead?eligibleCommonFoods(foods,resolved.context,q.mealHead):foods.filter(safe)).filter(food=>food.generatorEligible&&food.clientConsumable).map(food=>food.id);

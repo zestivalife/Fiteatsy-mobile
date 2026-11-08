@@ -18,6 +18,7 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
   const admin = await createAuthenticatedSession(server.baseUrl, { name: 'E2E Provisioning Admin' });
   await pool.query("update users set role = 'admin', account_purpose = 'QA_TEST' where id = $1", [admin.current.body.accountId]);
   const consultant = await provisionQaIdentity(server.baseUrl, admin.token, 'consultant', 'consultant');
+  await pool.query("update users set role = 'dietician' where id = $1", [consultant.user.id]);
   await provisionQaIdentity(server.baseUrl, admin.token, 'senior_consultant', 'senior');
   const outsider = await provisionQaIdentity(server.baseUrl, admin.token, 'consultant', 'outsider');
 

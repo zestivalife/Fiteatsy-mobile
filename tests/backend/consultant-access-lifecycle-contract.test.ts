@@ -54,6 +54,8 @@ test('nutrition access uses active assignment without a consent business gate or
   assert.match(routes, /error: access\.reason/);
   assert.doesNotMatch(routes, /if \(!await canAccessConsultantNutritionClient\(String\(req\.params\.clientId\), account,[\s\S]+error: 'CLIENT_ASSIGNMENT_REQUIRED'/);
   assert.match(commonFood, /new CommonFoodApiError\(access\.reason,403\)/);
+  assert.match(commonFood, /canAccessConsultantClientApi\(input\.account\)/);
+  assert.match(commonFood, /searchCommonFoods[\s\S]+canAccessConsultantClientApi\(account\)/);
 });
 
 test('legacy mobile consent preferences remain auditable but are not Consultant workspace authority', () => {
