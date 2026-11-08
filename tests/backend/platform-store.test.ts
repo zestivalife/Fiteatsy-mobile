@@ -35,7 +35,10 @@ test('repository layer upserts health profile and increments version', async () 
   const created = await createOrUpdateHealthProfile(owner, { gender: 'Female' });
   const updated = await createOrUpdateHealthProfile(owner, { heightCm: 165 });
   assert.equal(created.id, updated.id);
-  assert.equal(updated.version, 2);
+  // Verified identities now own an initial health profile. The repository
+  // contract is one immutable version increment per upsert, independent of
+  // the caller's starting version.
+  assert.equal(updated.version, created.version + 1);
   assert.equal(updated.clientId, owner.clientId);
   assert.equal((await getHealthProfileByClientId(owner.clientId))?.heightCm, 165);
 });

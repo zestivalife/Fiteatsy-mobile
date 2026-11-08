@@ -14,7 +14,7 @@ const seedTenantClient = async (tenantId: string, suffix: string) => {
   const clientId = randomUUID();
   const profileId = randomUUID();
   await pool.query(
-    `insert into tenants(id,name,slug,tenant_type) values($1,$2,$3,'PRACTICE')
+    `insert into tenants(id,name,slug,tenant_type,status) values($1,$2,$3,'PRACTICE','active')
      on conflict(id) do nothing`,
     [tenantId, `Practice ${suffix}`, `practice-${suffix}`],
   );
@@ -56,7 +56,7 @@ test('PARENT_CHILD_TENANT_OWNERSHIP_INVARIANT fails closed', async () => {
   await resetBackendStateForTests();
   const client = await seedTenantClient(TENANT_B, 'b');
   await pool.query(
-    `insert into tenants(id,name,slug,tenant_type) values($1,'Practice A','practice-a','PRACTICE')
+    `insert into tenants(id,name,slug,tenant_type,status) values($1,'Practice A','practice-a','PRACTICE','active')
      on conflict(id) do nothing`,
     [TENANT_A],
   );
@@ -122,7 +122,7 @@ test('database rejects cross-tenant parent-child writes', async () => {
   await resetBackendStateForTests();
   const client = await seedTenantClient(TENANT_A, 'constraint-a');
   await pool.query(
-    `insert into tenants(id,name,slug,tenant_type) values($1,'Constraint B','constraint-b','PRACTICE')
+    `insert into tenants(id,name,slug,tenant_type,status) values($1,'Constraint B','constraint-b','PRACTICE','active')
      on conflict(id) do nothing`,
     [TENANT_B],
   );

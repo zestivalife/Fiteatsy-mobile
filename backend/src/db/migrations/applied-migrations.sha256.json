@@ -7,6 +7,18 @@
     "0035": [
       "0035_professional_names.sql",
       "0035_subscription_plan_catalog_correction.sql"
+    ],
+    "0067": [
+      "0067_consultant_food_proposals.sql",
+      "0067_external_consultant_canonical_nutrition.sql"
+    ],
+    "0068": [
+      "0068_fiteatsy_client_tenant_integrity.sql",
+      "0068_wearable_health_platform.sql"
+    ],
+    "0069": [
+      "0069_delegated_assignment_actor_attribution.sql",
+      "0069_food_explorer_search_projection.sql"
     ]
   },
   "appliedSha256": {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { pool } from '../../backend/src/db/pool.js';
 import { resolveVerifiedAccountIdentity } from '../../backend/src/modules/auth/auth.repository.js';
@@ -16,7 +17,9 @@ test.beforeEach(async () => {
       updated_at timestamptz not null default now()
     )
   `);
-  await pool.query('truncate table external_consultant_signups');
+  // DELETE respects the production FK graph. PostgreSQL rejects truncating a
+  // referenced table even when its RESTRICT child is empty.
+  await pool.query('delete from external_consultant_signups');
 });
 
 const account = async (suffix: string) => resolveVerifiedAccountIdentity({
@@ -25,14 +28,20 @@ const account = async (suffix: string) => resolveVerifiedAccountIdentity({
   mobileNumber: `+9198210000${suffix.padStart(2, '0')}`,
 });
 
+const insertGovernedSignup = async (authIdentityId: string, fiteatsyUserId: string) => {
+  await pool.query(
+    `insert into external_consultant_signups(
+       id,auth_identity_id,fiteatsy_user_id,email_normalized,account_type,
+       signup_state,idempotency_key,created_by_reference
+     ) values($1,$2,$3,$4,'INDEPENDENT_CONSULTANT','READY',$5,'IDENTITY_RESOLUTION_TEST')`,
+    [randomUUID(), authIdentityId, fiteatsyUserId, `${randomUUID()}@example.test`, randomUUID()],
+  );
+};
+
 test('governed signup maps the Auth subject to the assignment principal', async () => {
   const authenticated = await account('1');
   const assignmentPrincipal = await account('2');
-  await pool.query(
-    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state)
-     values(gen_random_uuid(),$1,$2,'READY')`,
-    [authenticated.user.id, assignmentPrincipal.user.id],
-  );
+  await insertGovernedSignup(authenticated.user.id, assignmentPrincipal.user.id);
 
   assert.deepEqual(
     await resolveConsultantApplicationIdentity(authenticated.user.id, `ext_${authenticated.user.id}`),
@@ -40,24 +49,23 @@ test('governed signup maps the Auth subject to the assignment principal', async 
   );
 });
 
-test('inactive and ambiguous governed identities fail closed', async () => {
+test('inactive governed identities fail closed and duplicate Auth mappings are rejected', async () => {
   const authenticated = await account('3');
   const inactive = await account('4');
   await pool.query("update users set status='inactive' where id=$1", [inactive.user.id]);
-  await pool.query(
-    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state)
-     values(gen_random_uuid(),$1,$2,'READY')`,
-    [authenticated.user.id, inactive.user.id],
-  );
+  await insertGovernedSignup(authenticated.user.id, inactive.user.id);
   assert.equal((await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id)).status, 'INACTIVE');
 
-  await pool.query('truncate table external_consultant_signups');
+  await pool.query('delete from external_consultant_signups');
   const first = await account('5');
   const second = await account('6');
-  await pool.query(
-    `insert into external_consultant_signups(id,auth_identity_id,fiteatsy_user_id,signup_state)
-     values(gen_random_uuid(),$1,$2,'READY'),(gen_random_uuid(),$1,$3,'READY')`,
-    [authenticated.user.id, first.user.id, second.user.id],
+  await insertGovernedSignup(authenticated.user.id, first.user.id);
+  await assert.rejects(
+    insertGovernedSignup(authenticated.user.id, second.user.id),
+    (error: { code?: string }) => error.code === '23505',
   );
-  assert.equal((await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id)).status, 'AMBIGUOUS');
+  assert.deepEqual(
+    await resolveConsultantApplicationIdentity(authenticated.user.id, authenticated.user.id),
+    { status: 'RESOLVED', applicationUserId: first.user.id, source: 'EXTERNAL_CONSULTANT_SIGNUP' },
+  );
 });

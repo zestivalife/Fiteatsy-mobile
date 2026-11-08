@@ -129,6 +129,17 @@ test('migration backfills one client for an existing account and records the mig
   resetMigrationStateForTests();
   await migrateDatabase();
 
+  // Rebuilding the M3A table in isolation intentionally leaves the later
+  // tenant-integrity migration recorded in the shared ledger. Reapply that
+  // additive contract before resolving the backfilled client: a legacy row
+  // must acquire the canonical Zestiva tenant and membership, never bypass
+  // CLIENT_TENANT_MISMATCH with an unowned record.
+  const tenantIntegrity = fs.readFileSync(
+    new URL('../../backend/src/db/migrations/0068_fiteatsy_client_tenant_integrity.sql', import.meta.url),
+    'utf8',
+  );
+  await pool.query(tenantIntegrity);
+
   const currentClient = await resolveCurrentClientForAccount('legacy-account-user');
   const migrationRow = await pool.query(
     'select version from schema_migrations where version = $1',
