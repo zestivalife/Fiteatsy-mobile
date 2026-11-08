@@ -1,16 +1,20 @@
 {
   "migrationIdentity": "full-filename",
-  "historicalLedgerOnly": {
-    "0018_health_calculations.sql": "Renamed historically before immutability governance; superseded byte-for-byte by 0019_health_calculations.sql."
-  },
+  "historicalLedgerOnly": {},
   "allowedDuplicatePrefixes": {
+    "0018": [
+      "0018_admin_role_management_foundation.sql",
+      "0018_health_calculations.sql"
+    ],
     "0035": [
       "0035_professional_names.sql",
       "0035_subscription_plan_catalog_correction.sql"
     ],
     "0067": [
       "0067_consultant_food_proposals.sql",
-      "0067_external_consultant_canonical_nutrition.sql"
+      "0067_external_consultant_canonical_nutrition.sql",
+      "0067_partial_diet_draft_selection.sql",
+      "0067_subscription_plan_catalogue_v17_39.sql"
     ],
     "0068": [
       "0068_fiteatsy_client_tenant_integrity.sql",
@@ -19,6 +23,38 @@
     "0069": [
       "0069_delegated_assignment_actor_attribution.sql",
       "0069_food_explorer_search_projection.sql"
+    ],
+    "0070": [
+      "0070_fiteatsy_client_directory_outbox.sql",
+      "0070_food_explorer_projection_source_identity.sql"
+    ],
+    "0071": [
+      "0071_assignable_fiteatsy_identity_backfill.sql",
+      "0071_food_authorisation.sql"
+    ],
+    "0072": [
+      "0072_assignment_tenant_integrity.sql",
+      "0072_food_master_authorisation_decisions.sql"
+    ],
+    "0089": [
+      "0089_external_consultant_clients.sql",
+      "0089_external_consultant_onboarding_profile_fields.sql"
+    ],
+    "0090": [
+      "0090_external_client_invitations.sql",
+      "0090_tenant_scoped_assignment_uniqueness.sql"
+    ],
+    "0094": [
+      "0094_external_biomarker_history.sql",
+      "0094_inhouse_governed_qa_identity_links.sql"
+    ],
+    "0103": [
+      "0103_external_health_records.sql",
+      "0103_external_qa_practice_provisioning.sql"
+    ],
+    "0104": [
+      "0104_external_health_records.sql",
+      "0104_external_qa_nutrition_professions.sql"
     ]
   },
   "appliedSha256": {
@@ -40,6 +76,7 @@
     "0016_report_retryable_hash_index.sql": "c214a0990bea5f1a8eab657a125420af176c047fe0c55eb59eeb2e3f2ee0d54d",
     "0017_document_intelligence_audit.sql": "e673e6c7db418081f79b34e05dc705eda1b7c77b420bb29ae72d481aa93d31f8",
     "0018_admin_role_management_foundation.sql": "7951078b2a6be77f0a801666a8f01da7c71403b26e065c3c59fe1bc47dcbed4b",
+    "0018_health_calculations.sql": "516fcee649db34f3491918d028e781fa8e3eb98477578af8078261d423bdaf57",
     "0019_health_calculations.sql": "516fcee649db34f3491918d028e781fa8e3eb98477578af8078261d423bdaf57",
     "0020_progressive_health_profile_collection.sql": "3b204d5826367a5fed836f351998ba4051546bbcd41b8b0af3cd589b86072ddf",
     "0021_health_profile_completion_experience.sql": "d6e2aea0cf80033025b01df83eda3769dc76a600acc5cb23fee89c6c946b338c",
@@ -60,6 +97,16 @@
     "0035_subscription_plan_catalog_correction.sql": "55adf38be514f1b9708ecd88eb8e1212e1c00746f6b5594937aaf25766a1e942",
     "0036_professional_identity_snapshot_backfill.sql": "f7ff4f50903b541237f91289969d461464a980982ad5d84d0d9d2e64a36c6118",
     "0037_subscription_gst_snapshot.sql": "343b4bafd32f5f0c3c56c2fad2ef3edd95a78e07c1f228ce64ed49beda7c467d",
-    "0038_canonical_operational_phone_identity.sql": "b699b8af3c5be9ebc020b17d62bac4ccf659190fc2d576926ca84ac51bca9bd1"
+    "0038_canonical_operational_phone_identity.sql": "b699b8af3c5be9ebc020b17d62bac4ccf659190fc2d576926ca84ac51bca9bd1",
+    "0067_partial_diet_draft_selection.sql": "a51300d06a1aa777cca8974b883c7dc741acf4d0710eb512c8d2ac4c49195f1e",
+    "0067_subscription_plan_catalogue_v17_39.sql": "d9fea723ad17e6b17177ae514c2d98cfdc6a453e7fe6e777a116df6e1d476b9f",
+    "0070_fiteatsy_client_directory_outbox.sql": "6ba4d98c2dc51cbe64275c2e44ba3e1cd5bbf001d4c438b382b1d1d602645df0",
+    "0071_assignable_fiteatsy_identity_backfill.sql": "e743d6909cd48feb936c455edb41c57b07c998a1654f8b81b6390beca9291eb7",
+    "0072_assignment_tenant_integrity.sql": "06e0b22a8c089f2db5bc7e993b09a5707feb5b75ff1aa8a56310eeaad918b71c",
+    "0089_external_consultant_onboarding_profile_fields.sql": "ee27bcfdf7d9f29659cf7d6ecc5572b018a394a88d35315a6d80a8bcdfab3ca8",
+    "0090_tenant_scoped_assignment_uniqueness.sql": "af369ae7916c8265dd9d110f98a762d4c8cdc99bbbfbdc1a447feb4606e8bf21",
+    "0094_inhouse_governed_qa_identity_links.sql": "ef9d414c840d3c3c3465f33d3c2cb157f7cdcb3447b030f544eed7e392817df9",
+    "0103_external_health_records.sql": "8282b9843eaf268a2fcc27e83dc80cf48b83d456dbf230b4d52a722ec16f62d5",
+    "0104_external_qa_nutrition_professions.sql": "307b26bc97e687852a41697b31a5cfcda1f6262ba848193f414dc2fa2b1eafdd"
   }
 }

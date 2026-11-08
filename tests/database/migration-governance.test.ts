@@ -55,10 +55,10 @@ test('production-applied migration files remain present and immutable', () => {
   }
 });
 
-test('historical ledger-only aliases are explicitly documented', () => {
-  assert.deepEqual(manifest.historicalLedgerOnly, {
-    '0018_health_calculations.sql': 'Renamed historically before immutability governance; superseded byte-for-byte by 0019_health_calculations.sql.'
-  });
-  assert.equal(migrationFiles.includes('0018_health_calculations.sql'), false);
+test('historical production ledger entries are restored as immutable files', () => {
+  assert.deepEqual(manifest.historicalLedgerOnly, {});
+  assert.equal(migrationFiles.includes('0018_health_calculations.sql'), true);
+  assert.equal(sha256('0018_health_calculations.sql'), manifest.appliedSha256['0018_health_calculations.sql']);
   assert.equal(sha256('0019_health_calculations.sql'), manifest.appliedSha256['0019_health_calculations.sql']);
+  assert.equal(sha256('0018_health_calculations.sql'), sha256('0019_health_calculations.sql'));
 });
