@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { PoolClient } from 'pg';
@@ -9,6 +10,10 @@ const MIGRATION_LOCK_NAMESPACE = 20260730;
 const MIGRATION_LOCK_KEY = 11;
 const LEGACY_PROFESSIONAL_SNAPSHOT_FILE = '0036_professional_identity_snapshot_backfill.sql';
 const EXTERNAL_HEALTH_RECORDS_FILE = '0104_external_health_records.sql';
+const LEGACY_SUBSCRIPTION_CATALOGUE_FILE = '0067_subscription_plan_catalogue_v17_39.sql';
+const LEGACY_SUBSCRIPTION_CATALOGUE_SHA256 = 'd9fea723ad17e6b17177ae514c2d98cfdc6a453e7fe6e777a116df6e1d476b9f';
+const LEGACY_ONE_TIME_DURATION = '199900, 1, 0, 30, null, false,';
+const FRESH_REPLAY_ONE_TIME_DURATION = '199900, 1, 1, 30, null, false,';
 const LEGACY_PROFESSIONAL_SNAPSHOT_USER_IDS = [
   '0e65d616-b96e-4fc5-8d36-a2f33cd81c89',
   '3bc788d8-795d-4ecb-bded-e120b33ed554',
@@ -67,6 +72,27 @@ export const prepareMigrationSql = (file: string, sql: string) => {
     );
   }
   return prepared;
+};
+
+export const prepareFreshReplayMigrationSql = (file: string, sql: string) => {
+  const prepared = prepareMigrationSql(file, sql);
+  if (file !== LEGACY_SUBSCRIPTION_CATALOGUE_FILE) return prepared;
+
+  const actualHash = crypto.createHash('sha256').update(sql).digest('hex');
+  if (actualHash !== LEGACY_SUBSCRIPTION_CATALOGUE_SHA256) {
+    throw new Error(`FRESH_REPLAY_MIGRATION_HASH_MISMATCH:${file}`);
+  }
+  const occurrences = prepared.split(LEGACY_ONE_TIME_DURATION).length - 1;
+  if (occurrences !== 1) {
+    throw new Error(`FRESH_REPLAY_MIGRATION_CONTRACT_MISMATCH:${file}`);
+  }
+
+  // Production applied the immutable catalogue migration before the schema
+  // represented one-time services with a nullable duration_months value.
+  // A fresh reconstruction uses the then-valid one-month placeholder only for
+  // this intermediate step. Migration 0080 immediately canonicalises the same
+  // plan to duration_months = null and installs the final plan-type constraint.
+  return prepared.replace(LEGACY_ONE_TIME_DURATION, FRESH_REPLAY_ONE_TIME_DURATION);
 };
 
 const acquireMigrationLock = async (client: PoolClient) => {
@@ -144,7 +170,10 @@ const applyMigrations = async (): Promise<MigrationReport> => {
     const files = await readMigrationFiles();
     for (const file of files) {
       if (appliedVersions.has(file)) continue;
-      const sql = prepareMigrationSql(file, await fs.readFile(path.join(MIGRATIONS_DIR, file), 'utf8'));
+      const migrationSource = await fs.readFile(path.join(MIGRATIONS_DIR, file), 'utf8');
+      const sql = startedWithEmptyLedger
+        ? prepareFreshReplayMigrationSql(file, migrationSource)
+        : prepareMigrationSql(file, migrationSource);
       await client.query('begin');
       try {
         await ensureSchemaMigrationsTable(client);

@@ -8,6 +8,7 @@ import {
 import {
   evaluateDatabaseSchemaStatus,
   prepareMigrationSql,
+  prepareFreshReplayMigrationSql,
   type DatabaseSchemaStatus
 } from '../../backend/src/db/migrator.js';
 
@@ -117,4 +118,28 @@ test('health-record replay uses an immutable timezone-independent index expressi
   );
   assert.match(prepared, /\(analysis_date at time zone 'UTC'\)::date/);
   assert.doesNotMatch(prepared, /analysis_date::date/);
+});
+
+test('fresh replay adapts only the verified immutable legacy subscription catalogue', () => {
+  const file = '0067_subscription_plan_catalogue_v17_39.sql';
+  const source = fs.readFileSync(new URL(`../../backend/src/db/migrations/${file}`, import.meta.url), 'utf8');
+  const prepared = prepareFreshReplayMigrationSql(file, source);
+  assert.match(prepared, /199900, 1, 1, 30, null, false/);
+  assert.doesNotMatch(prepared, /199900, 1, 0, 30, null, false/);
+  assert.equal(prepareMigrationSql(file, source), source);
+});
+
+test('fresh replay fails closed for a modified legacy subscription catalogue', () => {
+  const file = '0067_subscription_plan_catalogue_v17_39.sql';
+  const source = fs.readFileSync(new URL(`../../backend/src/db/migrations/${file}`, import.meta.url), 'utf8');
+  assert.throws(
+    () => prepareFreshReplayMigrationSql(file, `${source}\n-- unexpected mutation`),
+    /FRESH_REPLAY_MIGRATION_HASH_MISMATCH/
+  );
+});
+
+test('fresh replay does not adapt another migration filename', () => {
+  const file = '0067_subscription_plan_catalogue_v17_39.sql';
+  const source = fs.readFileSync(new URL(`../../backend/src/db/migrations/${file}`, import.meta.url), 'utf8');
+  assert.equal(prepareFreshReplayMigrationSql('0067_other.sql', source), source);
 });
