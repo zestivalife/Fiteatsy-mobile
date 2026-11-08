@@ -225,9 +225,9 @@ export const reconcileClientDirectoryOutbox = async () => {
     `update fiteatsy_client_directory_sync_state
         set last_reconciliation_user_id=$1,
             last_successful_reconciliation_at=case when $1::text is null then now() else last_successful_reconciliation_at end,
-            last_source_count=coalesce($2,last_source_count),
-            last_excluded_count=coalesce($3,last_excluded_count),
-            last_duplicate_mobile_count=coalesce($4,last_duplicate_mobile_count),
+            last_source_count=coalesce($2::int,last_source_count),
+            last_excluded_count=coalesce($3::int,last_excluded_count),
+            last_duplicate_mobile_count=coalesce($4::int,last_duplicate_mobile_count),
             updated_at=now()
       where singleton=true`,
     [nextCheckpoint, sourceCount, excludedCount, duplicateMobileCount],

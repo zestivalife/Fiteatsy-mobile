@@ -24,9 +24,12 @@ test('automatic client conversion uses an explicit client-role allow-list', () =
   }
 });
 
-test('assignment mutations reject stale workforce client mappings', () => {
-  const matches = assignmentRepository.match(/lower\(coalesce\((?:u|client)\.role, 'user'\)\) in \('user', 'client'\)/g) ?? [];
-  assert.ok(matches.length >= 4, 'all discovery and mutation paths must enforce client account roles');
+test('assignment mutations require canonical active clients and tenant membership', () => {
+  const activeClientMappings = assignmentRepository.match(/join fiteatsy_clients (?:c|fc) on [\s\S]{0,180}deleted_at is null[\s\S]{0,100}status, ''\)\) = 'active'/g) ?? [];
+  assert.ok(activeClientMappings.length >= 4, 'all discovery and mutation paths must require canonical active client mappings');
+  assert.match(assignmentRepository, /supervisor\.tenant_id = fc\.tenant_id/);
+  assert.match(assignmentRepository, /target_membership\.tenant_id = fc\.tenant_id/);
+  assert.match(assignmentRepository, /lower\(coalesce\(target_membership\.status, ''\)\) = 'active'/);
 });
 
 test('backfill never converts a workforce identity into a client', () => {

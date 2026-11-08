@@ -281,7 +281,7 @@ test('consultant can access client list after admin role assignment', async () =
   assert.equal(list.body.clients[0].name, 'QA Real Client');
 });
 
-test('senior allocation pool uses the active client mapping for a dual-role mobile registrant', async () => {
+test('platform allocation pool uses the active client mapping for a dual-role mobile registrant', async () => {
   const senior = await createAuthenticatedSession(server.baseUrl, {
     name: 'Senior Client Allocator',
     email: `senior-client-allocator-${Date.now()}@example.com`
@@ -298,7 +298,7 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
     name: 'Dual Role Mobile Client',
     email: `dual-role-mobile-client-${Date.now()}@example.com`
   });
-  await promoteRole(senior.current.body.accountId, 'senior_consultant');
+  await promoteRole(senior.current.body.accountId, 'admin');
   await promoteRole(consultant.current.body.accountId, 'consultant');
   await promoteRole(otherConsultant.current.body.accountId, 'consultant');
   await promoteRole(mobileClient.current.body.accountId, 'admin');
@@ -377,7 +377,7 @@ test('senior allocation pool uses the active client mapping for a dual-role mobi
   assert.equal(wrongConsultantDetail.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 });
 
-test('all active canonical client cohorts remain allocation-visible and roster-isolated exactly once', async () => {
+test('all active canonical client cohorts remain platform-allocation-visible and roster-isolated exactly once', async () => {
   const marker = `Lifecycle Cohort ${Date.now()}`;
   const senior = await createAuthenticatedSession(server.baseUrl, {
     name: `${marker} Senior`, email: `lifecycle-cohort-senior-${Date.now()}@example.com`
@@ -388,7 +388,7 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
   const otherConsultant = await createAuthenticatedSession(server.baseUrl, {
     name: `${marker} Other Consultant`, email: `lifecycle-cohort-other-${Date.now()}@example.com`
   });
-  await promoteRole(senior.current.body.accountId, 'senior_consultant');
+  await promoteRole(senior.current.body.accountId, 'admin');
   await promoteRole(consultant.current.body.accountId, 'consultant');
   await promoteRole(otherConsultant.current.body.accountId, 'consultant');
 
@@ -480,7 +480,8 @@ test('all active canonical client cohorts remain allocation-visible and roster-i
         actorUserId: senior.current.body.accountId,
         clientUserId: session.current.body.accountId,
         professionalUserId: consultant.current.body.accountId,
-        professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Whole-population lifecycle matrix'
+        professionalType: 'CONSULTANT', relationshipType: 'CLIENT_CARE', reason: 'Whole-population lifecycle matrix',
+        allowReassignment: definition.reassign === true
       });
       assert.notEqual(assignment, null);
 

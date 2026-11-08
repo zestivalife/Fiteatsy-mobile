@@ -52,7 +52,7 @@ test('eligible-client queries exclude deleted and inactive records and mask cont
   assert.match(repository, /lower\(coalesce\(u\.status, ''\)\) = 'active'/);
   assert.match(repository, /maskedEmail: maskEmail/);
   assert.match(repository, /maskedMobileNumber: maskMobile/);
-  assert.match(repository, /lower\(coalesce\((?:u|client)\.role, 'user'\)\) in \('user', 'client'\)/);
+  assert.match(repository, /join fiteatsy_clients c on c\.account_user_id = u\.id[\s\S]+c\.deleted_at is null[\s\S]+status, ''\)\) = 'active'/);
 });
 
 test('Senior Consultant delegation preserves supervision and is limited to internal delivery consultants', () => {

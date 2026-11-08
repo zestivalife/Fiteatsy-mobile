@@ -20,8 +20,8 @@ databaseTest.before(async () => {
     food_knowledge_components, food_knowledge_servings, food_knowledge_food_nutrients,
     food_knowledge_version_sources, food_knowledge_calculation_methods, food_knowledge_sources,
     food_knowledge_aliases, food_knowledge_nutrients, food_knowledge_versions,
-    food_knowledge_food_profiles, food_knowledge_families, food_knowledge_releases cascade`);
-  await pool.query(`delete from nutrition_foods where source_metadata->>'source'='Food Knowledge fixture'`);
+    food_knowledge_food_profiles, food_knowledge_families, food_knowledge_releases,
+    nutrition_foods cascade`);
 });
 
 databaseTest.after(async () => { await closePool(); });

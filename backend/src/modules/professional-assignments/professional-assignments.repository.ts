@@ -121,7 +121,6 @@ export const discoverClientsForAssignment = async (query: string, limit: number,
           order by subscriptions.expires_at desc limit 1
        ) subscription on true
       where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active'
-        and lower(coalesce(u.role, 'user')) in ('user', 'client')
         and ($1 = '' or lower(u.name) like '%' || lower($1) || '%' or lower(coalesce(u.email_normalized, '')) like '%' || lower($1) || '%' or (regexp_replace($1, '[^0-9]', '', 'g') <> '' and regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g') like '%' || regexp_replace($1, '[^0-9]', '', 'g') || '%'))
         and ($5 = 'all' or ($5 = 'unassigned' and active_assignment.id is null) or ($5 = 'assigned' and active_assignment.id is not null) or ($5 = 'mine' and active_assignment.consultant_user_id = $4))
       order by u.created_at desc limit $2 offset $3`,
@@ -162,7 +161,6 @@ export const listClientAllocationPool = async (input: { query: string; limit: nu
           order by subscriptions.expires_at desc limit 1
        ) subscription on true
       where u.deleted_at is null and lower(coalesce(u.status, '')) = 'active'
-        and lower(coalesce(u.role, 'user')) in ('user', 'client')
         and ($1 = '' or lower(u.name) like '%' || lower($1) || '%' or lower(coalesce(u.email_normalized, '')) like '%' || lower($1) || '%' or (regexp_replace($1, '[^0-9]', '', 'g') <> '' and regexp_replace(coalesce(u.mobile_number_normalized, ''), '[^0-9]', '', 'g') like '%' || regexp_replace($1, '[^0-9]', '', 'g') || '%'))
         and ($5 = 'all' or ($5 = 'unassigned' and active_assignment.id is null) or ($5 = 'assigned' and active_assignment.id is not null) or ($5 = 'mine' and active_assignment.consultant_user_id = $4))
         and ($6::boolean = false or exists (
@@ -211,7 +209,7 @@ export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentAct
     if (!target.rowCount) { await connection.query('rollback'); return null; }
 
     const eligible = await connection.query(
-      `select client.id
+      `select client.id, fc.tenant_id
          from users client
          join fiteatsy_clients fc on fc.account_user_id = client.id
           and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
@@ -221,14 +219,14 @@ export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentAct
          and supervisor.product = 'FITEATSY'
          and supervisor.relationship_type = 'CLIENT_CARE'
          and supervisor.status = 'active'
+         and supervisor.tenant_id = fc.tenant_id
          join tenant_memberships target_membership
           on target_membership.user_id = $3
          and target_membership.tenant_id = fc.tenant_id
          and lower(coalesce(target_membership.status, '')) = 'active'
          and lower(coalesce(target_membership.tenant_role, '')) in ('consultant', 'provider', 'dietician')
         where client.id = any($1::text[]) and client.deleted_at is null
-          and lower(coalesce(client.status, '')) = 'active'
-          and lower(coalesce(client.role, 'user')) in ('user', 'client')`,
+          and lower(coalesce(client.status, '')) = 'active'`,
       [input.clientUserIds, input.actorUserId, input.professionalUserId],
     );
     if (eligible.rowCount !== input.clientUserIds.length) { await connection.query('rollback'); return null; }
@@ -250,7 +248,10 @@ export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentAct
     if (conflicts.length && !input.allowReassignment) throw new ReassignmentRequiredError({ conflicts });
 
     const assignments: Record<string, unknown>[] = [];
+    const tenantByClient = new Map(eligible.rows.map((row) => [String(row.id), String(row.tenant_id)]));
     for (const clientUserId of input.clientUserIds) {
+      const tenantId = tenantByClient.get(clientUserId);
+      if (!tenantId) throw new Error('Eligible delegated client tenant was not resolved.');
       const current = existingByClient.get(clientUserId);
       if (current && String(current.consultant_user_id) === input.professionalUserId) {
         assignments.push(current);
@@ -275,9 +276,9 @@ export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentAct
       const assignmentId = crypto.randomUUID();
       const created = await connection.query(
         `insert into consultant_client_assignments
-          (id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
-         values ($1,$2,$3,$4,'FITEATSY','CONSULTANT','DELEGATED_CLIENT_CARE') returning *`,
-        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId],
+          (id, tenant_id, consultant_user_id, client_user_id, created_by_user_id, product, professional_type, relationship_type)
+         values ($1,$5,$2,$3,$4,'FITEATSY','CONSULTANT','DELEGATED_CLIENT_CARE') returning *`,
+        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId, tenantId],
       );
       await connection.query(
         `insert into professional_assignment_audit_events
@@ -368,20 +369,23 @@ export const createProfessionalAssignment = async (input: AssignmentActor & { cl
     }
     const result = await connection.query(
     `insert into consultant_client_assignments
-      (id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
-     select $1, professional.id, client.id, $2, $7, 'FITEATSY', $4, $5
+      (id, tenant_id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
+     select $1, fc.tenant_id, professional.id, client.id, $2, $7, 'FITEATSY', $4, $5
        from users professional join users client on client.id = $3
        join fiteatsy_clients fc on fc.account_user_id = client.id and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
-       join tenant_memberships professional_membership
+      join tenant_memberships professional_membership
          on professional_membership.user_id = professional.id
         and professional_membership.tenant_id = fc.tenant_id
         and lower(coalesce(professional_membership.status, '')) = 'active'
+       join tenant_memberships client_membership
+         on client_membership.user_id = client.id
+        and client_membership.tenant_id = fc.tenant_id
+        and lower(coalesce(client_membership.status, '')) = 'active'
       where professional.id = $6 and professional.deleted_at is null and client.deleted_at is null
         and lower(coalesce(professional.status, '')) = 'active'
         and lower(coalesce(client.status, '')) = 'active'
-        and lower(coalesce(client.role, 'user')) in ('user', 'client')
         and lower(coalesce(professional.role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
-     on conflict (consultant_user_id, client_user_id, scope) where status = 'active'
+     on conflict (tenant_id, consultant_user_id, client_user_id, scope) where status = 'active'
      do update set updated_at = now()
      returning *`,
       [crypto.randomUUID(), input.actorUserId, input.clientUserId, input.professionalType, input.relationshipType, input.professionalUserId, input.actorReference ?? null]
@@ -419,7 +423,7 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
       return null;
     }
     const eligibleClients = await connection.query(
-      `select client.id
+      `select client.id, fc.tenant_id
          from users client
          join fiteatsy_clients fc on fc.account_user_id = client.id
           and fc.deleted_at is null and lower(coalesce(fc.status, '')) = 'active'
@@ -427,9 +431,12 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
            on professional_membership.user_id = $2
           and professional_membership.tenant_id = fc.tenant_id
           and lower(coalesce(professional_membership.status, '')) = 'active'
+         join tenant_memberships client_membership
+           on client_membership.user_id = client.id
+          and client_membership.tenant_id = fc.tenant_id
+          and lower(coalesce(client_membership.status, '')) = 'active'
         where client.id = any($1::text[]) and client.deleted_at is null
-          and lower(coalesce(client.status, '')) = 'active'
-          and lower(coalesce(client.role, 'user')) in ('user', 'client')`,
+          and lower(coalesce(client.status, '')) = 'active'`,
       [input.clientUserIds, input.professionalUserId],
     );
     if (eligibleClients.rowCount !== input.clientUserIds.length) {
@@ -455,7 +462,10 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
     }
 
     const assignments: Record<string, unknown>[] = [];
+    const tenantByClient = new Map(eligibleClients.rows.map((row) => [String(row.id), String(row.tenant_id)]));
     for (const clientUserId of input.clientUserIds) {
+      const tenantId = tenantByClient.get(clientUserId);
+      if (!tenantId) throw new Error('Eligible client tenant was not resolved.');
       const activeAssignment = currentByClient.get(clientUserId);
       if (activeAssignment && String(activeAssignment.consultant_user_id) === input.professionalUserId) {
         assignments.push(activeAssignment);
@@ -465,9 +475,9 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
         const previous = await connection.query(
           `update consultant_client_assignments
               set status = 'revoked', ends_at = now(), revoked_at = now(), revoked_by_user_id = $2, revoked_by_actor_reference = $3, updated_at = now()
-            where client_user_id = $1 and product = 'FITEATSY' and status = 'active'
+            where client_user_id = $1 and tenant_id = $4 and product = 'FITEATSY' and status = 'active'
             returning *`,
-          [clientUserId, input.actorUserId, input.actorReference ?? null],
+          [clientUserId, input.actorUserId, input.actorReference ?? null, tenantId],
         );
         for (const row of previous.rows) {
           await connection.query(
@@ -481,10 +491,10 @@ export const createProfessionalAssignmentsBatch = async (input: AssignmentActor 
       const assignmentId = crypto.randomUUID();
       const created = await connection.query(
         `insert into consultant_client_assignments
-          (id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
-         values ($1, $2, $3, $4, $7, 'FITEATSY', $5, $6)
+          (id, tenant_id, consultant_user_id, client_user_id, created_by_user_id, created_by_actor_reference, product, professional_type, relationship_type)
+         values ($1, $8, $2, $3, $4, $7, 'FITEATSY', $5, $6)
          returning *`,
-        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId, input.professionalType, input.relationshipType, input.actorReference ?? null],
+        [assignmentId, input.professionalUserId, clientUserId, input.actorUserId, input.professionalType, input.relationshipType, input.actorReference ?? null, tenantId],
       );
       const row = created.rows[0] as Record<string, unknown>;
       await connection.query(

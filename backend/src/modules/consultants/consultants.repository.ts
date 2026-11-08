@@ -230,6 +230,10 @@ const ADDITIONAL_STAFF_ROLE_EXCLUSION_SQL =
 // turn a newly introduced workforce role into a client, which would expose
 // that identity to assignment and care workflows.
 const CLIENT_ACCOUNT_ROLES = ['user', 'client'];
+const PROTECTED_REPORT_STATUSES_PARAMETER = CLIENT_ACCOUNT_ROLES.length + 1;
+const PROTECTED_CLIENT_IDENTIFIER_PARAMETER = CLIENT_ACCOUNT_ROLES.length + 2;
+const PROTECTED_CONSULTANT_PARAMETER = CLIENT_ACCOUNT_ROLES.length + 3;
+const PROTECTED_PROFESSIONAL_TYPE_PARAMETER = CLIENT_ACCOUNT_ROLES.length + 4;
 const PUBLISHED_REPORT_STATUSES = ['PUBLISHED', 'PARTIALLY_VALIDATED'];
 
 const toIso = (value: unknown) => {
@@ -433,7 +437,7 @@ const protectedClientSelect = `
     where hr.user_id = u.id
       and hr.client_id = c.id
       and hr.deleted_at is null
-      and hr.processing_status = any($5)
+      and hr.processing_status = any($${PROTECTED_REPORT_STATUSES_PARAMETER}::text[])
   ) report_stats on true
   left join lateral (
     select
@@ -605,14 +609,14 @@ export const listRegisteredConsultantClients = async (
   const order = options.order === 'asc' ? 'asc' : 'desc';
   const directoryClause = `
     and (
-      $3 = ''
-      or u.name ilike '%' || $3 || '%'
-      or c.fiteatsy_client_id ilike '%' || $3 || '%'
+      $3::text = ''
+      or u.name ilike '%' || $3::text || '%'
+      or c.fiteatsy_client_id ilike '%' || $3::text || '%'
     )
     and (
-      $4 = 'all'
-      or ($4 = 'active' and lower(coalesce(u.status, '')) = 'active')
-      or ($4 = 'inactive' and lower(coalesce(u.status, '')) <> 'active')
+      $4::text = 'all'
+      or ($4::text = 'active' and lower(coalesce(u.status, '')) = 'active')
+      or ($4::text = 'inactive' and lower(coalesce(u.status, '')) <> 'active')
     )
   `;
   const rosterSelect = `
@@ -800,8 +804,8 @@ export const getRegisteredConsultantClientProfileContext = async (
           exists (
             select 1 from consultant_client_assignments cap003
             where cap003.client_user_id = u.id
-              and cap003.consultant_user_id = $7
-              and cap003.professional_type = $8
+              and cap003.consultant_user_id = $${PROTECTED_CONSULTANT_PARAMETER}
+              and cap003.professional_type = $${PROTECTED_PROFESSIONAL_TYPE_PARAMETER}
               and ${consultantAssignmentSqlPredicate('cap003')}
           )
         )
@@ -809,7 +813,7 @@ export const getRegisteredConsultantClientProfileContext = async (
     : '';
   const result = await pool.query(
     `${protectedClientSelect}
-      and c.fiteatsy_client_id = $6
+      and c.fiteatsy_client_id = $${PROTECTED_CLIENT_IDENTIFIER_PARAMETER}
       ${assignmentClause}
       order by hp.updated_at desc nulls last
       limit 1
@@ -867,7 +871,7 @@ export const getRegisteredClientProfileContextByAccountId = async (
 ): Promise<ConsultantClientProfileContext | null> => {
   const result = await pool.query(
     `${protectedClientSelect}
-      and u.id = $6
+      and u.id = $${PROTECTED_CLIENT_IDENTIFIER_PARAMETER}
       order by hp.updated_at desc nulls last
       limit 1
     `,

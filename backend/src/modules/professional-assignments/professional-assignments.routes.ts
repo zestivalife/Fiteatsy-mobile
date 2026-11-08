@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
+import { assertPlatformOperationAuthority } from '../tenancy/platform-authority.js';
+import { resolveActiveTenantContext } from '../tenancy/tenant-context.js';
 import { createProfessionalAssignment, createProfessionalAssignmentsBatch, createSeniorDelegatedAssignment, createSeniorDelegatedAssignmentsBatch, discoverClientsForAssignment, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, revokeSeniorDelegatedAssignment, type ProfessionalType } from './professional-assignments.repository.js';
 import { assignmentValidationDetails, professionalAssignmentBatchSchema, professionalAssignmentSchema } from './professional-assignment.contract.js';
 
@@ -12,9 +14,23 @@ export const canManageProfessionalAssignments = (role: string | null | undefined
 const assignmentSchema = professionalAssignmentSchema;
 const assignmentBatchSchema = professionalAssignmentBatchSchema;
 
+const assertProfessionalDiscoveryAuthority = async (req: Parameters<typeof getAuthenticatedAccount>[0]) => {
+  const account = getAuthenticatedAccount(req);
+  const role = String(account.user.role ?? '').trim().toLowerCase();
+  // Assignment administrators and care operations retain their established
+  // operational authority. Senior Consultant authority is tenant-bound below.
+  if (role === 'admin' || role === 'care_operations') return true;
+  const tenantContext = await resolveActiveTenantContext(account);
+  return assertPlatformOperationAuthority(account.user.role, true, tenantContext?.tenantType);
+};
+
 professionalAssignmentsRouter.get('/clients/search', async (req, res) => {
   const account = getAuthenticatedAccount(req);
-  if (!canManageProfessionalAssignments(account.user.role)) return res.status(403).json({ error: 'ASSIGNMENT_PERMISSION_REQUIRED' });
+  try {
+    await assertProfessionalDiscoveryAuthority(req);
+  } catch {
+    return res.status(403).json({ error: 'PLATFORM_AUTHORITY_REQUIRED' });
+  }
   await ensureRegisteredClientsForEligibleUsers();
   const query = typeof req.query.q === 'string' ? req.query.q : '';
   const limit = Math.min(Math.max(Number(req.query.limit) || 25, 1), 100);
@@ -27,7 +43,11 @@ professionalAssignmentsRouter.get('/clients/search', async (req, res) => {
 
 professionalAssignmentsRouter.get('/clients/pool', async (req, res) => {
   const account = getAuthenticatedAccount(req);
-  if (String(account.user.role).toLowerCase() !== 'senior_consultant' && !['admin', 'super_admin', 'platform_owner'].includes(String(account.user.role).toLowerCase())) return res.status(403).json({ error: 'ASSIGNMENT_PERMISSION_REQUIRED' });
+  try {
+    await assertProfessionalDiscoveryAuthority(req);
+  } catch {
+    return res.status(403).json({ error: 'PLATFORM_AUTHORITY_REQUIRED' });
+  }
   await ensureRegisteredClientsForEligibleUsers();
   const query = typeof req.query.q === 'string' ? req.query.q : '';
   const assignmentFilter = typeof req.query.assignment === 'string' && ['all', 'unassigned', 'assigned', 'mine'].includes(req.query.assignment) ? req.query.assignment as 'all' | 'unassigned' | 'assigned' | 'mine' : 'all';
@@ -37,7 +57,11 @@ professionalAssignmentsRouter.get('/clients/pool', async (req, res) => {
 });
 
 professionalAssignmentsRouter.get('/professionals', async (req, res) => {
-  if (!canManageProfessionalAssignments(getAuthenticatedAccount(req).user.role)) return res.status(403).json({ error: 'ASSIGNMENT_PERMISSION_REQUIRED' });
+  try {
+    await assertProfessionalDiscoveryAuthority(req);
+  } catch {
+    return res.status(403).json({ error: 'PLATFORM_AUTHORITY_REQUIRED' });
+  }
   const type = typeof req.query.type === 'string' && ['CONSULTANT', 'PRACTITIONER', 'MENTOR'].includes(req.query.type) ? req.query.type as ProfessionalType : undefined;
   const seniorDelegation = String(getAuthenticatedAccount(req).user.role).toLowerCase() === 'senior_consultant';
   return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type, seniorDelegation) });
