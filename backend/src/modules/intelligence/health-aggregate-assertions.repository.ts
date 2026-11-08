@@ -37,8 +37,15 @@ export type HealthRecalculationQueueItem={id:string;userId:string;clientId:strin
 export const claimPendingHealthRecalculations=async(limit=10):Promise<HealthRecalculationQueueItem[]>=>{
   const boundedLimit=Math.max(1,Math.min(50,Math.trunc(limit)));
   const result=await pool.query(`with pending as (
-      select id from health_intelligence_recalculation_queue
-      where status='PENDING' order by requested_at asc,id asc
+      select pending_queue.id from health_intelligence_recalculation_queue pending_queue
+      where pending_queue.status='PENDING'
+        and not exists (
+          select 1 from health_intelligence_recalculation_queue running_queue
+          where running_queue.client_id=pending_queue.client_id
+            and running_queue.health_day=pending_queue.health_day
+            and running_queue.status='RUNNING'
+        )
+      order by pending_queue.requested_at asc,pending_queue.id asc
       for update skip locked limit $1
     ) update health_intelligence_recalculation_queue queue
       set status='RUNNING',attempts=queue.attempts+1,last_error_code=null

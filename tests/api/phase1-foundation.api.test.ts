@@ -10,7 +10,10 @@ import {
 import { getClientByAccountUserId } from '../../backend/src/modules/client/client.repository.js';
 import { ingestHealthObservations } from '../../backend/src/modules/health/health-observations.repository.js';
 import { pool } from '../../backend/src/db/pool.js';
-import { enqueueHealthRecalculation } from '../../backend/src/modules/intelligence/health-aggregate-assertions.repository.js';
+import {
+  claimPendingHealthRecalculations,
+  enqueueHealthRecalculation
+} from '../../backend/src/modules/intelligence/health-aggregate-assertions.repository.js';
 import { processPendingHealthRecalculations } from '../../backend/src/jobs/process-health-recalculations.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
@@ -155,6 +158,26 @@ test('durable failed-upload recalculation queue is atomically claimed, drained, 
   const scores=await pool.query(`select count(*)::int as count from health_scores where client_id=$1
     and calculation_version='HEALTH_INTELLIGENCE_V1'`,[client.id]);
   assert.equal(scores.rows[0].count,9);
+});
+
+test('recalculation claiming skips a key with an existing running owner without blocking unrelated work',async()=>{
+  const session=await createAuthenticatedSession(server.baseUrl);
+  const client=await getClientByAccountUserId(session.current.body.accountId);
+  assert.ok(client);
+  const owner={accountId:session.current.body.accountId,clientId:client.id};
+  await enqueueHealthRecalculation(owner,'2026-09-15','INITIAL_ATTEMPT');
+  await pool.query(`update health_intelligence_recalculation_queue set status='RUNNING'
+    where client_id=$1 and health_day=$2 and status='PENDING'`,[client.id,'2026-09-15']);
+  await enqueueHealthRecalculation(owner,'2026-09-15','RETRY_WHILE_RUNNING');
+  await enqueueHealthRecalculation(owner,'2026-09-16','UNRELATED_RECALCULATION');
+
+  const claimed=await claimPendingHealthRecalculations(10);
+  assert.equal(claimed.length,1);
+  assert.equal(claimed[0].clientId,client.id);
+  assert.equal(claimed[0].healthDay,'2026-09-16');
+  const blocked=await pool.query(`select status from health_intelligence_recalculation_queue
+    where client_id=$1 and health_day=$2 order by status`,[client.id,'2026-09-15']);
+  assert.deepEqual(blocked.rows.map(row=>row.status),['PENDING','RUNNING']);
 });
 
 test('health ingestion preserves Health Connect provenance and rejects unsafe observations atomically', async () => {
