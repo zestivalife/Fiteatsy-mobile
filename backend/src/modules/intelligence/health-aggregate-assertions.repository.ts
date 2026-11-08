@@ -40,10 +40,10 @@ export const claimPendingHealthRecalculations=async(limit=10):Promise<HealthReca
       select pending_queue.id from health_intelligence_recalculation_queue pending_queue
       where pending_queue.status='PENDING'
         and not exists (
-          select 1 from health_intelligence_recalculation_queue running_queue
-          where running_queue.client_id=pending_queue.client_id
-            and running_queue.health_day=pending_queue.health_day
-            and running_queue.status='RUNNING'
+          select 1 from health_intelligence_recalculation_queue existing_queue
+          where existing_queue.client_id=pending_queue.client_id
+            and existing_queue.health_day=pending_queue.health_day
+            and existing_queue.id<>pending_queue.id
         )
       order by pending_queue.requested_at asc,pending_queue.id asc
       for update skip locked limit $1

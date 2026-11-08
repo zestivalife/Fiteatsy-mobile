@@ -160,7 +160,7 @@ test('durable failed-upload recalculation queue is atomically claimed, drained, 
   assert.equal(scores.rows[0].count,9);
 });
 
-test('recalculation claiming skips a key with an existing running owner without blocking unrelated work',async()=>{
+test('recalculation claiming skips ambiguous historical states without blocking unrelated work',async()=>{
   const session=await createAuthenticatedSession(server.baseUrl);
   const client=await getClientByAccountUserId(session.current.body.accountId);
   assert.ok(client);
@@ -170,14 +170,18 @@ test('recalculation claiming skips a key with an existing running owner without 
     where client_id=$1 and health_day=$2 and status='PENDING'`,[client.id,'2026-09-15']);
   await enqueueHealthRecalculation(owner,'2026-09-15','RETRY_WHILE_RUNNING');
   await enqueueHealthRecalculation(owner,'2026-09-16','UNRELATED_RECALCULATION');
+  await enqueueHealthRecalculation(owner,'2026-09-17','INITIAL_FAILED_ATTEMPT');
+  await pool.query(`update health_intelligence_recalculation_queue set status='FAILED',completed_at=now()
+    where client_id=$1 and health_day=$2 and status='PENDING'`,[client.id,'2026-09-17']);
+  await enqueueHealthRecalculation(owner,'2026-09-17','RETRY_AFTER_FAILURE');
 
   const claimed=await claimPendingHealthRecalculations(10);
   assert.equal(claimed.length,1);
   assert.equal(claimed[0].clientId,client.id);
   assert.equal(claimed[0].healthDay,'2026-09-16');
   const blocked=await pool.query(`select status from health_intelligence_recalculation_queue
-    where client_id=$1 and health_day=$2 order by status`,[client.id,'2026-09-15']);
-  assert.deepEqual(blocked.rows.map(row=>row.status),['PENDING','RUNNING']);
+    where client_id=$1 and health_day in ($2,$3) order by health_day,status`,[client.id,'2026-09-15','2026-09-17']);
+  assert.deepEqual(blocked.rows.map(row=>row.status),['PENDING','RUNNING','FAILED','PENDING']);
 });
 
 test('health ingestion preserves Health Connect provenance and rejects unsafe observations atomically', async () => {
