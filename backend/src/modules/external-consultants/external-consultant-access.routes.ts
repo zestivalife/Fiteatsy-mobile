@@ -12,6 +12,7 @@ import { getCareCaseByClientId } from '../platform/platform.store.js';
 import { ingestExternalDietPlan, selectExternalDietPlan } from './external-diet-plan.store.js';
 import { resolveConsultantApplicationIdentity } from './external-consultant-identity.repository.js';
 import { CommonFoodApiError, resolveDelegatedCommonFoodOption } from '../nutrition/common-food-consultant.service.js';
+import { calculateHealthMetrics } from '../health/health-calculations.service.js';
 
 export const externalConsultantAccessRouter = Router();
 const authority = (req: Request) => (req as Request & { delegatedAuthority?: DelegatedAuthority }).delegatedAuthority;
@@ -39,6 +40,45 @@ const governedOptionSchema = z.object({
     proteinTolerance: z.number().positive(),
   }),
 }).strict();
+
+const energyEstimateSchema = z.object({
+  activityLevel: z.enum(['sedentary', 'light', 'moderate', 'very_active']),
+  energyAdjustmentKcal: z.number().int().min(-2000).max(2000).default(0),
+}).strict();
+
+externalConsultantAccessRouter.post('/:userId/health-calculations/energy-estimate', requireDelegatedAuthority('fiteatsy.external.health.calculate', 'external_consultant_health_calculation'), async (req, res, next) => {
+  const auth = verifyTarget(req);
+  if (!auth) return res.status(403).json({ error: 'DELEGATED_TARGET_MISMATCH', message: 'The delegated client target is invalid.' });
+  const scopes = new Set(auth.scopes ?? []);
+  if (!scopes.has('PROFILE') || !scopes.has('MEASUREMENTS')) {
+    return res.status(403).json({ error: 'HEALTH_CALCULATION_CONSENT_REQUIRED', message: 'Profile and Measurements consent are required for an energy estimate.' });
+  }
+  const parsed = energyEstimateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const context = await getRegisteredClientProfileContextByAccountId(String(req.params.userId));
+    if (!context) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'The connected Fiteatsy client was not found.' });
+    const calculatedAt = new Date().toISOString();
+    const input = { ...context.calculationInput, activityLevel: parsed.data.activityLevel };
+    const metrics = calculateHealthMetrics(input, calculatedAt);
+    const adjustedDailyEnergy = metrics.tdee.status === 'AVAILABLE'
+      ? metrics.tdee.value + parsed.data.energyAdjustmentKcal
+      : null;
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({
+      connectionId: auth.connection_id,
+      methodology: metrics.tdee.formulaVersion,
+      calculatedAt,
+      inputs: metrics.tdee.inputSnapshot,
+      activityAssumption: parsed.data.activityLevel,
+      energyAdjustmentKcal: parsed.data.energyAdjustmentKcal,
+      bmr: metrics.bmr,
+      tdee: metrics.tdee,
+      adjustedDailyEnergy,
+      unit: adjustedDailyEnergy == null ? null : 'kcal/day',
+    });
+  } catch (error) { return next(error); }
+});
 
 externalConsultantAccessRouter.post('/:userId/common-food/resolve-option', requireDelegatedAuthority('fiteatsy.external.diet.resolve', 'external_consultant_diet_option'), async (req, res, next) => {
   const auth = verifyTarget(req);

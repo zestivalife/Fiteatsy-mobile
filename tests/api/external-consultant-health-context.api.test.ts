@@ -4,12 +4,12 @@ import test from 'node:test';
 import { resetDelegatedAuthorityReplayStoreForTests } from '../../backend/src/modules/auth/delegated-authority.js';
 import { pss10Items } from '../../backend/src/modules/assessments/assessment-definitions.js';
 import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
-import { getJson, postJson, putJson } from '../helpers/http.js';
+import { getJson, patchJson, postJson, putJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 
-const sign = (userId: string, scopes: string[]) => {
+const sign = (userId: string, scopes: string[], permission = 'fiteatsy.external.health.read', purpose = 'external_consultant_health') => {
   const now = Math.floor(Date.now() / 1000);
   const header = Buffer.from(JSON.stringify({
     alg: 'RS256', typ: 'Zestiva-Delegated-Authority', kid: 'external-health-test-key'
@@ -17,7 +17,7 @@ const sign = (userId: string, scopes: string[]) => {
   const payload = Buffer.from(JSON.stringify({
     iss: 'zestiva-platform', sub: 'external-consultant-test', aud: 'fiteatsy-backend',
     iat: now, exp: now + 180, jti: crypto.randomUUID(), product: 'fiteatsy',
-    permissions: ['fiteatsy.external.health.read'], purpose: 'external_consultant_health',
+    permissions: [permission], purpose,
     actor_type: 'EXTERNAL_CONSULTANT', tenant_id: 'practice-test', connection_id: 'connection-test',
     fiteatsy_user_id: userId, scopes
   })).toString('base64url');
@@ -87,4 +87,40 @@ test('delegated health context omits preferences and assessment when their conse
   assert.equal(delegated.body.foodPreferences, null);
   assert.equal(delegated.body.assessment, null);
   assert.notEqual(delegated.body.measurements, null);
+});
+
+test('delegated energy estimate uses authoritative stored inputs, explicit activity assumption, and consent', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Energy Estimate Client', email: `energy-estimate-${Date.now()}@example.com`
+  });
+  const profile = await patchJson(server.baseUrl, '/v1/platform/health-profile', {
+    dateOfBirthISO: '1990-04-12T00:00:00.000Z', gender: 'Female', heightCm: 164,
+    currentWeightKg: 62, activityLevel: 'Sedentary'
+  }, { headers: authHeaders(client.token) });
+  assert.equal(profile.response.status, 200, JSON.stringify(profile.body));
+  const token = sign(client.current.body.accountId, ['PROFILE', 'MEASUREMENTS'], 'fiteatsy.external.health.calculate', 'external_consultant_health_calculation');
+  const calculated = await postJson(server.baseUrl, `/v1/internal/external-consultant-access/${client.current.body.accountId}/health-calculations/energy-estimate`, {
+    activityLevel: 'moderate', energyAdjustmentKcal: -250
+  }, { headers: { 'x-zestiva-delegation': token } });
+  assert.equal(calculated.response.status, 200, JSON.stringify(calculated.body));
+  assert.equal(calculated.body.methodology, 'm2-health-calculations-v1');
+  assert.equal(calculated.body.activityAssumption, 'moderate');
+  assert.equal(calculated.body.energyAdjustmentKcal, -250);
+  assert.equal(calculated.body.bmr.status, 'AVAILABLE');
+  assert.equal(calculated.body.tdee.status, 'AVAILABLE');
+  assert.equal(calculated.body.adjustedDailyEnergy, calculated.body.tdee.value - 250);
+  assert.equal(calculated.body.inputs.heightCm, 164);
+  assert.equal(calculated.body.inputs.weightKg, 62);
+});
+
+test('delegated energy estimate fails closed without both profile and measurements consent', async () => {
+  const client = await createAuthenticatedSession(server.baseUrl, {
+    name: 'Energy Consent Client', email: `energy-consent-${Date.now()}@example.com`
+  });
+  const token = sign(client.current.body.accountId, ['PROFILE'], 'fiteatsy.external.health.calculate', 'external_consultant_health_calculation');
+  const denied = await postJson(server.baseUrl, `/v1/internal/external-consultant-access/${client.current.body.accountId}/health-calculations/energy-estimate`, {
+    activityLevel: 'light', energyAdjustmentKcal: 0
+  }, { headers: { 'x-zestiva-delegation': token } });
+  assert.equal(denied.response.status, 403, JSON.stringify(denied.body));
+  assert.equal(denied.body.error, 'HEALTH_CALCULATION_CONSENT_REQUIRED');
 });
