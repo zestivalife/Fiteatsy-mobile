@@ -11,7 +11,7 @@ import { nutritionPlanContentSchema } from '../nutrition/nutrition.routes.js';
 import { getCareCaseByClientId } from '../platform/platform.store.js';
 import { ingestExternalDietPlan, selectExternalDietPlan } from './external-diet-plan.store.js';
 import { resolveConsultantApplicationIdentity } from './external-consultant-identity.repository.js';
-import { CommonFoodApiError, resolveDelegatedCommonFoodOption } from '../nutrition/common-food-consultant.service.js';
+import { CommonFoodApiError, generateDelegatedCommonFoodPlan, resolveDelegatedCommonFoodOption } from '../nutrition/common-food-consultant.service.js';
 import { calculateHealthMetrics } from '../health/health-calculations.service.js';
 
 export const externalConsultantAccessRouter = Router();
@@ -39,6 +39,17 @@ const governedOptionSchema = z.object({
     kcalTolerance: z.number().positive(),
     proteinTolerance: z.number().positive(),
   }),
+}).strict();
+
+const governedGenerationSchema = z.object({
+  mealHeads: z.array(mealHeadSchema).min(1).max(7),
+  dailyTargets: z.object({
+    calories: z.number().positive().max(10000),
+    protein: z.number().nonnegative().max(1000),
+    carbohydrate: z.number().nonnegative().max(2000).nullable().optional(),
+    fat: z.number().nonnegative().max(1000).nullable().optional(),
+    fibre: z.number().nonnegative().max(300).nullable().optional(),
+  }).strict(),
 }).strict();
 
 const energyEstimateSchema = z.object({
@@ -90,6 +101,22 @@ externalConsultantAccessRouter.post('/:userId/common-food/resolve-option', requi
     const option = await resolveDelegatedCommonFoodOption({ accountId: String(req.params.userId), ...parsed.data });
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({ connectionId: auth.connection_id, option });
+  } catch (error) {
+    if (error instanceof CommonFoodApiError) return res.status(error.statusCode).json({ error: error.code, message: error.message });
+    return next(error);
+  }
+});
+
+externalConsultantAccessRouter.post('/:userId/common-food/generate', requireDelegatedAuthority('fiteatsy.external.diet.generate', 'external_consultant_diet_generation'), async (req, res, next) => {
+  const auth = verifyTarget(req);
+  if (!auth) return res.status(403).json({ error: 'DELEGATED_TARGET_MISMATCH', message: 'The delegated client target is invalid.' });
+  if (!(auth.scopes ?? []).includes('DIET_PLANS')) return res.status(403).json({ error: 'DIET_PLAN_CONSENT_REQUIRED', message: 'Active Diet Plans consent is required.' });
+  const parsed = governedGenerationSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const result = await generateDelegatedCommonFoodPlan({ accountId: String(req.params.userId), ...parsed.data });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ connectionId: auth.connection_id, ...result });
   } catch (error) {
     if (error instanceof CommonFoodApiError) return res.status(error.statusCode).json({ error: error.code, message: error.message });
     return next(error);

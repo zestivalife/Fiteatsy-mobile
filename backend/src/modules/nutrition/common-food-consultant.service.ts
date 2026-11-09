@@ -26,6 +26,7 @@ import { listApprovedFoodAliases, listApprovedProposalFoods } from './food-propo
 import { replaceFoodExplorerProjection, searchFoodExplorerProjection, type FoodExplorerProjectionRecord } from './food-explorer-projection.repository.js';
 import { resolveBiomarkerGeneration } from './biomarker-generation.js';
 import { createPracticalReferenceFoods, isPracticalReferenceFood, practicalFoodMasterRows } from './practical-indian-food-master.js';
+import { deriveVersionedMealTargets } from './calorie-macro-allocation.js';
 
 const catalogue=JSON.parse(readFileSync(new URL('./catalogue/data/fiteatsy-nutrition-catalogue-v1.1.json',import.meta.url),'utf8')) as {foods:CatalogueFood[]};
 const p0Verification=JSON.parse(readFileSync(new URL('./food-curation/data/p0_food_verification_v17_29.json',import.meta.url),'utf8')) as {decisions:Array<{sourceRecordId:string;referenceItemId:string;canonicalName:string;aliases:string[];category:string;sourceMapping:{fdcId:number}|null;generatorEligible:boolean;componentEligible:boolean}>};
@@ -35,7 +36,7 @@ export const governedCommonFoodCatalogue=dedupeCanonicalFoods(governedFoods);
 const practicalReferenceFoods=createPracticalReferenceFoods().map(withSemanticServingProfile);
 const foods=dedupeCanonicalFoods([...governedCommonFoodCatalogue,...practicalReferenceFoods]);
 export const commonFoodCatalogueMergeReport={oldGovernedTotal:governedCommonFoodCatalogue.length,newReferenceInputTotal:practicalFoodMasterRows.length,duplicatesConsolidated:practicalReferenceFoods.length-(foods.length-governedCommonFoodCatalogue.length),newNonDuplicateAdded:foods.length-governedCommonFoodCatalogue.length,finalCanonicalTotal:foods.length,finalAliasTotal:foods.reduce((total,food)=>total+food.aliases.length,0)} as const;
-const sectionByHead:Record<MealHead,string>={EARLY_MORNING:'earlyMorning',BREAKFAST:'breakfast',MID_MORNING:'midMorningSnack',LUNCH:'lunch',EVENING_SNACK:'eveningSnack',DINNER:'dinner',BEDTIME:'bedtimeNutrition'};
+const sectionByHead:Record<MealHead,keyof ReturnType<typeof deriveVersionedMealTargets>>={EARLY_MORNING:'earlyMorning',BREAKFAST:'breakfast',MID_MORNING:'midMorningSnack',LUNCH:'lunch',EVENING_SNACK:'eveningSnack',DINNER:'dinner',BEDTIME:'bedtimeNutrition'};
 const dietMap={vegetarian:'VEGETARIAN',eggetarian:'EGG',non_vegetarian:'NON_VEGETARIAN',vegan:'VEGAN',jain:'VEGETARIAN'} as const;
 export class CommonFoodApiError extends Error{constructor(public code:string,public statusCode:number,message=code){super(message)}}
 const roleAllowed=(account:AuthenticatedAccount)=>['consultant','senior_consultant','admin','super_admin','platform_owner'].includes(String(account.user.role).toLowerCase());
@@ -91,6 +92,49 @@ export async function resolveDelegatedCommonFoodOption(input:{accountId:string;m
  if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404,'The connected Fiteatsy client was not found.');
  const prefs=await getFoodPreferenceProfile(registered.profile.client.id);
  return resolveGovernedCommonFoodOption(foodContext(prefs?.profile),input);
+}
+
+export async function generateDelegatedCommonFoodPlan(input:{
+ accountId:string;
+ mealHeads:MealHead[];
+ dailyTargets:{calories:number;protein:number;carbohydrate?:number|null;fat?:number|null;fibre?:number|null};
+}){
+ const registered=await getRegisteredClientProfileContextByAccountId(input.accountId);
+ if(!registered)throw new CommonFoodApiError('CLIENT_NOT_FOUND',404,'The connected Fiteatsy client was not found.');
+ const prefs=await getFoodPreferenceProfile(registered.profile.client.id);
+ const context=foodContext(prefs?.profile);
+ if(context.diet==='VEGAN')throw new CommonFoodApiError('VEGAN_COMMON_FOOD_ENGINE_V1_NOT_SUPPORTED',422,'GOVERNED_VEGAN_BEDTIME_SOURCE_REQUIRED');
+ const allocated=deriveVersionedMealTargets({
+  calories:input.dailyTargets.calories,
+  proteinGrams:input.dailyTargets.protein,
+  carbsGrams:input.dailyTargets.carbohydrate,
+  fatGrams:input.dailyTargets.fat,
+  fibreGrams:input.dailyTargets.fibre,
+ });
+ const targets=Object.fromEntries(MEAL_HEADS.map(head=>{const value=allocated[sectionByHead[head]];return[head,{
+  kcal:value.calories??0,protein:value.proteinGrams??0,
+  kcalTolerance:Math.max(1,((value.caloriesBand?.max??0)-(value.caloriesBand?.min??0))/2||50),
+  proteinTolerance:Math.max(1,((value.proteinBand?.max??0)-(value.proteinBand?.min??0))/2||10),
+  kcalTargetAvailable:value.calories!=null&&value.calories>0,
+  proteinTargetAvailable:value.proteinGrams!=null&&value.proteinGrams>0,
+ } satisfies MealTarget]})) as Record<MealHead,MealTarget>;
+ const generated=input.mealHeads.map(mealHead=>({mealHead,result:generateMealCombinations({foods,context,mealHead,target:targets[mealHead],limit:30,rankingV3:COMMON_FOOD_RANKING_V3_ENABLED,semanticV1:true})}));
+ const diverse=selectDayDiverseOptions({foods,meals:generated.map(row=>({mealHead:row.mealHead,options:row.result.options,required:5}))});
+ const meals=diverse.meals.map(selected=>{
+  const source=generated.find(row=>row.mealHead===selected.mealHead)!;
+  const recommendedIds=new Set(selected.options.map(option=>option.combinationId));
+  const options=[...selected.options,...source.result.options.filter(option=>!recommendedIds.has(option.combinationId))].slice(0,5);
+  const shortage=options.length<5?(selected.shortage??source.result.shortage??{state:'SHORTAGE' as const,available:options.length,required:5,missing:5-options.length}):null;
+  return {mealHead:selected.mealHead,target:targets[selected.mealHead],coverage:shortage??{state:'COMPLETE' as const,available:options.length,required:5,missing:0},options:options.map(option=>({...option,optionHash:canonicalHash(option)}))};
+ });
+ return {
+  supported:true,
+  generatorVersion:'COMMON_FOOD_COMBINATION_ENGINE_V1',
+  rankingVersion:COMMON_FOOD_RANKING_V3_ENABLED?COMMON_FOOD_DAY_DIVERSITY_VERSION_V5:'COMMON_FOOD_RANKING_V2',
+  allocationMethodology:allocated.earlyMorning.methodologyVersion,
+  generationSnapshot:{source:'FITEATSY_GOVERNED_COMMON_FOOD',dietPreference:prefs?.profile?.dietType??null,foodPreferencesApplied:Boolean(prefs?.profile),dailyTargets:input.dailyTargets},
+  meals,
+ };
 }
 
 type FoodSearchQuery={scope?:'ALL'|'RECOMMENDED';mealHead?:MealHead;search?:string;category?:string;family?:string;referenceState?:string;nutritionStatus?:'REFERENCE_ONLY'|'NUTRITION_PENDING'|'NUTRITION_VERIFIED';generatorEligibility?:'ELIGIBLE'|'INELIGIBLE';entityType?:string;componentRole?:ComponentRole;dietClass?:string;proteinMin?:number;proteinMax?:number;caloriesMin?:number;caloriesMax?:number;limit:number;offset:number};
