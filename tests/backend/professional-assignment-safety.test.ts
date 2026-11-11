@@ -67,6 +67,12 @@ test('Senior Consultant delegation preserves supervision and is limited to inter
   assert.match(routes, /clients\/search[\s\S]+supervisorOnly: true/);
 });
 
+test('all internal assignment discovery surfaces exclude external-practice identities', () => {
+  assert.match(routes, /discoverProfessionalsForAssignment\(type, true\)/);
+  assert.match(delegatedRoutes, /discoverProfessionalsForAssignment\(type, true\)/);
+  assert.match(repository, /left\(id, 4\) <> 'ext_'/);
+});
+
 test('Senior Consultant can revoke only a delegated assignment beneath an active supervision assignment', () => {
   assert.match(repository, /revokeSeniorDelegatedAssignment/);
   assert.match(repository, /delegated\.relationship_type='DELEGATED_CLIENT_CARE'/);

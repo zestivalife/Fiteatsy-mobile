@@ -265,7 +265,9 @@ delegatedRouter.get('/professional-assignments/clients/pool', requireDelegatedAu
 delegatedRouter.get('/professional-assignments/professionals', requireDelegatedAuthority('fiteatsy.client.assignment.read', 'client_assignment', 'platform_owner'), async (req, res) => {
   try {
     const type = typeof req.query.type === 'string' && ['CONSULTANT', 'PRACTITIONER', 'MENTOR'].includes(req.query.type) ? req.query.type as ProfessionalType : undefined;
-    return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type) });
+    // Platform-owner allocation is an internal-care operation. External-practice
+    // consultants are connected by the client through the governed consent flow.
+    return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type, true) });
   } catch (error) { return respondError(res, error, 'ASSIGNMENT_PROFESSIONAL_LIST_FAILED'); }
 });
 

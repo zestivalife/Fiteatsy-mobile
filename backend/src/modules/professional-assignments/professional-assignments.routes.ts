@@ -63,8 +63,9 @@ professionalAssignmentsRouter.get('/professionals', async (req, res) => {
     return res.status(403).json({ error: 'PLATFORM_AUTHORITY_REQUIRED' });
   }
   const type = typeof req.query.type === 'string' && ['CONSULTANT', 'PRACTITIONER', 'MENTOR'].includes(req.query.type) ? req.query.type as ProfessionalType : undefined;
-  const seniorDelegation = String(getAuthenticatedAccount(req).user.role).toLowerCase() === 'senior_consultant';
-  return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type, seniorDelegation) });
+  // This route governs internal care allocation only. External-practice identities
+  // use their separate governed relationship lifecycle and are never assignment targets.
+  return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type, true) });
 });
 
 professionalAssignmentsRouter.get('/', async (req, res) => {
