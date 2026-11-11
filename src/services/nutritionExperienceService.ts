@@ -106,12 +106,12 @@ export const getNutritionExperience = async (date?: string) => {
   const canonicalDate = date ?? nutritionDate();
   let response: NutritionExperience;
   try {
-    response = await getActiveExternalNutritionExperience(canonicalDate);
-  } catch (error) {
-    const noExternalPlan = error instanceof ApiClientError && error.code === 'NOT_FOUND'
-      && (error.serverCode === 'DIET_PLAN_NOT_FOUND' || error.serverCode === 'FEATURE_DISABLED');
-    if (!noExternalPlan) throw error;
     response = await nutritionFetch<NutritionExperience>(`/v1/platform/nutrition-experience?date=${encodeURIComponent(canonicalDate)}`);
+  } catch (error) {
+    const noCanonicalPlan = error instanceof ApiClientError && error.code === 'NOT_FOUND'
+      && (error.serverCode === 'DIET_PLAN_NOT_FOUND' || error.serverCode === 'FEATURE_DISABLED');
+    if (!noCanonicalPlan) throw error;
+    response = await getActiveExternalNutritionExperience(canonicalDate);
   }
   if (!response?.plan?.id || !response?.version?.id || !Array.isArray(response.meals) || !response.version.content?.nutritionSnapshot) {
     throw new ApiClientError('VALIDATION_ERROR', 'The published nutrition plan response is malformed.');

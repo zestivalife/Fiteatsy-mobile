@@ -20,16 +20,16 @@ const experience = (id: string) => ({
   mealStates: [], adherence: { percent: 0, label: '' }, nutritionScore: 0, selectedDate: '2026-11-07', consultantNote: null,
 });
 
-test('active external publication takes precedence without reading the native plan store', async () => {
-  mockGetExternal.mockResolvedValueOnce(experience('external-plan'));
+test('canonical persisted Nutrition projection takes precedence for every active plan type', async () => {
+  mockApiFetch.mockResolvedValueOnce(experience('canonical-plan'));
   const { getNutritionExperience } = require('../src/services/nutritionExperienceService');
-  await expect(getNutritionExperience('2026-11-07')).resolves.toMatchObject({ plan: { id: 'external-plan' } });
-  expect(mockApiFetch).not.toHaveBeenCalled();
+  await expect(getNutritionExperience('2026-11-07')).resolves.toMatchObject({ plan: { id: 'canonical-plan' } });
+  expect(mockGetExternal).not.toHaveBeenCalled();
 });
 
-test('native Nutrition remains available when no external publication exists', async () => {
-  mockGetExternal.mockRejectedValueOnce(new MockApiClientError('NOT_FOUND', 'none', 404, 'DIET_PLAN_NOT_FOUND'));
-  mockApiFetch.mockResolvedValueOnce(experience('native-plan'));
+test('direct consultant projection remains a read-only compatibility fallback when canonical ingestion is unavailable', async () => {
+  mockApiFetch.mockRejectedValueOnce(new MockApiClientError('NOT_FOUND', 'none', 404, 'DIET_PLAN_NOT_FOUND'));
+  mockGetExternal.mockResolvedValueOnce(experience('external-fallback'));
   const { getNutritionExperience } = require('../src/services/nutritionExperienceService');
-  await expect(getNutritionExperience('2026-11-07')).resolves.toMatchObject({ plan: { id: 'native-plan' } });
+  await expect(getNutritionExperience('2026-11-07')).resolves.toMatchObject({ plan: { id: 'external-fallback' } });
 });

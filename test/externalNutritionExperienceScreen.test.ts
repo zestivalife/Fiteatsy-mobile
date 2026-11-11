@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (callback: () => void) => {
@@ -64,5 +64,40 @@ test('mobile Nutrition renders exact consultant-published meals read-only', asyn
   expect(screen.queryByText('My Pattern')).toBeNull();
   expect(screen.queryByText('What can I eat now?')).toBeNull();
   expect(mockLogNutritionEvent).not.toHaveBeenCalled();
+  expect(mockLogWater).not.toHaveBeenCalled();
+}, 15_000);
+
+test('canonical consultant plan enables persisted meal and hydration tracking', async () => {
+  const experience = {
+    delivery: { source: 'EXTERNAL_CONSULTANT', readOnly: false, publicationId: 'publication-7' },
+    plan: { id: 'canonical-plan-1', templateVersion: 'EXTERNAL_DIET_PLAN_V1', planStatus: 'PUBLISHED', publishedAtISO: '2026-11-07T10:00:00Z' },
+    version: { id: 'canonical-version-7', versionNumber: 7, content: { nutritionSnapshot: { programmeName: 'Consultant plan' },
+      dailyTargets: { calories: 1800, protein: 100, carbohydrates: 200, fat: 60, fibre: 30, hydration: 2.5 }, supplementsAndClinicalNotes: [] } },
+    meals: [
+      { key: 'breakfast', label: 'Breakfast', window: '08:00–09:00', state: 'PENDING', consumedAtISO: null, consumed: null,
+        selectedOptionId: 'breakfast-1',
+        options: [{ id: 'breakfast-1', slot: 1, meal: 'Poha + curd', portion: '1 bowl · 100 g', approxKcal: 320, proteinGrams: 14, carbsGrams: 48, fatGrams: 8, fibreGrams: 6,
+          components: [{ id: 'poha', name: 'Poha', serving: '1 bowl' }, { id: 'curd', name: 'Curd', serving: '100 g' }] }] },
+    ],
+    totals: { calories: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 }, remaining: { calories: 1800, protein: 100, carbs: 200, fat: 60, fibre: 30 },
+    water: { litres: 0, targetLitres: 2.5 }, mealCount: 1, mealsFollowed: 0, outOfPlanCount: 0, skippedCount: 0, pendingCount: 1,
+    plannedVsActual: { calories: { planned: 1800, actual: 0 }, mealsFollowed: { planned: 1, actual: 0 }, outOfPlan: 0, skipped: 0 },
+    mealStates: [{ mealHeadId: 'breakfast', mealHeadName: 'Breakfast', scheduledTime: '08:00–09:00', status: 'PENDING', loggedEventId: null, loggedOptionId: null, loggedFood: null, timestamp: null }],
+    adherence: { percent: 0, label: 'No meals logged yet' }, nutritionScore: 0, selectedDate: '2026-11-07', consultantNote: null,
+  };
+  mockGetNutritionExperience.mockResolvedValueOnce(experience);
+  mockLogNutritionEvent.mockResolvedValueOnce(experience);
+  mockLogWater.mockResolvedValueOnce({ ...experience, water: { litres: .25, targetLitres: 2.5 } });
+  const screen = render(React.createElement(require('../src/screens/home/NutritionExperienceScreen').NutritionExperienceScreen));
+  await waitFor(() => expect(screen.getByText('Poha + curd')).toBeTruthy());
+  expect(screen.getByText("Today's Plan")).toBeTruthy();
+  expect(screen.queryByText('Tracking remains read-only in this view.')).toBeNull();
+
+  fireEvent.press(screen.getByText('Log meal'));
+  await waitFor(() => expect(mockLogNutritionEvent).toHaveBeenCalledWith(expect.objectContaining({
+    planId: 'canonical-plan-1', versionId: 'canonical-version-7', mealKey: 'breakfast', optionId: 'breakfast-1', state: 'CONSUMED_APPROVED',
+  })));
+
+  expect(screen.getByText('+ Add water')).toBeTruthy();
   expect(mockLogWater).not.toHaveBeenCalled();
 }, 15_000);
