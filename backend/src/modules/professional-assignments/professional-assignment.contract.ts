@@ -8,6 +8,15 @@ export const postgresUuidSchema = z.string().trim().regex(
   'Must be a canonical PostgreSQL UUID.',
 );
 
+// External Consultant identities are provisioned by the external signup
+// lifecycle and intentionally live in the text-backed users namespace. Keep
+// this contract separate from internal assignment identifiers so Senior and
+// internal Consultant assignment remains canonical-UUID-only.
+export const externalProfessionalIdSchema = z.string().trim().regex(
+  /^ext_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  'Must be an established External Consultant identifier.',
+);
+
 export const professionalAssignmentSchema = z.object({
   clientUserId: postgresUuidSchema,
   professionalUserId: postgresUuidSchema,
@@ -27,7 +36,7 @@ export const professionalAssignmentBatchSchema = professionalAssignmentSchema
 
 export const externalPracticeReferralSchema = z.object({
   clientUserId: postgresUuidSchema,
-  professionalUserId: postgresUuidSchema,
+  professionalUserId: externalProfessionalIdSchema,
   reason: z.string().trim().max(240).optional(),
   allowReassignment: z.boolean().optional().default(false),
 }).strict();

@@ -73,6 +73,16 @@ test('all internal assignment discovery surfaces exclude external-practice ident
   assert.match(repository, /left\(id, 4\) <> 'ext_'/);
 });
 
+test('external referrals accept only established ext-prefixed identities while internal assignments remain UUID-only', () => {
+  assert.match(assignmentContract, /externalProfessionalIdSchema/);
+  assert.match(assignmentContract, /\^ext_\[0-9a-f\]/);
+  assert.match(assignmentContract, /externalPracticeReferralSchema[\s\S]+professionalUserId: externalProfessionalIdSchema/);
+  assert.match(assignmentContract, /professionalAssignmentSchema[\s\S]+professionalUserId: postgresUuidSchema/);
+  assert.match(repository, /membership\.id = signup\.owner_membership_id/);
+  assert.match(repository, /membership\.tenant_id = signup\.tenant_id/);
+  assert.match(repository, /membership\.user_id = signup\.fiteatsy_user_id/);
+});
+
 test('Senior Consultant can revoke only a delegated assignment beneath an active supervision assignment', () => {
   assert.match(repository, /revokeSeniorDelegatedAssignment/);
   assert.match(repository, /delegated\.relationship_type='DELEGATED_CLIENT_CARE'/);

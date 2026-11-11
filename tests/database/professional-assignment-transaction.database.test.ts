@@ -137,21 +137,29 @@ databaseTest('external practice referral preserves assignment while leaving conn
   const clientTenantId = randomUUID();
   const practiceTenantId = randomUUID();
   const clientId = randomUUID();
-  const professionalId = randomUUID();
+  const professionalId = `ext_${randomUUID()}`;
+  const replacementProfessionalId = `ext_${randomUUID()}`;
+  const ownerMembershipId = randomUUID();
+  const replacementMembershipId = randomUUID();
+  const replacementPracticeTenantId = randomUUID();
   const actorReference = `zestiva:external-referral-${randomUUID()}`;
 
   try {
     await pool.query(
       `insert into tenants (id, name, slug, tenant_type, status)
        values ($1, 'Referral Client Tenant', $2, 'EXTERNAL_PRACTICE', 'active'),
-              ($3, 'Referral Practice', $4, 'EXTERNAL_PRACTICE', 'active')`,
-      [clientTenantId, `referral-client-${clientTenantId}`, practiceTenantId, `referral-practice-${practiceTenantId}`],
+              ($3, 'Referral Practice', $4, 'EXTERNAL_PRACTICE', 'active'),
+              ($5, 'Replacement Referral Practice', $6, 'EXTERNAL_PRACTICE', 'active')`,
+      [clientTenantId, `referral-client-${clientTenantId}`, practiceTenantId, `referral-practice-${practiceTenantId}`,
+        replacementPracticeTenantId, `referral-practice-${replacementPracticeTenantId}`],
     );
     await pool.query(
       `insert into users (id, name, email_normalized, role, status, account_purpose)
        values ($1, 'Referral Client', $2, 'user', 'active', 'QA_TEST'),
-              ($3, 'External Referral Consultant', $4, 'consultant', 'active', 'QA_TEST')`,
-      [clientId, `client-${clientId}@example.test`, professionalId, `consultant-${professionalId}@example.test`],
+              ($3, 'External Referral Consultant', $4, 'consultant', 'active', 'QA_TEST'),
+              ($5, 'Replacement External Consultant', $6, 'consultant', 'active', 'QA_TEST')`,
+      [clientId, `client-${clientId}@example.test`, professionalId, `consultant-${professionalId}@example.test`,
+        replacementProfessionalId, `consultant-${replacementProfessionalId}@example.test`],
     );
     await pool.query(
       `insert into fiteatsy_clients (id, tenant_id, fiteatsy_client_id, account_user_id, status)
@@ -159,12 +167,46 @@ databaseTest('external practice referral preserves assignment while leaving conn
       [randomUUID(), clientTenantId, `referral-client-${clientId}`, clientId],
     );
     await pool.query(
+      `insert into tenant_memberships
+        (id, tenant_id, user_id, tenant_role, status, joined_at, created_at, updated_at)
+       values ($1, $2, $3, 'OWNER', 'active', now(), now(), now()),
+              ($4, $5, $6, 'OWNER', 'active', now(), now(), now())`,
+      [ownerMembershipId, practiceTenantId, professionalId,
+        replacementMembershipId, replacementPracticeTenantId, replacementProfessionalId],
+    );
+    await pool.query(
       `insert into external_consultant_signups
         (id, auth_identity_id, fiteatsy_user_id, email_normalized, account_type, signup_state,
-         tenant_id, idempotency_key, created_by_reference)
-       values ($1,$2,$3,$4,'INDEPENDENT_CONSULTANT','READY',$5,$6,'EXTERNAL_REFERRAL_TEST')`,
-      [randomUUID(), `auth-${professionalId}`, professionalId, `signup-${professionalId}@example.test`, practiceTenantId, randomUUID()],
+         tenant_id, owner_membership_id, idempotency_key, created_by_reference)
+       values ($1,$2,$3,$4,'INDEPENDENT_CONSULTANT','READY',$5,$6,$7,'EXTERNAL_REFERRAL_TEST')`,
+      [randomUUID(), `auth-${professionalId}`, professionalId, `signup-${professionalId}@example.test`, practiceTenantId, ownerMembershipId, randomUUID()],
     );
+    await pool.query(
+      `insert into external_consultant_signups
+        (id, auth_identity_id, fiteatsy_user_id, email_normalized, account_type, signup_state,
+         tenant_id, owner_membership_id, idempotency_key, created_by_reference)
+       values ($1,$2,$3,$4,'INDEPENDENT_CONSULTANT','READY',$5,$6,$7,'EXTERNAL_REFERRAL_TEST')`,
+      [randomUUID(), `auth-${replacementProfessionalId}`, replacementProfessionalId,
+        `signup-${replacementProfessionalId}@example.test`, replacementPracticeTenantId, replacementMembershipId, randomUUID()],
+    );
+
+    await pool.query(`update tenant_memberships set status='inactive' where id=$1`, [ownerMembershipId]);
+    assert.equal(await createExternalPracticeReferral({
+      actorUserId: null,
+      actorReference,
+      clientUserId: clientId,
+      professionalUserId: professionalId,
+    }), null);
+    await pool.query(`update tenant_memberships set status='active' where id=$1`, [ownerMembershipId]);
+
+    await pool.query(`update users set status='inactive' where id=$1`, [professionalId]);
+    assert.equal(await createExternalPracticeReferral({
+      actorUserId: null,
+      actorReference,
+      clientUserId: clientId,
+      professionalUserId: professionalId,
+    }), null);
+    await pool.query(`update users set status='active' where id=$1`, [professionalId]);
 
     const input = {
       actorUserId: null,
@@ -176,6 +218,7 @@ databaseTest('external practice referral preserves assignment while leaving conn
     const created = await createExternalPracticeReferral(input);
     assert.equal(created?.relationship_type, 'EXTERNAL_PRACTICE_REFERRAL');
     assert.equal(created?.tenant_id, clientTenantId);
+    assert.equal(created?.consultant_user_id, professionalId);
 
     const retry = await createExternalPracticeReferral(input);
     assert.equal(retry?.id, created?.id);
@@ -185,15 +228,47 @@ databaseTest('external practice referral preserves assignment while leaving conn
       [clientId, professionalId],
     );
     assert.equal(assignmentCount.rows[0].count, 1);
+    const persisted = await pool.query(
+      `select consultant_user_id, client_user_id, tenant_id, relationship_type
+         from consultant_client_assignments where id=$1`,
+      [created?.id],
+    );
+    assert.deepEqual(persisted.rows[0], {
+      consultant_user_id: professionalId,
+      client_user_id: clientId,
+      tenant_id: clientTenantId,
+      relationship_type: 'EXTERNAL_PRACTICE_REFERRAL',
+    });
+
+    await assert.rejects(createExternalPracticeReferral({
+      ...input,
+      professionalUserId: replacementProfessionalId,
+    }), ReassignmentRequiredError);
+    const reassigned = await createExternalPracticeReferral({
+      ...input,
+      professionalUserId: replacementProfessionalId,
+      allowReassignment: true,
+    });
+    assert.equal(reassigned?.consultant_user_id, replacementProfessionalId);
+    const history = await pool.query(
+      `select consultant_user_id, status from consultant_client_assignments
+        where client_user_id=$1 order by created_at`,
+      [clientId],
+    );
+    assert.deepEqual(history.rows, [
+      { consultant_user_id: professionalId, status: 'revoked' },
+      { consultant_user_id: replacementProfessionalId, status: 'active' },
+    ]);
     // PIN connections and consent are owned by Practice Operations. This
     // transaction persists only the administrative Fiteatsy assignment.
   } finally {
     await pool.query('delete from professional_assignment_audit_events where client_user_id=$1', [clientId]);
     await pool.query('delete from consultant_client_assignments where client_user_id=$1', [clientId]);
-    await pool.query('delete from external_consultant_signups where fiteatsy_user_id=$1', [professionalId]);
+    await pool.query('delete from external_consultant_signups where fiteatsy_user_id = any($1::text[])', [[professionalId, replacementProfessionalId]]);
     await pool.query('delete from fiteatsy_clients where account_user_id=$1', [clientId]);
-    await pool.query('delete from users where id = any($1::text[])', [[clientId, professionalId]]);
-    await pool.query('delete from tenants where id = any($1::uuid[])', [[clientTenantId, practiceTenantId]]);
+    await pool.query('delete from tenant_memberships where id = any($1::uuid[])', [[ownerMembershipId, replacementMembershipId]]);
+    await pool.query('delete from users where id = any($1::text[])', [[clientId, professionalId, replacementProfessionalId]]);
+    await pool.query('delete from tenants where id = any($1::uuid[])', [[clientTenantId, practiceTenantId, replacementPracticeTenantId]]);
   }
 });
 

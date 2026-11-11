@@ -226,9 +226,15 @@ export const createExternalPracticeReferral = async (input: AssignmentActor & {
          from external_consultant_signups signup
          join users professional on professional.id = signup.fiteatsy_user_id
          join tenants practice on practice.id = signup.tenant_id
+         join tenant_memberships membership
+           on membership.id = signup.owner_membership_id
+          and membership.tenant_id = signup.tenant_id
+          and membership.user_id = signup.fiteatsy_user_id
         where professional.id = $1 and signup.signup_state = 'READY'
           and professional.deleted_at is null and lower(coalesce(professional.status, '')) = 'active'
-          and lower(coalesce(practice.status, '')) = 'active'`,
+          and lower(coalesce(practice.status, '')) = 'active'
+          and lower(coalesce(membership.status, '')) = 'active'
+          and membership.removed_at is null`,
       [input.professionalUserId],
     );
     if (target.rowCount !== 1) { await connection.query('rollback'); return null; }
