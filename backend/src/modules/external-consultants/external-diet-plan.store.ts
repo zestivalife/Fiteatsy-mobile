@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import type { NutritionPlanContent } from '../platform/platform.types.js';
+import { isPublishableGovernedCommonFood } from '../nutrition/common-food-consultant.service.js';
 
 export type ExternalDietPlanPublication = {
   userId: string;
@@ -16,6 +17,31 @@ export type ExternalDietPlanPublication = {
   content: NutritionPlanContent;
 };
 
+export type InvalidExternalFoodReference = {
+  foodId: string;
+  displayName: string;
+  mealHead: string;
+};
+
+export class ExternalDietPlanFoodReferenceError extends Error {
+  constructor(public readonly invalidReferences: InvalidExternalFoodReference[]) {
+    super('EXTERNAL_DIET_PLAN_UNVERIFIED_FOOD_REFERENCE');
+  }
+}
+
+export const invalidExternalFoodReferences = (content: NutritionPlanContent): InvalidExternalFoodReference[] =>
+  Object.entries(content.mealPlan).flatMap(([mealHead, section]) =>
+    section.options.flatMap((option) =>
+      (option.components ?? [])
+        .filter((component) => Boolean(component.foodId) && !isPublishableGovernedCommonFood(component.foodId!))
+        .map((component) => ({
+          foodId: component.foodId!,
+          displayName: component.componentName || 'Unavailable food',
+          mealHead,
+        })),
+    ),
+  );
+
 const summary = (content: NutritionPlanContent) => ({
   calories: content.dailyTargets.calories,
   protein: content.dailyTargets.protein,
@@ -27,12 +53,8 @@ export const ingestExternalDietPlan = async (input: ExternalDietPlanPublication)
   const client = await pool.connect();
   try {
     await client.query('begin');
-    const foodIds = [...new Set(Object.values(input.content.mealPlan).flatMap((section) => section.options.flatMap((option) => option.components?.map((component) => component.foodId).filter((id): id is string => Boolean(id)) ?? [])))];
-    const verifiedFoods = await client.query(
-      `select id::text from nutrition_foods where id::text = any($1::text[]) and verification_status = 'verified' and status = 'active' and deleted_at is null`,
-      [foodIds],
-    );
-    if (verifiedFoods.rowCount !== foodIds.length) throw new Error('EXTERNAL_DIET_PLAN_UNVERIFIED_FOOD_REFERENCE');
+    const invalidReferences = invalidExternalFoodReferences(input.content);
+    if (invalidReferences.length) throw new ExternalDietPlanFoodReferenceError(invalidReferences);
     const existingPlan = await client.query(
       `select * from diet_plans
        where external_source_system = 'ZESTIVA_360' and external_connection_id = $1

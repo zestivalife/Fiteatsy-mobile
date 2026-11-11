@@ -14,8 +14,22 @@ test('external consultant plan migration keeps independent plans and one explici
 test('external plan ingestion is idempotent and validates governed foods', () => {
   const store = read('backend/src/modules/external-consultants/external-diet-plan.store.ts');
   assert.match(store, /external_source_version = \$2/);
-  assert.match(store, /verification_status = 'verified'/);
+  assert.match(store, /isPublishableGovernedCommonFood/);
+  assert.match(store, /ExternalDietPlanFoodReferenceError/);
   assert.match(store, /on conflict \(care_case_id,user_id\) do update/);
+});
+
+test('delegated generation excludes reference-only foods that publication rejects', () => {
+  const service = read('backend/src/modules/nutrition/common-food-consultant.service.ts');
+  const delegated = service.slice(service.indexOf('export async function generateDelegatedCommonFoodPlan'), service.indexOf('type FoodSearchQuery'));
+  assert.match(delegated, /foods:governedCommonFoodCatalogue/);
+  assert.doesNotMatch(delegated, /generateMealCombinations\(\{foods,/);
+});
+
+test('publication errors identify affected foods without exposing catalogue identifiers', () => {
+  const routes = read('backend/src/modules/external-consultants/external-consultant-access.routes.ts');
+  assert.match(routes, /invalidFoods: error\.invalidReferences\.map\(\(\{ displayName, mealHead \}\)/);
+  assert.doesNotMatch(routes, /invalidFoods:[^\n]+foodId/);
 });
 
 test('nutrition selection is preferred without replacing another consultant plan', () => {

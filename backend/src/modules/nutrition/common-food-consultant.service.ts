@@ -35,6 +35,8 @@ const governedFoods=applyUsdaActivationV1733A2Aliases(applyUsdaActivationV1732B2
 export const governedCommonFoodCatalogue=dedupeCanonicalFoods(governedFoods);
 const practicalReferenceFoods=createPracticalReferenceFoods().map(withSemanticServingProfile);
 const foods=dedupeCanonicalFoods([...governedCommonFoodCatalogue,...practicalReferenceFoods]);
+const publishableFoodIds=new Set(governedCommonFoodCatalogue.filter(food=>food.active&&food.clientConsumable).map(food=>food.id));
+export const isPublishableGovernedCommonFood=(foodId:string)=>publishableFoodIds.has(foodId);
 export const commonFoodCatalogueMergeReport={oldGovernedTotal:governedCommonFoodCatalogue.length,newReferenceInputTotal:practicalFoodMasterRows.length,duplicatesConsolidated:practicalReferenceFoods.length-(foods.length-governedCommonFoodCatalogue.length),newNonDuplicateAdded:foods.length-governedCommonFoodCatalogue.length,finalCanonicalTotal:foods.length,finalAliasTotal:foods.reduce((total,food)=>total+food.aliases.length,0)} as const;
 const sectionByHead:Record<MealHead,keyof ReturnType<typeof deriveVersionedMealTargets>>={EARLY_MORNING:'earlyMorning',BREAKFAST:'breakfast',MID_MORNING:'midMorningSnack',LUNCH:'lunch',EVENING_SNACK:'eveningSnack',DINNER:'dinner',BEDTIME:'bedtimeNutrition'};
 const dietMap={vegetarian:'VEGETARIAN',eggetarian:'EGG',non_vegetarian:'NON_VEGETARIAN',vegan:'VEGAN',jain:'VEGETARIAN'} as const;
@@ -118,8 +120,8 @@ export async function generateDelegatedCommonFoodPlan(input:{
   kcalTargetAvailable:value.calories!=null&&value.calories>0,
   proteinTargetAvailable:value.proteinGrams!=null&&value.proteinGrams>0,
  } satisfies MealTarget]})) as Record<MealHead,MealTarget>;
- const generated=input.mealHeads.map(mealHead=>({mealHead,result:generateMealCombinations({foods,context,mealHead,target:targets[mealHead],limit:30,rankingV3:COMMON_FOOD_RANKING_V3_ENABLED,semanticV1:true})}));
- const diverse=selectDayDiverseOptions({foods,meals:generated.map(row=>({mealHead:row.mealHead,options:row.result.options,required:5}))});
+ const generated=input.mealHeads.map(mealHead=>({mealHead,result:generateMealCombinations({foods:governedCommonFoodCatalogue,context,mealHead,target:targets[mealHead],limit:30,rankingV3:COMMON_FOOD_RANKING_V3_ENABLED,semanticV1:true})}));
+ const diverse=selectDayDiverseOptions({foods:governedCommonFoodCatalogue,meals:generated.map(row=>({mealHead:row.mealHead,options:row.result.options,required:5}))});
  const meals=diverse.meals.map(selected=>{
   const source=generated.find(row=>row.mealHead===selected.mealHead)!;
   const recommendedIds=new Set(selected.options.map(option=>option.combinationId));

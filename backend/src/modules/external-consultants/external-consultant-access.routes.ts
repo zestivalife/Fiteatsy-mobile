@@ -9,7 +9,7 @@ import { getReportFile } from '../reports/reports.store.js';
 import { z } from 'zod';
 import { nutritionPlanContentSchema } from '../nutrition/nutrition.routes.js';
 import { getCareCaseByClientId } from '../platform/platform.store.js';
-import { ingestExternalDietPlan, selectExternalDietPlan } from './external-diet-plan.store.js';
+import { ExternalDietPlanFoodReferenceError, ingestExternalDietPlan, selectExternalDietPlan } from './external-diet-plan.store.js';
 import { resolveConsultantApplicationIdentity } from './external-consultant-identity.repository.js';
 import { CommonFoodApiError, generateDelegatedCommonFoodPlan, resolveDelegatedCommonFoodOption } from '../nutrition/common-food-consultant.service.js';
 import { calculateHealthMetrics } from '../health/health-calculations.service.js';
@@ -187,8 +187,12 @@ externalConsultantAccessRouter.post('/:userId/diet-plans', requireDelegatedAutho
     res.setHeader('Cache-Control', 'no-store');
     return res.status(result.created ? 201 : 200).json(result);
   } catch (error) {
-    if (error instanceof Error && error.message === 'EXTERNAL_DIET_PLAN_UNVERIFIED_FOOD_REFERENCE') {
-      return res.status(422).json({ error: 'UNVERIFIED_FOOD_REFERENCE', message: 'Every external meal component must use an active verified Fiteatsy food.' });
+    if (error instanceof ExternalDietPlanFoodReferenceError) {
+      return res.status(422).json({
+        error: 'UNVERIFIED_FOOD_REFERENCE',
+        message: 'Replace foods that are no longer available in the verified catalogue, then try publishing again.',
+        invalidFoods: error.invalidReferences.map(({ displayName, mealHead }) => ({ displayName, mealHead })),
+      });
     }
     return next(error);
   }
