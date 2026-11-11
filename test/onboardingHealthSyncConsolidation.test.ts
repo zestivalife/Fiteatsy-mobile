@@ -15,7 +15,7 @@ describe('returning-user bootstrap and canonical Health Data Sync', () => {
     expect(deriveOnboardingGate(null)).toEqual({ status: 'NOT_STARTED', resumeStep: 'basics' });
     expect(deriveOnboardingGate({
       dateOfBirthISO: '1990-01-01', gender: 'Female', heightCm: null, currentWeightKg: 62
-    })).toEqual({ status: 'IN_PROGRESS', resumeStep: 'anthropometrics' });
+    })).toEqual({ status: 'IN_PROGRESS', resumeStep: 'assessment' });
   });
 
   test('unknown canonical state remains unknown instead of reopening onboarding', () => {
@@ -56,6 +56,23 @@ describe('returning-user bootstrap and canonical Health Data Sync', () => {
     expect(navigation).toContain("from '../screens/sync/CanonicalHealthDataSyncScreen'");
     expect(canonical).toContain('useCanonicalHealthSyncCoordinator');
     expect(canonical).not.toContain('HealthDataSyncExperience');
+    expect(canonical).toContain('Health connection successful');
+    expect(canonical).toContain('No supported health data was available to import.');
+    expect(canonical).toContain('Your connection remains active');
+  });
+
+  test('height and weight are collected once in assessment without an obsolete route', () => {
+    const navigation = read('src/navigation/AppNavigation.tsx');
+    const navigationTypes = read('src/navigation/types.ts');
+    const basics = read('src/screens/onboarding/OnboardingBasicsScreen.tsx');
+    const splash = read('src/screens/auth/SplashScreen.tsx');
+    const assessment = read('src/screens/onboarding/OnboardingAssessmentScreen.tsx');
+    expect(navigation).not.toContain('OnboardingAnthropometrics');
+    expect(navigationTypes).not.toContain('OnboardingAnthropometrics');
+    expect(basics).toContain("navigation.navigate('OnboardingAssessment', { startPhase: 'lifestyle' })");
+    expect(splash).not.toContain("navigation.replace('OnboardingAnthropometrics')");
+    expect(assessment).toContain('What is your height?');
+    expect(assessment).toContain('What is your weight?');
   });
 
   test('setup later is governed by entry context, not connection state', () => {

@@ -2,7 +2,7 @@ import type { PlatformHealthProfile } from '../services/platformHealthProfileSer
 
 export type OnboardingStatus = 'UNKNOWN' | 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export type OnboardingResolution = 'UNKNOWN' | 'INCOMPLETE' | 'COMPLETE';
-export type OnboardingResumeStep = 'basics' | 'anthropometrics' | 'assessment' | null;
+export type OnboardingResumeStep = 'basics' | 'assessment' | null;
 
 export type OnboardingGate = {
   status: OnboardingStatus;
@@ -35,7 +35,7 @@ export const deriveOnboardingGate = (profile: OnboardingProfileEvidence | null):
   if (resolveOnboardingState(profile) === 'COMPLETE') return { status: 'COMPLETED', resumeStep: null };
   if (!profile.dateOfBirthISO || !profile.gender) return { status: 'IN_PROGRESS', resumeStep: 'basics' };
   if (!hasPositiveNumber(profile.heightCm) || !hasPositiveNumber(profile.currentWeightKg)) {
-    return { status: 'IN_PROGRESS', resumeStep: 'anthropometrics' };
+    return { status: 'IN_PROGRESS', resumeStep: 'assessment' };
   }
   return { status: 'COMPLETED', resumeStep: null };
 };

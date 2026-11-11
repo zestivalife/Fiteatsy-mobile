@@ -59,7 +59,7 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
       careTrack: deriveCareTrack(selectedConditions, primaryGoal), createdAtISO: seed.createdAtISO || new Date().toISOString()
     }));
     setWearableSetupCompleted(false);
-    navigation.navigate('OnboardingAnthropometrics');
+    navigation.navigate('OnboardingAssessment', { startPhase: 'lifestyle' });
   };
   const onDob = (event: DateTimePickerEvent, date?: Date) => {
     if (Platform.OS === 'android') setShowDatePicker(false);

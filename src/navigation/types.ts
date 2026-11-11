@@ -4,7 +4,6 @@ import { ReportParameter } from '../services/nuetraService';
 export type RootStackParamList = {
   Splash: undefined;
   OnboardingBasics: undefined;
-  OnboardingAnthropometrics: undefined;
   OnboardingAssessment: {
     startPhase?: 'lifestyle' | 'recovery';
     lifestyle?: { heightCm: number; weightKg: number; activityLevel: string; sleepHours: number; sleepQuality: string };
