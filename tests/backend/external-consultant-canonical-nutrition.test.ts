@@ -13,10 +13,13 @@ test('external consultant plan migration keeps independent plans and one explici
 
 test('external plan ingestion is idempotent and validates governed foods', () => {
   const store = read('backend/src/modules/external-consultants/external-diet-plan.store.ts');
-  assert.match(store, /external_source_version = \$2/);
-  assert.match(store, /isPublishableGovernedCommonFood/);
+  assert.match(store, /external_source_version = \$3/);
+  assert.match(store, /isPublishableGovernedFoodSnapshot/);
   assert.match(store, /ExternalDietPlanFoodReferenceError/);
   assert.match(store, /on conflict \(care_case_id,user_id\) do update/);
+  assert.match(store, /id, tenant_id, care_case_id, user_id/);
+  assert.match(store, /id,tenant_id,diet_plan_id,version_number/);
+  assert.match(store, /where tenant_id = \$1 and external_source_system/);
 });
 
 test('delegated generation excludes reference-only foods that publication rejects', () => {

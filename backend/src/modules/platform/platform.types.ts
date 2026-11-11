@@ -306,6 +306,10 @@ export type NutritionMealRecommendationSet = {
 export type NutritionMealComponent = {
   id?: string;
   foodId?: string | null;
+  foodVersion?: number | null;
+  servingId?: string | null;
+  servingVersion?: number | null;
+  sourceMappingId?: string | null;
   componentName: string;
   quantity: number | null;
   quantityUnit: string;

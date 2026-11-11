@@ -63,6 +63,10 @@ const mealOptionSchema = z.object({
     z.object({
       id: z.string().optional(),
       foodId: z.string().nullable().optional(),
+      foodVersion: z.number().int().positive().nullable().optional(),
+      servingId: z.string().min(1).nullable().optional(),
+      servingVersion: z.number().int().positive().nullable().optional(),
+      sourceMappingId: z.string().min(1).nullable().optional(),
       componentName: z.string(),
       quantity: z.number().nullable(),
       quantityUnit: z.string(),

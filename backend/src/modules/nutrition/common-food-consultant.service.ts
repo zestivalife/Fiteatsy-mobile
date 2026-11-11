@@ -37,6 +37,15 @@ const practicalReferenceFoods=createPracticalReferenceFoods().map(withSemanticSe
 const foods=dedupeCanonicalFoods([...governedCommonFoodCatalogue,...practicalReferenceFoods]);
 const publishableFoodIds=new Set(governedCommonFoodCatalogue.filter(food=>food.active&&food.clientConsumable).map(food=>food.id));
 export const isPublishableGovernedCommonFood=(foodId:string)=>publishableFoodIds.has(foodId);
+export type GovernedFoodPublicationReference={foodId:string;foodVersion?:number|null;servingId?:string|null;servingVersion?:number|null;sourceMappingId?:string|null};
+export const isPublishableGovernedFoodSnapshot=(reference:GovernedFoodPublicationReference)=>{
+ const food=foods.find(item=>item.id===reference.foodId);
+ if(!food||!food.active||!food.clientConsumable)return false;
+ if(publishableFoodIds.has(food.id)&&reference.foodVersion==null&&reference.servingId==null&&reference.sourceMappingId==null)return true;
+ if(reference.foodVersion!==food.version||reference.sourceMappingId!==food.sourceMappingId||!reference.servingId||reference.servingVersion==null)return false;
+ const serving=food.servings.find(item=>item.id===reference.servingId&&item.version===reference.servingVersion);
+ return Boolean(serving?.active);
+};
 export const commonFoodCatalogueMergeReport={oldGovernedTotal:governedCommonFoodCatalogue.length,newReferenceInputTotal:practicalFoodMasterRows.length,duplicatesConsolidated:practicalReferenceFoods.length-(foods.length-governedCommonFoodCatalogue.length),newNonDuplicateAdded:foods.length-governedCommonFoodCatalogue.length,finalCanonicalTotal:foods.length,finalAliasTotal:foods.reduce((total,food)=>total+food.aliases.length,0)} as const;
 const sectionByHead:Record<MealHead,keyof ReturnType<typeof deriveVersionedMealTargets>>={EARLY_MORNING:'earlyMorning',BREAKFAST:'breakfast',MID_MORNING:'midMorningSnack',LUNCH:'lunch',EVENING_SNACK:'eveningSnack',DINNER:'dinner',BEDTIME:'bedtimeNutrition'};
 const dietMap={vegetarian:'VEGETARIAN',eggetarian:'EGG',non_vegetarian:'NON_VEGETARIAN',vegan:'VEGAN',jain:'VEGETARIAN'} as const;

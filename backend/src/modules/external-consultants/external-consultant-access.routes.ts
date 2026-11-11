@@ -208,7 +208,7 @@ externalConsultantAccessRouter.put('/:userId/diet-plans/active', requireDelegate
     if (!context) return res.status(404).json({ error: 'CLIENT_NOT_FOUND', message: 'The connected Fiteatsy client was not found.' });
     const careCase = await getCareCaseByClientId(context.internalClientId);
     if (!careCase) return res.status(409).json({ error: 'CARE_CASE_NOT_FOUND', message: 'The client does not have an active care case.' });
-    const selected = await selectExternalDietPlan({ userId: context.accountId, careCaseId: careCase.id, connectionId: auth.connection_id!, externalPlanId: parsed.data.externalPlanId });
+    const selected = await selectExternalDietPlan({ userId: context.accountId, careCaseId: careCase.id, connectionId: auth.connection_id!, externalPlanId: parsed.data.externalPlanId, tenantId: auth.tenant_id! });
     if (!selected) return res.status(404).json({ error: 'DIET_PLAN_NOT_FOUND', message: 'The published external diet plan was not found.' });
     return res.status(200).json(selected);
   } catch (error) { return next(error); }
