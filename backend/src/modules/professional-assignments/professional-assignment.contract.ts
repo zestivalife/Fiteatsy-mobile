@@ -25,6 +25,13 @@ export const professionalAssignmentBatchSchema = professionalAssignmentSchema
   })
   .strict();
 
+export const externalPracticeReferralSchema = z.object({
+  clientUserId: postgresUuidSchema,
+  professionalUserId: postgresUuidSchema,
+  reason: z.string().trim().max(240).optional(),
+  allowReassignment: z.boolean().optional().default(false),
+}).strict();
+
 export const assignmentValidationDetails = (error: z.ZodError) => ({
   fieldErrors: error.flatten().fieldErrors,
   formErrors: error.flatten().formErrors,

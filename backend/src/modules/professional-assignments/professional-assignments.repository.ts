@@ -183,11 +183,127 @@ export const discoverProfessionalsForAssignment = async (professionalType?: Prof
       where deleted_at is null and lower(coalesce(status, '')) = 'active'
         and lower(coalesce(role, '')) in ('consultant', 'provider', 'dietician', 'senior_consultant', 'practitioner', 'mentor')
         and ($1::text is null or upper(case when lower(role) in ('provider', 'dietician', 'senior_consultant') then 'CONSULTANT' else role end) = $1)
-        and ($2::boolean = false or (left(id, 4) <> 'ext_' and lower(role) in ('consultant', 'provider', 'dietician')))
+        and ($2::boolean = false or (left(id, 4) <> 'ext_' and lower(role) in ('consultant', 'provider', 'dietician', 'senior_consultant')))
       order by name asc`,
     [professionalType ?? null, internalDeliveryOnly]
   );
   return result.rows.map(mapProfessional);
+};
+
+export const discoverExternalPracticeProfessionals = async () => {
+  const result = await pool.query(
+    `select professional.id, professional.name, professional.first_name, professional.last_name,
+            professional.email_normalized, professional.role, professional.status,
+            signup.tenant_id::text as practice_tenant_id, practice.name as practice_name
+       from external_consultant_signups signup
+       join users professional on professional.id = signup.fiteatsy_user_id
+       join tenants practice on practice.id = signup.tenant_id
+      where signup.signup_state = 'READY'
+        and professional.deleted_at is null
+        and lower(coalesce(professional.status, '')) = 'active'
+        and lower(coalesce(practice.status, '')) = 'active'
+      order by practice.name asc, professional.name asc`,
+  );
+  return result.rows.map((row) => ({
+    ...mapProfessional(row),
+    assignmentAuthority: 'EXTERNAL_PRACTICE',
+    practiceTenantId: String(row.practice_tenant_id),
+    practiceName: String(row.practice_name),
+  }));
+};
+
+export const createExternalPracticeReferral = async (input: AssignmentActor & {
+  clientUserId: string;
+  professionalUserId: string;
+  reason?: string;
+  allowReassignment?: boolean;
+}) => {
+  const connection = await pool.connect();
+  try {
+    await connection.query('begin');
+    const target = await connection.query(
+      `select professional.id, signup.tenant_id
+         from external_consultant_signups signup
+         join users professional on professional.id = signup.fiteatsy_user_id
+         join tenants practice on practice.id = signup.tenant_id
+        where professional.id = $1 and signup.signup_state = 'READY'
+          and professional.deleted_at is null and lower(coalesce(professional.status, '')) = 'active'
+          and lower(coalesce(practice.status, '')) = 'active'`,
+      [input.professionalUserId],
+    );
+    if (target.rowCount !== 1) { await connection.query('rollback'); return null; }
+
+    const client = await connection.query(
+      `select account.id, fiteatsy.tenant_id
+         from users account
+         join fiteatsy_clients fiteatsy on fiteatsy.account_user_id = account.id
+          and fiteatsy.deleted_at is null and lower(coalesce(fiteatsy.status, '')) = 'active'
+        where account.id = $1 and account.deleted_at is null
+          and lower(coalesce(account.status, '')) = 'active'`,
+      [input.clientUserId],
+    );
+    if (client.rowCount !== 1) { await connection.query('rollback'); return null; }
+
+    const current = await connection.query(
+      `select * from consultant_client_assignments
+        where client_user_id = $1 and product = 'FITEATSY' and status = 'active'
+        order by updated_at desc limit 1 for update`,
+      [input.clientUserId],
+    );
+    const activeAssignment = current.rows[0] as Record<string, unknown> | undefined;
+    if (activeAssignment && String(activeAssignment.consultant_user_id) === input.professionalUserId
+      && String(activeAssignment.relationship_type) === 'EXTERNAL_PRACTICE_REFERRAL') {
+      await connection.query('commit');
+      return activeAssignment;
+    }
+    if (activeAssignment && !input.allowReassignment) {
+      await connection.query('rollback');
+      throw new ReassignmentRequiredError(activeAssignment);
+    }
+    const previous = await connection.query(
+      `update consultant_client_assignments
+          set status='revoked', ends_at=now(), revoked_at=now(), revoked_by_user_id=$2,
+              revoked_by_actor_reference=$3, updated_at=now()
+        where client_user_id=$1 and product='FITEATSY' and status='active' returning *`,
+      [input.clientUserId, input.actorUserId, input.actorReference ?? null],
+    );
+    for (const row of previous.rows) {
+      await connection.query(
+        `insert into professional_assignment_audit_events
+          (id,assignment_id,action,actor_user_id,actor_reference,client_user_id,professional_user_id,professional_type,relationship_type,reason)
+         values ($1,$2,'REASSIGNED',$3,$4,$5,$6,$7,$8,$9)`,
+        [crypto.randomUUID(), row.id, input.actorUserId, input.actorReference ?? null, input.clientUserId,
+          row.consultant_user_id, row.professional_type, row.relationship_type, input.reason ?? 'External practice referral reassigned'],
+      );
+    }
+
+    const assignmentId = crypto.randomUUID();
+    const created = await connection.query(
+      `insert into consultant_client_assignments
+        (id,tenant_id,consultant_user_id,client_user_id,created_by_user_id,created_by_actor_reference,product,professional_type,relationship_type)
+       values ($1,$2,$3,$4,$5,$6,'FITEATSY','CONSULTANT','EXTERNAL_PRACTICE_REFERRAL')
+       on conflict (tenant_id,consultant_user_id,client_user_id,scope) where status='active'
+       do update set updated_at=now()
+       returning *`,
+      [assignmentId, client.rows[0].tenant_id, input.professionalUserId, input.clientUserId,
+        input.actorUserId, input.actorReference ?? null],
+    );
+    const row = created.rows[0];
+    await connection.query(
+      `insert into professional_assignment_audit_events
+        (id,assignment_id,action,actor_user_id,actor_reference,client_user_id,professional_user_id,professional_type,relationship_type,reason)
+       values ($1,$2,'CREATED',$3,$4,$5,$6,'CONSULTANT','EXTERNAL_PRACTICE_REFERRAL',$7)`,
+      [crypto.randomUUID(), row.id, input.actorUserId, input.actorReference ?? null,
+        input.clientUserId, input.professionalUserId, input.reason ?? 'Platform Owner routed lead to external practice'],
+    );
+    await connection.query('commit');
+    return row;
+  } catch (error) {
+    await connection.query('rollback');
+    throw error;
+  } finally {
+    connection.release();
+  }
 };
 
 export const createSeniorDelegatedAssignmentsBatch = async (input: AssignmentActor & {

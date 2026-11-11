@@ -12,8 +12,8 @@ import { deactivateExternalQaPractice, EXTERNAL_QA_PROFESSIONS, provisionExterna
 import { listFiteatsyIntakeLeads } from './admin.repository.js';
 import { issueTemporaryLoginPin } from '../auth/auth.service.js';
 import { ensureRegisteredClientsForEligibleUsers } from '../consultants/consultants.repository.js';
-import { createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from '../professional-assignments/professional-assignments.repository.js';
-import { assignmentValidationDetails, professionalAssignmentBatchSchema, professionalAssignmentSchema } from '../professional-assignments/professional-assignment.contract.js';
+import { createExternalPracticeReferral, createProfessionalAssignment, createProfessionalAssignmentsBatch, discoverExternalPracticeProfessionals, discoverProfessionalsForAssignment, listClientAllocationPool, listProfessionalAssignments, ReassignmentRequiredError, revokeProfessionalAssignment, type ProfessionalType } from '../professional-assignments/professional-assignments.repository.js';
+import { assignmentValidationDetails, externalPracticeReferralSchema, professionalAssignmentBatchSchema, professionalAssignmentSchema } from '../professional-assignments/professional-assignment.contract.js';
 
 export const delegatedRouter = Router();
 
@@ -269,6 +269,28 @@ delegatedRouter.get('/professional-assignments/professionals', requireDelegatedA
     // consultants are connected by the client through the governed consent flow.
     return res.status(200).json({ professionals: await discoverProfessionalsForAssignment(type, true) });
   } catch (error) { return respondError(res, error, 'ASSIGNMENT_PROFESSIONAL_LIST_FAILED'); }
+});
+
+delegatedRouter.get('/external-practice-referrals/professionals', requireDelegatedAuthority('fiteatsy.client.assignment.read', 'external_practice_referral', 'platform_owner'), async (_req, res) => {
+  try { return res.status(200).json({ professionals: await discoverExternalPracticeProfessionals() }); }
+  catch (error) { return respondError(res, error, 'EXTERNAL_PRACTICE_LIST_FAILED'); }
+});
+
+delegatedRouter.post('/external-practice-referrals', requireDelegatedAuthority('fiteatsy.client.assign', 'external_practice_referral', 'platform_owner'), async (req, res) => {
+  const parsed = externalPracticeReferralSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', message: 'External practice referral contains invalid fields.', details: assignmentValidationDetails(parsed.error) });
+  try {
+    const actorReference = `zestiva:${actorId(req)}`;
+    const result = await executeDelegatedIdempotently({ operation: 'external_practice_referral', key: req.header('idempotency-key') || '', execute: async () => {
+      const assignment = await createExternalPracticeReferral({ ...parsed.data, actorUserId: null, actorReference });
+      if (!assignment) throw Object.assign(new Error('The client or external practice is not an eligible active identity.'), { status: 400, code: 'INVALID_EXTERNAL_REFERRAL_TARGET' });
+      return { assignment, connectionState: 'PENDING_CLIENT_CONNECTION', consentState: 'NOT_GRANTED' };
+    }});
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, idempotentReplay: result.replayed });
+  } catch (error) {
+    if (error instanceof ReassignmentRequiredError) return res.status(409).json({ error: 'REASSIGNMENT_CONFIRMATION_REQUIRED', currentAssignment: error.currentAssignment });
+    return respondError(res, error, 'EXTERNAL_PRACTICE_REFERRAL_FAILED');
+  }
 });
 
 delegatedRouter.get('/professional-assignments', requireDelegatedAuthority('fiteatsy.client.assignment.read', 'client_assignment', 'platform_owner'), async (_req, res) => {
