@@ -1,5 +1,7 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
+
+const mockRequestAccess = jest.fn();
 
 jest.mock('@expo/vector-icons/Ionicons', () => 'Icon');
 jest.mock('../src/components/Screen', () => ({
@@ -16,7 +18,7 @@ jest.mock('../src/services/canonicalHealthSyncCoordinator', () => ({ useCanonica
   uploadState: 'SYNCED', availableMetricCount: 1, pendingUploadCount: 0, message: null,
   lifecycle: { lastHealthReadAtISO: '2026-11-13T08:00:00Z', lastSavedAtISO: '2026-11-13T08:00:00Z', lastUploadedAtISO: '2026-11-13T08:00:00Z' },
   metrics: [{ supported: true, queryState: 'DATA_AVAILABLE', observation: { metricType: 'steps', value: 3200, unit: 'count', measuredAtISO: '2026-11-13T08:00:00Z', sourceMetadata: {} }, definition: { metricKey: 'steps', displayName: 'Steps', backendCanonicalType: 'steps' } }],
-  activity: [], syncLocalMetrics: jest.fn(), requestAccess: jest.fn(), markPermissionReviewStarted: jest.fn()
+  activity: [], syncLocalMetrics: jest.fn(), requestAccess: mockRequestAccess, markPermissionReviewStarted: jest.fn()
 }) }));
 
 test('the HealthData route mounts the accepted dedicated connected-health experience on the canonical coordinator', () => {
@@ -31,8 +33,12 @@ test('the HealthData route mounts the accepted dedicated connected-health experi
   expect(screen.getByText('ACTIVITY')).toBeTruthy();
   expect(screen.getByText('Steps')).toBeTruthy();
   expect(screen.getByText('3,200 count')).toBeTruthy();
+  expect(screen.getByText('Sync')).toBeTruthy();
   expect(screen.getByText('Refresh Health Data')).toBeTruthy();
   expect(screen.queryByText('Some health signals are available')).toBeNull();
   expect(screen.queryByText('Sync Now')).toBeNull();
   expect(screen.queryByText('Sync Activity')).toBeNull();
+
+  fireEvent.press(screen.getByLabelText('Sync with Apple Health'));
+  expect(mockRequestAccess).toHaveBeenCalledTimes(1);
 });

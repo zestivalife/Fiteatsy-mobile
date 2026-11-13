@@ -79,7 +79,7 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
     void health.syncLocalMetrics();
   }, [health]);
 
-  const connect = useCallback(() => {
+  const syncWithHealthProvider = useCallback(() => {
     void health.requestAccess();
   }, [health]);
 
@@ -118,23 +118,25 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
         <Ionicons name={connected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={connected ? palette.success : palette.textMuted} />
       </View>
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Sync with ${health.sourceName}`}
+        accessibilityHint={`Requests permission to read supported health data from ${health.sourceName}, then starts syncing it.`}
+        disabled={refreshing}
+        onPress={syncWithHealthProvider}
+        style={({ pressed }) => [styles.syncButton, { backgroundColor: palette.blue, opacity: pressed || refreshing ? 0.7 : 1 }]}
+      >
+        {refreshing ? <ActivityIndicator color="#FFFFFF" /> : <Ionicons name="sync" size={20} color="#FFFFFF" />}
+        <Text style={styles.refreshText}>{refreshing ? 'Syncing…' : 'Sync'}</Text>
+      </Pressable>
+
       {!connected ? (
         <View style={[styles.connectCard, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
           <View style={[styles.connectIcon, { backgroundColor: palette.blueSoft }]}>
             <Ionicons name={Platform.OS === 'ios' ? 'heart' : 'fitness'} size={30} color={palette.blue} />
           </View>
           <Text style={[styles.connectTitle, { color: palette.textPrimary }]}>{health.sourceName} is not connected</Text>
-          <Text style={[styles.connectBody, { color: palette.textSecondary }]}>Connect to securely read only the health records you choose to share.</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Connect ${health.sourceName}`}
-            disabled={refreshing}
-            onPress={connect}
-            style={({ pressed }) => [styles.connectButton, { backgroundColor: palette.blue, opacity: pressed ? 0.7 : 1 }]}
-          >
-            {refreshing ? <ActivityIndicator color="#FFFFFF" /> : <Ionicons name="link-outline" size={20} color="#FFFFFF" />}
-            <Text style={styles.refreshText}>{refreshing ? 'Connecting…' : `Connect ${health.sourceName}`}</Text>
-          </Pressable>
+          <Text style={[styles.connectBody, { color: palette.textSecondary }]}>Tap Sync to choose the health records you want to share. Fiteatsy only requests read access.</Text>
           {health.message ? <Text style={[styles.connectError, { color: palette.textSecondary }]}>{health.message}</Text> : null}
         </View>
       ) : loading ? (
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
   connectIcon: { width: 60, height: 60, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   connectTitle: { ...typography.cardTitle, marginTop: spacing.md, textAlign: 'center' },
   connectBody: { ...typography.bodySmall, marginTop: spacing.xs, textAlign: 'center' },
-  connectButton: { width: '100%', minHeight: 52, marginTop: spacing.lg, paddingHorizontal: spacing.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  syncButton: { minHeight: 52, marginTop: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   connectError: { ...typography.bodySmall, marginTop: spacing.sm, textAlign: 'center' },
   list: { marginTop: spacing.lg, gap: 12 },
   sectionTitle: { ...typography.label, letterSpacing: 1.1, marginLeft: 6, marginTop: 8 },
