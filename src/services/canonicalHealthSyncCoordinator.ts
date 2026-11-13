@@ -21,6 +21,7 @@ import {
 import { getHealthIntelligenceV1, type HealthIntelligenceV1, type HealthScoreSummary } from './healthIntelligenceService';
 import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLocalHealthProviderConnected,
   migrateLegacyHealthInstallationId, readLocalHealthBootstrapSnapshot,
+  performApprovedStaleHealthQueueCleanup,
   persistLocalCanonicalHealthSnapshot,
   readLocalHealthAggregates, readLocalHealthLifecycle, readLocalHealthPresentationObservations,
   type HealthSyncLifecycleTimestamps } from './healthSyncLocalStore';
@@ -326,7 +327,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     if (!bootstrapped || !localScope) return;
     let active = true;
     Promise.all([
-      readLocalHealthBootstrapSnapshot(localScope),
+      performApprovedStaleHealthQueueCleanup(localScope).then(() => readLocalHealthBootstrapSnapshot(localScope)),
       readLocalHealthPresentationObservations(localScope)
     ]).then(([snapshot, presentations]) => {
         if (!active || !mounted.current) return;

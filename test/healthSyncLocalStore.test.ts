@@ -16,7 +16,8 @@ import { acknowledgeLocalObservations, countPendingLocalObservations, markLocalH
   readLocalHealthPresentationObservations, readLocalHealthProviderConnected,
   readLocalSyncCursors, readPendingLocalObservations, persistLocalCanonicalHealthSnapshot,
   readLocalCanonicalHealthSnapshot, recomputeLocalHealthAggregates, readLocalHealthAggregates,
-  ensureLocalHealthAggregatesCurrent, readLocalHealthBootstrapSnapshot } from '../src/services/healthSyncLocalStore';
+  ensureLocalHealthAggregatesCurrent, performApprovedStaleHealthQueueCleanup,
+  readLocalHealthBootstrapSnapshot } from '../src/services/healthSyncLocalStore';
 import { calculateCanonicalHealthIntelligence } from '../src/services/localHealthIntelligence';
 
 const observation = (value: number, deleted = false, recordId = 'record-1') => ({
@@ -70,6 +71,24 @@ describe('durable local health sync store', () => {
     expect(await readLocalHealthObservations(scope)).toEqual([observation(100)]);
     expect(await countPendingLocalObservations(scope)).toBe(1);
     expect(await readLocalHealthObservations('account:user-2:apple-health')).toEqual([]);
+  });
+
+  it('performs the approved cleanup once and deletes only old pending records', async () => {
+    const scope = 'account:user-cleanup:apple-health';
+    const oldPending = observation(100, false, 'old-pending');
+    const oldUploaded = observation(200, false, 'old-uploaded');
+    const newPending = observation(300, false, 'new-pending');
+    mockStorage.set(`@fiteatsy/health-sync-local-v2:${scope}`, JSON.stringify({
+      records: {
+        oldPending: { observation: oldPending, uploaded: false, updatedAtISO: '2026-11-13T10:34:45.000Z' },
+        oldUploaded: { observation: oldUploaded, uploaded: true, updatedAtISO: '2026-11-13T10:34:45.000Z' },
+        newPending: { observation: newPending, uploaded: false, updatedAtISO: '2026-11-13T10:35:01.000Z' }
+      }
+    }));
+    expect(await performApprovedStaleHealthQueueCleanup(scope)).toBe(1);
+    expect((await readLocalHealthObservations(scope)).map((item) => item.sourceRecordId).sort())
+      .toEqual(['new-pending', 'old-uploaded']);
+    expect(await performApprovedStaleHealthQueueCleanup(scope)).toBe(0);
   });
 
   it('hydrates a bounded startup projection without parsing the raw health store', async () => {

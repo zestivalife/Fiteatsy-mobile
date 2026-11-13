@@ -39,7 +39,7 @@ describe('Health Data Sync control-centre contracts', () => {
     ]) expect(screen).toContain(copy);
     expect(screen).toContain('Restoring saved health data…');
     expect(screen).toContain('health.localHydrated');
-    expect(screen).toContain('health.pendingUploadCount');
+    expect(screen).not.toContain('records are safely stored on this device and awaiting secure upload');
   });
 
   test('shows one canonical sync popup and surfaces connection/read failures', () => {

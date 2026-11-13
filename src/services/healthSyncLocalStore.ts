@@ -16,6 +16,10 @@ const legacyBootstrapKeyFor = (scope: string) => `@fiteatsy/health-sync-bootstra
 const INSTALLATION_KEY = '@fiteatsy/health-sync-installation-id';
 const PREVIOUS_INSTALLATION_KEY = '@fiteatsy/health-sync-local-v1:installation-id';
 const LEGACY_KEYS = ['@fiteatsy/wearable-installation-id', '@fiteatsy/wearable-last-foreground-sync'] as const;
+// User-authorized one-time cleanup: the screenshot identified the obsolete
+// 5,914-record queue at 2026-11-13T10:34:45Z. Never touch newer records.
+const APPROVED_STALE_QUEUE_CUTOFF_ISO = '2026-11-13T10:35:00.000Z';
+const approvedCleanupKeyFor = (scope: string) => `@fiteatsy/approved-health-queue-cleanup-2026-11-13:${scope}`;
 const identity = (item: HealthObservationDraft) => item.syncKey
   ?? `${item.sourceProvider}:${item.metricType}:${item.sourceRecordId ?? item.measuredAtISO}`;
 
@@ -124,6 +128,23 @@ export const countPendingLocalObservations = (scope: string) =>
   serializeScopeOperation(scope, async () => {
     const state = await readState(scope);
     return Object.values(state.records).filter((record) => !record.uploaded).length;
+  });
+
+export const performApprovedStaleHealthQueueCleanup = (scope: string) =>
+  serializeScopeOperation(scope, async () => {
+    const markerKey = approvedCleanupKeyFor(scope);
+    if (await AsyncStorage.getItem(markerKey)) return 0;
+    const state = await readState(scope);
+    let removed = 0;
+    for (const [recordKey, record] of Object.entries(state.records)) {
+      if (!record.uploaded && record.updatedAtISO <= APPROVED_STALE_QUEUE_CUTOFF_ISO) {
+        delete state.records[recordKey];
+        removed += 1;
+      }
+    }
+    await writeState(scope, state);
+    await AsyncStorage.setItem(markerKey, APPROVED_STALE_QUEUE_CUTOFF_ISO);
+    return removed;
   });
 
 export const readLocalHealthProviderConnected = (scope: string) =>

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -64,6 +64,7 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
   const palette = getThemeColors(themeMode);
   const health = useCanonicalHealthSyncCoordinator();
   const connected = health.providerState === 'CONNECTED';
+  const liveRefreshStarted = useRef(false);
   const loading = !health.localHydrated;
   const refreshing = health.metrics.some((metric) => metric.queryState === 'QUERYING');
 
@@ -92,6 +93,12 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
   const updatedAt = health.lifecycle.lastHealthReadAtISO
     ? new Date(health.lifecycle.lastHealthReadAtISO).toLocaleString()
     : null;
+
+  useEffect(() => {
+    if (!connected || !health.localHydrated || liveRefreshStarted.current) return;
+    liveRefreshStarted.current = true;
+    void health.syncLocalMetrics();
+  }, [connected, health]);
 
   return (
     <Screen
@@ -193,9 +200,6 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
       ) : null}
 
       {updatedAt ? <Text style={[styles.updatedAt, { color: palette.textMuted }]}>Last read: {updatedAt}</Text> : null}
-      {health.pendingUploadCount > 0 ? (
-        <Text style={[styles.pending, { color: palette.warning }]}>{health.pendingUploadCount} records are safely stored on this device and awaiting secure upload.</Text>
-      ) : null}
       {route.params?.entryContext === 'ONBOARDING' ? (
         <Pressable accessibilityRole="button" onPress={finishOnboarding} style={[styles.continueButton, { borderColor: palette.stroke }]}>
           <Text style={[styles.continueText, { color: palette.textPrimary }]}>{connected ? 'Continue' : 'Set Up Later'}</Text>
@@ -238,7 +242,6 @@ const styles = StyleSheet.create({
   refreshButton: { minHeight: 52, marginTop: spacing.lg, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   refreshText: { ...typography.button, color: '#FFFFFF' },
   updatedAt: { ...typography.subtext, marginTop: spacing.sm, textAlign: 'center' },
-  pending: { ...typography.subtext, marginTop: spacing.sm, textAlign: 'center' },
   continueButton: { minHeight: 52, marginTop: spacing.lg, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   continueText: typography.button
 });
