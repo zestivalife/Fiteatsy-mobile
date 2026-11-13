@@ -6,6 +6,7 @@ const migration=readFileSync(new URL('../../backend/src/db/migrations/0104_exter
 const health=readFileSync(new URL('../../backend/src/modules/external-clients/external-health-records.repository.ts',import.meta.url),'utf8');
 const transient=readFileSync(new URL('../../backend/src/modules/external-clients/external-transient-report.repository.ts',import.meta.url),'utf8');
 const routes=readFileSync(new URL('../../backend/src/modules/external-clients/external-clients.routes.ts',import.meta.url),'utf8');
+const authority=readFileSync(new URL('../../backend/src/modules/external-clients/external-client-resource-authority.ts',import.meta.url),'utf8');
 
 test('migration is additive and External-only',()=>{
   assert.match(migration,/create table if not exists external_health_records/);
@@ -51,8 +52,12 @@ test('comparison blocks incompatible units and uses neutral factual language',()
 });
 
 test('every endpoint resolves tenant-scoped External client authority',()=>{
-  assert.match(health,/tenantType==='ZESTIVA_INTERNAL'/);
-  assert.match(health,/id=\$1 and tenant_id=\$2 and deleted_at is null/);
+  assert.match(health,/resolveExternalClientResourceAuthority/);
+  assert.match(authority,/client\.id=\$1/);
+  assert.match(authority,/membership\.tenant_id=client\.tenant_id/);
+  assert.match(authority,/membership\.user_id=\$2/);
+  assert.match(authority,/membership\.tenant_role in \('OWNER','CONSULTANT'\)/);
+  assert.doesNotMatch(authority,/resolveActiveTenantContext/);
   assert.match(routes,/\/:id\/health-records\/compare/);
   assert.match(routes,/\/:id\/health-records\/:recordId\/remove/);
 });

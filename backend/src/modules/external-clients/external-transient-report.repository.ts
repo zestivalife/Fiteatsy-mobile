@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { pool } from '../../db/pool.js';
-import { resolveActiveTenantContext } from '../tenancy/tenant-context.js';
 import { analyzeReportBuffer } from '../reports/reports.service.js';
 import { ExternalClientError } from './external-clients.repository.js';
 import { mapExternalBiomarker } from './external-biomarker.domain.js';
@@ -9,6 +8,7 @@ import { validateExternalDocumentFile } from './external-client-documents.reposi
 import { externalReportReviewRedisCommand as redisCommand } from './external-report-review-store.js';
 import { readExternalSourceEvidence, traceExternalParameter } from './external-report-source-fidelity.js';
 import { createExternalHealthRecordForAnalysis } from './external-health-records.repository.js';
+import { resolveExternalClientResourceAuthority } from './external-client-resource-authority.js';
 
 const PROCESSING_VERSION='external-transient-biomarker-v1';
 const REVIEW_TTL_SECONDS=2*60*60;
@@ -16,7 +16,7 @@ const reviewKey=(analysisId:string)=>`fiteatsy:external-report-review:${analysis
 const digest=(value:string|Buffer)=>crypto.createHash('sha256').update(value).digest('hex');
 const stable=(value:unknown):string=>Array.isArray(value)?`[${value.map(stable).join(',')}]`:value&&typeof value==='object'?`{${Object.entries(value as Record<string,unknown>).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>`${JSON.stringify(key)}:${stable(item)}`).join(',')}}`:JSON.stringify(value);
 const audit=(db:any,tenantId:string,clientId:string,actor:string|null,event:string,metadata:object)=>db.query('insert into external_client_audit_events(id,tenant_id,client_id,actor_user_id,event_type,metadata) values($1,$2,$3,$4,$5,$6::jsonb)',[crypto.randomUUID(),tenantId,clientId,actor,event,JSON.stringify(metadata)]);
-const scope=async(account:AuthenticatedAccount,clientId:string)=>{const tenant=await resolveActiveTenantContext(account);if(!tenant||tenant.tenantType==='ZESTIVA_INTERNAL'||!['OWNER','CONSULTANT'].includes(tenant.currentMembershipRole))throw new ExternalClientError('EXTERNAL_REPORT_AUTHORITY_REQUIRED',403,'External practice authority is required.');const client=await pool.query('select id from external_clients where id=$1 and tenant_id=$2 and deleted_at is null',[clientId,tenant.tenantId]);if(!client.rowCount)throw new ExternalClientError('EXTERNAL_CLIENT_NOT_FOUND',404,'Client not found.');return tenant.tenantId;};
+const scope=(account:AuthenticatedAccount,clientId:string)=>resolveExternalClientResourceAuthority(account,clientId,'EXTERNAL_REPORT_AUTHORITY_REQUIRED');
 const rawReviewFields=(item:any)=>({rowIdentity:item.rowIdentity,canonicalId:item.canonicalId,canonicalCode:item.canonicalCode,canonicalName:item.canonicalName,canonicalStatus:item.canonicalStatus,rawName:item.rawName,rawValue:item.rawValue,rawUnit:item.rawUnit,rawRange:item.rawRange,rawFlag:item.rawFlag,rawSection:item.rawSection,numericValue:item.numericValue,canonicalUnit:item.canonicalUnit,referenceMin:item.referenceMin,referenceMax:item.referenceMax,referenceText:item.referenceText,labFlag:item.labFlag,observationDate:item.observationDate,dateSource:item.dateSource,extractionConfidence:item.extractionConfidence,mappingConfidence:item.mappingConfidence,panel:item.panel,provenance:item.provenance,sourcePage:item.sourcePage,sourceTestName:item.sourceTestName,sourceSectionPrecedence:item.sourceSectionPrecedence,sourceTraceable:item.sourceTraceable,bulkConfirmEligible:item.bulkConfirmEligible});
 
 type AnalysisScope={tenantId:string;clientId:string;actorId:string|null;uploadSource:'CLIENT_SELF_REPORTED'|'CONSULTANT_UPLOADED'};

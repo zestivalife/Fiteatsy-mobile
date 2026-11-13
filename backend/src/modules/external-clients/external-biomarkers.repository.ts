@@ -2,19 +2,14 @@ import crypto from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { AuthenticatedAccount } from '../auth/auth.repository.js';
 import { pool } from '../../db/pool.js';
-import { resolveActiveTenantContext } from '../tenancy/tenant-context.js';
 import { analyzeReportBuffer } from '../reports/reports.service.js';
 import { ExternalClientError } from './external-clients.repository.js';
 import { mapExternalBiomarker } from './external-biomarker.domain.js';
+import { resolveExternalClientResourceAuthority } from './external-client-resource-authority.js';
 
 const PROCESSING_VERSION = 'external-biomarker-v1';
-const scope = async (account: AuthenticatedAccount, clientId: string) => {
-  const tenant = await resolveActiveTenantContext(account);
-  if (!tenant || tenant.tenantType === 'ZESTIVA_INTERNAL' || !['OWNER', 'CONSULTANT'].includes(tenant.currentMembershipRole)) throw new ExternalClientError('EXTERNAL_BIOMARKER_AUTHORITY_REQUIRED', 403, 'External practice authority is required.');
-  const client = await pool.query('select id from external_clients where id=$1 and tenant_id=$2 and deleted_at is null', [clientId, tenant.tenantId]);
-  if (!client.rowCount) throw new ExternalClientError('EXTERNAL_CLIENT_NOT_FOUND', 404, 'Client not found.');
-  return tenant.tenantId;
-};
+const scope = (account: AuthenticatedAccount, clientId: string) =>
+  resolveExternalClientResourceAuthority(account, clientId, 'EXTERNAL_BIOMARKER_AUTHORITY_REQUIRED');
 const audit = (db: PoolClient, tenantId: string, clientId: string, actor: string|null, event: string, metadata: object) => db.query('insert into external_client_audit_events(id,tenant_id,client_id,actor_user_id,event_type,metadata) values($1,$2,$3,$4,$5,$6::jsonb)', [crypto.randomUUID(), tenantId, clientId, actor, event, JSON.stringify(metadata)]);
 const projection = (row: any) => ({ id: row.id, documentId: row.document_id, canonicalBiomarkerId: row.corrected_canonical_biomarker_id ?? row.canonical_biomarker_id, canonicalCode: row.corrected_canonical_code ?? row.canonical_code, name: row.corrected_canonical_name ?? row.canonical_name ?? row.raw_test_name, canonicalStatus: row.corrected_canonical_biomarker_id || row.canonical_biomarker_id ? 'MAPPED' : row.canonical_status, value: row.corrected_value ?? row.numeric_value ?? row.text_value, unit: row.corrected_unit ?? row.canonical_unit ?? row.raw_unit, referenceMin: row.corrected_reference_min ?? row.reference_min, referenceMax: row.corrected_reference_max ?? row.reference_max, referenceText: row.corrected_reference_text ?? row.reference_text, flag: row.lab_flag ?? 'UNKNOWN', observationDate: row.corrected_observation_date ?? row.observation_date, dateSource: row.date_source, source: row.source, confidence: row.extraction_confidence, mappingConfidence: row.mapping_confidence, reviewStatus: row.review_status, raw: { testName: row.raw_test_name, value: row.raw_value, unit: row.raw_unit, referenceRange: row.raw_reference_range, flag: row.raw_flag, section: row.raw_section }, reviewedAt: row.reviewed_at, createdAt: row.created_at, reportDownloadPath: `/v1/external/clients/${row.client_id}/documents/${row.document_id}/download` });
 
