@@ -9,6 +9,11 @@ public final class FiteatsyHealthKitModule: Module {
   private let anchoredReadLimit = 250
   private let store = HKHealthStore()
   private let iso = ISO8601DateFormatter()
+  private let fractionalISO: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+  }()
   private var observerQueries: [HKObserverQuery] = []
   private let metricsKey = "fiteatsy.healthkit.observerMetrics"
   private let logger = Logger(subsystem: "com.fiteatsy.health", category: "HealthKit")
@@ -113,8 +118,10 @@ public final class FiteatsyHealthKitModule: Module {
     AsyncFunction("readChanges") { (metric: String, anchorText: String?, startText: String?, promise: Promise) in
       guard let type = self.sampleType(metric) else { promise.reject("HEALTHKIT_UNSUPPORTED_METRIC", metric); return }
       let anchor = anchorText.flatMap { Data(base64Encoded: $0) }.flatMap { try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: $0) }
-      let start = startText.flatMap { self.iso.date(from: $0) }
-      let predicate = start.map { HKQuery.predicateForSamples(withStart: $0, end: nil, options: []) }
+      let start = startText.flatMap { self.parseISO($0) }
+      // Never let future-dated source records displace the live records the
+      // user can see in Apple Health today.
+      let predicate = start.map { HKQuery.predicateForSamples(withStart: $0, end: Date(), options: []) }
       // A first sync can contain a very large heart-rate history. Bound each
       // bridge response; HealthKit's returned anchor continues the next page.
       let query = HKAnchoredObjectQuery(type: type, predicate: predicate, anchor: anchor, limit: self.anchoredReadLimit) {
@@ -127,15 +134,35 @@ public final class FiteatsyHealthKitModule: Module {
         let rows = (samples ?? []).compactMap { self.serialize($0, metric: metric) }
         let deletedIds = (deleted ?? []).map { $0.uuid.uuidString }
         let anchorData = newAnchor.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
-        self.logger.info("HealthKit read completed for \(metric, privacy: .public); records=\(rows.count, privacy: .public)")
-        promise.resolve(["samples": rows, "deletedIds": deletedIds, "anchor": anchorData?.base64EncodedString() ?? "",
-          "hasMore": rows.count + deletedIds.count >= self.anchoredReadLimit])
+        let resolve = { (latestSamples: [HKSample]) in
+          var rowsById = Dictionary(uniqueKeysWithValues: rows.map { ($0["id"] as? String ?? UUID().uuidString, $0) })
+          latestSamples.compactMap { self.serialize($0, metric: metric) }.forEach { row in
+            if let id = row["id"] as? String { rowsById[id] = row }
+          }
+          let mergedRows = Array(rowsById.values)
+          self.logger.info("HealthKit read completed for \(metric, privacy: .public); records=\(mergedRows.count, privacy: .public)")
+          promise.resolve(["samples": mergedRows, "deletedIds": deletedIds,
+            "anchor": anchorData?.base64EncodedString() ?? "",
+            "hasMore": rows.count + deletedIds.count >= self.anchoredReadLimit])
+        }
+        guard start != nil else { resolve([]); return }
+        let latestSort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let latestQuery = HKSampleQuery(sampleType: type, predicate: predicate, limit: self.anchoredReadLimit,
+          sortDescriptors: [latestSort]) { _, latestSamples, latestError in
+          if let latestError = latestError as NSError? {
+            self.logger.error("HealthKit latest fallback failed for \(metric, privacy: .public); domain=\(latestError.domain, privacy: .public), code=\(latestError.code, privacy: .public)")
+            resolve([])
+            return
+          }
+          resolve(latestSamples ?? [])
+        }
+        self.store.execute(latestQuery)
       }
       self.store.execute(query)
     }
 
     AsyncFunction("readLatestSamples") { (metric: String, startText: String, requestedLimit: Int, promise: Promise) in
-      guard let type = self.sampleType(metric), let start = self.iso.date(from: startText) else {
+      guard let type = self.sampleType(metric), let start = self.parseISO(startText) else {
         promise.reject("HEALTHKIT_UNSUPPORTED_METRIC", metric)
         return
       }
@@ -159,7 +186,7 @@ public final class FiteatsyHealthKitModule: Module {
     AsyncFunction("readCumulativeStatistics") { (metric: String, startText: String, endText: String, promise: Promise) in
       guard let type = self.sampleType(metric) as? HKQuantityType,
             ["steps", "active_energy", "distance", "exercise_minutes"].contains(metric),
-            let start = self.iso.date(from: startText), let end = self.iso.date(from: endText) else {
+            let start = self.parseISO(startText), let end = self.parseISO(endText) else {
         promise.reject("HEALTHKIT_UNSUPPORTED_STATISTIC", metric)
         return
       }
@@ -188,6 +215,10 @@ public final class FiteatsyHealthKitModule: Module {
       }
       group.notify(queue: .main) { promise.resolve(ok) }
     }
+  }
+
+  private func parseISO(_ text: String) -> Date? {
+    fractionalISO.date(from: text) ?? iso.date(from: text)
   }
 
   private func requestStatusName(_ status: HKAuthorizationRequestStatus) -> String {

@@ -16,7 +16,7 @@ describe('end-to-end health data capture recovery contracts', () => {
   test('first Apple sync uses bounded backfill and incremental sync uses only valid anchors', () => {
     const apple = read('src/services/appleHealthService.ts');
     expect(apple).toContain('definition?.syncWindowDays');
-    expect(apple).toContain('options.forceBackfill || options.liveOnly || !pageAnchor ? start : undefined');
+    expect(apple).toContain('readHealthKitChanges(metric, pageAnchor, start)');
     expect(apple).toContain('options.forceBackfill || options.liveOnly ? undefined : anchors[metric]');
     expect(apple).toContain('result.samples.length > 0 || result.deletedIds.length > 0');
     expect(apple).not.toContain('new Date(null)');
@@ -99,7 +99,8 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(coordinator).not.toContain('ensureLocalHealthAggregatesCurrent');
     expect(coordinator).not.toContain('automaticInitialSyncStarted');
     expect(coordinator).toContain('refreshQueued.current = true');
-    expect(coordinator).toContain('void syncLocalMetrics()');
+    expect(coordinator).toContain('queuedSyncOptions.current');
+    expect(coordinator).toContain('void syncLocalMetrics(nextOptions)');
     expect(coordinator).not.toContain('NetInfo.addEventListener');
     expect(screen).toContain('HEALTHKIT_DAILY_CUMULATIVE_STATISTIC');
     for (const color of ['#FF5E1A','#0A84FF','#5E5CE6','#FF375F','#32D74B','#BF5AF2','#64D2FF']) {

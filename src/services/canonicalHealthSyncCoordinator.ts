@@ -74,6 +74,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const mounted = useRef(true);
   const inFlight = useRef(false);
   const refreshQueued = useRef(false);
+  const queuedSyncOptions = useRef<{ forceSourceBackfill?: boolean; liveOnly?: boolean }>({});
   const awaitingPermissionReturn = useRef(false);
   const foregroundRefreshAt = useRef(0);
   const forceBackfill = useRef(false);
@@ -144,6 +145,10 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     if (!authSession || !localScope) return;
     if (inFlight.current) {
       refreshQueued.current = true;
+      queuedSyncOptions.current = {
+        forceSourceBackfill: queuedSyncOptions.current.forceSourceBackfill || options.forceSourceBackfill,
+        liveOnly: queuedSyncOptions.current.liveOnly || options.liveOnly
+      };
       return;
     }
     inFlight.current = true;
@@ -254,7 +259,9 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       inFlight.current = false;
       if (refreshQueued.current) {
         refreshQueued.current = false;
-        setTimeout(() => void syncLocalMetrics(), 0);
+        const nextOptions = queuedSyncOptions.current;
+        queuedSyncOptions.current = {};
+        setTimeout(() => void syncLocalMetrics(nextOptions), 0);
       }
     }
   }, [adapter, authSession, localScope, mergeLocalObservations, mergePresentationObservations, refreshRemoteSnapshot, setSelectedDeviceId, setWellness, sourceName, status, wellness]);

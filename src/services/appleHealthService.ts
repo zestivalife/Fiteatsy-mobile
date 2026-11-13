@@ -116,8 +116,10 @@ export const syncFromAppleHealth = async (
         let latestReadFailed = false;
         const [page, latestSamples] = await Promise.all([
           withAppleHealthTimeout(
-            readHealthKitChanges(metric, pageAnchor,
-              options.forceBackfill || options.liveOnly || !pageAnchor ? start : undefined),
+            // Always constrain source reads to the metric's supported rolling
+            // window. The anchor still tracks changes/deletions, while the
+            // native fallback supplies newest samples for live presentation.
+            readHealthKitChanges(metric, pageAnchor, start),
             APPLE_HEALTH_METRIC_TIMEOUT_MS,
             `apple_health_metric_timeout:${metric}`
           ),
@@ -251,7 +253,8 @@ export const syncFromAppleHealth = async (
   const hrvMs = average(validValues(metricValues.hrv_sdnn_ms ?? []));
   const workoutMinutes = Math.max(sum(validValues(metricValues.workout_minutes ?? [])), sum(validValues(metricValues.active_minutes ?? [])));
   const activeEnergy = sum(validValues(metricValues.active_energy ?? []));
-  diagnostic('HEALTH_SYNC_COMPLETE', { durationMs: 0, status: observations.length ? 'SUCCESS' : 'NO_DATA' });
+  diagnostic('HEALTH_SYNC_COMPLETE', { durationMs: 0, status: observations.length ? 'SUCCESS' : 'NO_DATA',
+    observationCount: observations.length, presentationCount: presentationObservations.length });
   const metricStatuses = Object.values(statuses);
   return {deviceId:'ios-healthkit',brand:'Apple',model:'Apple Health',provider:'Apple Health',syncedAtISO:new Date().toISOString(),source:'api',
     metrics:{heartRateAvg:restingHeartRate,sleepHours:sleepMinutes > 0 ? sleepMinutes / 60 : null,
