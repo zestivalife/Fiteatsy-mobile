@@ -29,7 +29,7 @@ export interface HealthPlatformAdapter {
   requestAccess(): Promise<HealthAccessResult>;
   queryAllSupportedMetrics(
     checkpoints: Record<string, string>,
-    options?: { forceBackfill?: boolean }
+    options?: { forceBackfill?: boolean; liveOnly?: boolean }
   ): Promise<WearableSyncPayload & { anchors?: Record<string, string> }>;
   getSupportedMetricRegistry(): readonly string[];
 }
@@ -43,7 +43,7 @@ export const appleHealthAdapter: HealthPlatformAdapter = {
     return { supportedScopes: result.supportedScopes, grantedScopes: result.supportedScopes };
   },
   queryAllSupportedMetrics: (checkpoints, options) =>
-    syncFromAppleHealth(checkpoints, { forceBackfill: options?.forceBackfill }),
+    syncFromAppleHealth(checkpoints, { forceBackfill: options?.forceBackfill, liveOnly: options?.liveOnly }),
   getSupportedMetricRegistry: () => APPLE_HEALTH_QUERYABLE_METRICS.map((metric) => metric.metricKey)
 };
 

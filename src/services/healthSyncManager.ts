@@ -197,6 +197,7 @@ export const runHealthSync = async (
   governed?: { connectionId: string; provider: GovernedProvider; trigger: 'INITIAL_CONNECT' | 'MANUAL' | 'FOREGROUND_RESUME' | 'BACKGROUND' | 'RETRY'; localScope?: string },
   options: {
     forceSourceBackfill?: boolean;
+    liveOnly?: boolean;
     localScope?: string;
     onLocalComplete?: (result: {
       payload: WearableSyncPayload;
@@ -217,7 +218,7 @@ export const runHealthSync = async (
     const adapter = getHealthPlatformAdapter();
     if (adapter.appId !== appId) throw new Error('health_provider_not_available');
     payload = await withHealthSyncPipelineTimeout(
-      adapter.queryAllSupportedMetrics(localCursors, { forceBackfill: options.forceSourceBackfill }),
+      adapter.queryAllSupportedMetrics(localCursors, { forceBackfill: options.forceSourceBackfill, liveOnly: options.liveOnly }),
       'health_sync_native_read_timeout'
     );
     observations = deriveObservations(payload);

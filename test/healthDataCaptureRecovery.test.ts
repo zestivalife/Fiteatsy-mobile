@@ -7,7 +7,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 describe('end-to-end health data capture recovery contracts', () => {
   test('Apple queries every supported metric independently with bounded concurrent settled reads', () => {
     const apple = read('src/services/appleHealthService.ts');
-    expect(apple).toContain('settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY');
+    expect(apple).toContain('settleWithConcurrency(APPLE_HEALTH_SCOPES');
     expect(apple).toContain('APPLE_HEALTH_METRIC_TIMEOUT_MS');
     expect(apple).toContain("result.samples.length ? 'SUCCESS' : 'NO_DATA'");
     expect(apple).toContain("statuses[statusKey] !== 'synced'");

@@ -140,7 +140,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     }
   }, [adapter, localScope]);
 
-  const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean } = {}) => {
+  const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean; liveOnly?: boolean } = {}) => {
     if (!authSession || !localScope) return;
     if (inFlight.current) {
       refreshQueued.current = true;

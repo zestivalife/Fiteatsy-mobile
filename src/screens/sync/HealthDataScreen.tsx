@@ -77,7 +77,7 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
     }), [health.metrics]);
 
   const refresh = useCallback(() => {
-    void health.syncLocalMetrics();
+    void health.syncLocalMetrics({ liveOnly: true });
   }, [health]);
 
   const syncWithHealthProvider = useCallback(() => {
@@ -97,7 +97,7 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
   useEffect(() => {
     if (!connected || !health.localHydrated || liveRefreshStarted.current) return;
     liveRefreshStarted.current = true;
-    void health.syncLocalMetrics();
+    void health.syncLocalMetrics({ liveOnly: true });
   }, [connected, health]);
 
   return (

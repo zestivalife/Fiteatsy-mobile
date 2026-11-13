@@ -17,6 +17,7 @@ export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 8_000;
 // The returned anchor makes every transaction incremental, so subsequent
 // explicit syncs continue without sacrificing source records.
 export const APPLE_HEALTH_QUERY_CONCURRENCY = 3;
+export const APPLE_HEALTH_LIVE_QUERY_CONCURRENCY = APPLE_HEALTH_SCOPES.length;
 export const APPLE_HEALTH_MAX_PAGES_PER_METRIC = 1;
 const APPLE_HEALTH_STATUS_KEYS: Record<string, string> = {
   steps: 'steps', sleep_minutes: 'sleep', resting_heart_rate: 'heart_rate', heart_rate: 'heart_rate',
@@ -74,7 +75,7 @@ export const settleWithConcurrency = async <T, R>(
 
 export const syncFromAppleHealth = async (
   anchors: Record<string,string> = {},
-  options: { forceBackfill?: boolean } = {}
+  options: { forceBackfill?: boolean; liveOnly?: boolean } = {}
 ): Promise<WearableSyncPayload & { anchors: Record<string,string> }> => {
   const availabilityStartedAt = Date.now();
   if (Platform.OS !== 'ios' || !(await inspectAppleHealthAvailability())) throw new Error('apple_health_unavailable');
@@ -88,22 +89,21 @@ export const syncFromAppleHealth = async (
   // Statistics are independent of anchored change reads. Starting them here
   // prevents their timeout budget from being added after every read batch.
   const readStatistics = async () => {
-    const results: Array<{ metric: string; value: number | null; failed: boolean }> = [];
-    for (const metric of ['steps', 'active_energy', 'distance', 'exercise_minutes']) {
-    const startDate = new Date(); startDate.setHours(0, 0, 0, 0);
-    const start = startDate.toISOString();
-    try {
-      const statistic = await withAppleHealthTimeout(readHealthKitCumulativeStatistics(metric, start, new Date().toISOString()),
-        APPLE_HEALTH_METRIC_TIMEOUT_MS, `apple_health_statistics_timeout:${metric}`);
-      results.push({ metric, value: statistic.value, failed: false });
-    } catch {
-      results.push({ metric, value: null, failed: true });
-    }
-    }
-    return results;
+    return Promise.all(['steps', 'active_energy', 'distance', 'exercise_minutes'].map(async (metric) => {
+      const startDate = new Date(); startDate.setHours(0, 0, 0, 0);
+      const start = startDate.toISOString();
+      try {
+        const statistic = await withAppleHealthTimeout(readHealthKitCumulativeStatistics(metric, start, new Date().toISOString()),
+          APPLE_HEALTH_METRIC_TIMEOUT_MS, `apple_health_statistics_timeout:${metric}`);
+        return { metric, value: statistic.value, failed: false };
+      } catch {
+        return { metric, value: null, failed: true };
+      }
+    }));
   };
   const statisticsPromise = readStatistics();
-  const settledReads = await settleWithConcurrency(APPLE_HEALTH_SCOPES, APPLE_HEALTH_QUERY_CONCURRENCY, async (metric) => {
+  const settledReads = await settleWithConcurrency(APPLE_HEALTH_SCOPES,
+    options.liveOnly ? APPLE_HEALTH_LIVE_QUERY_CONCURRENCY : APPLE_HEALTH_QUERY_CONCURRENCY, async (metric) => {
     const definition = APPLE_HEALTH_QUERYABLE_METRICS.find((item) => item.appleHealthType === metric);
     const start = new Date(Date.now() - (definition?.syncWindowDays ?? 30) * 86400000).toISOString();
     const startedAt = Date.now();
@@ -115,7 +115,7 @@ export const syncFromAppleHealth = async (
       do {
         let latestReadFailed = false;
         const [page, latestSamples] = await Promise.all([
-          withAppleHealthTimeout(
+          options.liveOnly ? Promise.resolve({ samples: [], deletedIds: [], anchor: pageAnchor ?? '', hasMore: false }) : withAppleHealthTimeout(
             readHealthKitChanges(metric, pageAnchor,
               options.forceBackfill || !pageAnchor ? start : undefined),
             APPLE_HEALTH_METRIC_TIMEOUT_MS,
