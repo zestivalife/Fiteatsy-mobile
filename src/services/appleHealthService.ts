@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { enableHealthKitBackgroundDelivery, inspectHealthKitAuthorization, isHealthKitAvailable, readHealthKitChanges,
-  readHealthKitCumulativeStatistics, requestHealthKitAuthorization } from '../../modules/fiteatsy-healthkit';
+  readHealthKitCumulativeStatistics, readLatestHealthKitSamples, requestHealthKitAuthorization } from '../../modules/fiteatsy-healthkit';
+import type { HealthKitSample } from '../../modules/fiteatsy-healthkit';
 import type { HealthObservationDraft, WearableSyncPayload } from '../types';
 import { APPLE_HEALTH_QUERYABLE_METRICS, APPLE_HEALTH_READ_TYPES } from './healthMetricRegistry';
 
@@ -109,16 +110,27 @@ export const syncFromAppleHealth = async (
     diagnostic('METRIC_QUERY_START', { metric, durationMs: 0, status: 'CHECKING' });
     try {
       let pageAnchor = options.forceBackfill ? undefined : anchors[metric];
-      const samples = []; const deletedIds:string[] = [];
+      const samples: HealthKitSample[] = []; const deletedIds:string[] = [];
       let hasMore = false; let pagesRead = 0;
       do {
-        const page = await withAppleHealthTimeout(
-          readHealthKitChanges(metric, pageAnchor,
-            options.forceBackfill || !pageAnchor ? start : undefined),
-          APPLE_HEALTH_METRIC_TIMEOUT_MS,
-          `apple_health_metric_timeout:${metric}`
-        );
-        samples.push(...page.samples); deletedIds.push(...page.deletedIds);
+        const [page, latestSamples] = await Promise.all([
+          withAppleHealthTimeout(
+            readHealthKitChanges(metric, pageAnchor,
+              options.forceBackfill || !pageAnchor ? start : undefined),
+            APPLE_HEALTH_METRIC_TIMEOUT_MS,
+            `apple_health_metric_timeout:${metric}`
+          ),
+          withAppleHealthTimeout(
+            readLatestHealthKitSamples(metric, start, 250),
+            APPLE_HEALTH_METRIC_TIMEOUT_MS,
+            `apple_health_latest_metric_timeout:${metric}`
+          ).catch(() => [])
+        ]);
+        const samplesById = new Map(samples.map((sample) => [sample.id, sample]));
+        page.samples.forEach((sample) => samplesById.set(sample.id, sample));
+        latestSamples.forEach((sample) => samplesById.set(sample.id, sample));
+        samples.splice(0, samples.length, ...samplesById.values());
+        deletedIds.push(...page.deletedIds);
         pageAnchor = page.anchor; hasMore = page.hasMore; pagesRead += 1;
       } while (hasMore && pagesRead < APPLE_HEALTH_MAX_PAGES_PER_METRIC);
       const result = { samples, deletedIds, anchor: pageAnchor ?? '', hasMore };

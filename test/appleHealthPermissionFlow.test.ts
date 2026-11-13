@@ -86,6 +86,9 @@ describe('Apple Health physical-device permission flow', () => {
     expect(native).toContain('HealthKit authorization invoked');
     expect(native).toContain('HealthKit authorization completed');
     expect(native).toContain('HealthKit read completed');
+    expect(native).toContain('AsyncFunction("readLatestSamples")');
+    expect(native).toContain('HKSampleSortIdentifierEndDate');
+    expect(apple).toContain('readLatestHealthKitSamples(metric, start, 250)');
     expect(native).not.toContain('privacy: .private(mask: .none)');
   });
 });

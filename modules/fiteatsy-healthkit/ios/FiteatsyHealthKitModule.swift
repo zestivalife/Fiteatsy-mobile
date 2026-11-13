@@ -134,6 +134,28 @@ public final class FiteatsyHealthKitModule: Module {
       self.store.execute(query)
     }
 
+    AsyncFunction("readLatestSamples") { (metric: String, startText: String, requestedLimit: Int, promise: Promise) in
+      guard let type = self.sampleType(metric), let start = self.iso.date(from: startText) else {
+        promise.reject("HEALTHKIT_UNSUPPORTED_METRIC", metric)
+        return
+      }
+      let limit = min(max(requestedLimit, 1), self.anchoredReadLimit)
+      let predicate = HKQuery.predicateForSamples(withStart: start, end: nil, options: [])
+      let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+      let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: limit, sortDescriptors: [sort]) {
+        _, samples, error in
+        if let error = error as NSError? {
+          self.logger.error("HealthKit latest read failed for \(metric, privacy: .public); domain=\(error.domain, privacy: .public), code=\(error.code, privacy: .public)")
+          promise.reject("HEALTHKIT_LATEST_READ_FAILED", "Apple Health could not read recent \(metric)")
+          return
+        }
+        let rows = (samples ?? []).compactMap { self.serialize($0, metric: metric) }
+        self.logger.info("HealthKit latest read completed for \(metric, privacy: .public); records=\(rows.count, privacy: .public)")
+        promise.resolve(rows)
+      }
+      self.store.execute(query)
+    }
+
     AsyncFunction("readCumulativeStatistics") { (metric: String, startText: String, endText: String, promise: Promise) in
       guard let type = self.sampleType(metric) as? HKQuantityType,
             ["steps", "active_energy", "distance", "exercise_minutes"].contains(metric),

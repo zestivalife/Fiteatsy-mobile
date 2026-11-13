@@ -15,6 +15,7 @@ type FiteatsyHealthKitNativeModule = {
   getAuthorizationRequestStatus(metrics: string[]): Promise<HealthKitAuthorizationInspection>;
   requestAuthorization(metrics: string[]): Promise<HealthKitAuthorizationResult>;
   readChanges(metric: string, anchor: string | null, startAtISO: string | null): Promise<HealthKitReadResult>;
+  readLatestSamples(metric: string, startAtISO: string, limit: number): Promise<HealthKitSample[]>;
   readCumulativeStatistics(metric: string, startAtISO: string, endAtISO: string): Promise<HealthKitStatisticsResult>;
   enableBackgroundDelivery(metrics: string[]): Promise<boolean>;
   addListener(eventName: 'onHealthDataChanged', listener: (event: { metric?: string }) => void): EventSubscription;
@@ -60,6 +61,11 @@ export const inspectHealthKitAuthorization = async (metrics: string[]): Promise<
 export const readHealthKitChanges = (metric: string, anchor?: string, startAtISO?: string): Promise<HealthKitReadResult> =>
   nativeModule()?.readChanges(metric, anchor ?? null, startAtISO ?? null)
     ?? Promise.reject(new Error('FITEATSY_HEALTHKIT_NATIVE_MODULE_MISSING'));
+export const readLatestHealthKitSamples = (metric: string, startAtISO: string, limit = 250): Promise<HealthKitSample[]> => {
+  const native = nativeModule();
+  if (!native?.readLatestSamples) return Promise.reject(new Error('FITEATSY_HEALTHKIT_LATEST_READ_UNAVAILABLE'));
+  return native.readLatestSamples(metric, startAtISO, limit);
+};
 export const readHealthKitCumulativeStatistics = (metric: string, startAtISO: string, endAtISO: string): Promise<HealthKitStatisticsResult> => {
   const native = nativeModule();
   if (!native?.readCumulativeStatistics) return Promise.reject(new Error('FITEATSY_HEALTHKIT_STATISTICS_UNAVAILABLE'));
