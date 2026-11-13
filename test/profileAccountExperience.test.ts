@@ -37,7 +37,7 @@ describe('profile and account experience contract', () => {
     const screen = read('src/screens/profile/ConnectedHealthScreen.tsx');
     expect(screen).toContain("Platform.OS==='ios'?'Apple Health':'Health Connect'");
     expect(screen).toContain('useCanonicalHealthSyncCoordinator');
-    expect(screen).toContain("navigate('HealthDataSync'");
+    expect(screen).toContain("navigate('HealthData'");
   });
 
   test('profile rendering never contains screenshot fixture identities', () => {

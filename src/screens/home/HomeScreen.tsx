@@ -8,8 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
 import { AppBackground } from '../../components/AppBackground';
 import { ConsultantAccessPrompt } from '../../components/ConsultantAccessPrompt';
-import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
-import WearableSyncIcon from '../../assets/fiteatsy-home/wearable-sync.svg';
+import { HomeHealthActions } from '../../components/HomeHealthActions';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
 import ProgressDonutChartAsset from '../../assets/fiteatsy-home/progress-donut-chart.svg';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
@@ -341,22 +340,13 @@ export const HomeScreen = () => {
               onSelectMetric={setSelectedMetric}
             />
 
-            <View style={styles.actionRow}>
-              <ActionPill
-                label="Assist"
-                Icon={AssistIcon}
-                onPress={() => { void openAssist(); }}
-              />
-              <ActionPill
-                label={health.providerState === 'CONNECTED' ? 'Sync Health' : 'Connect Health'}
-                Icon={WearableSyncIcon}
-                onPress={() => {
-                  navigation.navigate('HealthDataSync');
-                }}
-              />
-              <ActionPill label="Health Reports" Icon={ReportsActionIcon} onPress={() => navigation.navigate('Reports')} />
-              <ActionPill label="Cycle" Icon={CycleActionIcon} onPress={() => navigation.navigate('Cycle')} />
-            </View>
+            <HomeHealthActions
+              onAssist={() => { void openAssist(); }}
+              onPlans={() => navigation.navigate('SubscriptionPlans', { source: 'subscription_management' })}
+              onMyFitness={() => navigation.navigate('HealthData', { entryContext: 'HOME' })}
+              onHealthReports={() => navigation.navigate('Reports')}
+              onCycle={() => navigation.navigate('Cycle')}
+            />
 
             <View style={styles.summaryRow}>
               <MedicationCard timeline={todayMedicationTimeline} onPress={() => navigation.navigate('MedicationCalendar')} />
@@ -431,21 +421,6 @@ const RecoveryTrend = ({ values, hasData }: { values: RecoveryTrendDay[]; hasDat
       })}
     </View>
   </View>
-);
-
-const ReportsActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
-  <Ionicons name="document-text-outline" size={Math.min(Number(width), Number(height))} color="#FFFFFF" />
-);
-
-const CycleActionIcon: SvgAsset = ({ width = 18, height = 18 }) => (
-  <Ionicons name="calendar-outline" size={Math.min(Number(width), Number(height))} color="#FFFFFF" />
-);
-
-const ActionPill = ({ label, Icon, onPress, disabled = false }: { label: string; Icon: SvgAsset; onPress: () => void; disabled?: boolean }) => (
-  <Pressable onPress={onPress} disabled={disabled} style={[styles.actionPill, disabled && { opacity:0.65 }]} accessibilityRole="button">
-    <Icon width={18} height={18} />
-    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.actionText}>{label}</Text>
-  </Pressable>
 );
 
 const RecoveryPanel = ({
@@ -808,33 +783,6 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#59616A'
-  },
-  actionRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    rowGap: 7
-  },
-  actionPill: {
-    minHeight: 44,
-    width: '49%',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#2B3137',
-    backgroundColor: '#171C21',
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8
-  },
-  actionText: {
-    color: '#FFFFFF',
-    fontFamily: font.bold,
-    fontSize: 10,
-    lineHeight: 13
   },
   recoveryPanel: {
     height: 320,

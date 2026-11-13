@@ -71,7 +71,7 @@ describe('bounded static app intro contract', () => {
       'SignIn',
       'FoodPreferences',
       'OnboardingAssessment',
-      'HealthDataSync',
+      'HealthData',
       'OnboardingBasics',
       'Main'
     ]) {

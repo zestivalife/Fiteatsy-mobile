@@ -11,7 +11,7 @@ import type { RootStackParamList } from '../../navigation/types';
 import { useCanonicalHealthSyncCoordinator, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
 import { useAppContext } from '../../state/AppContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'HealthDataSync'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'HealthData'>;
 type ExperienceStage = 'restoring' | 'intro' | 'ready' | 'syncing' | 'complete' | 'partial' | 'failed';
 type HealthDomain = { label: string; icon: keyof typeof Ionicons.glyphMap; metricKeys: string[] };
 
@@ -37,7 +37,7 @@ const when=(iso?:string|null)=>{if(!iso)return'Not synced yet';const date=new Da
 const shown=(item:HealthObservationDto)=>item.metricType==='sleep_minutes'?{value:(item.value/60).toFixed(1),unit:'hr'}:{value:new Intl.NumberFormat().format(item.value),unit:item.unit};
 const queryLabel=(state:string)=>({QUERYING:'Checking',DATA_AVAILABLE:'Synced',UPLOAD_PENDING:'Upload pending',TIMEOUT:'Timed out',ERROR:'Couldn’t read',NO_VISIBLE_DATA:'No recent data'}[state]??'No recent data');
 
-export const HealthDataSyncScreen=({navigation,route}:Props)=>{
+export const HealthDataScreen=({navigation,route}:Props)=>{
   const {themeMode,onboarding,setOnboarding,setWearableSetupCompleted}=useAppContext();
   const palette=getThemeColors(themeMode);const health=useCanonicalHealthSyncCoordinator();
   const [selected,setSelected]=useState<HealthObservationDto|null>(null);const [permissionHelp,setPermissionHelp]=useState(false);const [syncPopupVisible,setSyncPopupVisible]=useState(false);
@@ -64,7 +64,7 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   const reviewPermissions=useCallback(()=>{health.markPermissionReviewStarted();if(Platform.OS==='ios')setPermissionHelp(true);else void Linking.openSettings();},[health]);
   return <>
     <Screen scroll contentStyle={styles.content}>
-      <PageHeader title="Health Data Sync" onBack={()=>navigation.goBack()}/>
+      <PageHeader title="Health Data" onBack={()=>navigation.goBack()}/>
       <Card style={styles.experienceCard}>
         <Text style={[styles.eyebrow,{color:palette.blue}]}>{experience.eyebrow.toUpperCase()}</Text>
         <View style={[styles.heroIcon,{backgroundColor:experienceStage==='failed'?palette.dangerSoft:palette.blueSoft}]}>

@@ -25,13 +25,13 @@ jest.mock('../src/services/canonicalHealthSyncCoordinator', () => ({ useCanonica
   activity: [], syncLocalMetrics: jest.fn(), requestAccess: jest.fn(), markPermissionReviewStarted: jest.fn()
 }) }));
 
-test('the HealthDataSync route mounts the accepted dedicated connected-health experience on the canonical coordinator', () => {
-  const { HealthDataSyncScreen } = require('../src/screens/sync/CanonicalHealthDataSyncScreen');
-  const screen = render(React.createElement(HealthDataSyncScreen, {
+test('the HealthData route mounts the accepted dedicated connected-health experience on the canonical coordinator', () => {
+  const { HealthDataScreen } = require('../src/screens/sync/HealthDataScreen');
+  const screen = render(React.createElement(HealthDataScreen, {
     navigation: { goBack: jest.fn(), reset: jest.fn() }, route: { params: { entryContext: 'HOME' } }
   }));
 
-  expect(screen.getByText('Health Data Sync')).toBeTruthy();
+  expect(screen.getByText('Health Data')).toBeTruthy();
   expect(screen.getByText('Your health data is ready')).toBeTruthy();
   expect(screen.getByText('Apple Health')).toBeTruthy();
   expect(screen.getByText('Activity')).toBeTruthy();

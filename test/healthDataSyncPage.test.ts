@@ -5,15 +5,19 @@ const root = path.resolve(__dirname, '..');
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 
 describe('Health Data Sync control-centre contracts', () => {
-  test('routes connected users to the control centre and disconnected users to permission onboarding', () => {
+  test('routes My Fitness to the dedicated Health Data experience without an obsolete Sync action', () => {
     const home = read('src/screens/home/HomeScreen.tsx');
-    expect(home).toContain("navigation.navigate('HealthDataSync')");
-    expect(home).toContain("health.providerState === 'CONNECTED' ? 'Sync Health' : 'Connect Health'");
+    const actions = read('src/components/HomeHealthActions.tsx');
+    expect(home).toContain("navigation.navigate('HealthData', { entryContext: 'HOME' })");
+    expect(actions).toContain('label="My Fitness"');
+    expect(actions).not.toContain('Sync Health');
+    expect(actions).not.toContain('Connect Health');
     expect(home).toContain('useCanonicalHealthSyncCoordinator');
     expect(home).not.toContain('resolveHealthSyncRoute');
     expect(home).not.toContain("status.overallStatus === 'CONNECTED'");
-    expect(read('src/navigation/types.ts')).toContain("HealthDataSync: { entryContext?: 'ONBOARDING' | 'HOME' | 'SETTINGS'");
-    expect(read('src/navigation/AppNavigation.tsx')).toContain('<Stack.Screen name="HealthDataSync"');
+    expect(read('src/navigation/types.ts')).toContain("HealthData: { entryContext?: 'ONBOARDING' | 'HOME' | 'SETTINGS'");
+    expect(read('src/navigation/AppNavigation.tsx')).toContain('<Stack.Screen name="HealthData"');
+    expect(read('src/navigation/AppNavigation.tsx')).not.toContain('<Stack.Screen name="SyncWearable"');
   });
 
   test('uses the governed sync pipeline and does not fabricate unavailable metric values', () => {

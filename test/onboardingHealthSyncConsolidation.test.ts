@@ -50,10 +50,10 @@ describe('returning-user bootstrap and canonical Health Data Sync', () => {
     const navigation = read('src/navigation/AppNavigation.tsx');
     const assessment = read('src/screens/onboarding/OnboardingAssessmentScreen.tsx');
     const canonical = read('src/screens/sync/CanonicalHealthDataSyncScreen.tsx');
-    expect(navigation).toContain('<Stack.Screen name="HealthDataSync" component={HealthDataSyncScreen} />');
+    expect(navigation).toContain('<Stack.Screen name="HealthData" component={HealthDataScreen} />');
     expect(navigation).not.toContain('<Stack.Screen name="SyncWearable"');
-    expect(assessment).toContain("navigation.navigate('HealthDataSync', { entryContext: 'ONBOARDING' })");
-    expect(navigation).toContain("from '../screens/sync/CanonicalHealthDataSyncScreen'");
+    expect(assessment).toContain("navigation.navigate('HealthData', { entryContext: 'ONBOARDING' })");
+    expect(navigation).toContain("from '../screens/sync/HealthDataScreen'");
     expect(canonical).toContain('useCanonicalHealthSyncCoordinator');
     expect(canonical).not.toContain('HealthDataSyncExperience');
     expect(canonical).toContain('Health connection successful');

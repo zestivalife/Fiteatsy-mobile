@@ -77,7 +77,7 @@ export const SplashScreen = ({ navigation }: Props) => {
       return;
     }
     if (progress?.phase === 'connect') {
-      transitionTo(() => navigation.replace('HealthDataSync', { entryContext: 'ONBOARDING' }));
+      transitionTo(() => navigation.replace('HealthData', { entryContext: 'ONBOARDING' }));
       return;
     }
     if (progress?.phase === 'ready') {
