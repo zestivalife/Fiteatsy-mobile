@@ -22,6 +22,7 @@ import { getNutritionExperience, type NutritionExperience } from '../../services
 import {
   getHealthScoreHistory,
 } from '../../services/healthIntelligenceService';
+import { buildSevenDayRecoveryTrend, type RecoveryTrendDay } from '../../services/recoveryTrend';
 import type { Medication, MedicationLogStatus } from '../../types';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import { resolveClientFirstName } from '../../utils/clientIdentity';
@@ -33,7 +34,6 @@ import {
   type Pss10StressContext
 } from '../../utils/pss10StressContext';
 
-const trendDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DONUT_ASSET_SIZE = 236;
 const DONUT_VIEWBOX_SIZE = 276;
 const DONUT_ART_CENTER = 126;
@@ -138,7 +138,7 @@ export const HomeScreen = () => {
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('healthIntelligence');
   const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
-  const [recoveryTrend, setRecoveryTrend] = useState<number[]>([]);
+  const [recoveryTrend, setRecoveryTrend] = useState<RecoveryTrendDay[]>(() => buildSevenDayRecoveryTrend([]));
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
     buildPss10StressContext({ latestResult: null, previousResult: null, draft: null })
   );
@@ -216,19 +216,12 @@ export const HomeScreen = () => {
 
   const refreshHealthScores = useCallback(async () => {
     if (!hasAuthSession) {
-      setRecoveryTrend([]);
+      setRecoveryTrend(buildSevenDayRecoveryTrend([]));
       return;
     }
     try {
       const history = await getHealthScoreHistory('recovery');
-      setRecoveryTrend(
-        history.items
-          .filter((item) => item.scoreStatus === 'calculated' && item.scoreValue != null)
-          .sort((a, b) => (+new Date(a.calculatedAtISO)) - (+new Date(b.calculatedAtISO)))
-          .slice(-7)
-          .map((item) => normalizeScore(item.scoreValue))
-          .filter((score): score is number => score != null)
-      );
+      setRecoveryTrend(buildSevenDayRecoveryTrend(history.items));
     } catch {
       // Keep the last canonical trend while temporarily offline.
     }
@@ -296,7 +289,7 @@ export const HomeScreen = () => {
   ];
   const displayMetrics = metrics;
   const trendValues = recoveryTrend;
-  const hasTrendData = trendValues.length > 0;
+  const hasTrendData = trendValues.some((item) => item.score != null);
   const healthIntelligenceScore = normalizeScore(health.canonicalIntelligence?.scores.healthIntelligence.score);
 
   const selected = selectedMetric === 'healthIntelligence'
@@ -419,20 +412,20 @@ const HeaderIcon = ({ icon, onPress, badge }: { icon: keyof typeof Ionicons.glyp
   </Pressable>
 );
 
-const RecoveryTrend = ({ values, hasData }: { values: number[]; hasData: boolean }) => (
+const RecoveryTrend = ({ values, hasData }: { values: RecoveryTrendDay[]; hasData: boolean }) => (
   <View style={styles.trendCard}>
     <View style={styles.trendHeadingRow}>
       <Text style={styles.trendTitle}>7-Day Recovery</Text>
       {!hasData ? <Text style={styles.trendEmptyLabel}>Waiting for data</Text> : null}
     </View>
     <View style={styles.trendRow}>
-      {trendDays.map((day, index) => {
-        const value = values[index] ?? 0;
-        const tone = trendTone(hasData ? value : 0);
+      {values.map((day) => {
+        const value = day.score;
+        const tone = trendTone(value ?? 0);
         return (
-          <View key={`${day}-${index}`} style={styles.trendItem}>
-            {hasData ? <View style={[styles.trendPill, { backgroundColor: tone.bg }]}><Text style={[styles.trendValue, { color: tone.text }]}>{`${Math.round(value)}%`}</Text></View> : <View style={styles.trendEmptyDot} />}
-            <Text style={styles.trendDay}>{day}</Text>
+          <View key={day.dayKey} style={styles.trendItem}>
+            {value != null ? <View style={[styles.trendPill, { backgroundColor: tone.bg }]}><Text style={[styles.trendValue, { color: tone.text }]}>{`${value}%`}</Text></View> : <View style={styles.trendEmptyDot} />}
+            <Text style={styles.trendDay}>{day.dayLabel.slice(0, 1)}</Text>
           </View>
         );
       })}

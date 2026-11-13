@@ -12,6 +12,25 @@ import { useCanonicalHealthSyncCoordinator, type HealthObservationDto } from '..
 import { useAppContext } from '../../state/AppContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthDataSync'>;
+type ExperienceStage = 'restoring' | 'intro' | 'ready' | 'syncing' | 'complete' | 'partial' | 'failed';
+type HealthDomain = { label: string; icon: keyof typeof Ionicons.glyphMap; metricKeys: string[] };
+
+const healthDomains: HealthDomain[] = [
+  { label: 'Activity', icon: 'walk-outline', metricKeys: ['steps', 'distance', 'active_energy', 'exercise', 'workout'] },
+  { label: 'Sleep', icon: 'moon-outline', metricKeys: ['sleep'] },
+  { label: 'Heart', icon: 'heart-outline', metricKeys: ['heart_rate', 'resting_heart_rate'] },
+  { label: 'Recovery', icon: 'pulse-outline', metricKeys: ['hrv_sdnn', 'hrv_rmssd', 'respiratory_rate', 'spo2'] }
+];
+
+const experienceCopy: Record<ExperienceStage, { eyebrow: string; title: string; body: string }> = {
+  restoring: { eyebrow: 'Health connection', title: 'Restoring your health data', body: 'Loading the most recent health records saved securely on this device.' },
+  intro: { eyebrow: 'Health connection', title: 'Connect your health data', body: 'Choose read-only access to activity, sleep, heart and recovery records.' },
+  ready: { eyebrow: 'Connected', title: 'Health Data Connected', body: 'Access is ready. Sync to read the health categories you allowed.' },
+  syncing: { eyebrow: 'Sync in progress', title: 'Reading your health data', body: 'Reading supported records without replacing your previously saved health data.' },
+  complete: { eyebrow: 'Sync complete', title: 'Your health data is ready', body: 'Supported health records are available for Recovery and Tracker experiences.' },
+  partial: { eyebrow: 'Partial sync', title: 'Some health signals are available', body: 'Available records are preserved. Missing categories were not estimated or fabricated.' },
+  failed: { eyebrow: 'Sync needs attention', title: 'Your previous data is safe', body: 'This sync could not complete. Review access or try again without losing saved records.' }
+};
 const icons:Record<string,keyof typeof Ionicons.glyphMap>={steps:'footsteps-outline',distance:'navigate-outline',sleep:'moon-outline',heart_rate:'heart-outline',resting_heart_rate:'heart-circle-outline',hrv_sdnn:'pulse-outline',hrv_rmssd:'pulse-outline',active_energy:'flame-outline',exercise:'fitness-outline',workout:'barbell-outline',weight:'scale-outline',hydration:'water-outline',spo2:'water-outline',respiratory_rate:'cloud-outline'};
 const metricColors:Record<string,string>={steps:'#FF5E1A',distance:'#0A84FF',sleep:'#5E5CE6',heart_rate:'#FF375F',resting_heart_rate:'#FF375F',hrv_sdnn:'#FF375F',hrv_rmssd:'#FF375F',active_energy:'#FF5E1A',exercise:'#32D74B',workout:'#FF5E1A',weight:'#BF5AF2',hydration:'#32D74B',spo2:'#64D2FF',respiratory_rate:'#64D2FF'};
 const when=(iso?:string|null)=>{if(!iso)return'Not synced yet';const date=new Date(iso);if(Number.isNaN(date.getTime()))return'Not available';const minutes=Math.floor((Date.now()-date.getTime())/60000);return minutes<1?'Just now':minutes<60?`${minutes} min ago`:date.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});};
@@ -31,6 +50,13 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   const unavailableMetricCount=supportedMetrics.filter(metric=>metric.queryState==='NO_VISIBLE_DATA'||metric.queryState==='TIMEOUT'||metric.queryState==='ERROR').length;
   const localReadComplete=terminalMetricCount===supportedMetrics.length&&supportedMetrics.length>0;
   const noSupportedDataAvailable=localReadComplete&&health.availableMetricCount===0;
+  const experienceStage: ExperienceStage = !health.localHydrated ? 'restoring' : busy ? 'syncing' : failed ? 'failed'
+    : connected && health.availableMetricCount > 0 && unavailableMetricCount > 0 ? 'partial'
+    : connected && health.availableMetricCount > 0 ? 'complete' : connected ? 'ready' : 'intro';
+  const experience=experienceCopy[experienceStage];
+  const domainStatus=(domain:HealthDomain)=>{const states=health.metrics.filter(metric=>domain.metricKeys.includes(metric.definition.metricKey)&&metric.supported).map(metric=>metric.queryState);
+    if(states.some(state=>state==='QUERYING'))return'Checking';if(states.some(state=>state==='DATA_AVAILABLE'))return'Synced';
+    if(states.some(state=>state==='ERROR'||state==='TIMEOUT'))return'Needs attention';return connected?'No recent data':'Permission needed';};
   const syncErrorMessage=health.message??(timedOutCount?`${timedOutCount} health ${timedOutCount===1?'metric took':'metrics took'} too long to respond.`:readErrorCount?`${readErrorCount} health ${readErrorCount===1?'metric could':'metrics could'} not be read.`:'Health data could not be synced. Check your connection and try again.');
   useEffect(()=>{if(busy)setSyncPopupVisible(true);else if(failed||uploadPending)setSyncPopupVisible(true);},[busy,failed,uploadPending]);
   const startSync=useCallback(()=>{setSyncPopupVisible(true);void health.syncLocalMetrics();},[health]);
@@ -39,13 +65,22 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   return <>
     <Screen scroll contentStyle={styles.content}>
       <PageHeader title="Health Data Sync" onBack={()=>navigation.goBack()}/>
+      <Card style={styles.experienceCard}>
+        <Text style={[styles.eyebrow,{color:palette.blue}]}>{experience.eyebrow.toUpperCase()}</Text>
+        <View style={[styles.heroIcon,{backgroundColor:experienceStage==='failed'?palette.dangerSoft:palette.blueSoft}]}>
+          <Ionicons name={experienceStage==='restoring'||experienceStage==='syncing'?'sync-outline':experienceStage==='complete'?'checkmark-done-circle-outline':experienceStage==='failed'?'warning-outline':connected?'checkmark-circle-outline':'shield-checkmark-outline'} size={34} color={experienceStage==='failed'?palette.danger:connected?palette.success:palette.blue}/>
+        </View>
+        <Text style={[styles.heroTitle,{color:palette.textPrimary}]}>{experience.title}</Text>
+        <Text style={[styles.heroBody,{color:palette.textSecondary}]}>{experience.body}</Text>
+        <View style={styles.domainGrid}>{healthDomains.map(domain=>{const status=domainStatus(domain);const healthy=status==='Synced';return <View key={domain.label} style={[styles.domainRow,{borderColor:palette.stroke}]}><Ionicons name={domain.icon} size={20} color={healthy?palette.success:palette.textMuted}/><View style={styles.grow}><Text style={[styles.value,{color:palette.textPrimary}]}>{domain.label}</Text><Text style={[styles.caption,{color:healthy?palette.success:palette.textMuted}]}>{status}</Text></View></View>;})}</View>
+      </Card>
       <Card style={styles.connectionCard}>
         <View style={styles.row}><View style={[styles.sourceIcon,{backgroundColor:palette.blueSoft}]}><Ionicons name={Platform.OS==='ios'?'heart':'fitness'} size={24} color={palette.blue}/></View><View style={styles.grow}><Text style={[styles.title,{color:palette.textPrimary}]}>{health.sourceName}</Text><Text style={[styles.body,{color:connected?palette.success:palette.warning}]}>{health.providerLabel}</Text></View><View style={[styles.chip,{backgroundColor:connected?palette.successSoft:palette.warningSoft}]}><Text style={[styles.chipText,{color:connected?palette.success:palette.warning}]}>{health.providerLabel}</Text></View></View>
         <View style={styles.summary}><View><Text style={[styles.caption,{color:palette.textMuted}]}>Last health read</Text><Text style={[styles.value,{color:palette.textPrimary}]}>{health.localHydrated?when(health.lifecycle.lastHealthReadAtISO):'Restoring saved data…'}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>Saved on device {when(health.lifecycle.lastSavedAtISO)}</Text><Text style={[styles.caption,{color:palette.textMuted}]}>Uploaded {when(health.lifecycle.lastUploadedAtISO)}</Text></View><View><Text style={[styles.caption,{color:palette.textMuted}]}>Available metrics</Text><Text style={[styles.value,{color:palette.textPrimary}]}>{health.localHydrated?health.availableMetricCount:'—'}</Text></View></View>
         {!health.localHydrated?<View style={styles.hydrating}><Ionicons name="cloud-download-outline" size={22} color={palette.blue}/><Text style={[styles.body,{color:palette.textSecondary}]}>Restoring saved health data…</Text></View>:connected ? (
           <PrimaryButton title={busy ? 'Reading health data…' : 'Sync Now'} loading={busy} onPress={startSync} />
         ) : (
-          <PrimaryButton title="Request Health Access" onPress={() => void health.requestAccess()} />
+          <PrimaryButton title={`Connect ${health.sourceName}`} onPress={() => void health.requestAccess()} />
         )}
         <PrimaryButton title="Review Permissions" variant="secondary" onPress={reviewPermissions}/>
         {connected&&!busy?<Text style={[styles.message,{color:palette.success}]}>Automatic sync enabled</Text>:null}
@@ -74,4 +109,4 @@ export const HealthDataSyncScreen=({navigation,route}:Props)=>{
   </>;
 };
 
-const styles=StyleSheet.create({content:{paddingBottom:spacing.xxl},connectionCard:{gap:spacing.md,marginTop:spacing.md},row:{flexDirection:'row',alignItems:'center',gap:spacing.sm},sourceIcon:{width:48,height:48,borderRadius:radius.md,alignItems:'center',justifyContent:'center'},grow:{flex:1},title:{...typography.cardTitle},body:{...typography.body},caption:{...typography.caption},chip:{paddingHorizontal:spacing.sm,paddingVertical:spacing.xs,borderRadius:radius.pill},chipText:{...typography.badge},summary:{flexDirection:'row',justifyContent:'space-between'},value:{...typography.bodyStrong},message:{...typography.subtext,textAlign:'center'},hydrating:{minHeight:48,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:spacing.sm},section:{...typography.sectionTitle,marginTop:spacing.xl,marginBottom:spacing.sm},metric:{flexDirection:'row',alignItems:'center',gap:spacing.sm,marginBottom:spacing.sm},metricIcon:{width:40,height:40,borderRadius:radius.md,alignItems:'center',justifyContent:'center'},metricValue:{...typography.metricSmall,marginVertical:2},metricUnit:{...typography.subtext},activity:{flexDirection:'row',alignItems:'center',paddingVertical:spacing.sm},onboarding:{marginTop:spacing.xl},overlay:{flex:1,justifyContent:'flex-end'},sheet:{borderTopLeftRadius:radius.lg,borderTopRightRadius:radius.lg,padding:spacing.xl,gap:spacing.md},handle:{width:44,height:4,borderRadius:2,backgroundColor:'#94A3B8',alignSelf:'center'},detail:{...typography.metric},syncOverlay:{flex:1,alignItems:'center',justifyContent:'center',padding:spacing.xl},syncDialog:{width:'100%',maxWidth:420,borderWidth:1,borderRadius:radius.lg,padding:spacing.xl,alignItems:'center',gap:spacing.md},syncResultIcon:{width:64,height:64,borderRadius:radius.pill,alignItems:'center',justifyContent:'center'},syncTitle:{...typography.sectionTitle,textAlign:'center'},syncBody:{...typography.body,textAlign:'center'},syncProgress:{...typography.caption,textAlign:'center'},syncActions:{alignSelf:'stretch',gap:spacing.sm,marginTop:spacing.xs}});
+const styles=StyleSheet.create({content:{paddingBottom:spacing.xxl},experienceCard:{gap:spacing.sm,marginTop:spacing.md,alignItems:'center'},eyebrow:{...typography.badge,letterSpacing:1.2},heroIcon:{width:68,height:68,borderRadius:radius.pill,alignItems:'center',justifyContent:'center',marginTop:spacing.xs},heroTitle:{...typography.sectionTitle,textAlign:'center'},heroBody:{...typography.body,textAlign:'center',maxWidth:360},domainGrid:{width:'100%',marginTop:spacing.sm,gap:spacing.xs},domainRow:{minHeight:54,borderWidth:1,borderRadius:radius.md,paddingHorizontal:spacing.md,flexDirection:'row',alignItems:'center',gap:spacing.sm},connectionCard:{gap:spacing.md,marginTop:spacing.md},row:{flexDirection:'row',alignItems:'center',gap:spacing.sm},sourceIcon:{width:48,height:48,borderRadius:radius.md,alignItems:'center',justifyContent:'center'},grow:{flex:1},title:{...typography.cardTitle},body:{...typography.body},caption:{...typography.caption},chip:{paddingHorizontal:spacing.sm,paddingVertical:spacing.xs,borderRadius:radius.pill},chipText:{...typography.badge},summary:{flexDirection:'row',justifyContent:'space-between'},value:{...typography.bodyStrong},message:{...typography.subtext,textAlign:'center'},hydrating:{minHeight:48,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:spacing.sm},section:{...typography.sectionTitle,marginTop:spacing.xl,marginBottom:spacing.sm},metric:{flexDirection:'row',alignItems:'center',gap:spacing.sm,marginBottom:spacing.sm},metricIcon:{width:40,height:40,borderRadius:radius.md,alignItems:'center',justifyContent:'center'},metricValue:{...typography.metricSmall,marginVertical:2},metricUnit:{...typography.subtext},activity:{flexDirection:'row',alignItems:'center',paddingVertical:spacing.sm},onboarding:{marginTop:spacing.xl},overlay:{flex:1,justifyContent:'flex-end'},sheet:{borderTopLeftRadius:radius.lg,borderTopRightRadius:radius.lg,padding:spacing.xl,gap:spacing.md},handle:{width:44,height:4,borderRadius:2,backgroundColor:'#94A3B8',alignSelf:'center'},detail:{...typography.metric},syncOverlay:{flex:1,alignItems:'center',justifyContent:'center',padding:spacing.xl},syncDialog:{width:'100%',maxWidth:420,borderWidth:1,borderRadius:radius.lg,padding:spacing.xl,alignItems:'center',gap:spacing.md},syncResultIcon:{width:64,height:64,borderRadius:radius.pill,alignItems:'center',justifyContent:'center'},syncTitle:{...typography.sectionTitle,textAlign:'center'},syncBody:{...typography.body,textAlign:'center'},syncProgress:{...typography.caption,textAlign:'center'},syncActions:{alignSelf:'stretch',gap:spacing.sm,marginTop:spacing.xs}});

@@ -125,6 +125,18 @@ export const calculateCanonicalHealthIntelligenceFromAggregates=(aggregates:Cano
 export const hasCalculatedCanonicalScore = (snapshot: LocalCanonicalHealthSnapshot) =>
   Object.values(snapshot.scores).some((score) => finite(score.score));
 
+export const preferCanonicalHealthSnapshot = (
+  current: LocalCanonicalHealthSnapshot | null,
+  incoming: LocalCanonicalHealthSnapshot
+) => {
+  if (!current) return incoming;
+  const currentCalculated = hasCalculatedCanonicalScore(current);
+  const incomingCalculated = hasCalculatedCanonicalScore(incoming);
+  if (current.source === 'LOCAL_CANONICAL_INPUTS' && currentCalculated) return current;
+  if (!currentCalculated && incomingCalculated) return incoming;
+  return current;
+};
+
 export const markCanonicalSnapshotStale = (snapshot: LocalCanonicalHealthSnapshot): LocalCanonicalHealthSnapshot => ({
   ...snapshot,
   inputFreshness: 'STALE',

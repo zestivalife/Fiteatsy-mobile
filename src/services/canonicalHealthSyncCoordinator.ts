@@ -27,7 +27,7 @@ import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLoc
 import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
 import { buildPresentedHealthObservations, mergeHealthPresentationObservations } from './healthMetricPresentation';
 import { calculateCanonicalHealthIntelligenceFromAggregates, hasCalculatedCanonicalScore,
-  markCanonicalSnapshotStale, type LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
+  markCanonicalSnapshotStale, preferCanonicalHealthSnapshot, type LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
 import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 import { traceSessionLifecycle } from './sessionLifecycleTrace';
@@ -129,10 +129,9 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       });
       setActivity(nextActivity.items);
       const snapshot = serverSnapshot(nextIntelligence);
-      // A delayed server response must not replace the canonical local
-      // projection produced from a just-completed native read. The server
-      // snapshot remains a bootstrap fallback until local aggregates hydrate.
-      setCanonicalIntelligence((current) => current?.source === 'LOCAL_CANONICAL_INPUTS' ? current : snapshot);
+      // Preserve a calculated local projection from a just-completed native read,
+      // but allow a calculated server snapshot to replace an uncalculated local placeholder.
+      setCanonicalIntelligence((current) => preferCanonicalHealthSnapshot(current, snapshot));
       if (localScope) await persistLocalCanonicalHealthSnapshot(localScope, snapshot);
     } catch {
       // Backend availability is not provider availability. Local reads stay usable.
