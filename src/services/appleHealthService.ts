@@ -8,15 +8,15 @@ import { APPLE_HEALTH_QUERYABLE_METRICS, APPLE_HEALTH_READ_TYPES } from './healt
 export const APPLE_HEALTH_SCOPES = APPLE_HEALTH_READ_TYPES;
 export const APPLE_HEALTH_AVAILABILITY_TIMEOUT_MS = 5_000;
 export const APPLE_HEALTH_PERMISSION_TIMEOUT_MS = 20_000;
-// Thirteen reads run serially. Keep the worst-case local read budget
+// Thirteen reads run in bounded groups of three. Keep the worst-case local read budget
 // below HEALTH_SYNC_PIPELINE_TIMEOUT_MS even when every native query times out.
-export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 3_000;
-// Keep the native-to-JS transfer deliberately small. A first HealthKit read can
+export const APPLE_HEALTH_METRIC_TIMEOUT_MS = 8_000;
+// Keep each native-to-JS transfer deliberately small. A first HealthKit read can
 // contain years of dense heart-rate samples; retaining several 2,500-record
 // pages for three metrics at once caused >1.6 GiB resident memory and Jetsam.
 // The returned anchor makes every transaction incremental, so subsequent
 // explicit syncs continue without sacrificing source records.
-export const APPLE_HEALTH_QUERY_CONCURRENCY = 1;
+export const APPLE_HEALTH_QUERY_CONCURRENCY = 3;
 export const APPLE_HEALTH_MAX_PAGES_PER_METRIC = 1;
 const APPLE_HEALTH_STATUS_KEYS: Record<string, string> = {
   steps: 'steps', sleep_minutes: 'sleep', resting_heart_rate: 'heart_rate', heart_rate: 'heart_rate',
@@ -88,16 +88,16 @@ export const syncFromAppleHealth = async (
   // Statistics are independent of anchored change reads. Starting them here
   // prevents their timeout budget from being added after every read batch.
   const readStatistics = async () => {
-    const results: Array<{ metric: string; value: number | null }> = [];
+    const results: Array<{ metric: string; value: number | null; failed: boolean }> = [];
     for (const metric of ['steps', 'active_energy', 'distance', 'exercise_minutes']) {
     const startDate = new Date(); startDate.setHours(0, 0, 0, 0);
     const start = startDate.toISOString();
     try {
       const statistic = await withAppleHealthTimeout(readHealthKitCumulativeStatistics(metric, start, new Date().toISOString()),
         APPLE_HEALTH_METRIC_TIMEOUT_MS, `apple_health_statistics_timeout:${metric}`);
-      results.push({ metric, value: statistic.value });
+      results.push({ metric, value: statistic.value, failed: false });
     } catch {
-      results.push({ metric, value: null });
+      results.push({ metric, value: null, failed: true });
     }
     }
     return results;
@@ -113,6 +113,7 @@ export const syncFromAppleHealth = async (
       const samples: HealthKitSample[] = []; const deletedIds:string[] = [];
       let hasMore = false; let pagesRead = 0;
       do {
+        let latestReadFailed = false;
         const [page, latestSamples] = await Promise.all([
           withAppleHealthTimeout(
             readHealthKitChanges(metric, pageAnchor,
@@ -124,13 +125,17 @@ export const syncFromAppleHealth = async (
             readLatestHealthKitSamples(metric, start, 250),
             APPLE_HEALTH_METRIC_TIMEOUT_MS,
             `apple_health_latest_metric_timeout:${metric}`
-          ).catch(() => [])
+          ).catch(() => {
+            latestReadFailed = true;
+            return [];
+          })
         ]);
         const samplesById = new Map(samples.map((sample) => [sample.id, sample]));
         page.samples.forEach((sample) => samplesById.set(sample.id, sample));
         latestSamples.forEach((sample) => samplesById.set(sample.id, sample));
         samples.splice(0, samples.length, ...samplesById.values());
         deletedIds.push(...page.deletedIds);
+        if (!samples.length && latestReadFailed) throw new Error(`apple_health_latest_metric_failed:${metric}`);
         pageAnchor = page.anchor; hasMore = page.hasMore; pagesRead += 1;
       } while (hasMore && pagesRead < APPLE_HEALTH_MAX_PAGES_PER_METRIC);
       const result = { samples, deletedIds, anchor: pageAnchor ?? '', hasMore };
@@ -215,7 +220,7 @@ export const syncFromAppleHealth = async (
   // product totals while anchored source rows remain available for audit.
   const statisticEndISO = new Date().toISOString();
   const statisticStartDate = new Date(); statisticStartDate.setHours(0, 0, 0, 0);
-  (await statisticsPromise).forEach(({ metric, value }) => {
+  (await statisticsPromise).forEach(({ metric, value, failed }) => {
     // Older installed native builds may not expose statistics yet. Anchored
     // values remain truthful fallback data until the next native build.
     if (value != null) {
@@ -228,6 +233,10 @@ export const syncFromAppleHealth = async (
           sourceRecordId:`daily-total:${metric}:${statisticStartDate.toISOString().slice(0,10)}`,
           qualityStatus:'accepted',sourceMetadata:{recordType:metric,measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'}});
       }
+    }
+    if (failed) {
+      const statusKey = APPLE_HEALTH_STATUS_KEYS[metric] ?? metric;
+      if (statuses[statusKey] !== 'synced') statuses[statusKey] = 'read_failed';
     }
   });
   void withAppleHealthTimeout(enableHealthKitBackgroundDelivery(APPLE_HEALTH_SCOPES), 5_000,

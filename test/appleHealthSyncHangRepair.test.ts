@@ -51,7 +51,7 @@ describe('Apple Health sync hang repair', () => {
 
   test('network reachability cannot recursively restart native HealthKit collection', () => {
     expect(coordinator).not.toContain('NetInfo.addEventListener');
-    expect(apple).toContain('APPLE_HEALTH_QUERY_CONCURRENCY = 1');
+    expect(apple).toContain('APPLE_HEALTH_QUERY_CONCURRENCY = 3');
   });
 
   test('ends blocking UI at durable local completion rather than backend upload completion', () => {

@@ -96,7 +96,7 @@ export class HealthSyncPostUploadRefreshError extends Error {
   }
 }
 
-export const HEALTH_SYNC_PIPELINE_TIMEOUT_MS = 45_000;
+export const HEALTH_SYNC_PIPELINE_TIMEOUT_MS = 90_000;
 // Keep rich observation payloads comfortably below Express' default 100 KB
 // JSON body limit. First-sync heart-rate samples carry source metadata and can
 // exceed that boundary when the previous 250-record chunk is used.
