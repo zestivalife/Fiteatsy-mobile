@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Platform, ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Platform, ScrollView, StyleProp, StyleSheet, View, ViewStyle, type RefreshControlProps } from 'react-native';
 import { spacing } from '../design/tokens';
 import { AppBackground } from './AppBackground';
 
@@ -8,12 +8,14 @@ export const Screen = ({
   children,
   scroll = false,
   contentStyle,
-  keyboardShouldPersistTaps = 'handled'
+  keyboardShouldPersistTaps = 'handled',
+  refreshControl
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
   keyboardShouldPersistTaps?: 'always' | 'never' | 'handled';
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }) => {
   return (
     <AppBackground>
@@ -25,6 +27,7 @@ export const Screen = ({
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps={keyboardShouldPersistTaps}
             nestedScrollEnabled
+            refreshControl={refreshControl}
             showsVerticalScrollIndicator={false}
           >{children}</ScrollView>
         ) : (

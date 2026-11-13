@@ -5,14 +5,8 @@ jest.mock('@expo/vector-icons/Ionicons', () => 'Icon');
 jest.mock('../src/components/Screen', () => ({
   Screen: ({ children }: { children: React.ReactNode }) => require('react').createElement(require('react-native').View, null, children)
 }));
-jest.mock('../src/components/Card', () => ({
-  Card: ({ children }: { children: React.ReactNode }) => require('react').createElement(require('react-native').View, null, children)
-}));
-jest.mock('../src/components/PageHeader', () => ({
-  PageHeader: ({ title }: { title: string }) => require('react').createElement(require('react-native').Text, null, title)
-}));
-jest.mock('../src/components/PrimaryButton', () => ({
-  PrimaryButton: ({ title }: { title: string }) => require('react').createElement(require('react-native').Text, null, title)
+jest.mock('../src/components/AppBackButton', () => ({
+  AppBackButton: () => require('react').createElement(require('react-native').Text, null, 'Back')
 }));
 jest.mock('../src/state/AppContext', () => ({ useAppContext: () => ({
   themeMode: 'dark', onboarding: null, setOnboarding: jest.fn(), setWearableSetupCompleted: jest.fn()
@@ -32,12 +26,13 @@ test('the HealthData route mounts the accepted dedicated connected-health experi
   }));
 
   expect(screen.getByText('Health Data')).toBeTruthy();
-  expect(screen.getByText('Your health data is ready')).toBeTruthy();
-  expect(screen.getByText('Apple Health')).toBeTruthy();
-  expect(screen.getByText('Activity')).toBeTruthy();
-  expect(screen.getByText('Sleep')).toBeTruthy();
-  expect(screen.getByText('Heart')).toBeTruthy();
-  expect(screen.getByText('Recovery')).toBeTruthy();
-  expect(screen.getByText('Sync Now')).toBeTruthy();
-  expect(screen.getByText('Your Health Data')).toBeTruthy();
+  expect(screen.getByText('Live data available from Apple Health')).toBeTruthy();
+  expect(screen.getByText('Read-only data from this iPhone')).toBeTruthy();
+  expect(screen.getByText('ACTIVITY')).toBeTruthy();
+  expect(screen.getByText('Steps')).toBeTruthy();
+  expect(screen.getByText('3,200 count')).toBeTruthy();
+  expect(screen.getByText('Refresh Health Data')).toBeTruthy();
+  expect(screen.queryByText('Some health signals are available')).toBeNull();
+  expect(screen.queryByText('Sync Now')).toBeNull();
+  expect(screen.queryByText('Sync Activity')).toBeNull();
 });
