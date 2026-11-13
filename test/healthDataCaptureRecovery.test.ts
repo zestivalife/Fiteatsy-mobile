@@ -16,8 +16,8 @@ describe('end-to-end health data capture recovery contracts', () => {
   test('first Apple sync uses bounded backfill and incremental sync uses only valid anchors', () => {
     const apple = read('src/services/appleHealthService.ts');
     expect(apple).toContain('definition?.syncWindowDays');
-    expect(apple).toContain('options.forceBackfill || !pageAnchor ? start : undefined');
-    expect(apple).toContain('options.forceBackfill ? undefined : anchors[metric]');
+    expect(apple).toContain('options.forceBackfill || options.liveOnly || !pageAnchor ? start : undefined');
+    expect(apple).toContain('options.forceBackfill || options.liveOnly ? undefined : anchors[metric]');
     expect(apple).toContain('result.samples.length > 0 || result.deletedIds.length > 0');
     expect(apple).not.toContain('new Date(null)');
   });

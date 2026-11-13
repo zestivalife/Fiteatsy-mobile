@@ -109,15 +109,15 @@ export const syncFromAppleHealth = async (
     const startedAt = Date.now();
     diagnostic('METRIC_QUERY_START', { metric, durationMs: 0, status: 'CHECKING' });
     try {
-      let pageAnchor = options.forceBackfill ? undefined : anchors[metric];
+      let pageAnchor = options.forceBackfill || options.liveOnly ? undefined : anchors[metric];
       const samples: HealthKitSample[] = []; const deletedIds:string[] = [];
       let hasMore = false; let pagesRead = 0;
       do {
         let latestReadFailed = false;
         const [page, latestSamples] = await Promise.all([
-          options.liveOnly ? Promise.resolve({ samples: [], deletedIds: [], anchor: pageAnchor ?? '', hasMore: false }) : withAppleHealthTimeout(
+          withAppleHealthTimeout(
             readHealthKitChanges(metric, pageAnchor,
-              options.forceBackfill || !pageAnchor ? start : undefined),
+              options.forceBackfill || options.liveOnly || !pageAnchor ? start : undefined),
             APPLE_HEALTH_METRIC_TIMEOUT_MS,
             `apple_health_metric_timeout:${metric}`
           ),
@@ -135,7 +135,9 @@ export const syncFromAppleHealth = async (
         latestSamples.forEach((sample) => samplesById.set(sample.id, sample));
         samples.splice(0, samples.length, ...samplesById.values());
         deletedIds.push(...page.deletedIds);
-        if (!samples.length && latestReadFailed) throw new Error(`apple_health_latest_metric_failed:${metric}`);
+        if (!samples.length && latestReadFailed) {
+          diagnostic('METRIC_RECENT_QUERY_FALLBACK', { metric, durationMs: Date.now() - startedAt, status: 'FALLBACK_EMPTY' });
+        }
         pageAnchor = page.anchor; hasMore = page.hasMore; pagesRead += 1;
       } while (hasMore && pagesRead < APPLE_HEALTH_MAX_PAGES_PER_METRIC);
       const result = { samples, deletedIds, anchor: pageAnchor ?? '', hasMore };
