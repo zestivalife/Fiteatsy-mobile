@@ -16,7 +16,7 @@ describe('Journey and Tracker UI consistency', () => {
 
   test('keeps the canonical five-node Star Orb contract', () => {
     const source = read('src/screens/home/HomeScreen.tsx');
-    expect(source).toContain("key: 'recovery'");
+    expect(source).toContain("key: 'mind'");
     expect(source).toContain("key: 'activity'");
     expect(source).toContain("key: 'nourishment'");
     expect(source).toContain("key: 'sleep'");

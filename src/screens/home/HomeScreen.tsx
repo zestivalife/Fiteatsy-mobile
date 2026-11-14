@@ -59,7 +59,7 @@ type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Journey'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
-type MetricKey = 'healthIntelligence' | 'recovery' | 'sleep' | 'activity' | 'nourishment' | 'calm';
+type MetricKey = 'healthIntelligence' | 'mind' | 'sleep' | 'activity' | 'nourishment' | 'calm';
 type SvgAsset = React.FC<SvgProps>;
 type RecoveryMetric = {
   key: Exclude<MetricKey, 'healthIntelligence'>;
@@ -112,11 +112,11 @@ const arcGradientForMetric = (key: MetricKey) => {
       return ['#FF8A1E', '#A74200'];
     case 'nourishment':
       return ['#96FF45', '#2F9400'];
-    case 'calm':
+    case 'mind':
       return ['#9B70FF', '#763CEF'];
     case 'sleep':
       return ['#2E92FF', '#0643B5'];
-    case 'recovery':
+    case 'calm':
     case 'healthIntelligence':
     default:
       return ['#F4052D', '#8C071E'];
@@ -246,12 +246,12 @@ export const HomeScreen = () => {
   // score authority.
   const metrics: RecoveryMetric[] = [
     {
-      key: 'recovery',
-      label: 'Recovery',
-      score: normalizeScore(health.canonicalIntelligence?.scores.recovery.score),
+      key: 'calm',
+      label: 'Calm',
+      score: normalizeScore(health.canonicalIntelligence?.scores.calm.score),
       color: '#FF1717',
       position: 'recovery',
-      icon: 'heart-outline'
+      icon: 'leaf-outline'
     },
     {
       key: 'activity',
@@ -270,12 +270,12 @@ export const HomeScreen = () => {
       icon: 'nutrition-outline'
     },
     {
-      key: 'calm',
-      label: 'Calm',
-      score: normalizeScore(health.canonicalIntelligence?.scores.calm.score),
+      key: 'mind',
+      label: 'Mind',
+      score: normalizeScore(health.canonicalIntelligence?.scores.mind.score),
       color: '#763CEF',
       position: 'calm',
-      icon: 'leaf-outline'
+      icon: 'bulb-outline'
     },
     {
       key: 'sleep',
@@ -296,7 +296,7 @@ export const HomeScreen = () => {
     : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' };
   const frameworkByMetric = health.canonicalIntelligence ? {
     healthIntelligence: health.canonicalIntelligence.scores.healthIntelligence,
-    recovery: health.canonicalIntelligence.scores.recovery,
+    mind: health.canonicalIntelligence.scores.mind,
     sleep: health.canonicalIntelligence.scores.sleep,
     activity: health.canonicalIntelligence.scores.activity,
     nourishment: health.canonicalIntelligence.scores.nutrition,
@@ -449,11 +449,13 @@ const RecoveryPanel = ({
   const [arcStart, arcEnd] = arcGradientForMetric(selectedMetric);
 
   useEffect(() => {
-    Animated.timing(scoreArcProgress, {
+    const animation = Animated.timing(scoreArcProgress, {
       toValue: clampedScore,
       duration: 620,
       useNativeDriver: false
-    }).start();
+    });
+    animation.start();
+    return () => animation.stop();
   }, [clampedScore, scoreArcProgress]);
 
   return (

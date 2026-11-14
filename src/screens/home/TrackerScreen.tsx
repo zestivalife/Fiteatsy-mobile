@@ -57,9 +57,9 @@ type MetricConfig = {
   kind: MetricKind;
   color: string;
   values: number[];
-  latestValue: number;
+  latestValue: number | null;
   compareValues: number[];
-  recoveryImpact: 'Supporting Recovery' | 'Neutral' | 'Reducing Recovery' | 'Needs Attention' | 'Positive';
+  recoveryImpact: 'Supporting Recovery' | 'Neutral' | 'Reducing Recovery' | 'Needs Attention' | 'Positive' | 'Pending';
   signalState: 'Improving' | 'Stable' | 'Declining' | 'Recovering' | 'Overloaded' | 'Settling';
   freshness: 'Synced Recently' | 'Manual Input' | 'No Recent Data' | 'Calibration Mode';
   confidence: 'High' | 'Moderate' | 'Low';
@@ -923,7 +923,7 @@ const MetricSparkCard = ({
   subtitle: string;
   data: number[];
   color: string;
-  value: number;
+  value: number | null;
   unit: string;
   icon: string;
   signalState: string;
@@ -998,7 +998,7 @@ const MetricSparkCard = ({
         </View>
 
         <Animated.Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }, { transform: [{ scale: pulse }] }]}> 
-          {selected ? selected.value : value} {unit}
+          {selected ? selected.value : value == null ? '—' : value} {value == null && !selected ? '' : unit}
         </Animated.Text>
         <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#FFFFFF' }]} numberOfLines={1}>
           {signalState} • {recoveryImpact}
@@ -1015,6 +1015,7 @@ const MetricBarsCard = ({
   title,
   subtitle,
   bars,
+  value,
   color,
   icon,
   unit,
@@ -1029,6 +1030,7 @@ const MetricBarsCard = ({
   title: string;
   subtitle: string;
   bars: number[];
+  value: number | null;
   color: string;
   icon: string;
   unit: string;
@@ -1095,7 +1097,7 @@ const MetricBarsCard = ({
         </View>
 
         <Text style={[styles.metricValue, { color: isLight ? '#000000' : '#FFFFFF' }]}>
-          {bars[selectedBar]} {unit}
+          {bars[selectedBar] ?? value ?? '—'} {bars[selectedBar] == null && value == null ? '' : unit}
         </Text>
         <Text style={[styles.metricMeta, { color: isLight ? '#1F2937' : '#FFFFFF' }]} numberOfLines={1}>
           {signalState} • {recoveryImpact}
@@ -1251,7 +1253,8 @@ export const TrackerScreen = () => {
     return 'Stable';
   };
 
-  const impactState = (score: number): MetricConfig['recoveryImpact'] => {
+  const impactState = (score: number | null | undefined): MetricConfig['recoveryImpact'] => {
+    if (score == null || !Number.isFinite(score)) return 'Pending';
     if (recoveryIntel.isCalibrating) return 'Needs Attention';
     if (score >= 75) return 'Supporting Recovery';
     if (score >= 55) return 'Neutral';
@@ -1330,10 +1333,10 @@ export const TrackerScreen = () => {
       kind: 'spark',
       color: '#60AF00',
       values: observationSeries(['resting_heart_rate', 'heart_rate']),
-      latestValue: restingHeartRateValue ?? 0,
+      latestValue: restingHeartRateValue,
       compareValues: observationSeries(['resting_heart_rate', 'heart_rate']),
       signalState: trendState(observationSeries(['resting_heart_rate', 'heart_rate'])),
-      recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
+      recoveryImpact: impactState(displayScores?.recovery.score),
       freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='resting_heart_rate')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     },
@@ -1346,10 +1349,10 @@ export const TrackerScreen = () => {
       kind: 'bars',
       color: '#60AF00',
       values: observationSeries(['workout_minutes', 'active_minutes']),
-      latestValue: workoutMinutesValue ?? 0,
+      latestValue: workoutMinutesValue,
       compareValues: observationSeries(['workout_minutes', 'active_minutes']),
       signalState: trendState(observationSeries(['workout_minutes', 'active_minutes'])),
-      recoveryImpact: impactState(displayScores?.activity.score ?? 0),
+      recoveryImpact: impactState(displayScores?.activity.score),
       freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='workout')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     },
@@ -1362,10 +1365,10 @@ export const TrackerScreen = () => {
       kind: 'spark',
       color: '#60AF00',
       values: observationSeries(['hrv_sdnn_ms', 'hrv_rmssd_ms']),
-      latestValue: hrvValue ?? 0,
+      latestValue: hrvValue,
       compareValues: observationSeries(['hrv_sdnn_ms', 'hrv_rmssd_ms']),
       signalState: trendState(observationSeries(['hrv_sdnn_ms', 'hrv_rmssd_ms'])),
-      recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
+      recoveryImpact: impactState(displayScores?.recovery.score),
       freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey.startsWith('hrv_'))?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     },
@@ -1378,10 +1381,10 @@ export const TrackerScreen = () => {
       kind: 'bars',
       color: '#60AF00',
       values: scoreSeries('sleep'),
-      latestValue: sleepScoreValue ?? 0,
+      latestValue: sleepScoreValue,
       compareValues: scoreSeries('sleep'),
       signalState: trendState(scoreSeries('sleep')),
-      recoveryImpact: impactState(sleepScoreValue ?? 0),
+      recoveryImpact: impactState(sleepScoreValue),
       freshness: statusToFreshness(health.metrics.find(item=>item.definition.metricKey==='sleep')?.queryState==='DATA_AVAILABLE'?'synced':undefined),
       confidence: confidenceState()
     }
@@ -1397,10 +1400,10 @@ export const TrackerScreen = () => {
       kind: 'spark',
       color: '#60AF00',
       values: scoreSeries('recovery'),
-      latestValue: displayScores?.recovery.score ?? 0,
+      latestValue: displayScores?.recovery.score ?? null,
       compareValues: scoreSeries('recovery'),
       signalState: trendState(scoreSeries('recovery')),
-      recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
+      recoveryImpact: impactState(displayScores?.recovery.score),
       freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Synced Recently',
       confidence: confidenceState()
     },
@@ -1413,10 +1416,10 @@ export const TrackerScreen = () => {
       kind: 'bars',
       color: '#60AF00',
       values: scoreSeries('stress_resilience'),
-      latestValue: displayScores?.stressRecovery.score ?? 0,
+      latestValue: displayScores?.stressRecovery.score ?? null,
       compareValues: scoreSeries('stress_resilience'),
       signalState: trendState(scoreSeries('stress_resilience')),
-      recoveryImpact: impactState(displayScores?.stressRecovery.score ?? 0),
+      recoveryImpact: impactState(displayScores?.stressRecovery.score),
       freshness: recoveryIntel.questionnaireAvailable ? 'Synced Recently' : 'No Recent Data',
       confidence: confidenceState()
     },
@@ -1429,10 +1432,10 @@ export const TrackerScreen = () => {
       kind: 'spark',
       color: '#60AF00',
       values: scoreSeries('calm'),
-      latestValue: displayScores?.calm.score ?? 0,
+      latestValue: displayScores?.calm.score ?? null,
       compareValues: scoreSeries('calm'),
       signalState: trendState(scoreSeries('calm')),
-      recoveryImpact: impactState(displayScores?.calm.score ?? 0),
+      recoveryImpact: impactState(displayScores?.calm.score),
       freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Manual Input',
       confidence: confidenceState()
     },
@@ -1445,10 +1448,10 @@ export const TrackerScreen = () => {
       kind: 'bars',
       color: '#60AF00',
       values: scoreSeries('recovery'),
-      latestValue: displayScores?.recovery.score ?? 0,
+      latestValue: displayScores?.recovery.score ?? null,
       compareValues: scoreSeries('recovery'),
       signalState: trendState(scoreSeries('recovery')),
-      recoveryImpact: impactState(displayScores?.recovery.score ?? 0),
+      recoveryImpact: impactState(displayScores?.recovery.score),
       freshness: recoveryIntel.isCalibrating ? 'Calibration Mode' : 'Synced Recently',
       confidence: confidenceState()
     }
@@ -1458,7 +1461,7 @@ export const TrackerScreen = () => {
     const source = activeTab === 'health' ? healthMetrics : wellnessMetrics;
     const scored = source.map((metric) => {
       const impactRank = metric.recoveryImpact === 'Needs Attention' ? 4 : metric.recoveryImpact === 'Reducing Recovery' ? 3 : metric.recoveryImpact === 'Neutral' ? 2 : 1;
-      return { metric, score: impactRank * 100 + (100 - metric.latestValue) };
+      return { metric, score: impactRank * 100 + (metric.latestValue == null ? 0 : 100 - metric.latestValue) };
     });
     const primaryKey = scored.sort((a, b) => b.score - a.score)[0]?.metric.key;
     return source.map((metric) => ({ ...metric, primary: metric.key === primaryKey }));
@@ -1822,6 +1825,7 @@ export const TrackerScreen = () => {
                     icon={metric.icon}
                     color={metric.color}
                     bars={metric.values}
+                    value={metric.latestValue}
                     unit={metric.unit}
                     signalState={metric.signalState}
                     recoveryImpact={metric.recoveryImpact}

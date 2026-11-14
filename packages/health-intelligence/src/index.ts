@@ -13,9 +13,12 @@ const clamp=(v:number)=>Math.max(0,Math.min(100,v));
 const weighted=(key:string,values:Values,weights:Record<string,number>,pending:string[]=[],notApplicable:string[]=[],freshness:ScoreResult['freshness']='CURRENT'):ScoreResult=>{
  const expected=Object.keys(weights),used=expected.filter(k=>finite(values[k])),missing=expected.filter(k=>!used.includes(k)&&!notApplicable.includes(k));
  const unresolved=missing.filter(k=>pending.includes(k));const availableWeight=used.reduce((s,k)=>s+weights[k],0);
- const raw=availableWeight?used.reduce((s,k)=>s+(values[k] as number)*weights[k],0)/availableWeight:null;
+ // Only NOT_APPLICABLE inputs may redistribute their weight. Missing applicable
+ // inputs remain fail-closed so a partial data set cannot produce a misleading
+ // parent score. Clamp each governed component before applying its weight.
+ const raw=!missing.length&&availableWeight?used.reduce((s,k)=>s+clamp(values[k] as number)*weights[k],0)/availableWeight:null;
  const completeness=used.length/Math.max(1,expected.length-notApplicable.length);const confidence:Confidence=freshness==='STALE'?'LOW':completeness===1?'HIGH':completeness>=.5?'MODERATE':'LOW';
- const status:ScoreStatus=freshness==='STALE'&&raw!==null?'STALE':unresolved.length?'METHODOLOGY_PENDING':raw===null?'INSUFFICIENT_DATA':missing.length?'PARTIAL':'CALCULATED';
+ const status:ScoreStatus=freshness==='STALE'&&raw!==null?'STALE':unresolved.length?'METHODOLOGY_PENDING':raw===null?'INSUFFICIENT_DATA':'CALCULATED';
  return {key,score:status==='METHODOLOGY_PENDING'||status==='INSUFFICIENT_DATA'?null:Number(clamp(raw as number).toFixed(2)),status,confidence,trend:null,
   inputsUsed:used,inputsMissing:missing,inputsNotApplicable:notApplicable,methodologyPending:unresolved,contributingFactors:used,
   recommendedActions:[],explanation:unresolved.length?`Methodology pending: ${unresolved.join(', ')}.`:raw===null?'Insufficient canonical data.':`Calculated from ${used.join(', ')}${missing.length?`; missing ${missing.join(', ')}`:''}.`,

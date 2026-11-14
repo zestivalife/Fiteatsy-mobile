@@ -37,7 +37,7 @@ describe('grievance, profile photo and home presentation contracts',()=>{
     const home=read('src/screens/home/HomeScreen.tsx');
     expect(home).not.toContain("key: 'cycleWellness'");
     expect(home).not.toContain("position: 'bottomCenter'");
-    expect(home).toContain("key: 'recovery'");expect(home).toContain("key: 'activity'");expect(home).toContain("key: 'nourishment'");expect(home).toContain("key: 'calm'");expect(home).toContain("key: 'sleep'");
+    expect(home).toContain("key: 'mind'");expect(home).toContain("key: 'activity'");expect(home).toContain("key: 'nourishment'");expect(home).toContain("key: 'calm'");expect(home).toContain("key: 'sleep'");
     expect(home).toContain('marginTop: 8');
   });
 
