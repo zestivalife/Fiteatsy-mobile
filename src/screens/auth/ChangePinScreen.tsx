@@ -6,16 +6,17 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { getThemeColors, radius, shadows, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
-import { AuthServiceError, changePin } from '../../services/authService';
+import { AuthServiceError, changePin, createLoginPin } from '../../services/authService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChangePin'>;
 
 const PIN_LENGTH = 6;
 
 export const ChangePinScreen = ({ navigation, route }: Props) => {
-  const { authSession, themeMode } = useAppContext();
+  const { authSession, markLoginPinSetupComplete, themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
   const force = route.params?.force === true;
+  const setup = route.params?.mode === 'setup';
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmNewPin, setConfirmNewPin] = useState('');
@@ -27,7 +28,7 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
   const confirmPinRef = useRef<TextInput>(null);
 
   const valid =
-    currentPin.length === PIN_LENGTH &&
+    (setup || currentPin.length === PIN_LENGTH) &&
     newPin.length === PIN_LENGTH &&
     confirmNewPin.length === PIN_LENGTH &&
     newPin === confirmNewPin &&
@@ -48,13 +49,20 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
     setSuccess(null);
     setSaving(true);
     try {
-      await changePin(authSession.sessionToken, {
-        currentPin,
-        newPin,
-        confirmNewPin
-      });
-      setSuccess('PIN changed successfully.');
-      navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+      if (setup) {
+        await createLoginPin(authSession.sessionToken, { newPin, confirmNewPin });
+        await markLoginPinSetupComplete();
+        setSuccess('Login PIN created successfully.');
+        navigation.reset({ index: 0, routes: [{ name: 'OnboardingBasics' }] });
+      } else {
+        await changePin(authSession.sessionToken, {
+          currentPin,
+          newPin,
+          confirmNewPin
+        });
+        setSuccess('PIN changed successfully.');
+        navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+      }
     } catch (e) {
       const err = e as AuthServiceError;
       console.error('[ChangePinScreen] CHANGE PIN FAILED', {
@@ -109,20 +117,22 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
           <Text style={[styles.kicker, { color: palette.blue }]}>Security</Text>
           <Text style={[styles.title, { color: palette.textPrimary }]}>
-            {force ? 'Please create your personal PIN' : 'Change PIN'}
+            {setup ? 'Create your login PIN' : force ? 'Please create your personal PIN' : 'Change PIN'}
           </Text>
           <Text style={[styles.body, { color: palette.textSecondary }]}>
-            Use exactly 6 digits. Do not reuse the temporary default PIN.
+            {setup
+              ? 'Use exactly 6 digits. This PIN signs you into Fiteatsy; it is separate from a consultant Connection PIN.'
+              : 'Use exactly 6 digits. Do not reuse the temporary default PIN.'}
           </Text>
 
-          {renderPinInput('Current PIN', currentPin, setCurrentPin, force ? '123456' : 'Current PIN', currentPinRef, newPinRef)}
+          {!setup ? renderPinInput('Current PIN', currentPin, setCurrentPin, force ? '123456' : 'Current PIN', currentPinRef, newPinRef) : null}
           {renderPinInput('New PIN', newPin, setNewPin, 'New 6 digit PIN', newPinRef, confirmPinRef)}
           {renderPinInput('Confirm New PIN', confirmNewPin, setConfirmNewPin, 'Confirm PIN', confirmPinRef)}
 
           {error ? <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text> : null}
           {success ? <Text style={[styles.successText, { color: palette.success }]}>{success}</Text> : null}
 
-          <PrimaryButton title={saving ? 'Saving...' : 'Save PIN'} onPress={submit} disabled={!valid} />
+          <PrimaryButton title={saving ? 'Saving...' : setup ? 'Create Login PIN' : 'Save PIN'} onPress={submit} disabled={!valid} />
           {!force ? (
             <Pressable accessibilityRole="button" onPress={() => navigation.goBack()}>
               <Text style={[styles.secondaryLink, { color: palette.textSecondary }]}>Cancel</Text>

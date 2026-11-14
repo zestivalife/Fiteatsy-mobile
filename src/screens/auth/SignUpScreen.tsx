@@ -222,7 +222,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
         createdAtISO: previous?.createdAtISO ?? new Date().toISOString()
       }));
       try {
-        navigation.reset({ index: 0, routes: [{ name: 'OnboardingBasics' }] });
+        navigation.reset({ index: 0, routes: [{ name: 'ChangePin', params: { mode: 'setup', force: true } }] });
       } catch (navigationError) {
         console.error('[SignUpScreen] OTP VERIFY NAVIGATION FAILED', {
           errorMessage: navigationError instanceof Error ? navigationError.message : String(navigationError),

@@ -28,6 +28,7 @@ type ApiErrorCode =
 
 export type AuthSessionResponse = {
   sessionToken: string;
+  requiresPinSetup?: boolean;
   requiresPinChange?: boolean;
   user: {
     id: string;
@@ -46,6 +47,8 @@ export type CurrentAuthSession = {
   accountId: string;
   sessionId: string;
   sessionExpiresAtISO: string;
+  requiresPinSetup?: boolean;
+  requiresPinChange?: boolean;
   client: {
     fiteatsyClientId: string;
     status: string;
@@ -279,6 +282,15 @@ export const changePin = (sessionToken: string, params: { currentPin: string; ne
     body: JSON.stringify(params)
   });
 
+export const createLoginPin = (sessionToken: string, params: { newPin: string; confirmNewPin: string }) =>
+  requestJson<{ ok: true }>('/v1/auth/create-pin', {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify(params)
+  });
+
 export const resendSignupOtp = (challengeId: string) =>
   requestJson<SignupOtpResponse>('/v1/auth/signup/resend-otp', {
     method: 'POST',
@@ -306,6 +318,8 @@ export const buildSessionFromAuthResponse = (session: AuthSessionResponse): Curr
     accountId: session.user.id,
     sessionId: `fresh-login:${session.user.id}`,
     sessionExpiresAtISO: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    requiresPinSetup: session.requiresPinSetup,
+    requiresPinChange: session.requiresPinChange,
     client: {
       fiteatsyClientId: session.client.fiteatsyClientId,
       status: session.client.status

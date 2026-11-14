@@ -55,6 +55,11 @@ export const SplashScreen = ({ navigation }: Props) => {
       return;
     }
 
+    if (authSession?.requiresPinSetup) {
+      transitionTo(() => navigation.replace('ChangePin', { mode: 'setup', force: true }));
+      return;
+    }
+
     // A returning user's remotely unresolved onboarding state must never reopen
     // onboarding or block the authenticated shell. UNKNOWN is not INCOMPLETE.
     if (onboardingStatus === 'UNKNOWN') {
@@ -96,6 +101,7 @@ export const SplashScreen = ({ navigation }: Props) => {
     transitionTo(() => navigation.replace('Main'));
   }, [
     authSession?.client.fiteatsyClientId,
+    authSession?.requiresPinSetup,
     isAuthenticated,
     navigation,
     onboardingResumeStep,

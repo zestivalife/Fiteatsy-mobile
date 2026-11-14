@@ -126,6 +126,7 @@ type AppContextValue = {
   authSession: StoredAuthSession | null;
   isAuthenticated: boolean;
   completeAuthentication: (session: AuthSessionResponse) => Promise<void>;
+  markLoginPinSetupComplete: () => Promise<void>;
   checkIns: DailyCheckIn[];
   submitCheckIn: (checkIn: Omit<DailyCheckIn, 'dateISO'> & { stressLevel?: 1 | 2 | 3 | 4 | 5 }) => Promise<void>;
   hasCheckedInToday: boolean;
@@ -512,6 +513,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     })();
   }, [clearPersistedAuth, persistAuthSession]);
+
+  const markLoginPinSetupComplete = useCallback(async () => {
+    if (!authSession) return;
+    await persistAuthSession({
+      ...authSession,
+      requiresPinSetup: false,
+      requiresPinChange: false
+    });
+  }, [authSession, persistAuthSession]);
 
   useEffect(() => {
     registerAccessTokenProvider(() => authSession?.sessionToken ?? null);
@@ -1748,6 +1758,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       authSession,
       isAuthenticated,
       completeAuthentication,
+      markLoginPinSetupComplete,
       checkIns,
       submitCheckIn,
       hasCheckedInToday,
@@ -1812,6 +1823,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       hasCheckedInToday,
       isAuthenticated,
       completeAuthentication,
+      markLoginPinSetupComplete,
       logNudgeAction,
       logout,
       markMedicationAction,
