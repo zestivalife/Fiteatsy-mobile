@@ -1,16 +1,26 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Alert, Animated, Easing, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Path, Stop, SvgProps } from 'react-native-svg';
 import { AppBackground } from '../../components/AppBackground';
 import { ConsultantAccessPrompt } from '../../components/ConsultantAccessPrompt';
 import { HomeHealthActions } from '../../components/HomeHealthActions';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
 import ProgressDonutChartAsset from '../../assets/fiteatsy-home/progress-donut-chart.svg';
+import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-inactive.svg';
+import ActivityActiveIcon from '../../assets/fiteatsy-home/activity-selected.svg';
+import NutritionDefaultIcon from '../../assets/fiteatsy-home/nutrition-inactive.svg';
+import NutritionActiveIcon from '../../assets/fiteatsy-home/nutrition-selected.svg';
+import MindDefaultIcon from '../../assets/fiteatsy-home/mind-inactive.svg';
+import MindActiveIcon from '../../assets/fiteatsy-home/mind-selected.svg';
+import SleepDefaultIcon from '../../assets/fiteatsy-home/sleep-inactive.svg';
+import SleepActiveIcon from '../../assets/fiteatsy-home/sleep-selected.svg';
+import CalmDefaultIcon from '../../assets/fiteatsy-home/calm-inactive.svg';
+import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
@@ -33,20 +43,22 @@ import {
   type Pss10StressContext
 } from '../../utils/pss10StressContext';
 
-const DONUT_ASSET_SIZE = 236;
-const DONUT_VIEWBOX_SIZE = 276;
-const DONUT_ART_CENTER = 126;
-const DONUT_ART_CENTER_OFFSET =
-  DONUT_ASSET_SIZE * ((DONUT_VIEWBOX_SIZE / 2 - DONUT_ART_CENTER) / DONUT_VIEWBOX_SIZE);
-const SIDE_NODE_STEP = 70 * 0.1;
-const LOWER_NODE_OFFSET = 70 * 0.4;
-const CENTRAL_CIRCLE_OFFSET = DONUT_ASSET_SIZE * 0.05;
-const CORE_SIZE = 126;
-const SCORE_ARC_SIZE = 178;
-const SCORE_ARC_RADIUS = 59;
-const SCORE_ARC_STROKE_WIDTH = 17;
+const STAR_CENTER_X = 183;
+const STAR_CENTER_Y = 196;
+const DONUT_ASSET_SIZE = 276;
+const DONUT_ASSET_VISUAL_CENTER = 126;
+const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
+const CORE_SIZE = 150;
+const SCORE_ARC_SIZE = 209;
+const SCORE_ARC_RADIUS = 69;
+const SCORE_ARC_STROKE_WIDTH = 20;
 const SCORE_ARC_CIRCUMFERENCE = 2 * Math.PI * SCORE_ARC_RADIUS;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const STAR_ORB_PATH = 'M151.923 102.197C167.069 87.7458 174.642 80.5201 183.297 77.7974C190.915 75.4008 199.085 75.4008 206.703 77.7974C215.358 80.5201 222.931 87.7458 238.077 102.197L269.599 132.274C271.87 134.442 273.006 135.526 274.221 136.512C275.3 137.388 276.426 138.205 277.592 138.961C278.905 139.812 280.287 140.557 283.051 142.048L321.396 162.732C339.821 172.671 349.033 177.64 354.297 185.03C358.93 191.535 361.455 199.306 361.53 207.291C361.615 216.364 357.083 225.799 348.019 244.669L329.155 283.943C327.796 286.773 327.116 288.188 326.554 289.648C326.054 290.945 325.624 292.268 325.266 293.611C324.863 295.123 324.581 296.667 324.017 299.756L316.194 342.617C312.435 363.211 310.556 373.508 305.154 380.798C300.4 387.215 293.79 392.017 286.218 394.556C277.615 397.441 267.242 396.046 246.494 393.257L203.314 387.452C200.202 387.034 198.646 386.825 197.084 386.741C195.696 386.667 194.304 386.667 192.916 386.741C191.354 386.825 189.798 387.034 186.686 387.452L143.506 393.257C122.758 396.046 112.385 397.441 103.782 394.556C96.2102 392.017 89.6004 387.215 84.8458 380.798C79.444 373.508 77.5647 363.211 73.806 342.617L65.9832 299.756C65.4194 296.667 65.1375 295.123 64.7343 293.611C64.3759 292.268 63.9461 290.945 63.4465 289.648C62.8843 288.188 62.2045 286.773 60.845 283.943L41.9807 244.669C32.9169 225.799 28.3849 216.364 28.47 207.291C28.5449 199.306 31.0697 191.535 35.703 185.03C40.9671 177.64 50.1793 172.671 68.6036 162.732L106.949 142.048C109.713 140.557 111.095 139.812 112.408 138.961C113.574 138.205 114.7 137.388 115.779 136.512C116.994 135.526 118.13 134.442 120.401 132.274L151.923 102.197Z';
+const STAR_ORB_PATH_LENGTH = 1140;
+const STAR_ORB_MOTION_DURATION_MS = 3500;
+const STAR_ORB_NEON_PALETTE = ['#39F3FF', '#4D7CFF', '#FF4FD8', '#A970FF', '#7CFF00', '#7B61FF', '#39F3FF'] as const;
 
 const font = {
   regular: 'Exo_400Regular',
@@ -66,8 +78,11 @@ type RecoveryMetric = {
   label: string;
   score: number | null;
   color: string;
-  position: 'recovery' | 'activity' | 'nourishment' | 'calm' | 'sleep';
-  icon: keyof typeof Ionicons.glyphMap;
+  position: 'top' | 'left' | 'right' | 'bottomLeft' | 'bottomRight';
+  DefaultIcon: SvgAsset | ImageSourcePropType;
+  ActiveIcon: SvgAsset | ImageSourcePropType;
+  defaultIconType?: 'svg' | 'image';
+  activeIconType?: 'svg' | 'image';
 };
 
 type MedicationTimelineEntry = {
@@ -250,40 +265,45 @@ export const HomeScreen = () => {
       label: 'Calm',
       score: normalizeScore(health.canonicalIntelligence?.scores.calm.score),
       color: '#FF1717',
-      position: 'recovery',
-      icon: 'leaf-outline'
+      position: 'top',
+      DefaultIcon: CalmDefaultIcon,
+      ActiveIcon: CalmActiveIcon
     },
     {
       key: 'activity',
       label: 'Activity',
       score: normalizeScore(health.canonicalIntelligence?.scores.activity.score),
       color: '#F27A1A',
-      position: 'activity',
-      icon: 'walk-outline'
+      position: 'left',
+      DefaultIcon: ActivityDefaultIcon,
+      ActiveIcon: ActivityActiveIcon
     },
     {
       key: 'nourishment',
-      label: 'Nourishment',
+      label: 'Nutrition',
       score: normalizeScore(health.canonicalIntelligence?.scores.nutrition.score),
       color: '#77FF22',
-      position: 'nourishment',
-      icon: 'nutrition-outline'
+      position: 'right',
+      DefaultIcon: NutritionDefaultIcon,
+      ActiveIcon: NutritionActiveIcon
     },
     {
       key: 'mind',
       label: 'Mind',
       score: normalizeScore(health.canonicalIntelligence?.scores.mind.score),
       color: '#763CEF',
-      position: 'calm',
-      icon: 'bulb-outline'
+      position: 'bottomLeft',
+      DefaultIcon: MindDefaultIcon,
+      ActiveIcon: MindActiveIcon
     },
     {
       key: 'sleep',
       label: 'Sleep',
       score: normalizeScore(health.canonicalIntelligence?.scores.sleep.score),
       color: '#0F80FF',
-      position: 'sleep',
-      icon: 'moon-outline'
+      position: 'bottomRight',
+      DefaultIcon: SleepDefaultIcon,
+      ActiveIcon: SleepActiveIcon
     },
   ];
   const displayMetrics = metrics;
@@ -292,8 +312,8 @@ export const HomeScreen = () => {
   const healthIntelligenceScore = normalizeScore(health.canonicalIntelligence?.scores.healthIntelligence.score);
 
   const selected = selectedMetric === 'healthIntelligence'
-    ? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' }
-    : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Health Intelligence', score: healthIntelligenceScore, color: '#D5062D' };
+    ? { label: 'Recovery Core', score: healthIntelligenceScore, color: '#D5062D' }
+    : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: healthIntelligenceScore, color: '#D5062D' };
   const frameworkByMetric = health.canonicalIntelligence ? {
     healthIntelligence: health.canonicalIntelligence.scores.healthIntelligence,
     mind: health.canonicalIntelligence.scores.mind,
@@ -423,6 +443,90 @@ const RecoveryTrend = ({ values, hasData }: { values: RecoveryTrendDay[]; hasDat
   </View>
 );
 
+export const useReducedMotionPreference = () => {
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  return reduceMotion;
+};
+
+const StarOrbSurface = ({ reduceMotion }: { reduceMotion: boolean }) => {
+  const perimeterProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    perimeterProgress.stopAnimation();
+    if (reduceMotion) {
+      perimeterProgress.setValue(0);
+      return;
+    }
+    const animation = Animated.loop(
+      Animated.timing(perimeterProgress, {
+        toValue: 1,
+        duration: STAR_ORB_MOTION_DURATION_MS,
+        easing: Easing.linear,
+        useNativeDriver: false
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [perimeterProgress, reduceMotion]);
+
+  const perimeterOffset = perimeterProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -STAR_ORB_PATH_LENGTH]
+  });
+  const perimeterColor = perimeterProgress.interpolate({
+    inputRange: STAR_ORB_NEON_PALETTE.map((_, index) => index / (STAR_ORB_NEON_PALETTE.length - 1)),
+    outputRange: [...STAR_ORB_NEON_PALETTE]
+  });
+
+  return (
+    <View style={StyleSheet.absoluteFill} testID="star-orb-surface">
+      <RecoveryStarAsset width="100%" height="100%" pointerEvents="none" />
+      <Svg width="100%" height="100%" viewBox="0 0 390 473" style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Path d={STAR_ORB_PATH} fill="none" stroke="#626B75" strokeOpacity={reduceMotion ? 0.68 : 0.3} strokeWidth={1} />
+        {!reduceMotion ? (
+          <>
+            <AnimatedPath
+              d={STAR_ORB_PATH}
+              fill="none"
+              stroke={perimeterColor}
+              strokeOpacity={0.2}
+              strokeWidth={7}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={`${STAR_ORB_PATH_LENGTH * 0.2} ${STAR_ORB_PATH_LENGTH * 0.8}`}
+              strokeDashoffset={perimeterOffset}
+            />
+            <AnimatedPath
+              d={STAR_ORB_PATH}
+              fill="none"
+              stroke={perimeterColor}
+              strokeOpacity={0.82}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={`${STAR_ORB_PATH_LENGTH * 0.2} ${STAR_ORB_PATH_LENGTH * 0.8}`}
+              strokeDashoffset={perimeterOffset}
+            />
+          </>
+        ) : null}
+      </Svg>
+    </View>
+  );
+};
+
 const RecoveryPanel = ({
   metrics,
   selectedMetric,
@@ -440,6 +544,7 @@ const RecoveryPanel = ({
   selectedState: { label: string };
   onSelectMetric: (metric: MetricKey) => void;
 }) => {
+  const reduceMotion = useReducedMotionPreference();
   const clampedScore = selectedScore == null ? 0 : Math.max(0, Math.min(100, selectedScore));
   const scoreArcProgress = useRef(new Animated.Value(clampedScore)).current;
   const scoreArcOffset = scoreArcProgress.interpolate({
@@ -462,7 +567,7 @@ const RecoveryPanel = ({
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
         <View style={styles.starShadow} pointerEvents="none">
-          <RecoveryStarAsset width="100%" height="100%" pointerEvents="none" />
+          <StarOrbSurface reduceMotion={reduceMotion} />
         </View>
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
         {selectedScore != null ? (
@@ -511,7 +616,7 @@ const RecoveryPanel = ({
           accessibilityRole="button"
           accessibilityLabel="View today's Health Intelligence score"
         >
-          <Text style={styles.coreScore}>{selectedScore == null ? '—' : `${selectedScore}`}</Text>
+          <Text style={styles.coreScore}>{selectedScore == null ? '--/100' : `${selectedScore}/100`}</Text>
           <Text style={styles.coreLabel}>{selectedLabel}</Text>
           <View style={[styles.stateChip, { backgroundColor: selectedScore == null ? '#23272D' : selectedColor }]}>
             <Text style={styles.stateChipText}>{selectedState.label}</Text>
@@ -523,17 +628,31 @@ const RecoveryPanel = ({
 };
 
 const RecoveryNode = ({ metric, selected, onPress }: { metric: RecoveryMetric; selected: boolean; onPress: () => void }) => {
+  const Icon = selected ? metric.ActiveIcon : metric.DefaultIcon;
+  const isImage = (selected ? metric.activeIconType : metric.defaultIconType) === 'image';
+  const SvgIcon = Icon as SvgAsset;
+  const iconSize = selected ? 35 : 32;
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.recoveryNode, nodePositions[metric.position]]}
+      style={[styles.recoveryNode, nodePositions[metric.position], selected && styles.recoveryNodeSelected]}
       hitSlop={14}
       accessibilityRole="button"
       accessibilityLabel={`View today's ${metric.label} score`}
     >
-      <View style={[styles.recoveryNodeIconBox, selected && { backgroundColor: `${metric.color}22`, borderColor: `${metric.color}66` }]}>
-        <Ionicons name={metric.icon} size={24} color={selected ? metric.color : '#B6BDC5'} />
-      </View>
+      {isImage ? (
+        <Image
+          source={Icon as ImageSourcePropType}
+          resizeMode="contain"
+          style={[
+            styles.nodeImage,
+            metric.key === 'calm' && selected ? styles.nodeImageCalmActive : null,
+            metric.key === 'calm' && !selected ? styles.nodeImageCalmDefault : null
+          ]}
+        />
+      ) : (
+        <SvgIcon width={iconSize} height={iconSize} />
+      )}
       <Text style={[styles.recoveryNodeLabel, selected && { color: metric.color }]}>{metric.label}</Text>
     </Pressable>
   );
@@ -624,30 +743,26 @@ const StressCard = ({
 };
 
 const nodePositions = StyleSheet.create({
-  recovery: {
-    left: '50%',
-    top: '16%'
+  top: {
+    top: 24,
+    left: 131
   },
-  nourishment: {
-    left: '82%',
-    top: '40%',
-    transform: [{ translateY: SIDE_NODE_STEP }]
+  left: {
+    top: 125,
+    left: 1
   },
-  sleep: {
-    left: '72%',
-    top: '74%',
-    transform: [{ translateY: LOWER_NODE_OFFSET }]
+  right: {
+    top: 125,
+    right: 1
   },
-  calm: {
-    left: '28%',
-    top: '74%',
-    transform: [{ translateY: LOWER_NODE_OFFSET }]
+  bottomLeft: {
+    left: 52,
+    bottom: 17
   },
-  activity: {
-    left: '18%',
-    top: '40%',
-    transform: [{ translateY: SIDE_NODE_STEP }]
-  },
+  bottomRight: {
+    right: 52,
+    bottom: 17
+  }
 });
 
 const styles = StyleSheet.create({
@@ -787,11 +902,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#59616A'
   },
   recoveryPanel: {
-    height: 320,
+    height: 371,
     marginTop: 0,
     position: 'relative',
     alignItems: 'center',
-    overflow: 'hidden'
+    overflow: 'visible'
   },
   recoveryStage: {
     position: 'absolute',
@@ -799,16 +914,14 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: '100%',
-    transform: [{ translateY: 0 }]
+    transform: [{ translateY: -18 }]
   },
   starShadow: {
     position: 'absolute',
-    top: '51.5%',
-    left: '50%',
-    width: 384,
-    height: 465.6,
-    marginTop: -232.8,
-    marginLeft: -192,
+    top: -48,
+    left: -20,
+    width: 406,
+    height: 492,
     shadowColor: '#000000',
     shadowOpacity: 0.5,
     shadowRadius: 18,
@@ -817,29 +930,20 @@ const styles = StyleSheet.create({
   },
   progressDonutAsset: {
     position: 'absolute',
-    top: '51.5%',
-    left: '50%',
-    marginTop: -(DONUT_ASSET_SIZE / 2) + DONUT_ART_CENTER_OFFSET,
-    marginLeft: -(DONUT_ASSET_SIZE / 2) + DONUT_ART_CENTER_OFFSET,
-    transform: [{ translateY: CENTRAL_CIRCLE_OFFSET }],
+    top: STAR_CENTER_Y - DONUT_ASSET_VISUAL_CENTER + DONUT_VERTICAL_OFFSET,
+    left: STAR_CENTER_X - DONUT_ASSET_VISUAL_CENTER,
     zIndex: 1
   },
   scoreArc: {
     position: 'absolute',
-    top: '51.5%',
-    left: '50%',
-    marginTop: -(SCORE_ARC_SIZE / 2),
-    marginLeft: -(SCORE_ARC_SIZE / 2),
-    transform: [{ translateY: CENTRAL_CIRCLE_OFFSET }],
+    top: STAR_CENTER_Y - SCORE_ARC_SIZE / 2 + DONUT_VERTICAL_OFFSET,
+    left: STAR_CENTER_X - SCORE_ARC_SIZE / 2,
     zIndex: 2
   },
   coreCenter: {
     position: 'absolute',
-    top: '51.5%',
-    left: '50%',
-    marginTop: -(CORE_SIZE / 2),
-    marginLeft: -(CORE_SIZE / 2),
-    transform: [{ translateY: CENTRAL_CIRCLE_OFFSET }],
+    top: STAR_CENTER_Y - CORE_SIZE / 2 + DONUT_VERTICAL_OFFSET,
+    left: STAR_CENTER_X - CORE_SIZE / 2,
     width: CORE_SIZE,
     height: CORE_SIZE,
     borderRadius: CORE_SIZE / 2,
@@ -851,59 +955,61 @@ const styles = StyleSheet.create({
   coreScore: {
     color: '#E4E8ED',
     fontFamily: font.bold,
-    fontSize: 30,
-    lineHeight: 34,
+    fontSize: 26,
+    lineHeight: 31,
     textAlign: 'center'
   },
   coreLabel: {
     color: '#E1E4E3',
     fontFamily: font.regular,
-    maxWidth: 108,
-    fontSize: 12,
-    lineHeight: 15,
+    fontSize: 15,
+    lineHeight: 18,
     textAlign: 'center'
   },
   stateChip: {
-    minHeight: 21,
-    borderRadius: 11,
+    minHeight: 24,
+    borderRadius: 13,
     backgroundColor: '#FF1717',
-    paddingHorizontal: 9,
+    paddingHorizontal: 11,
     alignItems: 'center',
     justifyContent: 'center'
   },
   stateChipText: {
     color: '#FFFFFF',
     fontFamily: font.bold,
-    fontSize: 9,
-    lineHeight: 11
+    fontSize: 11,
+    lineHeight: 13
   },
   recoveryNode: {
     position: 'absolute',
-    width: 96,
-    height: 70,
+    width: 104,
+    minHeight: 86,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: -48,
-    marginTop: -35,
     zIndex: 5
+  },
+  recoveryNodeSelected: {
+    transform: [{ scale: 1.02 }]
   },
   recoveryNodeLabel: {
     marginTop: 3,
     color: '#F4F7F4',
     fontFamily: font.medium,
-    fontSize: 11,
-    lineHeight: 13,
+    fontSize: 12,
+    lineHeight: 14,
     textAlign: 'center'
   },
-  recoveryNodeIconBox: {
+  nodeImage: {
+    width: 50,
+    height: 55
+  },
+  nodeImageCalmActive: {
+    width: 46,
+    height: 64
+  },
+  nodeImageCalmDefault: {
     width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#3A4148',
-    backgroundColor: '#1B2025',
-    alignItems: 'center',
-    justifyContent: 'center'
+    height: 58
   },
   summaryRow: {
     marginTop: 10,

@@ -26,29 +26,20 @@ describe('Journey and Tracker UI consistency', () => {
 
   test('places Star Orb domains on one stable radial ring', () => {
     const source = read('src/screens/home/HomeScreen.tsx');
-    expect(source).toContain("recovery: {\n    left: '50%',\n    top: '16%'");
-    expect(source).toContain("nourishment: {\n    left: '82%',\n    top: '40%',\n    transform: [{ translateY: SIDE_NODE_STEP }]");
-    expect(source).toContain("sleep: {\n    left: '72%',\n    top: '74%',\n    transform: [{ translateY: LOWER_NODE_OFFSET }]");
-    expect(source).toContain("calm: {\n    left: '28%',\n    top: '74%',\n    transform: [{ translateY: LOWER_NODE_OFFSET }]");
-    expect(source).toContain("activity: {\n    left: '18%',\n    top: '40%',\n    transform: [{ translateY: SIDE_NODE_STEP }]");
-    expect(source.match(/top: '51\.5%'/g)).toHaveLength(4);
-    expect(source.match(/left: '50%'/g)?.length).toBeGreaterThanOrEqual(4);
-    expect(source).toContain("width: 96,\n    height: 70");
-    expect(source).toContain('marginLeft: -48');
-    expect(source).toContain('marginTop: -35');
+    expect(source).toContain("top: {\n    top: 24,\n    left: 131");
+    expect(source).toContain("left: {\n    top: 125,\n    left: 1");
+    expect(source).toContain("right: {\n    top: 125,\n    right: 1");
+    expect(source).toContain("bottomLeft: {\n    left: 52,\n    bottom: 17");
+    expect(source).toContain("bottomRight: {\n    right: 52,\n    bottom: 17");
+    expect(source).toContain("width: 104,\n    minHeight: 86");
     expect(source).toContain('<RecoveryStarAsset width="100%" height="100%" pointerEvents="none"');
     expect(source).not.toContain('preserveAspectRatio="none"');
-    expect(source).toContain("top: '51.5%',\n    left: '50%',\n    width: 384,\n    height: 465.6,\n    marginTop: -232.8,\n    marginLeft: -192");
-    expect(source).toContain('DONUT_ASSET_SIZE * ((DONUT_VIEWBOX_SIZE / 2 - DONUT_ART_CENTER) / DONUT_VIEWBOX_SIZE)');
-    expect(source).toContain('marginTop: -(DONUT_ASSET_SIZE / 2) + DONUT_ART_CENTER_OFFSET');
-    expect(source).toContain('marginLeft: -(DONUT_ASSET_SIZE / 2) + DONUT_ART_CENTER_OFFSET');
-    expect(source).toContain('const SIDE_NODE_STEP = 70 * 0.1');
-    expect(source).toContain('const LOWER_NODE_OFFSET = 70 * 0.4');
-    expect(source).toContain('const CENTRAL_CIRCLE_OFFSET = DONUT_ASSET_SIZE * 0.05');
-    expect(source.match(/transform: \[\{ translateY: CENTRAL_CIRCLE_OFFSET \}\]/g)).toHaveLength(3);
-    expect(source).toContain("height: 320");
-    expect(source).toContain("overflow: 'hidden'");
-    expect(source).not.toContain('recoveryNodeSelected');
+    expect(source).toContain("top: -48,\n    left: -20,\n    width: 406,\n    height: 492");
+    expect(source).toContain('top: STAR_CENTER_Y - DONUT_ASSET_VISUAL_CENTER + DONUT_VERTICAL_OFFSET');
+    expect(source).toContain('left: STAR_CENTER_X - DONUT_ASSET_VISUAL_CENTER');
+    expect(source).toContain("height: 371");
+    expect(source).toContain("overflow: 'visible'");
+    expect(source).toContain('recoveryNodeSelected');
   });
 
   test('uses shared segmented control and compact Tracker categories', () => {

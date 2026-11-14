@@ -10,7 +10,7 @@ describe('Health Intelligence V1 canonical surfaces', () => {
       expect(home).toContain(`health.canonicalIntelligence?.scores.${key}.score`);
     }
     expect(home).not.toContain('health.canonicalIntelligence?.scores.cycle.score');
-    expect(home).toContain("label: 'Nourishment'");
+    expect(home).toContain("label: 'Nutrition'");
     expect(home).not.toContain("label: 'Active Performance'");
   });
 
