@@ -67,5 +67,6 @@ describe('Star Orb governed calculations', () => {
     expect(sleepScore({ minutes: 480, targetMinutes: null }).status).toBe('METHODOLOGY_PENDING');
     expect(nutritionScore({ protein: null, hydration: null, foodQuality: null, clinical: null }).status).toBe('METHODOLOGY_PENDING');
     expect(stressRecoveryScore({ hrv: 70, sleep: 80, adaptation: null }).status).toBe('METHODOLOGY_PENDING');
+    expect(calmScore({ hrv: null, stress: null, mindfulness: null }).methodologyPending).toEqual(['hrv', 'stress', 'mindfulness']);
   });
 });

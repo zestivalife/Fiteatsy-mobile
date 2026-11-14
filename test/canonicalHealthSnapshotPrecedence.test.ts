@@ -30,4 +30,17 @@ describe('canonical health snapshot precedence', () => {
     const server = { ...calculateCanonicalHealthIntelligence(emptyInputs), source: 'CACHED_CANONICAL_SERVER' as const };
     expect(preferCanonicalHealthSnapshot(local, server)).toBe(local);
   });
+
+  test('a more complete canonical server snapshot replaces a partial local projection', () => {
+    const localBase = calculatedServerSnapshot();
+    const local = { ...localBase, source: 'LOCAL_CANONICAL_INPUTS' as const };
+    const serverBase = calculateCanonicalHealthIntelligence({
+      ...emptyInputs,
+      activity: { steps: 8_000, stepGoal: 10_000, exerciseMinutes: 30, exerciseTarget: 30, balance: 70, freshness: 'CURRENT' },
+      sleep: { minutes: 480, targetMinutes: 480, deep: 80, rem: 80, efficiency: 80, consistency: 80, freshness: 'CURRENT' }
+    });
+    const server = { ...serverBase, source: 'CACHED_CANONICAL_SERVER' as const };
+    expect(server.scores.sleep.score).toBe(88);
+    expect(preferCanonicalHealthSnapshot(local, server)).toBe(server);
+  });
 });

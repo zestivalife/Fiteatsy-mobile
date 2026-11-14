@@ -44,7 +44,6 @@ export type LocalCanonicalHealthSnapshot = {
 };
 
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-const percentOf = (value: number | null, target: number) => value == null ? null : Math.min(100, value / target * 100);
 
 export const calculateCanonicalHealthIntelligence = (
   inputs: CanonicalHealthInputs,
@@ -55,8 +54,20 @@ export const calculateCanonicalHealthIntelligence = (
   const sleep = sleepScore(inputs.sleep);
   const nutrition = nutritionScore(inputs.nutrition);
   const calm = calmScore(inputs.calm);
-  const stressRecovery = stressRecoveryScore(inputs.stressRecovery);
-  const recovery = recoveryScore(inputs.recovery);
+  // Parent-domain inputs must come from the same canonical calculation graph.
+  // A caller may provide a governed specialist score, otherwise reuse only the
+  // already-calculated child defined by the product contract. Raw observations
+  // are never substituted for a score here.
+  const stressRecovery = stressRecoveryScore({
+    ...inputs.stressRecovery,
+    hrv: inputs.stressRecovery.hrv ?? inputs.calm.hrv,
+    sleep: inputs.stressRecovery.sleep ?? sleep.score
+  });
+  const recovery = recoveryScore({
+    ...inputs.recovery,
+    sleep: inputs.recovery.sleep ?? sleep.score,
+    activityBalance: inputs.recovery.activityBalance ?? inputs.activity.balance
+  });
   const cycle = cycleScore(inputs.cycle);
   const mind = mindScore();
   const rawComponentScores = { activity, sleep, nutrition, calm, stressRecovery, recovery, cycle, mind };
@@ -89,17 +100,22 @@ export const calculateCanonicalHealthIntelligenceFromObservations = (
   const aggregates=aggregateCanonicalHealthObservations(observations,{fallbackOffsetMinutes,nowMs:now.getTime()});
   const dailyValue=(metricType:string)=>aggregates.find(row=>row.healthDay===today&&row.metricType===metricType)?.value??null;
   const steps = dailyValue('steps');
-  const exercise = dailyValue('active_minutes');
+  // Apple Health exposes the governed exercise-minutes quantity directly.
+  // Health Connect exposes session duration as workout_minutes. Prefer the
+  // direct quantity and use the session duration only when it is unavailable;
+  // summing both would double-count overlapping activity.
+  const exercise = dailyValue('active_minutes') ?? dailyValue('workout_minutes');
   const sleepMinutes = dailyValue('sleep_minutes');
-  const hydration = dailyValue('hydration_ml');
-  const mindfulness = dailyValue('mindfulness_minutes');
   return calculateCanonicalHealthIntelligence({
     activity: { steps, stepGoal: HEALTH_INTELLIGENCE_CONFIG.targets.steps, exerciseMinutes: exercise,
       exerciseTarget: HEALTH_INTELLIGENCE_CONFIG.targets.exerciseMinutes, balance: null, freshness },
     sleep: { minutes: sleepMinutes, targetMinutes: options.sleepTargetMinutes ?? HEALTH_INTELLIGENCE_CONFIG.targets.sleepMinutes,
       deep: null, rem: null, efficiency: null, consistency: null, freshness },
-    nutrition: { protein: null, hydration: percentOf(hydration, 2_500), foodQuality: null, clinical: null, freshness },
-    calm: { hrv: null, stress: null, mindfulness: percentOf(mindfulness, 15), freshness },
+    // Raw hydration, mindfulness and source-specific HRV are preserved in the
+    // canonical aggregates, but no approved normalization target exists. They
+    // must not be converted into scores with historical placeholder targets.
+    nutrition: { protein: null, hydration: null, foodQuality: null, clinical: null, freshness },
+    calm: { hrv: null, stress: null, mindfulness: null, freshness },
     stressRecovery: { hrv: null, sleep: null, adaptation: null, freshness },
     recovery: { sleep: null, body: null, activityBalance: null, lifestyle: null, freshness },
     cycle: { applicable: options.cycleApplicable === true, phase: null, symptoms: null, energy: null }
@@ -112,11 +128,11 @@ export const calculateCanonicalHealthIntelligenceFromAggregates=(aggregates:Cano
   const timestamps=aggregates.map(row=>row.latestMeasuredAtISO).sort();const latest=timestamps.at(-1)??null;
   const freshness:ScoreResult['freshness']=latest&&Date.parse(latest)>=now.getTime()-36*3_600_000?'CURRENT':latest?'STALE':'UNKNOWN';
   return calculateCanonicalHealthIntelligence({activity:{steps:daily('steps'),stepGoal:HEALTH_INTELLIGENCE_CONFIG.targets.steps,
-    exerciseMinutes:daily('active_minutes'),exerciseTarget:HEALTH_INTELLIGENCE_CONFIG.targets.exerciseMinutes,balance:null,freshness},
+    exerciseMinutes:daily('active_minutes')??daily('workout_minutes'),exerciseTarget:HEALTH_INTELLIGENCE_CONFIG.targets.exerciseMinutes,balance:null,freshness},
     sleep:{minutes:daily('sleep_minutes'),targetMinutes:options.sleepTargetMinutes??HEALTH_INTELLIGENCE_CONFIG.targets.sleepMinutes,
       deep:null,rem:null,efficiency:null,consistency:null,freshness},
-    nutrition:{protein:null,hydration:percentOf(daily('hydration_ml'),2500),foodQuality:null,clinical:null,freshness},
-    calm:{hrv:null,stress:null,mindfulness:percentOf(daily('mindfulness_minutes'),15),freshness},
+    nutrition:{protein:null,hydration:null,foodQuality:null,clinical:null,freshness},
+    calm:{hrv:null,stress:null,mindfulness:null,freshness},
     stressRecovery:{hrv:null,sleep:null,adaptation:null,freshness},recovery:{sleep:null,body:null,activityBalance:null,lifestyle:null,freshness},
     cycle:{applicable:options.cycleApplicable===true,phase:null,symptoms:null,energy:null}},now.toISOString(),
     {startAtISO:timestamps[0]??null,endAtISO:latest});
@@ -125,15 +141,25 @@ export const calculateCanonicalHealthIntelligenceFromAggregates=(aggregates:Cano
 export const hasCalculatedCanonicalScore = (snapshot: LocalCanonicalHealthSnapshot) =>
   Object.values(snapshot.scores).some((score) => finite(score.score));
 
+export const calculatedCanonicalScoreCount = (snapshot: LocalCanonicalHealthSnapshot) =>
+  Object.values(snapshot.scores).filter((score) => finite(score.score)).length;
+
 export const preferCanonicalHealthSnapshot = (
   current: LocalCanonicalHealthSnapshot | null,
   incoming: LocalCanonicalHealthSnapshot
 ) => {
   if (!current) return incoming;
-  const currentCalculated = hasCalculatedCanonicalScore(current);
-  const incomingCalculated = hasCalculatedCanonicalScore(incoming);
-  if (current.source === 'LOCAL_CANONICAL_INPUTS' && currentCalculated) return current;
-  if (!currentCalculated && incomingCalculated) return incoming;
+  const currentCount = calculatedCanonicalScoreCount(current);
+  const incomingCount = calculatedCanonicalScoreCount(incoming);
+  if (incomingCount > currentCount) return incoming;
+  if (currentCount > incomingCount) return current;
+  if (current.inputFreshness === 'STALE' && incoming.inputFreshness !== 'STALE') return incoming;
+  if (incoming.inputFreshness === 'STALE' && current.inputFreshness !== 'STALE') return current;
+  // Equal-coverage local projections are tied to the most recent native read
+  // and remain authoritative over a potentially lagging server projection.
+  if (current.source === 'LOCAL_CANONICAL_INPUTS') return current;
+  if (incoming.source === 'LOCAL_CANONICAL_INPUTS') return incoming;
+  if (Date.parse(incoming.calculatedAt) > Date.parse(current.calculatedAt)) return incoming;
   return current;
 };
 

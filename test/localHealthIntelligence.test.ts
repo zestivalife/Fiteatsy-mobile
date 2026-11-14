@@ -35,6 +35,42 @@ describe('device-local canonical Health Intelligence', () => {
     expect(result.scores.healthIntelligence.score).toBeNull();
   });
 
+  it('maps Health Connect workout duration to the governed Exercise component without double counting', () => {
+    const result = calculateCanonicalHealthIntelligenceFromObservations([
+      { metricType: 'steps', value: 5_000, unit: 'count', measuredAtISO: '2026-09-14T05:00:00.000Z',
+        sourceProvider: 'health_connect', sourceRecordId: 'steps' },
+      { metricType: 'workout_minutes', value: 15, unit: 'min', measuredAtISO: '2026-09-14T06:00:00.000Z',
+        startAtISO: '2026-09-14T05:45:00.000Z', endAtISO: '2026-09-14T06:00:00.000Z',
+        sourceProvider: 'health_connect', sourceRecordId: 'workout' }
+    ], { now: new Date('2026-09-14T08:00:00.000Z') });
+    expect(result.scores.activity.inputsUsed).toEqual(['steps', 'exercise']);
+    expect(result.scores.activity.inputsMissing).toEqual(['balance']);
+    expect(result.scores.activity.score).toBeNull();
+  });
+
+  it('does not normalize hydration or mindfulness with unapproved historical targets', () => {
+    const result = calculateCanonicalHealthIntelligenceFromObservations([
+      { metricType: 'hydration_ml', value: 2_500, unit: 'ml', measuredAtISO: '2026-09-14T05:00:00.000Z',
+        sourceProvider: 'apple_health', sourceRecordId: 'water' },
+      { metricType: 'mindfulness_minutes', value: 15, unit: 'min', measuredAtISO: '2026-09-14T06:00:00.000Z',
+        startAtISO: '2026-09-14T05:45:00.000Z', endAtISO: '2026-09-14T06:00:00.000Z',
+        sourceProvider: 'apple_health', sourceRecordId: 'mindful' }
+    ], { now: new Date('2026-09-14T08:00:00.000Z') });
+    expect(result.scores.nutrition.inputsUsed).not.toContain('hydration');
+    expect(result.scores.calm.inputsUsed).not.toContain('mindfulness');
+  });
+
+  it('propagates a governed calculated Sleep score into Recovery when no specialist override is supplied', () => {
+    const result = calculateCanonicalHealthIntelligence({
+      ...completeInputs,
+      stressRecovery: { hrv: 65, adaptation: 70, freshness: 'CURRENT' },
+      recovery: { body: 70, activityBalance: 80, lifestyle: 60, freshness: 'CURRENT' }
+    });
+    expect(result.scores.sleep.score).toBe(82);
+    expect(result.scores.recovery.inputsUsed).toEqual(['sleep', 'body', 'activityBalance', 'lifestyle']);
+    expect(result.scores.recovery.score).toBe(75.8);
+  });
+
   it('marks a persisted canonical snapshot stale without changing its score or version', () => {
     const snapshot = calculateCanonicalHealthIntelligence(completeInputs, '2026-09-13T10:00:00.000Z');
     const stale = markCanonicalSnapshotStale(snapshot);
