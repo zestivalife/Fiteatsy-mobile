@@ -30,10 +30,15 @@ export const getLiveHealthWindows = (nowMs = Date.now()) => {
 const STEPS = 'HKQuantityTypeIdentifierStepCount';
 const RESTING_HEART_RATE = 'HKQuantityTypeIdentifierRestingHeartRate';
 const HRV_SDNN = 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN';
+const HEART_RATE = 'HKQuantityTypeIdentifierHeartRate';
+const OXYGEN_SATURATION = 'HKQuantityTypeIdentifierOxygenSaturation';
+const RESPIRATORY_RATE = 'HKQuantityTypeIdentifierRespiratoryRate';
 const ACTIVE_ENERGY = 'HKQuantityTypeIdentifierActiveEnergyBurned';
+const EXERCISE_TIME = 'HKQuantityTypeIdentifierAppleExerciseTime';
 const BODY_MASS = 'HKQuantityTypeIdentifierBodyMass';
 const DISTANCE = 'HKQuantityTypeIdentifierDistanceWalkingRunning';
 const SLEEP = 'HKCategoryTypeIdentifierSleepAnalysis';
+const MINDFUL_SESSION = 'HKCategoryTypeIdentifierMindfulSession';
 const WORKOUT = 'HKWorkoutTypeIdentifier';
 
 export const APPLE_HEALTH_READ_TYPES = [
@@ -41,8 +46,13 @@ export const APPLE_HEALTH_READ_TYPES = [
   SLEEP,
   RESTING_HEART_RATE,
   HRV_SDNN,
+  HEART_RATE,
+  OXYGEN_SATURATION,
+  RESPIRATORY_RATE,
   WORKOUT,
   ACTIVE_ENERGY,
+  EXERCISE_TIME,
+  MINDFUL_SESSION,
   BODY_MASS,
   DISTANCE
 ] as const;
@@ -271,8 +281,9 @@ const syncFromAppleHealthInternal = async (options: AppleHealthReadOptions = {})
   };
 
   // Steps — live display uses local midnight through now; backend sync keeps its existing 24h window.
-  const stepBuckets = await readHourlySums('steps', STEPS, 'count', DAY, options.liveDisplay ? liveWindows.dayStart : undefined);
-  const stepCount = sum(stepBuckets.map((bucket) => bucket.total));
+  const stepBuckets = await readHourlySums('steps', STEPS, 'count', 7 * DAY);
+  const currentStepBuckets = stepBuckets.filter((bucket) => bucket.end.getTime() >= liveWindows.dayStart.getTime());
+  const stepCount = sum(currentStepBuckets.map((bucket) => bucket.total));
   stepBuckets.forEach((bucket) => addObservation({
     metricType: 'steps',
     value: bucket.total,
@@ -289,11 +300,12 @@ const syncFromAppleHealthInternal = async (options: AppleHealthReadOptions = {})
   // Sleep — live display uses the most recent local 6 PM through now.
   const sleepSamples = await guarded(
     'sleep',
-    () => healthKit.queryCategorySamples(SLEEP, { limit: 0, ascending: true, filter: options.liveDisplay ? dateFilterFrom(liveWindows.sleepStart) : dateFilter(2 * DAY) }),
+    () => healthKit.queryCategorySamples(SLEEP, { limit: 0, ascending: true, filter: dateFilter(7 * DAY) }),
     []
   );
   const primarySleep = selectPrimarySleepSamples(sleepSamples.map((sample) => ({ ...sample, value: Number(sample.value) })));
-  const sleepMinutes = sum(primarySleep.map((sample) => minutesBetween(sample.startDate, sample.endDate)));
+  const recentSleep = primarySleep.filter((sample) => sample.endDate.getTime() >= liveWindows.sleepStart.getTime());
+  const sleepMinutes = sum(recentSleep.map((sample) => minutesBetween(sample.startDate, sample.endDate)));
   primarySleep.forEach((sample) => addObservation({
     metricType: 'sleep_minutes',
     value: minutesBetween(sample.startDate, sample.endDate),
@@ -306,15 +318,38 @@ const syncFromAppleHealthInternal = async (options: AppleHealthReadOptions = {})
     source: sample.sourceRevision?.source,
     device: sample.device
   }));
+  const stageMetricByValue: Record<number, string> = {
+    1: 'sleep_asleep_minutes',
+    3: 'sleep_core_minutes',
+    4: 'sleep_deep_minutes',
+    5: 'sleep_rem_minutes'
+  };
+  primarySleep.forEach((sample) => {
+    const metricType = stageMetricByValue[sample.value];
+    if (!metricType) return;
+    addObservation({
+      metricType,
+      value: minutesBetween(sample.startDate, sample.endDate),
+      unit: 'min',
+      measuredAt: sample.endDate,
+      recordType: 'SleepAnalysisStage',
+      sourceRecordId: `${sample.uuid}:${metricType}`,
+      start: sample.startDate,
+      end: sample.endDate,
+      source: sample.sourceRevision?.source,
+      device: sample.device
+    });
+  });
   if (sleepMinutes > 0) markStatus('sleep', 'synced');
 
   // Resting heart rate — live display uses local midnight through now.
   const restingSamples = await guarded(
     'heart_rate',
-    () => healthKit.queryQuantitySamples(RESTING_HEART_RATE, { limit: 0, ascending: true, unit: 'count/min', filter: options.liveDisplay ? dateFilterFrom(liveWindows.dayStart) : dateFilter(7 * DAY) }),
+    () => healthKit.queryQuantitySamples(RESTING_HEART_RATE, { limit: 0, ascending: true, unit: 'count/min', filter: dateFilter(7 * DAY) }),
     []
   );
-  const hrValues = restingSamples.map((sample) => sample.quantity).filter((value) => value > 0);
+  const currentRestingSamples = restingSamples.filter((sample) => sample.endDate.getTime() >= liveWindows.dayStart.getTime());
+  const hrValues = currentRestingSamples.map((sample) => sample.quantity).filter((value) => value > 0);
   restingSamples.forEach((sample) => addObservation({
     metricType: 'resting_heart_rate',
     value: sample.quantity,
@@ -330,13 +365,25 @@ const syncFromAppleHealthInternal = async (options: AppleHealthReadOptions = {})
   const heartRateAvg = avg(hrValues);
   if (heartRateAvg != null) markStatus('heart_rate', 'synced');
 
+  const heartRateSamples = await guarded(
+    'heart_rate',
+    () => healthKit.queryQuantitySamples(HEART_RATE, { limit: 0, ascending: true, unit: 'count/min', filter: dateFilter(7 * DAY) }),
+    []
+  );
+  heartRateSamples.forEach((sample) => addObservation({
+    metricType: 'heart_rate', value: sample.quantity, unit: 'bpm', measuredAt: sample.endDate,
+    recordType: 'HeartRate', sourceRecordId: sample.uuid, start: sample.startDate, end: sample.endDate,
+    source: sample.sourceRevision?.source, device: sample.device
+  }));
+
   // HRV — live display uses local midnight through now. Apple reports SDNN.
   const hrvSamples = await guarded(
     'hrv',
-    () => healthKit.queryQuantitySamples(HRV_SDNN, { limit: 0, ascending: true, unit: 'ms', filter: options.liveDisplay ? dateFilterFrom(liveWindows.dayStart) : dateFilter(7 * DAY) }),
+    () => healthKit.queryQuantitySamples(HRV_SDNN, { limit: 0, ascending: true, unit: 'ms', filter: dateFilter(7 * DAY) }),
     []
   );
-  const hrvValues = hrvSamples.map((sample) => sample.quantity).filter((value) => value > 0);
+  const currentHrvSamples = hrvSamples.filter((sample) => sample.endDate.getTime() >= liveWindows.dayStart.getTime());
+  const hrvValues = currentHrvSamples.map((sample) => sample.quantity).filter((value) => value > 0);
   hrvSamples.forEach((sample) => addObservation({
     metricType: 'hrv_ms',
     value: sample.quantity,
@@ -352,13 +399,38 @@ const syncFromAppleHealthInternal = async (options: AppleHealthReadOptions = {})
   const hrvAvg = avg(hrvValues);
   if (hrvAvg != null) markStatus('hrv', 'synced');
 
-  // Workouts — last 7d
-  const workouts = await guarded(
-    'workouts',
-    () => healthKit.queryWorkoutSamples({ limit: 0, ascending: true, filter: dateFilter(7 * DAY) }),
+  const oxygenSamples = await guarded(
+    'spo2',
+    () => healthKit.queryQuantitySamples(OXYGEN_SATURATION, { limit: 0, ascending: true, unit: '%', filter: dateFilter(7 * DAY) }),
     []
   );
-  const workoutMinutes = sum(workouts.map((workout) => durationToMinutes(workout.duration)));
+  oxygenSamples.forEach((sample) => addObservation({
+    metricType: 'spo2_pct', value: sample.quantity <= 1 ? sample.quantity * 100 : sample.quantity, unit: '%', measuredAt: sample.endDate,
+    recordType: 'OxygenSaturation', sourceRecordId: sample.uuid, start: sample.startDate, end: sample.endDate,
+    source: sample.sourceRevision?.source, device: sample.device
+  }));
+  if (oxygenSamples.length) markStatus('spo2', 'synced');
+
+  const respiratorySamples = await guarded(
+    'respiratory_rate',
+    () => healthKit.queryQuantitySamples(RESPIRATORY_RATE, { limit: 0, ascending: true, unit: 'count/min', filter: dateFilter(7 * DAY) }),
+    []
+  );
+  respiratorySamples.forEach((sample) => addObservation({
+    metricType: 'respiratory_rate_brpm', value: sample.quantity, unit: 'brpm', measuredAt: sample.endDate,
+    recordType: 'RespiratoryRate', sourceRecordId: sample.uuid, start: sample.startDate, end: sample.endDate,
+    source: sample.sourceRevision?.source, device: sample.device
+  }));
+  if (respiratorySamples.length) markStatus('respiratory_rate', 'synced');
+
+  // Workouts — today's live display; seven days for persisted sync history.
+  const workouts = await guarded(
+    'workouts',
+    () => healthKit.queryWorkoutSamples({ limit: 0, ascending: true, filter: options.liveDisplay ? dateFilterFrom(liveWindows.dayStart) : dateFilter(7 * DAY) }),
+    []
+  );
+  const currentWorkouts = workouts.filter((workout) => workout.endDate.getTime() >= liveWindows.dayStart.getTime());
+  const workoutMinutes = sum(currentWorkouts.map((workout) => durationToMinutes(workout.duration)));
   workouts.forEach((workout) => addObservation({
     metricType: 'workout_minutes',
     value: durationToMinutes(workout.duration),
@@ -373,9 +445,30 @@ const syncFromAppleHealthInternal = async (options: AppleHealthReadOptions = {})
   }));
   if (workoutMinutes > 0) markStatus('workouts', 'synced');
 
+  const exerciseBuckets = await readHourlySums('workouts', EXERCISE_TIME, 'min', 7 * DAY);
+  exerciseBuckets.forEach((bucket) => addObservation({
+    metricType: 'active_minutes', value: bucket.total, unit: 'min', measuredAt: bucket.end,
+    recordType: 'AppleExerciseTime', sourceRecordId: `exercise:${bucket.start.toISOString()}`,
+    start: bucket.start, end: bucket.end, source: { bundleIdentifier: 'com.apple.health' }
+  }));
+  if (exerciseBuckets.length) markStatus('workouts', 'synced');
+
+  const mindfulSamples = await guarded(
+    'stress',
+    () => healthKit.queryCategorySamples(MINDFUL_SESSION, { limit: 0, ascending: true, filter: dateFilter(7 * DAY) }),
+    []
+  );
+  mindfulSamples.forEach((sample) => addObservation({
+    metricType: 'mindfulness_minutes', value: minutesBetween(sample.startDate, sample.endDate), unit: 'min', measuredAt: sample.endDate,
+    recordType: 'MindfulSession', sourceRecordId: sample.uuid, start: sample.startDate, end: sample.endDate,
+    source: sample.sourceRevision?.source, device: sample.device
+  }));
+  if (mindfulSamples.length) markStatus('stress', 'synced');
+
   // Active energy — live display uses local midnight through now.
-  const energyBuckets = await readHourlySums('calories', ACTIVE_ENERGY, 'kcal', 7 * DAY, options.liveDisplay ? liveWindows.dayStart : undefined);
-  const caloriesKcal = energyBuckets.length ? sum(energyBuckets.map((bucket) => bucket.total)) : null;
+  const energyBuckets = await readHourlySums('calories', ACTIVE_ENERGY, 'kcal', 7 * DAY);
+  const currentEnergyBuckets = energyBuckets.filter((bucket) => bucket.end.getTime() >= liveWindows.dayStart.getTime());
+  const caloriesKcal = currentEnergyBuckets.length ? sum(currentEnergyBuckets.map((bucket) => bucket.total)) : null;
   energyBuckets.forEach((bucket) => addObservation({
     metricType: 'active_energy',
     value: bucket.total,
@@ -410,7 +503,7 @@ const syncFromAppleHealthInternal = async (options: AppleHealthReadOptions = {})
   if (weightSamples.length) markStatus('weight', 'synced');
 
   // Walking/running distance — live display uses local midnight through now.
-  const distanceBuckets = await readHourlySums('distance', DISTANCE, 'm', 7 * DAY, options.liveDisplay ? liveWindows.dayStart : undefined);
+  const distanceBuckets = await readHourlySums('distance', DISTANCE, 'm', 7 * DAY);
   distanceBuckets.forEach((bucket) => addObservation({
     metricType: 'distance',
     value: bucket.total,
@@ -440,14 +533,14 @@ const syncFromAppleHealthInternal = async (options: AppleHealthReadOptions = {})
       hydrationLiters: null,
       focusMinutes: null,
       breathingMinutes: null,
-      movementMinutes: workoutMinutes > 0 ? Math.round(workoutMinutes) : null,
+      movementMinutes: workoutMinutes > 0 || exerciseBuckets.length ? Math.round(Math.max(workoutMinutes, sum(exerciseBuckets.filter((bucket) => bucket.end.getTime() >= liveWindows.dayStart.getTime()).map((bucket) => bucket.total)))) : null,
       hrvMs: hrvAvg == null ? null : Number(hrvAvg.toFixed(1)),
       caloriesKcal: caloriesKcal == null ? null : Math.round(caloriesKcal),
       workoutMinutes: workoutMinutes > 0 ? Math.round(workoutMinutes) : null,
       stressScore: null,
       cyclePhase: null,
-      spo2Pct: null,
-      respiratoryRateBrpm: null
+      spo2Pct: avg(oxygenSamples.map((sample) => sample.quantity <= 1 ? sample.quantity * 100 : sample.quantity)),
+      respiratoryRateBrpm: avg(respiratorySamples.map((sample) => sample.quantity))
     },
     dataQuality: {
       confidence: realSyncedCount > 0 ? 0.96 : 0,

@@ -1,4 +1,5 @@
 import { DailyCheckIn, WellnessSnapshot, WearableSyncPayload } from '../types';
+import { buildSevenDayHealthHistory } from './healthHistoryService';
 
 type RecoveryDirection = 'improving' | 'declining' | 'stable';
 
@@ -149,7 +150,12 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
   const pss10ResilienceScore = latestPss10 ? round(clamp(100 - (latestPss10.rawScore / 40) * 100, 0, 100)) : null;
 
   const hasSessionSignals = input.wellness.breathingMinutes > 0 || input.wellness.focusMinutes > 0 || input.wellness.moodScore > 0;
-  const hasEnoughForCalibration = coverageCount >= 3 && hasSessionSignals;
+  const healthHistory = buildSevenDayHealthHistory(latestSync);
+  const calculatedHealthDays = healthHistory.filter((day) => day.recoveryScore != null);
+  const latestHealthScore = calculatedHealthDays.at(-1)?.recoveryScore ?? null;
+  // Device health data is sufficient by itself. In-app wellness sessions improve the score,
+  // but must never block calculation when Apple Health / Health Connect has real signals.
+  const hasEnoughForCalibration = latestHealthScore != null || coverageCount >= 2 || (coverageCount >= 1 && hasSessionSignals);
   const insufficientReason = hasEnoughForCalibration
     ? null
     : coverageCount < 3
@@ -254,8 +260,12 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
   const previousCalm = clamp(100 - input.wellness.stressScore, 0, 100);
   const previousStressRecovery = clamp(100 - input.wellness.stressScore, 0, 100);
 
-  const recoveryScore = hasEnoughForCalibration ? smoothScore(previousRecovery, rawRecoveryScore, 9) : null;
-  const calmScore = hasEnoughForCalibration ? smoothScore(previousCalm, rawCalmScore, 8) : null;
+  const recoveryScore = hasEnoughForCalibration
+    ? (latestHealthScore != null
+      ? (previousRecovery > 0 ? smoothScore(previousRecovery, latestHealthScore, 12) : latestHealthScore)
+      : (previousRecovery > 0 ? smoothScore(previousRecovery, rawRecoveryScore, 9) : rawRecoveryScore))
+    : null;
+  const calmScore = hasEnoughForCalibration ? (input.wellness.stressScore > 0 ? smoothScore(previousCalm, rawCalmScore, 8) : rawCalmScore) : null;
   const stressRecoveryScore = pss10ResilienceScore ?? (hasEnoughForCalibration ? smoothScore(previousStressRecovery, rawStressRecoveryScore, 8) : null);
 
   const prior7 = lastNDays(input.checkIns, 14).slice(7);
@@ -334,7 +344,9 @@ export const buildRecoveryIntelligence = (input: Input): RecoveryOutput => {
     contextualInsights,
     whyChanged,
     blockers,
-    trendValues7d: pss10Results.length > 0
+    trendValues7d: calculatedHealthDays.length > 0
+      ? healthHistory.map((day) => day.recoveryScore ?? 0)
+      : pss10Results.length > 0
       ? pss10Results.slice(-7).map((result) => round(clamp(100 - (result.rawScore / 40) * 100, 0, 100)))
       : buildTrend(input.checkIns),
     debug: {

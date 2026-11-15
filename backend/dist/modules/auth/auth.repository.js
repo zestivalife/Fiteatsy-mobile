@@ -220,6 +220,8 @@ const rowToAuthenticatedAccount = async (row, input) => {
         sessionExpiresAtISO: input.sessionExpiresAtISO,
         token: input.token,
         authProvider: 'fiteatsy',
+        requiresPinSetup: row.pin_hash == null,
+        requiresPinChange: Boolean(row.force_pin_change),
         qaSession: row.qa_fixture_set_id == null ? null : {
             fixtureSetId: String(row.qa_fixture_set_id),
             purpose: String(row.qa_purpose),
@@ -612,6 +614,7 @@ export const getAuthenticatedAccountByToken = async (token) => {
         u.last_login_at as user_last_login_at,
         u.email_verified_at,
         u.mobile_verified_at
+        ,u.pin_hash
       from auth_sessions s
       join users u on u.id = s.user_id
       where s.token_hash = $1
@@ -703,6 +706,8 @@ export const getAuthenticatedAccountByToken = async (token) => {
         sessionExpiresAtISO: new Date(Number(bridgePayload?.exp) * 1000).toISOString(),
         token,
         authProvider: 'consultant_dashboard',
+        requiresPinSetup: false,
+        requiresPinChange: false,
         qaSession: null,
         user: bridgedUser,
         client: undefined

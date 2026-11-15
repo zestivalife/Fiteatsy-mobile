@@ -73,6 +73,16 @@ export const SplashScreen = ({ navigation }: Props) => {
       return;
     }
 
+    if (authSession?.requiresPinSetup) {
+      transitionTo(() => navigation.replace('ChangePin', { force: true, initialSetup: true }));
+      return;
+    }
+
+    if (authSession?.requiresPinChange) {
+      transitionTo(() => navigation.replace('ChangePin', { force: true }));
+      return;
+    }
+
     const progress = await getOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
     if (onboardingStatus === 'COMPLETED') {
       transitionTo(() => navigation.replace('Main'));
@@ -113,6 +123,8 @@ export const SplashScreen = ({ navigation }: Props) => {
     transitionTo(() => navigation.replace('Main'));
   }, [
     authSession?.client.fiteatsyClientId,
+    authSession?.requiresPinSetup,
+    authSession?.requiresPinChange,
     isAuthenticated,
     navigation,
     onboardingResumeStep,

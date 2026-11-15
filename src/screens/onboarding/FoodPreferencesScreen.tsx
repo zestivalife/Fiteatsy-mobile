@@ -4,6 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { AppBackButton } from '../../components/AppBackButton';
 import { getThemeColors, radius, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
@@ -163,6 +164,11 @@ export const FoodPreferencesScreen = ({ navigation, route }: Props) => {
 
   return (
     <Screen scroll>
+      <View style={styles.profileHeader}>
+        <AppBackButton onPress={() => navigation.goBack()} />
+        <Text style={[styles.profileHeaderTitle, { color: palette.textPrimary }]}>Food Preferences</Text>
+        <View style={styles.profileHeaderSpacer} />
+      </View>
       <Text style={[styles.eyebrow, { color: palette.blue }]}>FOOD PREFERENCES</Text>
       <Text style={[styles.title, { color: palette.textPrimary }]}>Food Preferences</Text>
       <Text style={[styles.body, { color: palette.textSecondary }]}>Your choices help your consultant personalise recommendations. Clinical restrictions remain managed separately.</Text>
@@ -261,6 +267,18 @@ const FoodPicker = ({ title, helper, mode, activeMode, setMode, query, setQuery,
 };
 
 const styles = StyleSheet.create({
+  profileHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12
+  },
+  profileHeaderTitle: {
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 17,
+    lineHeight: 22
+  },
+  profileHeaderSpacer: { width: 44 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   eyebrow: { ...typography.caption, marginBottom: 8 },
   title: { ...typography.sectionTitle, fontSize: 20, lineHeight: 26, marginBottom: 8 },

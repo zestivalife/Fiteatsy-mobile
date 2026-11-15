@@ -46,6 +46,7 @@ import {
   deleteAllAnalyzedReports,
   deleteAnalyzedReport,
   getCurrentReportComparison,
+  isReportAnalysisTimeoutError,
   listAnalyzedReports,
   reanalyzeReport,
   ReportAnalysisResponse,
@@ -904,7 +905,7 @@ export const ReportsScreen = () => {
             onProgress
           });
         } catch (error) {
-          if (!(error instanceof Error) || error.message !== 'REQUEST_TIMEOUT' || !activeReportId) throw error;
+          if (!isReportAnalysisTimeoutError(error) || !activeReportId) throw error;
           while (!controller.signal.aborted) {
             try {
               analysis = await waitForReportAnalysis({ reportId: activeReportId, signal: controller.signal, onProgress });

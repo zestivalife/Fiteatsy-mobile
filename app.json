@@ -39,7 +39,7 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/adaptive-icon.png",
-        "backgroundColor": "#191533"
+        "backgroundColor": "#000000"
       },
       "package": "com.fiteatsy.health"
     },

@@ -97,6 +97,19 @@ describe('recoveryIntelligenceEngine', () => {
     expect(output.contextualInsights[0]).toContain('Recovery insights improve');
   });
 
+  it('does not collapse the first valid device score by smoothing it against zero', () => {
+    const output = buildRecoveryIntelligence({
+      wellness: { ...baseWellness, recoveryScore: 0, stressScore: 0 },
+      checkIns: [],
+      medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
+      hasWearable: true,
+      wearableSyncData: [syncedPayload]
+    });
+    expect(output.isCalibrating).toBe(false);
+    expect(output.recoveryScore).toBe(output.debug.rawRecoveryScore);
+    expect(output.recoveryScore as number).toBeGreaterThan(20);
+  });
+
   it('hydrates approved PSS-10 questionnaire results into stress recovery and trend values', () => {
     const output = buildRecoveryIntelligence({
       wellness: baseWellness,

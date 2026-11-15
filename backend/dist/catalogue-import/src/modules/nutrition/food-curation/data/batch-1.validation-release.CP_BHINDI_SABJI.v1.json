@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "FITEATSY_VALIDATION_RELEASE_V1",
+  "validationReleaseId": "BATCH1_CP_BHINDI_SABJI_VR1",
+  "recipeId": "CP_BHINDI_SABJI",
+  "recipeName": "Bhindi Sabji",
+  "recipeVersion": "CP_BHINDI_SABJI_STAGE_A_v1",
+  "stageADecisionId": "STAGE_A_CP_BHINDI_SABJI_V1",
+  "stageADecisionHash": "485e25398e172f7452753b7e8145cf7a2a48d0dd16b2cc921f56eb4cbc3e4d73",
+  "sourceDecisionIds": [
+    "SOURCE_BHINDI",
+    "SOURCE_GARLIC",
+    "SOURCE_REFINED_SUNFLOWER_OIL"
+  ],
+  "sourceDecisionHashes": [
+    "6a518e2099b76195056d20b69854557406dae72d3b18b148b053e50d12afba71",
+    "2b6a3a08b4255e48c53eb6ae1b2edfceccca641b3f9fb1f862928b8bb4360866",
+    "61439889fd35ea36ce4cc04ad055696458498c134ac75a56f02c616208212eaa"
+  ],
+  "canonicalSourceHashes": [
+    "6a518e2099b76195056d20b69854557406dae72d3b18b148b053e50d12afba71",
+    "2b6a3a08b4255e48c53eb6ae1b2edfceccca641b3f9fb1f862928b8bb4360866",
+    "61439889fd35ea36ce4cc04ad055696458498c134ac75a56f02c616208212eaa"
+  ],
+  "canonicalIngredientMappings": [
+    {
+      "ingredientId": "BHINDI",
+      "sourceRef": "USDA_FDC:169260",
+      "sourceHash": "6a518e2099b76195056d20b69854557406dae72d3b18b148b053e50d12afba71"
+    },
+    {
+      "ingredientId": "GARLIC",
+      "sourceRef": "USDA_FDC:169230",
+      "sourceHash": "2b6a3a08b4255e48c53eb6ae1b2edfceccca641b3f9fb1f862928b8bb4360866"
+    },
+    {
+      "ingredientId": "REFINED_SUNFLOWER_OIL",
+      "sourceRef": "USDA_FDC:171025",
+      "sourceHash": "61439889fd35ea36ce4cc04ad055696458498c134ac75a56f02c616208212eaa"
+    }
+  ],
+  "formulaHash": "18210283f4a706789e5b50b9ca720974851e08b78d44f8c0749111e2dcb25c71",
+  "measurementHash": "37f4907f6fc8b985466c898afda90dbe00e698d614e3efc1286213c7ca3cbdf9",
+  "calculationHash": "ffe9b7a4af17aa021b417e4060ebf39324aa29566f3c984aee42f9bf743dae64",
+  "reconciliationStatus": "PASS",
+  "reconciliationHash": "6f41fe65311438eb0cf0d088546530967f04804105633714c10253ec53703076",
+  "stageBDecisionId": "STAGE_B_DECISION_V12_CP_BHINDI_SABJI",
+  "stageBDecisionHash": "795b21c77fe495a515cfa98d6d3137f2b5d8f0c1646a54d924c9480e3aeafd68",
+  "validationReleaseVersion": 1,
+  "releaseTimestamp": "2026-09-03T12:04:07Z",
+  "releaseStatus": "VALIDATED_RELEASED",
+  "releaseHash": "18d3ffcd01987d96af695c4d9fd39546e41367992a536f535d1b70505865a2c1",
+  "productionActivationStatus": "NOT_PRODUCTION_ACTIVE",
+  "createdBy": "FITEATSY_GOVERNED_RELEASE_PIPELINE",
+  "immutable": true
+}

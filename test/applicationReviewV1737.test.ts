@@ -48,9 +48,8 @@ describe('v17.37 application review acceptance contracts', () => {
 
   it('keeps launch-time care-case creation tenant scoped', () => {
     const store = read('backend/src/modules/platform/platform.store.ts');
-    expect(store).toContain('from fiteatsy_clients');
-    expect(store).toContain('account_user_id = $2');
-    expect(store).toContain("throw new Error('Client ownership could not be verified')");
+    expect(store).toContain('deleted_at, tenant_id');
+    expect(store).toContain('select tenant_id from fiteatsy_clients where id = $3 and account_user_id = $2');
   });
 
   it('exposes the complete canonical wellness goal domain with unique stable IDs', () => {

@@ -61,9 +61,37 @@ const priorityChoices: Choice<PlanPriority>[] = [
 const generateIdempotencyKey = (planId: string) => `${planId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 const planDailyCostLabel = (plan: SubscriptionPlan) => {
+  const suppliedDailyCost: Record<string, string> = {
+    WELLNESS_TRACKING_6M: '₹16/day',
+    WELLNESS_TRACKING_12M: '₹13/day',
+    CLINICAL_CARE_1M: '₹200/day',
+    CLINICAL_TRANSFORMATION_3M: '₹166/day',
+    DEEP_HEALING_6M: '₹138/day'
+  };
+  if (plan.code === 'LIFESTYLE_MODIFICATION_CONSULT') return null;
+  if (suppliedDailyCost[plan.code]) return suppliedDailyCost[plan.code];
   if (plan.durationDays <= 0) return null;
   const dailyMinor = Math.ceil(plan.priceMinor / plan.durationDays);
   return `${formatPlanPrice({ ...plan, priceMinor: dailyMinor })}/day`;
+};
+
+const planCategory = (code: string) => code.startsWith('WELLNESS_TRACKING')
+  ? 'Wellness tracking'
+  : code === 'LIFESTYLE_MODIFICATION_CONSULT'
+    ? 'One-time consultation'
+    : 'Clinical nutrition';
+
+const planDurationLabel = (plan: SubscriptionPlan) => plan.code === 'LIFESTYLE_MODIFICATION_CONSULT'
+  ? '1 session'
+  : formatPlanDuration(plan.durationDays);
+
+const planPositioning: Record<string, string> = {
+  WELLNESS_TRACKING_6M: 'Build awareness with daily health and wellness tracking.',
+  WELLNESS_TRACKING_12M: 'See long-term trends with a full year of tracking.',
+  LIFESTYLE_MODIFICATION_CONSULT: 'Get focused expert guidance in one consultation.',
+  CLINICAL_CARE_1M: 'Start personalised nutrition support with expert follow-up.',
+  CLINICAL_TRANSFORMATION_3M: 'Build sustainable nutrition, lifestyle, and habit change.',
+  DEEP_HEALING_6M: 'Long-term support for deeper lifestyle transformation.'
 };
 
 export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
@@ -157,16 +185,17 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
 
   const entitledForRequiredFeature = requiredEntitlement ? activeEntitlements.includes(requiredEntitlement) : false;
   const recommendedPlan = recommendation.primary;
+  const showPlanFinder = false;
 
   return (
     <Screen scroll contentStyle={styles.screen}>
-      <PageHeader title="Subscriptions" onBack={() => navigation.goBack()} />
+      <PageHeader title="Plans" onBack={() => navigation.goBack()} />
 
       <View style={[styles.hero, { backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0E120F', borderColor: palette.stroke }]}>
-        <Text style={styles.eyebrow}>Fiteatsy subscriptions</Text>
-        <Text style={[styles.title, { color: palette.textPrimary }]}>Choose support that matches your health journey.</Text>
+        <Text style={styles.eyebrow}>Fiteatsy plans</Text>
+        <Text style={[styles.heroTitle, { color: palette.textPrimary }]}>Choose the care that fits your journey.</Text>
         <Text style={[styles.body, { color: palette.textSecondary }]}>
-          Plans and entitlements come from the Fiteatsy backend. Premium features unlock only after server-verified payment.
+          Start with self-guided tracking, book a focused consultation, or choose ongoing clinical support.
         </Text>
         {requiredEntitlement ? (
           <View style={[styles.entitlementPill, entitledForRequiredFeature ? styles.entitlementPillActive : null]}>
@@ -193,7 +222,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
         </View>
       ) : null}
 
-      {!loading && !errorMessage && recommendedPlan ? (
+      {showPlanFinder && !loading && !errorMessage && recommendedPlan ? (
         <View style={[styles.recommendationCard, { backgroundColor: '#111A12', borderColor: '#2D5226' }]}>
           <View style={styles.badgeRow}>
             <Text style={styles.badge}>{recommendedPlan.badge ?? 'Recommended for you'}</Text>
@@ -229,7 +258,7 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
         </View>
       ) : null}
 
-      {!loading && !errorMessage && recommendation.secondary ? (
+      {showPlanFinder && !loading && !errorMessage && recommendation.secondary ? (
         <View style={[styles.secondaryCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}>
           <Text style={[styles.secondaryLabel, { color: palette.textSecondary }]}>Also worth considering</Text>
           <Text style={[styles.secondaryName, { color: palette.textPrimary }]}>{recommendation.secondary.name}</Text>
@@ -247,16 +276,17 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
         </View>
       ) : null}
 
-      <View style={[styles.helpCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}>
+      {showPlanFinder ? <View style={[styles.helpCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Help me choose</Text>
         <ChoiceGroup title="What kind of support do you want?" choices={supportChoices} value={supportPreference} onSelect={setSupportPreference} />
         <ChoiceGroup title="How long do you want support?" choices={durationChoices} value={durationPreference} onSelect={setDurationPreference} />
         <ChoiceGroup title="What matters most right now?" choices={priorityChoices} value={priority} onSelect={setPriority} />
-      </View>
+      </View> : null}
 
       {!loading && !errorMessage ? (
         <View style={styles.catalogSection}>
-          <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>All live plans</Text>
+          <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Available plans</Text>
+          <Text style={[styles.body, { color: palette.textSecondary }]}>Simple pricing with the complete tax amount shown before payment.</Text>
           {plans.map((plan) => (
             <Pressable
               key={plan.id}
@@ -265,18 +295,15 @@ export const SubscriptionPlansScreen = ({ navigation, route }: Props) => {
               style={[styles.catalogCard, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}
               accessibilityRole="button"
             >
-              <View style={styles.catalogTop}>
-                <Text style={[styles.catalogName, { color: palette.textPrimary }]}>{plan.name}</Text>
-                <Text style={styles.catalogPrice}>{formatPlanPrice(plan)}</Text>
-              </View>
+              <View style={styles.categoryRow}><Text style={styles.categoryLabel}>{planCategory(plan.code)}</Text>{plan.badge ? <Text style={styles.catalogValue}>{plan.badge}</Text> : null}</View>
+              <Text style={[styles.catalogName, { color: palette.textPrimary }]}>{plan.name}</Text>
+              <Text style={[styles.positioning, { color: palette.textSecondary }]}>{planPositioning[plan.code] ?? plan.description}</Text>
+              <View style={styles.catalogTop}><Text style={styles.catalogPrice}>{formatPlanPrice(plan)}</Text><Text style={[styles.durationPill, { color: palette.textPrimary }]}>{planDurationLabel(plan)}</Text></View>
               <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>
-                {formatPlanDuration(plan.durationDays)}{planDailyCostLabel(plan) ? ` · ${planDailyCostLabel(plan)}` : ''}
+                {planDailyCostLabel(plan) ? `${planDailyCostLabel(plan)} · ` : ''}{plan.code === 'LIFESTYLE_MODIFICATION_CONSULT' ? 'One-time payment' : 'Full-plan payment'}
               </Text>
-              <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>Base price + applicable GST at checkout</Text>
-              {plan.badge ? <Text style={styles.catalogValue}>{plan.badge}</Text> : null}
-              <Text style={[styles.catalogMeta, { color: palette.textSecondary }]}>
-                Unlocks {plan.entitlements.slice(0, 3).map((item) => item.replace(/_/g, ' ')).join(', ')}
-              </Text>
+              <View style={styles.benefitList}>{plan.benefits.slice(0, 4).map((benefit) => <View key={benefit} style={styles.benefitRow}><Ionicons name="checkmark-circle" size={17} color="#64D900" /><Text style={[styles.benefitText, { color: palette.textPrimary }]}>{benefit}</Text></View>)}</View>
+              <View style={styles.subscribeRow}><Text style={styles.subscribeText}>View & subscribe</Text><Ionicons name="arrow-forward-circle" size={25} color="#64D900" /></View>
             </Pressable>
           ))}
         </View>
@@ -726,5 +753,50 @@ const styles = StyleSheet.create({
   taxNote: {
     ...typography.subtext,
     color: '#8F9690'
+  },
+  heroTitle: {
+    fontFamily: 'Exo_700Bold',
+    fontSize: 25,
+    lineHeight: 31
+  },
+  categoryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm
+  },
+  categoryLabel: {
+    color: '#A985FF',
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase'
+  },
+  positioning: {
+    fontFamily: 'Exo_400Regular',
+    fontSize: 14,
+    lineHeight: 20
+  },
+  durationPill: {
+    backgroundColor: '#202126',
+    borderRadius: radius.pill,
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 12,
+    paddingHorizontal: 11,
+    paddingVertical: 7
+  },
+  subscribeRow: {
+    alignItems: 'center',
+    borderTopColor: '#2B2D31',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+    paddingTop: spacing.sm
+  },
+  subscribeText: {
+    color: '#64D900',
+    fontFamily: 'Exo_700Bold',
+    fontSize: 15
   }
 });

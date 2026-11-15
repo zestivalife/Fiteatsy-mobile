@@ -14,6 +14,29 @@ const parseAliases = (value) => {
     }
     return [];
 };
+const resolveBiomarkerTenantId = async (owner) => {
+    const result = await pool.query(`select client.tenant_id, client.account_user_id
+       from fiteatsy_clients client
+      where client.id = $1 and client.deleted_at is null
+      limit 1`, [owner.clientId]);
+    const client = result.rows[0];
+    if (!client || client.account_user_id !== owner.accountId)
+        throw new Error('TENANT_RESOURCE_MISMATCH');
+    if (client.tenant_id)
+        return client.tenant_id;
+    const membership = await pool.query(`select membership.tenant_id
+       from tenant_memberships membership
+       join tenants tenant on tenant.id = membership.tenant_id
+      where membership.user_id = $1
+        and membership.status = 'active'
+        and tenant.status = 'active'
+      order by (tenant.tenant_type = 'ZESTIVA_INTERNAL') desc, membership.joined_at asc
+      limit 1`, [owner.accountId]);
+    const tenantId = membership.rows[0]?.tenant_id;
+    if (!tenantId)
+        throw new Error('TENANT_CONTEXT_REQUIRED');
+    return tenantId;
+};
 const rowToBiomarker = (row) => ({
     id: String(row.id),
     canonicalName: String(row.canonical_name),
@@ -38,35 +61,38 @@ const rowToObservation = (row) => ({
     referenceRange: row.reference_range == null ? null : String(row.reference_range),
     createdAtISO: new Date(String(row.created_at)).toISOString()
 });
-export const listBiomarkers = async () => {
-    const result = await pool.query('select * from biomarkers order by canonical_name asc');
+export const listBiomarkers = async (owner) => {
+    const tenantId = await resolveBiomarkerTenantId(owner);
+    const result = await pool.query('select * from biomarkers where tenant_id = $1 order by canonical_name asc', [tenantId]);
     return result.rows.map(rowToBiomarker);
 };
-export const upsertBiomarker = async (input) => {
+export const upsertBiomarker = async (owner, input) => {
+    const tenantId = await resolveBiomarkerTenantId(owner);
     const id = `bio_${crypto.randomUUID()}`;
     const result = await pool.query(`
-      insert into biomarkers (id, canonical_name, aliases, category, standard_unit)
-      values ($1, $2, $3::jsonb, $4, $5)
-      on conflict (canonical_name)
+      insert into biomarkers (id, canonical_name, aliases, category, standard_unit, tenant_id)
+      values ($1, $2, $3::jsonb, $4, $5, $6)
+      on conflict (tenant_id, canonical_name)
       do update set aliases = excluded.aliases, category = excluded.category, standard_unit = excluded.standard_unit, updated_at = now()
       returning *
-    `, [id, input.canonicalName, JSON.stringify(input.aliases ?? []), input.category, input.standardUnit]);
+    `, [id, input.canonicalName, JSON.stringify(input.aliases ?? []), input.category, input.standardUnit, tenantId]);
     return rowToBiomarker(result.rows[0]);
 };
 export const createBiomarkerObservation = async (owner, input) => {
+    const tenantId = await resolveBiomarkerTenantId(owner);
     const id = `bobs_${crypto.randomUUID()}`;
     const result = await pool.query(`
       with inserted as (
         insert into biomarker_observations (
           id, user_id, client_id, biomarker_id, source_report_id, value, unit, test_date,
-          confidence, validation_status, original_parameter_name, source_location, reference_range
+          confidence, validation_status, original_parameter_name, source_location, reference_range, tenant_id
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         returning *
       )
       select inserted.*, b.canonical_name
       from inserted
-      join biomarkers b on b.id = inserted.biomarker_id
+      join biomarkers b on b.id = inserted.biomarker_id and b.tenant_id = inserted.tenant_id
     `, [
         id,
         owner.accountId,
@@ -80,7 +106,8 @@ export const createBiomarkerObservation = async (owner, input) => {
         input.validationStatus ?? 'pending',
         input.originalParameterName ?? null,
         input.sourceLocation ?? null,
-        input.referenceRange ?? null
+        input.referenceRange ?? null,
+        tenantId
     ]);
     return rowToObservation(result.rows[0]);
 };

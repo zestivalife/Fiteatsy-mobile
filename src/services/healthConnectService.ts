@@ -468,11 +468,13 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   if (hasPermission(grantedSet, 'Steps')) {
     const stepRecords = await readMetric<{ startTime: string; endTime: string; count?: number; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('steps', 'Steps', {
-      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY), endTime: end }
+      timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
     });
-    const valid = stepRecords.filter((record) => within(record.endTime, DAY));
-    stepCount = sum(valid.map((record) => record.count ?? 0));
-    if (stepCount > 0) {
+    const valid = stepRecords.filter((record) => within(record.endTime, DAY * 7));
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    stepCount = sum(valid.filter((record) => Date.parse(record.endTime) >= todayStart.getTime()).map((record) => record.count ?? 0));
+    if (valid.length > 0) {
       connectedMetrics.steps = 'synced';
       valid.forEach((record) => addObservation('steps', record.count ?? null, 'count', record.endTime, 'Steps', record));
       console.info('[HealthConnect] Steps read success:', stepCount);
@@ -484,7 +486,7 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
 
   const sleepRecords = hasPermission(grantedSet, 'SleepSession')
     ? await readMetric<{ startTime: string; endTime: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>('sleep', 'SleepSession', {
-        timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 2), endTime: end }
+        timeRangeFilter: { operator: 'between', startTime: toIso(now() - DAY * 7), endTime: end }
       })
     : ([] as Array<{ startTime: string; endTime: string; metadata?: { id?: string; dataOrigin?: string; clientRecordId?: string; device?: { manufacturer?: string; model?: string; type?: number }; recordingMethod?: number } }>);
 
@@ -495,7 +497,7 @@ const syncFromHealthConnectInternal = async (): Promise<WearableSyncPayload> => 
   );
   if (hasPermission(grantedSet, 'SleepSession')) {
     if (connectedMetrics.sleep !== 'read_failed') connectedMetrics.sleep = sleepMinutes > 0 ? 'synced' : 'no_recent_data';
-    sleepRecords.filter((record) => within(record.endTime, DAY * 2)).forEach((record) => {
+    sleepRecords.filter((record) => within(record.endTime, DAY * 7)).forEach((record) => {
       const minutes = Math.max(0, (+new Date(record.endTime) - +new Date(record.startTime)) / 60000);
       addObservation('sleep_minutes', minutes, 'min', record.endTime, 'SleepSession', record);
     });

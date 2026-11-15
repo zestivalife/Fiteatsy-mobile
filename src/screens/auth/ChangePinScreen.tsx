@@ -6,7 +6,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { getThemeColors, radius, shadows, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
-import { AuthServiceError, changePin } from '../../services/authService';
+import { AuthServiceError, changePin, createLoginPin } from '../../services/authService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChangePin'>;
 
@@ -16,6 +16,7 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
   const { authSession, themeMode } = useAppContext();
   const palette = getThemeColors(themeMode);
   const force = route.params?.force === true;
+  const initialSetup = route.params?.initialSetup === true;
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmNewPin, setConfirmNewPin] = useState('');
@@ -24,7 +25,7 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
   const [success, setSuccess] = useState<string | null>(null);
 
   const valid =
-    currentPin.length === PIN_LENGTH &&
+    (initialSetup || currentPin.length === PIN_LENGTH) &&
     newPin.length === PIN_LENGTH &&
     confirmNewPin.length === PIN_LENGTH &&
     newPin === confirmNewPin &&
@@ -45,13 +46,13 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
     setSuccess(null);
     setSaving(true);
     try {
-      await changePin(authSession.sessionToken, {
-        currentPin,
-        newPin,
-        confirmNewPin
-      });
-      setSuccess('PIN changed successfully.');
-      navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+      if (initialSetup) {
+        await createLoginPin(authSession.sessionToken, { newPin, confirmNewPin });
+      } else {
+        await changePin(authSession.sessionToken, { currentPin, newPin, confirmNewPin });
+      }
+      setSuccess(initialSetup ? 'Login PIN created successfully.' : 'PIN changed successfully.');
+      navigation.reset({ index: 0, routes: [{ name: initialSetup ? 'OnboardingBasics' : 'Splash' }] });
     } catch (e) {
       const err = e as AuthServiceError;
       console.error('[ChangePinScreen] CHANGE PIN FAILED', {
@@ -60,6 +61,10 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
         retryAfterSec: err.retryAfterSec,
         stack: err.stack
       });
+      if (initialSetup && err.code === 'PIN_ALREADY_CONFIGURED') {
+        navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+        return;
+      }
       setError(err.message);
     } finally {
       setSaving(false);
@@ -100,13 +105,13 @@ export const ChangePinScreen = ({ navigation, route }: Props) => {
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
           <Text style={[styles.kicker, { color: palette.blue }]}>Security</Text>
           <Text style={[styles.title, { color: palette.textPrimary }]}>
-            {force ? 'Please create your personal PIN' : 'Change PIN'}
+            {initialSetup || force ? 'Create your personal Login PIN' : 'Change Login PIN'}
           </Text>
           <Text style={[styles.body, { color: palette.textSecondary }]}>
             Use exactly 6 digits. Do not reuse the temporary default PIN.
           </Text>
 
-          {renderPinInput('Current PIN', currentPin, setCurrentPin, force ? '123456' : 'Current PIN')}
+          {!initialSetup ? renderPinInput('Current PIN', currentPin, setCurrentPin, force ? '123456' : 'Current PIN') : null}
           {renderPinInput('New PIN', newPin, setNewPin, 'New 6 digit PIN')}
           {renderPinInput('Confirm New PIN', confirmNewPin, setConfirmNewPin, 'Confirm PIN')}
 

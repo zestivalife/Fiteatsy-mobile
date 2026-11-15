@@ -222,11 +222,14 @@ export const verifyOtpChallenge = async (challengeId, otp, metadata = {}) => {
             email: challenge.user.email,
             mobileNumber: challenge.user.mobileNumber
         });
+        const pinUser = await findUserByIdForPin(user.id);
         const { token } = await createAuthSession(user.id, metadata);
         const client = await createOrResolveClientForAccount(user.id);
         await ensureClientHealthProfile(user.id, client.id);
         return {
             sessionToken: token,
+            requiresPinSetup: !pinUser?.pinHash,
+            requiresPinChange: Boolean(pinUser?.forcePinChange),
             user: {
                 id: user.id,
                 name: user.name,
@@ -340,6 +343,46 @@ export const changePin = async (userId, input, metadata = {}) => {
         ipAddress: metadata.ipAddress
     });
     return { ok: true };
+};
+export const createInitialPin = async (userId, input, metadata = {}) => {
+    const newPin = input.newPin.trim();
+    assertPinShape(newPin);
+    const user = await findUserByIdForPin(userId);
+    if (!user) {
+        throw asDomainError({ code: 'PIN_USER_NOT_FOUND', message: 'Authenticated account was not found.' });
+    }
+    if (user.pinHash) {
+        throw asDomainError({ code: 'PIN_ALREADY_CONFIGURED', message: 'A Login PIN is already configured for this account.' });
+    }
+    if (newPin === DEFAULT_PIN) {
+        throw asDomainError({ code: 'PIN_REUSE_NOT_ALLOWED', message: 'Choose a personal PIN instead of the temporary PIN.' });
+    }
+    await setUserPinHash(user.id, await bcrypt.hash(newPin, PIN_BCRYPT_ROUNDS), { forcePinChange: false });
+    await createAuthEvent({
+        userId: user.id,
+        event: 'PIN_INITIALIZED',
+        metadata: {},
+        userAgent: metadata.userAgent,
+        ipAddress: metadata.ipAddress
+    });
+    return { ok: true };
+};
+export const issueTemporaryLoginPin = async (actorUserId, targetUserId, metadata = {}) => {
+    const user = await findUserByIdForPin(targetUserId);
+    if (!user)
+        throw asDomainError({ code: 'PIN_USER_NOT_FOUND', message: 'The Fiteatsy account was not found.' });
+    let temporaryPin = DEFAULT_PIN;
+    while (temporaryPin === DEFAULT_PIN)
+        temporaryPin = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    await setUserPinHash(user.id, await bcrypt.hash(temporaryPin, PIN_BCRYPT_ROUNDS), { forcePinChange: true });
+    await createAuthEvent({
+        userId: user.id,
+        event: 'TEMPORARY_LOGIN_PIN_ISSUED',
+        metadata: { actorUserId },
+        userAgent: metadata.userAgent,
+        ipAddress: metadata.ipAddress
+    });
+    return { temporaryPin, forcePinChange: true };
 };
 export const resetOtpChallengesForTests = () => {
     otpStore.resetForTests();

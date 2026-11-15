@@ -1,0 +1,15 @@
+<?php
+declare(strict_types=1);
+namespace App\Controllers;
+
+use App\Core\Auth;use App\Core\Database;use App\Core\View;
+
+final class AuthController
+{
+    public function login():void{if(auth())redirect('account');View::render('auth/login',['title'=>'Citizen login']);}
+    public function authenticate():void{$email=mb_strtolower(trim($_POST['email']??''));$identity=hash('sha256',$email.'|'.($_SERVER['REMOTE_ADDR']??''));$rate=Database::one('SELECT * FROM rate_limit_records WHERE action_key=? AND identity_hash=?',['login',$identity]);if($rate&&$rate['blocked_until']&&strtotime($rate['blocked_until'])>time()){flash('error','Too many attempts. Please try again later.');redirect('login');}if(!Auth::attempt($email,$_POST['password']??'')){if($rate){$attempts=(int)$rate['attempts']+1;Database::run('UPDATE rate_limit_records SET attempts=?,blocked_until=? WHERE id=?',[$attempts,$attempts>=5?date('Y-m-d H:i:s',time()+900):null,$rate['id']]);}else Database::run('INSERT INTO rate_limit_records(action_key,identity_hash,window_started_at) VALUES(?,?,CURRENT_TIMESTAMP)',['login',$identity]);flash('error','The email or password is incorrect.');redirect('login');}Database::run('DELETE FROM rate_limit_records WHERE action_key=? AND identity_hash=?',['login',$identity]);redirect('account');}
+    public function register():void{View::render('auth/register',['title'=>'Create citizen account']);}
+    public function store():void{$name=trim($_POST['full_name']??'');$email=mb_strtolower(trim($_POST['email']??''));$password=$_POST['password']??'';if(mb_strlen($name)<2||!filter_var($email,FILTER_VALIDATE_EMAIL)||strlen($password)<10||$password!==($_POST['password_confirmation']??'')){$_SESSION['_old']=$_POST;flash('error','Use a valid name, email and matching password of at least 10 characters.');redirect('register');}if(Database::one('SELECT id FROM users WHERE email=?',[$email])){flash('error','An account cannot be created with those details.');redirect('register');}Database::connection()->beginTransaction();try{Database::run('INSERT INTO users(full_name,email,password_hash,mobile,locality,status) VALUES(?,?,?,?,?,?)',[$name,$email,password_hash($password,PASSWORD_DEFAULT),trim($_POST['mobile']??''),trim($_POST['locality']??''),'active']);$id=Database::id();Database::run("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE slug='citizen'",[$id]);Database::connection()->commit();}catch(\Throwable $e){Database::connection()->rollBack();throw $e;}Auth::attempt($email,$password);redirect('account');}
+    public function logout():void{Auth::logout();redirect('');}
+    public function account():void{Auth::requireLogin();$u=auth();$issues=Database::all('SELECT * FROM civic_issues WHERE user_id=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 10',[$u['id']]);$discussions=Database::all('SELECT * FROM discussions WHERE user_id=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 10',[$u['id']]);$notifications=Database::all('SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 20',[$u['id']]);View::render('citizen/dashboard',compact('u','issues','discussions','notifications'));}
+}

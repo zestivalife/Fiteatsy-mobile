@@ -1,0 +1,415 @@
+{
+  "schemaVersion": "FITEATSY_FOOD_USDA_ADJUDICATION_V17_33A_BEFORE",
+  "baselineSha": "f1c3ec584a72acdfa92863f049b32623e3cbf814",
+  "processorVersion": "FOOD_USDA_ADJUDICATION_V17_33A",
+  "sourceArtifact": "food_resolution_v17_32c_decisions.json",
+  "cohortCount": 35,
+  "priorDecisionCounts": {
+    "STATE_MISMATCH_CONFIRMED": 7,
+    "IDENTITY_AMBIGUOUS_CONFIRMED": 28
+  },
+  "generatedAt": "2026-09-07T00:00:00.000Z",
+  "records": [
+    {
+      "referenceItemId": "BATCH0_30",
+      "canonicalName": "Bottle gourd",
+      "aliases": [
+        "Lauki",
+        "Doodhi",
+        "Ghiya"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_31",
+      "canonicalName": "Ridge gourd",
+      "aliases": [
+        "Turai",
+        "Dodka"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_32",
+      "canonicalName": "Sponge gourd",
+      "aliases": [
+        "Gilki",
+        "Ghosale"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_34",
+      "canonicalName": "Snake gourd",
+      "aliases": [
+        "Padwal",
+        "Chichinda"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_35",
+      "canonicalName": "Ash gourd",
+      "aliases": [
+        "Petha",
+        "Winter melon"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_37",
+      "canonicalName": "Pointed gourd",
+      "aliases": [
+        "Parwal",
+        "Potol"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_38",
+      "canonicalName": "Ivy gourd",
+      "aliases": [
+        "Tindora",
+        "Kundru",
+        "Tendli"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_39",
+      "canonicalName": "Round gourd",
+      "aliases": [
+        "Tinda"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_40",
+      "canonicalName": "Spine gourd",
+      "aliases": [
+        "Kantola",
+        "Kakora"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_43",
+      "canonicalName": "Yellow cucumber",
+      "aliases": [
+        "Dosakaya"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_47",
+      "canonicalName": "Brinjal, purple",
+      "aliases": [
+        "Baingan",
+        "Vangi"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_49",
+      "canonicalName": "Brinjal, green",
+      "aliases": [
+        "Green brinjal"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_54",
+      "canonicalName": "Green chilli",
+      "aliases": [
+        "Hari mirch"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_56",
+      "canonicalName": "Raw banana",
+      "aliases": [
+        "Kaccha kela",
+        "Plantain"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables"
+    },
+    {
+      "referenceItemId": "BATCH0_66",
+      "canonicalName": "Elephant foot yam",
+      "aliases": [
+        "Suran",
+        "Jimikand"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs"
+    },
+    {
+      "referenceItemId": "BATCH0_68",
+      "canonicalName": "Purple yam",
+      "aliases": [
+        "Ratalu",
+        "Kand"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs"
+    },
+    {
+      "referenceItemId": "BATCH0_70",
+      "canonicalName": "Chinese potato",
+      "aliases": [
+        "Koorka"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs"
+    },
+    {
+      "referenceItemId": "BATCH0_72",
+      "canonicalName": "Onion, red",
+      "aliases": [
+        "Pyaz"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs"
+    },
+    {
+      "referenceItemId": "BATCH0_73",
+      "canonicalName": "Onion, white",
+      "aliases": [
+        "White onion"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "STATE_MISMATCH_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs"
+    },
+    {
+      "referenceItemId": "BATCH0_77",
+      "canonicalName": "Fresh turmeric",
+      "aliases": [
+        "Kacchi haldi"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs"
+    },
+    {
+      "referenceItemId": "BATCH0_86",
+      "canonicalName": "Cluster beans",
+      "aliases": [
+        "Gawar",
+        "Guar"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms"
+    },
+    {
+      "referenceItemId": "BATCH0_87",
+      "canonicalName": "Yardlong beans",
+      "aliases": [
+        "Chawli pods",
+        "Borboti"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "STATE_MISMATCH_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms"
+    },
+    {
+      "referenceItemId": "BATCH0_90",
+      "canonicalName": "Cowpea pods",
+      "aliases": [
+        "Chawli green pods"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms"
+    },
+    {
+      "referenceItemId": "BATCH0_92",
+      "canonicalName": "Fresh pigeon peas",
+      "aliases": [
+        "Tuvar lilva"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "STATE_MISMATCH_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms"
+    },
+    {
+      "referenceItemId": "BATCH0_93",
+      "canonicalName": "Fresh chickpeas",
+      "aliases": [
+        "Hara chana"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "STATE_MISMATCH_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms"
+    },
+    {
+      "referenceItemId": "BATCH0_94",
+      "canonicalName": "Banana flower",
+      "aliases": [
+        "Kele ka phool"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms"
+    },
+    {
+      "referenceItemId": "BATCH0_95",
+      "canonicalName": "Banana stem",
+      "aliases": [
+        "Kele ka tana"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms"
+    },
+    {
+      "referenceItemId": "BATCH0_100",
+      "canonicalName": "Milky mushroom",
+      "aliases": [
+        "Milky mushroom"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms"
+    },
+    {
+      "referenceItemId": "BATCH0_119",
+      "canonicalName": "Dragon fruit",
+      "aliases": [
+        "Pitaya"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "STATE_MISMATCH_CONFIRMED",
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits"
+    },
+    {
+      "referenceItemId": "BATCH0_121",
+      "canonicalName": "Strawberry",
+      "aliases": [
+        "Strawberry"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits"
+    },
+    {
+      "referenceItemId": "BATCH0_122",
+      "canonicalName": "Blueberry",
+      "aliases": [
+        "Blueberry"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits"
+    },
+    {
+      "referenceItemId": "BATCH0_127",
+      "canonicalName": "Dates, dried",
+      "aliases": [
+        "Khajur"
+      ],
+      "exactState": "DRIED",
+      "priorDecision": "STATE_MISMATCH_CONFIRMED",
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits"
+    },
+    {
+      "referenceItemId": "BATCH0_128",
+      "canonicalName": "Raisins",
+      "aliases": [
+        "Kishmish"
+      ],
+      "exactState": "DRIED",
+      "priorDecision": "STATE_MISMATCH_CONFIRMED",
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits"
+    },
+    {
+      "referenceItemId": "BATCH0_132",
+      "canonicalName": "Star fruit",
+      "aliases": [
+        "Kamrakh"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits"
+    },
+    {
+      "referenceItemId": "BATCH0_133",
+      "canonicalName": "Jackfruit, ripe",
+      "aliases": [
+        "Kathal"
+      ],
+      "exactState": "RAW",
+      "priorDecision": "IDENTITY_AMBIGUOUS_CONFIRMED",
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits"
+    }
+  ]
+}

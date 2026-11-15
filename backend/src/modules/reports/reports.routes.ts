@@ -209,8 +209,15 @@ const analyzeAndPersistReport = async (input: {
     qualityGate: selectedAnalysis.qualityGate.status
   });
   if (selectedAnalysis.qualityGate.canPublish) {
-    await syncReportPipelineToPlatform(input.owner, input.reportId, 'biomarkers_updated', `Biomarkers extracted from ${input.fileName}`);
-    await syncReportPipelineToPlatform(input.owner, input.reportId, 'analysis_completed', `AI validation completed for ${input.fileName}`);
+    try {
+      await syncReportPipelineToPlatform(input.owner, input.reportId, 'biomarkers_updated', `Biomarkers extracted from ${input.fileName}`);
+      await syncReportPipelineToPlatform(input.owner, input.reportId, 'analysis_completed', `AI validation completed for ${input.fileName}`);
+    } catch (error) {
+      logReportRuntime('processing:platform-sync-failed', {
+        reportId: input.reportId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
   const publicAnalysis = sanitizeReportAnalysisForPublic(selectedAnalysis);
   return {
@@ -663,6 +670,7 @@ reportsRouter.post('/analyze/start', upload.single('reportFile'), async (req, re
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to start report analysis.';
+    logReportRuntime('upload:start:failed', { reportId: currentReportId, processingJobId: currentJobId, message });
     if (currentReportId) {
       await updateReportStatus(currentReportId, 'FAILED', message);
     }

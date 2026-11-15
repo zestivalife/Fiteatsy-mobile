@@ -38,7 +38,12 @@ const observationSchema = z.object({
 const metricUnits: Record<string, ReadonlySet<string>> = {
   steps: new Set(['count']),
   sleep_minutes: new Set(['min']),
+  sleep_asleep_minutes: new Set(['min']),
+  sleep_core_minutes: new Set(['min']),
+  sleep_deep_minutes: new Set(['min']),
+  sleep_rem_minutes: new Set(['min']),
   resting_heart_rate: new Set(['bpm']),
+  heart_rate: new Set(['bpm']),
   hrv_ms: new Set(['ms']),
   workout_minutes: new Set(['min']),
   active_minutes: new Set(['min']),
@@ -47,7 +52,9 @@ const metricUnits: Record<string, ReadonlySet<string>> = {
   distance: new Set(['m']),
   hydration_ml: new Set(['ml']),
   stress_score: new Set(['score']),
-  mindfulness_minutes: new Set(['min'])
+  mindfulness_minutes: new Set(['min']),
+  spo2_pct: new Set(['%']),
+  respiratory_rate_brpm: new Set(['brpm'])
 };
 
 const validateObservation = (observation: z.infer<typeof observationSchema>) => {

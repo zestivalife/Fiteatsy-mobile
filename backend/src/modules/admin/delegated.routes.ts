@@ -5,6 +5,8 @@ import { requireDelegatedAuthority } from '../auth/delegated-authority.middlewar
 import { executeDelegatedIdempotently } from './delegated-operation-idempotency.js';
 import { issueQaAdminSessionHandoff } from '../auth/qa-session-handoff.js';
 import { createQaAssignment, deactivateQaIdentity, provisionQaIdentity, recordQaIdentityReuse, resetQaOnboarding, revokeQaAssignment } from './qa-provisioning.repository.js';
+import { listFiteatsyIntakeLeads } from './admin.repository.js';
+import { issueTemporaryLoginPin } from '../auth/auth.service.js';
 
 export const delegatedRouter = Router();
 
@@ -29,6 +31,30 @@ const respondError = (res: Response, error: unknown, fallback: string) => {
   return res.status(typed.status ?? 500).json({ error: typed.code ?? fallback, message: typed.status ? typed.message : 'Fiteatsy operation could not be completed.' });
 };
 const correlationReason = (req: Request, reason: string) => `${reason} [correlation:${req.header('x-correlation-id') || 'unavailable'}]`;
+
+delegatedRouter.get('/intake-leads', requireDelegatedAuthority('fiteatsy.leads.read', 'lead_management', 'platform_owner'), async (_req, res) => {
+  try {
+    return res.status(200).json({ leads: await listFiteatsyIntakeLeads() });
+  } catch (error) { return respondError(res, error, 'FITEATSY_LEADS_FAILED'); }
+});
+
+delegatedRouter.post('/users/:userId/temporary-login-pin', requireDelegatedAuthority('fiteatsy.login_pin.issue', 'login_pin_recovery', 'platform_owner'), async (req, res) => {
+  const parsed = reasonSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const result = await executeDelegatedIdempotently({
+      operation: 'temporary_login_pin_issue',
+      key: req.header('idempotency-key') || '',
+      execute: () => issueTemporaryLoginPin(actorId(req), String(req.params.userId), {
+        userAgent: req.header('user-agent') ?? null,
+        ipAddress: req.ip || null,
+      }),
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.status(result.replayed ? 200 : 201).json({ ...result.value, displayOnce: true, idempotentReplay: result.replayed });
+  } catch (error) { return respondError(res, error, 'PIN_ISSUE_FAILED'); }
+});
 
 delegatedRouter.post('/qa-clients', requireDelegatedAuthority('fiteatsy.qa.identity.create', 'qa_provisioning'), async (req, res) => {
   const parsed = identitySchema.safeParse(req.body);

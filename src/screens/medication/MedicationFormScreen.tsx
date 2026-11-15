@@ -318,7 +318,7 @@ export const MedicationFormScreen = ({ route, navigation }: Props) => {
   };
 
   return (
-    <Screen>
+    <Screen keyboardAware>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <AppBackButton onPress={() => navigation.goBack()} iconOnly />

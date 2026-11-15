@@ -15,6 +15,39 @@ import {
 
 const nowIso = () => new Date().toISOString();
 
+const resolveNotificationTenantId = async (userId: string, clientId: string | null): Promise<string> => {
+  const result = await pool.query<{ tenant_id: string | null; account_user_id: string | null }>(
+    `select client.tenant_id, client.account_user_id
+       from users account
+       left join fiteatsy_clients client
+         on client.id = $2
+        and client.deleted_at is null
+      where account.id = $1
+      limit 1`,
+    [userId, clientId]
+  );
+  const ownership = result.rows[0];
+  if (clientId != null && (!ownership || ownership.account_user_id !== userId)) {
+    throw new Error('TENANT_RESOURCE_MISMATCH');
+  }
+  if (ownership?.tenant_id) return ownership.tenant_id;
+
+  const membership = await pool.query<{ tenant_id: string }>(
+    `select membership.tenant_id
+       from tenant_memberships membership
+       join tenants tenant on tenant.id = membership.tenant_id
+      where membership.user_id = $1
+        and membership.status = 'active'
+        and tenant.status = 'active'
+      order by (tenant.tenant_type = 'ZESTIVA_INTERNAL') desc, membership.joined_at asc
+      limit 1`,
+    [userId]
+  );
+  const tenantId = membership.rows[0]?.tenant_id;
+  if (!tenantId) throw new Error('TENANT_CONTEXT_REQUIRED');
+  return tenantId;
+};
+
 const toIso = (value: unknown) => {
   if (value == null) return null;
   return new Date(String(value)).toISOString();
@@ -727,20 +760,16 @@ export const createCareCaseIfMissing = async (
     `
       insert into care_cases (
         id, user_id, client_id, health_profile_id, recovery_program_id, assigned_consultant_id, assigned_mentor_id,
-        current_stage, previous_stage, last_transition_at, status, version, created_at, updated_at, deleted_at
-      )
-      select
+        current_stage, previous_stage, last_transition_at, status, version, created_at, updated_at, deleted_at, tenant_id
+      ) values (
         $1, $2, $3, $4, $5, null, null,
-        $6, null, $7, 'active', 1, $7, $7, null
-      from fiteatsy_clients
-      where id = $3
-        and account_user_id = $2
-        and deleted_at is null
+        $6, null, $7, 'active', 1, $7, $7, null,
+        (select tenant_id from fiteatsy_clients where id = $3 and account_user_id = $2 and deleted_at is null)
+      )
       returning *
     `,
     [crypto.randomUUID(), owner.accountId, owner.clientId, healthProfileId, recoveryProgramId, stage, nowIso()]
   );
-  if (inserted.rowCount === 0) throw new Error('Client ownership could not be verified');
   return mapCareCase(inserted.rows[0]);
 };
 
@@ -986,14 +1015,15 @@ export const updateHealthTicket = async (ticketId: string, patch: Partial<Health
 
 export const createNotificationRecord = async (input: Omit<NotificationRecord, 'id' | 'createdAtISO' | 'updatedAtISO' | 'deletedAtISO' | 'version' | 'status' | 'readAtISO' | 'dismissedAtISO'>) => {
   const createdAtISO = nowIso();
+  const tenantId = await resolveNotificationTenantId(input.userId, input.clientId);
   const inserted = await pool.query(
     `
       insert into notifications (
         id, user_id, client_id, care_case_id, channel, title, body, sent_at,
-        status, version, created_at, updated_at, deleted_at
+        status, version, created_at, updated_at, deleted_at, tenant_id
       ) values (
         $1, $2, $3, $4, $5, $6, $7, $8,
-        'active', 1, $9, $9, null
+        'active', 1, $9, $9, null, $10
       )
       returning *
     `,
@@ -1006,7 +1036,8 @@ export const createNotificationRecord = async (input: Omit<NotificationRecord, '
       input.title,
       input.body,
       input.sentAtISO,
-      createdAtISO
+      createdAtISO,
+      tenantId
     ]
   );
   return mapNotification(inserted.rows[0]);

@@ -97,7 +97,7 @@ export const persistReportIntelligence = async (
   const observations = [];
   for (const parameter of analysis.parameters) {
     const name = canonicalName(parameter.name);
-    const biomarker = await upsertBiomarker({
+    const biomarker = await upsertBiomarker(owner, {
       canonicalName: name,
       aliases: aliasesForCanonicalName(name, parameter.name),
       category: mapCategory(parameter),

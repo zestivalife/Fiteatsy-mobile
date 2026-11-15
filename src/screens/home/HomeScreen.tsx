@@ -7,7 +7,6 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, SvgProps } from 'react-native-svg';
-import AssistIcon from '../../assets/fiteatsy-home/assist.svg';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
 import ProgressDonutChartAsset from '../../assets/fiteatsy-home/progress-donut-chart.svg';
 import ActivityDefaultIcon from '../../assets/fiteatsy-home/activity-inactive.svg';
@@ -304,12 +303,7 @@ export const HomeScreen = () => {
             />
 
             <View style={styles.actionRow}>
-              <ActionPill
-                label="Plans"
-                Icon={AssistIcon}
-                onPress={() => navigation.navigate('SubscriptionPlans', { source: 'subscription_management' })}
-              />
-              <ActionPill label="My Fitness" Icon={HealthDataActionIcon} onPress={() => navigation.navigate('HealthData')} />
+              <ActionPill label="Fitness" Icon={HealthDataActionIcon} onPress={() => navigation.navigate('Fitness')} />
               <ActionPill label="Health Reports" Icon={ReportsActionIcon} onPress={() => navigation.navigate('Reports')} />
               <ActionPill label="Cycle" Icon={CycleActionIcon} onPress={() => navigation.navigate('Cycle')} />
             </View>

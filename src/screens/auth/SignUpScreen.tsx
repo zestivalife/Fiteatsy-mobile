@@ -26,6 +26,7 @@ import {
   verifySignupOtp,
   type SignupOtpResponse
 } from '../../services/authService';
+import { resolvePostSignupDestination } from '../../services/authNavigationPolicy';
 import { getPhoneDigits, normalizePhoneNumber } from '../../utils/phone';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
@@ -222,7 +223,10 @@ export const SignUpScreen = ({ navigation }: Props) => {
         createdAtISO: previous?.createdAtISO ?? new Date().toISOString()
       }));
       try {
-        navigation.reset({ index: 0, routes: [{ name: 'OnboardingBasics' }] });
+        navigation.reset({
+          index: 0,
+          routes: [resolvePostSignupDestination(session.requiresPinSetup, session.requiresPinChange)]
+        });
       } catch (navigationError) {
         console.error('[SignUpScreen] OTP VERIFY NAVIGATION FAILED', {
           errorMessage: navigationError instanceof Error ? navigationError.message : String(navigationError),
@@ -261,7 +265,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen>
+    <Screen scroll keyboardAware>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
         {phase === 'collect' ? (
           <>

@@ -5,15 +5,16 @@ import { ChoiceCard, OnboardingAction, OnboardingShell, QuestionHeader } from '.
 import { colors, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
+import { setOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingNotifications'>;
 
 export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
-  const { onboarding, setOnboarding, setWearableSetupCompleted } = useAppContext();
+  const { onboarding, setOnboarding, authSession } = useAppContext();
   const [allowReminders, setAllowReminders] = useState<'Yes' | 'No'>(onboarding?.notificationPermissionGranted ? 'Yes' : 'No');
   const complete = () => {
     if (onboarding) setOnboarding({ ...onboarding, notificationPermissionGranted: allowReminders === 'Yes' });
-    setWearableSetupCompleted(false);
+    void setOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId, { phase: 'ready', step: 1 });
     navigation.navigate('OnboardingReady');
   };
   return <OnboardingShell phase="CONNECT" step={3} total={3} onBack={() => navigation.goBack()} action={<OnboardingAction title="Continue" onPress={complete} />}>

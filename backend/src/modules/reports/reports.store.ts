@@ -90,6 +90,23 @@ export type DocumentIntelligenceTriggerSource = 'USER_REANALYZE' | 'UPLOAD' | 'A
 
 const nowIso = () => new Date().toISOString();
 
+const resolveReportTenantId = async (userId: string): Promise<string> => {
+  const result = await pool.query<{ tenant_id: string }>(
+    `select membership.tenant_id
+       from tenant_memberships membership
+       join tenants tenant on tenant.id = membership.tenant_id
+      where membership.user_id = $1
+        and membership.status = 'active'
+        and tenant.status = 'active'
+      order by (tenant.tenant_type = 'ZESTIVA_INTERNAL') desc, membership.joined_at asc
+      limit 1`,
+    [userId]
+  );
+  const tenantId = result.rows[0]?.tenant_id;
+  if (!tenantId) throw new Error('TENANT_CONTEXT_REQUIRED');
+  return tenantId;
+};
+
 const parseJson = <T>(value: unknown, fallback: T): T => {
   if (value == null) return fallback;
   if (typeof value === 'string') {
@@ -206,16 +223,17 @@ export const createUploadSession = async (input: {
   source?: 'camera' | 'gallery' | 'pdf';
 }) => {
   const id = `upl_${crypto.randomUUID()}`;
-  const storageObjectRef = `pending-report://${input.clientId}/${id}/${encodeURIComponent(input.fileName)}`;
+  const tenantId = await resolveReportTenantId(input.userId);
+  const storageObjectRef = `pending-report://${tenantId}/${input.clientId}/${id}/${encodeURIComponent(input.fileName)}`;
   const result = await pool.query(
     `
       insert into health_report_upload_sessions (
-        id, user_id, client_id, file_name, mime_type, file_size, upload_source, storage_object_ref, expires_at
+        id, user_id, client_id, file_name, mime_type, file_size, upload_source, storage_object_ref, expires_at, tenant_id
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, now() + interval '15 minutes')
+      values ($1, $2, $3, $4, $5, $6, $7, $8, now() + interval '15 minutes', $9)
       returning *
     `,
-    [id, input.userId, input.clientId, input.fileName, input.mimeType, input.fileSize, input.source ?? null, storageObjectRef]
+    [id, input.userId, input.clientId, input.fileName, input.mimeType, input.fileSize, input.source ?? null, storageObjectRef, tenantId]
   );
   return rowToUploadSession(result.rows[0]);
 };
@@ -269,13 +287,14 @@ export const createReportRecord = async (input: {
   documentHash?: string;
 }) => {
   const id = `rep_${crypto.randomUUID()}`;
+  const tenantId = await resolveReportTenantId(input.userId);
   const result = await pool.query(
     `
       insert into health_reports (
         id, user_id, client_id, report_type, storage_object_ref, original_filename, mime_type,
-        file_size, upload_source, processing_status, report_date, lab_name, document_hash
+        file_size, upload_source, processing_status, report_date, lab_name, document_hash, tenant_id
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'UPLOADED', $10, $11, $12)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'UPLOADED', $10, $11, $12, $13)
       returning *
     `,
     [
@@ -283,14 +302,15 @@ export const createReportRecord = async (input: {
       input.userId,
       input.clientId,
       input.reportType ?? 'medical_report',
-      input.storageObjectRef ?? `report://${input.clientId}/${id}/${encodeURIComponent(input.fileName)}`,
+      input.storageObjectRef ?? `report://${tenantId}/${input.clientId}/${id}/${encodeURIComponent(input.fileName)}`,
       input.fileName,
       input.mimeType,
       input.fileSize,
       input.source ?? null,
       input.reportDate ?? null,
       input.labName ?? null,
-      input.documentHash ?? null
+      input.documentHash ?? null,
+      tenantId
     ]
   );
   return rowToReport(result.rows[0]);
@@ -301,10 +321,11 @@ export const saveReportFile = async (
   owner: { userId: string; clientId: string },
   input: { mimeType: string; fileName: string; fileSize: number; content: Buffer }
 ) => {
+  const tenantId = await resolveReportTenantId(owner.userId);
   await pool.query(
     `
-      insert into health_report_files (report_id, user_id, client_id, mime_type, original_filename, file_size, content)
-      values ($1, $2, $3, $4, $5, $6, $7)
+      insert into health_report_files (report_id, user_id, client_id, mime_type, original_filename, file_size, content, tenant_id)
+      values ($1, $2, $3, $4, $5, $6, $7, $8)
       on conflict (report_id)
       do update set
         mime_type = excluded.mime_type,
@@ -313,7 +334,7 @@ export const saveReportFile = async (
         content = excluded.content,
         created_at = now()
     `,
-    [reportId, owner.userId, owner.clientId, input.mimeType, input.fileName, input.fileSize, input.content]
+    [reportId, owner.userId, owner.clientId, input.mimeType, input.fileName, input.fileSize, input.content, tenantId]
   );
 };
 

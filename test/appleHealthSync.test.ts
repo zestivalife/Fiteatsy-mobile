@@ -119,9 +119,11 @@ describe('Apple Health sync', () => {
     mockHealthKit.queryStatisticsCollectionForQuantity.mockImplementation(async (identifier: string) =>
       identifier.endsWith('StepCount') ? [completedHour(3, 500), completedHour(2, 0), completedHour(1, 700)] : []
     );
-    mockHealthKit.queryCategorySamples.mockResolvedValue([
-      { uuid: 'sleep-1', value: 3, startDate: at(9), endDate: at(5), sourceRevision: source('com.apple.health') }
-    ]);
+    mockHealthKit.queryCategorySamples.mockImplementation(async (identifier: string) =>
+      identifier.endsWith('SleepAnalysis')
+        ? [{ uuid: 'sleep-1', value: 3, startDate: at(9), endDate: at(5), sourceRevision: source('com.apple.health') }]
+        : []
+    );
     mockHealthKit.queryQuantitySamples.mockImplementation(async (identifier: string) => {
       if (identifier.endsWith('RestingHeartRate')) {
         return [{ uuid: 'hr-1', quantity: 60, startDate: at(3), endDate: at(3), sourceRevision: source('com.apple.health') }];
@@ -132,7 +134,7 @@ describe('Apple Health sync', () => {
       return [];
     });
     mockHealthKit.queryWorkoutSamples.mockResolvedValue([
-      { uuid: 'w-1', duration: { unit: 's', quantity: 2400 }, startDate: at(20), endDate: at(19), sourceRevision: source('com.apple.health') }
+      { uuid: 'w-1', duration: { unit: 's', quantity: 2400 }, startDate: at(2), endDate: at(1), sourceRevision: source('com.apple.health') }
     ]);
   });
 
@@ -159,7 +161,7 @@ describe('Apple Health sync', () => {
       stress: 'unsupported'
     });
     expect(payload.observations?.map((o) => o.metricType).sort()).toEqual(
-      ['hrv_ms', 'resting_heart_rate', 'sleep_minutes', 'steps', 'steps', 'workout_minutes'].sort()
+      ['hrv_ms', 'resting_heart_rate', 'sleep_core_minutes', 'sleep_minutes', 'steps', 'steps', 'workout_minutes'].sort()
     );
     expect(payload.observations?.every((o) => o.sourceProvider === 'apple_health' && o.syncKey)).toBe(true);
   });
@@ -191,7 +193,7 @@ describe('Apple Health sync', () => {
     expect(livePayload.observations?.filter((item) => item.metricType === 'steps')).toHaveLength(2);
   });
 
-  it('requests today for live activity and the most recent 6 PM for live sleep', async () => {
+  it('requests seven days for history while retaining local live windows for display totals', async () => {
     await syncFromAppleHealth({ includeCurrentHour: true, liveDisplay: true });
 
     const stepsCall = mockHealthKit.queryStatisticsCollectionForQuantity.mock.calls.find(
@@ -201,9 +203,9 @@ describe('Apple Health sync', () => {
     const heartCall = mockHealthKit.queryQuantitySamples.mock.calls.find(
       ([identifier]) => identifier.endsWith('RestingHeartRate')
     );
-    expect(stepsCall?.[4].filter.date.startDate.getHours()).toBe(0);
-    expect(sleepCall[1].filter.date.startDate.getHours()).toBe(18);
-    expect(heartCall?.[1].filter.date.startDate.getHours()).toBe(0);
+    expect(Date.now() - stepsCall?.[4].filter.date.startDate.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(Date.now() - sleepCall[1].filter.date.startDate.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(Date.now() - heartCall?.[1].filter.date.startDate.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
     expect(stepsCall?.[4].filter.date.endDate.getTime()).toBe(Date.now());
   });
 

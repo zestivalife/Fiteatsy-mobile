@@ -2,6 +2,8 @@ node_modules/
 .expo/
 backend/node_modules/
 backend/.env
+nagpur-citizen-forum/.env
+nagpur-citizen-forum/env.zip
 .DS_Store
 npm-debug.log*
 yarn-debug.log*

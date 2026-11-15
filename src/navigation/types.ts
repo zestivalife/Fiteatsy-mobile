@@ -18,7 +18,7 @@ export type RootStackParamList = {
   } | undefined;
   SignIn: undefined;
   SignUp: undefined;
-  ChangePin: { force?: boolean } | undefined;
+  ChangePin: { force?: boolean; initialSetup?: boolean } | undefined;
   Main: undefined;
   FocusSession: undefined;
   BreathingSession: undefined;
@@ -53,6 +53,7 @@ export type RootStackParamList = {
   Cycle: undefined;
   ConnectedMetrics: undefined;
   HealthData: undefined;
+  Fitness: undefined;
   HealthSyncDebug: undefined;
   MyConsultants: undefined;
   ConnectConsultant: undefined;

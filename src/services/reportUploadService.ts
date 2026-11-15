@@ -166,7 +166,9 @@ export type ReportComparisonProjection = {
 type UploadProgressStage = 'uploading' | 'uploaded' | 'processing' | 'extraction' | 'validation' | 'completed' | 'failed';
 type UploadProgressEvent = { stage: UploadProgressStage; message: string; status?: string; reportId?: string };
 
-const REQUEST_TIMEOUT_MS = 30000;
+// Physical-device uploads can take longer than a normal JSON request. Keep the
+// multipart request alive long enough for large lab PDFs on mobile networks.
+const REQUEST_TIMEOUT_MS = 120000;
 const STATUS_REQUEST_TIMEOUT_MS = 20000;
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 120000;
@@ -183,6 +185,10 @@ const logReportDebug = (event: string, payload: Record<string, unknown>) => {
 };
 
 const isTerminalHttpError = (error: unknown) => error instanceof Error && error.message.startsWith('REPORT_API_HTTP_');
+
+export const isReportAnalysisTimeoutError = (error: unknown) =>
+  error instanceof Error &&
+  (error.message === 'REQUEST_TIMEOUT' || error.message.startsWith('Analysis timed out.'));
 
 const getBaseUrls = () => {
   return unique([apiBaseUrl]);

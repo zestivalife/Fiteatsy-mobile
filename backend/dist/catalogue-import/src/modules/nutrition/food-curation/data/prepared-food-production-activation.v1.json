@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "FITEATSY_PREPARED_FOOD_PRODUCTION_ACTIVATION_V1",
+  "activationVersion": 1,
+  "records": [
+    {"auditEventId":"PF_ACT_20260904_CHAPATI_V1","releaseId":"BATCH1_CP_CHAPATI_VR1","previousState":"NOT_PRODUCTION_ACTIVE","newState":"PRODUCTION_ACTIVE","activationTimestamp":"2026-09-04T11:45:00Z","activatingActor":"FITEATSY_GOVERNED_RELEASE_PIPELINE","activationReason":"Explicit Product Owner approval for separate v17.20 production activation","sourceValidationReference":"batch-1.validation-release.CP_CHAPATI.v1.json","immutableArtifactHash":"d3ea1ee6037f2f9b0c3b057866fac22b19da992bb9fdf2d9e4c4d6bbee31563b"},
+    {"auditEventId":"PF_ACT_20260904_BHINDI_SABJI_V1","releaseId":"BATCH1_CP_BHINDI_SABJI_VR1","previousState":"NOT_PRODUCTION_ACTIVE","newState":"PRODUCTION_ACTIVE","activationTimestamp":"2026-09-04T11:45:00Z","activatingActor":"FITEATSY_GOVERNED_RELEASE_PIPELINE","activationReason":"Explicit Product Owner approval for separate v17.20 production activation","sourceValidationReference":"batch-1.validation-release.CP_BHINDI_SABJI.v1.json","immutableArtifactHash":"18d3ffcd01987d96af695c4d9fd39546e41367992a536f535d1b70505865a2c1"},
+    {"auditEventId":"PF_ACT_20260904_BHINDI_ALOO_V1","releaseId":"BATCH1_CP_BHINDI_ALOO_VR1","previousState":"NOT_PRODUCTION_ACTIVE","newState":"PRODUCTION_ACTIVE","activationTimestamp":"2026-09-04T11:45:00Z","activatingActor":"FITEATSY_GOVERNED_RELEASE_PIPELINE","activationReason":"Explicit Product Owner approval for separate v17.20 production activation","sourceValidationReference":"batch-1.validation-release.CP_BHINDI_ALOO.v1.json","immutableArtifactHash":"e9929cdb691fa95fb001494e2e118bfcfa5b7d156fd53b7e6ad61b9cb6d13d0a"}
+  ]
+}

@@ -2,6 +2,33 @@ import crypto from 'node:crypto';
 import { pool } from '../../db/pool.js';
 import { syncLegacyProfessionalAssignment } from '../professional-assignments/professional-assignments.repository.js';
 const nowIso = () => new Date().toISOString();
+const resolveNotificationTenantId = async (userId, clientId) => {
+    const result = await pool.query(`select client.tenant_id, client.account_user_id
+       from users account
+       left join fiteatsy_clients client
+         on client.id = $2
+        and client.deleted_at is null
+      where account.id = $1
+      limit 1`, [userId, clientId]);
+    const ownership = result.rows[0];
+    if (clientId != null && (!ownership || ownership.account_user_id !== userId)) {
+        throw new Error('TENANT_RESOURCE_MISMATCH');
+    }
+    if (ownership?.tenant_id)
+        return ownership.tenant_id;
+    const membership = await pool.query(`select membership.tenant_id
+       from tenant_memberships membership
+       join tenants tenant on tenant.id = membership.tenant_id
+      where membership.user_id = $1
+        and membership.status = 'active'
+        and tenant.status = 'active'
+      order by (tenant.tenant_type = 'ZESTIVA_INTERNAL') desc, membership.joined_at asc
+      limit 1`, [userId]);
+    const tenantId = membership.rows[0]?.tenant_id;
+    if (!tenantId)
+        throw new Error('TENANT_CONTEXT_REQUIRED');
+    return tenantId;
+};
 const toIso = (value) => {
     if (value == null)
         return null;
@@ -168,6 +195,8 @@ const mapNotification = (row) => ({
     title: String(row.title),
     body: String(row.body),
     sentAtISO: toIso(row.sent_at),
+    readAtISO: toIso(row.read_at),
+    dismissedAtISO: toIso(row.dismissed_at),
     ...mapAuditFields(row)
 });
 const buildHealthProfileDefaults = (owner) => ({
@@ -865,13 +894,14 @@ export const updateHealthTicket = async (ticketId, patch) => {
 };
 export const createNotificationRecord = async (input) => {
     const createdAtISO = nowIso();
+    const tenantId = await resolveNotificationTenantId(input.userId, input.clientId);
     const inserted = await pool.query(`
       insert into notifications (
         id, user_id, client_id, care_case_id, channel, title, body, sent_at,
-        status, version, created_at, updated_at, deleted_at
+        status, version, created_at, updated_at, deleted_at, tenant_id
       ) values (
         $1, $2, $3, $4, $5, $6, $7, $8,
-        'active', 1, $9, $9, null
+        'active', 1, $9, $9, null, $10
       )
       returning *
     `, [
@@ -883,7 +913,8 @@ export const createNotificationRecord = async (input) => {
         input.title,
         input.body,
         input.sentAtISO,
-        createdAtISO
+        createdAtISO,
+        tenantId
     ]);
     return mapNotification(inserted.rows[0]);
 };
@@ -893,9 +924,25 @@ export const listNotificationsForClient = async (clientId) => {
       from notifications
       where client_id = $1
         and deleted_at is null
+        and dismissed_at is null
       order by created_at desc
     `, [clientId]);
     return result.rows.map((row) => mapNotification(row));
+};
+export const updateNotificationStateForClient = async (clientId, notificationId, action) => {
+    const result = await pool.query(`
+      update notifications
+      set
+        read_at = case when $3 = 'read' then coalesce(read_at, now()) when $3 = 'unread' then null else read_at end,
+        dismissed_at = case when $3 = 'dismiss' then coalesce(dismissed_at, now()) else dismissed_at end,
+        updated_at = now(),
+        version = version + 1
+      where id = $1
+        and client_id = $2
+        and deleted_at is null
+      returning *
+    `, [notificationId, clientId, action]);
+    return result.rowCount === 0 ? null : mapNotification(result.rows[0]);
 };
 export const resetPlatformStoreForTests = async () => {
     await pool.query(`

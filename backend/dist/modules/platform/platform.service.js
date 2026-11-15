@@ -1,5 +1,5 @@
 import { countReports } from '../reports/reports.store.js';
-import { createCareCaseIfMissing, createNotificationRecord, createOrUpdateHealthProfile, getCareCaseById, getCareCaseByClientId, getHealthProfileByClientId, listHealthEvents, listHealthTickets, listNotificationsForClient, listTimelineEvents, saveNutritionProfile, addTimelineEvent, addHealthEvent, updateCareCase, } from './platform.store.js';
+import { createCareCaseIfMissing, createNotificationRecord, createOrUpdateHealthProfile, getCareCaseById, getCareCaseByClientId, getHealthProfileByClientId, listHealthEvents, listHealthTickets, listNotificationsForClient, listTimelineEvents, saveNutritionProfile, addTimelineEvent, addHealthEvent, updateCareCase, updateNotificationStateForClient, } from './platform.store.js';
 import { calculateAgeFromDob, calculateNutritionProfileCompletion } from './platform.calculations.js';
 import { createOperationalTicket, transitionCareCaseStage, validateStageTransition } from './platform.lifecycle.js';
 const nowIso = () => new Date().toISOString();
@@ -95,6 +95,7 @@ export const listCareCaseTimeline = async (careCaseId) => listTimelineEvents(car
 export const listCareCaseEvents = async (careCaseId) => listHealthEvents(careCaseId);
 export const listCareCaseTickets = async (careCaseId) => listHealthTickets(careCaseId);
 export const listClientNotifications = async (owner) => listNotificationsForClient(owner.clientId);
+export const updateClientNotification = async (owner, notificationId, action) => updateNotificationStateForClient(owner.clientId, notificationId, action);
 export const assignConsultant = async (owner, careCaseId, consultantId, mentorId) => {
     const careCase = await getCareCaseById(careCaseId);
     if (!careCase)

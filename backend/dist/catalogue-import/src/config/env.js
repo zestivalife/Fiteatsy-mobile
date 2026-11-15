@@ -45,8 +45,8 @@ const resolvePort = () => {
     return parsed;
 };
 const resolveEnvironment = () => readNodeEnv() || readEnvironmentName() || 'development';
-const resolveGitCommit = () => process.env.GIT_COMMIT?.trim() ||
-    process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
+const resolveGitCommit = () => process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
+    process.env.GIT_COMMIT?.trim() ||
     'unknown';
 export const env = {
     get serviceName() {
@@ -122,5 +122,23 @@ export const env = {
     get subscriptionExpiryWarningDays() {
         const parsed = Number(process.env.SUBSCRIPTION_EXPIRY_WARNING_DAYS?.trim() || 7);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+    },
+    get externalConsultantsEnabled() {
+        return process.env.EXTERNAL_FITEATSY_CONNECTION_ENABLED?.trim().toLowerCase() === 'true';
+    },
+    get externalConsultantsBaseUrl() {
+        return process.env.EXTERNAL_FITEATSY_BASE_URL?.trim().replace(/\/$/, '') || '';
+    },
+    get externalConsultantsAssertionPrivateKey() {
+        return process.env.EXTERNAL_FITEATSY_ASSERTION_PRIVATE_KEY?.replace(/\\n/g, '\n').trim() || '';
+    },
+    get externalConsultantsAssertionKeyId() {
+        return process.env.EXTERNAL_FITEATSY_ASSERTION_KEY_ID?.trim() || '';
+    },
+    get externalConsultantsAssertionIssuer() {
+        return process.env.EXTERNAL_FITEATSY_ASSERTION_ISSUER?.trim() || 'fiteatsy-auth-service';
+    },
+    get externalConsultantsAssertionAudience() {
+        return process.env.EXTERNAL_FITEATSY_ASSERTION_AUDIENCE?.trim() || 'practice-operations-service';
     },
 };

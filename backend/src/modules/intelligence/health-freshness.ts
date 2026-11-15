@@ -5,9 +5,16 @@ export const HEALTH_OBSERVATION_FRESHNESS_MS: Record<string, number> = {
   mindfulness_minutes: 24 * 60 * 60 * 1000,
   stress_score: 24 * 60 * 60 * 1000,
   sleep_minutes: 48 * 60 * 60 * 1000,
+  sleep_asleep_minutes: 48 * 60 * 60 * 1000,
+  sleep_core_minutes: 48 * 60 * 60 * 1000,
+  sleep_deep_minutes: 48 * 60 * 60 * 1000,
+  sleep_rem_minutes: 48 * 60 * 60 * 1000,
   resting_heart_rate: 7 * 24 * 60 * 60 * 1000,
+  heart_rate: 24 * 60 * 60 * 1000,
   hrv_ms: 7 * 24 * 60 * 60 * 1000,
-  workout_minutes: 7 * 24 * 60 * 60 * 1000
+  workout_minutes: 7 * 24 * 60 * 60 * 1000,
+  spo2_pct: 7 * 24 * 60 * 60 * 1000,
+  respiratory_rate_brpm: 7 * 24 * 60 * 60 * 1000
 };
 
 export const isCurrentHealthObservation = (

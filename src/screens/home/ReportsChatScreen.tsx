@@ -107,7 +107,7 @@ export const ReportsChatScreen = () => {
   const headerIconColor = colors.textPrimary;
 
   return (
-    <Screen contentStyle={[styles.container, isLight && styles.containerLight]}>
+    <Screen keyboardAware contentStyle={[styles.container, isLight && styles.containerLight]}>
       <View style={styles.header}>
         <AppBackButton onPress={() => navigation.goBack()} iconOnly style={[styles.headerBtn, isLight && styles.headerBtnLight]} />
         <Text style={[styles.title, isLight && styles.titleLight]}>Ask Fiteatsy</Text>

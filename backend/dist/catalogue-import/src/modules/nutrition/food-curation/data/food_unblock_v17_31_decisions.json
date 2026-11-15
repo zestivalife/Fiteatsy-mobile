@@ -1,0 +1,4996 @@
+{
+  "schemaVersion": "FITEATSY_FOOD_UNBLOCK_V17_31",
+  "baselineSha": "1f25614416943dcea1c6777a9412323ee774c283",
+  "processorVersion": "FOOD_UNBLOCK_V17_31",
+  "sourceBeforeArtifact": "food_unblock_v17_31_before.json",
+  "sourceBeforeArtifactSha256": "54f9699b43e773bcff747c2cbbaa3d0501c217b0b294a92b237d41c1b18daabd",
+  "decisionCount": 186,
+  "newlyDirectAddable": 0,
+  "newlyComponentAddable": 0,
+  "newlyIngredientOnlyVerified": 0,
+  "newlySecondaryOnlyVerified": 0,
+  "newlyGeneratorEligible": 0,
+  "newlySourceMappedNotGenerator": 1,
+  "stateMismatch": 0,
+  "servingIncomplete": 0,
+  "preparedProvenanceRequired": 0,
+  "externalEvidenceRequired": 185,
+  "totalRemainingBlocked": 185,
+  "generatedAt": "2026-09-05T00:00:00.000Z",
+  "decisions": [
+    {
+      "decisionId": "P0V1731_002",
+      "referenceItemId": "BATCH0_2",
+      "sourceRecordId": "2",
+      "canonicalName": "Fenugreek leaves",
+      "aliases": [
+        "Methi"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Fenugreek leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_003",
+      "referenceItemId": "BATCH0_3",
+      "sourceRecordId": "3",
+      "canonicalName": "Mustard greens",
+      "aliases": [
+        "Sarson"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Mustard greens in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_004",
+      "referenceItemId": "BATCH0_4",
+      "sourceRecordId": "4",
+      "canonicalName": "Amaranth leaves, green",
+      "aliases": [
+        "Chaulai",
+        "Math",
+        "Keerai"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Amaranth leaves, green in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_005",
+      "referenceItemId": "BATCH0_5",
+      "sourceRecordId": "5",
+      "canonicalName": "Amaranth leaves, red",
+      "aliases": [
+        "Lal math",
+        "Lal saag"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Amaranth leaves, red in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_006",
+      "referenceItemId": "BATCH0_6",
+      "sourceRecordId": "6",
+      "canonicalName": "Bathua leaves",
+      "aliases": [
+        "Bathua"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Bathua leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_007",
+      "referenceItemId": "BATCH0_7",
+      "sourceRecordId": "7",
+      "canonicalName": "Dill leaves",
+      "aliases": [
+        "Shepu",
+        "Suva"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Dill leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_008",
+      "referenceItemId": "BATCH0_8",
+      "sourceRecordId": "8",
+      "canonicalName": "Coriander leaves",
+      "aliases": [
+        "Dhania"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Coriander leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_009",
+      "referenceItemId": "BATCH0_9",
+      "sourceRecordId": "9",
+      "canonicalName": "Mint leaves",
+      "aliases": [
+        "Pudina"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Mint leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_010",
+      "referenceItemId": "BATCH0_10",
+      "sourceRecordId": "10",
+      "canonicalName": "Curry leaves",
+      "aliases": [
+        "Kadi patta"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Curry leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_011",
+      "referenceItemId": "BATCH0_11",
+      "sourceRecordId": "11",
+      "canonicalName": "Drumstick leaves",
+      "aliases": [
+        "Moringa leaves",
+        "Murungai keerai"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Drumstick leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_012",
+      "referenceItemId": "BATCH0_12",
+      "sourceRecordId": "12",
+      "canonicalName": "Colocasia leaves",
+      "aliases": [
+        "Arbi ke patte",
+        "Alu leaves"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Colocasia leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_013",
+      "referenceItemId": "BATCH0_13",
+      "sourceRecordId": "13",
+      "canonicalName": "Malabar spinach",
+      "aliases": [
+        "Poi",
+        "Basale",
+        "Mayalu"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Malabar spinach in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_014",
+      "referenceItemId": "BATCH0_14",
+      "sourceRecordId": "14",
+      "canonicalName": "Gongura",
+      "aliases": [
+        "Roselle leaves",
+        "Ambadi"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Gongura in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_015",
+      "referenceItemId": "BATCH0_15",
+      "sourceRecordId": "15",
+      "canonicalName": "Purslane",
+      "aliases": [
+        "Kulfa"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Purslane in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_016",
+      "referenceItemId": "BATCH0_16",
+      "sourceRecordId": "16",
+      "canonicalName": "Water spinach",
+      "aliases": [
+        "Kalmi saag"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Water spinach in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_017",
+      "referenceItemId": "BATCH0_17",
+      "sourceRecordId": "17",
+      "canonicalName": "Sorrel leaves",
+      "aliases": [
+        "Chuka",
+        "Khatta palak"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Sorrel leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_018",
+      "referenceItemId": "BATCH0_18",
+      "sourceRecordId": "18",
+      "canonicalName": "Radish leaves",
+      "aliases": [
+        "Mooli ke patte"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Radish leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_019",
+      "referenceItemId": "BATCH0_19",
+      "sourceRecordId": "19",
+      "canonicalName": "Beet greens",
+      "aliases": [
+        "Beetroot leaves"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Beet greens in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_020",
+      "referenceItemId": "BATCH0_20",
+      "sourceRecordId": "20",
+      "canonicalName": "Turnip greens",
+      "aliases": [
+        "Shalgam ke patte"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Turnip greens in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_021",
+      "referenceItemId": "BATCH0_21",
+      "sourceRecordId": "21",
+      "canonicalName": "Spring onion greens",
+      "aliases": [
+        "Hara pyaz patta"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Spring onion greens in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_022",
+      "referenceItemId": "BATCH0_22",
+      "sourceRecordId": "22",
+      "canonicalName": "Lettuce, iceberg",
+      "aliases": [
+        "Iceberg lettuce"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Lettuce, iceberg in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_023",
+      "referenceItemId": "BATCH0_23",
+      "sourceRecordId": "23",
+      "canonicalName": "Lettuce, romaine",
+      "aliases": [
+        "Romaine lettuce"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Lettuce, romaine in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_024",
+      "referenceItemId": "BATCH0_24",
+      "sourceRecordId": "24",
+      "canonicalName": "Kale",
+      "aliases": [
+        "Kale"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Kale in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_025",
+      "referenceItemId": "BATCH0_25",
+      "sourceRecordId": "25",
+      "canonicalName": "Bok choy",
+      "aliases": [
+        "Pak choi"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Bok choy in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_026",
+      "referenceItemId": "BATCH0_26",
+      "sourceRecordId": "26",
+      "canonicalName": "Celery",
+      "aliases": [
+        "Celery stalk",
+        "leaves"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Celery in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_027",
+      "referenceItemId": "BATCH0_27",
+      "sourceRecordId": "27",
+      "canonicalName": "Agathi leaves",
+      "aliases": [
+        "Agathi keerai"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Agathi leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_028",
+      "referenceItemId": "BATCH0_28",
+      "sourceRecordId": "28",
+      "canonicalName": "Manathakkali leaves",
+      "aliases": [
+        "Black nightshade greens"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Manathakkali leaves in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_029",
+      "referenceItemId": "BATCH0_29",
+      "sourceRecordId": "29",
+      "canonicalName": "Ponnanganni greens",
+      "aliases": [
+        "Sessile joyweed"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Leafy greens",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Ponnanganni greens in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_030",
+      "referenceItemId": "BATCH0_30",
+      "sourceRecordId": "30",
+      "canonicalName": "Bottle gourd",
+      "aliases": [
+        "Lauki",
+        "Doodhi",
+        "Ghiya"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Bottle gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_031",
+      "referenceItemId": "BATCH0_31",
+      "sourceRecordId": "31",
+      "canonicalName": "Ridge gourd",
+      "aliases": [
+        "Turai",
+        "Dodka"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Ridge gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_032",
+      "referenceItemId": "BATCH0_32",
+      "sourceRecordId": "32",
+      "canonicalName": "Sponge gourd",
+      "aliases": [
+        "Gilki",
+        "Ghosale"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Sponge gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_033",
+      "referenceItemId": "BATCH0_33",
+      "sourceRecordId": "33",
+      "canonicalName": "Bitter gourd",
+      "aliases": [
+        "Karela"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Bitter gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_034",
+      "referenceItemId": "BATCH0_34",
+      "sourceRecordId": "34",
+      "canonicalName": "Snake gourd",
+      "aliases": [
+        "Padwal",
+        "Chichinda"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Snake gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_035",
+      "referenceItemId": "BATCH0_35",
+      "sourceRecordId": "35",
+      "canonicalName": "Ash gourd",
+      "aliases": [
+        "Petha",
+        "Winter melon"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Ash gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_037",
+      "referenceItemId": "BATCH0_37",
+      "sourceRecordId": "37",
+      "canonicalName": "Pointed gourd",
+      "aliases": [
+        "Parwal",
+        "Potol"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Pointed gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_038",
+      "referenceItemId": "BATCH0_38",
+      "sourceRecordId": "38",
+      "canonicalName": "Ivy gourd",
+      "aliases": [
+        "Tindora",
+        "Kundru",
+        "Tendli"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Ivy gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_039",
+      "referenceItemId": "BATCH0_39",
+      "sourceRecordId": "39",
+      "canonicalName": "Round gourd",
+      "aliases": [
+        "Tinda"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Round gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_040",
+      "referenceItemId": "BATCH0_40",
+      "sourceRecordId": "40",
+      "canonicalName": "Spine gourd",
+      "aliases": [
+        "Kantola",
+        "Kakora"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Spine gourd in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_041",
+      "referenceItemId": "BATCH0_41",
+      "sourceRecordId": "41",
+      "canonicalName": "Chayote",
+      "aliases": [
+        "Chow chow"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Chayote in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_043",
+      "referenceItemId": "BATCH0_43",
+      "sourceRecordId": "43",
+      "canonicalName": "Yellow cucumber",
+      "aliases": [
+        "Dosakaya"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Yellow cucumber in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_044",
+      "referenceItemId": "BATCH0_44",
+      "sourceRecordId": "44",
+      "canonicalName": "Zucchini",
+      "aliases": [
+        "Courgette"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Zucchini in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_045",
+      "referenceItemId": "BATCH0_45",
+      "sourceRecordId": "45",
+      "canonicalName": "Tomato",
+      "aliases": [
+        "Tamatar"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Tomato in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_046",
+      "referenceItemId": "BATCH0_46",
+      "sourceRecordId": "46",
+      "canonicalName": "Cherry tomato",
+      "aliases": [
+        "Cherry tomato"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cherry tomato in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_047",
+      "referenceItemId": "BATCH0_47",
+      "sourceRecordId": "47",
+      "canonicalName": "Brinjal, purple",
+      "aliases": [
+        "Baingan",
+        "Vangi"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Brinjal, purple in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_048",
+      "referenceItemId": "BATCH0_48",
+      "sourceRecordId": "48",
+      "canonicalName": "Brinjal, long",
+      "aliases": [
+        "Long eggplant"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Brinjal, long in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_049",
+      "referenceItemId": "BATCH0_49",
+      "sourceRecordId": "49",
+      "canonicalName": "Brinjal, green",
+      "aliases": [
+        "Green brinjal"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Brinjal, green in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_051",
+      "referenceItemId": "BATCH0_51",
+      "sourceRecordId": "51",
+      "canonicalName": "Capsicum, green",
+      "aliases": [
+        "Shimla mirch"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Capsicum, green in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_052",
+      "referenceItemId": "BATCH0_52",
+      "sourceRecordId": "52",
+      "canonicalName": "Capsicum, red",
+      "aliases": [
+        "Red bell pepper"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Capsicum, red in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_053",
+      "referenceItemId": "BATCH0_53",
+      "sourceRecordId": "53",
+      "canonicalName": "Capsicum, yellow",
+      "aliases": [
+        "Yellow bell pepper"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Capsicum, yellow in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_054",
+      "referenceItemId": "BATCH0_54",
+      "sourceRecordId": "54",
+      "canonicalName": "Green chilli",
+      "aliases": [
+        "Hari mirch"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Green chilli in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_055",
+      "referenceItemId": "BATCH0_55",
+      "sourceRecordId": "55",
+      "canonicalName": "Raw papaya",
+      "aliases": [
+        "Kaccha papita"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Raw papaya in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_056",
+      "referenceItemId": "BATCH0_56",
+      "sourceRecordId": "56",
+      "canonicalName": "Raw banana",
+      "aliases": [
+        "Kaccha kela",
+        "Plantain"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Raw banana in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_057",
+      "referenceItemId": "BATCH0_57",
+      "sourceRecordId": "57",
+      "canonicalName": "Raw jackfruit",
+      "aliases": [
+        "Kathal"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Raw jackfruit in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_058",
+      "referenceItemId": "BATCH0_58",
+      "sourceRecordId": "58",
+      "canonicalName": "Breadfruit",
+      "aliases": [
+        "Breadfruit"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Breadfruit in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_059",
+      "referenceItemId": "BATCH0_59",
+      "sourceRecordId": "59",
+      "canonicalName": "Drumstick pods",
+      "aliases": [
+        "Moringa",
+        "Sahjan"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Gourds & fruit vegetables",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Drumstick pods in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_063",
+      "referenceItemId": "BATCH0_63",
+      "sourceRecordId": "63",
+      "canonicalName": "Radish",
+      "aliases": [
+        "Mooli"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Radish in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_064",
+      "referenceItemId": "BATCH0_64",
+      "sourceRecordId": "64",
+      "canonicalName": "Beetroot",
+      "aliases": [
+        "Chukandar"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Beetroot in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_065",
+      "referenceItemId": "BATCH0_65",
+      "sourceRecordId": "65",
+      "canonicalName": "Turnip",
+      "aliases": [
+        "Shalgam"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Turnip in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_066",
+      "referenceItemId": "BATCH0_66",
+      "sourceRecordId": "66",
+      "canonicalName": "Elephant foot yam",
+      "aliases": [
+        "Suran",
+        "Jimikand"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Elephant foot yam in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_067",
+      "referenceItemId": "BATCH0_67",
+      "sourceRecordId": "67",
+      "canonicalName": "Colocasia root",
+      "aliases": [
+        "Arbi",
+        "Taro"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Colocasia root in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_068",
+      "referenceItemId": "BATCH0_68",
+      "sourceRecordId": "68",
+      "canonicalName": "Purple yam",
+      "aliases": [
+        "Ratalu",
+        "Kand"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Purple yam in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_069",
+      "referenceItemId": "BATCH0_69",
+      "sourceRecordId": "69",
+      "canonicalName": "Cassava",
+      "aliases": [
+        "Tapioca",
+        "Kappa"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cassava in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_070",
+      "referenceItemId": "BATCH0_70",
+      "sourceRecordId": "70",
+      "canonicalName": "Chinese potato",
+      "aliases": [
+        "Koorka"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Chinese potato in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_071",
+      "referenceItemId": "BATCH0_71",
+      "sourceRecordId": "71",
+      "canonicalName": "Lotus root",
+      "aliases": [
+        "Kamal kakdi"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Lotus root in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_072",
+      "referenceItemId": "BATCH0_72",
+      "sourceRecordId": "72",
+      "canonicalName": "Onion, red",
+      "aliases": [
+        "Pyaz"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Onion, red in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_073",
+      "referenceItemId": "BATCH0_73",
+      "sourceRecordId": "73",
+      "canonicalName": "Onion, white",
+      "aliases": [
+        "White onion"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Onion, white in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_074",
+      "referenceItemId": "BATCH0_74",
+      "sourceRecordId": "74",
+      "canonicalName": "Shallots",
+      "aliases": [
+        "Small onion",
+        "Sambar onion"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Shallots in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_077",
+      "referenceItemId": "BATCH0_77",
+      "sourceRecordId": "77",
+      "canonicalName": "Fresh turmeric",
+      "aliases": [
+        "Kacchi haldi"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Fresh turmeric in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_078",
+      "referenceItemId": "BATCH0_78",
+      "sourceRecordId": "78",
+      "canonicalName": "Kohlrabi",
+      "aliases": [
+        "Ganth gobhi",
+        "Knol-khol"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Roots, tubers & bulbs",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Kohlrabi in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_080",
+      "referenceItemId": "BATCH0_80",
+      "sourceRecordId": "80",
+      "canonicalName": "Cabbage, green",
+      "aliases": [
+        "Patta gobhi"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cabbage, green in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_081",
+      "referenceItemId": "BATCH0_81",
+      "sourceRecordId": "81",
+      "canonicalName": "Cabbage, red",
+      "aliases": [
+        "Red cabbage"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cabbage, red in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_083",
+      "referenceItemId": "BATCH0_83",
+      "sourceRecordId": "83",
+      "canonicalName": "Brussels sprouts",
+      "aliases": [
+        "Brussels sprouts"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Brussels sprouts in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_084",
+      "referenceItemId": "BATCH0_84",
+      "sourceRecordId": "84",
+      "canonicalName": "Green peas",
+      "aliases": [
+        "Matar"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Green peas in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_085",
+      "referenceItemId": "BATCH0_85",
+      "sourceRecordId": "85",
+      "canonicalName": "French beans",
+      "aliases": [
+        "Green beans"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "COMPONENT_ADDABLE",
+      "outcome": "SOURCE_MAPPED_NOT_GENERATOR",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": {
+        "sourceId": "USDA_FDC",
+        "fdcId": 2346400,
+        "sourceFoodId": "67e456fa-8e83-4779-9162-ab4daaa6e795",
+        "sourceDisplayName": "Green beans",
+        "sourceCategory": "vegetable",
+        "sourceVersion": "10/28/2022",
+        "mappingType": "EXACT_APPROVED_GENERIC_COMMODITY",
+        "rightsStatus": "CC0-1.0_APPROVED"
+      },
+      "servingProfile": {
+        "servingId": "SV_P0_85_100G",
+        "label": "100 g",
+        "grams": 100,
+        "source": "USDA_FDC_PORTION_100G",
+        "humanServingStatus": "GRAM_BASED_GOVERNED"
+      },
+      "mealHeadEligibility": [],
+      "evidenceStatus": "APPROVED_GENERIC_SOURCE_MAPPED",
+      "rationale": "French beans is an Indian alias for green beans. The repository-pinned USDA FoodData Central Foundation record 2346400 is already active as the governed Green beans identity, so v17.31 records the exact source mapping and alias search bridge without creating a duplicate generator/component food.",
+      "directAddEligible": false,
+      "nutritionVector": {
+        "kcal": 33.6,
+        "protein": 1.97,
+        "carbohydrate": 7.41,
+        "fat": 0.275,
+        "fibre": 3.01,
+        "sourceRecordId": "2346400",
+        "sourceVersion": "10/28/2022",
+        "state": "RAW",
+        "transformationHistory": []
+      }
+    },
+    {
+      "decisionId": "P0V1731_086",
+      "referenceItemId": "BATCH0_86",
+      "sourceRecordId": "86",
+      "canonicalName": "Cluster beans",
+      "aliases": [
+        "Gawar",
+        "Guar"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cluster beans in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_087",
+      "referenceItemId": "BATCH0_87",
+      "sourceRecordId": "87",
+      "canonicalName": "Yardlong beans",
+      "aliases": [
+        "Chawli pods",
+        "Borboti"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Yardlong beans in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_088",
+      "referenceItemId": "BATCH0_88",
+      "sourceRecordId": "88",
+      "canonicalName": "Hyacinth beans",
+      "aliases": [
+        "Sem",
+        "Valor",
+        "Avarekalu"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Hyacinth beans in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_089",
+      "referenceItemId": "BATCH0_89",
+      "sourceRecordId": "89",
+      "canonicalName": "Broad beans",
+      "aliases": [
+        "Fava beans",
+        "fresh"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Broad beans in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_090",
+      "referenceItemId": "BATCH0_90",
+      "sourceRecordId": "90",
+      "canonicalName": "Cowpea pods",
+      "aliases": [
+        "Chawli green pods"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cowpea pods in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_091",
+      "referenceItemId": "BATCH0_91",
+      "sourceRecordId": "91",
+      "canonicalName": "Snow peas",
+      "aliases": [
+        "Snow peas"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Snow peas in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_092",
+      "referenceItemId": "BATCH0_92",
+      "sourceRecordId": "92",
+      "canonicalName": "Fresh pigeon peas",
+      "aliases": [
+        "Tuvar lilva"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Fresh pigeon peas in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_093",
+      "referenceItemId": "BATCH0_93",
+      "sourceRecordId": "93",
+      "canonicalName": "Fresh chickpeas",
+      "aliases": [
+        "Hara chana"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Fresh chickpeas in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_094",
+      "referenceItemId": "BATCH0_94",
+      "sourceRecordId": "94",
+      "canonicalName": "Banana flower",
+      "aliases": [
+        "Kele ka phool"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Banana flower in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_095",
+      "referenceItemId": "BATCH0_95",
+      "sourceRecordId": "95",
+      "canonicalName": "Banana stem",
+      "aliases": [
+        "Kele ka tana"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Banana stem in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_096",
+      "referenceItemId": "BATCH0_96",
+      "sourceRecordId": "96",
+      "canonicalName": "Bamboo shoots",
+      "aliases": [
+        "Bans ke kope"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Bamboo shoots in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_097",
+      "referenceItemId": "BATCH0_97",
+      "sourceRecordId": "97",
+      "canonicalName": "Asparagus",
+      "aliases": [
+        "Asparagus"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Asparagus in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_098",
+      "referenceItemId": "BATCH0_98",
+      "sourceRecordId": "98",
+      "canonicalName": "Button mushroom",
+      "aliases": [
+        "Mushroom"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Button mushroom in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_099",
+      "referenceItemId": "BATCH0_99",
+      "sourceRecordId": "99",
+      "canonicalName": "Oyster mushroom",
+      "aliases": [
+        "Dhingri"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Oyster mushroom in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_100",
+      "referenceItemId": "BATCH0_100",
+      "sourceRecordId": "100",
+      "canonicalName": "Milky mushroom",
+      "aliases": [
+        "Milky mushroom"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Milky mushroom in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_101",
+      "referenceItemId": "BATCH0_101",
+      "sourceRecordId": "101",
+      "canonicalName": "Shiitake mushroom",
+      "aliases": [
+        "Shiitake"
+      ],
+      "category": "Vegetables",
+      "subcategory": "Beans, flowers, stems & mushrooms",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "VEGETABLE"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Shiitake mushroom in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_106",
+      "referenceItemId": "BATCH0_106",
+      "sourceRecordId": "106",
+      "canonicalName": "Mosambi",
+      "aliases": [
+        "Sweet lime"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Mosambi in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_108",
+      "referenceItemId": "BATCH0_108",
+      "sourceRecordId": "108",
+      "canonicalName": "Guava",
+      "aliases": [
+        "Amrood",
+        "Peru"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Guava in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_109",
+      "referenceItemId": "BATCH0_109",
+      "sourceRecordId": "109",
+      "canonicalName": "Pomegranate",
+      "aliases": [
+        "Anar"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Pomegranate in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_110",
+      "referenceItemId": "BATCH0_110",
+      "sourceRecordId": "110",
+      "canonicalName": "Watermelon",
+      "aliases": [
+        "Tarbooz"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Watermelon in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_111",
+      "referenceItemId": "BATCH0_111",
+      "sourceRecordId": "111",
+      "canonicalName": "Muskmelon",
+      "aliases": [
+        "Kharbooja"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Muskmelon in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_113",
+      "referenceItemId": "BATCH0_113",
+      "sourceRecordId": "113",
+      "canonicalName": "Grapes",
+      "aliases": [
+        "Angoor"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Grapes in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_114",
+      "referenceItemId": "BATCH0_114",
+      "sourceRecordId": "114",
+      "canonicalName": "Pear",
+      "aliases": [
+        "Nashpati"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Pear in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_115",
+      "referenceItemId": "BATCH0_115",
+      "sourceRecordId": "115",
+      "canonicalName": "Chikoo",
+      "aliases": [
+        "Sapota",
+        "Sapodilla"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Chikoo in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_116",
+      "referenceItemId": "BATCH0_116",
+      "sourceRecordId": "116",
+      "canonicalName": "Custard apple",
+      "aliases": [
+        "Sitaphal"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Custard apple in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_117",
+      "referenceItemId": "BATCH0_117",
+      "sourceRecordId": "117",
+      "canonicalName": "Jamun",
+      "aliases": [
+        "Indian blackberry"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Jamun in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_118",
+      "referenceItemId": "BATCH0_118",
+      "sourceRecordId": "118",
+      "canonicalName": "Litchi",
+      "aliases": [
+        "Lychee"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Litchi in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_119",
+      "referenceItemId": "BATCH0_119",
+      "sourceRecordId": "119",
+      "canonicalName": "Dragon fruit",
+      "aliases": [
+        "Pitaya"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Dragon fruit in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_120",
+      "referenceItemId": "BATCH0_120",
+      "sourceRecordId": "120",
+      "canonicalName": "Kiwi",
+      "aliases": [
+        "Kiwi"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Kiwi in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_121",
+      "referenceItemId": "BATCH0_121",
+      "sourceRecordId": "121",
+      "canonicalName": "Strawberry",
+      "aliases": [
+        "Strawberry"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Strawberry in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_122",
+      "referenceItemId": "BATCH0_122",
+      "sourceRecordId": "122",
+      "canonicalName": "Blueberry",
+      "aliases": [
+        "Blueberry"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Blueberry in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_123",
+      "referenceItemId": "BATCH0_123",
+      "sourceRecordId": "123",
+      "canonicalName": "Peach",
+      "aliases": [
+        "Aadoo"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Peach in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_124",
+      "referenceItemId": "BATCH0_124",
+      "sourceRecordId": "124",
+      "canonicalName": "Plum",
+      "aliases": [
+        "Aloo bukhara"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Plum in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_125",
+      "referenceItemId": "BATCH0_125",
+      "sourceRecordId": "125",
+      "canonicalName": "Apricot",
+      "aliases": [
+        "Khubani"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Apricot in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_126",
+      "referenceItemId": "BATCH0_126",
+      "sourceRecordId": "126",
+      "canonicalName": "Fig, fresh",
+      "aliases": [
+        "Anjeer"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Fig, fresh in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_127",
+      "referenceItemId": "BATCH0_127",
+      "sourceRecordId": "127",
+      "canonicalName": "Dates, dried",
+      "aliases": [
+        "Khajur"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "DRIED",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Dates, dried in state DRIED. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_128",
+      "referenceItemId": "BATCH0_128",
+      "sourceRecordId": "128",
+      "canonicalName": "Raisins",
+      "aliases": [
+        "Kishmish"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "DRIED",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Raisins in state DRIED. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_129",
+      "referenceItemId": "BATCH0_129",
+      "sourceRecordId": "129",
+      "canonicalName": "Coconut meat",
+      "aliases": [
+        "Nariyal"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Coconut meat in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_130",
+      "referenceItemId": "BATCH0_130",
+      "sourceRecordId": "130",
+      "canonicalName": "Tender coconut water",
+      "aliases": [
+        "Nariyal pani"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "READY_TO_DRINK",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Tender coconut water in state READY_TO_DRINK. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_131",
+      "referenceItemId": "BATCH0_131",
+      "sourceRecordId": "131",
+      "canonicalName": "Amla",
+      "aliases": [
+        "Indian gooseberry"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Amla in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_132",
+      "referenceItemId": "BATCH0_132",
+      "sourceRecordId": "132",
+      "canonicalName": "Star fruit",
+      "aliases": [
+        "Kamrakh"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Star fruit in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_133",
+      "referenceItemId": "BATCH0_133",
+      "sourceRecordId": "133",
+      "canonicalName": "Jackfruit, ripe",
+      "aliases": [
+        "Kathal"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Jackfruit, ripe in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_134",
+      "referenceItemId": "BATCH0_134",
+      "sourceRecordId": "134",
+      "canonicalName": "Avocado",
+      "aliases": [
+        "Butter fruit"
+      ],
+      "category": "Fruits",
+      "subcategory": "Fresh & dried fruits",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "FRUIT"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Avocado in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_135",
+      "referenceItemId": "BATCH0_135",
+      "sourceRecordId": "135",
+      "canonicalName": "Rice, white",
+      "aliases": [
+        "Chawal"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Rice, white in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_137",
+      "referenceItemId": "BATCH0_137",
+      "sourceRecordId": "137",
+      "canonicalName": "Basmati rice",
+      "aliases": [
+        "Basmati"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Basmati rice in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_138",
+      "referenceItemId": "BATCH0_138",
+      "sourceRecordId": "138",
+      "canonicalName": "Parboiled rice",
+      "aliases": [
+        "Ukda rice"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Parboiled rice in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_139",
+      "referenceItemId": "BATCH0_139",
+      "sourceRecordId": "139",
+      "canonicalName": "Red rice",
+      "aliases": [
+        "Lal chawal"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Red rice in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_140",
+      "referenceItemId": "BATCH0_140",
+      "sourceRecordId": "140",
+      "canonicalName": "Black rice",
+      "aliases": [
+        "Black rice"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Black rice in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_141",
+      "referenceItemId": "BATCH0_141",
+      "sourceRecordId": "141",
+      "canonicalName": "Flattened rice",
+      "aliases": [
+        "Poha",
+        "Aval",
+        "Chivda"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "DRY,_UNCOOKED",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Flattened rice in state DRY,_UNCOOKED. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_142",
+      "referenceItemId": "BATCH0_142",
+      "sourceRecordId": "142",
+      "canonicalName": "Puffed rice",
+      "aliases": [
+        "Murmura",
+        "Kurmura"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Puffed rice in state DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_143",
+      "referenceItemId": "BATCH0_143",
+      "sourceRecordId": "143",
+      "canonicalName": "Wheat whole grain",
+      "aliases": [
+        "Gehu"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Wheat whole grain in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_145",
+      "referenceItemId": "BATCH0_145",
+      "sourceRecordId": "145",
+      "canonicalName": "Refined wheat flour",
+      "aliases": [
+        "Maida"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Refined wheat flour in state DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_146",
+      "referenceItemId": "BATCH0_146",
+      "sourceRecordId": "146",
+      "canonicalName": "Semolina",
+      "aliases": [
+        "Sooji",
+        "Rava"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Semolina in state DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_147",
+      "referenceItemId": "BATCH0_147",
+      "sourceRecordId": "147",
+      "canonicalName": "Broken wheat",
+      "aliases": [
+        "Dalia"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Broken wheat in state DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_148",
+      "referenceItemId": "BATCH0_148",
+      "sourceRecordId": "148",
+      "canonicalName": "Barley",
+      "aliases": [
+        "Jau"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Barley in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_149",
+      "referenceItemId": "BATCH0_149",
+      "sourceRecordId": "149",
+      "canonicalName": "Pearl millet",
+      "aliases": [
+        "Bajra"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Pearl millet in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_150",
+      "referenceItemId": "BATCH0_150",
+      "sourceRecordId": "150",
+      "canonicalName": "Sorghum",
+      "aliases": [
+        "Jowar"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Sorghum in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_151",
+      "referenceItemId": "BATCH0_151",
+      "sourceRecordId": "151",
+      "canonicalName": "Finger millet",
+      "aliases": [
+        "Ragi",
+        "Nachni"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Finger millet in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_152",
+      "referenceItemId": "BATCH0_152",
+      "sourceRecordId": "152",
+      "canonicalName": "Foxtail millet",
+      "aliases": [
+        "Kangni",
+        "Thinai"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Foxtail millet in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_153",
+      "referenceItemId": "BATCH0_153",
+      "sourceRecordId": "153",
+      "canonicalName": "Little millet",
+      "aliases": [
+        "Kutki",
+        "Samai"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Little millet in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_154",
+      "referenceItemId": "BATCH0_154",
+      "sourceRecordId": "154",
+      "canonicalName": "Kodo millet",
+      "aliases": [
+        "Kodo"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Kodo millet in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_155",
+      "referenceItemId": "BATCH0_155",
+      "sourceRecordId": "155",
+      "canonicalName": "Barnyard millet",
+      "aliases": [
+        "Sama",
+        "Sanwa",
+        "Jhangora"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Barnyard millet in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_156",
+      "referenceItemId": "BATCH0_156",
+      "sourceRecordId": "156",
+      "canonicalName": "Proso millet",
+      "aliases": [
+        "Cheena"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Proso millet in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_157",
+      "referenceItemId": "BATCH0_157",
+      "sourceRecordId": "157",
+      "canonicalName": "Amaranth grain",
+      "aliases": [
+        "Rajgira"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Amaranth grain in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_158",
+      "referenceItemId": "BATCH0_158",
+      "sourceRecordId": "158",
+      "canonicalName": "Quinoa",
+      "aliases": [
+        "Quinoa"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Quinoa in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_160",
+      "referenceItemId": "BATCH0_160",
+      "sourceRecordId": "160",
+      "canonicalName": "Corn maize",
+      "aliases": [
+        "Makka"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "RAW,_DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Corn maize in state RAW,_DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_161",
+      "referenceItemId": "BATCH0_161",
+      "sourceRecordId": "161",
+      "canonicalName": "Cornmeal",
+      "aliases": [
+        "Makka atta"
+      ],
+      "category": "Grains & Millets",
+      "subcategory": "Whole grains & grain products",
+      "referenceState": "DRY",
+      "targetRoles": [
+        "GRAIN",
+        "STARCH"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cornmeal in state DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_162",
+      "referenceItemId": "BATCH0_162",
+      "sourceRecordId": "162",
+      "canonicalName": "Chickpeas, kabuli",
+      "aliases": [
+        "Kabuli chana"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Chickpeas, kabuli in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_163",
+      "referenceItemId": "BATCH0_163",
+      "sourceRecordId": "163",
+      "canonicalName": "Chickpeas, desi",
+      "aliases": [
+        "Kala chana"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Chickpeas, desi in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_164",
+      "referenceItemId": "BATCH0_164",
+      "sourceRecordId": "164",
+      "canonicalName": "Green gram, whole",
+      "aliases": [
+        "Sabut moong"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Green gram, whole in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_165",
+      "referenceItemId": "BATCH0_165",
+      "sourceRecordId": "165",
+      "canonicalName": "Moong dal, split hulled yellow",
+      "aliases": [
+        "Moong dal"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Moong dal, split hulled yellow in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_166",
+      "referenceItemId": "BATCH0_166",
+      "sourceRecordId": "166",
+      "canonicalName": "Black gram, whole",
+      "aliases": [
+        "Sabut urad"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Black gram, whole in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_167",
+      "referenceItemId": "BATCH0_167",
+      "sourceRecordId": "167",
+      "canonicalName": "Urad dal, split",
+      "aliases": [
+        "Urad dal"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Urad dal, split in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_168",
+      "referenceItemId": "BATCH0_168",
+      "sourceRecordId": "168",
+      "canonicalName": "Pigeon pea",
+      "aliases": [
+        "Toor",
+        "Arhar dal"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Pigeon pea in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_169",
+      "referenceItemId": "BATCH0_169",
+      "sourceRecordId": "169",
+      "canonicalName": "Masoor dal, red",
+      "aliases": [
+        "Red lentil"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Masoor dal, red in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_170",
+      "referenceItemId": "BATCH0_170",
+      "sourceRecordId": "170",
+      "canonicalName": "Masoor, whole",
+      "aliases": [
+        "Whole lentil"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Masoor, whole in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_171",
+      "referenceItemId": "BATCH0_171",
+      "sourceRecordId": "171",
+      "canonicalName": "Bengal gram dal",
+      "aliases": [
+        "Chana dal"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Bengal gram dal in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_172",
+      "referenceItemId": "BATCH0_172",
+      "sourceRecordId": "172",
+      "canonicalName": "Moth beans",
+      "aliases": [
+        "Matki"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Moth beans in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_173",
+      "referenceItemId": "BATCH0_173",
+      "sourceRecordId": "173",
+      "canonicalName": "Cowpeas",
+      "aliases": [
+        "Lobia",
+        "Chawli"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cowpeas in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_174",
+      "referenceItemId": "BATCH0_174",
+      "sourceRecordId": "174",
+      "canonicalName": "Kidney beans, red",
+      "aliases": [
+        "Rajma"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Kidney beans, red in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_175",
+      "referenceItemId": "BATCH0_175",
+      "sourceRecordId": "175",
+      "canonicalName": "Kidney beans, light",
+      "aliases": [
+        "Chitra rajma"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Kidney beans, light in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_176",
+      "referenceItemId": "BATCH0_176",
+      "sourceRecordId": "176",
+      "canonicalName": "Black-eyed peas",
+      "aliases": [
+        "Lobia"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Black-eyed peas in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_177",
+      "referenceItemId": "BATCH0_177",
+      "sourceRecordId": "177",
+      "canonicalName": "Horse gram",
+      "aliases": [
+        "Kulthi"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Horse gram in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_178",
+      "referenceItemId": "BATCH0_178",
+      "sourceRecordId": "178",
+      "canonicalName": "Field beans",
+      "aliases": [
+        "Val",
+        "Avarekalu",
+        "dry"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Field beans in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_179",
+      "referenceItemId": "BATCH0_179",
+      "sourceRecordId": "179",
+      "canonicalName": "Dry peas, green",
+      "aliases": [
+        "Sukha matar"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Dry peas, green in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_180",
+      "referenceItemId": "BATCH0_180",
+      "sourceRecordId": "180",
+      "canonicalName": "Dry peas, yellow",
+      "aliases": [
+        "Yellow peas"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Dry peas, yellow in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_181",
+      "referenceItemId": "BATCH0_181",
+      "sourceRecordId": "181",
+      "canonicalName": "Soybeans",
+      "aliases": [
+        "Soyabean"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "DRY,_RAW",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Soybeans in state DRY,_RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_182",
+      "referenceItemId": "BATCH0_182",
+      "sourceRecordId": "182",
+      "canonicalName": "Edamame",
+      "aliases": [
+        "Green soybean"
+      ],
+      "category": "Pulses & Legumes",
+      "subcategory": "Dry pulses, dals & beans",
+      "referenceState": "COOKED",
+      "targetRoles": [
+        "PULSE",
+        "PROTEIN"
+      ],
+      "operationalUse": "COMPONENT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Edamame in state COOKED. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_198",
+      "referenceItemId": "BATCH0_198",
+      "sourceRecordId": "198",
+      "canonicalName": "Cow milk, whole",
+      "aliases": [
+        "Doodh"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "LIQUID",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cow milk, whole in state LIQUID. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_199",
+      "referenceItemId": "BATCH0_199",
+      "sourceRecordId": "199",
+      "canonicalName": "Buffalo milk",
+      "aliases": [
+        "Bhains ka doodh"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "LIQUID",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Buffalo milk in state LIQUID. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_200",
+      "referenceItemId": "BATCH0_200",
+      "sourceRecordId": "200",
+      "canonicalName": "Toned milk",
+      "aliases": [
+        "Toned milk"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "LIQUID",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Toned milk in state LIQUID. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_201",
+      "referenceItemId": "BATCH0_201",
+      "sourceRecordId": "201",
+      "canonicalName": "Double toned milk",
+      "aliases": [
+        "Double toned milk"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "LIQUID",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Double toned milk in state LIQUID. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_202",
+      "referenceItemId": "BATCH0_202",
+      "sourceRecordId": "202",
+      "canonicalName": "Skim milk",
+      "aliases": [
+        "Skimmed milk"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "LIQUID",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Skim milk in state LIQUID. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_203",
+      "referenceItemId": "BATCH0_203",
+      "sourceRecordId": "203",
+      "canonicalName": "Curd, whole milk",
+      "aliases": [
+        "Dahi"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "READY_TO_EAT",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Curd, whole milk in state READY_TO_EAT. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_204",
+      "referenceItemId": "BATCH0_204",
+      "sourceRecordId": "204",
+      "canonicalName": "Hung curd",
+      "aliases": [
+        "Chakka",
+        "Greek-style curd"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "READY_TO_EAT",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Hung curd in state READY_TO_EAT. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_205",
+      "referenceItemId": "BATCH0_205",
+      "sourceRecordId": "205",
+      "canonicalName": "Buttermilk",
+      "aliases": [
+        "Chaas"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "READY_TO_DRINK",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Buttermilk in state READY_TO_DRINK. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_206",
+      "referenceItemId": "BATCH0_206",
+      "sourceRecordId": "206",
+      "canonicalName": "Paneer",
+      "aliases": [
+        "Cottage cheese"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "READY_TO_EAT",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Paneer in state READY_TO_EAT. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_207",
+      "referenceItemId": "BATCH0_207",
+      "sourceRecordId": "207",
+      "canonicalName": "Low-fat paneer",
+      "aliases": [
+        "Low-fat cottage cheese"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "READY_TO_EAT",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Low-fat paneer in state READY_TO_EAT. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_208",
+      "referenceItemId": "BATCH0_208",
+      "sourceRecordId": "208",
+      "canonicalName": "Cheddar cheese",
+      "aliases": [
+        "Cheddar"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "READY_TO_EAT",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Cheddar cheese in state READY_TO_EAT. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_209",
+      "referenceItemId": "BATCH0_209",
+      "sourceRecordId": "209",
+      "canonicalName": "Mozzarella",
+      "aliases": [
+        "Mozzarella"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "READY_TO_EAT",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Mozzarella in state READY_TO_EAT. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_210",
+      "referenceItemId": "BATCH0_210",
+      "sourceRecordId": "210",
+      "canonicalName": "Processed cheese",
+      "aliases": [
+        "Cheese slice",
+        "block"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "READY_TO_EAT",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Processed cheese in state READY_TO_EAT. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_211",
+      "referenceItemId": "BATCH0_211",
+      "sourceRecordId": "211",
+      "canonicalName": "Khoya",
+      "aliases": [
+        "Mawa"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "READY_TO_USE",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Khoya in state READY_TO_USE. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_212",
+      "referenceItemId": "BATCH0_212",
+      "sourceRecordId": "212",
+      "canonicalName": "Milk powder, whole",
+      "aliases": [
+        "Whole milk powder"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "DRY",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Milk powder, whole in state DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_213",
+      "referenceItemId": "BATCH0_213",
+      "sourceRecordId": "213",
+      "canonicalName": "Milk powder, skim",
+      "aliases": [
+        "Skim milk powder"
+      ],
+      "category": "Dairy",
+      "subcategory": "Milk & dairy products",
+      "referenceState": "DRY",
+      "targetRoles": [
+        "DAIRY",
+        "PROTEIN"
+      ],
+      "operationalUse": "DIRECT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Milk powder, skim in state DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_214",
+      "referenceItemId": "BATCH0_214",
+      "sourceRecordId": "214",
+      "canonicalName": "Chicken egg, whole",
+      "aliases": [
+        "Anda"
+      ],
+      "category": "Protein Foods",
+      "subcategory": "Eggs & plant proteins",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "PROTEIN"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Chicken egg, whole in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_215",
+      "referenceItemId": "BATCH0_215",
+      "sourceRecordId": "215",
+      "canonicalName": "Chicken egg white",
+      "aliases": [
+        "Egg white"
+      ],
+      "category": "Protein Foods",
+      "subcategory": "Eggs & plant proteins",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "PROTEIN"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Chicken egg white in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_216",
+      "referenceItemId": "BATCH0_216",
+      "sourceRecordId": "216",
+      "canonicalName": "Chicken egg yolk",
+      "aliases": [
+        "Egg yolk"
+      ],
+      "category": "Protein Foods",
+      "subcategory": "Eggs & plant proteins",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "PROTEIN"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Chicken egg yolk in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_217",
+      "referenceItemId": "BATCH0_217",
+      "sourceRecordId": "217",
+      "canonicalName": "Duck egg",
+      "aliases": [
+        "Batakh anda"
+      ],
+      "category": "Protein Foods",
+      "subcategory": "Eggs & plant proteins",
+      "referenceState": "RAW",
+      "targetRoles": [
+        "PROTEIN"
+      ],
+      "operationalUse": "INGREDIENT_ONLY",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Duck egg in state RAW. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_219",
+      "referenceItemId": "BATCH0_219",
+      "sourceRecordId": "219",
+      "canonicalName": "Tempeh",
+      "aliases": [
+        "Tempeh"
+      ],
+      "category": "Protein Foods",
+      "subcategory": "Eggs & plant proteins",
+      "referenceState": "READY_TO_EAT",
+      "targetRoles": [
+        "PROTEIN"
+      ],
+      "operationalUse": "COMPONENT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Tempeh in state READY_TO_EAT. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_220",
+      "referenceItemId": "BATCH0_220",
+      "sourceRecordId": "220",
+      "canonicalName": "Soy chunks, dry",
+      "aliases": [
+        "Soya nuggets"
+      ],
+      "category": "Protein Foods",
+      "subcategory": "Eggs & plant proteins",
+      "referenceState": "DRY",
+      "targetRoles": [
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Soy chunks, dry in state DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_221",
+      "referenceItemId": "BATCH0_221",
+      "sourceRecordId": "221",
+      "canonicalName": "Soy granules, dry",
+      "aliases": [
+        "Soya granules"
+      ],
+      "category": "Protein Foods",
+      "subcategory": "Eggs & plant proteins",
+      "referenceState": "DRY",
+      "targetRoles": [
+        "PROTEIN"
+      ],
+      "operationalUse": "PREPARATION_REQUIRED",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Soy granules, dry in state DRY. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    },
+    {
+      "decisionId": "P0V1731_222",
+      "referenceItemId": "BATCH0_222",
+      "sourceRecordId": "222",
+      "canonicalName": "Seitan",
+      "aliases": [
+        "Wheat gluten"
+      ],
+      "category": "Protein Foods",
+      "subcategory": "Eggs & plant proteins",
+      "referenceState": "READY_TO_EAT",
+      "targetRoles": [
+        "PROTEIN"
+      ],
+      "operationalUse": "COMPONENT_ADDABLE",
+      "outcome": "EXTERNAL_SOURCE_REQUIRED",
+      "generatorEligible": false,
+      "componentEligible": false,
+      "sourceMapping": null,
+      "servingProfile": null,
+      "mealHeadEligibility": [],
+      "evidenceStatus": "AUTHORITATIVE_SOURCE_AND_SERVING_REQUIRED",
+      "rationale": "No existing repository-governed exact source mapping, complete required nutrition vector, and governed serving profile was found for Seitan in state READY_TO_EAT. Activation remains fail-closed under v17.31.",
+      "directAddEligible": false,
+      "nutritionVector": null
+    }
+  ]
+}

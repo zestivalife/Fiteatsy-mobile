@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { assignConsultant, getHealthProfileBundle, listCareCaseEvents, listCareCaseTickets, listCareCaseTimeline, listClientNotifications, requestMissingInformation, upsertHealthProfile, } from './platform.service.js';
+import { assignConsultant, getHealthProfileBundle, listCareCaseEvents, listCareCaseTickets, listCareCaseTimeline, listClientNotifications, requestMissingInformation, upsertHealthProfile, updateClientNotification, } from './platform.service.js';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { getCareCaseById } from './platform.store.js';
 const ageFromDob = (value) => {
@@ -86,6 +86,7 @@ const assignConsultantSchema = z.object({
     consultantId: z.string().trim().min(2),
     mentorId: z.string().trim().optional(),
 });
+const notificationActionSchema = z.object({ action: z.enum(['read', 'unread', 'dismiss']) });
 export const platformRouter = Router();
 platformRouter.use(requireAuthenticatedAccount);
 const currentOwner = (req) => {
@@ -210,4 +211,13 @@ platformRouter.get('/care-cases/:careCaseId/tickets', async (req, res) => {
 platformRouter.get('/notifications', async (req, res) => {
     const items = await listClientNotifications(currentOwner(req));
     return res.status(200).json({ items: items.map(notificationDto) });
+});
+platformRouter.patch('/notifications/:notificationId', async (req, res) => {
+    const parsed = notificationActionSchema.safeParse(req.body);
+    if (!parsed.success)
+        return res.status(400).json({ error: 'VALIDATION_ERROR', details: parsed.error.flatten() });
+    const updated = await updateClientNotification(currentOwner(req), req.params.notificationId, parsed.data.action);
+    if (!updated)
+        return res.status(404).json({ error: 'NOTIFICATION_NOT_FOUND', message: 'Notification was not found.' });
+    return res.status(200).json(notificationDto(updated));
 });

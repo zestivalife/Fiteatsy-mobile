@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { AppBackButton } from '../../components/AppBackButton';
 import { PageHeader } from '../../components/PageHeader';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -65,17 +64,10 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
 
   return (
     <Screen scroll contentStyle={styles.screen}>
-      <PageHeader title="Consultant Booking" onBack={() => navigation.goBack()} />
+      <PageHeader title="Care" subtitle="Expert support, organised around your health goals." back={false} />
 
-      <View style={[styles.hero, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#101311' }]}>
-        <Text style={styles.eyebrow}>Consultant booking</Text>
-        <Text style={[styles.title, { color: palette.textPrimary }]}>Book expert support</Text>
-        <Text style={[styles.body, { color: palette.textSecondary }]}>
-          Choose a preferred window and request a consultation through your assigned consultant channel.
-        </Text>
-      </View>
-
-      <View style={[styles.card, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}>
+      <CareSectionLabel icon="person-circle-outline" label="YOUR CONSULTANT" color="#46C9FF" />
+      <View style={[styles.card, { borderColor: themeMode === 'light' ? palette.stroke : '#2A2932', backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#111016' }]}>
         <View style={styles.consultantHeader}>
           <View style={[styles.avatar, { borderColor: palette.stroke }]}>
             <Text style={[styles.avatarText, { color: palette.textPrimary }]}>{consultant.fullName.slice(0, 1).toUpperCase()}</Text>
@@ -94,8 +86,10 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
         ) : null}
       </View>
 
-      <View style={[styles.card, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}>
+      <CareSectionLabel icon="calendar-outline" label="BOOK A SESSION" color="#A87CFF" />
+      <View style={[styles.card, { borderColor: themeMode === 'light' ? palette.stroke : '#2A2932', backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#111016' }]}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Preferred time</Text>
+        <Text style={[styles.body, { color: palette.textSecondary }]}>Choose a window that works for you. Your consultant will confirm the exact time.</Text>
         <View style={styles.windowGrid}>
           {bookingWindows.map((window) => {
             const selected = selectedWindow === window;
@@ -107,7 +101,10 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
               >
-                <Text style={[styles.windowText, { color: selected ? '#FFFFFF' : palette.textSecondary }]}>{window}</Text>
+                <View style={styles.windowCopy}>
+                  <Ionicons name={selected ? 'checkmark-circle' : 'time-outline'} size={18} color={selected ? '#59E735' : '#8F96A3'} />
+                  <Text style={[styles.windowText, { color: selected ? '#FFFFFF' : palette.textSecondary }]}>{window}</Text>
+                </View>
               </Pressable>
             );
           })}
@@ -123,9 +120,12 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
 
       <Pressable
         onPress={() => navigation.navigate('SubscriptionPlans', { source: 'subscription_management' })}
-        style={[styles.planButton, { borderColor: palette.stroke, backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#0F1010' }]}
+        style={[styles.planButton, { borderColor: themeMode === 'light' ? palette.stroke : '#2A2932', backgroundColor: themeMode === 'light' ? '#FFFFFF' : '#111016' }]}
         accessibilityRole="button"
       >
+        <View style={[styles.planIcon, { backgroundColor: palette.blueSoft }]}>
+          <Ionicons name="heart-outline" size={21} color={palette.blue} />
+        </View>
         <View style={styles.planButtonCopy}>
           <Text style={[styles.planButtonTitle, { color: palette.textPrimary }]}>View recommended plans</Text>
           <Text style={[styles.planButtonBody, { color: palette.textSecondary }]}>See the best Fiteatsy support option based on your profile and goals.</Text>
@@ -138,9 +138,26 @@ export const ConsultantBookingScreen = ({ navigation }: Props) => {
   );
 };
 
+const CareSectionLabel = ({
+  icon,
+  label,
+  color
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  color: string;
+}) => (
+  <View style={styles.groupLabelRow}>
+    <View style={[styles.groupLabelIcon, { backgroundColor: `${color}1F` }]}>
+      <Ionicons name={icon} size={15} color={color} />
+    </View>
+    <Text style={[styles.groupLabel, { color }]}>{label}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
   screen: {
-    gap: spacing.md,
+    gap: spacing.sm,
     paddingBottom: 136
   },
   backButton: {
@@ -153,11 +170,36 @@ const styles = StyleSheet.create({
     fontFamily: 'Exo_600SemiBold',
     fontSize: 15
   },
-  hero: {
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    gap: spacing.sm
+  largeTitleBlock: {
+    gap: 3,
+    marginBottom: 16,
+    paddingHorizontal: 4
+  },
+  largeTitle: {
+    fontFamily: 'Exo_700Bold',
+    fontSize: 34,
+    letterSpacing: -1.1,
+    lineHeight: 41
+  },
+  groupLabel: {
+    fontFamily: 'Exo_500Medium',
+    fontSize: 12,
+    letterSpacing: 0.7,
+    lineHeight: 17,
+  },
+  groupLabelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 6,
+    marginTop: 8
+  },
+  groupLabelIcon: {
+    alignItems: 'center',
+    borderRadius: 8,
+    height: 28,
+    justifyContent: 'center',
+    width: 28
   },
   eyebrow: {
     color: '#5FC100',
@@ -179,7 +221,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderRadius: 22,
+    borderRadius: 18,
     padding: spacing.md,
     gap: spacing.md
   },
@@ -193,11 +235,12 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 29,
     borderWidth: 1,
-    backgroundColor: '#153923',
+    backgroundColor: '#46C9FF',
     alignItems: 'center',
     justifyContent: 'center'
   },
   avatarText: {
+    color: '#071016',
     fontFamily: 'Exo_700Bold',
     fontSize: 24
   },
@@ -238,20 +281,24 @@ const styles = StyleSheet.create({
     lineHeight: 22
   },
   windowGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10
+    gap: 8
   },
   windowChip: {
     borderWidth: 1,
-    borderRadius: radius.pill,
+    borderRadius: 12,
+    minHeight: 46,
     paddingHorizontal: 14,
-    paddingVertical: 11
+    paddingVertical: 12
   },
   windowText: {
     fontFamily: 'Exo_600SemiBold',
     fontSize: 14,
     lineHeight: 18
+  },
+  windowCopy: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10
   },
   successText: {
     color: colors.success,
@@ -267,7 +314,7 @@ const styles = StyleSheet.create({
   },
   planButton: {
     alignItems: 'center',
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
@@ -276,6 +323,13 @@ const styles = StyleSheet.create({
   planButtonCopy: {
     flex: 1,
     gap: 4
+  },
+  planIcon: {
+    alignItems: 'center',
+    borderRadius: 11,
+    height: 42,
+    justifyContent: 'center',
+    width: 42
   },
   planButtonTitle: {
     fontFamily: 'Exo_600SemiBold',

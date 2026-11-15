@@ -1,0 +1,1 @@
+<div class="page-shell"><header class="page-hero wrap"><span class="eyebrow">403</span><h1>Access denied</h1><p>You do not have permission to open this area.</p><a class="pill pill-dark" href="<?=url()?>">Return home</a></header></div>

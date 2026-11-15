@@ -3,7 +3,7 @@ jest.mock('../src/services/apiClient', () => ({
   buildAuthorizationHeaders: jest.fn(() => ({ Authorization: 'Bearer test-token' }))
 }));
 
-import { uploadAndAnalyzeReport } from '../src/services/reportUploadService';
+import { isReportAnalysisTimeoutError, uploadAndAnalyzeReport } from '../src/services/reportUploadService';
 
 describe('reportUploadService', () => {
   const originalFetch = global.fetch;
@@ -90,5 +90,15 @@ describe('reportUploadService', () => {
         mimeType: 'application/pdf'
       })
     ).rejects.toThrow('Could not reach analysis server');
+  });
+
+  it('keeps mapped upload timeouts recoverable after the backend accepted the report', () => {
+    expect(isReportAnalysisTimeoutError(new Error('REQUEST_TIMEOUT'))).toBe(true);
+    expect(
+      isReportAnalysisTimeoutError(
+        new Error('Analysis timed out. Check internet/backend and retry with a smaller or clearer report.')
+      )
+    ).toBe(true);
+    expect(isReportAnalysisTimeoutError(new Error('Network request failed'))).toBe(false);
   });
 });

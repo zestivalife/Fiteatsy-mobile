@@ -1,0 +1,1 @@
+<div class="page-shell"><header class="page-hero wrap"><span class="eyebrow">404</span><h1>Page not found</h1><p>The requested page is unavailable.</p><a class="pill pill-dark" href="<?=url()?>">Return home</a></header></div>

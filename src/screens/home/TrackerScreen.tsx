@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -19,6 +19,9 @@ import { toDayKey } from '../../utils/date';
 import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
 import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
 import type { WearableSyncPayload } from '../../types';
+import { readCurrentHealthData } from '../../services/healthAppService';
+import { getNutritionExperience } from '../../services/nutritionExperienceService';
+import { buildSevenDayHealthHistory, buildSleepRecommendation, calculateHealthStreak } from '../../services/healthHistoryService';
 
 type RangeMode = '7D' | '30D';
 type HealthSubTab = 'overview' | 'activity' | 'heart' | 'sleep';
@@ -259,6 +262,14 @@ const latestObservationValueFor = (
   observations: WearableSyncPayload['observations'] | undefined,
   metricTypes: string[]
 ) => observations?.find((item) => metricTypes.includes(item.metricType))?.value ?? null;
+
+const sumObservationValues = (
+  observations: WearableSyncPayload['observations'] | undefined,
+  metricType: string
+) => {
+  const values = observations?.filter((item) => item.metricType === metricType).map((item) => item.value) ?? [];
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+};
 
 const compactMetricValue = (value: number | null | undefined) =>
   value == null || !Number.isFinite(value) ? '—' : `${Math.round(value)}`;
@@ -634,9 +645,13 @@ const SleepParticleMetric = ({
   const renderedSleepParticles = useMemo(() => {
     const fieldSize = SLEEP_PARTICLE_FIELD_SIZE;
     const center = fieldSize / 2;
-    const breath = 1 + Math.sin(sleepTime * 1.755) * 0.008;
+    const scoreRatio = sleepScore == null ? 0.45 : Math.max(0, Math.min(1, sleepScore / 100));
+    const densityRatio = 0.32 + scoreRatio * 0.68;
+    const breath = 1 + Math.sin(sleepTime * 1.755) * (0.004 + scoreRatio * 0.008);
 
-    return sleepParticlePoints.map((particle) => {
+    return sleepParticlePoints
+      .filter((_, index) => (index % 100) / 100 <= densityRatio)
+      .map((particle) => {
       const n = particle.normalized;
       const radialWave = Math.sin(sleepTime * 3.64 + particle.phase) * (0.0015 + 0.003 * n);
       const radiusValue = (particle.base + radialWave) * fieldSize * breath;
@@ -673,10 +688,10 @@ const SleepParticleMetric = ({
         x: center + baseX + horizontalWave + sweepPush,
         y: center + baseY + verticalRipple,
         size: particle.size * (0.9 + 0.45 * n),
-        opacity: Math.max(0, Math.min(0.95, fade * shimmer))
+        opacity: Math.max(0, Math.min(0.98, fade * shimmer * (0.48 + scoreRatio * 0.68)))
       };
     });
-  }, [sleepTime]);
+  }, [sleepScore, sleepTime]);
   const durationLabel = formatMinutesDuration(durationMinutes);
 
   return (
@@ -836,70 +851,23 @@ const CurvedHealthTabs = ({
   activeTab: HealthSubTab;
   onChange: (tab: HealthSubTab) => void;
 }) => {
-  const [barWidth, setBarWidth] = useState(0);
-  const activeX = useRef(new Animated.Value(0)).current;
-  const activeIndex = Math.max(0, healthSubTabs.findIndex((tab) => tab.key === activeTab));
-  const activePalette = healthSubTabs[activeIndex] ?? healthSubTabs[0];
-  const tabWidth = barWidth > 0 ? barWidth / healthSubTabs.length : 0;
-  const sliderWidth = tabWidth + 40;
-
-  useEffect(() => {
-    if (!tabWidth) return;
-    activeX.stopAnimation();
-    Animated.timing(activeX, {
-      toValue: activeIndex * tabWidth,
-      duration: 420,
-      useNativeDriver: true
-    }).start();
-  }, [activeIndex, activeX, tabWidth]);
-
   return (
     <View
       style={styles.curvedTabsShell}
-      onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
       accessibilityRole="tablist"
       accessibilityLabel="Health Tracker"
     >
-      {barWidth > 0 ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.curvedActiveSlider,
-            {
-              width: sliderWidth,
-              transform: [{ translateX: activeX }],
-              shadowColor: activePalette.gradientEnd
-            }
-          ]}
-        >
-          <Svg width="100%" height="100%" viewBox="0 0 236 92" preserveAspectRatio="none">
-            <Defs>
-              <SvgLinearGradient id="activeTrackerTabBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-                <Stop offset="0%" stopColor={activePalette.gradientStart} />
-                <Stop offset="100%" stopColor={activePalette.gradientEnd} />
-              </SvgLinearGradient>
-            </Defs>
-            <Path d={CURVED_TAB_FILL_PATH} fill="#0B0910" />
-            <Path d={CURVED_TAB_PATH} fill="none" stroke="url(#activeTrackerTabBorder)" strokeWidth="2" />
-          </Svg>
-          <View style={[styles.curvedActiveGlow, { backgroundColor: activePalette.surface }]} />
-        </Animated.View>
-      ) : null}
-
       {healthSubTabs.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
           <Pressable
             key={tab.key}
-            style={styles.curvedTab}
+            style={[styles.curvedTab, isActive && styles.curvedTabActive]}
             onPress={() => onChange(tab.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
             accessibilityLabel={`${tab.label} health tracker tab`}
           >
-            <Svg style={styles.curvedTabOutline} viewBox="0 0 236 92" preserveAspectRatio="none" pointerEvents="none">
-              <Path d={CURVED_TAB_PATH} fill="transparent" stroke={isActive ? 'transparent' : '#26222F'} strokeWidth="1.1" />
-            </Svg>
             <View style={[styles.curvedTabContent, isActive && styles.curvedTabContentActive]}>
               <CurvedTabIcon tabKey={tab.key} active={isActive} gradientStart={tab.gradientStart} gradientEnd={tab.gradientEnd} />
               <Text style={[styles.curvedTabLabel, isActive && styles.curvedTabLabelActive]}>{tab.label}</Text>
@@ -1165,15 +1133,17 @@ const MetricBarsCard = ({
 
 export const TrackerScreen = () => {
   const navigation = useNavigation<TrackerNavigation>();
-  const { themeMode, checkIns, onboarding, wearableSyncData, wellness, authSession } = useAppContext();
+  const { themeMode, checkIns, onboarding, wearableSyncData, wellness, authSession, selectedDeviceId } = useAppContext();
   const [pss10History, setPss10History] = useState<AssessmentResult[]>([]);
+  const [liveHealthPayload, setLiveHealthPayload] = useState<WearableSyncPayload | null>(null);
+  const [nutritionHydrationLiters, setNutritionHydrationLiters] = useState<number | null>(null);
   const isLight = themeMode === 'light';
   const todayWeekIndex = new Date().getDay();
 
   const [activeTab, setActiveTab] = useState<TrackerTab>('health');
   const [activeHealthTab, setActiveHealthTab] = useState<HealthSubTab>('overview');
-  const sectionHighlight = activeTab === 'wellness' ? '#60AF00' : '#60AF00';
-  const badgeHighlight = activeTab === 'wellness' ? '#60AF00' : '#60AF00';
+  const sectionHighlight = activeTab === 'wellness' ? '#59E735' : '#0A84FF';
+  const badgeHighlight = activeTab === 'wellness' ? '#59E735' : '#A87CFF';
   const [rangeMode, setRangeMode] = useState<RangeMode>('7D');
   const [selectedDay, setSelectedDay] = useState(todayWeekIndex);
   const [compareYesterday, setCompareYesterday] = useState(false);
@@ -1189,6 +1159,22 @@ export const TrackerScreen = () => {
     model: 'fiteatsy-seed-v1'
   });
   const contentAnim = useRef(new Animated.Value(1)).current;
+
+  const refreshTrackerSources = useCallback(async () => {
+    const healthConnected = selectedDeviceId === 'apple-health' || selectedDeviceId === 'health-connect' || wearableSyncData.length > 0;
+    const [healthResult, nutritionResult] = await Promise.allSettled([
+      healthConnected ? readCurrentHealthData() : Promise.resolve(null),
+      getNutritionExperience()
+    ]);
+    if (healthResult.status === 'fulfilled' && healthResult.value) setLiveHealthPayload(healthResult.value);
+    if (nutritionResult.status === 'fulfilled') setNutritionHydrationLiters(nutritionResult.value.water.litres);
+  }, [selectedDeviceId, wearableSyncData.length]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshTrackerSources();
+    }, [refreshTrackerSources])
+  );
 
   useEffect(() => {
     let active = true;
@@ -1237,16 +1223,21 @@ export const TrackerScreen = () => {
   const selected = days[selectedDay] ?? days[days.length - 1];
   const yesterday = days[Math.max(0, selectedDay - 1)] ?? selected;
 
+  const effectiveHealthData = useMemo(
+    () => liveHealthPayload ? [liveHealthPayload, ...wearableSyncData] : wearableSyncData,
+    [liveHealthPayload, wearableSyncData]
+  );
+
   const recoveryIntel = useMemo(() => {
     return buildRecoveryIntelligence({
       wellness,
       checkIns,
       medication: { scheduledToday: 0, takenToday: 0, pendingToday: 0, skippedToday: 0, missedToday: 0 },
-      hasWearable: wearableSyncData.length > 0,
-      wearableSyncData,
+      hasWearable: effectiveHealthData.length > 0,
+      wearableSyncData: effectiveHealthData,
       pss10Results: pss10History
     });
-  }, [wellness, checkIns, wearableSyncData, pss10History]);
+  }, [wellness, checkIns, effectiveHealthData, pss10History]);
 
   useEffect(() => {
     contentAnim.setValue(0.86);
@@ -1300,28 +1291,47 @@ export const TrackerScreen = () => {
   };
 
   const driverMap = useMemo(() => Object.fromEntries(recoveryIntel.recoveryDrivers.map((d) => [d.label, d])), [recoveryIntel.recoveryDrivers]);
-  const latestSync = wearableSyncData[0] ?? null;
+  const latestSync = effectiveHealthData[0] ?? null;
   const latestObservations = latestSync?.observations;
-  const stepsValue = latestObservationValue(latestObservations, 'steps');
-  const caloriesValue = latestSync?.metrics.caloriesKcal ?? latestObservationValue(latestObservations, 'calories_kcal');
-  const workoutMinutesValue = latestSync?.metrics.workoutMinutes ?? latestSync?.metrics.movementMinutes ?? null;
+  const sevenDayHealthHistory = useMemo(() => buildSevenDayHealthHistory(latestSync), [latestSync]);
+  const todayHealth = sevenDayHealthHistory.at(-1);
+  const latestSleepDay = [...sevenDayHealthHistory].reverse().find((day) => day.sleepMinutes != null);
+  const healthStreak = calculateHealthStreak(sevenDayHealthHistory);
+  const sleepRecommendation = buildSleepRecommendation(sevenDayHealthHistory);
+  const healthRecoveryTrend = sevenDayHealthHistory.map((day) => day.recoveryScore ?? 0);
+  const stepsValue = todayHealth?.steps ?? null;
+  const distanceMetersValue = todayHealth?.distanceMeters ?? null;
+  const activeEnergyValue = todayHealth?.activeEnergyKcal ?? null;
+  const caloriesValue = activeEnergyValue ?? latestSync?.metrics.caloriesKcal ?? latestObservationValue(latestObservations, 'calories_kcal');
+  const workoutMinutesValue = todayHealth?.workoutMinutes ?? latestSync?.metrics.workoutMinutes ?? latestSync?.metrics.movementMinutes ?? null;
   const activityScoreValue = recoveryIntel.signalCoverage.workouts ? driverMap['Movement / Workouts']?.score ?? null : null;
-  const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? latestSync?.metrics.heartRateAvg ?? null : null;
-  const hrvValue = recoveryIntel.signalCoverage.hrv ? latestSync?.metrics.hrvMs ?? null : null;
-  const sleepHoursValue = recoveryIntel.signalCoverage.sleep ? latestSync?.metrics.sleepHours ?? null : null;
-  const sleepScoreValue = recoveryIntel.signalCoverage.sleep ? driverMap.Sleep?.score ?? null : null;
-  const bedtimeValue = toClockMinutes(onboarding?.sleepTime);
-  const wakeTimeValue = toClockMinutes(onboarding?.wakeTime);
+  const restingHeartRateValue = todayHealth?.restingHeartRate ?? latestSync?.metrics.heartRateAvg ?? null;
+  const hrvValue = todayHealth?.hrvMs ?? latestSync?.metrics.hrvMs ?? null;
+  const sleepHoursValue = latestSleepDay?.sleepMinutes == null ? latestSync?.metrics.sleepHours ?? null : latestSleepDay.sleepMinutes / 60;
+  const sleepScoreValue = latestSleepDay?.sleepScore ?? (recoveryIntel.signalCoverage.sleep ? driverMap.Sleep?.score ?? null : null);
+  const latestSleepDayKey = latestSleepDay?.dateKey;
+  const latestNightObservations = latestObservations?.filter((item) => !latestSleepDayKey || toDayKey(item.measuredAtISO) === latestSleepDayKey) ?? [];
+  const sleepObservations = latestNightObservations.filter((item) => item.metricType === 'sleep_minutes');
+  const actualSleepStart = sleepObservations
+    .map((item) => item.sourceMetadata?.startAtISO)
+    .filter((value): value is string => Boolean(value))
+    .sort()[0];
+  const actualSleepEnd = sleepObservations
+    .map((item) => item.sourceMetadata?.endAtISO)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
+  const bedtimeValue = toClockMinutes(actualSleepStart ?? onboarding?.sleepTime);
+  const wakeTimeValue = toClockMinutes(actualSleepEnd ?? onboarding?.wakeTime);
   const sleepDurationMinutes = calculateSleepMinutes(bedtimeValue, wakeTimeValue, sleepHoursValue);
-  const sleepStages = [
-    ['Deep', formatSleepStage(latestObservationValueFor(latestObservations, ['deep_sleep_pct', 'deep_sleep_percent', 'sleep_deep_pct']))],
-    ['REM', formatSleepStage(latestObservationValueFor(latestObservations, ['rem_sleep_pct', 'rem_sleep_percent', 'sleep_rem_pct']))],
-    ['Light', formatSleepStage(latestObservationValueFor(latestObservations, ['light_sleep_pct', 'light_sleep_percent', 'sleep_light_pct']))],
-    ['Awake', formatSleepStage(latestObservationValueFor(latestObservations, ['awake_sleep_pct', 'awake_sleep_percent', 'sleep_awake_pct']))]
-  ]
-    .filter((stage): stage is [string, string] => Boolean(stage[1]))
-    .map(([label, value]) => `${label} ${value}`);
-  const hydrationValue = wellness.hydrationLiters > 0 ? wellness.hydrationLiters : null;
+  const sleepStages = ([
+    ['Core', sumObservationValues(latestNightObservations, 'sleep_core_minutes')],
+    ['Deep', sumObservationValues(latestNightObservations, 'sleep_deep_minutes')],
+    ['REM', sumObservationValues(latestNightObservations, 'sleep_rem_minutes')]
+  ] as Array<[string, number | null]>)
+    .filter((stage): stage is [string, number] => stage[1] != null && stage[1] > 0)
+    .map(([label, minutes]) => `${label} ${formatMinutesDuration(minutes)}`);
+  const hydrationValue = nutritionHydrationLiters ?? (wellness.hydrationLiters > 0 ? wellness.hydrationLiters : null);
   const activeMinutesValue = wellness.movementMinutes > 0 ? wellness.movementMinutes : workoutMinutesValue;
   const recommendationText = recoveryIntel.highestImpactActions[0] ?? recoveryIntel.insufficientReason ?? 'Sync health data to unlock personalized guidance.';
 
@@ -1339,7 +1349,7 @@ export const TrackerScreen = () => {
       compareValues: recoveryIntel.trendValues7d,
       signalState: trendState(recoveryIntel.trendValues7d),
       recoveryImpact: impactState(driverMap['Resting heart load']?.score ?? 0),
-      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.heart_rate),
+      freshness: statusToFreshness(latestSync?.dataQuality.connectedMetrics?.heart_rate),
       confidence: confidenceState()
     },
     {
@@ -1355,7 +1365,7 @@ export const TrackerScreen = () => {
       compareValues: recoveryIntel.trendValues7d,
       signalState: trendState(recoveryIntel.trendValues7d),
       recoveryImpact: impactState(driverMap['Movement / Workouts']?.score ?? 0),
-      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.workouts),
+      freshness: statusToFreshness(latestSync?.dataQuality.connectedMetrics?.workouts),
       confidence: confidenceState()
     },
     {
@@ -1371,7 +1381,7 @@ export const TrackerScreen = () => {
       compareValues: recoveryIntel.trendValues7d,
       signalState: trendState(recoveryIntel.trendValues7d),
       recoveryImpact: impactState(driverMap['HRV / Recovery balance']?.score ?? 0),
-      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.hrv),
+      freshness: statusToFreshness(latestSync?.dataQuality.connectedMetrics?.hrv),
       confidence: confidenceState()
     },
     {
@@ -1387,7 +1397,7 @@ export const TrackerScreen = () => {
       compareValues: recoveryIntel.trendValues7d,
       signalState: trendState(recoveryIntel.trendValues7d),
       recoveryImpact: impactState(driverMap.Sleep?.score ?? 0),
-      freshness: statusToFreshness(wearableSyncData[0]?.dataQuality.connectedMetrics?.sleep),
+      freshness: statusToFreshness(latestSync?.dataQuality.connectedMetrics?.sleep),
       confidence: confidenceState()
     }
   ];
@@ -1574,21 +1584,32 @@ export const TrackerScreen = () => {
 
   const renderTrend = () => (
     <Card style={styles.healthPanel}>
-      <Text style={styles.healthPanelTitle}>7-Day Recovery Trend</Text>
-      <View style={styles.recoveryTrendRow}>
-        {recoveryIntel.trendValues7d.map((value, index) => {
-          const hasTrend = !recoveryIntel.isCalibrating || checkIns.length > 0;
+      <View style={styles.healthMetricLabelWrap}>
+        <Text style={styles.healthPanelTitle}>7-Day Recovery Trend</Text>
+        <Text style={styles.healthMuted}>{healthStreak > 0 ? `${healthStreak}-day health streak` : 'Sync daily to start your streak'}</Text>
+      </View>
+      {healthRecoveryTrend.every((value) => value === 0) ? (
+        <View style={styles.trendEmptyState}>
+          <Ionicons name="analytics-outline" size={26} color="#A87CFF" />
+          <View style={styles.trendEmptyCopy}>
+            <Text style={styles.trendEmptyTitle}>Building your baseline</Text>
+            <Text style={styles.healthMuted}>Today’s signals are available. A trend appears after multiple days of synced data.</Text>
+          </View>
+        </View>
+      ) : <View style={styles.recoveryTrendRow}>
+        {healthRecoveryTrend.map((value, index) => {
+          const hasTrend = value > 0;
           const color = value >= 70 ? '#41B96B' : value >= 50 ? '#B7686C' : '#FF8188';
           return (
             <View key={`${index}-${value}`} style={styles.recoveryTrendItem}>
               <View style={styles.recoveryTrendBar}>
                 {hasTrend ? <View style={[styles.recoveryTrendFill, { height: `${Math.max(6, value)}%`, backgroundColor: color }]} /> : null}
               </View>
-              <Text style={styles.recoveryTrendLabel}>{dayShort[index].slice(0, 1)}</Text>
+              <Text style={styles.recoveryTrendLabel}>{new Date(`${sevenDayHealthHistory[index].dateKey}T12:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' })}</Text>
             </View>
           );
         })}
-      </View>
+      </View>}
     </Card>
   );
 
@@ -1598,9 +1619,9 @@ export const TrackerScreen = () => {
       {renderTrend()}
       <View style={styles.healthMiniGrid}>
         {renderMiniStat('Steps', numberLabel(stepsValue), 'walk-outline', recoveryIntel.signalCoverage.steps ? 'Synced' : 'Sync health data')}
-        {renderMiniStat('Calories', numberLabel(caloriesValue, ' kcal'), 'flame-outline')}
+        {renderMiniStat('Distance', distanceMetersValue == null ? 'No data' : decimalLabel(distanceMetersValue / 1000, ' km'), 'navigate-outline')}
+        {renderMiniStat('Active Energy', numberLabel(caloriesValue, ' kcal'), 'flame-outline')}
         {renderMiniStat('Hydration', decimalLabel(hydrationValue, ' L'), 'water-outline')}
-        {renderMiniStat('Active', numberLabel(activeMinutesValue, ' min'), 'pulse-outline')}
       </View>
     </View>
   );
@@ -1608,7 +1629,7 @@ export const TrackerScreen = () => {
   const renderActivityTab = () => {
     const stepTarget = 5000;
     const workoutTarget = 30;
-    const calorieTarget = 2100;
+    const calorieTarget = 500;
     return (
       <View style={styles.healthContentStack}>
         <Card style={styles.activityCard}>
@@ -1620,8 +1641,9 @@ export const TrackerScreen = () => {
             <ProgressRing value={activityScoreValue} label="Activity" />
           </View>
           {renderMetricRow('Steps', numberLabel(stepsValue), stepsValue ? stepTarget.toLocaleString() : '', stepsValue ? (stepsValue / stepTarget) * 100 : null)}
+          {renderMetricRow('Walking + Running', distanceMetersValue == null ? 'No data' : decimalLabel(distanceMetersValue / 1000, ' km'), '', null, '#32D74B')}
           {renderMetricRow('Workout', numberLabel(workoutMinutesValue, ' min'), workoutMinutesValue ? `${workoutTarget} min` : '', workoutMinutesValue ? (workoutMinutesValue / workoutTarget) * 100 : null, '#BFFFA9')}
-          {renderMetricRow('Calories', numberLabel(caloriesValue, ' kcal'), caloriesValue ? `${calorieTarget} kcal` : '', caloriesValue ? (caloriesValue / calorieTarget) * 100 : null, '#FF8188')}
+          {renderMetricRow('Active Energy', numberLabel(caloriesValue, ' kcal'), caloriesValue ? `${calorieTarget} kcal` : '', caloriesValue ? (caloriesValue / calorieTarget) * 100 : null, '#FF453A')}
         </Card>
         <Card style={styles.recommendationCard}>
           <Text style={styles.recommendationTitle}>Activity Recommendation</Text>
@@ -1658,7 +1680,7 @@ export const TrackerScreen = () => {
       />
       <Card style={styles.recommendationCard}>
         <Text style={[styles.recommendationTitle, { color: '#6FD3FF' }]}>Sleep Recommendation</Text>
-        <Text style={styles.recommendationCopy}>{sleepScoreValue == null ? 'Sync sleep data to unlock sleep recommendations.' : recommendationText}</Text>
+        <Text style={styles.recommendationCopy}>{sleepRecommendation}</Text>
       </Card>
     </View>
   );
@@ -1680,7 +1702,7 @@ export const TrackerScreen = () => {
             accessibilityRole="button"
             accessibilityLabel="Health Tracker tab"
           >
-            <Text style={[styles.tabText, !isLight && styles.tabTextDark, activeTab === 'health' && styles.tabTextActive]}>Health Tracker</Text>
+            <Text style={[styles.tabText, !isLight && styles.tabTextDark, activeTab === 'health' && styles.tabTextActive]}>Health</Text>
           </Pressable>
           <Pressable
             style={[styles.tabButton, activeTab === 'wellness' && styles.tabButtonActive, activeTab === 'wellness' && { backgroundColor: sectionHighlight }]}
@@ -1688,7 +1710,7 @@ export const TrackerScreen = () => {
             accessibilityRole="button"
             accessibilityLabel="Wellness Tracker tab"
           >
-            <Text style={[styles.tabText, !isLight && styles.tabTextDark, activeTab === 'wellness' && styles.tabTextActive]}>Wellness Tracker</Text>
+            <Text style={[styles.tabText, !isLight && styles.tabTextDark, activeTab === 'wellness' && styles.tabTextActive]}>Daily Wellness</Text>
           </Pressable>
         </View>
 
@@ -1709,34 +1731,16 @@ export const TrackerScreen = () => {
         </>
       ) : (
         <>
-          <Card style={[styles.summaryCard, !isLight && styles.summaryCardDark]}>
-        <View style={styles.summaryStatsRow}>
-          <View style={styles.summaryStat}>
-            <Text style={[styles.summaryValue, !isLight && styles.summaryValueDark]}>{selected.calories.toFixed(1)}</Text>
-            <Text style={[styles.summaryLabel, !isLight && styles.summaryLabelDark]}>Cal</Text>
-          </View>
-          <View style={styles.summaryStat}>
-            <Text style={[styles.summaryValue, !isLight && styles.summaryValueDark]}>{selected.distanceKm.toFixed(1)}</Text>
-            <Text style={[styles.summaryLabel, !isLight && styles.summaryLabelDark]}>Km</Text>
-          </View>
-          <View style={styles.summaryStat}>
-            <Text style={[styles.summaryValue, !isLight && styles.summaryValueDark]}>{selected.steps}</Text>
-            <Text style={[styles.summaryLabel, !isLight && styles.summaryLabelDark]}>Steps</Text>
-          </View>
-        </View>
-
-        <Pressable style={[styles.compareButton, !isLight && styles.compareButtonDark]} onPress={() => setCompareYesterday((v) => !v)} accessibilityRole="button" accessibilityLabel="Toggle recovery comparison">
-          <Text style={[styles.compareButtonText, !isLight && styles.compareButtonTextDark]}>{compareYesterday ? 'Hide Comparison' : 'Recovery vs Yesterday'}</Text>
-        </Pressable>
-      </Card>
-
       <View style={styles.daysRow}>
         {days.map((day, index) => {
           const active = index === selectedDay;
+          const future = day.key > toDayKey(new Date().toISOString());
           return (
             <Pressable
               key={day.key}
-              style={[styles.dayCard, isLight ? styles.dayCardLight : styles.dayCardDark, active && styles.dayCardActive, active && { backgroundColor: sectionHighlight, borderColor: sectionHighlight }]}
+              disabled={future}
+              accessibilityState={{ disabled: future, selected: active }}
+              style={[styles.dayCard, isLight ? styles.dayCardLight : styles.dayCardDark, future && { opacity: 0.38 }, active && styles.dayCardActive, active && { backgroundColor: sectionHighlight, borderColor: sectionHighlight }]}
               onPress={() => setSelectedDay(index)}
             >
               <Text
@@ -1789,50 +1793,28 @@ export const TrackerScreen = () => {
           ]
         }}
       >
-        <View style={styles.grid}>
-          {[0, 2].map((startIndex) => (
-            <View key={String(startIndex)} style={styles.metricRow}>
-              {metrics.slice(startIndex, startIndex + 2).map((metric) =>
-                metric.kind === 'spark' ? (
-                  <MetricSparkCard
-                    key={metric.key}
-                    title={metric.title}
-                    subtitle={metric.subtitle}
-                    icon={metric.icon}
-                    color={metric.color}
-                    data={metric.values}
-                    value={metric.latestValue}
-                    unit={metric.unit}
-                    signalState={metric.signalState}
-                    recoveryImpact={metric.recoveryImpact}
-                    freshness={metric.freshness}
-                    confidence={metric.confidence}
-                    primary={metric.primary}
-                    onOpen={() => openDetail(metric)}
-                    isLight={isLight}
-                  />
-                ) : (
-                  <MetricBarsCard
-                    key={metric.key}
-                    title={metric.title}
-                    subtitle={metric.subtitle}
-                    icon={metric.icon}
-                    color={metric.color}
-                    bars={metric.values}
-                    unit={metric.unit}
-                    signalState={metric.signalState}
-                    recoveryImpact={metric.recoveryImpact}
-                    freshness={metric.freshness}
-                    confidence={metric.confidence}
-                    primary={metric.primary}
-                    onOpen={() => openDetail(metric)}
-                    isLight={isLight}
-                  />
-                )
-              )}
-            </View>
-          ))}
-        </View>
+        <Card style={styles.wellnessSummaryCard}>
+          <Text style={styles.wellnessSummaryTitle}>Today’s Wellness</Text>
+          <Text style={styles.wellnessSummarySubtitle}>A clear view of your current self-reported and recovery signals.</Text>
+          {metrics.map((metric, index) => {
+            const icon: keyof typeof Ionicons.glyphMap = metric.key === 'stress-load' ? 'bulb-outline' : metric.key === 'focus-stability' ? 'locate-outline' : metric.key === 'recovery-capacity' ? 'moon-outline' : 'sparkles-outline';
+            const color = metric.key === 'stress-load' ? '#FF9F0A' : metric.key === 'focus-stability' ? '#64D2FF' : metric.key === 'recovery-capacity' ? '#A87CFF' : '#59E735';
+            return (
+              <Pressable key={metric.key} onPress={() => openDetail(metric)} style={[styles.wellnessSummaryRow, index > 0 && styles.wellnessSummaryDivider]}>
+                <View style={[styles.wellnessSummaryIcon, { backgroundColor: `${color}1F` }]}><Ionicons name={icon} size={21} color={color} /></View>
+                <View style={styles.wellnessSummaryCopy}>
+                  <Text style={styles.wellnessSummaryMetric}>{metric.title}</Text>
+                  <Text style={styles.wellnessSummaryMeta}>{metric.subtitle} · {metric.freshness}</Text>
+                </View>
+                <View style={styles.wellnessSummaryValueWrap}>
+                  <Text style={[styles.wellnessSummaryValue, { color }]}>{metric.latestValue === 0 && metric.freshness === 'Manual Input' ? '—' : Math.round(metric.latestValue)}</Text>
+                  <Text style={styles.wellnessSummaryUnit}>{metric.latestValue === 0 && metric.freshness === 'Manual Input' ? 'No data' : metric.unit}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#6F7078" />
+              </Pressable>
+            );
+          })}
+        </Card>
       </Animated.View>
 
       <Card style={[styles.insightCard, !isLight && styles.insightCardDark]}>
@@ -1872,6 +1854,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 176
   },
+  largeTitleBlock: {
+    gap: 3,
+    marginBottom: 18,
+    paddingHorizontal: 4
+  },
+  largeTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10
+  },
+  largeTitleIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,79,123,0.14)',
+    borderRadius: 12,
+    height: 42,
+    justifyContent: 'center',
+    width: 42
+  },
+  largeTitle: {
+    color: '#111111',
+    fontFamily: 'Exo_700Bold',
+    fontSize: 34,
+    letterSpacing: -1.1,
+    lineHeight: 41
+  },
+  largeTitleDark: { color: '#FFFFFF' },
+  largeSubtitle: {
+    color: '#667085',
+    fontFamily: 'Exo_400Regular',
+    fontSize: 14,
+    lineHeight: 20
+  },
+  largeSubtitleDark: { color: '#A1A1AA' },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1882,7 +1897,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     borderRadius: radius.pill,
-    backgroundColor: colors.cardMuted,
+    backgroundColor: '#111016',
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.06)',
     padding: 4
@@ -1891,8 +1906,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceTint
   },
   tabSwitchDark: {
-    backgroundColor: colors.cardRaised,
-    borderColor: colors.strokeStrong
+    backgroundColor: '#111016',
+    borderColor: '#2A2932'
   },
   tabTextDark: {
     color: '#FFFFFF'
@@ -1913,7 +1928,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary
   },
   tabTextActive: {
-    color: colors.white
+    color: '#050505'
   },
   rangeChip: {
     borderRadius: radius.pill,
@@ -1934,7 +1949,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary
   },
   rangeTextActive: {
-    color: colors.white
+    color: '#050505'
   },
   rangeChipDark: {
     backgroundColor: colors.cardRaised,
@@ -1985,14 +2000,16 @@ const styles = StyleSheet.create({
     color: '#A5A7B1'
   },
   curvedTabsShell: {
-    position: 'relative',
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 88,
+    alignItems: 'center',
+    minHeight: 64,
     marginBottom: 18,
-    overflow: 'visible',
-    borderBottomWidth: 1,
-    borderBottomColor: '#24202D'
+    borderRadius: 18,
+    backgroundColor: '#111016',
+    borderColor: '#2A2932',
+    borderWidth: 1,
+    padding: 5,
+    gap: 3
   },
   curvedActiveSlider: {
     position: 'absolute',
@@ -2016,14 +2033,14 @@ const styles = StyleSheet.create({
   },
   curvedTab: {
     flex: 1,
-    position: 'relative',
-    zIndex: 4,
-    height: 78,
+    minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    backgroundColor: 'transparent'
+    borderRadius: 14,
+    paddingVertical: 7
+  },
+  curvedTabActive: {
+    backgroundColor: '#323232'
   },
   curvedTabOutline: {
     position: 'absolute',
@@ -2040,7 +2057,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: 2 }]
   },
   curvedTabContentActive: {
-    transform: [{ translateY: -1 }]
+    transform: [{ translateY: 0 }]
   },
   curvedTabLabel: {
     ...typography.bodyStrong,
@@ -2056,6 +2073,62 @@ const styles = StyleSheet.create({
   healthContentStack: {
     gap: 16
   },
+  trendEmptyState: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 92,
+    paddingTop: 14
+  },
+  trendEmptyCopy: { flex: 1, gap: 4 },
+  trendEmptyTitle: {
+    color: '#FFFFFF',
+    fontFamily: 'Exo_600SemiBold',
+    fontSize: 15,
+    lineHeight: 20
+  },
+  wellnessSummaryCard: {
+    backgroundColor: '#111016',
+    borderColor: '#2A2932',
+    borderRadius: 22,
+    marginBottom: 16,
+    padding: 18
+  },
+  wellnessSummaryTitle: {
+    color: '#FFFFFF',
+    fontFamily: 'Exo_700Bold',
+    fontSize: 20,
+    lineHeight: 26
+  },
+  wellnessSummarySubtitle: {
+    color: '#94949E',
+    fontFamily: 'Exo_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+    marginTop: 3
+  },
+  wellnessSummaryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 11,
+    minHeight: 76,
+    paddingVertical: 12
+  },
+  wellnessSummaryDivider: { borderTopColor: '#2A2932', borderTopWidth: 1 },
+  wellnessSummaryIcon: {
+    alignItems: 'center',
+    borderRadius: 12,
+    height: 44,
+    justifyContent: 'center',
+    width: 44
+  },
+  wellnessSummaryCopy: { flex: 1, gap: 3 },
+  wellnessSummaryMetric: { color: '#FFFFFF', fontFamily: 'Exo_600SemiBold', fontSize: 15, lineHeight: 20 },
+  wellnessSummaryMeta: { color: '#8F9099', fontFamily: 'Exo_400Regular', fontSize: 12, lineHeight: 17 },
+  wellnessSummaryValueWrap: { alignItems: 'flex-end' },
+  wellnessSummaryValue: { fontFamily: 'Exo_700Bold', fontSize: 20, lineHeight: 24 },
+  wellnessSummaryUnit: { color: '#777983', fontFamily: 'Exo_400Regular', fontSize: 10, lineHeight: 13 },
   healthPanel: {
     borderRadius: 28,
     paddingHorizontal: 16,

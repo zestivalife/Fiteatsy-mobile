@@ -23,8 +23,8 @@ const toBiomarkerObservationDto = (observation, fiteatsyClientId) => ({
     createdAtISO: observation.createdAtISO
 });
 biomarkersRouter.use(requireAuthenticatedAccount);
-biomarkersRouter.get('/', async (_req, res) => {
-    const items = await listBiomarkers();
+biomarkersRouter.get('/', async (req, res) => {
+    const items = await listBiomarkers(currentOwner(getAuthenticatedAccount(req)));
     return res.status(200).json({ total: items.length, items });
 });
 biomarkersRouter.get('/history', async (req, res) => {

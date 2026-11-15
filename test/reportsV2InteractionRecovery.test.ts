@@ -30,6 +30,7 @@ describe('Reports V2 interaction recovery contract', () => {
   it('reconciles a non-terminal backend job after navigation or restart', () => {
     expect(screenSource).toContain("setProcessingIntent('resume')");
     expect(screenSource).toContain('waitForReportAnalysis({');
+    expect(screenSource).toContain('isReportAnalysisTimeoutError(error)');
     expect(screenSource).toContain('processingStatus ? <Text style={styles.processingStatusText}>Status: {processingStatus}</Text> : null');
     expect(screenSource).not.toContain('failSafeTimeout');
     expect(screenSource).not.toContain('Analysis is taking too long');

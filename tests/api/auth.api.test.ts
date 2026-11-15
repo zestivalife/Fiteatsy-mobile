@@ -99,7 +99,41 @@ test('POST /v1/auth/signup/verify-otp issues a persisted session and GET /v1/aut
   assert.match(me.body.user.createdAtISO, /^\d{4}-\d{2}-\d{2}T/);
   assert.match(me.body.client.fiteatsyClientId, /^fc_[a-f0-9]{32}$/i);
   assert.equal(me.body.client.status, 'active');
+  assert.equal(me.body.requiresPinSetup, true);
   assert.equal('id' in me.body.client, false);
+});
+
+test('new signup must create a personal Login PIN before continuing', async () => {
+  const created = await postJson(server.baseUrl, '/v1/auth/signup/request-otp', {
+    name: 'Mandatory Pin User', email: 'mandatory-pin@example.com', mobileNumber: '+919876543219'
+  });
+  const verified = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+    challengeId: created.body.challengeId, otp: TEST_OTP
+  });
+  assert.equal(verified.body.requiresPinSetup, true);
+
+  const blockedBeforePinSetup = await getJson(server.baseUrl, '/v1/external-consultants/feature-status', {
+    headers: authHeaders(verified.body.sessionToken)
+  });
+  assert.equal(blockedBeforePinSetup.response.status, 428);
+  assert.equal(blockedBeforePinSetup.body.code, 'LOGIN_PIN_SETUP_REQUIRED');
+
+  const createdPin = await getJson(server.baseUrl, '/v1/auth/create-pin', {
+    method: 'PUT', headers: { 'content-type': 'application/json', ...authHeaders(verified.body.sessionToken) },
+    body: JSON.stringify({ newPin: '946281', confirmNewPin: '946281' })
+  });
+  assert.equal(createdPin.response.status, 201);
+
+  const duplicate = await getJson(server.baseUrl, '/v1/auth/create-pin', {
+    method: 'PUT', headers: { 'content-type': 'application/json', ...authHeaders(verified.body.sessionToken) },
+    body: JSON.stringify({ newPin: '846281', confirmNewPin: '846281' })
+  });
+  assert.equal(duplicate.response.status, 409);
+  assert.equal(duplicate.body.error, 'PIN_ALREADY_CONFIGURED');
+
+  const login = await postJson(server.baseUrl, '/v1/auth/login/pin', { mobile: '919876543219', pin: '946281' });
+  assert.equal(login.response.status, 200);
+  assert.equal(login.body.requiresPinChange, false);
 });
 
 test('PIN login bootstraps existing OTP users with default PIN and requires PIN change', async () => {

@@ -30,7 +30,7 @@ const deriveCareTrack = (items: HealthCondition[], goal: HealthGoal | null) => {
 };
 
 export const OnboardingBasicsScreen = ({ navigation }: Props) => {
-  const { onboarding, setOnboarding, setWearableSetupCompleted } = useAppContext();
+  const { onboarding, setOnboarding } = useAppContext();
   const seed = useMemo(() => onboarding ?? baseProfile(), [onboarding]);
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
@@ -58,7 +58,6 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
       wellnessGoalIds: selectedGoals.map(wellnessGoalIdForLabel).filter((id): id is string => Boolean(id)),
       careTrack: deriveCareTrack(selectedConditions, primaryGoal), createdAtISO: seed.createdAtISO || new Date().toISOString()
     }));
-    setWearableSetupCompleted(false);
     navigation.navigate('OnboardingAnthropometrics');
   };
   const onDob = (event: DateTimePickerEvent, date?: Date) => {
