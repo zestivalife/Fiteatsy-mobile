@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -6,59 +6,11 @@ import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
 import { getThemeColors, radius, spacing, typography } from '../../design/tokens';
 import type { RootStackParamList } from '../../navigation/types';
-import {
-  useCanonicalHealthSyncCoordinator,
-  type CanonicalHealthMetricState
-} from '../../services/canonicalHealthSyncCoordinator';
+import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
 import { useAppContext } from '../../state/AppContext';
+import { FitnessParameterCards } from '../fitness/FitnessScreen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthData'>;
-type Section = 'Activity' | 'Sleep' | 'Heart & Vitals' | 'Body & Mind';
-type MetricPresentation = {
-  section: Section;
-  period: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  accent: string;
-};
-
-const metricPresentation: Record<string, MetricPresentation> = {
-  steps: { section: 'Activity', period: '12:00 AM – Now', icon: 'footsteps-outline', accent: '#FF6B35' },
-  distance: { section: 'Activity', period: '12:00 AM – Now', icon: 'walk-outline', accent: '#32D74B' },
-  active_energy: { section: 'Activity', period: '12:00 AM – Now', icon: 'flame-outline', accent: '#FF453A' },
-  exercise: { section: 'Activity', period: '12:00 AM – Now', icon: 'fitness-outline', accent: '#FF9F0A' },
-  workout: { section: 'Activity', period: '12:00 AM – Now', icon: 'barbell-outline', accent: '#BF5AF2' },
-  sleep: { section: 'Sleep', period: 'Last sleep window', icon: 'bed-outline', accent: '#7D7AFF' },
-  heart_rate: { section: 'Heart & Vitals', period: 'Latest today', icon: 'heart', accent: '#FF375F' },
-  resting_heart_rate: { section: 'Heart & Vitals', period: '12:00 AM – Now', icon: 'heart-outline', accent: '#FF375F' },
-  hrv_sdnn: { section: 'Heart & Vitals', period: 'Latest 35 days', icon: 'pulse-outline', accent: '#FF2D55' },
-  hrv_rmssd: { section: 'Heart & Vitals', period: 'Latest 35 days', icon: 'pulse-outline', accent: '#FF2D55' },
-  spo2: { section: 'Heart & Vitals', period: 'Latest 35 days', icon: 'water-outline', accent: '#30D5C8' },
-  respiratory_rate: { section: 'Heart & Vitals', period: 'Latest 35 days', icon: 'analytics-outline', accent: '#64D2FF' },
-  weight: { section: 'Body & Mind', period: 'Latest measurement', icon: 'scale-outline', accent: '#FFD60A' },
-  hydration: { section: 'Body & Mind', period: '12:00 AM – Now', icon: 'water-outline', accent: '#32D74B' }
-};
-
-const sectionOrder: Section[] = ['Activity', 'Sleep', 'Heart & Vitals', 'Body & Mind'];
-
-const formatValue = (metric: CanonicalHealthMetricState) => {
-  const observation = metric.observation;
-  if (!observation) return 'No Data';
-  if (observation.metricType === 'sleep_minutes') {
-    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(observation.value / 60)} hr`;
-  }
-  const maximumFractionDigits = ['steps', 'active_minutes', 'workout_minutes'].includes(observation.metricType) ? 0 : 1;
-  const value = new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(observation.value);
-  return `${value} ${observation.unit}`.trim();
-};
-
-const statusLabel = (metric: CanonicalHealthMetricState) => {
-  if (metric.queryState === 'DATA_AVAILABLE') return 'synced';
-  if (metric.queryState === 'QUERYING') return 'reading';
-  if (metric.queryState === 'TIMEOUT') return 'timed out';
-  if (metric.queryState === 'ERROR') return 'needs attention';
-  return 'no recent data';
-};
-
 export const HealthDataScreen = ({ navigation, route }: Props) => {
   const { themeMode, onboarding, setOnboarding, setWearableSetupCompleted } = useAppContext();
   const palette = getThemeColors(themeMode);
@@ -67,14 +19,6 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
   const liveRefreshStarted = useRef(false);
   const loading = !health.localHydrated;
   const refreshing = health.metrics.some((metric) => metric.queryState === 'QUERYING');
-
-  const rows = useMemo(() => health.metrics
-    .filter((metric) => metric.supported && metricPresentation[metric.definition.metricKey])
-    .sort((left, right) => {
-      const leftSection = metricPresentation[left.definition.metricKey].section;
-      const rightSection = metricPresentation[right.definition.metricKey].section;
-      return sectionOrder.indexOf(leftSection) - sectionOrder.indexOf(rightSection);
-    }), [health.metrics]);
 
   const refresh = useCallback(() => {
     void health.syncLocalMetrics({ liveOnly: true });
@@ -152,38 +96,7 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
           <Text style={[styles.stateText, { color: palette.textSecondary }]}>Restoring saved health data…</Text>
         </View>
       ) : (
-        <View style={styles.list}>
-          {rows.map((metric, index) => {
-            const presentation = metricPresentation[metric.definition.metricKey];
-            const previous = rows[index - 1];
-            const previousSection = previous ? metricPresentation[previous.definition.metricKey].section : null;
-            const status = statusLabel(metric);
-            return (
-              <React.Fragment key={metric.definition.metricKey}>
-                {presentation.section !== previousSection ? (
-                  <Text style={[styles.sectionTitle, { color: palette.textSecondary }]}>{presentation.section.toUpperCase()}</Text>
-                ) : null}
-                <View style={[styles.metricCard, { backgroundColor: palette.card }]}>
-                  <View style={styles.metricTopRow}>
-                    <View style={styles.metricIdentity}>
-                      <Ionicons name={presentation.icon} size={20} color={presentation.accent} />
-                      <Text style={[styles.metricLabel, { color: presentation.accent }]}>{metric.definition.displayName}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
-                  </View>
-                  <Text style={[styles.metricValue, { color: palette.textPrimary }]}>{formatValue(metric)}</Text>
-                  <View style={styles.metricFooter}>
-                    <Text style={[styles.period, { color: palette.textSecondary }]}>{presentation.period}</Text>
-                    <Text style={[styles.status, { color: status === 'synced' ? palette.success : palette.textMuted }]}>{status}</Text>
-                  </View>
-                  {metric.observation?.sourceMetadata?.sourceApplication ? (
-                    <Text style={[styles.source, { color: palette.textMuted }]}>Source: {metric.observation.sourceMetadata.sourceApplication}</Text>
-                  ) : null}
-                </View>
-              </React.Fragment>
-            );
-          })}
-        </View>
+        <FitnessParameterCards health={health} />
       )}
 
       {connected ? (
@@ -228,17 +141,6 @@ const styles = StyleSheet.create({
   connectBody: { ...typography.bodySmall, marginTop: spacing.xs, textAlign: 'center' },
   syncButton: { minHeight: 52, marginTop: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   connectError: { ...typography.bodySmall, marginTop: spacing.sm, textAlign: 'center' },
-  list: { marginTop: spacing.lg, gap: 12 },
-  sectionTitle: { ...typography.label, letterSpacing: 1.1, marginLeft: 6, marginTop: 8 },
-  metricCard: { minHeight: 154, padding: 20, borderRadius: 22 },
-  metricTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  metricIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  metricLabel: { ...typography.label, fontWeight: '700' },
-  status: { ...typography.badge, textTransform: 'capitalize' },
-  metricValue: { ...typography.metric, fontSize: 34, lineHeight: 42, marginTop: spacing.lg },
-  metricFooter: { marginTop: spacing.xs, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  period: typography.subtext,
-  source: { ...typography.subtext, marginTop: spacing.xxs },
   refreshButton: { minHeight: 52, marginTop: spacing.lg, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   refreshText: { ...typography.button, color: '#FFFFFF' },
   updatedAt: { ...typography.subtext, marginTop: spacing.sm, textAlign: 'center' },
