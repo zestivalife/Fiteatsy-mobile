@@ -52,4 +52,23 @@ describe('forward-only Fitness presentation integration', () => {
     expect(fitness).toContain('Measured ');
     expect(fitness).not.toContain("|| '0'");
   });
+
+  test('retains the original detailed metric presentation alongside Fitness summaries', () => {
+    for (const contract of [
+      'metric.definition.displayName',
+      'formatValue(metric)',
+      'presentation.period',
+      'statusLabel(metric)',
+      'sourceMetadata.sourceApplication'
+    ]) expect(healthData).toContain(contract);
+    expect(healthData).toContain('Detailed Health Data');
+    expect(healthData).toContain('metricPresentation');
+  });
+
+  test('classifies Mindfulness from the actual canonical registry capability', () => {
+    const registry = read('src/services/healthMetricRegistry.ts');
+    expect(registry).not.toContain("metricKey:'mindfulness'");
+    expect(fitness).toContain("key: 'mindfulness'");
+    expect(fitness).toContain('metricKeys: []');
+  });
 });

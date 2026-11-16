@@ -45,7 +45,7 @@ const formatMeasurement = (metric: CanonicalHealthMetricState | null) => {
     : observation.value;
   const unit = observation.metricType === 'sleep_minutes' ? 'hr' : observation.unit;
   const maximumFractionDigits = ['steps', 'active_minutes', 'workout_minutes'].includes(observation.metricType) ? 0 : 1;
-  return `Latest ${new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value)} ${unit}`.trim();
+  return `Latest ${metric.definition.displayName}: ${new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value)} ${unit}`.trim();
 };
 
 const readStatus = (metrics: CanonicalHealthMetricState[]) => {
@@ -72,7 +72,7 @@ export const FitnessParameterCards = ({ health }: { health: CanonicalHealthSyncS
     const supported = metrics.filter((metric) => metric.supported);
     const latest = latestMetric(supported);
     const recordCount = supported.reduce((total, metric) => total + metric.localRecordCount, 0);
-    return { category, metrics: supported, latest, recordCount };
+    return { category, registered: metrics.length > 0, metrics: supported, latest, recordCount };
   }), [health.metrics]);
 
   return (
@@ -82,9 +82,9 @@ export const FitnessParameterCards = ({ health }: { health: CanonicalHealthSyncS
         <Text style={[styles.providerStatus, { color: palette.textMuted }]}>{health.providerLabel}</Text>
       </View>
       <View style={styles.parameterList}>
-        {rows.map(({ category, metrics, latest, recordCount }) => {
+        {rows.map(({ category, registered, metrics, latest, recordCount }) => {
           const measuredAt = measurementTime(latest);
-          const unsupported = metrics.length === 0;
+          const unsupported = !registered || metrics.length === 0;
           return (
             <View
               accessibilityLabel={`${category.title} health parameter`}
