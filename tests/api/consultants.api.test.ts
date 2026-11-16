@@ -1765,16 +1765,25 @@ test('consultant workspace contract syncs wearable summaries and source metadata
   });
   const consultant = await createConsultantSession();
   await assignClientToConsultant(client, consultant);
-  const owner = { accountId: client.current.body.accountId, clientId: await getClientDatabaseId(client) };
+  const consent = await postJson(server.baseUrl, '/v1/health/wearable-consents', {
+    provider: 'APPLE_HEALTH',
+    consentVersion: 'wearable-consent-v1',
+    purposeVersion: 'wearable-purpose-v1',
+    requestedScopes: ['steps', 'resting_heart_rate'],
+    acknowledgedPurposes: ['wellness_insights', 'consultant_care']
+  }, { headers: authHeaders(client.token) });
+  assert.equal(consent.response.status, 201, JSON.stringify(consent.body));
 
-  await ingestHealthObservations(owner, [
-    {
+  const observationBatch = {
+    observations: [{
       metricType: 'steps',
       value: 6842,
       unit: 'count',
       measuredAtISO: '2026-08-11T07:30:00.000Z',
       sourceProvider: 'apple_health',
-      sourceRecordId: 'steps-1'
+      sourceMetadata: { sourceApplication: 'Apple Health' },
+      sourceRecordId: 'steps-1',
+      syncKey: 'consultant-round-trip-steps-1'
     },
     {
       metricType: 'resting_heart_rate',
@@ -1782,9 +1791,23 @@ test('consultant workspace contract syncs wearable summaries and source metadata
       unit: 'bpm',
       measuredAtISO: '2026-08-11T07:35:00.000Z',
       sourceProvider: 'apple_health',
-      sourceRecordId: 'rhr-1'
-    }
-  ]);
+      sourceMetadata: { sourceApplication: 'Apple Health' },
+      sourceRecordId: 'rhr-1',
+      syncKey: 'consultant-round-trip-rhr-1'
+    }]
+  };
+  const uploaded = await postJson(server.baseUrl, '/v1/health/observations:batch', observationBatch, {
+    headers: authHeaders(client.token)
+  });
+  assert.equal(uploaded.response.status, 200, JSON.stringify(uploaded.body));
+  assert.equal(uploaded.body.accepted, 2);
+
+  const repeated = await postJson(server.baseUrl, '/v1/health/observations:batch', observationBatch, {
+    headers: authHeaders(client.token)
+  });
+  assert.equal(repeated.response.status, 200, JSON.stringify(repeated.body));
+  assert.equal(repeated.body.accepted, 0);
+  assert.equal(repeated.body.duplicate, 2);
 
   const response = await getJson(
     server.baseUrl,
@@ -1799,6 +1822,15 @@ test('consultant workspace contract syncs wearable summaries and source metadata
   assert.ok(response.body.wearableSummary.latestMetrics.some((item: { metricType: string }) => item.metricType === 'steps'));
   assert.equal(response.body.planWorkflow.gates.wearableSignalsReady, true);
   assert.equal(response.body.sourceMetadata.lastWearableSyncAt, response.body.wearableSummary.lastSyncedAt);
+
+  const unrelatedConsultant = await createConsultantSession();
+  const denied = await getJson(
+    server.baseUrl,
+    `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
+    { headers: authHeaders(unrelatedConsultant.token) }
+  );
+  assert.equal(denied.response.status, 404, JSON.stringify(denied.body));
+  assert.equal(denied.body.error, 'CLIENT_NOT_FOUND');
 });
 
 test('GET /v1/clients/:clientId/workspace denies non-consultant sessions', async () => {

@@ -19,7 +19,7 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
   await pool.query("update users set role = 'admin', account_purpose = 'QA_TEST' where id = $1", [admin.current.body.accountId]);
   const consultant = await provisionQaIdentity(server.baseUrl, admin.token, 'consultant', 'consultant');
   await pool.query("update users set role = 'dietician' where id = $1", [consultant.user.id]);
-  await provisionQaIdentity(server.baseUrl, admin.token, 'senior_consultant', 'senior');
+  const senior = await provisionQaIdentity(server.baseUrl, admin.token, 'senior_consultant', 'senior');
   const outsider = await provisionQaIdentity(server.baseUrl, admin.token, 'consultant', 'outsider');
 
   for (const [index, dietType] of ['vegetarian', 'eggetarian', 'non_vegetarian', 'vegan'].entries()) {
@@ -284,6 +284,74 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
     }, { headers: authHeaders(consultant.token) });
     assert.equal(stale.response.status, 409, JSON.stringify(stale.body));
     assert.equal(stale.body.error, 'STALE_PLAN_VERSION');
+
+    if (dietType === 'vegetarian') {
+      const submitted = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/submit-review`, {}, { headers: authHeaders(consultant.token) });
+      assert.equal(submitted.response.status, 200, JSON.stringify(submitted.body));
+
+      const approved = await postJson(server.baseUrl, `/v1/consultants/diet-plan-reviews/${planId}/approve`, {
+        versionId: submitted.body.version.id,
+      }, { headers: authHeaders(senior.token) });
+      assert.equal(approved.response.status, 200, JSON.stringify(approved.body));
+
+      const published = await postJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/diet-plans/${planId}/publish`, {
+        approvedVersionId: approved.body.version.id,
+      }, { headers: authHeaders(consultant.token) });
+      assert.equal(published.response.status, 200, JSON.stringify(published.body));
+
+      const clientPlan = await getJson(server.baseUrl, '/v1/platform/nutrition-plan', { headers: authHeaders(client.token) });
+      assert.equal(clientPlan.response.status, 200, JSON.stringify(clientPlan.body));
+      assert.equal(clientPlan.body.plan.id, planId);
+      assert.equal(clientPlan.body.version.id, published.body.version.id);
+
+      const consumedAtISO = new Date().toISOString();
+      const consumedPayload = {
+        planId,
+        versionId: published.body.version.id,
+        mealKey: 'earlyMorning',
+        state: 'CONSUMED_APPROVED',
+        optionId: selectedOptions[0].optionId,
+        consumedAtISO,
+      };
+      const consumed = await postJson(server.baseUrl, '/v1/platform/nutrition-experience/event', consumedPayload, { headers: authHeaders(client.token) });
+      assert.equal(consumed.response.status, 201, JSON.stringify(consumed.body));
+      assert.equal(consumed.body.mealStates.find((item: { mealHeadId: string }) => item.mealHeadId === 'earlyMorning')?.status, 'CONSUMED_APPROVED');
+
+      const repeated = await postJson(server.baseUrl, '/v1/platform/nutrition-experience/event', consumedPayload, { headers: authHeaders(client.token) });
+      assert.equal(repeated.response.status, 201, JSON.stringify(repeated.body));
+
+      const skipped = await postJson(server.baseUrl, '/v1/platform/nutrition-experience/event', {
+        planId,
+        versionId: published.body.version.id,
+        mealKey: 'breakfast',
+        state: 'SKIPPED',
+        consumedAtISO: new Date(Date.now() + 1).toISOString(),
+      }, { headers: authHeaders(client.token) });
+      assert.equal(skipped.response.status, 201, JSON.stringify(skipped.body));
+
+      const consultantReadBack = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/nutrition-intelligence`, { headers: authHeaders(consultant.token) });
+      assert.equal(consultantReadBack.response.status, 200, JSON.stringify(consultantReadBack.body));
+      assert.equal(consultantReadBack.body.nutritionMonitoring.daily.dailyNutrition.planId, planId);
+      assert.equal(consultantReadBack.body.nutritionMonitoring.daily.dailyNutrition.planVersionId, published.body.version.id);
+      assert.equal(consultantReadBack.body.nutritionMonitoring.daily.mealSummary.consumedApprovedMeals, 1);
+      assert.equal(consultantReadBack.body.nutritionMonitoring.daily.mealSummary.skippedMeals, 1);
+
+      const persistedEvents = await pool.query(
+        `select count(*)::int as count
+           from health_events event
+           join care_cases care_case on care_case.id=event.care_case_id
+          where care_case.client_id=$1
+            and event.type='meal_logged'
+            and event.payload->>'planId'=$2
+            and event.payload->>'versionId'=$3`,
+        [client.client.id, planId, published.body.version.id],
+      );
+      assert.equal(persistedEvents.rows[0].count, 2, 'an identical acknowledged retry must not duplicate the consumption event');
+
+      const outsiderReadBack = await getJson(server.baseUrl, `/v1/consultants/clients/${publicClientId}/nutrition-intelligence`, { headers: authHeaders(outsider.token) });
+      assert.equal(outsiderReadBack.response.status, 403, JSON.stringify(outsiderReadBack.body));
+      assert.equal(outsiderReadBack.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
+    }
     await assertAssignmentRemainsCanonicalAuthority();
   }
 });
