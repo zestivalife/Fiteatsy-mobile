@@ -1829,8 +1829,8 @@ test('consultant workspace contract syncs wearable summaries and source metadata
     `/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`,
     { headers: authHeaders(unrelatedConsultant.token) }
   );
-  assert.equal(denied.response.status, 404, JSON.stringify(denied.body));
-  assert.equal(denied.body.error, 'CLIENT_NOT_FOUND');
+  assert.equal(denied.response.status, 403, JSON.stringify(denied.body));
+  assert.equal(denied.body.error, 'CLIENT_ASSIGNMENT_REQUIRED');
 });
 
 test('GET /v1/clients/:clientId/workspace denies non-consultant sessions', async () => {
