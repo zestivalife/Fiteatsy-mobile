@@ -53,7 +53,7 @@ const formatValue = (metric: CanonicalHealthMetricState) => {
 };
 
 const statusLabel = (metric: CanonicalHealthMetricState) => {
-  if (metric.queryState === 'DATA_AVAILABLE') return 'synced';
+  if (metric.queryState === 'DATA_AVAILABLE') return 'available locally';
   if (metric.queryState === 'QUERYING') return 'reading';
   if (metric.queryState === 'TIMEOUT') return 'timed out';
   if (metric.queryState === 'ERROR') return 'needs attention';
@@ -178,7 +178,7 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
                     <Text style={[styles.metricValue, { color: palette.textPrimary }]}>{formatValue(metric)}</Text>
                     <View style={styles.metricFooter}>
                       <Text style={[styles.period, { color: palette.textSecondary }]}>{presentation.period}</Text>
-                      <Text style={[styles.status, { color: status === 'synced' ? palette.success : palette.textMuted }]}>{status}</Text>
+                      <Text style={[styles.status, { color: status === 'available locally' ? palette.success : palette.textMuted }]}>{status}</Text>
                     </View>
                     {metric.observation?.sourceMetadata?.sourceApplication ? (
                       <Text style={[styles.source, { color: palette.textMuted }]}>Source: {metric.observation.sourceMetadata.sourceApplication}</Text>

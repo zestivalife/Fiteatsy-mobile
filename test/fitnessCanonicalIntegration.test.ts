@@ -65,6 +65,13 @@ describe('forward-only Fitness presentation integration', () => {
     expect(healthData).toContain('metricPresentation');
   });
 
+  test('does not confuse local measurement availability with backend upload acknowledgement', () => {
+    expect(healthData).toContain("metric.queryState === 'DATA_AVAILABLE') return 'available locally'");
+    expect(healthData).not.toContain("metric.queryState === 'DATA_AVAILABLE') return 'synced'");
+    expect(fitness).toContain("health.uploadState === 'SYNCED'");
+    expect(fitness).toContain("return 'Uploaded'");
+  });
+
   test('classifies Mindfulness from the actual canonical registry capability', () => {
     const registry = read('src/services/healthMetricRegistry.ts');
     expect(registry).not.toContain("metricKey:'mindfulness'");

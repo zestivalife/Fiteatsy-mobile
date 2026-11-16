@@ -50,7 +50,8 @@ test('the HealthData route mounts the accepted dedicated connected-health experi
   expect(screen.getAllByText('12:00 AM – Now')).toHaveLength(2);
   expect(screen.getByText('Source: iPhone')).toBeTruthy();
   expect(screen.getByText('Source: Apple Watch')).toBeTruthy();
-  expect(screen.getAllByText('synced')).toHaveLength(2);
+  expect(screen.getAllByText('available locally')).toHaveLength(2);
+  expect(screen.queryByText('synced')).toBeNull();
   expect(screen.getByText('Sync')).toBeTruthy();
   expect(screen.getByText('Refresh Health Data')).toBeTruthy();
   expect(screen.queryByText('Some health signals are available')).toBeNull();
