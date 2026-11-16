@@ -341,7 +341,7 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
            from health_events event
            join care_cases care_case on care_case.id=event.care_case_id
           where care_case.client_id=$1
-            and event.type='meal_logged'
+            and event.event_type='meal_logged'
             and event.payload->>'planId'=$2
             and event.payload->>'versionId'=$3`,
         [client.client.id, planId, published.body.version.id],
