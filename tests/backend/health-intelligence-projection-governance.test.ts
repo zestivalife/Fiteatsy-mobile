@@ -24,13 +24,15 @@ const observation = (metricType: string, value: number, measuredAtISO: string) =
   deletedAtISO: null
 });
 
-test('projection maps workout duration to Exercise without fabricating Activity Balance', () => {
+test('projection preserves Steps and Exercise while unconfigured goals and Activity Balance remain pending', () => {
   const projection = buildHealthIntelligenceV1([
     observation('steps', 5_000, '2026-11-17T08:00:00.000Z'),
     observation('workout_minutes', 15, '2026-11-17T09:00:00.000Z')
   ] as never, '2026-11-17');
-  assert.deepEqual(projection.scores.activity.inputsUsed, ['steps', 'exercise']);
-  assert.deepEqual(projection.scores.activity.methodologyPending, ['balance']);
+  assert.equal(projection.aggregates.find(item => item.metric === 'steps')?.value, 5_000);
+  assert.equal(projection.aggregates.find(item => item.metric === 'workout_minutes')?.value, 15);
+  assert.deepEqual(projection.scores.activity.inputsUsed, []);
+  assert.deepEqual(projection.scores.activity.methodologyPending, ['steps', 'exercise', 'balance']);
   assert.equal(projection.scores.activity.score, null);
 });
 
