@@ -140,15 +140,14 @@ test('GET /v1/version exposes canonical identity without leaking environment sec
   );
 });
 
-test('POST /v1/checkins stores accepted check-in payload', async () => {
+test('POST /v1/checkins rejects unauthenticated health data writes', async () => {
   const server = await startAppServer(createApp());
   const { response, body } = await postJson(server.baseUrl, '/v1/checkins', {
-    userId: 'checkin-user',
-    mood: 4,
+    dateISO:new Date().toISOString(),mood:4,energy:3,sleepQuality:4
   });
   try {
-    assert.equal(response.status, 201);
-    assert.equal(body.status, 'stored');
+    assert.equal(response.status, 401);
+    assert.equal(body.error, 'AUTH_REQUIRED');
   } finally {
     await server.close();
   }

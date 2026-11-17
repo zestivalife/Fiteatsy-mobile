@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   assignConsultant,
   getHealthProfileBundle,
+  ingestClientHealthEvent,
   listCareCaseEvents,
   listCareCaseTickets,
   listCareCaseTimeline,
@@ -96,6 +97,15 @@ const healthProfilePatchSchema = z.object({
   assignedConsultantId: z.string().trim().optional(),
   assignedMentorId: z.string().trim().optional(),
 });
+
+const clientHealthEventSchema = z.object({
+  id: z.string().min(1).max(200),
+  eventType: z.string().regex(/^[a-z0-9_]+$/).max(80),
+  eventSource: z.string().regex(/^mobile\.[a-z0-9_]+$/).max(80),
+  occurredAtISO: z.string().datetime(),
+  eventPayload: z.record(z.string(), z.unknown()),
+  schemaVersion: z.number().int().positive().max(10)
+}).passthrough();
 
 const requestMissingSchema = z.object({
   requestedBy: z.string().trim().min(2),
@@ -226,6 +236,9 @@ platformRouter.post('/care-cases/:careCaseId/assign-consultant', async (req, res
     if (error instanceof Error && error.name === 'CARE_CASE_FORBIDDEN') {
       return res.status(403).json({ error: 'CARE_CASE_FORBIDDEN', message: error.message });
     }
+    if (error instanceof Error && error.name === 'INVALID_HEALTH_EVENT') {
+      return res.status(400).json({ error: 'INVALID_HEALTH_EVENT', message: error.message });
+    }
     return res.status(404).json({ error: 'CARE_CASE_NOT_FOUND', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
@@ -240,6 +253,20 @@ platformRouter.get('/care-cases/:careCaseId/events', async (req, res) => {
   const careCase = await requireOwnedCareCase(req, res, req.params.careCaseId);
   if (!careCase) return;
   return res.status(200).json({ items: await listCareCaseEvents(req.params.careCaseId) });
+});
+
+platformRouter.post('/care-cases/:careCaseId/events', async (req, res) => {
+  const parsed = clientHealthEventSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'INVALID_INPUT', details: parsed.error.flatten() });
+  try {
+    const event = await ingestClientHealthEvent(currentOwner(req), req.params.careCaseId, parsed.data);
+    return res.status(200).json({ accepted: true, event });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'CARE_CASE_FORBIDDEN') {
+      return res.status(403).json({ error: 'CARE_CASE_FORBIDDEN', message: error.message });
+    }
+    throw error;
+  }
 });
 
 platformRouter.get('/care-cases/:careCaseId/tickets', async (req, res) => {

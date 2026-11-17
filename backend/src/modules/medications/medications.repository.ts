@@ -132,6 +132,7 @@ export const upsertMedicationSnapshot = async (
             updated_at = now(),
             deleted_at = null
           where client_medications.user_id = excluded.user_id
+            and client_medications.source_updated_at <= excluded.source_updated_at
         `,
         [
           medication.id,
@@ -193,6 +194,8 @@ export const upsertMedicationSnapshot = async (
             version = client_medication_logs.version + 1,
             updated_at = now(),
             deleted_at = null
+          where coalesce(client_medication_logs.actioned_at,'-infinity'::timestamptz)
+             <= coalesce(excluded.actioned_at,'-infinity'::timestamptz)
         `,
         [
           log.id,

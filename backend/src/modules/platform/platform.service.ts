@@ -19,6 +19,8 @@ import {
 import { calculateAgeFromDob, calculateNutritionProfileCompletion } from './platform.calculations.js';
 import { createOperationalTicket, transitionCareCaseStage, validateStageTransition } from './platform.lifecycle.js';
 import { CareCaseStage, ClientOwnershipContext, HealthProfileRecord } from './platform.types.js';
+import { upsertDailyCheckIn } from '../checkins/checkins.repository.js';
+import { syncClientMedicationSnapshot } from '../medications/medications.service.js';
 
 const nowIso = () => new Date().toISOString();
 
@@ -145,6 +147,54 @@ export const requestMissingInformation = async (owner: ClientOwnershipContext, f
 
 export const listCareCaseTimeline = async (careCaseId: string) => listTimelineEvents(careCaseId);
 export const listCareCaseEvents = async (careCaseId: string) => listHealthEvents(careCaseId);
+export const ingestClientHealthEvent = async (owner: ClientOwnershipContext, careCaseId: string, input: {
+  id: string; eventType: string; eventSource: string; occurredAtISO: string;
+  eventPayload: Record<string, unknown>; schemaVersion: number;
+}) => {
+  const careCase = await getCareCaseById(careCaseId);
+  if (!careCase || careCase.clientId !== owner.clientId || careCase.userId !== owner.accountId) {
+    const error = new Error('Care case does not belong to current client.');
+    error.name = 'CARE_CASE_FORBIDDEN';
+    throw error;
+  }
+  if (input.eventType === 'daily_check_in_submitted') {
+    const payload = input.eventPayload;
+    const values = [payload.mood, payload.energy, payload.sleepQuality].map(Number);
+    if (values.some((value) => !Number.isInteger(value) || value < 1 || value > 5)) {
+      const error = new Error('Invalid daily check-in payload.');
+      error.name = 'INVALID_HEALTH_EVENT';
+      throw error;
+    }
+    await upsertDailyCheckIn(owner, {
+      dateISO: input.occurredAtISO,
+      mood: values[0], energy: values[1], sleepQuality: values[2]
+    });
+  }
+  if (input.eventType === 'medication_snapshot') {
+    const medications = (Array.isArray(input.eventPayload.medications) ? input.eventPayload.medications : []).map((value) => {
+      const medication = value as Record<string, unknown>;
+      return {
+        ...medication,
+        notificationEnabled: Array.isArray(medication.notificationIds) && medication.notificationIds.length > 0
+      };
+    });
+    const logs = Array.isArray(input.eventPayload.logs) ? input.eventPayload.logs : [];
+    await syncClientMedicationSnapshot(owner, medications as never, logs as never);
+  }
+  return addHealthEvent({
+    careCaseId,
+    userId: owner.accountId,
+    type: input.eventType as never,
+    summary: input.eventType.replaceAll('_', ' '),
+    payload: {
+      ...input.eventPayload,
+      source: input.eventSource,
+      schemaVersion: input.schemaVersion
+    },
+    replayKey: `${careCaseId}:mobile:${input.id}`,
+    eventTimeISO: input.occurredAtISO
+  });
+};
 export const listCareCaseTickets = async (careCaseId: string) => listHealthTickets(careCaseId);
 export const listClientNotifications = async (owner: ClientOwnershipContext) => listNotificationsForClient(owner.clientId);
 export const updateClientNotification = async (owner: ClientOwnershipContext, notificationId: string, action: 'read' | 'unread' | 'dismiss') =>

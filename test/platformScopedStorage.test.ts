@@ -24,7 +24,7 @@ jest.mock('../src/services/apiClient', () => {
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolveActiveCareCase } from '../src/services/platformCaseService';
-import { enqueueSyncItem, getSyncQueue } from '../src/services/platformSyncService';
+import { enqueueSyncItem, getPendingSyncItems, getSyncQueue } from '../src/services/platformSyncService';
 import { SyncQueueItem } from '../src/types';
 
 const syncItem = (id: string): SyncQueueItem => ({
@@ -82,5 +82,15 @@ describe('platform scoped storage', () => {
     await expect(getSyncQueue({ userId: 'acct_b', clientId: 'fc_b' })).resolves.toMatchObject([{ id: 'event-b' }]);
     await expect(getSyncQueue({ userId: 'acct_c', clientId: 'fc_c' })).resolves.toEqual([]);
     expect(mockStorage.get('fiteatsy.platform.syncQueue.v1')).toBeUndefined();
+  });
+
+  it('does not truncate offline clinical events and recovers interrupted processing after restart',async()=>{
+    const identity={userId:'acct_a',clientId:'fc_a'};
+    await Promise.all(Array.from({length:525},(_,index)=>enqueueSyncItem(syncItem(`event-${index}`),identity)));
+    const queue=await getSyncQueue(identity);
+    expect(queue).toHaveLength(525);
+    const processing={...syncItem('crash-event'),status:'processing' as const};
+    await enqueueSyncItem(processing,identity);
+    await expect(getPendingSyncItems(identity)).resolves.toEqual(expect.arrayContaining([expect.objectContaining({id:'crash-event'})]));
   });
 });

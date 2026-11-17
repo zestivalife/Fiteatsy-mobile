@@ -17,7 +17,8 @@ import {
   getLatestAssessmentResult,
   listAssessmentResults
 } from '../assessments/assessments.repository.js';
-import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId } from '../platform/platform.store.js';
+import { getCareCaseByClientId, getHealthProfileByClientId, getNutritionProfileByClientId, listHealthEvents } from '../platform/platform.store.js';
+import { listDailyCheckIns } from '../checkins/checkins.repository.js';
 import { getFoodPreferenceProfile } from '../nutrition/food-preferences.service.js';
 import {
   ensureRegisteredClientsForEligibleUsers,
@@ -821,6 +822,10 @@ export const getConsultantClientWorkspace = async (
         };
       })()
     : null;
+  const [clientCapturedEvents, dailyCheckIns] = await Promise.all([
+    careCase ? listHealthEvents(careCase.id) : Promise.resolve([]),
+    listDailyCheckIns(owner, 30)
+  ]);
   const provenance = buildProvenance({
     healthProfile,
     nutritionProfile,
@@ -897,6 +902,8 @@ export const getConsultantClientWorkspace = async (
     reports,
     medicationMonitoring,
     stressAssessment,
+    clientCapturedEvents,
+    dailyCheckIns,
     wearableSummary,
     recoveryMetrics: {
       calculationVersion: 'HEALTH_INTELLIGENCE_V1',

@@ -831,7 +831,12 @@ export type HealthEventType =
   | 'medication_taken'
   | 'medication_skipped'
   | 'medication_snoozed'
+  | 'medication_snapshot'
   | 'cycle_logged'
+  | 'hydration_logged'
+  | 'breathing_session_completed'
+  | 'focus_session_completed'
+  | 'movement_session_completed'
   | 'family_ping_sent'
   | 'family_sos_triggered';
 

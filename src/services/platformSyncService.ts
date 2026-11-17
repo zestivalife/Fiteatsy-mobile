@@ -28,6 +28,13 @@ const safeParse = <T,>(raw: string | null, fallback: T): T => {
 const getStorageKey = (identity?: StorageIdentity | null) =>
   getIdentityScopedStorageKey(SYNC_QUEUE_STORAGE_KEY, identity);
 
+let queueMutation = Promise.resolve();
+const serializeQueueMutation = async <T,>(mutation: () => Promise<T>): Promise<T> => {
+  const next = queueMutation.then(mutation, mutation);
+  queueMutation = next.then(() => undefined, () => undefined);
+  return next;
+};
+
 const persistQueue = async (items: SyncQueueItem[], identity?: StorageIdentity | null) => {
   const key = getStorageKey(identity);
   if (!key) return;
@@ -42,8 +49,13 @@ export const getSyncQueue = async (identity?: StorageIdentity | null): Promise<S
 };
 
 export const enqueueSyncItem = async (item: SyncQueueItem, identity?: StorageIdentity | null): Promise<void> => {
-  const queue = await getSyncQueue(identity);
-  await persistQueue([item, ...queue].slice(0, 500), identity);
+  await serializeQueueMutation(async () => {
+    const queue = await getSyncQueue(identity);
+    if (queue.some((queued) => queued.id === item.id)) return;
+    // Health records are clinical user data. Never discard an older unsent item
+    // merely because the device has been offline for a long time.
+    await persistQueue([item, ...queue], identity);
+  });
 };
 
 export const updateSyncQueueItem = async (
@@ -51,21 +63,25 @@ export const updateSyncQueueItem = async (
   updater: (item: SyncQueueItem) => SyncQueueItem,
   identity?: StorageIdentity | null
 ): Promise<void> => {
-  const queue = await getSyncQueue(identity);
-  const next = queue.map((item) => (item.id === itemId ? updater(item) : item));
-  await persistQueue(next, identity);
+  await serializeQueueMutation(async () => {
+    const queue = await getSyncQueue(identity);
+    const next = queue.map((item) => (item.id === itemId ? updater(item) : item));
+    await persistQueue(next, identity);
+  });
 };
 
 export const getPendingSyncItems = async (identity?: StorageIdentity | null): Promise<SyncQueueItem[]> => {
   const queue = await getSyncQueue(identity);
-  return queue.filter((item) => item.status === 'pending' || item.status === 'failed');
+  return queue.filter((item) => item.status === 'pending' || item.status === 'failed' || item.status === 'processing');
 };
 
 
 export const removeSyncQueueItem = async (itemId: string, identity?: StorageIdentity | null): Promise<void> => {
-  const queue = await getSyncQueue(identity);
-  const next = queue.filter((item) => item.id !== itemId);
-  await persistQueue(next, identity);
+  await serializeQueueMutation(async () => {
+    const queue = await getSyncQueue(identity);
+    const next = queue.filter((item) => item.id !== itemId);
+    await persistQueue(next, identity);
+  });
 };
 
 export const getHealthProfileSyncDiagnostics = async (

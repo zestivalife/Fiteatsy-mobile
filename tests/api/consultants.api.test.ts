@@ -741,6 +741,47 @@ test('GET /v1/consultants/clients/:clientId/workspace returns incomplete states 
   assert.equal(workspace.body.syncMetadata.dataSource, 'Fiteatsy production database');
 });
 
+test('client capture events persist idempotently and project only to the assigned Consultant', async()=>{
+  const client=await createAuthenticatedSession(server.baseUrl,{name:'Capture Client',email:`capture-${Date.now()}@example.com`});
+  const otherClient=await createAuthenticatedSession(server.baseUrl,{name:'Other Capture Client',email:`capture-other-${Date.now()}@example.com`});
+  const consultant=await createConsultantSession();
+  const unassigned=await createConsultantSession();
+  await assignClientToConsultant(client,consultant);
+  await patchJson(server.baseUrl,'/v1/platform/health-profile',{heightCm:165,currentWeightKg:60},{headers:authHeaders(client.token)});
+  const careCase=await getJson(server.baseUrl,'/v1/platform/care-cases/current',{headers:authHeaders(client.token)});
+  assert.equal(careCase.response.status,200);
+  const now=new Date().toISOString();
+  const events=[
+    {id:'cycle-1',eventType:'cycle_logged',eventSource:'mobile.cycle',occurredAtISO:now,eventPayload:{dateISO:now,periodStarted:true,periodEnded:false,flow:'medium',symptoms:['cramps'],mood:'calm',energy:'low',notes:'rested'},schemaVersion:1},
+    {id:'hydration-1',eventType:'hydration_logged',eventSource:'mobile.tracker',occurredAtISO:now,eventPayload:{value:1.5,unit:'liters',previousValue:1},schemaVersion:1},
+    {id:'breathing-1',eventType:'breathing_session_completed',eventSource:'mobile.tracker',occurredAtISO:now,eventPayload:{value:8,unit:'minutes',previousValue:0},schemaVersion:1},
+    {id:'focus-1',eventType:'focus_session_completed',eventSource:'mobile.tracker',occurredAtISO:now,eventPayload:{value:15,unit:'minutes',previousValue:0},schemaVersion:1},
+    {id:'movement-1',eventType:'movement_session_completed',eventSource:'mobile.tracker',occurredAtISO:now,eventPayload:{value:10,unit:'minutes',previousValue:0},schemaVersion:1},
+    {id:'checkin-1',eventType:'daily_check_in_submitted',eventSource:'mobile.tracker',occurredAtISO:now,eventPayload:{mood:4,energy:3,sleepQuality:2},schemaVersion:1}
+  ];
+  for(const event of events){
+    const first=await postJson(server.baseUrl,`/v1/platform/care-cases/${careCase.body.id}/events`,event,{headers:authHeaders(client.token)});
+    const duplicate=await postJson(server.baseUrl,`/v1/platform/care-cases/${careCase.body.id}/events`,event,{headers:authHeaders(client.token)});
+    assert.equal(first.response.status,200,JSON.stringify(first.body));assert.equal(duplicate.response.status,200);
+    assert.equal(first.body.event.id,duplicate.body.event.id);
+  }
+  const crossClient=await postJson(server.baseUrl,`/v1/platform/care-cases/${careCase.body.id}/events`,events[0],{headers:authHeaders(otherClient.token)});
+  assert.equal(crossClient.response.status,403);
+  const ownCheckins=await getJson(server.baseUrl,'/v1/checkins',{headers:authHeaders(client.token)});
+  assert.equal(ownCheckins.response.status,200);assert.equal(ownCheckins.body.items.length,1);
+  assert.equal(ownCheckins.body.items[0].mood,4);
+  const clientReadback=await getJson(server.baseUrl,`/v1/platform/care-cases/${careCase.body.id}/events`,{headers:authHeaders(client.token)});
+  assert.equal(clientReadback.response.status,200);assert.equal(clientReadback.body.items.length,events.length);
+  const workspacePath=`/v1/consultants/clients/${encodeURIComponent(client.current.body.client.fiteatsyClientId)}/workspace`;
+  const workspace=await getJson(server.baseUrl,workspacePath,{headers:authHeaders(consultant.token)});
+  assert.equal(workspace.response.status,200);assert.equal(workspace.body.clientCapturedEvents.length,events.length);
+  assert.equal(workspace.body.dailyCheckIns.length,1);
+  const cycle=workspace.body.clientCapturedEvents.find((item:{type:string})=>item.type==='cycle_logged');
+  assert.deepEqual(cycle.payload.symptoms,['cramps']);assert.equal(cycle.payload.mood,'calm');assert.equal(cycle.payload.energy,'low');
+  const denied=await getJson(server.baseUrl,workspacePath,{headers:authHeaders(unassigned.token)});
+  assert.equal(denied.response.status,403);assert.equal(denied.body.error,'CLIENT_ASSIGNMENT_REQUIRED');
+});
+
 test('Consultant workspace projects canonical Food Preferences with exact array parity', async () => {
   const client = await createAuthenticatedSession(server.baseUrl, {
     name: 'Food Preference Client',
@@ -909,6 +950,12 @@ test('consultant medication monitoring uses client tracker data and enforces ass
   assert.equal(snapshot.response.status, 200, JSON.stringify(snapshot.body));
   assert.equal(snapshot.body.medicationCount, 1);
   assert.equal(snapshot.body.logCount, 2);
+
+  const staleRetry=await postJson(server.baseUrl,'/v1/platform/medications/snapshot',{
+    medications:[{...medication,name:'Stale Metformin',updatedAtISO:new Date(Date.parse(medication.updatedAtISO)-60_000).toISOString()}],
+    logs:[]
+  },{headers:authHeaders(client.token)});
+  assert.equal(staleRetry.response.status,200);
 
   await assignClientToConsultant(client, consultant);
 
@@ -1796,7 +1843,12 @@ test('consultant workspace contract syncs wearable summaries and source metadata
       unit,
       measuredAtISO: new Date(Date.parse('2026-08-11T07:30:00.000Z') + index * 60_000).toISOString(),
       sourceProvider: 'apple_health',
-      sourceMetadata: { sourceApplication: 'Apple Health' },
+      sourceMetadata: { sourceApplication: 'Apple Health', sourceDevice:'iPhone' },
+      startAtISO:new Date(Date.parse('2026-08-11T07:29:00.000Z')+index*60_000).toISOString(),
+      endAtISO:new Date(Date.parse('2026-08-11T07:30:00.000Z')+index*60_000).toISOString(),
+      timezoneOffsetMinutes:330,
+      providerUpdatedAtISO:new Date(Date.parse('2026-08-11T07:31:00.000Z')+index*60_000).toISOString(),
+      providerVersion:'healthkit-v1',
       sourceRecordId: `consultant-round-trip-${metricType}`,
       syncKey: `consultant-round-trip-${metricType}`
     }))
@@ -1813,6 +1865,12 @@ test('consultant workspace contract syncs wearable summaries and source metadata
   assert.equal(repeated.response.status, 200, JSON.stringify(repeated.body));
   assert.equal(repeated.body.accepted, 0);
   assert.equal(repeated.body.duplicate, metricFixtures.length);
+  const clientReadback=await getJson(server.baseUrl,'/v1/health/observations?limit=200',{headers:authHeaders(client.token)});
+  assert.equal(clientReadback.response.status,200);assert.equal(clientReadback.body.total,metricFixtures.length);
+  const steps=clientReadback.body.items.find((item:{metricType:string})=>item.metricType==='steps');
+  assert.equal(steps.unit,'count');assert.equal(steps.sourceProvider,'apple_health');
+  assert.equal(steps.timezoneOffsetMinutes,330);assert.equal(steps.providerVersion,'healthkit-v1');
+  assert.equal(steps.sourceMetadata.sourceDevice,'iPhone');assert.equal(steps.startAtISO,'2026-08-11T07:29:00.000Z');
 
   const response = await getJson(
     server.baseUrl,

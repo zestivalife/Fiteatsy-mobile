@@ -76,7 +76,7 @@ import {
   registerNetworkTypeProvider,
   registerUnauthorizedHandler
 } from '../services/apiClient';
-import { queueHealthEvent } from '../services/platformEventService';
+import { processPendingHealthEvents, queueHealthEvent } from '../services/platformEventService';
 import {
   getPlatformHealthProfile,
   getPlatformHealthProfileSyncDiagnostics,
@@ -94,10 +94,8 @@ import {
   settleClientBootstrap,
   type ClientBootstrapState
 } from './canonicalClientDataContract';
-import { getHealthScoreSummary, submitPssAssessment } from '../services/healthIntelligenceService';
 import { syncMedicationSnapshot } from '../services/medicationSyncService';
 import { normalizeOnboardingProfile } from '../utils/healthProfile';
-import { wellnessFromHealthScores } from '../services/healthSyncManager';
 import { getIdentityScopedStorageKey, type StorageIdentity } from '../utils/identityScopedStorage';
 import { deriveOnboardingGate, type OnboardingResumeStep, type OnboardingStatus } from '../utils/onboardingGate';
 import { traceSessionLifecycle } from '../services/sessionLifecycleTrace';
@@ -224,6 +222,8 @@ const STORAGE_KEYS = {
   familyInvites: 'nuetra.familyInvites',
   familyConnections: 'nuetra.familyConnections',
   familyEmergencyEvents: 'nuetra.familyEmergencyEvents',
+  wellness: 'nuetra.wellness',
+  checkIns: 'nuetra.checkIns',
   reportHistory: 'fiteatsy.reportHistory',
   sessionSignals: 'fiteatsy.sessionSignals.v1',
   platformActiveCareCase: 'fiteatsy.platform.activeCareCase.v1',
@@ -247,6 +247,8 @@ const USER_SCOPED_STORAGE_KEYS = [
   STORAGE_KEYS.familyInvites,
   STORAGE_KEYS.familyConnections,
   STORAGE_KEYS.familyEmergencyEvents,
+  STORAGE_KEYS.wellness,
+  STORAGE_KEYS.checkIns,
   STORAGE_KEYS.reportHistory,
   STORAGE_KEYS.sessionSignals,
   STORAGE_KEYS.platformActiveCareCase,
@@ -346,6 +348,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const retryPendingHealthProfileSync = useCallback(async () => {
     if (!currentStorageIdentity) return;
     await processPendingHealthProfileSync(currentStorageIdentity);
+    await processPendingHealthEvents(currentStorageIdentity);
     await refreshHealthProfileSyncDiagnostics(currentStorageIdentity);
   }, [currentStorageIdentity, refreshHealthProfileSyncDiagnostics]);
 
@@ -603,6 +606,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           storedFamilyInvites,
           storedFamilyConnections,
           storedFamilyEmergencyEvents,
+          storedWellness,
+          storedCheckIns,
           storedCanonicalProfile,
           storedPublishedNutritionPlan
         ] = await Promise.all([
@@ -620,6 +625,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           readScoped(STORAGE_KEYS.familyInvites),
           readScoped(STORAGE_KEYS.familyConnections),
           readScoped(STORAGE_KEYS.familyEmergencyEvents),
+          readScoped(STORAGE_KEYS.wellness),
+          readScoped(STORAGE_KEYS.checkIns),
           readScoped(STORAGE_KEYS.canonicalProfile),
           readScoped(STORAGE_KEYS.publishedNutritionPlan)
         ]);
@@ -698,6 +705,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         void (async () => {
           try {
             await processPendingHealthProfileSync(toSessionStorageIdentity(sessionForStorage));
+            await processPendingHealthEvents(toSessionStorageIdentity(sessionForStorage));
           } catch (error) {
             console.warn('[CanonicalData] pending profile sync deferred', {
               errorCode: resourceErrorCode(error)
@@ -832,6 +840,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const parsed = safeParse<FamilyEmergencyEvent[]>(storedFamilyEmergencyEvents, []);
           if (Array.isArray(parsed)) setFamilyEmergencyEvents(parsed);
         }
+        if (storedWellness) setWellnessState(safeParse<WellnessSnapshot>(storedWellness, emptyWellness));
+        if (storedCheckIns) setCheckIns(safeParse<DailyCheckIn[]>(storedCheckIns, []));
       } finally {
         setBootstrapped(true);
       }
@@ -971,8 +981,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       console.warn('[MedicationSync] Snapshot sync failed', {
         message: error instanceof Error ? error.message : String(error)
       });
+      void queueHealthEvent({
+        userId,
+        clientId,
+        onboarding,
+        eventType: 'medication_snapshot',
+        eventSource: 'mobile.medication',
+        priority: 'medium',
+        eventPayload: { medications: nextMedications, logs: nextLogs }
+      });
     });
-  }, [authSession?.sessionToken, userId]);
+  }, [authSession?.sessionToken, clientId, onboarding, userId]);
 
   const persistCycleLogs = useCallback((next: CycleLog[]) => {
     setUserStorageItem(STORAGE_KEYS.cycleLogs, JSON.stringify(next));
@@ -1050,8 +1069,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           eventSource: 'mobile.cycle',
           eventPayload: {
             dateISO: normalizedISO,
+            periodStarted: input.periodStarted,
+            periodEnded: input.periodEnded,
             flow: input.flow ?? null,
             symptoms: input.symptoms,
+            mood: input.mood ?? null,
+            energy: input.energy ?? null,
             notes: input.notes ?? ''
           },
           priority: 'medium'
@@ -1554,10 +1577,30 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     (updater) => {
       setWellnessState((previous) => {
         const next = typeof updater === 'function' ? updater(previous) : updater;
-        return applyMoodImpact(next, mood);
+        const resolved = applyMoodImpact(next, mood);
+        setUserStorageItem(STORAGE_KEYS.wellness, JSON.stringify(resolved));
+        const fields: Array<[keyof WellnessSnapshot, string, string]> = [
+          ['hydrationLiters', 'hydration_logged', 'liters'],
+          ['breathingMinutes', 'breathing_session_completed', 'minutes'],
+          ['focusMinutes', 'focus_session_completed', 'minutes'],
+          ['movementMinutes', 'movement_session_completed', 'minutes']
+        ];
+        for (const [field, eventType, unit] of fields) {
+          if (userId && resolved[field] !== previous[field]) {
+            void queueHealthEvent({
+              userId,
+              clientId,
+              onboarding,
+              eventType: eventType as 'hydration_logged' | 'breathing_session_completed' | 'focus_session_completed' | 'movement_session_completed',
+              eventSource: 'mobile.tracker',
+              eventPayload: { value: resolved[field], unit, previousValue: previous[field] }
+            });
+          }
+        }
+        return resolved;
       });
     },
-    [mood]
+    [clientId,mood,onboarding,setUserStorageItem,userId]
   );
 
   const setMoodWithImpact = useCallback<React.Dispatch<React.SetStateAction<MoodSelection | null>>>((updater) => {
@@ -1581,6 +1624,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const key = toDayKey(nowISO);
         const withoutToday = previous.filter((item) => toDayKey(item.dateISO) !== key);
         const next = [...withoutToday, nextCheckIn].slice(-30);
+        setUserStorageItem(STORAGE_KEYS.checkIns, JSON.stringify(next));
 
         const sentToday = nudges.filter((nudge) => toDayKey(nudge.scheduledAtISO) === key).length;
         const todayMeetings = 4;
@@ -1608,21 +1652,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const moodFromCheckIn = moodMap[dailyCheckInPayload.mood];
         setMood((_) => moodFromCheckIn);
 
-        const normalizedEnergy = dailyCheckInPayload.energy / 5;
-        setWellnessState((current) =>
-          applyMoodImpact(
-            {
-              ...current,
-              sleepHours: Number((6 + dailyCheckInPayload.sleepQuality * 0.5).toFixed(1)),
-              focusMinutes: Math.max(0, current.focusMinutes + Math.round((normalizedEnergy - 0.5) * 6)),
-              breathingMinutes: Math.max(0, current.breathingMinutes + (dailyCheckInPayload.mood <= 2 ? 3 : 1)),
-              movementMinutes: Math.max(0, current.movementMinutes + (dailyCheckInPayload.energy >= 4 ? 2 : 1)),
-              heartRateAvg: Math.max(52, Math.min(120, current.heartRateAvg + (dailyCheckInPayload.mood <= 2 ? 2 : -1)))
-            },
-            moodFromCheckIn
-          )
-        );
-
         return next;
       });
       if (userId) {
@@ -1638,25 +1667,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
 
-      if (stressLevel != null) {
-        try {
-          const answers = [
-            { questionId: 'pss_01', score: Math.max(0, Math.min(4, stressLevel - 1)) },
-            { questionId: 'pss_03', score: Math.max(0, Math.min(4, stressLevel)) },
-            { questionId: 'pss_06', score: Math.max(0, Math.min(4, stressLevel - 1)) },
-            { questionId: 'pss_10', score: Math.max(0, Math.min(4, stressLevel)) },
-          ];
-          await submitPssAssessment(answers);
-          const scores = await getHealthScoreSummary();
-          setWellnessState((current) => wellnessFromHealthScores(current, null, scores));
-        } catch (error) {
-          console.warn('[AppContext] stress assessment sync skipped', {
-            errorMessage: error instanceof Error ? error.message : String(error)
-          });
-        }
-      }
+      // A single subjective stress value is not a completed PSS questionnaire
+      // and must never be expanded into fabricated PSS answers or physiology.
     },
-    [clientId, nudges, onboarding, userId]
+    [clientId, nudges, onboarding, setUserStorageItem, userId]
   );
 
   const logNudgeAction = useCallback((nudgeId: string, action: NudgeAction) => {
