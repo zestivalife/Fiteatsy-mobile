@@ -37,4 +37,15 @@ describe('seven-day Recovery calendar alignment', () => {
     expect(trend.at(-1)?.score).toBe(100);
     expect(trend.filter((item) => item.score != null)).toHaveLength(1);
   });
+
+  test('uses the governed health day instead of retry calculation time', () => {
+    const retried = {
+      ...score('2026-11-13T18:00:00+05:30', 68),
+      healthDay: '2026-11-10',
+      inputSummary: { healthDay: '2026-11-10' }
+    };
+    const trend = buildSevenDayRecoveryTrend([retried], new Date('2026-11-13T20:00:00+05:30'));
+    expect(trend.find((item) => item.dayKey === '2026-11-10')?.score).toBe(68);
+    expect(trend.at(-1)?.score).toBeNull();
+  });
 });

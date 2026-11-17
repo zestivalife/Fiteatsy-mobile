@@ -7,7 +7,8 @@ describe('Journey recovery star canonical data contract', () => {
   it('loads the account-scoped canonical snapshot and canonical recovery history', () => {
     expect(source).toContain("getHealthScoreHistory('recovery')");
     expect(source).toContain('health.canonicalIntelligence?.scores.mind.score');
-    expect(source).toContain('health.canonicalIntelligence?.scores.healthIntelligence.score');
+    expect(source).toContain('health.canonicalIntelligence?.scores.recovery.score');
+    expect(source).toContain('healthIntelligence: health.canonicalIntelligence.scores.recovery');
     expect(source).toContain('health.canonicalIntelligence?.scores.activity.score');
     expect(source).toContain('health.canonicalIntelligence?.scores.sleep.score');
     expect(source).toContain('health.canonicalIntelligence?.scores.calm.score');

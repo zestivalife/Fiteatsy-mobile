@@ -23,7 +23,12 @@ export const buildSevenDayRecoveryTrend = (
     if (item.scoreStatus !== 'calculated' || item.scoreValue == null || !Number.isFinite(item.scoreValue)) return;
     const calculatedAt = new Date(item.calculatedAtISO);
     if (Number.isNaN(calculatedAt.getTime())) return;
-    const dayKey = localDayKey(calculatedAt);
+    const governedHealthDay = item.healthDay ?? (
+      typeof item.inputSummary.healthDay === 'string' ? item.inputSummary.healthDay : null
+    );
+    const dayKey = governedHealthDay && /^\d{4}-\d{2}-\d{2}$/.test(governedHealthDay)
+      ? governedHealthDay
+      : localDayKey(calculatedAt);
     const current = scoreByDay.get(dayKey);
     if (!current || calculatedAt.getTime() > current.timestamp) {
       scoreByDay.set(dayKey, {

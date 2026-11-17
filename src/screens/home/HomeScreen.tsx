@@ -255,6 +255,10 @@ export const HomeScreen = () => {
     }),
     [refreshDailyNutrition, refreshHealthScores]
   );
+  useEffect(() => {
+    if (!health.lifecycle.lastUploadedAtISO) return;
+    void refreshHealthScores();
+  }, [health.lifecycle.lastUploadedAtISO, refreshHealthScores]);
 
   // The Star Orb is projected exclusively from the canonical intelligence
   // summary. Daily nutrition is a separate product surface, not a fallback
@@ -309,13 +313,15 @@ export const HomeScreen = () => {
   const displayMetrics = metrics;
   const trendValues = recoveryTrend;
   const hasTrendData = trendValues.some((item) => item.score != null);
-  const healthIntelligenceScore = normalizeScore(health.canonicalIntelligence?.scores.healthIntelligence.score);
+  // The centre is labelled Recovery Core, so it must bind to the governed
+  // Recovery domain rather than silently displaying Overall Health Intelligence.
+  const recoveryScore = normalizeScore(health.canonicalIntelligence?.scores.recovery.score);
 
   const selected = selectedMetric === 'healthIntelligence'
-    ? { label: 'Recovery Core', score: healthIntelligenceScore, color: '#D5062D' }
-    : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: healthIntelligenceScore, color: '#D5062D' };
+    ? { label: 'Recovery Core', score: recoveryScore, color: '#D5062D' }
+    : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryScore, color: '#D5062D' };
   const frameworkByMetric = health.canonicalIntelligence ? {
-    healthIntelligence: health.canonicalIntelligence.scores.healthIntelligence,
+    healthIntelligence: health.canonicalIntelligence.scores.recovery,
     mind: health.canonicalIntelligence.scores.mind,
     sleep: health.canonicalIntelligence.scores.sleep,
     activity: health.canonicalIntelligence.scores.activity,

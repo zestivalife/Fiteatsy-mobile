@@ -44,8 +44,25 @@ export const calculateCanonicalHealthScores = async (
       inputWindow: { healthDay },
       healthDay
     },
-    calculationVersion: CALCULATION_VERSION
+    calculationVersion: CALCULATION_VERSION,
+    healthDay
   }));
 
   return createHealthScores(owner, scores);
+};
+
+export const calculateCanonicalHealthScoreWindow = async (
+  owner: ClientOwnershipContext,
+  throughHealthDay: string,
+  days = 7
+) => {
+  const end = new Date(`${throughHealthDay}T12:00:00.000Z`);
+  if (Number.isNaN(end.getTime())) throw new Error('INVALID_HEALTH_DAY');
+  const results = [];
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const date = new Date(end);
+    date.setUTCDate(date.getUTCDate() - offset);
+    results.push(await calculateCanonicalHealthScores(owner, date.toISOString().slice(0, 10)));
+  }
+  return results;
 };

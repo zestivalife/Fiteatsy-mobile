@@ -580,6 +580,8 @@ create table if not exists health_scores (
   input_summary jsonb not null default '{}'::jsonb,
   calculated_at timestamptz not null default now(),
   calculation_version text not null,
+  health_day date,
+  idempotency_key text,
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
   check (score_type in ('energy_balance', 'body_support', 'nourishment', 'recovery', 'physical_wellness_index', 'active_performance', 'stress_resilience', 'nutrition', 'clinical', 'activity', 'sleep', 'calm', 'overall')),
   check (score_status in ('calculated', 'insufficient_data')),
@@ -1038,6 +1040,10 @@ create index if not exists health_scores_client_calculated_idx
 
 create index if not exists health_scores_client_type_calculated_idx
   on health_scores (client_id, score_type, calculated_at desc);
+
+create unique index if not exists health_scores_idempotency_key_unique
+  on health_scores (idempotency_key)
+  where idempotency_key is not null;
 
 create index if not exists health_calculations_client_type_calculated_idx
   on health_calculations (client_id, calculation_type, calculated_at desc);

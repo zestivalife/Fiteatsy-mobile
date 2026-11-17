@@ -8,7 +8,7 @@ import {
   listHealthObservations
 } from './health-observations.repository.js';
 import { ClientOwnershipContext } from '../platform/platform.types.js';
-import { calculateCanonicalHealthScores as calculateHealthScores } from '../intelligence/canonical-health-calculation-engine.js';
+import { calculateCanonicalHealthScoreWindow, calculateCanonicalHealthScores as calculateHealthScores } from '../intelligence/canonical-health-calculation-engine.js';
 import {persistAggregateAssertions,enqueueHealthRecalculation} from '../intelligence/health-aggregate-assertions.repository.js';
 import {aggregateDaily} from '../intelligence/health-aggregation-v1.js';
 import {listDailyAggregates} from '../intelligence/health-aggregates.repository.js';
@@ -308,10 +308,10 @@ healthRouter.post('/intelligence:recalculate', async (req,res)=>{
   const parsed=z.object({healthDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),aggregateAssertions:z.array(aggregateAssertionSchema).max(500).optional()}).safeParse(req.body??{});
   if(!parsed.success)return res.status(400).json({error:'INVALID_HEALTH_RECALCULATION',details:parsed.error.flatten()});
   const healthDay=parsed.data.healthDay??new Date().toISOString().slice(0,10);
-  try{const scores=await calculateHealthScores(owner,healthDay);const observations=await listHealthObservationsForCalculation(owner);
+  try{const scoreWindow=await calculateCanonicalHealthScoreWindow(owner,healthDay,7);const scores=scoreWindow.at(-1)??[];const observations=await listHealthObservationsForCalculation(owner);
     const parity=parsed.data.aggregateAssertions?.length?await persistAggregateAssertions(owner,parsed.data.aggregateAssertions,aggregateDaily(observations)):[];
     return res.status(200).json({recalculated:true,calculationVersion:'HEALTH_INTELLIGENCE_V1',scoreCount:scores.length,
-      aggregateVersion:'HEALTH_AGGREGATION_V2',parity,mismatchCount:parity.filter(item=>item.status==='MISMATCH').length});
+      aggregateVersion:'HEALTH_AGGREGATION_V2',historyDaysRecalculated:scoreWindow.length,parity,mismatchCount:parity.filter(item=>item.status==='MISMATCH').length});
   }catch(error){await enqueueHealthRecalculation(owner,healthDay,error instanceof Error?error.message.slice(0,100):'UNKNOWN');throw error;}
 });
 

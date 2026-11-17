@@ -26,6 +26,7 @@ export type HealthScore = {
   inputSummary: Record<string, unknown>;
   calculatedAtISO: string;
   calculationVersion: string;
+  healthDay?: string | null;
 };
 
 export type HealthScoreSummary = {

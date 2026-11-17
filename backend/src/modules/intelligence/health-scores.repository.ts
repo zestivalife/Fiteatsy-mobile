@@ -40,6 +40,7 @@ export type HealthScoreRecord = {
   inputSummary: Record<string, unknown>;
   calculatedAtISO: string;
   calculationVersion: string;
+  healthDay: string | null;
 };
 
 export type HealthScoreInput = {
@@ -49,6 +50,7 @@ export type HealthScoreInput = {
   confidence: number;
   inputSummary: Record<string, unknown>;
   calculationVersion: string;
+  healthDay?: string | null;
 };
 
 const toRecord = (value: unknown): Record<string, unknown> => {
@@ -66,17 +68,29 @@ const rowToScore = (row: Record<string, unknown>): HealthScoreRecord => ({
   confidence: Number(row.confidence),
   inputSummary: toRecord(row.input_summary),
   calculatedAtISO: new Date(String(row.calculated_at)).toISOString(),
-  calculationVersion: String(row.calculation_version)
+  calculationVersion: String(row.calculation_version),
+  healthDay: row.health_day == null ? null : String(row.health_day).slice(0, 10)
 });
 
 export const createHealthScore = async (owner: ClientOwnershipContext, input: HealthScoreInput) => {
+  const idempotencyKey = input.healthDay
+    ? `${owner.clientId}:${owner.accountId}:${input.scoreType}:${input.calculationVersion}:${input.healthDay}`
+    : null;
   const result = await pool.query(
     `
       insert into health_scores (
         id, user_id, client_id, score_type, score_value, score_status,
-        confidence, input_summary, calculation_version
+        confidence, input_summary, calculation_version, health_day, idempotency_key
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+      values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::date, $11)
+      on conflict (idempotency_key)
+      where idempotency_key is not null
+      do update set
+        score_value = excluded.score_value,
+        score_status = excluded.score_status,
+        confidence = excluded.confidence,
+        input_summary = excluded.input_summary,
+        calculated_at = now()
       returning *
     `,
     [
@@ -88,7 +102,9 @@ export const createHealthScore = async (owner: ClientOwnershipContext, input: He
       input.scoreStatus,
       input.confidence,
       JSON.stringify(input.inputSummary),
-      input.calculationVersion
+      input.calculationVersion,
+      input.healthDay ?? null,
+      idempotencyKey
     ]
   );
   return rowToScore(result.rows[0]);

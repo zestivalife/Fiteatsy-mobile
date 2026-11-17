@@ -56,7 +56,8 @@ const toScoreDto = (score: Awaited<ReturnType<typeof listLatestHealthScores>>[nu
   confidence: score.confidence,
   inputSummary: score.inputSummary,
   calculatedAtISO: score.calculatedAtISO,
-  calculationVersion: score.calculationVersion
+  calculationVersion: score.calculationVersion,
+  healthDay: score.healthDay
 });
 
 const getScoreValue = (scores: Awaited<ReturnType<typeof listLatestHealthScores>>, scoreType: HealthScoreType) =>
