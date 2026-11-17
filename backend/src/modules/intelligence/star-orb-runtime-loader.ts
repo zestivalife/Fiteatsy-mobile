@@ -157,7 +157,7 @@ export async function loadStarOrbRuntimeInputs(
   for(const [day,value] of mindfulnessByDay) observations.push({id:`session-mindfulness:${owner.clientId}:${day}`,metricType:'mindfulness_minutes',value,unit:'min',userId:owner.accountId,clientId:owner.clientId,qualityStatus:'accepted',createdAtISO:new Date().toISOString(),measuredAtISO:`${day}T12:00:00.000Z`,sourceProvider:'fiteatsy_sessions',sourceRecordId:`mindfulness:${day}`,syncKey:`mindfulness:${owner.clientId}:${day}`,timezoneOffsetMinutes:offset,sourceMetadata:{provenance:'completed_health_event'},startAtISO:null,endAtISO:null,providerUpdatedAtISO:null,providerVersion:null,deletedAtISO:null});
   const mindDays=[...new Set([...checkins.map(row=>row.day),...completedByDay.keys()])].sort();
   const mind: RuntimeMindDay[] = mindDays.map((day) => ({
-    healthDay:day,moodCheckIns:checkins.filter(row=>row.day===day).map(row=>row.mood),completedSessions:completedByDay.get(day)??0,
+    healthDay:day,moodCheckIns:checkins.filter(row=>row.day===day).map(row=>row.mood),completedSessions:completedByDay.get(day)??null,
     emotionalWellbeing:checkins.filter((item) => item.day <= day && item.day >= shiftDay(day,-6)).map((item) => item.mood)
   }));
 
