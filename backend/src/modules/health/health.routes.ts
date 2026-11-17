@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import {
@@ -18,6 +18,7 @@ import {
   getActiveWearableConsent, listWearableConnections, listWearableCheckpoints, listWearableSyncRuns, startWearableSyncRun,
   resolveWearableProviderAuthority, upsertWearableConnection, withdrawWearableConsent, type WearableProvider
 } from './wearable-platform.repository.js';
+import { healthObservability } from './health-observability.js';
 
 const observationSchema = z.object({
   metricType: z.string().trim().min(1).max(80),
@@ -139,6 +140,7 @@ const freshness = (iso: string | null) => {
 };
 
 healthRouter.use(requireAuthenticatedAccount);
+healthRouter.use(healthObservability);
 
 const providerSchema = z.enum(['APPLE_HEALTH', 'HEALTH_CONNECT']);
 const connectionSchema = z.object({
@@ -422,4 +424,12 @@ healthRouter.get('/aggregates', async (req, res) => {
     metricType:row.metric,localDay:row.date,value:row.value,unit:row.unit,method:row.method,
     freshness:row.freshness,lineageHash:row.lineageHash
   })) });
+});
+
+healthRouter.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  // The correlation header is already attached by healthObservability. Never
+  // expose database/provider errors or clinical payload fragments to clients.
+  console.error('HEALTH_API_FAILURE', { correlationId:res.getHeader('X-Correlation-Id'),
+    errorCode:error instanceof Error ? error.name.slice(0,80) : 'UNKNOWN' });
+  return res.status(500).json({ error:'HEALTH_OPERATION_FAILED', message:'The health operation could not be completed.' });
 });

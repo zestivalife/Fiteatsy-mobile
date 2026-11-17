@@ -83,7 +83,29 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
 
   let updated = 0;
   let deleted = 0;
-  for (const observation of observations) {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    // One client-scoped transaction prevents concurrent retries/corrections from
+    // racing between identity lookup and mutation while allowing other clients
+    // to ingest independently.
+    await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [`health-observations:${owner.clientId}`]);
+    const prepared = observations.map((observation) => ({ observation, syncKey: buildSyncKey(owner, observation) }));
+    const existingResult = prepared.length ? await client.query(
+      `select * from health_observations where client_id=$1 and sync_key=any($2::text[])`,
+      [owner.clientId, prepared.map((item) => item.syncKey)]
+    ) : { rows: [] };
+    const existingBySyncKey = new Map(existingResult.rows.map((row) => [String(row.sync_key), row]));
+    const isStale = (row: Record<string, unknown>, observation: HealthObservationInput) => {
+      const currentTime = row.provider_updated_at == null ? null : Date.parse(String(row.provider_updated_at));
+      const incomingTime = observation.providerUpdatedAtISO == null ? null : Date.parse(observation.providerUpdatedAtISO);
+      if (currentTime != null && incomingTime != null && incomingTime < currentTime) return true;
+      const currentVersion = row.provider_version == null ? null : Number(row.provider_version);
+      const incomingVersion = observation.providerVersion == null ? null : Number(observation.providerVersion);
+      return currentVersion != null && incomingVersion != null && Number.isFinite(currentVersion)
+        && Number.isFinite(incomingVersion) && incomingVersion < currentVersion;
+    };
+    for (const { observation, syncKey } of prepared) {
     const measuredAt = new Date(observation.measuredAtISO);
     if (!Number.isFinite(observation.value) || Number.isNaN(measuredAt.getTime())) {
       rejected.push({ metricType: observation.metricType, reason: 'Invalid value or measuredAtISO.' });
@@ -91,7 +113,6 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
     }
 
     const id = `hobs_${crypto.randomUUID()}`;
-    const syncKey = buildSyncKey(owner, observation);
     const contentHash = crypto.createHash('sha256').update(JSON.stringify({
       metricType: observation.metricType,
       value: observation.value,
@@ -108,7 +129,7 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
     })).digest('hex');
     const providerWideDeletion = observation.deleted && observation.metricType === 'provider_record_deletion';
     if (providerWideDeletion && observation.sourceRecordId) {
-      const result = await pool.query(
+      const result = await client.query(
         `update health_observations set deleted_at=now(),provider_updated_at=$1,provider_version=$2,
          source_metadata=coalesce($3,source_metadata)
          where client_id=$4 and source_provider=$5 and source_record_id=$6 and deleted_at is null
@@ -120,31 +141,50 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
       else duplicate.push({ syncKey, metricType: observation.metricType });
       continue;
     }
-    const existing = observation.sourceRecordId ? await pool.query(
-      `select * from health_observations where client_id=$1 and source_provider=$2 and source_record_id=$3
-       and metric_type=$4 and deleted_at is null limit 1`,
-      [owner.clientId, observation.sourceProvider, observation.sourceRecordId, observation.metricType]
-    ) : { rows: [] };
-    if (existing.rows[0]) {
+    const existing = existingBySyncKey.get(syncKey);
+    if (existing) {
+      if (isStale(existing, observation)) {
+        duplicate.push({ syncKey, metricType: observation.metricType });
+        continue;
+      }
       if (observation.deleted) {
-        await pool.query(`update health_observations set deleted_at=now(),provider_updated_at=$1,provider_version=$2,
+        if (existing.deleted_at != null) { duplicate.push({ syncKey, metricType: observation.metricType }); continue; }
+        await client.query(`update health_observations set deleted_at=now(),provider_updated_at=$1,provider_version=$2,
           source_metadata=coalesce($3,source_metadata) where id=$4`, [observation.providerUpdatedAtISO ?? null,
-          observation.providerVersion ?? null,observation.sourceMetadata ?? null,existing.rows[0].id]);
+          observation.providerVersion ?? null,observation.sourceMetadata ?? null,existing.id]);
         deleted += 1;
-      } else if (existing.rows[0].content_hash !== contentHash) {
-        const result = await pool.query(`update health_observations set value=$1,unit=$2,measured_at=$3,start_at=$4,end_at=$5,
+      } else if (existing.deleted_at != null) {
+        // A provider deletion is authoritative. Only a strictly newer provider
+        // timestamp/version may resurrect the same provider identity.
+        const existingTime = existing.provider_updated_at == null ? null : Date.parse(String(existing.provider_updated_at));
+        const incomingTime = observation.providerUpdatedAtISO == null ? null : Date.parse(observation.providerUpdatedAtISO);
+        const existingVersion = existing.provider_version == null ? null : Number(existing.provider_version);
+        const incomingVersion = observation.providerVersion == null ? null : Number(observation.providerVersion);
+        const newer = existingTime != null && incomingTime != null && incomingTime > existingTime
+          || Number.isFinite(existingVersion) && Number.isFinite(incomingVersion) && Number(incomingVersion) > Number(existingVersion);
+        if (!newer) { duplicate.push({ syncKey, metricType: observation.metricType }); continue; }
+        const result = await client.query(`update health_observations set value=$1,unit=$2,measured_at=$3,start_at=$4,end_at=$5,
+          timezone_offset_minutes=$6,provider_updated_at=$7,provider_version=$8,content_hash=$9,
+          quality_status=$10,source_metadata=$11,deleted_at=null where id=$12 returning *`,
+          [observation.value,observation.unit,observation.measuredAtISO,observation.startAtISO ?? null,
+            observation.endAtISO ?? null,observation.timezoneOffsetMinutes ?? null,observation.providerUpdatedAtISO ?? null,
+            observation.providerVersion ?? null,contentHash,observation.qualityStatus ?? 'accepted',
+            observation.sourceMetadata ?? null,existing.id]);
+        accepted.push(rowToObservation(result.rows[0])); updated += 1;
+      } else if (existing.content_hash !== contentHash) {
+        const result = await client.query(`update health_observations set value=$1,unit=$2,measured_at=$3,start_at=$4,end_at=$5,
           timezone_offset_minutes=$6,provider_updated_at=$7,provider_version=$8,content_hash=$9,
           quality_status=$10,source_metadata=$11 where id=$12 returning *`,
           [observation.value,observation.unit,observation.measuredAtISO,observation.startAtISO ?? null,
             observation.endAtISO ?? null,observation.timezoneOffsetMinutes ?? null,observation.providerUpdatedAtISO ?? null,
             observation.providerVersion ?? null,contentHash,observation.qualityStatus ?? 'accepted',
-            observation.sourceMetadata ?? null,existing.rows[0].id]);
+            observation.sourceMetadata ?? null,existing.id]);
         accepted.push(rowToObservation(result.rows[0])); updated += 1;
       } else duplicate.push({ syncKey, metricType: observation.metricType });
       continue;
     }
     if (observation.deleted) { duplicate.push({ syncKey, metricType: observation.metricType }); continue; }
-    const result = await pool.query(
+    const result = await client.query(
       `
         insert into health_observations (
           id, user_id, client_id, metric_type, value, unit, measured_at, source_provider,
@@ -175,12 +215,19 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
 
     if (result.rows[0]) {
       accepted.push(rowToObservation(result.rows[0]));
+      existingBySyncKey.set(syncKey, result.rows[0]);
     } else {
       duplicate.push({ syncKey, metricType: observation.metricType });
     }
+    }
+    await client.query('commit');
+    return { accepted, duplicate, rejected, updated, deleted };
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
   }
-
-  return { accepted, duplicate, rejected, updated, deleted };
 };
 
 export const listHealthObservations = async (

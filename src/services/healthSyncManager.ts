@@ -7,7 +7,8 @@ import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceS
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
 import { acknowledgeLocalObservations, persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalSyncCursors,
-  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded } from './healthSyncLocalStore';
+  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded,readLocalHealthQueueDiagnostics } from './healthSyncLocalStore';
+import { emitHealthSyncDiagnostic, newHealthSyncCorrelationId } from './healthSyncObservability';
 
 export type HealthSyncConnectionState =
   | 'NOT_CONNECTED'
@@ -206,6 +207,9 @@ export const runHealthSync = async (
     }) => void | Promise<void>;
   } = {}
 ): Promise<HealthSyncResult> => {
+  const correlationId = newHealthSyncCorrelationId();
+  const provider = appId === 'apple-health' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT';
+  const syncStartedAt = Date.now();
   let run: Awaited<ReturnType<typeof beginWearableSyncRun>> | null = null;
   let payload: WearableSyncPayload | null = null;
   let observations: HealthObservationDraft[] = [];
@@ -222,6 +226,8 @@ export const runHealthSync = async (
       'health_sync_native_read_timeout'
     );
     observations = deriveObservations(payload);
+    emitHealthSyncDiagnostic({ event:'LOCAL_READ',correlationId,provider,durationMs:Date.now()-syncStartedAt,
+      recordsRead:observations.length });
     const anchors = (payload as WearableSyncPayload & { anchors?: Record<string,string> }).anchors ?? {};
     // Cursor advancement and normalized/tombstone persistence are one durable
     // local transaction and always precede every backend operation.
@@ -240,6 +246,7 @@ export const runHealthSync = async (
 
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
     let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+    emitHealthSyncDiagnostic({ event:'QUEUE_STATE',correlationId,provider,...await readLocalHealthQueueDiagnostics(localScope) });
     let uploadBatchCount = 0;
     while (pending.length && uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN) {
       const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
@@ -251,6 +258,9 @@ export const runHealthSync = async (
       updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
       if (ingest.rejected > 0) break;
       await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
+      emitHealthSyncDiagnostic({ event:'UPLOAD_BATCH',correlationId,provider,recordsRead:pending.length,
+        recordsAccepted:ingest.accepted,recordsUpdated:ingest.updated??0,recordsDeleted:ingest.deleted??0,
+        recordsRejected:ingest.rejected });
       uploadBatchCount += 1;
       pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     }
@@ -278,10 +288,15 @@ export const runHealthSync = async (
     }
 
     const [scores, status] = await Promise.all([getHealthScoreSummary(), getHealthSyncStatus()]);
+    emitHealthSyncDiagnostic({ event:'SYNC_COMPLETE',correlationId,provider,durationMs:Date.now()-syncStartedAt,
+      recordsRead:observations.length,recordsAccepted:accepted,recordsUpdated:updated,recordsDeleted:deleted,
+      recordsRejected:rejected,...await readLocalHealthQueueDiagnostics(localScope) });
     return { payload, observations, accepted, duplicate, rejected, scores, status,
       diagnostics: buildHealthSourceDiagnostics(appId === 'apple-health' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', payload, { state: 'SUCCESS' }),
       wellness: wellnessFromCanonicalAggregates(previousWellness,canonicalAggregates,scores) };
   } catch (error) {
+    emitHealthSyncDiagnostic({ event:'SYNC_FAILED',correlationId,provider,durationMs:Date.now()-syncStartedAt,
+      recordsRead:observations.length,retryable:payload!=null,errorCode:error instanceof Error?error.message.slice(0,100):'UNKNOWN' });
     if (run) await finishWearableSyncRun(run.id, { status:'FAILED',recordsRead:0,recordsUploaded:0,recordsInserted:0,
       recordsDuplicates:0,recordsUpdated:0,recordsDeleted:0,errorStage:'SYNC',errorCode:error instanceof Error ? error.message.slice(0,100) : 'UNKNOWN',
       safeErrorSummary:'Wearable synchronization could not complete.' }).catch(() => undefined);

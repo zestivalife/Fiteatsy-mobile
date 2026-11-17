@@ -130,6 +130,16 @@ export const countPendingLocalObservations = (scope: string) =>
     return Object.values(state.records).filter((record) => !record.uploaded).length;
   });
 
+export const readLocalHealthQueueDiagnostics = (scope: string, nowMs = Date.now()) =>
+  serializeScopeOperation(scope, async () => {
+    const pending = Object.values((await readState(scope)).records).filter((record) => !record.uploaded);
+    const oldest = pending.reduce<number|null>((value, record) => {
+      const timestamp = Date.parse(record.updatedAtISO);
+      return Number.isFinite(timestamp) && (value == null || timestamp < value) ? timestamp : value;
+    }, null);
+    return { pendingCount: pending.length, oldestPendingAgeMs: oldest == null ? null : Math.max(0, nowMs - oldest) };
+  });
+
 export const performApprovedStaleHealthQueueCleanup = (scope: string) =>
   serializeScopeOperation(scope, async () => {
     const markerKey = approvedCleanupKeyFor(scope);

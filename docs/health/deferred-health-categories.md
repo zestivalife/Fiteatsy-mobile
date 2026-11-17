@@ -1,0 +1,15 @@
+# Deferred native health categories
+
+These categories are intentionally disabled until the product purpose, granular consent, canonical contract, retention and authorised receiving surfaces are approved. Availability in a native SDK is not authorisation to ingest it.
+
+| Category | Native capability | Native read permission | Canonical contract | Product purpose and consent | Storage | Fiteatsy UI | Consultant receiving |
+|---|---|---|---|---|---|---|---|
+| Blood pressure | HealthKit correlation; Health Connect BloodPressure | HealthKit clinical quantity authorisation; `READ_BLOOD_PRESSURE` | Required: systolic/diastolic pair, posture, method, unit and provenance | Explicit clinical-monitoring purpose and metric consent required | Pair-preserving clinical observation contract required | Not approved | Not approved |
+| Blood glucose | HealthKit quantity; Health Connect BloodGlucose | HealthKit quantity authorisation; `READ_BLOOD_GLUCOSE` | Required: concentration, specimen/meal relation, method and unit | Explicit metabolic-health purpose and metric consent required | Clinical retention and correction rules required | Not approved | Not approved |
+| Body composition and height | HealthKit quantities; Health Connect Height/BodyFat/LeanBodyMass | Corresponding native read permissions | Required per metric with source/device/unit provenance | Body-composition purpose and granular consent required | Canonical contracts and unit policy required | Not approved | Not approved |
+| Body and basal temperature | HealthKit quantities; Health Connect BodyTemperature/BasalBodyTemperature | Corresponding native read permissions | Required: temperature, site/method, cycle context and unit | Separate wellness/clinical purpose; reproductive inference prohibited without consent | Sensitive-context retention rules required | Not approved | Not approved |
+| Nutrition | HealthKit dietary quantities; Health Connect Nutrition | Corresponding dietary/nutrition read permissions | Required nutrient dictionary, meal context, serving and source lineage | Nutrition-import purpose and granular consent required | Must reconcile with governed Fiteatsy food/diary contracts | Not approved | Not approved |
+| Menstrual and reproductive data | HealthKit category types; Health Connect cycle tracking records | Corresponding reproductive-health permissions | Required event semantics, certainty, timezone and correction rules | Explicit sensitive reproductive-health consent and purpose required | Restricted retention/access/audit policy required | Existing manual cycle data only; native import not approved | Not approved |
+| Other clinical metrics | SDK-dependent, including electrodermal activity and specialised clinical records | Metric-specific native permission | Required before enablement | Documented clinical purpose and explicit consent required | Metric-specific retention and access policy required | Not approved | Not approved |
+
+No deferred permission is declared or requested by the current approved health registry.

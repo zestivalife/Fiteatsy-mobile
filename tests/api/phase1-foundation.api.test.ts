@@ -118,6 +118,62 @@ test('POST /v1/health/observations:batch persists client-owned observations and 
   assert.equal(listed.body.items[0].userId, undefined);
 });
 
+test('health ingestion preserves derived identities, rejects stale corrections and serializes concurrent retries', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  await grantHealthConnectConsent(session.token);
+  const headers = authHeaders(session.token);
+  const base = { unit:'min',measuredAtISO:'2026-11-16T23:00:00.000Z',sourceProvider:'health_connect',
+    sourceRecordId:'sleep-session-integrity-1',providerUpdatedAtISO:'2026-11-17T00:00:00.000Z',providerVersion:'2' };
+  const derived = await postJson(server.baseUrl,'/v1/health/observations:batch',{observations:[
+    {...base,metricType:'sleep_deep_minutes',value:60,syncKey:'hc:sleep:1:deep'},
+    {...base,metricType:'sleep_deep_minutes',value:30,syncKey:'hc:sleep:1:deep:second-stage'}
+  ]},{headers});
+  assert.equal(derived.response.status,200);
+  assert.equal(derived.body.accepted,2);
+
+  const stale = await postJson(server.baseUrl,'/v1/health/observations:batch',{observations:[
+    {...base,metricType:'sleep_deep_minutes',value:5,syncKey:'hc:sleep:1:deep',
+      providerUpdatedAtISO:'2026-11-16T23:59:00.000Z',providerVersion:'1'}
+  ]},{headers});
+  assert.equal(stale.body.updated,0);
+  assert.equal(stale.body.duplicate,1);
+
+  const concurrent = await Promise.all(Array.from({length:8},()=>postJson(server.baseUrl,'/v1/health/observations:batch',{
+    observations:[{metricType:'heart_rate',value:72,unit:'bpm',measuredAtISO:'2026-11-17T00:01:00.000Z',
+      sourceProvider:'health_connect',sourceRecordId:'concurrent-heart-1',syncKey:'hc:heart:concurrent-1',
+      providerUpdatedAtISO:'2026-11-17T00:01:00.000Z',providerVersion:'1'}]
+  },{headers})));
+  assert.equal(concurrent.reduce((sum,item)=>sum+Number(item.body.accepted),0),1);
+  assert.equal(concurrent.reduce((sum,item)=>sum+Number(item.body.duplicate),0),7);
+  const history = await getJson(server.baseUrl,'/v1/health/observations?metricType=sleep_deep_minutes&limit=20',{headers});
+  assert.deepEqual(history.body.items.map((item:{value:number})=>item.value).sort((a:number,b:number)=>a-b),[30,60]);
+});
+
+test('health ingestion rolls back the complete transaction after a partial-write failure and blocks deletion replay', async () => {
+  const session = await createAuthenticatedSession(server.baseUrl);
+  const client = await getClientByAccountUserId(session.current.body.accountId);
+  assert.ok(client);
+  const owner={accountId:session.current.body.accountId,clientId:client.id};
+  const circular:Record<string,unknown>={}; circular.self=circular;
+  await assert.rejects(ingestHealthObservations(owner,[
+    {metricType:'steps',value:100,unit:'count',measuredAtISO:'2026-11-17T01:00:00.000Z',sourceProvider:'health_connect',
+      sourceRecordId:'rollback-1',syncKey:'rollback-1'},
+    {metricType:'steps',value:200,unit:'count',measuredAtISO:'2026-11-17T01:01:00.000Z',sourceProvider:'health_connect',
+      sourceRecordId:'rollback-2',syncKey:'rollback-2',sourceMetadata:circular}
+  ]));
+  assert.equal(Number((await pool.query(`select count(*) as count from health_observations where client_id=$1 and sync_key like 'rollback-%'`,[client.id])).rows[0].count),0);
+
+  const original={metricType:'steps',value:500,unit:'count',measuredAtISO:'2026-11-17T02:00:00.000Z',sourceProvider:'health_connect',
+    sourceRecordId:'deleted-replay-1',syncKey:'deleted-replay-1',providerUpdatedAtISO:'2026-11-17T02:00:00.000Z',providerVersion:'4'};
+  await ingestHealthObservations(owner,[original]);
+  await ingestHealthObservations(owner,[{...original,metricType:'provider_record_deletion',value:0,unit:'deleted',
+    syncKey:'deleted:replay-1',deleted:true,providerUpdatedAtISO:'2026-11-17T02:05:00.000Z',providerVersion:'5'}]);
+  const replay=await ingestHealthObservations(owner,[original]);
+  assert.equal(replay.accepted.length,0);
+  assert.equal(replay.duplicate.length,1);
+  assert.equal(Number((await pool.query(`select count(*) as count from health_observations where client_id=$1 and source_record_id='deleted-replay-1' and deleted_at is null`,[client.id])).rows[0].count),0);
+});
+
 test('local aggregate assertions traverse authenticated upload and backend canonical recomputation with parity',async()=>{
   const session=await createAuthenticatedSession(server.baseUrl);
   await grantHealthConnectConsent(session.token);
