@@ -116,8 +116,44 @@ const toErrorCode = (status: number): ApiClientErrorCode => {
 };
 
 export const API_REQUEST_TIMEOUT_MS = 15_000;
+export const API_MAX_RETRY_ATTEMPTS = 2;
+export const API_RETRY_BASE_DELAY_MS = 350;
 
-type ApiRequestInit = RequestInit & { timeoutMs?: number };
+export type ApiRequestInit = RequestInit & {
+  timeoutMs?: number;
+  retryPolicy?: 'none' | 'safe' | 'idempotent';
+  idempotencyKey?: string;
+  maxRetryAttempts?: number;
+};
+
+const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
+const retryableStatuses = new Set([408, 425, 429, 502, 503, 504]);
+const boundedRetryCount = (value: number | undefined) =>
+  Math.max(0, Math.min(API_MAX_RETRY_ATTEMPTS, value ?? API_MAX_RETRY_ATTEMPTS));
+const retryDelayMs = (attempt: number, retryAfter: string | null) => {
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return Math.min(5_000, Math.max(0, seconds * 1_000));
+    const at = Date.parse(retryAfter);
+    if (Number.isFinite(at)) return Math.min(5_000, Math.max(0, at - Date.now()));
+  }
+  return Math.min(2_000, API_RETRY_BASE_DELAY_MS * 2 ** attempt);
+};
+const waitForRetry = (delayMs: number, signal?: AbortSignal | null) => new Promise<void>((resolve, reject) => {
+  if (signal?.aborted) {
+    reject(new ApiClientError('NETWORK_ERROR', 'The request was cancelled.', undefined, 'REQUEST_CANCELLED'));
+    return;
+  }
+  const timeout = setTimeout(() => {
+    signal?.removeEventListener('abort', abort);
+    resolve();
+  }, delayMs);
+  const abort = () => {
+    clearTimeout(timeout);
+    reject(new ApiClientError('NETWORK_ERROR', 'The request was cancelled.', undefined, 'REQUEST_CANCELLED'));
+  };
+  signal?.addEventListener('abort', abort, { once: true });
+});
 
 export const apiResponse = async (path: string, init: ApiRequestInit = {}): Promise<Response> => {
   const startedAt = Date.now();
@@ -131,40 +167,71 @@ export const apiResponse = async (path: string, init: ApiRequestInit = {}): Prom
     diagnosticSink?.(event);
     if (__DEV__) console.info('[ApiRequest]', event);
   };
-  const controller = new AbortController();
   const callerSignal = init.signal;
-  const abortFromCaller = () => controller.abort();
-  callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
   const timeoutMs = init.timeoutMs ?? API_REQUEST_TIMEOUT_MS;
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let response: Response;
-  try {
-    const { timeoutMs: _timeoutMs, ...requestInit } = init;
-    const isMultipart = typeof FormData !== 'undefined' && init.body instanceof FormData;
-    response = await fetch(`${apiBaseUrl}${path}`, {
-      ...requestInit,
-      signal: controller.signal,
-      headers: isMultipart ? { ...buildAuthorizationHeaders(), ...init.headers } : buildHeaders(init.headers)
-    });
-  } catch (error) {
-    if (controller.signal.aborted && !callerSignal?.aborted) {
-      emit('TIMEOUT');
-      throw new ApiClientError('TIMEOUT', 'The platform request timed out. Please try again.');
+  const normalizedMethod = method.toUpperCase();
+  const isMultipart = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  const retryPolicy = init.retryPolicy ?? (safeMethods.has(normalizedMethod) ? 'safe' : 'none');
+  const canRetry = !isMultipart && (retryPolicy === 'safe' && safeMethods.has(normalizedMethod) || retryPolicy === 'idempotent' && Boolean(init.idempotencyKey));
+  const maxRetries = canRetry ? boundedRetryCount(init.maxRetryAttempts) : 0;
+  let attempt = 0;
+  while (true) {
+    const controller = new AbortController();
+    const abortFromCaller = () => controller.abort();
+    callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let response: Response;
+    try {
+      const {
+        timeoutMs: _timeoutMs,
+        retryPolicy: _retryPolicy,
+        idempotencyKey: _idempotencyKey,
+        maxRetryAttempts: _maxRetryAttempts,
+        ...requestInit
+      } = init;
+      response = await fetch(`${apiBaseUrl}${path}`, {
+        ...requestInit,
+        signal: controller.signal,
+        headers: isMultipart
+          ? { ...buildAuthorizationHeaders(), ...init.headers }
+          : buildHeaders({ ...(init.idempotencyKey ? { 'Idempotency-Key': init.idempotencyKey } : {}), ...init.headers })
+      });
+    } catch (error) {
+      clearTimeout(timeout);
+      callerSignal?.removeEventListener('abort', abortFromCaller);
+      if (callerSignal?.aborted) {
+        emit('NETWORK_ERROR');
+        throw new ApiClientError('NETWORK_ERROR', 'The request was cancelled.', undefined, 'REQUEST_CANCELLED');
+      }
+      const timedOut = controller.signal.aborted;
+      if (attempt < maxRetries && networkReachabilityProvider?.() !== false) {
+        await waitForRetry(retryDelayMs(attempt, null), callerSignal);
+        attempt += 1;
+        continue;
+      }
+      if (timedOut) {
+        emit('TIMEOUT');
+        throw new ApiClientError('TIMEOUT', 'The platform request timed out. Please try again.');
+      }
+      emit('NETWORK_ERROR');
+      const isDefinitelyOffline = networkReachabilityProvider?.() === false;
+      throw new ApiClientError(
+        'NETWORK_ERROR',
+        isDefinitelyOffline ? 'This device is offline.' : 'Unable to reach the platform backend.',
+        undefined,
+        isDefinitelyOffline ? 'DEVICE_OFFLINE' : 'SERVICE_UNREACHABLE'
+      );
+    } finally {
+      clearTimeout(timeout);
+      callerSignal?.removeEventListener('abort', abortFromCaller);
     }
-    emit('NETWORK_ERROR');
-    const isDefinitelyOffline = networkReachabilityProvider?.() === false;
-    throw new ApiClientError(
-      'NETWORK_ERROR',
-      isDefinitelyOffline ? 'This device is offline.' : 'Unable to reach the platform backend.',
-      undefined,
-      isDefinitelyOffline ? 'DEVICE_OFFLINE' : 'SERVICE_UNREACHABLE'
-    );
-  } finally {
-    clearTimeout(timeout);
-    callerSignal?.removeEventListener('abort', abortFromCaller);
-  }
 
-  if (!response.ok) {
+    if (retryableStatuses.has(response.status) && attempt < maxRetries) {
+      await waitForRetry(retryDelayMs(attempt, response.headers.get('Retry-After')), callerSignal);
+      attempt += 1;
+      continue;
+    }
+    if (!response.ok) {
     let payload: { error?: string; message?: string } | null = null;
     try {
       payload = (await response.json()) as { error?: string; message?: string };
@@ -176,11 +243,12 @@ export const apiResponse = async (path: string, init: ApiRequestInit = {}): Prom
     }
     const code = toErrorCode(response.status);
     emit(code);
-    throw new ApiClientError(code, payload?.message ?? 'Platform request failed.', response.status, payload?.error);
-  }
+      throw new ApiClientError(code, payload?.message ?? 'Platform request failed.', response.status, payload?.error);
+    }
 
-  emit('SUCCESS');
-  return response;
+    emit('SUCCESS');
+    return response;
+  }
 };
 
 export const apiFetch = async <T>(path: string, init: ApiRequestInit = {}): Promise<T> =>

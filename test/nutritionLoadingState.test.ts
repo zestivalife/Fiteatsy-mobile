@@ -49,8 +49,9 @@ describe('Nutrition bounded loading states', () => {
 describe('Nutrition reconnect contract', () => {
   it('refreshes after an offline-to-online edge while retaining cached Nutrition and authentication on failure', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/state/AppContext.tsx'), 'utf8');
-    expect(source).toContain('const previousReachability = previousNetworkReachabilityRef.current');
-    expect(source).toContain('if (previousReachability === false) void refreshPublishedNutritionPlan();');
+    expect(source).toContain('transitionRuntimeNetwork(runtimeNetworkStateRef.current, state)');
+    expect(source).toContain('if (transition.shouldRecover) void recoverPendingRuntime();');
+    expect(source).toContain('await refreshPublishedNutritionPlan();');
     expect(source).toContain('nutrition projection refresh failed; retaining last valid plan');
     expect(source).not.toMatch(/nutrition projection refresh failed[\s\S]{0,300}clearPersistedAuth/);
   });

@@ -55,7 +55,10 @@ export const queueHealthEvent = async (input: QueueHealthEventInput): Promise<He
 
 const retryAt = (attempt: number) => new Date(Date.now() + Math.min(300_000, 2 ** attempt * 1_000)).toISOString();
 
-export const processPendingHealthEvents = async (identity?: StorageIdentity | null) => {
+const activeProcessors = new Map<string, Promise<number>>();
+const processorKey = (identity?: StorageIdentity | null) => `${identity?.userId ?? 'none'}:${identity?.clientId ?? 'none'}`;
+
+const processPendingHealthEventsOnce = async (identity?: StorageIdentity | null) => {
   const items = (await getPendingSyncItems(identity))
     .filter((item) => item.entityType === 'health_event' && item.operation === 'enqueue')
     .sort((a, b) => new Date(a.createdAtISO).getTime() - new Date(b.createdAtISO).getTime());
@@ -69,7 +72,9 @@ export const processPendingHealthEvents = async (identity?: StorageIdentity | nu
       const currentCase = await apiFetch<{ id: string }>('/v1/platform/care-cases/current');
       await apiFetch(`/v1/platform/care-cases/${encodeURIComponent(currentCase.id)}/events`, {
         method: 'POST',
-        body: JSON.stringify({ ...event, careCaseId: currentCase.id })
+        body: JSON.stringify({ ...event, careCaseId: currentCase.id }),
+        retryPolicy: 'idempotent',
+        idempotencyKey: event.id
       });
       await removeSyncQueueItem(item.id, identity);
       processed += 1;
@@ -89,4 +94,15 @@ export const processPendingHealthEvents = async (identity?: StorageIdentity | nu
     }
   }
   return processed;
+};
+
+export const processPendingHealthEvents = (identity?: StorageIdentity | null) => {
+  const key = processorKey(identity);
+  const active = activeProcessors.get(key);
+  if (active) return active;
+  const processor = processPendingHealthEventsOnce(identity).finally(() => {
+    if (activeProcessors.get(key) === processor) activeProcessors.delete(key);
+  });
+  activeProcessors.set(key, processor);
+  return processor;
 };

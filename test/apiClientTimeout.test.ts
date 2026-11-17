@@ -25,7 +25,7 @@ describe('shared API bounded completion', () => {
     global.fetch = jest.fn((_url, init) => new Promise((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
     })) as typeof fetch;
-    const request = apiFetch('/v1/health', { timeoutMs: 50 });
+    const request = apiFetch('/v1/health', { timeoutMs: 50, maxRetryAttempts: 0 });
     const assertion = expect(request).rejects.toMatchObject({ code: 'TIMEOUT' });
     await jest.advanceTimersByTimeAsync(51);
     await assertion;
@@ -61,7 +61,7 @@ describe('shared API bounded completion', () => {
     registerNetworkReachabilityProvider(() => reachable);
     global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
 
-    await expect(apiFetch('/v1/reports')).rejects.toMatchObject({
+    await expect(apiFetch('/v1/reports', { maxRetryAttempts: 0 })).rejects.toMatchObject({
       code: 'NETWORK_ERROR',
       serverCode: 'SERVICE_UNREACHABLE'
     });
@@ -71,7 +71,7 @@ describe('shared API bounded completion', () => {
     registerNetworkReachabilityProvider(() => false);
     global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
 
-    await expect(apiFetch('/v1/reports')).rejects.toMatchObject({
+    await expect(apiFetch('/v1/reports', { maxRetryAttempts: 0 })).rejects.toMatchObject({
       code: 'NETWORK_ERROR',
       serverCode: 'DEVICE_OFFLINE'
     });
@@ -86,5 +86,56 @@ describe('shared API bounded completion', () => {
     await expect(apiFetch('/v1/platform/health-profile')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
     expect(onUnauthorized).toHaveBeenCalledWith({ status: 401, serverCode: 'ACCESS_TOKEN_REJECTED' });
+  });
+
+  it('retries a safe read once after a transport failure', async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn()
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ recovered: true }) });
+    const request = apiFetch<{ recovered: boolean }>('/v1/recovery', { maxRetryAttempts: 1 });
+    await jest.advanceTimersByTimeAsync(351);
+    await expect(request).resolves.toEqual({ recovered: true });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('never retries a non-idempotent POST by default', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+    await expect(apiFetch('/v1/medications', { method: 'POST', body: '{}' })).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not enter a retry loop while reachability is definitively offline', async () => {
+    registerNetworkReachabilityProvider(() => false);
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+    await expect(apiFetch('/v1/offline-read')).rejects.toMatchObject({ serverCode: 'DEVICE_OFFLINE' });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('honours caller cancellation without retrying', async () => {
+    const controller = new AbortController();
+    global.fetch = jest.fn((_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+    })) as typeof fetch;
+    const request = apiFetch('/v1/cancelled', { signal: controller.signal });
+    controller.abort();
+    await expect(request).rejects.toMatchObject({ serverCode: 'REQUEST_CANCELLED' });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries an explicitly idempotent POST with its stable key', async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn()
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ accepted: true }) });
+    const request = apiFetch('/v1/platform/events', {
+      method: 'POST', body: '{}', retryPolicy: 'idempotent', idempotencyKey: 'event-1', maxRetryAttempts: 1
+    });
+    await jest.advanceTimersByTimeAsync(351);
+    await expect(request).resolves.toEqual({ accepted: true });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({
+      headers: expect.objectContaining({ 'Idempotency-Key': 'event-1' })
+    }));
   });
 });

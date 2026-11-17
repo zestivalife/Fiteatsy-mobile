@@ -24,8 +24,20 @@ describe('clinical event queue recovery',()=>{
     await enqueueSyncItem(item(),identity);
     mockApiFetch.mockResolvedValueOnce({id:'server-case'}).mockResolvedValueOnce({accepted:true});
     await expect(processPendingHealthEvents(identity)).resolves.toBe(1);
-    expect(mockApiFetch).toHaveBeenNthCalledWith(2,'/v1/platform/care-cases/server-case/events',expect.objectContaining({body:expect.stringContaining('server-case')}));
+    expect(mockApiFetch).toHaveBeenNthCalledWith(2,'/v1/platform/care-cases/server-case/events',expect.objectContaining({body:expect.stringContaining('server-case'),retryPolicy:'idempotent',idempotencyKey:'event-1'}));
     await expect(getSyncQueue(identity)).resolves.toEqual([]);
+  });
+  it('coalesces concurrent replay triggers for the same identity',async()=>{
+    await enqueueSyncItem(item(),identity);
+    let release:(value:{accepted:boolean})=>void=()=>undefined;
+    mockApiFetch.mockResolvedValueOnce({id:'server-case'}).mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;}));
+    const first=processPendingHealthEvents(identity);
+    const second=processPendingHealthEvents(identity);
+    expect(second).toBe(first);
+    while(mockApiFetch.mock.calls.length<2) await new Promise(resolve=>setTimeout(resolve,0));
+    release({accepted:true});
+    await expect(first).resolves.toBe(1);
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
   });
   it('preserves the item and retry budget when the session expired',async()=>{
     await enqueueSyncItem(item(),identity);

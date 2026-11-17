@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import { AppState } from 'react-native';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as Notifications from 'expo-notifications';
 import { emptyWellness } from './emptyWellness';
@@ -77,6 +78,7 @@ import {
   registerUnauthorizedHandler
 } from '../services/apiClient';
 import { processPendingHealthEvents, queueHealthEvent } from '../services/platformEventService';
+import { initialRuntimeNetworkState, transitionRuntimeNetwork } from '../services/networkRuntimeService';
 import {
   getPlatformHealthProfile,
   getPlatformHealthProfileSyncDiagnostics,
@@ -532,7 +534,28 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const networkTypeRef = useRef('UNKNOWN');
   const networkReachabilityRef = useRef<boolean | null>(null);
-  const previousNetworkReachabilityRef = useRef<boolean | null>(null);
+  const runtimeNetworkStateRef = useRef(initialRuntimeNetworkState());
+  const recoveryInFlightRef = useRef<Promise<void> | null>(null);
+  const recoverPendingRuntime = useCallback(() => {
+    if (!authSession) return Promise.resolve();
+    if (recoveryInFlightRef.current) return recoveryInFlightRef.current;
+    const recovery = (async () => {
+      try {
+        await retryPendingHealthProfileSync();
+      } catch (error) {
+        console.warn('[NetworkRecovery] queued health replay deferred', { errorCode: resourceErrorCode(error) });
+      }
+      try {
+        await refreshPublishedNutritionPlan();
+      } catch (error) {
+        console.warn('[NetworkRecovery] nutrition refresh deferred', { errorCode: resourceErrorCode(error) });
+      }
+    })().finally(() => {
+      if (recoveryInFlightRef.current === recovery) recoveryInFlightRef.current = null;
+    });
+    recoveryInFlightRef.current = recovery;
+    return recovery;
+  }, [authSession, refreshPublishedNutritionPlan, retryPendingHealthProfileSync]);
   useEffect(() => {
     registerNetworkTypeProvider(() => networkTypeRef.current);
     registerNetworkReachabilityProvider(() => networkReachabilityRef.current);
@@ -1736,21 +1759,28 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const previousReachability = previousNetworkReachabilityRef.current;
-      networkTypeRef.current = state.type?.toUpperCase() ?? 'UNKNOWN';
-      networkReachabilityRef.current = state.isConnected === false || state.isInternetReachable === false
-        ? false
-        : state.isConnected === true
-          ? true
-          : null;
-      previousNetworkReachabilityRef.current = networkReachabilityRef.current;
-      if (authSession && networkReachabilityRef.current === true) {
-        void retryPendingHealthProfileSync();
-        if (previousReachability === false) void refreshPublishedNutritionPlan();
-      }
+      const transition = transitionRuntimeNetwork(runtimeNetworkStateRef.current, state);
+      runtimeNetworkStateRef.current = transition.state;
+      networkTypeRef.current = transition.state.transport;
+      networkReachabilityRef.current = transition.state.reachability;
+      if (transition.shouldRecover) void recoverPendingRuntime();
     });
     return () => unsubscribe();
-  }, [authSession, refreshPublishedNutritionPlan, retryPendingHealthProfileSync]);
+  }, [recoverPendingRuntime]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !authSession) return;
+      void NetInfo.fetch().then((sample) => {
+        const transition = transitionRuntimeNetwork(runtimeNetworkStateRef.current, sample);
+        runtimeNetworkStateRef.current = transition.state;
+        networkTypeRef.current = transition.state.transport;
+        networkReachabilityRef.current = transition.state.reachability;
+        if (transition.state.reachability === true) void recoverPendingRuntime();
+      }).catch(() => undefined);
+    });
+    return () => subscription.remove();
+  }, [authSession, recoverPendingRuntime]);
 
   const value = useMemo(
     () => ({
