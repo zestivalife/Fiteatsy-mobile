@@ -28,6 +28,10 @@ const recordTypes = [
   'ActiveCaloriesBurned',
   'Weight',
   'Distance'
+  ,'HeartRate'
+  ,'Hydration'
+  ,'OxygenSaturation'
+  ,'RespiratoryRate'
 ];
 
 const grant = (types = recordTypes) => types.map((recordType) => ({ accessType: 'read', recordType }));
@@ -132,6 +136,38 @@ describe('Health Connect native failure boundary', () => {
     expect(payload.dataQuality.connectedMetrics?.distance).toBe('synced');
     expect(payload.observations).toEqual(expect.arrayContaining([
       expect.objectContaining({ metricType: 'distance', value: 900 })
+    ]));
+  });
+
+  it('reads approved HeartRate, Hydration, OxygenSaturation, RespiratoryRate and provider sleep stages', async () => {
+    prepareAvailableProvider();
+    const endTime = new Date().toISOString();
+    const startTime = new Date(Date.now() - 60 * 60_000).toISOString();
+    (readRecords as jest.Mock).mockImplementation(async (recordType: string) => {
+      const metadata = { id: `${recordType}-1`, dataOrigin: 'test.health' };
+      if (recordType === 'HeartRate') return { records: [{ startTime, endTime, metadata,
+        samples: [{ time: endTime, beatsPerMinute: 64 }, { time: endTime, beatsPerMinute: 72 }] }] };
+      if (recordType === 'Hydration') return { records: [{ startTime, endTime, metadata, volume: { inMilliliters: 400 } }] };
+      if (recordType === 'OxygenSaturation') return { records: [{ time: endTime, metadata, percentage: 98 }] };
+      if (recordType === 'RespiratoryRate') return { records: [{ time: endTime, metadata, rate: 16 }] };
+      if (recordType === 'SleepSession') return { records: [{ startTime, endTime, metadata, stages: [
+        { startTime, endTime, stage: 5 }
+      ] }] };
+      return { records: [] };
+    });
+
+    const payload = await syncFromHealthConnect();
+
+    expect(payload.metrics).toEqual(expect.objectContaining({ heartRateAvg: 68, hydrationLiters: 0.4,
+      spo2Pct: 98, respiratoryRateBrpm: 16 }));
+    expect(payload.dataQuality.connectedMetrics).toEqual(expect.objectContaining({ heart_rate: 'synced',
+      hydration: 'synced', spo2: 'synced', respiratory_rate: 'synced', sleep: 'synced' }));
+    expect(payload.observations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ metricType: 'heart_rate', value: 68 }),
+      expect.objectContaining({ metricType: 'hydration_ml', value: 400 }),
+      expect.objectContaining({ metricType: 'spo2', value: 98 }),
+      expect.objectContaining({ metricType: 'respiratory_rate', value: 16 }),
+      expect.objectContaining({ metricType: 'sleep_deep_minutes', value: 60 })
     ]));
   });
 

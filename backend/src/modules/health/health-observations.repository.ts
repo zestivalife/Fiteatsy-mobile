@@ -107,10 +107,23 @@ export const ingestHealthObservations = async (owner: ClientOwnershipContext, ob
       deleted: observation.deleted ?? false
     })).digest('hex');
     const providerWideDeletion = observation.deleted && observation.metricType === 'provider_record_deletion';
+    if (providerWideDeletion && observation.sourceRecordId) {
+      const result = await pool.query(
+        `update health_observations set deleted_at=now(),provider_updated_at=$1,provider_version=$2,
+         source_metadata=coalesce($3,source_metadata)
+         where client_id=$4 and source_provider=$5 and source_record_id=$6 and deleted_at is null
+         returning id`,
+        [observation.providerUpdatedAtISO ?? null, observation.providerVersion ?? null,
+          observation.sourceMetadata ?? null, owner.clientId, observation.sourceProvider, observation.sourceRecordId]
+      );
+      if (result.rowCount) deleted += result.rowCount;
+      else duplicate.push({ syncKey, metricType: observation.metricType });
+      continue;
+    }
     const existing = observation.sourceRecordId ? await pool.query(
       `select * from health_observations where client_id=$1 and source_provider=$2 and source_record_id=$3
-       and ($4::boolean or metric_type=$5) and deleted_at is null limit 1`,
-      [owner.clientId, observation.sourceProvider, observation.sourceRecordId, providerWideDeletion, observation.metricType]
+       and metric_type=$4 and deleted_at is null limit 1`,
+      [owner.clientId, observation.sourceProvider, observation.sourceRecordId, observation.metricType]
     ) : { rows: [] };
     if (existing.rows[0]) {
       if (observation.deleted) {

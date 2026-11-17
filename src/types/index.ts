@@ -303,7 +303,8 @@ export type WearableSyncPayload = {
         | 'stress'
         | 'cycle'
         | 'spo2'
-        | 'respiratory_rate',
+        | 'respiratory_rate'
+        | 'hydration',
         'synced' | 'missing' | 'unsupported' | 'estimated' | 'no_permission' | 'no_recent_data' | 'read_failed' | 'unavailable'
       >
     >;

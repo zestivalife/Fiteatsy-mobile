@@ -21,6 +21,9 @@ describe('governed wearable health platform', () => {
     expect(repository).toContain('deleted_at=now()');
     expect(repository).toContain('timezone_offset_minutes');
     expect(repository).toContain('provider_updated_at');
+    expect(repository).toContain('providerWideDeletion && observation.sourceRecordId');
+    expect(repository).toContain('where client_id=$4 and source_provider=$5 and source_record_id=$6 and deleted_at is null');
+    expect(repository).toContain('if (result.rowCount) deleted += result.rowCount');
   });
 
   it('paginates Health Connect and chunks backend uploads', () => {

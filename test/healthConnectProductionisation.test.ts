@@ -13,8 +13,13 @@ describe('Health Connect D2 production contracts', () => {
       'READ_ACTIVE_CALORIES_BURNED',
       'READ_DISTANCE',
       'READ_EXERCISE',
+      'READ_HEALTH_DATA_HISTORY',
+      'READ_HEALTH_DATA_IN_BACKGROUND',
       'READ_HEART_RATE',
       'READ_HEART_RATE_VARIABILITY',
+      'READ_HYDRATION',
+      'READ_OXYGEN_SATURATION',
+      'READ_RESPIRATORY_RATE',
       'READ_SLEEP',
       'READ_STEPS',
       'READ_WEIGHT'
@@ -72,7 +77,8 @@ describe('Health Connect D2 production contracts', () => {
     expect(service).toContain("'ActiveCaloriesBurned'");
     expect(service).not.toContain('workoutMinutes * 6');
     expect(service).not.toContain('stepCount / 120');
-    expect(service).toContain('hydrationLiters: null');
+    expect(service).toContain('record.volume.inMilliliters');
+    expect(service).toContain('hydrationMl == null ? null');
     expect(service).toContain('focusMinutes: null');
     expect(service).toContain('breathingMinutes: null');
   });
