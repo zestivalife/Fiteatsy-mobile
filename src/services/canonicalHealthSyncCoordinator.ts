@@ -18,7 +18,7 @@ import {
   runHealthSync,
   wellnessFromCanonicalAggregates
 } from './healthSyncManager';
-import { getHealthIntelligenceV1, type HealthIntelligenceV1, type HealthScoreSummary } from './healthIntelligenceService';
+import { candidateValidationClientEnabled, getCandidateStarOrbValidation, getHealthIntelligenceV1, type CandidateStarOrbValidation, type FrameworkScore, type HealthIntelligenceV1, type HealthScoreSummary } from './healthIntelligenceService';
 import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLocalHealthProviderConnected,
   migrateLegacyHealthInstallationId, readLocalHealthBootstrapSnapshot,
   performApprovedStaleHealthQueueCleanup,
@@ -64,6 +64,22 @@ const serverSnapshot = (value: HealthIntelligenceV1): LocalCanonicalHealthSnapsh
   scores: value.scores
 });
 
+const candidateFrameworkScore=(score:CandidateStarOrbValidation['days'][number]['activity']):Omit<FrameworkScore,'calculationVersion'>&{calculationVersion:string}=>({
+  key:score.domain,score:score.score,status:score.status,confidence:score.confidence,trend:null,
+  inputsUsed:score.inputsUsed,inputsMissing:score.inputsMissing,inputsNotApplicable:[],methodologyPending:[],
+  contributingFactors:score.contributingFactors,recommendedActions:[],explanation:score.explanation,
+  freshness:score.inputFreshness==='STALE'?'STALE':score.inputFreshness==='CURRENT'?'CURRENT':'UNKNOWN',
+  calculationVersion:score.methodologyVersion,calculatedAt:score.calculatedAt
+});
+
+export const candidateResponseToHomeSnapshot=(value:CandidateStarOrbValidation)=>{
+  const current=value.days.at(-1);if(!current)return null;
+  const recovery=candidateFrameworkScore(current.recovery);
+  return {methodologyVersion:value.methodologyVersion,activation:value.activation,sourceCoverage:value.sourceCoverage,
+    scores:{activity:candidateFrameworkScore(current.activity),sleep:candidateFrameworkScore(current.sleep),nutrition:candidateFrameworkScore(current.nourishment),calm:candidateFrameworkScore(current.calm),mind:candidateFrameworkScore(current.mind),recovery},
+    recoveryTrend:value.days.map(day=>({dayKey:day.healthDay,score:day.recovery.score}))};
+};
+
 export const countAvailableHealthMetrics = (metrics: CanonicalHealthMetricState[]) =>
   metrics.filter((metric) => metric.queryState === 'DATA_AVAILABLE').length;
 
@@ -92,6 +108,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const [localHydrated, setLocalHydrated] = useState(false);
   const [pendingUploadCount, setPendingUploadCount] = useState(0);
   const [canonicalIntelligence, setCanonicalIntelligence] = useState<LocalCanonicalHealthSnapshot | null>(null);
+  const [candidateIntelligence,setCandidateIntelligence]=useState<ReturnType<typeof candidateResponseToHomeSnapshot>>(null);
   const [aggregates,setAggregates]=useState<CanonicalDailyAggregate[]>([]);
   const [lifecycle,setLifecycle]=useState<HealthSyncLifecycleTimestamps>({lastHealthReadAtISO:null,lastSavedAtISO:null,lastUploadedAtISO:null,lastFullySyncedAtISO:null});
   const localScope = useMemo(() => authSession
@@ -118,8 +135,9 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const refreshRemoteSnapshot = useCallback(async () => {
     const locallyAvailable = await adapter.isAvailable().catch(() => false);
     try {
-      const [nextStatus, nextObservations, nextActivity, nextIntelligence] = await Promise.all([
-        getHealthSyncStatus(), getLatestHealthObservations(200), getHealthSyncActivity(8), getHealthIntelligenceV1()
+      const [nextStatus, nextObservations, nextActivity, nextIntelligence,nextCandidate] = await Promise.all([
+        getHealthSyncStatus(), getLatestHealthObservations(200), getHealthSyncActivity(8), getHealthIntelligenceV1(),
+        candidateValidationClientEnabled()?getCandidateStarOrbValidation():Promise.resolve(null)
       ]);
       if (!mounted.current) return;
       setStatus(nextStatus);
@@ -134,6 +152,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       // Preserve a calculated local projection from a just-completed native read,
       // but allow a calculated server snapshot to replace an uncalculated local placeholder.
       setCanonicalIntelligence((current) => preferCanonicalHealthSnapshot(current, snapshot));
+      setCandidateIntelligence(nextCandidate?candidateResponseToHomeSnapshot(nextCandidate):null);
       if (localScope) await persistLocalCanonicalHealthSnapshot(localScope, snapshot);
     } catch {
       // Backend availability is not provider availability. Local reads stay usable.
@@ -329,6 +348,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     setErrors({});
     setPendingUploadCount(0);
     setCanonicalIntelligence(null);
+    setCandidateIntelligence(null);
     setAggregates([]);
     setLocalHydrated(false);
     if (!bootstrapped || !localScope) return;
@@ -428,6 +448,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     message,
     diagnostics,
     canonicalIntelligence,
+    candidateIntelligence,
     localHydrated,
     pendingUploadCount,
     syncLocalMetrics,

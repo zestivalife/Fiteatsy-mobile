@@ -263,11 +263,14 @@ export const HomeScreen = () => {
   // The Star Orb is projected exclusively from the canonical intelligence
   // summary. Daily nutrition is a separate product surface, not a fallback
   // score authority.
+  // A separately gated development build may expose the isolated candidate
+  // contract. Release builds cannot enable it because the client gate requires
+  // __DEV__ and the backend independently rejects it in production.
   const metrics: RecoveryMetric[] = [
     {
       key: 'calm',
       label: 'Calm',
-      score: normalizeScore(health.canonicalIntelligence?.scores.calm.score),
+      score: normalizeScore(health.candidateIntelligence?.scores.calm.score ?? health.canonicalIntelligence?.scores.calm.score),
       color: '#FF1717',
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
@@ -276,7 +279,7 @@ export const HomeScreen = () => {
     {
       key: 'activity',
       label: 'Activity',
-      score: normalizeScore(health.canonicalIntelligence?.scores.activity.score),
+      score: normalizeScore(health.candidateIntelligence?.scores.activity.score ?? health.canonicalIntelligence?.scores.activity.score),
       color: '#F27A1A',
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
@@ -285,7 +288,7 @@ export const HomeScreen = () => {
     {
       key: 'nourishment',
       label: 'Nutrition',
-      score: normalizeScore(health.canonicalIntelligence?.scores.nutrition.score),
+      score: normalizeScore(health.candidateIntelligence?.scores.nutrition.score ?? health.canonicalIntelligence?.scores.nutrition.score),
       color: '#77FF22',
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
@@ -294,7 +297,7 @@ export const HomeScreen = () => {
     {
       key: 'mind',
       label: 'Mind',
-      score: normalizeScore(health.canonicalIntelligence?.scores.mind.score),
+      score: normalizeScore(health.candidateIntelligence?.scores.mind.score ?? health.canonicalIntelligence?.scores.mind.score),
       color: '#763CEF',
       position: 'bottomLeft',
       DefaultIcon: MindDefaultIcon,
@@ -303,7 +306,7 @@ export const HomeScreen = () => {
     {
       key: 'sleep',
       label: 'Sleep',
-      score: normalizeScore(health.canonicalIntelligence?.scores.sleep.score),
+      score: normalizeScore(health.candidateIntelligence?.scores.sleep.score ?? health.canonicalIntelligence?.scores.sleep.score),
       color: '#0F80FF',
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
@@ -311,16 +314,25 @@ export const HomeScreen = () => {
     },
   ];
   const displayMetrics = metrics;
-  const trendValues = recoveryTrend;
+  const trendValues = health.candidateIntelligence?.recoveryTrend.map(item=>({
+    ...item,dayLabel:new Date(`${item.dayKey}T12:00:00`).toLocaleDateString(undefined,{weekday:'short'})
+  }))??recoveryTrend;
   const hasTrendData = trendValues.some((item) => item.score != null);
   // The centre is labelled Recovery Core, so it must bind to the governed
   // Recovery domain rather than silently displaying Overall Health Intelligence.
-  const recoveryScore = normalizeScore(health.canonicalIntelligence?.scores.recovery.score);
+  const recoveryScore = normalizeScore(health.candidateIntelligence?.scores.recovery.score ?? health.canonicalIntelligence?.scores.recovery.score);
 
   const selected = selectedMetric === 'healthIntelligence'
     ? { label: 'Recovery Core', score: recoveryScore, color: '#D5062D' }
     : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryScore, color: '#D5062D' };
-  const frameworkByMetric = health.canonicalIntelligence ? {
+  const frameworkByMetric = health.candidateIntelligence?.scores ? {
+    healthIntelligence: health.candidateIntelligence.scores.recovery,
+    mind: health.candidateIntelligence.scores.mind,
+    sleep: health.candidateIntelligence.scores.sleep,
+    activity: health.candidateIntelligence.scores.activity,
+    nourishment: health.candidateIntelligence.scores.nutrition,
+    calm: health.candidateIntelligence.scores.calm
+  } : health.canonicalIntelligence?.scores ? {
     healthIntelligence: health.canonicalIntelligence.scores.recovery,
     mind: health.canonicalIntelligence.scores.mind,
     sleep: health.canonicalIntelligence.scores.sleep,
@@ -428,7 +440,7 @@ const HeaderIcon = ({ icon, onPress, badge }: { icon: keyof typeof Ionicons.glyp
   </Pressable>
 );
 
-const RecoveryTrend = ({ values, hasData }: { values: RecoveryTrendDay[]; hasData: boolean }) => (
+export const RecoveryTrend = ({ values, hasData }: { values: RecoveryTrendDay[]; hasData: boolean }) => (
   <View style={styles.trendCard}>
     <View style={styles.trendHeadingRow}>
       <Text style={styles.trendTitle}>7-Day Recovery</Text>
@@ -533,7 +545,7 @@ const StarOrbSurface = ({ reduceMotion }: { reduceMotion: boolean }) => {
   );
 };
 
-const RecoveryPanel = ({
+export const RecoveryPanel = ({
   metrics,
   selectedMetric,
   selectedLabel,

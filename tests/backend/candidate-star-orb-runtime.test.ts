@@ -65,8 +65,10 @@ test('missing governed inputs fail closed and candidate values do not leak into 
 
 test('sealed Home binds each visible node to its matching production canonical domain',()=>{
   const source=readFileSync(resolve(repositoryRoot,'src/screens/home/HomeScreen.tsx'),'utf8');
-  for(const binding of ['scores.activity.score','scores.sleep.score','scores.nutrition.score','scores.calm.score','scores.mind.score','scores.recovery.score'])assert.ok(source.includes(binding));
-  assert.ok(source.includes('healthIntelligence: health.canonicalIntelligence.scores.recovery'));
+  for(const domain of ['activity','sleep','nutrition','calm','mind','recovery']) {
+    assert.ok(source.includes(`health.candidateIntelligence?.scores.${domain}.score ?? health.canonicalIntelligence?.scores.${domain}.score`));
+  }
   const routes=readFileSync(resolve(repositoryRoot,'backend/src/modules/intelligence/intelligence.routes.ts'),'utf8');
-  assert.ok(!routes.includes('candidate-star-orb-runtime'));
+  assert.ok(routes.includes("intelligenceRouter.get('/candidate-validation'"));
+  assert.ok(routes.includes('candidateValidationEnabled()'));
 });
