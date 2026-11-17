@@ -256,6 +256,16 @@ export const verifyOtpChallenge = async (
   otp: string,
   metadata: { userAgent?: string | null; ipAddress?: string | null } = {}
 ) => {
+  const submittedOtpHash = buildOtpHashForTests(challengeId, otp);
+  const completedResponse = await otpStore.getVerificationReceipt<{
+    sessionToken: string;
+    requiresPinSetup: boolean;
+    requiresPinChange: boolean;
+    user: { id: string; name: string; email: string; mobileNumber: string };
+    client: { fiteatsyClientId: string; status: string };
+  }>(challengeId, submittedOtpHash);
+  if (completedResponse) return completedResponse;
+
   const challenge = await otpStore.get(challengeId);
   if (!challenge) throw asDomainError({ code: 'OTP_NOT_FOUND', message: 'Challenge not found.' });
 
@@ -273,7 +283,7 @@ export const verifyOtpChallenge = async (
     });
   }
 
-  const matches = buildOtpHashForTests(challengeId, otp) === challenge.otpHash;
+  const matches = submittedOtpHash === challenge.otpHash;
   if (!matches) {
     challenge.attemptsRemaining -= 1;
     await otpStore.set(challenge, Math.max(1, challenge.expiresAtMs - current));
@@ -309,9 +319,7 @@ export const verifyOtpChallenge = async (
     );
     if (!issuedSession) throw new Error('OTP registration session was not created.');
     const pinUser = await findUserByIdForPin(user.id);
-    await otpStore.completeVerification(challengeId);
-
-    return {
+    const response = {
       sessionToken: issuedSession.token,
       requiresPinSetup: !pinUser?.pinHash,
       requiresPinChange: Boolean(pinUser?.forcePinChange),
@@ -326,6 +334,14 @@ export const verifyOtpChallenge = async (
         status: client.status
       }
     };
+    await otpStore.setVerificationReceipt(
+      challengeId,
+      submittedOtpHash,
+      response,
+      Math.max(1, challenge.expiresAtMs - current)
+    );
+    await otpStore.completeVerification(challengeId);
+    return response;
   } catch (error) {
     await otpStore.releaseVerification(challengeId);
     if (error instanceof Error && error.name === 'AUTH_CONTACT_CONFLICT') {

@@ -41,9 +41,11 @@ describe('local-first session and bootstrap contract', () => {
 
   test('generic transport and domain failures cannot clear authentication', () => {
     const context = read('src/state/AppContext.tsx');
-    expect(context).toContain("serverCode === 'SESSION_REVOKED'");
-    expect(context).toContain("serverCode === 'ACCOUNT_DISABLED'");
-    expect(context).toContain("serverCode === 'SESSION_EXPIRED'");
+    const policy = read('src/services/sessionLifecyclePolicy.ts');
+    expect(context).toContain('isTerminalSessionCode(serverCode)');
+    expect(policy).toContain("'SESSION_REVOKED'");
+    expect(policy).toContain("'ACCOUNT_DISABLED'");
+    expect(policy).toContain("'SESSION_EXPIRED'");
     expect(context).not.toMatch(/catch\s*\([^)]*\)\s*\{\s*clearPersistedAuth/);
   });
 

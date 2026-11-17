@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { getAuthenticatedAccountByToken, type AuthenticatedAccount } from './auth.repository.js';
+import { getAuthenticatedAccountByToken, getSessionRejectionCodeByToken, type AuthenticatedAccount } from './auth.repository.js';
 
 type AuthenticatedRequest = Request & {
   authenticatedAccount?: AuthenticatedAccount;
@@ -33,7 +33,8 @@ export const requireAuthenticatedAccount = async (req: Request, res: Response, n
 
     const account = await getAuthenticatedAccountByToken(token);
     if (!account) {
-      return res.status(401).json({ error: 'INVALID_SESSION', message: 'Session token is invalid, expired, or revoked.' });
+      const error = await getSessionRejectionCodeByToken(token);
+      return res.status(401).json({ error, message: 'Session is no longer authorised.' });
     }
 
     const pinSetupRouteAllowed = req.originalUrl.startsWith('/v1/auth/create-pin')

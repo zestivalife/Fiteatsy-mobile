@@ -70,8 +70,10 @@ describe('v17.38 mobile production readiness contracts', () => {
   test('only explicit terminal authentication evidence clears a durable local session', () => {
     expect(read('src/services/apiClient.ts')).toContain('unauthorizedHandler?.({ status: 401, serverCode: payload?.error })');
     const context = read('src/state/AppContext.tsx');
-    expect(context).toContain("serverCode === 'SESSION_REVOKED'");
-    expect(context).toContain("serverCode === 'ACCOUNT_DISABLED'");
+    const policy = read('src/services/sessionLifecyclePolicy.ts');
+    expect(context).toContain('isTerminalSessionCode(serverCode)');
+    expect(policy).toContain("'SESSION_REVOKED'");
+    expect(policy).toContain("'ACCOUNT_DISABLED'");
     expect(context).not.toContain('registerUnauthorizedHandler(() => clearPersistedAuth(authSession))');
   });
 

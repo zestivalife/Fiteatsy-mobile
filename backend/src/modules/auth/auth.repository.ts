@@ -871,6 +871,7 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
         and s.revoked_at is null
         and s.expires_at > now()
         and u.deleted_at is null
+        and upper(u.status) = 'ACTIVE'
         and (s.qa_fixture_set_id is null or (
           u.account_purpose = 'QA_TEST'
           and s.qa_purpose = 'DIET_PARTIAL_PLAN_HYDRATION_E2E'
@@ -973,6 +974,27 @@ export const getAuthenticatedAccountByToken = async (token: string): Promise<Aut
     user: bridgedUser,
     client: undefined as unknown as PersistedClient
   };
+};
+
+export type SessionRejectionCode = 'SESSION_REVOKED' | 'SESSION_EXPIRED' | 'ACCOUNT_DISABLED' | 'INVALID_SESSION';
+
+export const getSessionRejectionCodeByToken = async (token: string): Promise<SessionRejectionCode> => {
+  const result = await pool.query(
+    `
+      select s.revoked_at, s.expires_at, u.status as user_status, u.deleted_at as user_deleted_at
+      from auth_sessions s
+      join users u on u.id = s.user_id
+      where s.token_hash = $1
+      limit 1
+    `,
+    [hashToken(token)]
+  );
+  if (result.rows.length === 0) return 'INVALID_SESSION';
+  const row = result.rows[0];
+  if (row.user_deleted_at || String(row.user_status).toUpperCase() !== 'ACTIVE') return 'ACCOUNT_DISABLED';
+  if (row.revoked_at) return 'SESSION_REVOKED';
+  if (new Date(String(row.expires_at)).getTime() <= now().getTime()) return 'SESSION_EXPIRED';
+  return 'INVALID_SESSION';
 };
 
 export const revokeAuthSession = async (sessionId: string) => {

@@ -90,6 +90,14 @@ test('POST /v1/auth/signup/verify-otp issues a persisted session and GET /v1/aut
   assert.match(verified.body.user.id, /^[0-9a-f-]{36}$/i);
   assert.notEqual(verified.body.user.id, 'asha@example.com');
 
+  const replayAfterResponseLoss = await postJson(server.baseUrl, '/v1/auth/signup/verify-otp', {
+    challengeId: created.body.challengeId,
+    otp: TEST_OTP,
+  });
+  assert.equal(replayAfterResponseLoss.response.status, 200);
+  assert.equal(replayAfterResponseLoss.body.sessionToken, verified.body.sessionToken);
+  assert.equal(replayAfterResponseLoss.body.user.id, verified.body.user.id);
+
   const tenantState = await pool.query(
     `select t.slug, t.tenant_type, tm.tenant_role, tm.status as membership_status,
             c.tenant_id = tm.tenant_id as tenant_matches

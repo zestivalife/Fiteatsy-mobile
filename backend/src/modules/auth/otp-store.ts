@@ -16,10 +16,12 @@ type RedisSocket = net.Socket | tls.TLSSocket;
 
 const memoryChallenges = new Map<string, StoredOtpChallenge>();
 const memoryRateLimits = new Map<string, number[]>();
+const memoryVerificationReceipts = new Map<string, { otpHash: string; response: unknown; expiresAtMs: number }>();
 
 const isTestRuntime = () => env.environment.toLowerCase() === 'test' || process.execArgv.some((arg) => arg.includes('--test'));
 const challengeKey = (id: string) => `fiteatsy:otp:challenge:${id}`;
 const verificationLockKey = (id: string) => `fiteatsy:otp:verify-lock:${id}`;
+const verificationReceiptKey = (id: string) => `fiteatsy:otp:verify-receipt:${id}`;
 const mobileKey = (mobile: string) => `fiteatsy:otp:mobile:${mobile}`;
 const rateKey = (mobile: string) => `fiteatsy:otp:rate:${mobile}`;
 
@@ -103,6 +105,27 @@ export const redisCommand = async (parts: string[]) => {
 };
 
 export const otpStore = {
+  async getVerificationReceipt<T>(challengeId: string, otpHash: string): Promise<T | null> {
+    const receipt = isTestRuntime()
+      ? memoryVerificationReceipts.get(challengeId) ?? null
+      : await redisCommand(['GET', verificationReceiptKey(challengeId)]).then((value) =>
+        value ? JSON.parse(String(value)) as { otpHash: string; response: T; expiresAtMs: number } : null);
+    if (!receipt || receipt.expiresAtMs <= Date.now() || receipt.otpHash !== otpHash) {
+      if (isTestRuntime() && receipt?.expiresAtMs && receipt.expiresAtMs <= Date.now()) {
+        memoryVerificationReceipts.delete(challengeId);
+      }
+      return null;
+    }
+    return receipt.response as T;
+  },
+  async setVerificationReceipt(challengeId: string, otpHash: string, response: unknown, ttlMs: number) {
+    const receipt = { otpHash, response, expiresAtMs: Date.now() + ttlMs };
+    if (isTestRuntime()) {
+      memoryVerificationReceipts.set(challengeId, receipt);
+      return;
+    }
+    await redisCommand(['SET', verificationReceiptKey(challengeId), JSON.stringify(receipt), 'PX', String(ttlMs)]);
+  },
   async get(challengeId: string): Promise<StoredOtpChallenge | null> {
     if (isTestRuntime()) return memoryChallenges.get(challengeId) ?? null;
     const value = await redisCommand(['GET', challengeKey(challengeId)]);
@@ -186,5 +209,6 @@ export const otpStore = {
   resetForTests() {
     memoryChallenges.clear();
     memoryRateLimits.clear();
+    memoryVerificationReceipts.clear();
   }
 };
