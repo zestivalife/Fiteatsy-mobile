@@ -1,5 +1,6 @@
 export const HEALTH_INTELLIGENCE_VERSION = 'HEALTH_INTELLIGENCE_V1' as const;
 export * from './methodology-v1.js';
+export * from './star-orb-candidate-v1.js';
 export const HEALTH_INTELLIGENCE_CONFIG={version:HEALTH_INTELLIGENCE_VERSION,clinicalValidation:'PENDING' as const,
   targets:{sleepMinutes:null as number|null,steps:null as number|null,exerciseMinutes:null as number|null},
   displayTargets:{steps:10_000,exerciseMinutes:30},
