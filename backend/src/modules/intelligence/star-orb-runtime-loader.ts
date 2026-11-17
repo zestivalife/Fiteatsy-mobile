@@ -37,6 +37,14 @@ const timezoneOffsetMinutes = (timezone: string, day: string) => {
 };
 
 const finiteOrNull = (value: unknown) => value == null || !Number.isFinite(Number(value)) ? null : Number(value);
+const databaseDateOnly = (value: unknown) => {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) throw new RangeError('INVALID_DATABASE_HEALTH_DAY');
+  return parsed.toISOString().slice(0, 10);
+};
 const deduplicateObservations = <T extends { sourceProvider:string;sourceRecordId:string|null;metricType:string;syncKey:string;providerUpdatedAtISO:string|null;createdAtISO:string }>(rows:T[]) => {
   const byIdentity=new Map<string,T>();
   for(const row of rows){
@@ -138,7 +146,7 @@ export async function loadStarOrbRuntimeInputs(
     return [{healthDay:new Date(Date.parse(String(row.completed_at))+offset*60_000).toISOString().slice(0,10),kind:'PSS_10' as const,
       score:Number(row.raw_score),minimum:0,maximum:Number(row.max_score),validated:true}];
   });
-  const checkins = checkinsResult.rows.map((row) => ({day:String(row.checkin_date).slice(0,10),mood:Number(row.mood)}));
+  const checkins = checkinsResult.rows.map((row) => ({day:databaseDateOnly(row.checkin_date),mood:Number(row.mood)}));
   const mind: RuntimeMindDay[] = checkins.map((row) => ({
     healthDay:row.day,moodCheckIns:[row.mood],completedSessions:null,
     emotionalWellbeing:checkins.filter((item) => item.day <= row.day && item.day >= shiftDay(row.day,-6)).map((item) => item.mood)
