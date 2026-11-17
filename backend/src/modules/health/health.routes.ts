@@ -31,6 +31,7 @@ const observationSchema = z.object({
   sourceMetadata: z.object({
     recordType: z.string().trim().max(80).optional(),
     sourceApplication: z.string().trim().max(180).optional(),
+    sourceDevice: z.string().trim().max(180).optional(),
     startAtISO: z.string().datetime().optional(),
     endAtISO: z.string().datetime().optional(),
     originalValue: z.number().finite().optional(),
