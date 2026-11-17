@@ -160,7 +160,8 @@ export const ingestClientHealthEvent = async (owner: ClientOwnershipContext, car
   if (['breathing_session_completed','focus_session_completed','movement_session_completed'].includes(input.eventType)) {
     const payload=input.eventPayload;const expectedCategory=input.eventType.replace('_session_completed','');
     const duration=Number(payload.durationMinutes);const healthDay=String(payload.healthDay??'');
-    if(payload.status!=='completed'||payload.category!==expectedCategory||!Number.isFinite(duration)||duration<=0||duration>1440||!/^\d{4}-\d{2}-\d{2}$/.test(healthDay)){
+    const canonicalContractPresent=['status','category','durationMinutes','healthDay'].some(key=>key in payload);
+    if(canonicalContractPresent&&(payload.status!=='completed'||payload.category!==expectedCategory||!Number.isFinite(duration)||duration<=0||duration>1440||!/^\d{4}-\d{2}-\d{2}$/.test(healthDay))){
       const error=new Error('Completed session requires its matching category, positive duration and health day.');error.name='INVALID_HEALTH_EVENT';throw error;
     }
   }
