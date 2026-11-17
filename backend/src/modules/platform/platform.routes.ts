@@ -15,6 +15,7 @@ import {
 import { getAuthenticatedAccount, requireAuthenticatedAccount } from '../auth/auth.middleware.js';
 import { getCareCaseById } from './platform.store.js';
 import { CareCaseRecord, ClientOwnershipContext, HealthProfileRecord, NotificationRecord, NutritionProfileRecord } from './platform.types.js';
+import { listGovernedGoals, reviseGovernedGoal } from '../intelligence/governed-goals.repository.js';
 
 const ageFromDob = (value: string) => {
   const dob = new Date(value);
@@ -118,6 +119,10 @@ const assignConsultantSchema = z.object({
 });
 
 const notificationActionSchema = z.object({ action: z.enum(['read', 'unread', 'dismiss']) });
+const governedGoalSchema=z.object({
+  kind:z.enum(['steps','exercise_minutes','mindfulness_minutes','mind_sessions']),
+  value:z.number().positive(),effectiveFrom:z.string().date()
+}).superRefine((value,ctx)=>{const limits={steps:[1000,50000],exercise_minutes:[5,300],mindfulness_minutes:[1,180],mind_sessions:[1,20]} as const;const [min,max]=limits[value.kind];if(value.value<min||value.value>max)ctx.addIssue({code:'custom',path:['value'],message:`Goal must be between ${min} and ${max}.`});});
 
 export const platformRouter = Router();
 platformRouter.use(requireAuthenticatedAccount);
@@ -173,6 +178,18 @@ platformRouter.get('/health-profile', async (req, res) => {
     return res.status(404).json({ error: 'HEALTH_PROFILE_NOT_FOUND' });
   }
   return res.status(200).json(bundleDto(bundle));
+});
+
+platformRouter.get('/wellness-goals',async(req,res)=>{
+  const account=getAuthenticatedAccount(req);
+  return res.status(200).json({items:await listGovernedGoals({accountId:account.accountId,clientId:account.client.id,tenantId:account.client.tenantId})});
+});
+platformRouter.put('/wellness-goals/:kind',async(req,res)=>{
+  const parsed=governedGoalSchema.safeParse({...req.body,kind:req.params.kind});
+  if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT',details:parsed.error.flatten()});
+  const account=getAuthenticatedAccount(req);
+  const goal=await reviseGovernedGoal({accountId:account.accountId,clientId:account.client.id,tenantId:account.client.tenantId},{...parsed.data,source:'USER'});
+  return res.status(200).json(goal);
 });
 
 platformRouter.patch('/health-profile', async (req, res) => {
@@ -264,6 +281,9 @@ platformRouter.post('/care-cases/:careCaseId/events', async (req, res) => {
   } catch (error) {
     if (error instanceof Error && error.name === 'CARE_CASE_FORBIDDEN') {
       return res.status(403).json({ error: 'CARE_CASE_FORBIDDEN', message: error.message });
+    }
+    if (error instanceof Error && error.name === 'INVALID_HEALTH_EVENT') {
+      return res.status(400).json({ error: 'INVALID_HEALTH_EVENT', message: error.message });
     }
     throw error;
   }

@@ -157,6 +157,13 @@ export const ingestClientHealthEvent = async (owner: ClientOwnershipContext, car
     error.name = 'CARE_CASE_FORBIDDEN';
     throw error;
   }
+  if (['breathing_session_completed','focus_session_completed','movement_session_completed'].includes(input.eventType)) {
+    const payload=input.eventPayload;const expectedCategory=input.eventType.replace('_session_completed','');
+    const duration=Number(payload.durationMinutes);const healthDay=String(payload.healthDay??'');
+    if(payload.status!=='completed'||payload.category!==expectedCategory||!Number.isFinite(duration)||duration<=0||duration>1440||!/^\d{4}-\d{2}-\d{2}$/.test(healthDay)){
+      const error=new Error('Completed session requires its matching category, positive duration and health day.');error.name='INVALID_HEALTH_EVENT';throw error;
+    }
+  }
   if (input.eventType === 'daily_check_in_submitted') {
     const payload = input.eventPayload;
     const values = [payload.mood, payload.energy, payload.sleepQuality].map(Number);

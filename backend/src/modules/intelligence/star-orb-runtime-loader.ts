@@ -8,6 +8,7 @@ import type {
   RuntimeMindDay,
   RuntimeNutritionDay
 } from './candidate-star-orb-runtime.js';
+import { listGovernedGoals } from './governed-goals.repository.js';
 
 export type StarOrbSourceStatus = {
   source: string;
@@ -73,8 +74,8 @@ export async function loadStarOrbRuntimeInputs(
     clientId: String(clientResult.rows[0].id),
     tenantId: String(clientResult.rows[0].tenant_id)
   };
-  const [storedObservations, profileResult, checkinsResult, assessmentsResult] = await Promise.all([
-    listHealthObservationsForCalculation(owner),
+  const [storedObservations, profileResult, checkinsResult, assessmentsResult,storedGoals,sessionResult] = await Promise.all([
+    listHealthObservationsForCalculation(owner,{fromISO:`${shiftDay(healthDay,-35)}T00:00:00.000Z`,throughISO:`${shiftDay(healthDay,1)}T00:00:00.000Z`}),
     pool.query(
       `select sleep_goal_hours,created_at,updated_at from health_profiles
         where user_id=$1 and client_id=$2 and status='active' and deleted_at is null
@@ -93,11 +94,14 @@ export async function loadStarOrbRuntimeInputs(
           and completed_at < $3::date+interval '1 day'
         order by completed_at`,
       [owner.accountId, owner.clientId, healthDay]
-    )
+    ),
+    listGovernedGoals(owner),
+    pool.query(`select event_type,event_time,payload from health_events where user_id=$1 and care_case_id in(select id from care_cases where client_id=$2) and event_type in('breathing_session_completed','focus_session_completed','movement_session_completed') and status='active' and deleted_at is null and event_time >= $3::date-interval '34 days' and event_time < $3::date+interval '1 day' order by event_time`,[owner.accountId,owner.clientId,healthDay])
   ]);
   const observations=deduplicateObservations(storedObservations);
 
   const goals: RuntimeGoal[] = [];
+  for(const row of storedGoals) goals.push({kind:String(row.goal_kind) as RuntimeGoal['kind'],value:Number(row.goal_value),source:String(row.source) as 'USER'|'CONSULTANT',active:row.status!=='revoked',approved:Boolean(row.approved),updatedAt:new Date(row.updated_at).toISOString(),effectiveFrom:databaseDateOnly(row.effective_from),effectiveThrough:row.effective_through?databaseDateOnly(row.effective_through):null});
   const profile = profileResult.rows[0];
   const sleepHours = finiteOrNull(profile?.sleep_goal_hours);
   if (sleepHours != null) goals.push({
@@ -147,9 +151,14 @@ export async function loadStarOrbRuntimeInputs(
       score:Number(row.raw_score),minimum:0,maximum:Number(row.max_score),validated:true}];
   });
   const checkins = checkinsResult.rows.map((row) => ({day:databaseDateOnly(row.checkin_date),mood:Number(row.mood)}));
-  const mind: RuntimeMindDay[] = checkins.map((row) => ({
-    healthDay:row.day,moodCheckIns:[row.mood],completedSessions:null,
-    emotionalWellbeing:checkins.filter((item) => item.day <= row.day && item.day >= shiftDay(row.day,-6)).map((item) => item.mood)
+  const completedByDay=new Map<string,number>();
+  const mindfulnessByDay=new Map<string,number>();
+  for(const row of sessionResult.rows){const payload=row.payload as Record<string,unknown>;if(payload.status!=='completed')continue;const day=typeof payload.healthDay==='string'?payload.healthDay:new Date(Date.parse(String(row.event_time))+offset*60_000).toISOString().slice(0,10);const duration=finiteOrNull(payload.durationMinutes);if(duration==null||duration<=0)continue;completedByDay.set(day,(completedByDay.get(day)??0)+1);if(row.event_type==='breathing_session_completed'||row.event_type==='focus_session_completed')mindfulnessByDay.set(day,(mindfulnessByDay.get(day)??0)+duration);}
+  for(const [day,value] of mindfulnessByDay) observations.push({id:`session-mindfulness:${owner.clientId}:${day}`,metricType:'mindfulness_minutes',value,unit:'min',userId:owner.accountId,clientId:owner.clientId,qualityStatus:'accepted',createdAtISO:new Date().toISOString(),measuredAtISO:`${day}T12:00:00.000Z`,sourceProvider:'fiteatsy_sessions',sourceRecordId:`mindfulness:${day}`,syncKey:`mindfulness:${owner.clientId}:${day}`,timezoneOffsetMinutes:offset,sourceMetadata:{provenance:'completed_health_event'},startAtISO:null,endAtISO:null,providerUpdatedAtISO:null,providerVersion:null,deletedAtISO:null});
+  const mindDays=[...new Set([...checkins.map(row=>row.day),...completedByDay.keys()])].sort();
+  const mind: RuntimeMindDay[] = mindDays.map((day) => ({
+    healthDay:day,moodCheckIns:checkins.filter(row=>row.day===day).map(row=>row.mood),completedSessions:completedByDay.get(day)??0,
+    emotionalWellbeing:checkins.filter((item) => item.day <= day && item.day >= shiftDay(day,-6)).map((item) => item.mood)
   }));
 
   return {
@@ -160,8 +169,8 @@ export async function loadStarOrbRuntimeInputs(
       nutrition:{source:'nutrition health events through getClientNutritionExperience',status:'INTEGRATED'},
       stress:{source:'assessment_results(PSS10)',status:'INTEGRATED'},
       mood:{source:'daily_checkins.mood',status:'INTEGRATED'},
-      activityGoals:{source:'none',status:'UNAVAILABLE',reason:'NO_PERSISTED_NUMERIC_STEPS_OR_EXERCISE_GOAL'},
-      mindSessions:{source:'none',status:'UNAVAILABLE',reason:'NO_CANONICAL_PERSISTED_SESSION_REPOSITORY'},
+      activityGoals:{source:'governed_wellness_goals',status:storedGoals.some(row=>row.goal_kind==='steps'||row.goal_kind==='exercise_minutes')?'INTEGRATED':'UNAVAILABLE',...(storedGoals.some(row=>row.goal_kind==='steps'||row.goal_kind==='exercise_minutes')?{}:{reason:'NO_PERSISTED_NUMERIC_STEPS_OR_EXERCISE_GOAL'})},
+      mindSessions:{source:'health_events completed session contract',status:'INTEGRATED'},
       wellbeing:{source:'none',status:'UNAVAILABLE',reason:'NO_VALIDATED_WELLBEING_INSTRUMENT_REPOSITORY'},
       clinicalMarkers:{source:'none',status:'UNAVAILABLE',reason:'NO_APPROVED_MARKER_TO_SCORE_PROJECTION'}
     }

@@ -8,6 +8,7 @@ import type {
 } from '../../services/canonicalHealthSyncCoordinator';
 import { useAppContext } from '../../state/AppContext';
 import { HEALTH_INTELLIGENCE_CONFIG } from '@fiteatsy/health-intelligence';
+import { WellnessGoalConfiguration } from './WellnessGoalConfiguration';
 
 type CategoryDefinition = {
   key: 'activity' | 'sleep' | 'heart' | 'recovery' | 'body' | 'mindfulness';
@@ -105,6 +106,7 @@ export const FitnessParameterCards = ({ health }: { health: CanonicalHealthSyncS
           </View>
         ))}
       </View>
+      <WellnessGoalConfiguration />
       <View style={styles.parameterList}>
         {rows.map(({ category, registered, metrics, latest, recordCount }) => {
           const measuredAt = measurementTime(latest);

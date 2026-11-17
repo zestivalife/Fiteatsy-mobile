@@ -1644,14 +1644,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           ['movementMinutes', 'movement_session_completed', 'minutes']
         ];
         for (const [field, eventType, unit] of fields) {
-          if (userId && resolved[field] !== previous[field]) {
+          const durationDelta = unit === 'minutes' ? Number(resolved[field]) - Number(previous[field]) : null;
+          if (userId && resolved[field] !== previous[field] && (durationDelta === null || durationDelta > 0)) {
             void queueHealthEvent({
               userId,
               clientId,
               onboarding,
               eventType: eventType as 'hydration_logged' | 'breathing_session_completed' | 'focus_session_completed' | 'movement_session_completed',
               eventSource: 'mobile.tracker',
-              eventPayload: { value: resolved[field], unit, previousValue: previous[field] }
+              eventPayload: {
+                value: resolved[field], unit, previousValue: previous[field],
+                durationMinutes: durationDelta ?? undefined,
+                category: eventType.replace('_session_completed', ''),
+                status: unit === 'minutes' ? 'completed' : 'logged',
+                healthDay: new Date().toLocaleDateString('en-CA')
+              }
             });
           }
         }

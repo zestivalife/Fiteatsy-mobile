@@ -251,12 +251,14 @@ export const listHealthObservations = async (
 };
 
 /** Complete calculation input. UI pagination limits must never truncate score inputs. */
-export const listHealthObservationsForCalculation = async (owner: ClientOwnershipContext) => {
+export const listHealthObservationsForCalculation = async (owner: ClientOwnershipContext, window?:{fromISO:string;throughISO:string}) => {
   const result = await pool.query(
     `select * from health_observations
      where user_id=$1 and client_id=$2 and deleted_at is null
+       and ($3::timestamptz is null or measured_at >= $3::timestamptz)
+       and ($4::timestamptz is null or measured_at < $4::timestamptz)
      order by measured_at desc, created_at desc`,
-    [owner.accountId, owner.clientId]
+    [owner.accountId, owner.clientId,window?.fromISO??null,window?.throughISO??null]
   );
   return result.rows.map(rowToObservation);
 };
