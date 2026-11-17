@@ -6,7 +6,6 @@ import { RecoveryPanel, RecoveryTrend } from '../src/screens/home/HomeScreen';
 jest.mock('@react-native-async-storage/async-storage',()=>({getItem:jest.fn(),setItem:jest.fn(),removeItem:jest.fn(),multiGet:jest.fn(),multiSet:jest.fn()}));
 jest.mock('@react-native-community/netinfo',()=>({addEventListener:jest.fn(()=>()=>{}),fetch:jest.fn()}));
 jest.mock('../src/services/apiClient',()=>({apiFetch:jest.fn(),apiBaseUrl:'https://example.test'}));
-jest.mock('expo-secure-store',()=>({getItemAsync:jest.fn(),setItemAsync:jest.fn(),deleteItemAsync:jest.fn()}),{virtual:true});
 jest.mock('expo-background-task',()=>({registerTaskAsync:jest.fn(),unregisterTaskAsync:jest.fn(),BackgroundTaskResult:{Success:'Success',Failed:'Failed'}}),{virtual:true});
 jest.mock('expo-task-manager',()=>({defineTask:jest.fn(),isTaskDefined:jest.fn(()=>false),isTaskRegisteredAsync:jest.fn()}),{virtual:true});
 jest.mock('../src/assets/fiteatsy-home/recovery-star.svg',()=>()=>null);
