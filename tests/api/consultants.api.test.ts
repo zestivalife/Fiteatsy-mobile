@@ -1774,40 +1774,45 @@ test('consultant workspace contract syncs wearable summaries and source metadata
   }, { headers: authHeaders(client.token) });
   assert.equal(consent.response.status, 201, JSON.stringify(consent.body));
 
+  const metricFixtures = [
+    ['steps', 6842, 'count'],
+    ['distance', 5120, 'm'],
+    ['sleep_minutes', 432, 'min'],
+    ['heart_rate', 76, 'bpm'],
+    ['resting_heart_rate', 62, 'bpm'],
+    ['hrv_sdnn_ms', 48, 'ms'],
+    ['active_energy', 438, 'kcal'],
+    ['active_minutes', 51, 'min'],
+    ['workout_minutes', 36, 'min'],
+    ['weight', 68.4, 'kg'],
+    ['hydration_ml', 2100, 'ml'],
+    ['spo2', 98, 'pct'],
+    ['respiratory_rate', 15, 'brpm'],
+  ] as const;
   const observationBatch = {
-    observations: [{
-      metricType: 'steps',
-      value: 6842,
-      unit: 'count',
-      measuredAtISO: '2026-08-11T07:30:00.000Z',
+    observations: metricFixtures.map(([metricType, value, unit], index) => ({
+      metricType,
+      value,
+      unit,
+      measuredAtISO: new Date(Date.parse('2026-08-11T07:30:00.000Z') + index * 60_000).toISOString(),
       sourceProvider: 'apple_health',
       sourceMetadata: { sourceApplication: 'Apple Health' },
-      sourceRecordId: 'steps-1',
-      syncKey: 'consultant-round-trip-steps-1'
-    },
-    {
-      metricType: 'resting_heart_rate',
-      value: 62,
-      unit: 'bpm',
-      measuredAtISO: '2026-08-11T07:35:00.000Z',
-      sourceProvider: 'apple_health',
-      sourceMetadata: { sourceApplication: 'Apple Health' },
-      sourceRecordId: 'rhr-1',
-      syncKey: 'consultant-round-trip-rhr-1'
-    }]
+      sourceRecordId: `consultant-round-trip-${metricType}`,
+      syncKey: `consultant-round-trip-${metricType}`
+    }))
   };
   const uploaded = await postJson(server.baseUrl, '/v1/health/observations:batch', observationBatch, {
     headers: authHeaders(client.token)
   });
   assert.equal(uploaded.response.status, 200, JSON.stringify(uploaded.body));
-  assert.equal(uploaded.body.accepted, 2);
+  assert.equal(uploaded.body.accepted, metricFixtures.length);
 
   const repeated = await postJson(server.baseUrl, '/v1/health/observations:batch', observationBatch, {
     headers: authHeaders(client.token)
   });
   assert.equal(repeated.response.status, 200, JSON.stringify(repeated.body));
   assert.equal(repeated.body.accepted, 0);
-  assert.equal(repeated.body.duplicate, 2);
+  assert.equal(repeated.body.duplicate, metricFixtures.length);
 
   const response = await getJson(
     server.baseUrl,
@@ -1817,9 +1822,12 @@ test('consultant workspace contract syncs wearable summaries and source metadata
 
   assert.equal(response.response.status, 200);
   assert.equal(response.body.wearableSummary.connected, true);
-  assert.equal(response.body.wearableSummary.recordsCount, 2);
+  assert.equal(response.body.wearableSummary.recordsCount, metricFixtures.length);
   assert.ok(response.body.wearableSummary.dataSources.includes('apple_health'));
-  assert.ok(response.body.wearableSummary.latestMetrics.some((item: { metricType: string }) => item.metricType === 'steps'));
+  assert.deepEqual(
+    new Set(response.body.wearableSummary.latestMetrics.map((item: { metricType: string }) => item.metricType)),
+    new Set(metricFixtures.map(([metricType]) => metricType))
+  );
   assert.equal(response.body.planWorkflow.gates.wearableSignalsReady, true);
   assert.equal(response.body.sourceMetadata.lastWearableSyncAt, response.body.wearableSummary.lastSyncedAt);
 

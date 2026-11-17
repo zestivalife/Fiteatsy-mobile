@@ -1206,7 +1206,6 @@ export const getConsultantWearableSummaryForClient = async (
       from ranked
       where metric_rank = 1
       order by measured_at desc
-      limit 10
     `,
     [internalClientId, accountId]
   );
