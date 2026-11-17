@@ -49,6 +49,7 @@ import { MyIssueDetailScreen } from '../screens/profile/MyIssueDetailScreen';
 import { CanonicalConnectedMetricsScreen } from '../screens/sync/CanonicalConnectedMetricsScreen';
 import { CanonicalHealthSyncDebugScreen } from '../screens/sync/CanonicalHealthSyncDebugScreen';
 import { HealthDataScreen } from '../screens/sync/HealthDataScreen';
+import { HealthMetricDetailScreen } from '../screens/sync/HealthMetricDetailScreen';
 import { ReportsChatScreen } from '../screens/home/ReportsChatScreen';
 import { NutritionPlanScreen } from '../screens/home/NutritionPlanScreen';
 import { NutritionHubScreen } from '../screens/home/NutritionHubScreen';
@@ -128,6 +129,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="ChangePin" component={ChangePinScreen} />
         <Stack.Screen name="HealthData" component={HealthDataScreen} />
+        <Stack.Screen name="HealthMetricDetail" component={HealthMetricDetailScreen} />
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="TrackerDetail" component={TrackerDetailScreen} />
         <Stack.Screen name="FocusSession" component={FocusScreen} />

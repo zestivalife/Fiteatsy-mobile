@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppBackButton } from '../../components/AppBackButton';
 import { Screen } from '../../components/Screen';
@@ -61,13 +62,15 @@ const statusLabel = (metric: CanonicalHealthMetricState) => {
 };
 
 export const HealthDataScreen = ({ navigation, route }: Props) => {
-  const { themeMode, onboarding, setOnboarding, setWearableSetupCompleted } = useAppContext();
+  const { themeMode, onboarding, setOnboarding, setWearableSetupCompleted, authSession } = useAppContext();
   const palette = getThemeColors(themeMode);
   const health = useCanonicalHealthSyncCoordinator();
   const connected = health.providerState === 'CONNECTED';
   const liveRefreshStarted = useRef(false);
   const loading = !health.localHydrated;
   const refreshing = health.metrics.some((metric) => metric.queryState === 'QUERYING');
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const favoritesKey = authSession ? `@fiteatsy/health-favorites:${authSession.accountId}` : null;
 
   const rows = useMemo(() => health.metrics
     .filter((metric) => metric.supported && metricPresentation[metric.definition.metricKey])
@@ -76,6 +79,33 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
       const rightSection = metricPresentation[right.definition.metricKey].section;
       return sectionOrder.indexOf(leftSection) - sectionOrder.indexOf(rightSection);
     }), [health.metrics]);
+  const orderedRows = useMemo(() => [...rows].sort((left, right) => {
+    const sectionDifference = sectionOrder.indexOf(metricPresentation[left.definition.metricKey].section)
+      - sectionOrder.indexOf(metricPresentation[right.definition.metricKey].section);
+    if (sectionDifference) return sectionDifference;
+    const leftFavorite = favorites.includes(left.definition.metricKey) ? 1 : 0;
+    const rightFavorite = favorites.includes(right.definition.metricKey) ? 1 : 0;
+    return rightFavorite - leftFavorite;
+  }), [favorites, rows]);
+
+  useEffect(() => {
+    if (!favoritesKey) return;
+    void AsyncStorage.getItem(favoritesKey).then((stored) => {
+      if (!stored) return;
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) setFavorites(parsed.filter((item): item is string => typeof item === 'string'));
+      } catch { /* Ignore malformed preference data without affecting health records. */ }
+    }).catch(() => undefined);
+  }, [favoritesKey]);
+
+  const toggleFavorite = useCallback((metricKey: string) => {
+    setFavorites((current) => {
+      const next = current.includes(metricKey) ? current.filter((item) => item !== metricKey) : [...current, metricKey];
+      if (favoritesKey) void AsyncStorage.setItem(favoritesKey, JSON.stringify(next)).catch(() => undefined);
+      return next;
+    });
+  }, [favoritesKey]);
 
   const refresh = useCallback(() => {
     void health.syncLocalMetrics({ liveOnly: true });
@@ -155,25 +185,39 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
       ) : (
         <>
           <FitnessParameterCards health={health} />
-          <Text style={[styles.detailedTitle, { color: palette.textPrimary }]}>Detailed Health Data</Text>
+          <View style={styles.detailedHeading}>
+            <View>
+              <Text style={[styles.detailedTitle, { color: palette.textPrimary }]}>Detailed Health Data</Text>
+              <Text style={[styles.detailedSubtitle, { color: palette.textMuted }]}>{favorites.length ? `${favorites.length} favourite ${favorites.length === 1 ? 'metric' : 'metrics'}` : 'Tap the star to add favourites'}</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open health source diagnostics" onPress={() => navigation.navigate('ConnectedMetrics')} style={[styles.diagnosticsButton, { borderColor: palette.stroke }]}>
+              <Ionicons name="information-circle-outline" size={22} color={palette.blue} />
+            </Pressable>
+          </View>
           <View style={styles.list}>
-            {rows.map((metric, index) => {
+            {orderedRows.map((metric, index) => {
               const presentation = metricPresentation[metric.definition.metricKey];
-              const previous = rows[index - 1];
+              const previous = orderedRows[index - 1];
               const previousSection = previous ? metricPresentation[previous.definition.metricKey].section : null;
               const status = statusLabel(metric);
+              const favorite = favorites.includes(metric.definition.metricKey);
               return (
                 <React.Fragment key={metric.definition.metricKey}>
                   {presentation.section !== previousSection ? (
                     <Text style={[styles.sectionTitle, { color: palette.textSecondary }]}>{presentation.section.toUpperCase()}</Text>
                   ) : null}
-                  <View accessibilityLabel={`${metric.definition.displayName} detailed health metric`} style={[styles.metricCard, { backgroundColor: palette.card }]}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Open ${metric.definition.displayName} details`} onPress={() => navigation.navigate('HealthMetricDetail', { metricKey: metric.definition.metricKey })} style={({ pressed }) => [styles.metricCard, { backgroundColor: palette.card, opacity: pressed ? 0.76 : 1 }]}>
                     <View style={styles.metricTopRow}>
                       <View style={styles.metricIdentity}>
                         <Ionicons name={presentation.icon} size={20} color={presentation.accent} />
                         <Text style={[styles.metricLabel, { color: presentation.accent }]}>{metric.definition.displayName}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
+                      <View style={styles.cardActions}>
+                        <Pressable accessibilityRole="button" accessibilityLabel={`${favorite ? 'Remove' : 'Add'} ${metric.definition.displayName} ${favorite ? 'from' : 'to'} favourites`} hitSlop={10} onPress={(event) => { event.stopPropagation(); toggleFavorite(metric.definition.metricKey); }}>
+                          <Ionicons name={favorite ? 'star' : 'star-outline'} size={20} color={favorite ? '#FFD60A' : palette.textMuted} />
+                        </Pressable>
+                        <Ionicons name="chevron-forward" size={18} color={palette.textMuted} />
+                      </View>
                     </View>
                     <Text style={[styles.metricValue, { color: palette.textPrimary }]}>{formatValue(metric)}</Text>
                     <View style={styles.metricFooter}>
@@ -183,10 +227,22 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
                     {metric.observation?.sourceMetadata?.sourceApplication ? (
                       <Text style={[styles.source, { color: palette.textMuted }]}>Source: {metric.observation.sourceMetadata.sourceApplication}</Text>
                     ) : null}
-                  </View>
+                  </Pressable>
                 </React.Fragment>
               );
             })}
+          </View>
+          <View style={styles.relatedRow}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open cycle health" onPress={() => navigation.navigate('Cycle')} style={({ pressed }) => [styles.relatedButton, { backgroundColor: palette.card, borderColor: palette.stroke, opacity: pressed ? 0.76 : 1 }]}>
+              <Ionicons name="calendar-outline" size={20} color={palette.pink} />
+              <Text style={[styles.relatedText, { color: palette.textPrimary }]}>Cycle health</Text>
+              <Ionicons name="chevron-forward" size={16} color={palette.textMuted} />
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Log hydration" onPress={() => navigation.navigate('HydrationSession')} style={({ pressed }) => [styles.relatedButton, { backgroundColor: palette.card, borderColor: palette.stroke, opacity: pressed ? 0.76 : 1 }]}>
+              <Ionicons name="water-outline" size={20} color="#32D74B" />
+              <Text style={[styles.relatedText, { color: palette.textPrimary }]}>Log hydration</Text>
+              <Ionicons name="chevron-forward" size={16} color={palette.textMuted} />
+            </Pressable>
           </View>
         </>
       )}
@@ -205,6 +261,7 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
       ) : null}
 
       {updatedAt ? <Text style={[styles.updatedAt, { color: palette.textMuted }]}>Last read: {updatedAt}</Text> : null}
+      <Text style={[styles.updatedAt, { color: palette.textMuted }]}>Last successful sync: {health.lifecycle.lastFullySyncedAtISO ? new Date(health.lifecycle.lastFullySyncedAtISO).toLocaleString() : 'Not synced yet'}</Text>
       {route.params?.entryContext === 'ONBOARDING' ? (
         <Pressable accessibilityRole="button" onPress={finishOnboarding} style={[styles.continueButton, { borderColor: palette.stroke }]}>
           <Text style={[styles.continueText, { color: palette.textPrimary }]}>{connected ? 'Continue' : 'Set Up Later'}</Text>
@@ -233,12 +290,19 @@ const styles = StyleSheet.create({
   connectBody: { ...typography.bodySmall, marginTop: spacing.xs, textAlign: 'center' },
   syncButton: { minHeight: 52, marginTop: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   connectError: { ...typography.bodySmall, marginTop: spacing.sm, textAlign: 'center' },
-  detailedTitle: { ...typography.sectionTitle, marginTop: spacing.xl },
+  detailedHeading: { marginTop: spacing.xl, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  detailedTitle: typography.sectionTitle,
+  detailedSubtitle: { ...typography.subtext, marginTop: spacing.xxs },
+  diagnosticsButton: { width: 44, height: 44, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   list: { marginTop: spacing.md, gap: 12 },
   sectionTitle: { ...typography.label, letterSpacing: 1.1, marginLeft: 6, marginTop: 8 },
   metricCard: { minHeight: 154, padding: 20, borderRadius: 22 },
   metricTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   metricIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  relatedRow: { marginTop: spacing.md, flexDirection: 'row', gap: spacing.sm },
+  relatedButton: { flex: 1, minHeight: 52, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  relatedText: { ...typography.label, flex: 1 },
   metricLabel: { ...typography.label, fontWeight: '700' },
   status: { ...typography.badge, textTransform: 'capitalize' },
   metricValue: { ...typography.metric, fontSize: 34, lineHeight: 42, marginTop: spacing.lg },

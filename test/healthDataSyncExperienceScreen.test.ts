@@ -4,6 +4,9 @@ import { fireEvent, render } from '@testing-library/react-native';
 const mockRequestAccess = jest.fn();
 
 jest.mock('@expo/vector-icons/Ionicons', () => 'Icon');
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn().mockResolvedValue(null), setItem: jest.fn().mockResolvedValue(undefined)
+}));
 jest.mock('../src/components/Screen', () => ({
   Screen: ({ children }: { children: React.ReactNode }) => require('react').createElement(require('react-native').View, null, children)
 }));
@@ -16,7 +19,8 @@ jest.mock('../src/state/AppContext', () => ({ useAppContext: () => ({
 jest.mock('../src/services/canonicalHealthSyncCoordinator', () => ({ useCanonicalHealthSyncCoordinator: () => ({
   providerState: 'CONNECTED', providerLabel: 'Connected', sourceName: 'Apple Health', localHydrated: true,
   uploadState: 'SYNCED', availableMetricCount: 2, pendingUploadCount: 0, message: null,
-  lifecycle: { lastHealthReadAtISO: '2026-11-13T08:00:00Z', lastSavedAtISO: '2026-11-13T08:00:00Z', lastUploadedAtISO: '2026-11-13T08:00:00Z' },
+  lifecycle: { lastHealthReadAtISO: '2026-11-13T08:00:00Z', lastSavedAtISO: '2026-11-13T08:00:00Z', lastUploadedAtISO: '2026-11-13T08:00:00Z', lastFullySyncedAtISO: '2026-11-13T08:00:00Z' },
+  aggregates: [],
   metrics: [
     { supported: true, queryState: 'DATA_AVAILABLE', localRecordCount: 1, observation: { metricType: 'steps', value: 3200, unit: 'count', measuredAtISO: '2026-11-13T08:00:00Z', sourceMetadata: { sourceApplication: 'iPhone' } }, definition: { metricKey: 'steps', displayName: 'Steps', backendCanonicalType: 'steps' } },
     { supported: true, queryState: 'DATA_AVAILABLE', localRecordCount: 1, observation: { metricType: 'distance', value: 2.5, unit: 'km', measuredAtISO: '2026-11-13T09:00:00Z', sourceMetadata: { sourceApplication: 'Apple Watch' } }, definition: { metricKey: 'distance', displayName: 'Distance', backendCanonicalType: 'distance' } }

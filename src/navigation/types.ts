@@ -17,6 +17,7 @@ export type RootStackParamList = {
   SignUp: undefined;
   ChangePin: { force?: boolean; mode?: 'setup' | 'change' } | undefined;
   HealthData: { entryContext?: 'ONBOARDING' | 'HOME' | 'SETTINGS'; autoSync?: boolean } | undefined;
+  HealthMetricDetail: { metricKey: string };
   Main: undefined;
   FocusSession: undefined;
   BreathingSession: undefined;

@@ -7,6 +7,7 @@ import type {
   CanonicalHealthSyncSnapshot
 } from '../../services/canonicalHealthSyncCoordinator';
 import { useAppContext } from '../../state/AppContext';
+import { HEALTH_INTELLIGENCE_CONFIG } from '@fiteatsy/health-intelligence';
 
 type CategoryDefinition = {
   key: 'activity' | 'sleep' | 'heart' | 'recovery' | 'body' | 'mindfulness';
@@ -74,12 +75,35 @@ export const FitnessParameterCards = ({ health }: { health: CanonicalHealthSyncS
     const recordCount = supported.reduce((total, metric) => total + metric.localRecordCount, 0);
     return { category, registered: metrics.length > 0, metrics: supported, latest, recordCount };
   }), [health.metrics]);
+  const supportedProgress = useMemo(() => {
+    const definitions = [
+      { metricKey: 'steps', metricType: 'steps', label: 'Daily steps', target: HEALTH_INTELLIGENCE_CONFIG.targets.steps, unit: 'steps', color: '#FF7139' },
+      { metricKey: 'exercise', metricType: 'active_minutes', label: 'Exercise', target: HEALTH_INTELLIGENCE_CONFIG.targets.exerciseMinutes, unit: 'min', color: '#32D74B' }
+    ];
+    const now = new Date();
+    const currentHealthDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return definitions.map((definition) => {
+      const aggregate = (health.aggregates ?? []).find((item) => item.healthDay === currentHealthDay && item.metricType === definition.metricType);
+      const actual = aggregate?.value ?? null;
+      return { ...definition, actual, progress: actual == null ? null : Math.min(1, Math.max(0, actual / definition.target)) };
+    });
+  }, [health.aggregates]);
 
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Health parameters</Text>
         <Text style={[styles.providerStatus, { color: palette.textMuted }]}>{health.providerLabel}</Text>
+      </View>
+      <View style={styles.progressGrid}>
+        {supportedProgress.map((item) => (
+          <View key={item.metricKey} accessibilityLabel={`${item.label} ${item.actual == null ? 'has no current data' : `${Math.round(item.progress! * 100)} percent of goal`}`} style={[styles.progressCard, { backgroundColor: palette.card, borderColor: palette.stroke }]}>
+            <Text style={[styles.progressLabel, { color: palette.textSecondary }]}>{item.label}</Text>
+            <Text style={[styles.progressValue, { color: palette.textPrimary }]}>{item.actual == null ? 'No data' : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(item.actual)} ${item.unit}`}</Text>
+            <View style={[styles.progressTrack, { backgroundColor: palette.surfaceAccent }]}><View style={[styles.progressFill, { width: `${(item.progress ?? 0) * 100}%`, backgroundColor: item.color }]} /></View>
+            <Text style={[styles.progressTarget, { color: palette.textMuted }]}>Goal {item.target.toLocaleString()} {item.unit}</Text>
+          </View>
+        ))}
       </View>
       <View style={styles.parameterList}>
         {rows.map(({ category, registered, metrics, latest, recordCount }) => {
@@ -131,6 +155,13 @@ const styles = StyleSheet.create({
   sectionTitle: typography.sectionTitle,
   providerStatus: typography.subtext,
   parameterList: { gap: spacing.sm },
+  progressGrid: { marginBottom: spacing.md, flexDirection: 'row', gap: spacing.sm },
+  progressCard: { flex: 1, minHeight: 128, borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
+  progressLabel: typography.label,
+  progressValue: { ...typography.metricSmall, marginTop: spacing.xs },
+  progressTrack: { height: 8, borderRadius: radius.pill, marginTop: spacing.md, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: radius.pill },
+  progressTarget: { ...typography.subtext, marginTop: spacing.xs },
   parameterCard: { minHeight: 76, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   parameterIcon: { width: 44, height: 44, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   parameterCopy: { flex: 1 },
