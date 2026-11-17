@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   buildCandidateStarOrbRuntimeDay,
   buildCandidateStarOrbRuntimeWindow,
@@ -11,6 +13,7 @@ import {
 import { buildHealthIntelligenceV1 } from '../../backend/src/modules/intelligence/health-intelligence-projection.js';
 import type { CanonicalObservation } from '../../packages/health-intelligence/dist/index.js';
 
+const repositoryRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const through='2026-11-17';
 const shifted=(offset:number)=>new Date(Date.parse(`${through}T12:00:00.000Z`)+offset*86_400_000).toISOString().slice(0,10);
 const goals:RuntimeGoal[]=[
@@ -61,9 +64,9 @@ test('missing governed inputs fail closed and candidate values do not leak into 
 });
 
 test('sealed Home binds each visible node to its matching production canonical domain',()=>{
-  const source=readFileSync('src/screens/home/HomeScreen.tsx','utf8');
+  const source=readFileSync(resolve(repositoryRoot,'src/screens/home/HomeScreen.tsx'),'utf8');
   for(const binding of ['scores.activity.score','scores.sleep.score','scores.nutrition.score','scores.calm.score','scores.mind.score','scores.recovery.score'])assert.ok(source.includes(binding));
   assert.ok(source.includes('healthIntelligence: health.canonicalIntelligence.scores.recovery'));
-  const routes=readFileSync('backend/src/modules/intelligence/intelligence.routes.ts','utf8');
+  const routes=readFileSync(resolve(repositoryRoot,'backend/src/modules/intelligence/intelligence.routes.ts'),'utf8');
   assert.ok(!routes.includes('candidate-star-orb-runtime'));
 });
