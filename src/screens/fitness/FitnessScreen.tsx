@@ -77,8 +77,8 @@ export const FitnessParameterCards = ({ health }: { health: CanonicalHealthSyncS
   }), [health.metrics]);
   const supportedProgress = useMemo(() => {
     const definitions = [
-      { metricKey: 'steps', metricType: 'steps', label: 'Daily steps', target: HEALTH_INTELLIGENCE_CONFIG.targets.steps, unit: 'steps', color: '#FF7139' },
-      { metricKey: 'exercise', metricType: 'active_minutes', label: 'Exercise', target: HEALTH_INTELLIGENCE_CONFIG.targets.exerciseMinutes, unit: 'min', color: '#32D74B' }
+      { metricKey: 'steps', metricType: 'steps', label: 'Daily steps', target: HEALTH_INTELLIGENCE_CONFIG.displayTargets.steps, unit: 'steps', color: '#FF7139' },
+      { metricKey: 'exercise', metricType: 'active_minutes', label: 'Exercise', target: HEALTH_INTELLIGENCE_CONFIG.displayTargets.exerciseMinutes, unit: 'min', color: '#32D74B' }
     ];
     const now = new Date();
     const currentHealthDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;

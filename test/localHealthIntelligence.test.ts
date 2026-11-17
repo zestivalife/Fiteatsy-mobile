@@ -35,7 +35,7 @@ describe('device-local canonical Health Intelligence', () => {
     expect(result.scores.healthIntelligence.score).toBeNull();
   });
 
-  it('maps Health Connect workout duration to the governed Exercise component without double counting', () => {
+  it('preserves Health Connect workout duration without scoring it against an unapproved default goal', () => {
     const result = calculateCanonicalHealthIntelligenceFromObservations([
       { metricType: 'steps', value: 5_000, unit: 'count', measuredAtISO: '2026-09-14T05:00:00.000Z',
         sourceProvider: 'health_connect', sourceRecordId: 'steps' },
@@ -43,8 +43,9 @@ describe('device-local canonical Health Intelligence', () => {
         startAtISO: '2026-09-14T05:45:00.000Z', endAtISO: '2026-09-14T06:00:00.000Z',
         sourceProvider: 'health_connect', sourceRecordId: 'workout' }
     ], { now: new Date('2026-09-14T08:00:00.000Z') });
-    expect(result.scores.activity.inputsUsed).toEqual(['steps', 'exercise']);
-    expect(result.scores.activity.inputsMissing).toEqual(['balance']);
+    expect(result.scores.activity.inputsUsed).toEqual([]);
+    expect(result.scores.activity.inputsMissing).toEqual(['steps', 'exercise', 'balance']);
+    expect(result.scores.activity.methodologyPending).toEqual(['steps', 'exercise', 'balance']);
     expect(result.scores.activity.score).toBeNull();
   });
 

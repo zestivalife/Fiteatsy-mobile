@@ -1,6 +1,8 @@
 export const HEALTH_INTELLIGENCE_VERSION = 'HEALTH_INTELLIGENCE_V1' as const;
+export * from './methodology-v1.js';
 export const HEALTH_INTELLIGENCE_CONFIG={version:HEALTH_INTELLIGENCE_VERSION,clinicalValidation:'PENDING' as const,
-  targets:{sleepMinutes:null as number|null,steps:10_000,exerciseMinutes:30},
+  targets:{sleepMinutes:null as number|null,steps:null as number|null,exerciseMinutes:null as number|null},
+  displayTargets:{steps:10_000,exerciseMinutes:30},
   weights:{sleep:{duration:.4,quality:.4,consistency:.2},activity:{steps:.4,exercise:.4,balance:.2},nutrition:{protein:.25,hydration:.2,foodQuality:.3,clinical:.25},calm:{hrv:.4,stress:.3,mindfulness:.3},stressRecovery:{hrv:.4,sleep:.3,adaptation:.3},recovery:{sleep:.4,body:.3,activityBalance:.2,lifestyle:.1},cycle:{phase:.4,symptoms:.3,energy:.3},overall:{activity:.15,sleep:.2,nutrition:.2,calm:.15,stressRecovery:.15,cycle:.15}}} as const;
 export type ScoreStatus='CALCULATED'|'PARTIAL'|'INSUFFICIENT_DATA'|'METHODOLOGY_PENDING'|'NOT_APPLICABLE'|'STALE';
 export type Confidence='HIGH'|'MODERATE'|'LOW';
@@ -24,12 +26,16 @@ const weighted=(key:string,values:Values,weights:Record<string,number>,pending:s
   recommendedActions:[],explanation:unresolved.length?`Methodology pending: ${unresolved.join(', ')}.`:raw===null?'Insufficient canonical data.':`Calculated from ${used.join(', ')}${missing.length?`; missing ${missing.join(', ')}`:''}.`,
   freshness,calculationVersion:HEALTH_INTELLIGENCE_VERSION,calculatedAt:new Date().toISOString()};
 };
-export const goalScore=(actual:number|null|undefined,target:number|null|undefined)=>finite(actual)&&finite(target)&&target>0?Math.min(100,actual/target*100):null;
+export const goalScore=(actual:number|null|undefined,target:number|null|undefined)=>finite(actual)&&finite(target)&&target>0?clamp(actual/target*100):null;
 export const sleepScore=(i:{minutes?:number|null;targetMinutes?:number|null;deep?:number|null;rem?:number|null;efficiency?:number|null;consistency?:number|null;freshness?:ScoreResult['freshness']})=>{
  const stages=[i.deep,i.rem,i.efficiency];const quality=stages.every(finite)?stages.reduce<number>((s,v)=>s+(v as number),0)/3:null;
  return weighted('sleep',{duration:goalScore(i.minutes,i.targetMinutes),quality,consistency:i.consistency},{...HEALTH_INTELLIGENCE_CONFIG.weights.sleep},['duration','quality','consistency'],[],i.freshness);
 };
-export const activityScore=(i:{steps?:number|null;stepGoal?:number|null;exerciseMinutes?:number|null;exerciseTarget?:number|null;balance?:number|null;freshness?:ScoreResult['freshness']})=>weighted('activity',{steps:goalScore(i.steps,i.stepGoal),exercise:goalScore(i.exerciseMinutes,i.exerciseTarget),balance:i.balance},{...HEALTH_INTELLIGENCE_CONFIG.weights.activity},['balance'],[],i.freshness);
+export const activityScore=(i:{steps?:number|null;stepGoal?:number|null;exerciseMinutes?:number|null;exerciseTarget?:number|null;balance?:number|null;freshness?:ScoreResult['freshness']})=>weighted('activity',{steps:goalScore(i.steps,i.stepGoal),exercise:goalScore(i.exerciseMinutes,i.exerciseTarget),balance:i.balance},{...HEALTH_INTELLIGENCE_CONFIG.weights.activity},[
+  ...(!finite(i.balance)?['balance']:[]),
+  ...(finite(i.steps)&&(!finite(i.stepGoal)||i.stepGoal<=0)?['steps']:[]),
+  ...(finite(i.exerciseMinutes)&&(!finite(i.exerciseTarget)||i.exerciseTarget<=0)?['exercise']:[])
+],[],i.freshness);
 export const calmScore=(i:{hrv?:number|null;stress?:number|null;mindfulness?:number|null;freshness?:ScoreResult['freshness']})=>weighted('calm',{hrv:i.hrv,stress:i.stress,mindfulness:i.mindfulness},{...HEALTH_INTELLIGENCE_CONFIG.weights.calm},['hrv','stress','mindfulness'],[],i.freshness);
 export const nutritionScore=(i:{protein?:number|null;hydration?:number|null;foodQuality?:number|null;clinical?:number|null;freshness?:ScoreResult['freshness']})=>weighted('nutrition',{protein:i.protein,hydration:i.hydration,foodQuality:i.foodQuality,clinical:i.clinical},{...HEALTH_INTELLIGENCE_CONFIG.weights.nutrition},['protein','hydration','foodQuality','clinical'],[],i.freshness);
 export const stressRecoveryScore=(i:{hrv?:number|null;sleep?:number|null;adaptation?:number|null;freshness?:ScoreResult['freshness']})=>weighted('stress_recovery',{hrv:i.hrv,sleep:i.sleep,adaptation:i.adaptation},{...HEALTH_INTELLIGENCE_CONFIG.weights.stressRecovery},['hrv','sleep','adaptation'],[],i.freshness);

@@ -2,6 +2,8 @@
 
 Status: **PROPOSED_NOT_CLINICALLY_VALIDATED**. None of the proposals below authorises a production numeric score. Existing weights remain unchanged. Missing methodology remains fail-closed.
 
+Engineering candidate reference: `FITEATSY_STAR_ORB_V1@1.0.0-candidate.1`. AB-01 and SC-01 are implemented for isolated deterministic validation only; their `CANDIDATE_ONLY` output is structurally separate from production `ScoreResult`.
+
 ## Shared contract
 
 - Normalised score range: 0–100 only after the relevant decision is approved; cap at both bounds.
