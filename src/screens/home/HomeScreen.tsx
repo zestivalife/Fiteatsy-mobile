@@ -114,6 +114,22 @@ export const frameworkStatusLabel = (status?: string | null) => {
   }
 };
 
+export const scoreUnavailableLabel = (score?: {
+  status?: string | null;
+  inputsMissing?: string[];
+  methodologyPending?: string[];
+} | null) => {
+  const missing = [...(score?.inputsMissing ?? []), ...(score?.methodologyPending ?? [])];
+  if (missing.some((item) => item.includes('goal') || item.includes('target'))) return 'Goal required';
+  if (score?.status === 'METHODOLOGY_PENDING') return 'Methodology pending';
+  if (score?.status === 'STALE') return 'Update needed';
+  if (score?.status === 'OFFLINE') return 'Available offline';
+  if (score?.status === 'ERROR') return 'Scoring unavailable';
+  if (missing.some((item) => item.includes('history') || item.includes('baseline') || item.includes('night'))) return 'More history needed';
+  if (score?.status === 'INSUFFICIENT_DATA') return 'More data needed';
+  return frameworkStatusLabel(score?.status);
+};
+
 const stateFromScore = (score: number | null, status?: string | null) => {
   if (score == null) return { label: frameworkStatusLabel(status) };
   if (score >= 80) return { label: 'Strong Today' };
@@ -318,6 +334,8 @@ export const HomeScreen = () => {
     ...item,dayLabel:new Date(`${item.dayKey}T12:00:00`).toLocaleDateString(undefined,{weekday:'short'})
   }))??recoveryTrend;
   const hasTrendData = trendValues.some((item) => item.score != null);
+  const recoveryFramework = health.candidateIntelligence?.scores.recovery ?? health.canonicalIntelligence?.scores.recovery;
+  const recoveryTrendUnavailableLabel = scoreUnavailableLabel(recoveryFramework);
   // The centre is labelled Recovery Core, so it must bind to the governed
   // Recovery domain rather than silently displaying Overall Health Intelligence.
   const recoveryScore = normalizeScore(health.candidateIntelligence?.scores.recovery.score ?? health.canonicalIntelligence?.scores.recovery.score);
@@ -347,7 +365,7 @@ export const HomeScreen = () => {
     calm: hasCanonicalMetricData(health.aggregates, ['hrv_sdnn_ms', 'hrv_rmssd_ms', 'mindfulness_minutes'])
   };
   const selectedState = selected.score == null && selectedMetricAvailability[selectedMetric]
-    ? { label: selectedFramework?.status === 'METHODOLOGY_PENDING' ? 'Data available · Methodology pending' : 'Data available · Building baseline' }
+    ? { label: `Data available · ${scoreUnavailableLabel(selectedFramework)}` }
     : stateFromScore(selected.score, selectedFramework?.status);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
 
@@ -366,7 +384,7 @@ export const HomeScreen = () => {
               onProfile={() => navigation.navigate('Profile')}
             />
 
-            <RecoveryTrend values={trendValues} hasData={hasTrendData} />
+            <RecoveryTrend values={trendValues} hasData={hasTrendData} unavailableLabel={recoveryTrendUnavailableLabel} />
 
             <RecoveryPanel
               metrics={displayMetrics}
@@ -440,11 +458,11 @@ const HeaderIcon = ({ icon, onPress, badge }: { icon: keyof typeof Ionicons.glyp
   </Pressable>
 );
 
-export const RecoveryTrend = ({ values, hasData }: { values: RecoveryTrendDay[]; hasData: boolean }) => (
+export const RecoveryTrend = ({ values, hasData, unavailableLabel = 'Waiting for data' }: { values: RecoveryTrendDay[]; hasData: boolean; unavailableLabel?: string }) => (
   <View style={styles.trendCard}>
     <View style={styles.trendHeadingRow}>
       <Text style={styles.trendTitle}>7-Day Recovery</Text>
-      {!hasData ? <Text style={styles.trendEmptyLabel}>Waiting for data</Text> : null}
+      {!hasData ? <Text style={styles.trendEmptyLabel}>{unavailableLabel}</Text> : null}
     </View>
     <View style={styles.trendRow}>
       {values.map((day) => {
@@ -572,14 +590,15 @@ export const RecoveryPanel = ({
   const [arcStart, arcEnd] = arcGradientForMetric(selectedMetric);
 
   useEffect(() => {
+    if (selectedScore == null) return undefined;
     const animation = Animated.timing(scoreArcProgress, {
       toValue: clampedScore,
-      duration: 620,
+      duration: reduceMotion ? 0 : 620,
       useNativeDriver: false
     });
     animation.start();
     return () => animation.stop();
-  }, [clampedScore, scoreArcProgress]);
+  }, [clampedScore, reduceMotion, scoreArcProgress, selectedScore]);
 
   return (
     <View style={styles.recoveryPanel}>
@@ -588,21 +607,31 @@ export const RecoveryPanel = ({
           <StarOrbSurface reduceMotion={reduceMotion} />
         </View>
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
-        {selectedScore != null ? (
-          <Svg
+        <Svg
             width={SCORE_ARC_SIZE}
             height={SCORE_ARC_SIZE}
             viewBox={`0 0 ${SCORE_ARC_SIZE} ${SCORE_ARC_SIZE}`}
             style={styles.scoreArc}
             pointerEvents="none"
           >
-            <Defs>
-              <SvgLinearGradient id="homeRecoveryScoreArc" x1="42" y1="12" x2="135" y2="126" gradientUnits="userSpaceOnUse">
-                <Stop offset="0" stopColor={arcStart} />
-                <Stop offset="1" stopColor={arcEnd} />
-              </SvgLinearGradient>
-            </Defs>
-            <AnimatedCircle
+            <Circle
+              testID="recovery-score-track"
+              cx={SCORE_ARC_SIZE / 2}
+              cy={SCORE_ARC_SIZE / 2}
+              r={SCORE_ARC_RADIUS}
+              fill="transparent"
+              stroke="#292E35"
+              strokeWidth={SCORE_ARC_STROKE_WIDTH}
+            />
+            {selectedScore != null ? <>
+              <Defs>
+                <SvgLinearGradient id="homeRecoveryScoreArc" x1="42" y1="12" x2="135" y2="126" gradientUnits="userSpaceOnUse">
+                  <Stop offset="0" stopColor={arcStart} />
+                  <Stop offset="1" stopColor={arcEnd} />
+                </SvgLinearGradient>
+              </Defs>
+              <AnimatedCircle
+              testID="recovery-score-progress"
               cx={SCORE_ARC_SIZE / 2}
               cy={SCORE_ARC_SIZE / 2}
               r={SCORE_ARC_RADIUS}
@@ -615,9 +644,9 @@ export const RecoveryPanel = ({
               originX={SCORE_ARC_SIZE / 2}
               originY={SCORE_ARC_SIZE / 2}
               rotation="-72"
-            />
+              />
+            </> : null}
           </Svg>
-        ) : null}
 
         {metrics.map((metric) => (
           <RecoveryNode

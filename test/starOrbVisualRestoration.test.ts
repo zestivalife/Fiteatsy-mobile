@@ -16,7 +16,7 @@ describe('original Star Orb visual and animation contract', () => {
   });
 
   test('preserves score selection animation and the xx/100 presentation', () => {
-    expect(source).toContain('duration: 620');
+    expect(source).toContain('duration: reduceMotion ? 0 : 620');
     expect(source).toContain('toValue: clampedScore');
     expect(source).toContain('animation.stop()');
     expect(source).toContain("selectedScore == null ? '--/100' : `${selectedScore}/100`");
@@ -26,7 +26,8 @@ describe('original Star Orb visual and animation contract', () => {
     expect(source).toContain('STAR_ORB_MOTION_DURATION_MS = 3500');
     expect(source).toContain('Animated.loop(');
     expect(source).toContain('<StarOrbSurface reduceMotion={reduceMotion} />');
-    expect(source).toContain('{selectedScore != null ? (');
+    expect(source).toContain('testID="recovery-score-track"');
+    expect(source).toContain('{selectedScore != null ? <>');
     expect(source).toContain("case 'METHODOLOGY_PENDING': return 'Methodology pending'");
     expect(source).not.toContain('HOME_RECOVERY_UI_FIXTURE');
   });
