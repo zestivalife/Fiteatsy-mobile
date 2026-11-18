@@ -838,6 +838,8 @@ export type HealthEventType =
   | 'breathing_session_completed'
   | 'focus_session_completed'
   | 'movement_session_completed'
+  | 'lifestyle_habit_recorded'
+  | 'lifestyle_habit_revoked'
   | 'family_ping_sent'
   | 'family_sos_triggered';
 

@@ -5,6 +5,7 @@ import type {
   CandidateRuntimeRepositories,
   RuntimeAssessment,
   RuntimeGoal,
+  RuntimeLifestyleDay,
   RuntimeMindDay,
   RuntimeNutritionDay
 } from './candidate-star-orb-runtime.js';
@@ -96,7 +97,7 @@ export async function loadStarOrbRuntimeInputs(
       [owner.accountId, owner.clientId, healthDay]
     ),
     listGovernedGoals(owner),
-    pool.query(`select event_type,event_time,payload from health_events where user_id=$1 and care_case_id in(select id from care_cases where client_id=$2) and event_type in('breathing_session_completed','focus_session_completed','movement_session_completed') and status='active' and deleted_at is null and event_time >= $3::date-interval '34 days' and event_time < $3::date+interval '1 day' order by event_time`,[owner.accountId,owner.clientId,healthDay])
+    pool.query(`select id,event_type,event_time,payload from health_events where user_id=$1 and care_case_id in(select id from care_cases where client_id=$2) and event_type in('breathing_session_completed','focus_session_completed','movement_session_completed','lifestyle_habit_recorded','lifestyle_habit_revoked') and status='active' and deleted_at is null and event_time >= $3::date-interval '34 days' and event_time < $3::date+interval '1 day' order by event_time,id`,[owner.accountId,owner.clientId,healthDay])
   ]);
   const observations=deduplicateObservations(storedObservations);
 
@@ -153,7 +154,15 @@ export async function loadStarOrbRuntimeInputs(
   const checkins = checkinsResult.rows.map((row) => ({day:databaseDateOnly(row.checkin_date),mood:Number(row.mood)}));
   const completedByDay=new Map<string,number>();
   const mindfulnessByDay=new Map<string,number>();
-  for(const row of sessionResult.rows){const payload=row.payload as Record<string,unknown>;if(payload.status!=='completed')continue;const day=typeof payload.healthDay==='string'?payload.healthDay:new Date(Date.parse(String(row.event_time))+offset*60_000).toISOString().slice(0,10);const duration=finiteOrNull(payload.durationMinutes);if(duration==null||duration<=0)continue;completedByDay.set(day,(completedByDay.get(day)??0)+1);if(row.event_type==='breathing_session_completed'||row.event_type==='focus_session_completed')mindfulnessByDay.set(day,(mindfulnessByDay.get(day)??0)+duration);}
+  const lifestyleLatest=new Map<string,{day:string;habit:string;completed:boolean|null;revision:number;eventTime:string}>();
+  for(const row of sessionResult.rows){const payload=row.payload as Record<string,unknown>;
+    if(row.event_type==='lifestyle_habit_recorded'||row.event_type==='lifestyle_habit_revoked'){
+      if(payload.contractVersion!=='LIFESTYLE_BALANCE_V1_PROPOSAL')continue;const day=String(payload.healthDay??'');const habit=String(payload.habitType??'');const revision=Number(payload.revision);if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isInteger(revision))continue;const key=`${day}:${habit}`;const eventTime=new Date(row.event_time).toISOString();const current=lifestyleLatest.get(key);if(!current||revision>current.revision||(revision===current.revision&&eventTime>=current.eventTime))lifestyleLatest.set(key,{day,habit,revision,eventTime,completed:row.event_type==='lifestyle_habit_revoked'?null:Boolean(payload.completed)});continue;
+    }
+    if(payload.status!=='completed')continue;const day=typeof payload.healthDay==='string'?payload.healthDay:new Date(Date.parse(String(row.event_time))+offset*60_000).toISOString().slice(0,10);const duration=finiteOrNull(payload.durationMinutes);if(duration==null||duration<=0)continue;completedByDay.set(day,(completedByDay.get(day)??0)+1);if(row.event_type==='breathing_session_completed'||row.event_type==='focus_session_completed')mindfulnessByDay.set(day,(mindfulnessByDay.get(day)??0)+duration);}
+  const requiredLifestyle=['consistent_daily_routine','recovery_rest_practice','evening_screen_boundary','outdoor_daylight_routine'];
+  const lifestyleDays=[...new Set([...lifestyleLatest.values()].map(item=>item.day))].sort();
+  const lifestyle:RuntimeLifestyleDay[]=lifestyleDays.flatMap(day=>{const values=requiredLifestyle.map(habit=>lifestyleLatest.get(`${day}:${habit}`)?.completed);return values.every(value=>typeof value==='boolean')?[{healthDay:day,habitScores:values.map(value=>value?100:0)}]:[];});
   for(const [day,value] of mindfulnessByDay) observations.push({id:`session-mindfulness:${owner.clientId}:${day}`,metricType:'mindfulness_minutes',value,unit:'min',userId:owner.accountId,clientId:owner.clientId,qualityStatus:'accepted',createdAtISO:new Date().toISOString(),measuredAtISO:`${day}T12:00:00.000Z`,sourceProvider:'fiteatsy_sessions',sourceRecordId:`mindfulness:${day}`,syncKey:`mindfulness:${owner.clientId}:${day}`,timezoneOffsetMinutes:offset,sourceMetadata:{provenance:'completed_health_event'},startAtISO:null,endAtISO:null,providerUpdatedAtISO:null,providerVersion:null,deletedAtISO:null});
   const mindDays=[...new Set([...checkins.map(row=>row.day),...completedByDay.keys()])].sort();
   const mind: RuntimeMindDay[] = mindDays.map((day) => ({
@@ -162,7 +171,7 @@ export async function loadStarOrbRuntimeInputs(
   }));
 
   return {
-    owner, observations, goals, nutrition, assessments, mind, fallbackOffsetMinutes: offset, nowISO: new Date().toISOString(),
+    owner, observations, goals, nutrition, assessments, mind, lifestyle, fallbackOffsetMinutes: offset, nowISO: new Date().toISOString(),
     sourceCoverage: {
       observations:{source:'health_observations',status:'INTEGRATED'},
       sleepGoal:{source:'health_profiles.sleep_goal_hours',status:sleepHours==null?'UNAVAILABLE':'INTEGRATED',...(sleepHours==null?{reason:'NO_EXPLICIT_SLEEP_GOAL'}:{})},
@@ -171,6 +180,7 @@ export async function loadStarOrbRuntimeInputs(
       mood:{source:'daily_checkins.mood',status:'INTEGRATED'},
       activityGoals:{source:'governed_wellness_goals',status:storedGoals.some(row=>row.goal_kind==='steps'||row.goal_kind==='exercise_minutes')?'INTEGRATED':'UNAVAILABLE',...(storedGoals.some(row=>row.goal_kind==='steps'||row.goal_kind==='exercise_minutes')?{}:{reason:'NO_PERSISTED_NUMERIC_STEPS_OR_EXERCISE_GOAL'})},
       mindSessions:{source:'health_events completed session contract',status:'INTEGRATED'},
+      lifestyle:{source:'health_events LIFESTYLE_BALANCE_V1_PROPOSAL',status:lifestyle.length?'INTEGRATED':'UNAVAILABLE',...(lifestyle.length?{}:{reason:'FOUR_EXPLICIT_DAILY_LIFESTYLE_ENTRIES_REQUIRED'})},
       wellbeing:{source:'none',status:'UNAVAILABLE',reason:'NO_VALIDATED_WELLBEING_INSTRUMENT_REPOSITORY'},
       clinicalMarkers:{source:'none',status:'UNAVAILABLE',reason:'NO_APPROVED_MARKER_TO_SCORE_PROJECTION'}
     }

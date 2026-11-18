@@ -1785,6 +1785,21 @@ export const TrackerScreen = () => {
         <Ionicons name="chevron-forward" size={20} color="#C9C7FF" />
       </Pressable>
 
+      <Pressable
+        style={[styles.pssEntryCard, !isLight && styles.pssEntryCardDark]}
+        onPress={() => navigation.navigate('LifestyleHabits')}
+        accessibilityRole="button"
+        accessibilityLabel="Record daily lifestyle"
+      >
+        <View style={styles.pssEntryIcon}><Ionicons name="leaf-outline" size={22} color="#60AF00" /></View>
+        <View style={styles.pssEntryText}>
+          <Text style={styles.pssEntryKicker}>Recovery</Text>
+          <Text style={styles.pssEntryTitle}>Daily lifestyle</Text>
+          <Text style={styles.pssEntryCopy}>Record today’s routine and recovery habits.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#9ACB60" />
+      </Pressable>
+
       <Animated.View
         style={{
           opacity: contentAnim,

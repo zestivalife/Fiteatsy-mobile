@@ -97,7 +97,8 @@ export const getHealthIntelligenceV1=()=>{
 };
 
 export type CandidateValidationScore={domain:string;score:number|null;status:FrameworkScore['status'];methodologyId:string;methodologyVersion:string;healthDay:string;calculatedAt:string;confidence:FrameworkScore['confidence'];inputFreshness:string;inputsUsed:string[];inputsMissing:string[];contributingFactors:string[];explanation:string;activation:'CANDIDATE_ONLY';clinicalValidation:'PENDING'};
-export type CandidateStarOrbValidation={activation:'ISOLATED_VALIDATION_ONLY';methodologyVersion:string|null;days:Array<{healthDay:string;activity:CandidateValidationScore;sleep:CandidateValidationScore;nourishment:CandidateValidationScore;calm:CandidateValidationScore;mind:CandidateValidationScore;recovery:CandidateValidationScore}>;sourceCoverage:Record<string,{source:string;status:'INTEGRATED'|'UNAVAILABLE';reason?:string}>};
+export type CandidateProposalScore={score:number|null;status:'PROPOSAL_ONLY'|'UNAVAILABLE';version:string;reason?:string;label?:string};
+export type CandidateStarOrbValidation={activation:'ISOLATED_VALIDATION_ONLY';methodologyVersion:string|null;days:Array<{healthDay:string;activity:CandidateValidationScore;sleep:CandidateValidationScore;nourishment:CandidateValidationScore;calm:CandidateValidationScore;mind:CandidateValidationScore;recovery:CandidateValidationScore;proposals:{everydayNourishment:CandidateProposalScore;selfReportedMindWellness:CandidateProposalScore}}>;sourceCoverage:Record<string,{source:string;status:'INTEGRATED'|'UNAVAILABLE';reason?:string}>};
 export const candidateValidationClientEnabled=()=>__DEV__&&process.env.EXPO_PUBLIC_STAR_ORB_CANDIDATE_VALIDATION_ENABLED==='true';
 export const getCandidateStarOrbValidation=()=>{
   const healthDay=new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10);

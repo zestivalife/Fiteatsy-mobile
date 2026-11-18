@@ -165,6 +165,16 @@ export const ingestClientHealthEvent = async (owner: ClientOwnershipContext, car
       const error=new Error('Completed session requires its matching category, positive duration and health day.');error.name='INVALID_HEALTH_EVENT';throw error;
     }
   }
+  if (input.eventType === 'lifestyle_habit_recorded' || input.eventType === 'lifestyle_habit_revoked') {
+    const payload=input.eventPayload;
+    const allowed=new Set(['consistent_daily_routine','recovery_rest_practice','evening_screen_boundary','outdoor_daylight_routine']);
+    const active=input.eventType==='lifestyle_habit_recorded';
+    if(payload.contractVersion!=='LIFESTYLE_BALANCE_V1_PROPOSAL'||!allowed.has(String(payload.habitType))||
+      !/^\d{4}-\d{2}-\d{2}$/.test(String(payload.healthDay??''))||!Number.isInteger(Number(payload.revision))||Number(payload.revision)<1||
+      (active&&typeof payload.completed!=='boolean')||payload.recordStatus!==(active?'active':'revoked')){
+      const error=new Error('Lifestyle habit requires the governed V1 contract, explicit completion, health day and revision.');error.name='INVALID_HEALTH_EVENT';throw error;
+    }
+  }
   if (input.eventType === 'daily_check_in_submitted') {
     const payload = input.eventPayload;
     const values = [payload.mood, payload.energy, payload.sleepQuality].map(Number);

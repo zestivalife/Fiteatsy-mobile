@@ -74,6 +74,7 @@ export type RootStackParamList = {
   CycleInsights: undefined;
   CycleNotifications: undefined;
   Pss10Assessment: { mode?: 'intro' | 'history' } | undefined;
+  LifestyleHabits: undefined;
   TrackerDetail: {
     metricKey: string;
     metricTitle: string;

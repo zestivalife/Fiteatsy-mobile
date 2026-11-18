@@ -38,15 +38,27 @@ const repositories:CandidateRuntimeRepositories={
     {healthDay:shifted(index-6),kind:'PSS_10' as const,score:14-index,minimum:0,maximum:40,validated:true},
     {healthDay:shifted(index-6),kind:'WELLBEING' as const,score:62+index*2,minimum:0,maximum:100,validated:true}
   ]).flat(),
-  mind:Array.from({length:7},(_,index)=>({healthDay:shifted(index-6),moodCheckIns:[3+index%2,4],completedSessions:2+index%3,emotionalWellbeing:[3,3,4,4,4,5,4]}))
+  mind:Array.from({length:7},(_,index)=>({healthDay:shifted(index-6),moodCheckIns:[3+index%2,4],completedSessions:2+index%3,emotionalWellbeing:[3,3,4,4,4,5,4]})),
+  lifestyle:[]
 };
 
 test('runtime adapters calculate eligible domains and fail Recovery closed without genuine lifestyle habits',()=>{
   const result=buildCandidateStarOrbRuntimeDay(repositories,through);
-  const values=Object.fromEntries(Object.entries(result).filter(([key])=>key!=='healthDay').map(([key,value])=>[key,(value as {score:number|null}).score]));
+  const values=Object.fromEntries(Object.entries(result).filter(([key])=>key!=='healthDay'&&key!=='proposals').map(([key,value])=>[key,(value as {score:number|null}).score]));
   assert.deepEqual(values,{activity:86.27,sleep:94.88,nourishment:87.92,calm:65.42,mind:66.8,recovery:null});
   assert.ok(result.recovery.inputsMissing.includes('explicit_lifestyle_habits'));
-  for(const value of Object.values(result).filter(value=>typeof value==='object'))assert.equal(value.activation,'CANDIDATE_ONLY');
+  for(const [key,value] of Object.entries(result).filter(([key,value])=>key!=='proposals'&&typeof value==='object'))assert.equal((value as {activation:string}).activation,'CANDIDATE_ONLY');
+  assert.equal(result.proposals.everydayNourishment.status,'PROPOSAL_ONLY');
+  assert.equal(result.proposals.selfReportedMindWellness.status,'PROPOSAL_ONLY');
+});
+
+test('runtime Recovery consumes complete explicit lifestyle records without inferring omitted habits',()=>{
+  const complete={...repositories,lifestyle:Array.from({length:7},(_,index)=>({healthDay:shifted(index-6),habitScores:[100,100,0,100]}))};
+  const current=buildCandidateStarOrbRuntimeDay(complete,'2026-11-17');
+  assert.equal(current.recovery.inputsMissing.includes('explicit_lifestyle_habits'),false);
+  assert.equal(typeof current.recovery.score,'number');
+  const omitted={...complete,lifestyle:complete.lifestyle.map(row=>row.healthDay==='2026-11-17'?{...row,habitScores:[]}:row)};
+  assert.equal(buildCandidateStarOrbRuntimeDay(omitted,'2026-11-17').recovery.score,null);
 });
 
 test('seven-day runtime window preserves seven distinct truthful gaps',()=>{

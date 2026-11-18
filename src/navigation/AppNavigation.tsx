@@ -15,6 +15,7 @@ import { ChangePinScreen } from '../screens/auth/ChangePinScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { TrackerScreen } from '../screens/home/TrackerScreen';
 import { TrackerDetailScreen } from '../screens/home/TrackerDetailScreen';
+import { LifestyleHabitsScreen } from '../screens/wellness/LifestyleHabitsScreen';
 import { ReportsScreen } from '../screens/home/ReportsScreen';
 import { ReportComparisonScreen } from '../screens/home/ReportComparisonScreen';
 import { SessionsScreen } from '../screens/home/SessionsScreen';
@@ -132,6 +133,7 @@ export const AppNavigation = () => {
         <Stack.Screen name="HealthMetricDetail" component={HealthMetricDetailScreen} />
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="TrackerDetail" component={TrackerDetailScreen} />
+        <Stack.Screen name="LifestyleHabits" component={LifestyleHabitsScreen} />
         <Stack.Screen name="FocusSession" component={FocusScreen} />
         <Stack.Screen name="BreathingSession" component={BreathingScreen} />
         <Stack.Screen name="MovementSession" component={MovementScreen} />

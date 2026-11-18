@@ -9,16 +9,17 @@ import { createAssessmentSession, saveAssessmentResponses, completeAssessmentSes
 import { pss10Items } from '../../backend/src/modules/assessments/assessment-definitions.js';
 import { loadStarOrbRuntimeInputs } from '../../backend/src/modules/intelligence/star-orb-runtime-loader.js';
 import { buildCandidateStarOrbRuntimeDay } from '../../backend/src/modules/intelligence/candidate-star-orb-runtime.js';
-
-const TENANT_ID='81000000-0000-4000-8000-000000000001';
+import { buildCandidateStarOrbRuntimeWindow } from '../../backend/src/modules/intelligence/candidate-star-orb-runtime.js';
+import { addHealthEvent, createCareCaseIfMissing } from '../../backend/src/modules/platform/platform.store.js';
+import { reviseGovernedGoal } from '../../backend/src/modules/intelligence/governed-goals.repository.js';
 
 test('database loader reads only the authenticated tenant client and fails closed for unavailable goal sources',async()=>{
   await resetBackendStateForTests();
-  const userId=randomUUID();const clientId=randomUUID();const profileId=randomUUID();
-  await pool.query(`insert into tenants(id,name,slug,tenant_type,status) values($1,'Star Orb QA','star-orb-qa','PRACTICE','active')`,[TENANT_ID]);
+  const userId=randomUUID();const clientId=randomUUID();const profileId=randomUUID();const tenantId=randomUUID();
+  await pool.query(`insert into tenants(id,name,slug,tenant_type,status) values($1,'Star Orb QA',$2,'PRACTICE','active')`,[tenantId,`star-orb-qa-${tenantId}`]);
   await pool.query(`insert into users(id,name,email_normalized,role,status,account_purpose) values($1,'Star Orb Client',$2,'user','active','QA_TEST')`,[userId,`star-orb-${userId}@example.test`]);
-  await pool.query(`insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status) values($1,$2,$3,'CLIENT','active')`,[randomUUID(),TENANT_ID,userId]);
-  await pool.query(`insert into fiteatsy_clients(id,tenant_id,fiteatsy_client_id,account_user_id) values($1,$2,$3,$4)`,[clientId,TENANT_ID,`fc_star_${Date.now()}`,userId]);
+  await pool.query(`insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status) values($1,$2,$3,'CLIENT','active')`,[randomUUID(),tenantId,userId]);
+  await pool.query(`insert into fiteatsy_clients(id,tenant_id,fiteatsy_client_id,account_user_id) values($1,$2,$3,$4)`,[clientId,tenantId,`fc_star_${Date.now()}`,userId]);
   await pool.query(`insert into health_profiles(id,user_id,client_id,sleep_goal_hours) values($1,$2,$3,8)`,[profileId,userId,clientId]);
   const owner={accountId:userId,clientId};
   const healthDay=new Date().toISOString().slice(0,10);
@@ -35,7 +36,7 @@ test('database loader reads only the authenticated tenant client and fails close
   await saveAssessmentResponses(owner,session.id,pss10Items.map(item=>({itemId:item.id,selectedValue:2})));
   await completeAssessmentSession(owner,session.id);
 
-  const loaded=await loadStarOrbRuntimeInputs(userId,healthDay,{tenantId:TENANT_ID,timezone:'Asia/Kolkata'});
+  const loaded=await loadStarOrbRuntimeInputs(userId,healthDay,{tenantId,timezone:'Asia/Kolkata'});
   assert.equal(loaded.owner.clientId,clientId);
   assert.equal(loaded.observations.length,5);
   assert.equal(loaded.goals.find(goal=>goal.kind==='sleep_minutes')?.value,480);
@@ -47,4 +48,24 @@ test('database loader reads only the authenticated tenant client and fails close
   assert.equal(result.activity.score,null);
   assert.ok(result.activity.inputsMissing.includes('step_goal'));
   await assert.rejects(loadStarOrbRuntimeInputs(userId,healthDay,{tenantId:'82000000-0000-4000-8000-000000000001',timezone:'Asia/Kolkata'}),/AUTHENTICATED_CLIENT_NOT_FOUND/);
+});
+
+test('persisted observations, governed goals and explicit lifestyle events calculate seven independent Recovery days',async()=>{
+  await resetBackendStateForTests();const tenantId=randomUUID();const userId=randomUUID();const clientId=randomUUID();const profileId=randomUUID();
+  await pool.query(`insert into tenants(id,name,slug,tenant_type,status) values($1,'Recovery QA',$2,'PRACTICE','active')`,[tenantId,`recovery-qa-${tenantId}`]);
+  await pool.query(`insert into users(id,name,email_normalized,role,status,account_purpose) values($1,'Recovery Client',$2,'user','active','QA_TEST')`,[userId,`recovery-${userId}@example.test`]);
+  await pool.query(`insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status) values($1,$2,$3,'CLIENT','active')`,[randomUUID(),tenantId,userId]);
+  await pool.query(`insert into fiteatsy_clients(id,tenant_id,fiteatsy_client_id,account_user_id) values($1,$2,$3,$4)`,[clientId,tenantId,`fc_recovery_${Date.now()}`,userId]);
+  await pool.query(`insert into health_profiles(id,user_id,client_id,sleep_goal_hours) values($1,$2,$3,8)`,[profileId,userId,clientId]);
+  const owner={accountId:userId,clientId,tenantId};const careCase=await createCareCaseIfMissing(owner,profileId);const through=new Date().toISOString().slice(0,10);const shift=(offset:number)=>new Date(Date.parse(`${through}T12:00:00.000Z`)+offset*86_400_000).toISOString().slice(0,10);
+  await reviseGovernedGoal(owner,{kind:'steps',value:10000,effectiveFrom:shift(-40),source:'USER'});await reviseGovernedGoal(owner,{kind:'exercise_minutes',value:30,effectiveFrom:shift(-40),source:'USER'});
+  const observations=[] as Parameters<typeof ingestHealthObservations>[1];
+  for(let offset=-34;offset<=0;offset+=1){const day=shift(offset);const previous=shift(offset-1);const index=offset+34;const end=`${day}T06:30:00.000Z`;const start=`${previous}T22:30:00.000Z`;const add=(metricType:string,value:number,unit:string,extra:Record<string,unknown>={})=>observations.push({metricType,value,unit,measuredAtISO:end,sourceProvider:'qa',sourceRecordId:`${metricType}:${day}`,syncKey:`qa:${metricType}:${day}`,...extra} as never);
+    add('steps',8200+index*20,'count');add('active_minutes',32+index%4,'min');add('hrv_sdnn_ms',52+index*.1,'ms');add('resting_heart_rate',62-index*.03,'bpm');add('mindfulness_minutes',20,'min');add('sleep_minutes',470+index%6,'min',{startAtISO:start,endAtISO:end});add('sleep_deep_minutes',90,'min',{startAtISO:`${previous}T23:30:00.000Z`,endAtISO:`${day}T01:00:00.000Z`});add('sleep_rem_minutes',100,'min',{startAtISO:`${day}T03:30:00.000Z`,endAtISO:`${day}T05:10:00.000Z`});}
+  await ingestHealthObservations({accountId:userId,clientId},observations);
+  const habits=['consistent_daily_routine','recovery_rest_practice','evening_screen_boundary','outdoor_daylight_routine'];
+  for(let offset=-6;offset<=0;offset+=1)for(const [index,habitType] of habits.entries())await addHealthEvent({careCaseId:careCase.id,userId,type:'lifestyle_habit_recorded' as never,summary:'lifestyle habit recorded',payload:{contractVersion:'LIFESTYLE_BALANCE_V1_PROPOSAL',habitType,healthDay:shift(offset),completed:index!==2,revision:1,recordStatus:'active',source:'mobile.tracker',schemaVersion:1},replayKey:`${careCase.id}:${shift(offset)}:${habitType}`,eventTimeISO:`${shift(offset)}T12:00:00.000Z`});
+  const loaded=await loadStarOrbRuntimeInputs(userId,through,{tenantId,timezone:'UTC'});assert.equal(loaded.lifestyle.length,7);assert.equal(loaded.sourceCoverage.lifestyle.status,'INTEGRATED');
+  const window=buildCandidateStarOrbRuntimeWindow(loaded,through);assert.equal(window.days.length,7);assert.equal(window.days.every(day=>typeof day.recovery.score==='number'),true);assert.equal(new Set(window.days.map(day=>day.recovery.score)).size>1,true);
+  for(const day of window.days){assert.equal(day.recovery.inputsMissing.length,0);assert.equal(day.recovery.contributingFactors.some(item=>item.startsWith('Lifestyle ')),true);}
 });
