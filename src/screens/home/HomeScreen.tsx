@@ -360,6 +360,9 @@ export const HomeScreen = () => {
     calm: health.canonicalIntelligence.scores.calm
   } : null;
   const selectedFramework = frameworkByMetric?.[selectedMetric];
+  const selectedComponentCoverage = selectedFramework && 'componentCoverage' in selectedFramework
+    ? selectedFramework.componentCoverage
+    : undefined;
   const selectedMetricAvailability: Partial<Record<MetricKey, boolean>> = {
     activity: hasCanonicalMetricData(health.aggregates, ['steps', 'active_minutes', 'workout_minutes', 'active_energy']),
     sleep: hasCanonicalMetricData(health.aggregates, ['sleep_minutes']),
@@ -367,7 +370,7 @@ export const HomeScreen = () => {
   };
   const selectedState = selected.score == null && selectedMetricAvailability[selectedMetric]
     ? { label: `Data available · ${scoreUnavailableLabel(selectedFramework)}` }
-    : stateFromScore(selected.score, selectedFramework?.status, selectedFramework?.componentCoverage);
+    : stateFromScore(selected.score, selectedFramework?.status, selectedComponentCoverage);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
 
   return (

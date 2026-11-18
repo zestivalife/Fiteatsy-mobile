@@ -19,7 +19,7 @@ describe('health score status contract', () => {
     expect(home).toContain("case 'NOT_APPLICABLE': return 'Not applicable'");
     expect(home).toContain("case 'INSUFFICIENT_DATA': return 'Not enough data'");
     expect(home).toContain("case 'NO_DATA': return 'No data yet'");
-    expect(home).toContain('stateFromScore(selected.score, selectedFramework?.status, selectedFramework?.componentCoverage)');
+    expect(home).toContain('stateFromScore(selected.score, selectedFramework?.status, selectedComponentCoverage)');
   });
 
   it('does not render legacy supporting scores as current numerics', () => {
