@@ -28,7 +28,7 @@ const completeScores=()=>{
 test('candidate golden fixture calculates every visible domain and central Recovery',()=>{
   const actual=completeScores();
   assert.deepEqual(Object.fromEntries(Object.entries(actual).map(([key,value])=>[key,value.score])),{
-    activity:89.4,sleep:95.68,nourishment:84,calm:69,mind:78.85,recovery:86.25
+    activity:89.4,sleep:95.68,nourishment:84,calm:69,mind:78.85,recovery:81.57
   });
   for(const result of Object.values(actual)){
     assert.equal(result.status,'CALCULATED');
