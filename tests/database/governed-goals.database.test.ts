@@ -24,7 +24,7 @@ test('governed goal revisions are serialized, immutable and day-boundary safe',a
   await assert.rejects(reviseGovernedGoal(owner,{kind:'steps',value:7000,effectiveFrom:'2026-11-17',source:'USER'}),/GOAL_BACKDATED_REVISION_REJECTED/);
   await reviseGovernedGoal(owner,{kind:'steps',value:9000,effectiveFrom:'2026-11-20',source:'USER'});
   const rows=await listGovernedGoals(owner);assert.equal(rows.length,2);
-  assert.equal(String(rows[0].effective_through).slice(0,10),'2026-11-19');assert.equal(rows[0].status,'superseded');
+  assert.equal(rows[0].effective_through instanceof Date?rows[0].effective_through.toISOString().slice(0,10):String(rows[0].effective_through).slice(0,10),'2026-11-19');assert.equal(rows[0].status,'superseded');
   assert.equal(rows[1].status,'active');assert.equal(Number(rows[1].revision),2);
 });
 
