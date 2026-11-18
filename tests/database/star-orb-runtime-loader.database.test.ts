@@ -13,7 +13,7 @@ import { buildCandidateStarOrbRuntimeWindow } from '../../backend/src/modules/in
 import { addHealthEvent, createCareCaseIfMissing } from '../../backend/src/modules/platform/platform.store.js';
 import { reviseGovernedGoal } from '../../backend/src/modules/intelligence/governed-goals.repository.js';
 
-test('database loader reads only the authenticated tenant client and fails closed for unavailable goal sources',async()=>{
+test('database loader reads only the authenticated tenant client and scores measured activity without personal goals',async()=>{
   await resetBackendStateForTests();
   const userId=randomUUID();const clientId=randomUUID();const profileId=randomUUID();const tenantId=randomUUID();
   await pool.query(`insert into tenants(id,name,slug,tenant_type,status) values($1,'Star Orb QA',$2,'PRACTICE','active')`,[tenantId,`star-orb-qa-${tenantId}`]);
@@ -45,8 +45,9 @@ test('database loader reads only the authenticated tenant client and fails close
   assert.equal(loaded.assessments[0]?.kind,'PSS_10');
   assert.equal(loaded.sourceCoverage.activityGoals.status,'UNAVAILABLE');
   const result=buildCandidateStarOrbRuntimeDay(loaded,healthDay);
-  assert.equal(result.activity.score,null);
-  assert.ok(result.activity.inputsMissing.includes('step_goal'));
+  assert.equal(result.activity.score,80);
+  assert.equal(result.activity.inputsMissing.includes('step_goal'),false);
+  assert.equal(result.activity.inputsMissing.includes('exercise_goal'),false);
   await assert.rejects(loadStarOrbRuntimeInputs(userId,healthDay,{tenantId:'82000000-0000-4000-8000-000000000001',timezone:'Asia/Kolkata'}),/AUTHENTICATED_CLIENT_NOT_FOUND/);
 });
 
@@ -69,6 +70,6 @@ test('persisted observations, governed goals and explicit lifestyle events calcu
   for(let offset=-6;offset<=0;offset+=1)await upsertDailyCheckIn({accountId:userId,clientId},{dateISO:shift(offset),mood:4,energy:4,sleepQuality:4});
   for(let offset=-3;offset<=0;offset+=1)await addHealthEvent({careCaseId:careCase.id,userId,type:'focus_session_completed' as never,summary:'focus completed',payload:{status:'completed',healthDay:shift(offset),durationMinutes:10},replayKey:`${careCase.id}:focus:${shift(offset)}`,eventTimeISO:`${shift(offset)}T13:00:00.000Z`});
   const loaded=await loadStarOrbRuntimeInputs(userId,through,{tenantId,timezone:'UTC'});assert.equal(loaded.lifestyle.length,7);assert.equal(loaded.sourceCoverage.lifestyle.status,'INTEGRATED');
-  const window=buildCandidateStarOrbRuntimeWindow(loaded,through);assert.equal(window.days.length,7);assert.deepEqual(window.days.map(day=>day.recovery.score),[80.84,81.36,81.13,80.7,80.31,80.28,80.28]);assert.equal(window.days.at(-1)?.proposals.selfReportedMindWellness.score,85);
+  const window=buildCandidateStarOrbRuntimeWindow(loaded,through);assert.equal(window.days.length,7);assert.deepEqual(window.days.map(day=>day.recovery.score),[81.24,81.31,80.99,80.69,80.39,80.42,80.5]);assert.equal(window.days.at(-1)?.proposals.selfReportedMindWellness.score,85);
   for(const day of window.days){assert.equal(day.recovery.inputsMissing.length,0);assert.equal(day.recovery.contributingFactors.some(item=>item.startsWith('Lifestyle ')),true);}
 });
