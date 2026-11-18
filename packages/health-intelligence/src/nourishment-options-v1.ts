@@ -1,4 +1,6 @@
 export const NOURISHMENT_OPTIONS_VERSION='NOURISHMENT_OPTIONS_V1_PROPOSAL' as const;
+export const STRICT_CLINICAL_NOURISHMENT_VERSION='STRICT_CLINICAL_NOURISHMENT_V1' as const;
+export const EVERYDAY_NOURISHMENT_VERSION='EVERYDAY_NOURISHMENT_V1_PROPOSAL' as const;
 const finite=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value);
 const clamp=(value:number)=>Math.max(0,Math.min(100,value));
 const mean=(values:number[])=>values.reduce((sum,value)=>sum+value,0)/values.length;
@@ -15,8 +17,8 @@ export const projectConsumedFoodQuality=(input:{logComplete:boolean;consumedFood
 };
 
 export const evaluateStrictClinicalComposite=(components:{protein:number;hydration:number;foodQuality:number;clinicalMarkers:number|null})=>
-  Object.values(components).every(finite)?{score:Number((components.protein*.25+components.hydration*.2+components.foodQuality*.3+components.clinicalMarkers!*.25).toFixed(2)),status:'CALCULATED' as const}:{score:null,status:'UNAVAILABLE' as const};
+  Object.values(components).every(finite)?{score:Number((components.protein*.25+components.hydration*.2+components.foodQuality*.3+components.clinicalMarkers!*.25).toFixed(2)),status:'CALCULATED' as const,version:STRICT_CLINICAL_NOURISHMENT_VERSION}:{score:null,status:'UNAVAILABLE' as const,version:STRICT_CLINICAL_NOURISHMENT_VERSION,reason:'VALIDATED_MARKER_SPECIFIC_DATA_REQUIRED' as const};
 
 /** Separate label/version: clinical weight is not silently redistributed. */
 export const evaluateEverydayNutritionProposal=(components:{protein:number;hydration:number;foodQuality:number})=>
-  Object.values(components).every(finite)?{score:Number((components.protein*.25/0.75+components.hydration*.2/0.75+components.foodQuality*.3/0.75).toFixed(2)),status:'PROPOSAL_ONLY' as const,version:NOURISHMENT_OPTIONS_VERSION}:{score:null,status:'UNAVAILABLE' as const,version:NOURISHMENT_OPTIONS_VERSION};
+  Object.values(components).every(finite)?{score:Number((components.protein/3+components.hydration/3+components.foodQuality/3).toFixed(2)),status:'PROPOSAL_ONLY' as const,version:EVERYDAY_NOURISHMENT_VERSION,label:'Non-diagnostic everyday nourishment' as const,weights:{protein:1/3,hydration:1/3,foodQuality:1/3}}:{score:null,status:'UNAVAILABLE' as const,version:EVERYDAY_NOURISHMENT_VERSION,label:'Non-diagnostic everyday nourishment' as const,reason:'COMPLETE_CONSUMPTION_PROTEIN_HYDRATION_AND_FOOD_QUALITY_REQUIRED' as const};

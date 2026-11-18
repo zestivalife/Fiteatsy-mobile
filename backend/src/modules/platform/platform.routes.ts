@@ -188,8 +188,13 @@ platformRouter.put('/wellness-goals/:kind',async(req,res)=>{
   const parsed=governedGoalSchema.safeParse({...req.body,kind:req.params.kind});
   if(!parsed.success)return res.status(400).json({error:'INVALID_INPUT',details:parsed.error.flatten()});
   const account=getAuthenticatedAccount(req);
-  const goal=await reviseGovernedGoal({accountId:account.accountId,clientId:account.client.id,tenantId:account.client.tenantId},{...parsed.data,source:'USER'});
-  return res.status(200).json(goal);
+  try{
+    const goal=await reviseGovernedGoal({accountId:account.accountId,clientId:account.client.id,tenantId:account.client.tenantId},{...parsed.data,source:'USER'});
+    return res.status(200).json(goal);
+  }catch(error){
+    const status=(error as {statusCode?:number}).statusCode;if(status)return res.status(status).json({error:error instanceof Error?error.message:'GOAL_REVISION_REJECTED'});
+    throw error;
+  }
 });
 
 platformRouter.patch('/health-profile', async (req, res) => {

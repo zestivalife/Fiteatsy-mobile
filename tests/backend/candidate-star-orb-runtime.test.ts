@@ -41,18 +41,19 @@ const repositories:CandidateRuntimeRepositories={
   mind:Array.from({length:7},(_,index)=>({healthDay:shifted(index-6),moodCheckIns:[3+index%2,4],completedSessions:2+index%3,emotionalWellbeing:[3,3,4,4,4,5,4]}))
 };
 
-test('runtime adapters calculate the complete candidate graph from raw canonical records',()=>{
+test('runtime adapters calculate eligible domains and fail Recovery closed without genuine lifestyle habits',()=>{
   const result=buildCandidateStarOrbRuntimeDay(repositories,through);
   const values=Object.fromEntries(Object.entries(result).filter(([key])=>key!=='healthDay').map(([key,value])=>[key,(value as {score:number|null}).score]));
-  assert.deepEqual(values,{activity:86.27,sleep:94.88,nourishment:87.92,calm:65.42,mind:66.8,recovery:86.23});
+  assert.deepEqual(values,{activity:86.27,sleep:94.88,nourishment:87.92,calm:65.42,mind:66.8,recovery:null});
+  assert.ok(result.recovery.inputsMissing.includes('explicit_lifestyle_habits'));
   for(const value of Object.values(result).filter(value=>typeof value==='object'))assert.equal(value.activation,'CANDIDATE_ONLY');
 });
 
-test('seven-day runtime window uses seven distinct historical inputs and values',()=>{
+test('seven-day runtime window preserves seven distinct truthful gaps',()=>{
   const result=buildCandidateStarOrbRuntimeWindow(repositories,through);
   assert.equal(result.activation,CANDIDATE_RUNTIME_ACTIVATION);assert.equal(result.days.length,7);
   assert.equal(new Set(result.days.map(day=>day.healthDay)).size,7);
-  assert.deepEqual(result.days.map(day=>day.recovery.score),[86.77,87.43,87.21,86.75,86.16,86.18,86.23]);
+  assert.deepEqual(result.days.map(day=>day.recovery.score),[null,null,null,null,null,null,null]);
 });
 
 test('missing governed inputs fail closed and candidate values do not leak into production projection',()=>{
