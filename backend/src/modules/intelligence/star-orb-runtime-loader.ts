@@ -76,8 +76,17 @@ export async function loadStarOrbRuntimeInputs(
     clientId: String(clientResult.rows[0].id),
     tenantId: String(clientResult.rows[0].tenant_id)
   };
-  const [storedObservations, profileResult, checkinsResult, assessmentsResult,storedGoals,sessionResult] = await Promise.all([
+  const [storedObservations, platformAggregatesResult, profileResult, checkinsResult, assessmentsResult,storedGoals,sessionResult] = await Promise.all([
     listHealthObservationsForCalculation(owner,{fromISO:`${shiftDay(healthDay,-35)}T00:00:00.000Z`,throughISO:`${shiftDay(healthDay,1)}T00:00:00.000Z`}),
+    pool.query(
+      `select health_day,metric_type,value,unit,lineage_hash,calculated_at
+         from health_aggregate_assertions
+        where user_id=$1 and client_id=$2
+          and aggregate_source='HEALTHKIT_STATISTICS'
+          and health_day between $3::date-interval '34 days' and $3::date
+        order by health_day,metric_type,calculated_at`,
+      [authenticatedUserId, String(clientResult.rows[0].id), healthDay]
+    ),
     pool.query(
       `select sleep_goal_hours,created_at,updated_at from health_profiles
         where user_id=$1 and client_id=$2 and status='active' and deleted_at is null
@@ -101,6 +110,20 @@ export async function loadStarOrbRuntimeInputs(
     pool.query(`select id,event_type,event_time,payload from health_events where user_id=$1 and care_case_id in(select id from care_cases where client_id=$2) and event_type in('breathing_session_completed','focus_session_completed','movement_session_completed','lifestyle_habit_recorded','lifestyle_habit_revoked') and status='active' and deleted_at is null and event_time >= $3::date-interval '34 days' and event_time < $3::date+interval '1 day' order by event_time,id`,[owner.accountId,owner.clientId,healthDay])
   ]);
   const observations=deduplicateObservations(storedObservations);
+  // HealthKit cumulative statistics are Apple's source-priority daily totals.
+  // A stable identity makes a later same-day assertion replace the old value
+  // in the scoring projection rather than being added to it.
+  for (const row of platformAggregatesResult.rows) {
+    const day=databaseDateOnly(row.health_day);const metricType=String(row.metric_type);
+    observations.push({id:`platform-aggregate:${owner.clientId}:${day}:${metricType}`,metricType,value:Number(row.value),
+      unit:String(row.unit),userId:owner.accountId,clientId:owner.clientId,qualityStatus:'accepted',
+      createdAtISO:new Date(row.calculated_at).toISOString(),measuredAtISO:`${day}T23:59:59.000Z`,
+      sourceProvider:'platform_aggregate',sourceRecordId:`daily-total:${metricType}:${day}`,
+      syncKey:`platform-aggregate:${owner.clientId}:${day}:${metricType}`,timezoneOffsetMinutes:0,
+      sourceMetadata:{measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC',lineageHash:String(row.lineage_hash)},
+      startAtISO:`${day}T00:00:00.000Z`,endAtISO:`${day}T23:59:59.000Z`,
+      providerUpdatedAtISO:new Date(row.calculated_at).toISOString(),providerVersion:null,deletedAtISO:null});
+  }
 
   const goals: RuntimeGoal[] = [];
   for(const row of storedGoals) goals.push({kind:String(row.goal_kind) as RuntimeGoal['kind'],value:Number(row.goal_value),source:String(row.source) as 'USER'|'CONSULTANT',active:row.status!=='revoked',approved:Boolean(row.approved),updatedAt:new Date(row.updated_at).toISOString(),effectiveFrom:databaseDateOnly(row.effective_from),effectiveThrough:row.effective_through?databaseDateOnly(row.effective_through):null});

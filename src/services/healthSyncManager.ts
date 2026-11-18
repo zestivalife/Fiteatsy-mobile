@@ -277,6 +277,7 @@ export const runHealthSync = async (
     if(uploadCompleted){
       await withHealthSyncPipelineTimeout(postJson('/v1/health/intelligence:recalculate',{
         healthDay:new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10),
+        timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
         aggregateAssertions:canonicalAggregates
       }),'health_sync_recalculation_timeout');
       await markLocalHealthUploaded(localScope,true);

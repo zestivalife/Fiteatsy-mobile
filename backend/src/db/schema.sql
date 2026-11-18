@@ -574,7 +574,7 @@ create table if not exists health_scores (
   user_id text not null references users(id),
   client_id text not null,
   score_type text not null,
-  score_value integer,
+  score_value numeric(6,2),
   score_status text not null default 'insufficient_data',
   confidence numeric(5,4) not null default 0,
   input_summary jsonb not null default '{}'::jsonb,
@@ -583,8 +583,8 @@ create table if not exists health_scores (
   health_day date,
   idempotency_key text,
   foreign key (client_id, user_id) references fiteatsy_clients(id, account_user_id) on delete restrict,
-  check (score_type in ('energy_balance', 'body_support', 'nourishment', 'recovery', 'physical_wellness_index', 'active_performance', 'stress_resilience', 'nutrition', 'clinical', 'activity', 'sleep', 'calm', 'overall')),
-  check (score_status in ('calculated', 'insufficient_data')),
+  constraint health_scores_score_type_check check (score_type in ('energy_balance','body_support','nourishment','recovery','physical_wellness_index','active_performance','stress_resilience','nutrition','clinical','activity','sleep','calm','mind','overall','stress_recovery','cycle','health_intelligence')),
+  constraint health_scores_score_status_check check (score_status in ('available','calculating','calibrating','no_data','calculated','insufficient_data','methodology_pending','not_applicable','stale','offline','error')),
   check (score_value is null or (score_value >= 0 and score_value <= 100)),
   check (confidence >= 0 and confidence <= 1)
 );

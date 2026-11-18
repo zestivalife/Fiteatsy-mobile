@@ -42,11 +42,12 @@ const repositories:CandidateRuntimeRepositories={
   lifestyle:[]
 };
 
-test('runtime adapters calculate eligible domains and fail Recovery closed without genuine lifestyle habits',()=>{
+test('runtime adapters calculate eligible domains and Recovery stays partial without genuine lifestyle habits',()=>{
   const result=buildCandidateStarOrbRuntimeDay(repositories,through);
   const values=Object.fromEntries(Object.entries(result).filter(([key])=>key!=='healthDay'&&key!=='proposals').map(([key,value])=>[key,(value as {score:number|null}).score]));
-  assert.deepEqual(values,{activity:86.27,sleep:94.88,nourishment:87.92,calm:65.42,mind:66.8,recovery:null});
+  assert.deepEqual(values,{activity:86.27,sleep:94.88,nourishment:87.92,calm:65.42,mind:66.8,recovery:80.87});
   assert.ok(result.recovery.inputsMissing.includes('explicit_lifestyle_habits'));
+  assert.equal(result.recovery.status,'PARTIAL');
   for(const [key,value] of Object.entries(result).filter(([key,value])=>key!=='proposals'&&typeof value==='object'))assert.equal((value as {activation:string}).activation,'CANDIDATE_ONLY');
   assert.equal(result.proposals.everydayNourishment.status,'PROPOSAL_ONLY');
   assert.equal(result.proposals.selfReportedMindWellness.status,'PROPOSAL_ONLY');
@@ -59,20 +60,25 @@ test('runtime Recovery consumes complete explicit lifestyle records without infe
   assert.equal(current.recovery.inputsMissing.includes('explicit_lifestyle_habits'),false);
   assert.equal(typeof current.recovery.score,'number');
   const omitted={...complete,lifestyle:complete.lifestyle.map(row=>row.healthDay==='2026-11-17'?{...row,habitScores:[]}:row)};
-  assert.equal(buildCandidateStarOrbRuntimeDay(omitted,'2026-11-17').recovery.score,null);
+  const omittedDay=buildCandidateStarOrbRuntimeDay(omitted,'2026-11-17');
+  assert.equal(omittedDay.recovery.score,80.87);
+  assert.equal(omittedDay.recovery.status,'PARTIAL');
 });
 
-test('seven-day runtime window preserves seven distinct truthful gaps',()=>{
+test('seven-day runtime window preserves seven distinct truthful partial calculations',()=>{
   const result=buildCandidateStarOrbRuntimeWindow(repositories,through);
   assert.equal(result.activation,CANDIDATE_RUNTIME_ACTIVATION);assert.equal(result.days.length,7);
   assert.equal(new Set(result.days.map(day=>day.healthDay)).size,7);
-  assert.deepEqual(result.days.map(day=>day.recovery.score),[null,null,null,null,null,null,null]);
+  assert.deepEqual(result.days.map(day=>day.recovery.score),[81.49,82.06,81.81,81.33,80.9,80.87,80.87]);
 });
 
 test('missing governed inputs fail closed and candidate values do not leak into production projection',()=>{
   const missing=buildCandidateStarOrbRuntimeDay({...repositories,goals:[]},through);
   assert.equal(missing.activity.score,null);assert.ok(missing.activity.inputsMissing.includes('step_goal'));
-  assert.equal(missing.sleep.score,null);assert.equal(missing.nourishment.score,null);
+  assert.equal(missing.sleep.score,100);assert.equal(missing.sleep.status,'PARTIAL');
+  assert.equal(missing.nourishment.score,84.55);assert.equal(missing.nourishment.status,'PARTIAL');
+  assert.ok(missing.sleep.inputsMissing.includes('sleep_target'));
+  assert.ok(missing.nourishment.inputsMissing.includes('protein_with_governed_target'));
   const production=buildHealthIntelligenceV1(observations.map((item,index)=>({...item,id:item.id??String(index),userId:'u',clientId:'c',qualityStatus:'accepted',createdAtISO:item.measuredAtISO,providerUpdatedAtISO:null,providerVersion:null,deletedAtISO:null,sourceMetadata:item.sourceMetadata??null,startAtISO:item.startAtISO??null,endAtISO:item.endAtISO??null})) as never,through);
   assert.equal(production.scores.recovery.score,null);assert.equal(production.scores.recovery.status,'METHODOLOGY_PENDING');
 });

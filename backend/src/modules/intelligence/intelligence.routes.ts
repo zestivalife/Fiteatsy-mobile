@@ -227,7 +227,7 @@ intelligenceRouter.get('/scores/history', requireAuthenticatedAccount, async (re
   const offset = Math.max(0, Number(req.query.offset || 0));
   const scoreType =
     typeof req.query.scoreType === 'string' &&
-    ['energy_balance', 'body_support', 'nourishment', 'recovery', 'physical_wellness_index', 'active_performance', 'stress_resilience', 'nutrition', 'clinical', 'activity', 'sleep', 'calm', 'overall','stress_recovery','cycle','health_intelligence'].includes(req.query.scoreType)
+    ['energy_balance', 'body_support', 'nourishment', 'recovery', 'physical_wellness_index', 'active_performance', 'stress_resilience', 'nutrition', 'clinical', 'activity', 'sleep', 'calm', 'mind', 'overall','stress_recovery','cycle','health_intelligence'].includes(req.query.scoreType)
       ? (req.query.scoreType as HealthScoreType)
       : undefined;
   const items = await listHealthScoreHistory(owner, { scoreType, limit, offset });

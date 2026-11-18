@@ -12,6 +12,7 @@ import { calculateCanonicalHealthScoreWindow, calculateCanonicalHealthScores as 
 import {persistAggregateAssertions,enqueueHealthRecalculation} from '../intelligence/health-aggregate-assertions.repository.js';
 import {aggregateDaily} from '../intelligence/health-aggregation-v1.js';
 import {listDailyAggregates} from '../intelligence/health-aggregates.repository.js';
+import { recalculateAndPersistStarOrb } from '../intelligence/star-orb-candidate.service.js';
 import {listHealthObservationsForCalculation} from './health-observations.repository.js';
 import {
   acceptWearableConsent, commitWearableCheckpoint, completeWearableSyncRun,
@@ -305,13 +306,14 @@ const aggregateAssertionSchema=z.object({healthDay:z.string().regex(/^\d{4}-\d{2
   rawLineageAvailable:z.boolean(),calculatedAtISO:z.string().datetime()});
 healthRouter.post('/intelligence:recalculate', async (req,res)=>{
   const account=getAuthenticatedAccount(req);const owner=currentOwner(account);
-  const parsed=z.object({healthDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),aggregateAssertions:z.array(aggregateAssertionSchema).max(500).optional()}).safeParse(req.body??{});
+  const parsed=z.object({healthDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),timezone:z.string().min(1).max(100).optional(),aggregateAssertions:z.array(aggregateAssertionSchema).max(500).optional()}).safeParse(req.body??{});
   if(!parsed.success)return res.status(400).json({error:'INVALID_HEALTH_RECALCULATION',details:parsed.error.flatten()});
   const healthDay=parsed.data.healthDay??new Date().toISOString().slice(0,10);
   try{const scoreWindow=await calculateCanonicalHealthScoreWindow(owner,healthDay,7);const scores=scoreWindow.at(-1)??[];const observations=await listHealthObservationsForCalculation(owner);
     const parity=parsed.data.aggregateAssertions?.length?await persistAggregateAssertions(owner,parsed.data.aggregateAssertions,aggregateDaily(observations)):[];
+    const starOrb=await recalculateAndPersistStarOrb(owner,healthDay,{tenantId:account.client.tenantId,timezone:parsed.data.timezone??'UTC'});
     return res.status(200).json({recalculated:true,calculationVersion:'HEALTH_INTELLIGENCE_V1',scoreCount:scores.length,
-      aggregateVersion:'HEALTH_AGGREGATION_V2',historyDaysRecalculated:scoreWindow.length,parity,mismatchCount:parity.filter(item=>item.status==='MISMATCH').length});
+      aggregateVersion:'HEALTH_AGGREGATION_V2',historyDaysRecalculated:scoreWindow.length,starOrbDaysPersisted:starOrb.days.length,parity,mismatchCount:parity.filter(item=>item.status==='MISMATCH').length});
   }catch(error){await enqueueHealthRecalculation(owner,healthDay,error instanceof Error?error.message.slice(0,100):'UNKNOWN');throw error;}
 });
 

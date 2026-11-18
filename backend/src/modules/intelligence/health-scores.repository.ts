@@ -15,6 +15,7 @@ export type HealthScoreType =
   | 'activity'
   | 'sleep'
   | 'calm'
+  | 'mind'
   | 'overall'|'stress_recovery'|'cycle'|'health_intelligence';
 export type HealthScoreStatus =
   | 'available'
