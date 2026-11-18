@@ -7,7 +7,7 @@ import { listGovernedGoals, reviseGovernedGoal } from '../../backend/src/modules
 
 const setup=async()=>{
   await resetBackendStateForTests();const accountId=randomUUID();const clientId=randomUUID();const tenantId=randomUUID();
-  await pool.query(`insert into tenants(id,name,slug,tenant_type,status) values($1,'Goal QA','goal-qa','PRACTICE','active')`,[tenantId]);
+  await pool.query(`insert into tenants(id,name,slug,tenant_type,status) values($1,'Goal QA',$2,'PRACTICE','active')`,[tenantId,`goal-qa-${tenantId}`]);
   await pool.query(`insert into users(id,name,email_normalized,role,status,account_purpose) values($1,'Goal Client',$2,'user','active','QA_TEST')`,[accountId,`goal-${accountId}@example.test`]);
   await pool.query(`insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status) values($1,$2,$3,'CLIENT','active')`,[randomUUID(),tenantId,accountId]);
   await pool.query(`insert into fiteatsy_clients(id,tenant_id,fiteatsy_client_id,account_user_id) values($1,$2,$3,$4)`,[clientId,tenantId,`goal_${Date.now()}`,accountId]);
