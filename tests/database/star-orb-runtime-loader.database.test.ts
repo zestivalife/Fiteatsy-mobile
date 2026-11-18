@@ -56,8 +56,9 @@ test('persisted observations, governed goals and explicit lifestyle events calcu
   await pool.query(`insert into users(id,name,email_normalized,role,status,account_purpose) values($1,'Recovery Client',$2,'user','active','QA_TEST')`,[userId,`recovery-${userId}@example.test`]);
   await pool.query(`insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status) values($1,$2,$3,'CLIENT','active')`,[randomUUID(),tenantId,userId]);
   await pool.query(`insert into fiteatsy_clients(id,tenant_id,fiteatsy_client_id,account_user_id) values($1,$2,$3,$4)`,[clientId,tenantId,`fc_recovery_${Date.now()}`,userId]);
-  await pool.query(`insert into health_profiles(id,user_id,client_id,sleep_goal_hours) values($1,$2,$3,8)`,[profileId,userId,clientId]);
-  const owner={accountId:userId,clientId,tenantId};const careCase=await createCareCaseIfMissing(owner,profileId);const through=new Date().toISOString().slice(0,10);const shift=(offset:number)=>new Date(Date.parse(`${through}T12:00:00.000Z`)+offset*86_400_000).toISOString().slice(0,10);
+  const through=new Date().toISOString().slice(0,10);const shift=(offset:number)=>new Date(Date.parse(`${through}T12:00:00.000Z`)+offset*86_400_000).toISOString().slice(0,10);
+  await pool.query(`insert into health_profiles(id,user_id,client_id,sleep_goal_hours,created_at,updated_at) values($1,$2,$3,8,$4,$4)`,[profileId,userId,clientId,`${shift(-40)}T00:00:00.000Z`]);
+  const owner={accountId:userId,clientId,tenantId};const careCase=await createCareCaseIfMissing(owner,profileId);
   await reviseGovernedGoal(owner,{kind:'steps',value:10000,effectiveFrom:shift(-40),source:'USER'});await reviseGovernedGoal(owner,{kind:'exercise_minutes',value:30,effectiveFrom:shift(-40),source:'USER'});
   const observations=[] as Parameters<typeof ingestHealthObservations>[1];
   for(let offset=-34;offset<=0;offset+=1){const day=shift(offset);const previous=shift(offset-1);const index=offset+34;const end=`${day}T06:30:00.000Z`;const start=`${previous}T22:30:00.000Z`;const add=(metricType:string,value:number,unit:string,extra:Record<string,unknown>={})=>observations.push({metricType,value,unit,measuredAtISO:end,sourceProvider:'qa',sourceRecordId:`${metricType}:${day}`,syncKey:`qa:${metricType}:${day}`,...extra} as never);
