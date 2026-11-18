@@ -24,7 +24,7 @@ export type RuntimeGoal = GovernedGoal & {
   kind:'steps'|'exercise_minutes'|'sleep_minutes'|'protein_grams'|'hydration_ml'|'mindfulness_minutes'|'mind_sessions';
   effectiveFrom:string;effectiveThrough?:string|null;
 };
-export type RuntimeNutritionDay={healthDay:string;complete:boolean;proteinGrams:number;foodQualityDimensions:number[];approvedClinicalMarkerScores:number[]};
+export type RuntimeNutritionDay={healthDay:string;complete:boolean;proteinGrams:number;foodQualityDimensions:number[];foodQualityStatus:'PROPOSAL_ONLY'|'UNAVAILABLE';foodQualityReason:string;approvedClinicalMarkerScores:number[]};
 export type RuntimeAssessment={healthDay:string;kind:'PSS_10'|'WELLBEING';score:number;minimum:number;maximum:number;validated:boolean};
 export type RuntimeMindDay={healthDay:string;moodCheckIns:number[];completedSessions:number|null;emotionalWellbeing:number[]};
 export type RuntimeLifestyleDay={healthDay:string;habitScores:number[]};
@@ -79,7 +79,17 @@ export const buildCandidateStarOrbRuntimeDay=(repositories:CandidateRuntimeRepos
   const activityBalance=calculateActivityBalanceCandidate({dailyActivityLoad:activityLoads,dailyRecoveryOrRest:rest}).value;const rhrHistory=Array.from({length:28},(_,index)=>metric(aggregates,dayShift(healthDay,index-28),'resting_heart_rate')).filter(finite);const currentRhr=metric(aggregates,healthDay,'resting_heart_rate');const lifestyle=repositories.lifestyle.find(row=>row.healthDay===healthDay);const recovery=calculateRecoveryCandidate({healthDay,calculatedAt:repositories.nowISO,freshness,sleep,activityBalance,currentHrv:currentHrv??NaN,hrvBaselineSameType:hrvHistory.length?mean(hrvHistory):NaN,currentRestingHeartRate:currentRhr??NaN,restingHeartRateBaseline:rhrHistory.length?mean(rhrHistory):NaN,baselineDays:Math.min(hrvHistory.length,rhrHistory.length),sleepBehaviour:sleep.score??NaN,activityDistribution:activityBalance??NaN,mindfulnessPractice:metric(aggregates,healthDay,'mindfulness_minutes')??NaN,explicitLifestyleHabits:lifestyle?.habitScores??[]});
   const proteinTarget=goalFor(repositories.goals,'protein_grams',healthDay,{min:20,max:300}).value;const hydrationTarget=goalFor(repositories.goals,'hydration_ml',healthDay,{min:500,max:6000}).value;const hydration=metric(aggregates,healthDay,'hydration_ml');
   const everydayNourishment=evaluateEverydayNutritionProposal({protein:nutrition&&proteinTarget?clamp(nutrition.proteinGrams/proteinTarget*100):NaN,hydration:hydration!=null&&hydrationTarget?clamp(hydration/hydrationTarget*100):NaN,foodQuality:nutrition?.foodQualityDimensions.length?mean(nutrition.foodQualityDimensions):NaN});
-  const recentMind=repositories.mind.filter(row=>row.healthDay<=healthDay&&row.healthDay>=dayShift(healthDay,-6)).sort((a,b)=>a.healthDay.localeCompare(b.healthDay));const moodScores=recentMind.flatMap(row=>row.moodCheckIns.slice(-1).map(value=>scale(value,1,5)));const sessionGoal=goalFor(repositories.goals,'mind_sessions',healthDay,{min:1,max:20}).value;const selfReportedMindWellness=evaluateSelfReportedMindWellnessProposal({moodScores,completedSessions:recentMind.reduce((sum,row)=>sum+(row.completedSessions??0),0),sessionGoal:sessionGoal==null?null:sessionGoal*7});
+  const requiredMindDays=Array.from({length:7},(_,index)=>dayShift(healthDay,index-6));
+  const recentMind=requiredMindDays.map(day=>repositories.mind.find(row=>row.healthDay===day)??null);
+  const moodScores=recentMind.flatMap(row=>row?.moodCheckIns.length?[scale(row.moodCheckIns.at(-1)!,1,5)]:[]);
+  const sessionGoal=goalFor(repositories.goals,'mind_sessions',healthDay,{min:1,max:20}).value;
+  const selfReportedMindWellness=evaluateSelfReportedMindWellnessProposal({
+    moodScores,
+    completedSessions:recentMind.reduce((sum,row)=>sum+(row?.completedSessions??0),0),
+    // mind_sessions is the explicit goal for this same seven-day proposal
+    // interval. Multiplying it by seven would silently change its unit.
+    sessionGoal
+  });
   return {healthDay,activity,sleep,nourishment,calm,mind,recovery,proposals:{everydayNourishment,selfReportedMindWellness}};
 };
 

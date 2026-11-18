@@ -12,7 +12,7 @@ export const evaluateSelfReportedMindWellnessProposal=(input:{
   completedSessions:number;
   sessionGoal:number|null;
 })=>{
-  if(input.moodScores.length<7||!input.moodScores.every(finite))return {score:null,status:'UNAVAILABLE' as const,version:SELF_REPORTED_MIND_WELLNESS_VERSION,reason:'SEVEN_DAYS_OF_SELF_REPORTED_MOOD_REQUIRED' as const};
+  if(input.moodScores.length!==7||!input.moodScores.every(finite))return {score:null,status:'UNAVAILABLE' as const,version:SELF_REPORTED_MIND_WELLNESS_VERSION,reason:'SEVEN_DISTINCT_DAYS_OF_SELF_REPORTED_MOOD_REQUIRED' as const};
   if(!finite(input.completedSessions)||!finite(input.sessionGoal)||input.sessionGoal<=0)return {score:null,status:'UNAVAILABLE' as const,version:SELF_REPORTED_MIND_WELLNESS_VERSION,reason:'COMPLETED_SESSIONS_AND_EXPLICIT_GOAL_REQUIRED' as const};
   const recent=input.moodScores.slice(-7).map(clamp);const mood=mean(recent);const average=mean(recent);
   const stability=clamp(100-Math.sqrt(mean(recent.map(value=>(value-average)**2))));

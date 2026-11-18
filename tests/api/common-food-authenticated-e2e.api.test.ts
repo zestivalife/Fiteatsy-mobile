@@ -316,6 +316,9 @@ test('QA_TEST identities exercise authenticated supported generation, vegan fail
       const consumed = await postJson(server.baseUrl, '/v1/platform/nutrition-experience/event', consumedPayload, { headers: authHeaders(client.token) });
       assert.equal(consumed.response.status, 201, JSON.stringify(consumed.body));
       assert.equal(consumed.body.mealStates.find((item: { mealHeadId: string }) => item.mealHeadId === 'earlyMorning')?.status, 'CONSUMED_APPROVED');
+      const consumedFoods=consumed.body.meals.find((item:{key:string})=>item.key==='earlyMorning')?.consumed?.canonicalConsumedFoods;
+      assert.ok(Array.isArray(consumedFoods)&&consumedFoods.length>0);
+      assert.ok(consumedFoods.every((item:{canonicalFoodId:string|null;verified:boolean;addedSugarGrams:number|null})=>typeof item.canonicalFoodId==='string'&&item.verified===true&&item.addedSugarGrams===null));
 
       const repeated = await postJson(server.baseUrl, '/v1/platform/nutrition-experience/event', consumedPayload, { headers: authHeaders(client.token) });
       assert.equal(repeated.response.status, 201, JSON.stringify(repeated.body));

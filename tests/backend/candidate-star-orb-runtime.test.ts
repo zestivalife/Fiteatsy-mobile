@@ -33,7 +33,7 @@ for(let offset=-34;offset<=0;offset+=1){
 
 const repositories:CandidateRuntimeRepositories={
   observations,goals,fallbackOffsetMinutes:0,nowISO:'2026-11-17T13:00:00.000Z',
-  nutrition:Array.from({length:7},(_,index)=>({healthDay:shifted(index-6),complete:true,proteinGrams:82+index*2,foodQualityDimensions:[76+index,82+index],approvedClinicalMarkerScores:[78+index]})),
+  nutrition:Array.from({length:7},(_,index)=>({healthDay:shifted(index-6),complete:true,proteinGrams:82+index*2,foodQualityDimensions:[76+index,82+index],foodQualityStatus:'PROPOSAL_ONLY' as const,foodQualityReason:'NON_DIAGNOSTIC_CONSUMED_FOOD_PROJECTION',approvedClinicalMarkerScores:[78+index]})),
   assessments:Array.from({length:7},(_,index)=>[
     {healthDay:shifted(index-6),kind:'PSS_10' as const,score:14-index,minimum:0,maximum:40,validated:true},
     {healthDay:shifted(index-6),kind:'WELLBEING' as const,score:62+index*2,minimum:0,maximum:100,validated:true}
@@ -54,6 +54,7 @@ test('runtime adapters calculate eligible domains and fail Recovery closed witho
 
 test('runtime Recovery consumes complete explicit lifestyle records without inferring omitted habits',()=>{
   const complete={...repositories,lifestyle:Array.from({length:7},(_,index)=>({healthDay:shifted(index-6),habitScores:[100,100,0,100]}))};
+  assert.deepEqual(buildCandidateStarOrbRuntimeWindow(complete,through).days.map(day=>day.recovery.score),[80.84,81.36,81.13,80.7,80.31,80.28,80.28]);
   const current=buildCandidateStarOrbRuntimeDay(complete,'2026-11-17');
   assert.equal(current.recovery.inputsMissing.includes('explicit_lifestyle_habits'),false);
   assert.equal(typeof current.recovery.score,'number');

@@ -49,13 +49,15 @@ HRV uses at least 14 days of the same type only: `clamp(50 + (current / personal
 
 Mood is the mean of explicit 0–100 check-ins. Validated Wellbeing is the scale-specific upstream 0–100 result. Completed Sessions uses a governed goal. Emotional Pattern uses seven explicit self-reports: `clamp(100 - populationStandardDeviation)`. No wearable value is used or inferred. The result is non-diagnostic; confidence is moderate at seven days and high at 14 days.
 
+The 30% Mood / 25% Wellbeing / 20% Sessions / 25% Emotional History weights appearing in the later release-package draft were never implemented, versioned, or justified. They are an unresolved product alternative, not the executable method. Until Product approves a separately versioned change, this register and the tested 40% / 35% / 15% / 10% candidate remain authoritative for engineering validation only.
+
 ## Recovery
 
 `Recovery = Sleep × 0.40 + BodyRecovery × 0.30 + ActivityBalance × 0.20 + LifestyleBalance × 0.10`.
 
-`BodyRecovery = Sleep × 0.40 + sameTypeHRV × 0.30 + RestingHeartRate × 0.30`. HRV uses the Calm personal-baseline transformation. RHR uses `clamp(50 - (current/baseline - 1)×100)`. Both require at least 14 personal-baseline days.
+`BodyRecovery = mean(sameTypeHRV, RestingHeartRate)`. HRV uses the Calm personal-baseline transformation. RHR uses `clamp(50 - (current/baseline - 1)×100)`. Both require at least 14 personal-baseline days. Sleep is already the independent 40% Recovery child and is not counted again inside Body Recovery.
 
-`LifestyleBalance = SleepBehaviour × 0.40 + ActivityDistribution × 0.35 + MindfulnessPractice × 0.15 + mean(explicitLifestyleHabits) × 0.10`. Each input must be a verified independent 0–100 behaviour component. Recovery never consumes Overall Health Intelligence, and Body Recovery does not feed Sleep or Activity Balance, preventing circularity.
+`LifestyleBalance = mean(four explicit daily lifestyle habits)`, where each explicit Yes is 100 and No is 0. The four proposal inputs are consistent daily routine, recovery/rest practice, evening screen boundary, and outdoor/daylight routine. Missing answers make the component unavailable. Sleep behaviour, Activity Distribution and mindfulness are not reused inside Lifestyle Balance, preventing double counting. Recovery never consumes Overall Health Intelligence.
 
 ## Seven-day Recovery
 

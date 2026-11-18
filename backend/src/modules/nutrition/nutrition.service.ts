@@ -3203,6 +3203,24 @@ export const logClientNutritionEvent = async (owner: ClientOwnershipContext, inp
   }
   const eventType = input.litres != null ? 'water_logged' : 'meal_logged';
   const eventTimeISO = input.consumedAtISO ?? new Date().toISOString();
+  const canonicalConsumedFoods = selectedCombination
+    ? (Array.isArray(selectedCombination.components) ? selectedCombination.components : []).map((component) => {
+        const snapshot = component as Record<string, unknown>;
+        const nutrient = snapshot.nutrition as Record<string, unknown> | undefined;
+        return {
+          canonicalFoodId: typeof snapshot.foodId === 'string' ? snapshot.foodId : null,
+          canonicalFoodVersion: Number.isInteger(snapshot.foodVersion) ? Number(snapshot.foodVersion) : null,
+          verified: typeof snapshot.foodId === 'string' && Number.isInteger(snapshot.foodVersion),
+          // The frozen option snapshot currently has no governed food-group
+          // role or added-sugar nutrient. Keep both explicitly unknown; total
+          // sugar must never be substituted for added sugar.
+          foodGroup: null,
+          fibreGrams: typeof nutrient?.fibre === 'number' && Number.isFinite(nutrient.fibre) ? nutrient.fibre : null,
+          addedSugarGrams: null,
+          source: 'published_governed_common_food_snapshot',
+        };
+      })
+    : [];
   assertCurrentNutritionBusinessDate(eventTimeISO);
   await addHealthEvent({
     careCaseId: careCase.id,
@@ -3223,6 +3241,7 @@ export const logClientNutritionEvent = async (owner: ClientOwnershipContext, inp
       carbsGrams: selectedCombination ? (selectedCombination.nutrition as Record<string,unknown>)?.carbohydrate ?? null : selectedOption?.carbsGrams ?? input.carbsGrams ?? null,
       fatGrams: selectedCombination ? (selectedCombination.nutrition as Record<string,unknown>)?.fat ?? null : selectedOption?.fatGrams ?? input.fatGrams ?? null,
       fibreGrams: selectedCombination ? (selectedCombination.nutrition as Record<string,unknown>)?.fibre ?? null : selectedOption?.fibreGrams ?? input.fibreGrams ?? null,
+      canonicalConsumedFoods,
       litres: input.litres ?? null,
       nutritionDate: nutritionDateKey(eventTimeISO),
     },

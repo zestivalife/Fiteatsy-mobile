@@ -24,6 +24,7 @@ test('self-reported Mind alternative is separately versioned, non-diagnostic and
   assert.equal(evaluateSelfReportedMindWellnessProposal({moodScores:[70],completedSessions:1,sessionGoal:1}).score,null);
   const result=evaluateSelfReportedMindWellnessProposal({moodScores:[70,70,70,70,70,70,70],completedSessions:2,sessionGoal:2});
   assert.equal(result.score,82);assert.equal(result.status,'PROPOSAL_ONLY');
+  assert.equal(evaluateSelfReportedMindWellnessProposal({moodScores:[70,70,70,70,70,70,70,70],completedSessions:2,sessionGoal:2}).score,null);
   assert.match(result.label,/Non-diagnostic/);
 });
 

@@ -10,6 +10,7 @@ import type {
   RuntimeNutritionDay
 } from './candidate-star-orb-runtime.js';
 import { listGovernedGoals } from './governed-goals.repository.js';
+import { projectConsumedFoodQuality } from '@fiteatsy/health-intelligence';
 
 export type StarOrbSourceStatus = {
   source: string;
@@ -120,16 +121,33 @@ export async function loadStarOrbRuntimeInputs(
     const targetProtein = finiteOrNull(experience.dailyNutrition.targetProtein);
     const hydrationTarget = finiteOrNull(experience.dailyNutrition.hydrationTargetMl);
     const hydrationConsumed = finiteOrNull(experience.dailyNutrition.hydrationConsumedMl);
+    const consumedFoods = experience.meals
+      .filter((meal) => meal.state === 'CONSUMED_APPROVED' || meal.state === 'CONSUMED_OUT_OF_PLAN')
+      .flatMap((meal) => {
+        const rows = (meal.consumed as Record<string,unknown>|null)?.canonicalConsumedFoods;
+        return Array.isArray(rows) ? rows : [];
+      })
+      .map((row) => {
+        const value=row as Record<string,unknown>;
+        return {
+          verified:value.verified===true,
+          foodGroup:typeof value.foodGroup==='string'?value.foodGroup:null,
+          fibreGrams:finiteOrNull(value.fibreGrams),
+          addedSugarGrams:finiteOrNull(value.addedSugarGrams)
+        };
+      });
+    const complete = experience.mealSummary.totalMealHeads > 0 && experience.mealSummary.pendingMeals === 0;
+    const foodQuality = projectConsumedFoodQuality({logComplete:complete,consumedFoods});
     if (targetProtein != null) goals.push({kind:'protein_grams',value:targetProtein,source:'CONSULTANT',active:true,approved:true,updatedAt:experience.version.updatedAtISO,effectiveFrom:day,effectiveThrough:day});
     if (hydrationTarget != null) goals.push({kind:'hydration_ml',value:hydrationTarget,source:'CONSULTANT',active:true,approved:true,updatedAt:experience.version.updatedAtISO,effectiveFrom:day,effectiveThrough:day});
     if (hydrationConsumed != null && hydrationConsumed > 0) nutritionHydration.set(day, hydrationConsumed);
     nutrition.push({
       healthDay: day,
-      complete: experience.mealSummary.totalMealHeads > 0 && experience.mealSummary.pendingMeals === 0,
+      complete,
       proteinGrams: consumedProtein ?? Number.NaN,
-      // Plan adherence is not silently relabelled as food quality. No approved
-      // clinical-marker scoring repository exists in the current schema.
-      foodQualityDimensions: [],
+      foodQualityDimensions: foodQuality.score==null?[]:[foodQuality.score],
+      foodQualityStatus:foodQuality.status,
+      foodQualityReason:foodQuality.reason,
       approvedClinicalMarkerScores: []
     });
   }
@@ -176,6 +194,7 @@ export async function loadStarOrbRuntimeInputs(
       observations:{source:'health_observations',status:'INTEGRATED'},
       sleepGoal:{source:'health_profiles.sleep_goal_hours',status:sleepHours==null?'UNAVAILABLE':'INTEGRATED',...(sleepHours==null?{reason:'NO_EXPLICIT_SLEEP_GOAL'}:{})},
       nutrition:{source:'nutrition health events through getClientNutritionExperience',status:'INTEGRATED'},
+      everydayNourishmentFoodQuality:{source:'canonicalConsumedFoods from governed published option snapshots',status:nutrition.some(day=>day.foodQualityStatus==='PROPOSAL_ONLY')?'INTEGRATED':'UNAVAILABLE',...(nutrition.some(day=>day.foodQualityStatus==='PROPOSAL_ONLY')?{}:{reason:'GOVERNED_FOOD_GROUP_AND_ADDED_SUGAR_METADATA_UNAVAILABLE'})},
       stress:{source:'assessment_results(PSS10)',status:'INTEGRATED'},
       mood:{source:'daily_checkins.mood',status:'INTEGRATED'},
       activityGoals:{source:'governed_wellness_goals',status:storedGoals.some(row=>row.goal_kind==='steps'||row.goal_kind==='exercise_minutes')?'INTEGRATED':'UNAVAILABLE',...(storedGoals.some(row=>row.goal_kind==='steps'||row.goal_kind==='exercise_minutes')?{}:{reason:'NO_PERSISTED_NUMERIC_STEPS_OR_EXERCISE_GOAL'})},
