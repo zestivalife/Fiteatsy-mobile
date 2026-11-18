@@ -23,6 +23,11 @@ const clamp=(v:number)=>Math.max(0,Math.min(100,v));
 const round=(v:number)=>Number(clamp(v).toFixed(2));
 const mean=(v:number[])=>v.reduce((s,n)=>s+n,0)/v.length;
 const goal=(actual:number,target:number)=>clamp(Math.max(0,actual)/target*100);
+// Reuse the established goal-independent fitness normalisation already used by
+// the production health calculation engine. These are measurement reference
+// scales, not user goals: the user's Personal Activity Goals remain independent.
+export const normalizeMeasuredActivityComponent=(kind:'steps'|'exercise_minutes',value:number)=>
+  finite(value)?clamp(Math.round(kind==='steps'?value/100:value/45*100)):null;
 const partial=(components:Array<{name:string;value:number|null;weight:number}>)=>{
   const available=components.filter((component):component is {name:string;value:number;weight:number}=>finite(component.value));
   const availableWeight=available.reduce((sum,component)=>sum+component.weight,0);
@@ -51,11 +56,11 @@ export const resolveGovernedGoal=(goals:{user?:GovernedGoal|null;consultant?:Gov
 export type CandidateActivityInput={healthDay:string;calculatedAt:string;freshness:string;steps:number;exerciseMinutes:number;stepGoal:GoalResolution;exerciseGoal:GoalResolution;dailyActivityLoad:number[];dailyRecoveryOrRest:number[]};
 export const calculateActivityCandidate=(i:CandidateActivityInput):CandidateStarOrbScore=>{
   const balance=calculateActivityBalanceCandidate(i);const missing:string[]=[];
-  if(!finite(i.steps))missing.push('steps');if(!finite(i.exerciseMinutes))missing.push('exercise_minutes');if(i.stepGoal.value==null)missing.push('step_goal');if(i.exerciseGoal.value==null)missing.push('exercise_goal');if(balance.value==null)missing.push(...balance.missingDependencies.map(v=>`activity_balance:${v}`));
-  const steps=finite(i.steps)&&i.stepGoal.value!=null?goal(i.steps,i.stepGoal.value):null;
-  const exercise=finite(i.exerciseMinutes)&&i.exerciseGoal.value!=null?goal(i.exerciseMinutes,i.exerciseGoal.value):null;
+  if(!finite(i.steps))missing.push('steps');if(!finite(i.exerciseMinutes))missing.push('exercise_minutes');if(balance.value==null)missing.push(...balance.missingDependencies.map(v=>`activity_balance:${v}`));
+  const steps=normalizeMeasuredActivityComponent('steps',i.steps);
+  const exercise=normalizeMeasuredActivityComponent('exercise_minutes',i.exerciseMinutes);
   const result=partial([{name:'steps',value:steps,weight:.4},{name:'exercise_minutes',value:exercise,weight:.4},{name:'activity_balance',value:balance.value,weight:.2}]);
-  return score({domain:'activity',healthDay:i.healthDay,calculatedAt:i.calculatedAt,value:result.value,freshness:i.freshness,used:result.used,missing,factors:[...(steps==null?[]:[`Steps ${round(steps)}`]),...(exercise==null?[]:[`Exercise ${round(exercise)}`]),...(balance.value==null?[]:[`Balance ${balance.value}`])],history:i.dailyActivityLoad.length,highWindow:28,coverage:result.coverage,explanation:result.value==null?'Activity needs at least one measured component with an explicit goal.':`Wellness Activity ${result.complete?'complete':'partial'} (${result.coverage}% component coverage).`});
+  return score({domain:'activity',healthDay:i.healthDay,calculatedAt:i.calculatedAt,value:result.value,freshness:i.freshness,used:result.used,missing,factors:[...(steps==null?[]:[`Steps ${round(steps)}`]),...(exercise==null?[]:[`Exercise ${round(exercise)}`]),...(balance.value==null?[]:[`Balance ${balance.value}`])],history:i.dailyActivityLoad.length,highWindow:28,coverage:result.coverage,explanation:result.value==null?'Activity needs at least one measured fitness component.':`Wellness Activity ${result.complete?'complete':'partial'} (${result.coverage}% component coverage).`});
 };
 
 export type SleepNight={asleepMinutes:number;opportunityMinutes:number;deepMinutes:number;remMinutes:number;bedtimeLocalMinute:number;wakeLocalMinute:number};

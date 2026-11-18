@@ -28,7 +28,7 @@ const completeScores=()=>{
 test('candidate golden fixture calculates every visible domain and central Recovery',()=>{
   const actual=completeScores();
   assert.deepEqual(Object.fromEntries(Object.entries(actual).map(([key,value])=>[key,value.score])),{
-    activity:89.4,sleep:95.68,nourishment:84,calm:69,mind:78.85,recovery:81.17
+    activity:76.2,sleep:95.68,nourishment:84,calm:69,mind:78.85,recovery:81.17
   });
   for(const result of Object.values(actual)){
     assert.equal(result.status,'CALCULATED');
@@ -53,10 +53,13 @@ test('available components produce partial scores while missing components remai
   const nourishment=calculateNourishmentCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',proteinGrams:0,proteinTarget:resolved(100),hydrationMl:0,hydrationTarget:resolved(2500),foodQualityDimensions:[],approvedClinicalMarkerScores:[]});
   assert.equal(nourishment.score,0);assert.equal(nourishment.status,'PARTIAL');assert.equal(nourishment.componentCoverage,45);
   const activity=calculateActivityCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',steps:8000,exerciseMinutes:30,stepGoal:{value:null,source:null,status:'GOAL_REQUIRED',reason:'none'},exerciseGoal:resolved(30),dailyActivityLoad:loads,dailyRecoveryOrRest:rests});
-  assert.notEqual(activity.score,null);assert.equal(activity.status,'PARTIAL');assert.ok(activity.inputsMissing.includes('step_goal'));
+  assert.notEqual(activity.score,null);assert.equal(activity.status,'CALCULATED');assert.equal(activity.inputsMissing.includes('step_goal'),false);
   const stepsOnly=calculateActivityCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',steps:6400,exerciseMinutes:Number.NaN,stepGoal:resolved(8000),exerciseGoal:{value:null,source:null,status:'GOAL_REQUIRED',reason:'none'},dailyActivityLoad:[],dailyRecoveryOrRest:[]});
-  assert.equal(stepsOnly.score,80);assert.equal(stepsOnly.status,'PARTIAL');assert.equal(stepsOnly.componentCoverage,40);
+  assert.equal(stepsOnly.score,64);assert.equal(stepsOnly.status,'PARTIAL');assert.equal(stepsOnly.componentCoverage,40);
   assert.deepEqual(stepsOnly.inputsUsed,['steps']);
+  const measured=calculateActivityCandidate({healthDay:'2026-11-18',calculatedAt,freshness:'CURRENT',steps:12700,exerciseMinutes:28,stepGoal:{value:null,source:null,status:'GOAL_REQUIRED',reason:'none'},exerciseGoal:{value:null,source:null,status:'GOAL_REQUIRED',reason:'none'},dailyActivityLoad:[],dailyRecoveryOrRest:[]});
+  assert.equal(measured.score,81);assert.equal(measured.status,'PARTIAL');assert.equal(measured.componentCoverage,80);
+  assert.deepEqual(measured.inputsUsed,['steps','exercise_minutes']);
   const invalidNights=nights.map(night=>({...night,asleepMinutes:0,deepMinutes:0,remMinutes:0}));
   const sleep=calculateSleepCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',target:resolved(480),nights:invalidNights});
   assert.notEqual(sleep.score,null);assert.equal(sleep.status,'PARTIAL');assert.ok(sleep.inputsMissing.includes('valid_sleep_stages'));

@@ -6,6 +6,7 @@ import { HealthScoreInput, clearHealthScoresForOwner, createHealthScores } from 
 import { HEALTH_OBSERVATION_FRESHNESS_MS, isCurrentHealthObservation } from './health-freshness.js';
 import {buildHealthIntelligenceV1} from './health-intelligence-projection.js';
 import {replaceDailyAggregates} from './health-aggregates.repository.js';
+import {normalizeMeasuredActivityComponent} from '@fiteatsy/health-intelligence';
 
 export const CALCULATION_VERSION = 'FIT-WELLNESS-200.v1';
 
@@ -83,10 +84,10 @@ const scoreFromReferenceRange = (value: number, referenceRange: string | null): 
 const scoreObservation = (metricType: string, value: number): number | null => {
   switch (metricType) {
     case 'steps':
-      return clamp(Math.round((value / 10000) * 100));
+      return normalizeMeasuredActivityComponent('steps',value);
     case 'active_minutes':
     case 'workout_minutes':
-      return clamp(Math.round((value / 45) * 100));
+      return normalizeMeasuredActivityComponent('exercise_minutes',value);
     case 'sleep_minutes':
       return clamp(Math.round(100 - Math.abs(value - 450) / 3));
     case 'hrv_ms':

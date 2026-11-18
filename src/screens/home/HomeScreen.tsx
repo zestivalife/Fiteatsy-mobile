@@ -151,9 +151,6 @@ export const activityHomeState = (input: {
       : 'Complete' };
   }
   if (!input.hasCurrentDayMeasurement) return { label: 'No Activity data for today' };
-  if ((input.inputsMissing ?? []).some((item) => item.includes('goal') || item.includes('target'))) {
-    return { label: 'Set your Activity goal' };
-  }
   return { label: scoreUnavailableLabel(input) };
 };
 

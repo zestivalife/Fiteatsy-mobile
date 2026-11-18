@@ -93,6 +93,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const queuedSyncOptions = useRef<{ forceSourceBackfill?: boolean; liveOnly?: boolean }>({});
   const awaitingPermissionReturn = useRef(false);
   const foregroundRefreshAt = useRef(0);
+  const syncGeneration = useRef(0);
+  const automaticallySyncedScope = useRef<string|null>(null);
   const forceBackfill = useRef(false);
   const connectionIdOverride = useRef<string | null>(null);
   const [providerState, setProviderState] = useState<HealthProviderState>('AVAILABLE');
@@ -162,6 +164,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
 
   const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean; liveOnly?: boolean } = {}) => {
     if (!authSession || !localScope) return;
+    const requestedGeneration=++syncGeneration.current;
     if (inFlight.current) {
       refreshQueued.current = true;
       queuedSyncOptions.current = {
@@ -171,6 +174,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       return;
     }
     inFlight.current = true;
+    const activeGeneration=requestedGeneration;
     traceSessionLifecycle('HEALTH_SYNC_START', { trigger: options.forceSourceBackfill ? 'BACKFILL' : 'AUTOMATIC_OR_MANUAL' });
     setUploadState('UPLOADING');
     setMessage(`Reading ${sourceName}…`);
@@ -183,7 +187,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         observations: HealthObservationDraft[];
         aggregates: CanonicalDailyAggregate[];
       }) => {
-        if (!mounted.current) return;
+        if (!mounted.current||activeGeneration!==syncGeneration.current) return;
         mergeLocalObservations(localResult.observations);
         mergePresentationObservations(localResult.payload.presentationObservations ?? []);
         setAggregates(localResult.aggregates);
@@ -211,7 +215,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         trigger: 'MANUAL',
         localScope
       } : undefined, { ...options, localScope, onLocalComplete: applyLocalCompletion });
-      if (!mounted.current) return;
+      if (!mounted.current||activeGeneration!==syncGeneration.current) return;
       mergeLocalObservations(result.observations);
       mergePresentationObservations(result.payload.presentationObservations ?? []);
       setSelectedDeviceId(adapter.appId);
@@ -243,7 +247,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       setMessage(count ? `${count} local records available` : `No visible ${sourceName} data found in the requested date ranges.`);
       void refreshRemoteSnapshot();
     } catch (error) {
-      if (!mounted.current) return;
+      if (!mounted.current||activeGeneration!==syncGeneration.current) return;
       if (error instanceof HealthSyncUploadPendingError || error instanceof HealthSyncPostUploadRefreshError) {
         mergeLocalObservations(error.observations);
         mergePresentationObservations(error.payload.presentationObservations ?? []);
@@ -384,25 +388,24 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     });
   }, [aggregates, localHydrated, localScope, onboarding?.gender, onboarding?.sleepGoalHours]);
 
+  useEffect(()=>{
+    if(!localHydrated||!localScope||!authSession||automaticallySyncedScope.current===localScope)return;
+    automaticallySyncedScope.current=localScope;
+    void syncLocalMetrics({liveOnly:true});
+  },[authSession,localHydrated,localScope,syncLocalMetrics]);
+
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active') return;
       const now = Date.now();
       if (now - foregroundRefreshAt.current < 1_500) return;
       foregroundRefreshAt.current = now;
-      if (!awaitingPermissionReturn.current) {
-        // Reconcile lightweight server state only. Native HealthKit reads are
-        // explicitly user-triggered and must never run merely because the app
-        // launched or returned to the foreground.
-        void refreshRemoteSnapshot();
-        return;
-      }
       const shouldBackfill = awaitingPermissionReturn.current || forceBackfill.current;
       awaitingPermissionReturn.current = false;
-      void syncLocalMetrics({ forceSourceBackfill: shouldBackfill });
+      void syncLocalMetrics({ forceSourceBackfill: shouldBackfill,liveOnly:!shouldBackfill });
     });
     return () => subscription.remove();
-  }, [refreshRemoteSnapshot, syncLocalMetrics]);
+  }, [syncLocalMetrics]);
 
   const latestByMetric = useMemo(() => buildPresentedHealthObservations(observations,presentationObservations,aggregates),
     [aggregates,observations,presentationObservations]);

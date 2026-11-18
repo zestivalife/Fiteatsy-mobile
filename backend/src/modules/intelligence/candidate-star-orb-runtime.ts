@@ -4,6 +4,7 @@ import {
   calculateActivityCandidate,
   calculateCalmCandidate,
   calculateMindCandidate,
+  normalizeMeasuredActivityComponent,
   calculateNourishmentCandidate,
   calculateRecoveryCandidate,
   calculateSevenDayRecoveryCandidate,
@@ -69,7 +70,7 @@ export const buildCandidateStarOrbRuntimeDay=(repositories:CandidateRuntimeRepos
   const aggregates=aggregateCanonicalHealthObservations(repositories.observations,{fallbackOffsetMinutes:repositories.fallbackOffsetMinutes,nowMs:Date.parse(repositories.nowISO)});
   const freshness=Date.parse(repositories.nowISO)-Date.parse(`${healthDay}T23:59:59.999Z`)>36*60*60_000?'STALE':'CURRENT';
   const steps=metric(aggregates,healthDay,'steps');const exercise=metric(aggregates,healthDay,'active_minutes')??metric(aggregates,healthDay,'workout_minutes');
-  const activityLoads=Array.from({length:14},(_,index)=>{const day=dayShift(healthDay,index-13);const s=metric(aggregates,day,'steps');const e=metric(aggregates,day,'active_minutes')??metric(aggregates,day,'workout_minutes');const sg=goalFor(repositories.goals,'steps',day,{min:1000,max:50000});const eg=goalFor(repositories.goals,'exercise_minutes',day,{min:5,max:300});return s==null||e==null||sg.value==null||eg.value==null?NaN:clamp(s/sg.value*50+e/eg.value*50);});
+  const activityLoads=Array.from({length:14},(_,index)=>{const day=dayShift(healthDay,index-13);const s=metric(aggregates,day,'steps');const e=metric(aggregates,day,'active_minutes')??metric(aggregates,day,'workout_minutes');const ss=s==null?null:normalizeMeasuredActivityComponent('steps',s);const es=e==null?null:normalizeMeasuredActivityComponent('exercise_minutes',e);return ss==null||es==null?NaN:(ss+es)/2;});
   const rest=Array.from({length:7},(_,index)=>{const day=dayShift(healthDay,index-6);const asleep=metric(aggregates,day,'sleep_minutes');const target=goalFor(repositories.goals,'sleep_minutes',day,{min:360,max:600});return asleep==null||target.value==null?NaN:clamp(asleep/target.value*100);});
   const activity=calculateActivityCandidate({healthDay,calculatedAt:repositories.nowISO,freshness,steps:steps??NaN,exerciseMinutes:exercise??NaN,stepGoal:goalFor(repositories.goals,'steps',healthDay,{min:1000,max:50000}),exerciseGoal:goalFor(repositories.goals,'exercise_minutes',healthDay,{min:5,max:300}),dailyActivityLoad:activityLoads,dailyRecoveryOrRest:rest});
   const nights=sleepNights(repositories,healthDay);const sleep=calculateSleepCandidate({healthDay,calculatedAt:repositories.nowISO,freshness,target:goalFor(repositories.goals,'sleep_minutes',healthDay,{min:360,max:600}),nights});

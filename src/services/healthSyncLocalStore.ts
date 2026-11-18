@@ -157,6 +157,22 @@ export const performApprovedStaleHealthQueueCleanup = (scope: string) =>
     return removed;
   });
 
+const ACTIVITY_UPLOAD_METRICS = new Set(['steps','distance','active_energy','active_minutes','workout_minutes']);
+/** Removes only unacknowledged Activity uploads before a fresh platform read.
+ * Successfully uploaded observations, history, aggregates and scores remain.
+ * The new daily platform snapshots are then persisted with stable identities. */
+export const discardObsoletePendingActivityUploads = (scope:string) =>
+  serializeScopeOperation(scope,async()=>{
+    const state=await readState(scope);let removed=0;
+    for(const [recordKey,record] of Object.entries(state.records)){
+      if(!record.uploaded&&ACTIVITY_UPLOAD_METRICS.has(record.observation.metricType)){
+        delete state.records[recordKey];removed+=1;
+      }
+    }
+    if(removed)await writeState(scope,state);
+    return removed;
+  });
+
 export const readLocalHealthProviderConnected = (scope: string) =>
   serializeScopeOperation(scope, async () => (await readState(scope)).providerConnected);
 

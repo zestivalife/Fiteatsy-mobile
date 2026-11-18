@@ -7,7 +7,8 @@ import { getHealthScoreSummary, HealthScoreSummary } from './healthIntelligenceS
 import { beginWearableSyncRun, commitWearableCheckpoint, finishWearableSyncRun, type GovernedProvider } from './wearablePlatformService';
 import { buildHealthSourceDiagnostics, type HealthSourceMetricDiagnostic } from './healthSourceDiagnostics';
 import { acknowledgeLocalObservations, persistLocalHealthPresentationObservations, persistLocalSyncBatch, readLocalSyncCursors,
-  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded,readLocalHealthQueueDiagnostics } from './healthSyncLocalStore';
+  readPendingLocalObservations,recomputeLocalHealthAggregates,markLocalHealthUploaded,readLocalHealthQueueDiagnostics,
+  discardObsoletePendingActivityUploads } from './healthSyncLocalStore';
 import { emitHealthSyncDiagnostic, newHealthSyncCorrelationId } from './healthSyncObservability';
 
 export type HealthSyncConnectionState =
@@ -223,6 +224,7 @@ export const runHealthSync = async (
     // Local source access is the first I/O boundary. A backend checkpoint lookup
     // must never delay or prevent HealthKit / Health Connect from returning data.
     const localScope = options.localScope ?? governed?.localScope ?? governed?.connectionId ?? `ungoverned:${appId}`;
+    await discardObsoletePendingActivityUploads(localScope);
     const localCursors = await readLocalSyncCursors(localScope);
     const adapter = getHealthPlatformAdapter();
     if (adapter.appId !== appId) throw new Error('health_provider_not_available');

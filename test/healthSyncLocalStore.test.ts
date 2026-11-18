@@ -17,6 +17,7 @@ import { acknowledgeLocalObservations, countPendingLocalObservations, markLocalH
   readLocalSyncCursors, readPendingLocalObservations, persistLocalCanonicalHealthSnapshot,
   readLocalCanonicalHealthSnapshot, recomputeLocalHealthAggregates, readLocalHealthAggregates,
   ensureLocalHealthAggregatesCurrent, performApprovedStaleHealthQueueCleanup,
+  discardObsoletePendingActivityUploads,
   readLocalHealthBootstrapSnapshot } from '../src/services/healthSyncLocalStore';
 import { calculateCanonicalHealthIntelligence } from '../src/services/localHealthIntelligence';
 
@@ -45,6 +46,17 @@ describe('durable local health sync store', () => {
     await persistLocalSyncBatch('connection-1', [observation(100)], { steps: 'anchor-2' });
     expect(await readPendingLocalObservations('connection-1')).toEqual([]);
     expect(await readLocalSyncCursors('connection-1')).toEqual({ steps: 'anchor-2' });
+  });
+
+  it('discards only obsolete pending Activity uploads and preserves acknowledged history',async()=>{
+    const scope='account:user-1:apple-health';
+    await persistLocalSyncBatch(scope,[observation(100,false,'uploaded')],{steps:'anchor-1'});
+    const uploaded=await readPendingLocalObservations(scope);
+    await acknowledgeLocalObservations(scope,uploaded.map(item=>item.recordKey));
+    await persistLocalSyncBatch(scope,[observation(200,false,'pending')],{steps:'anchor-2'});
+    expect(await discardObsoletePendingActivityUploads(scope)).toBe(1);
+    expect(await readPendingLocalObservations(scope)).toEqual([]);
+    expect((await readLocalHealthObservations(scope)).map(item=>item.sourceRecordId)).toEqual(['uploaded']);
   });
 
   it('requeues changed records and durably retains tombstones', async () => {

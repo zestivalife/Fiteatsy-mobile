@@ -69,11 +69,11 @@ test('pending score copy identifies actionable goals, history, methodology, and 
   expect(scoreUnavailableLabel({status:'ERROR'})).toBe('Scoring unavailable');
 });
 
-test('Activity Home state distinguishes today data, missing goals, and partial scores',()=>{
+test('Activity Home state distinguishes today data and measured partial scores without requiring goals',()=>{
   expect(activityHomeState({score:null,status:'INSUFFICIENT_DATA',inputsMissing:['step_goal'],hasCurrentDayMeasurement:false}))
     .toEqual({label:'No Activity data for today'});
   expect(activityHomeState({score:null,status:'INSUFFICIENT_DATA',inputsMissing:['step_goal'],hasCurrentDayMeasurement:true}))
-    .toEqual({label:'Set your Activity goal'});
+    .toEqual({label:'Goal required'});
   expect(activityHomeState({score:64,status:'PARTIAL',componentCoverage:40,inputsMissing:['exercise_minutes'],hasCurrentDayMeasurement:true}))
     .toEqual({label:'Partial · 40% coverage'});
   expect(activityHomeState({score:82,status:'CALCULATED',componentCoverage:100,inputsMissing:[],hasCurrentDayMeasurement:true}))
