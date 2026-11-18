@@ -102,10 +102,13 @@ export const HEALTH_SYNC_PIPELINE_TIMEOUT_MS = 90_000;
 // JSON body limit. First-sync heart-rate samples carry source metadata and can
 // exceed that boundary when the previous 250-record chunk is used.
 export const HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50;
-// A foreground sync must not remain active while draining years of durable
-// history. The queue resumes later and stable record identity prevents an
-// unchanged HealthKit sample from being enqueued twice.
-export const HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 10;
+// The native first-sync reader is itself bounded (250 anchored samples per
+// supported metric plus presentation aggregates). Allow that bounded payload
+// to drain in one explicit sync while retaining small, idempotently
+// acknowledged HTTP batches. The previous 10-batch ceiling stranded common
+// Apple Health backfills above 500 records with no automatic continuation, so
+// final recalculation and lastFullySyncedAtISO were never reached.
+export const HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 50;
 export const withHealthSyncPipelineTimeout = <T>(operation: Promise<T>, code: string): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(code)), HEALTH_SYNC_PIPELINE_TIMEOUT_MS);

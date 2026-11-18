@@ -71,6 +71,7 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(store).toContain('slice(0, limit)');
     expect(store).toContain('uploaded: true');
     expect(manager).toContain('HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50');
+    expect(manager).toContain('HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 50');
     expect(manager).toContain('readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE)');
     expect(manager).not.toContain('readPendingLocalObservations(localScope, 250)');
   });
