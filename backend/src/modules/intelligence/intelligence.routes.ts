@@ -31,7 +31,7 @@ import { ingestHealthObservations } from '../health/health-observations.reposito
 import { getReport } from '../reports/reports.store.js';
 import { listHealthObservationsForCalculation } from '../health/health-observations.repository.js';
 import { buildHealthIntelligenceV1 } from './health-intelligence-projection.js';
-import { calculatePersistedCandidateStarOrb, candidateValidationEnabled } from './star-orb-candidate.service.js';
+import { calculatePersistedCandidateStarOrb, calculatePersistedStarOrb, candidateValidationEnabled } from './star-orb-candidate.service.js';
 
 export const intelligenceRouter = Router();
 
@@ -66,6 +66,26 @@ intelligenceRouter.get('/candidate-validation', requireAuthenticatedAccount, asy
     return res.status(error instanceof RangeError ? 400 : 409).json({
       error:'CANDIDATE_CALCULATION_UNAVAILABLE',
       message:error instanceof Error ? error.message : 'Candidate calculation unavailable.'
+    });
+  }
+});
+
+intelligenceRouter.get('/star-orb', requireAuthenticatedAccount, async (req, res) => {
+  const account = getAuthenticatedAccount(req);
+  if (account.authProvider !== 'fiteatsy') return res.status(403).json({ error:'CLIENT_SESSION_REQUIRED' });
+  const parsed = z.object({
+    healthDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    timezone:z.string().min(1).max(100)
+  }).safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({error:'INVALID_STAR_ORB_QUERY',details:parsed.error.flatten()});
+  try {
+    return res.status(200).json(await calculatePersistedStarOrb(account.accountId, parsed.data.healthDay, {
+      tenantId:account.client.tenantId,timezone:parsed.data.timezone
+    }));
+  } catch (error) {
+    return res.status(error instanceof RangeError ? 400 : 409).json({
+      error:'STAR_ORB_CALCULATION_UNAVAILABLE',
+      message:error instanceof Error ? error.message : 'Star Orb calculation unavailable.'
     });
   }
 });

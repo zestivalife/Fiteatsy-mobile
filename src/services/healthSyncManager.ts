@@ -65,6 +65,7 @@ export type HealthSyncResult = {
   accepted: number;
   duplicate: number;
   rejected: number;
+  pendingCount: number;
   scores: HealthScoreSummary;
   status: HealthSyncStatus;
   wellness: WellnessSnapshot;
@@ -109,6 +110,7 @@ export const HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50;
 // Apple Health backfills above 500 records with no automatic continuation, so
 // final recalculation and lastFullySyncedAtISO were never reached.
 export const HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 50;
+export const HEALTH_SYNC_MAX_UPLOAD_CYCLES_PER_RUN = 4;
 export const withHealthSyncPipelineTimeout = <T>(operation: Promise<T>, code: string): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(code)), HEALTH_SYNC_PIPELINE_TIMEOUT_MS);
@@ -250,22 +252,26 @@ export const runHealthSync = async (
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
     let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
     emitHealthSyncDiagnostic({ event:'QUEUE_STATE',correlationId,provider,...await readLocalHealthQueueDiagnostics(localScope) });
-    let uploadBatchCount = 0;
-    while (pending.length && uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN) {
-      const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
-        '/v1/health/observations:batch', {
-          observations: pending.map((item) => item.observation),
-          recalculateIntelligence: false
-        }), 'health_sync_upload_timeout');
-      accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
-      updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
-      if (ingest.rejected > 0) break;
-      await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
-      emitHealthSyncDiagnostic({ event:'UPLOAD_BATCH',correlationId,provider,recordsRead:pending.length,
-        recordsAccepted:ingest.accepted,recordsUpdated:ingest.updated??0,recordsDeleted:ingest.deleted??0,
-        recordsRejected:ingest.rejected });
-      uploadBatchCount += 1;
-      pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+    let uploadCycleCount = 0;
+    while (pending.length && uploadCycleCount < HEALTH_SYNC_MAX_UPLOAD_CYCLES_PER_RUN && rejected === 0) {
+      let uploadBatchCount = 0;
+      while (pending.length && uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN) {
+        const ingest = await withHealthSyncPipelineTimeout(postJson<{ accepted: number; duplicate: number; rejected: number; updated: number; deleted: number }>(
+          '/v1/health/observations:batch', {
+            observations: pending.map((item) => item.observation),
+            recalculateIntelligence: false
+          }), 'health_sync_upload_timeout');
+        accepted += ingest.accepted; duplicate += ingest.duplicate; rejected += ingest.rejected;
+        updated += ingest.updated ?? 0; deleted += ingest.deleted ?? 0;
+        if (ingest.rejected > 0) break;
+        await acknowledgeLocalObservations(localScope, pending.map((item) => item.recordKey));
+        emitHealthSyncDiagnostic({ event:'UPLOAD_BATCH',correlationId,provider,recordsRead:pending.length,
+          recordsAccepted:ingest.accepted,recordsUpdated:ingest.updated??0,recordsDeleted:ingest.deleted??0,
+          recordsRejected:ingest.rejected });
+        uploadBatchCount += 1;
+        pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+      }
+      uploadCycleCount += 1;
     }
     uploadCompleted = rejected === 0 && pending.length === 0;
     if(uploadCompleted){
@@ -294,7 +300,7 @@ export const runHealthSync = async (
     emitHealthSyncDiagnostic({ event:'SYNC_COMPLETE',correlationId,provider,durationMs:Date.now()-syncStartedAt,
       recordsRead:observations.length,recordsAccepted:accepted,recordsUpdated:updated,recordsDeleted:deleted,
       recordsRejected:rejected,...await readLocalHealthQueueDiagnostics(localScope) });
-    return { payload, observations, accepted, duplicate, rejected, scores, status,
+    return { payload, observations, accepted, duplicate, rejected, pendingCount:pending.length, scores, status,
       diagnostics: buildHealthSourceDiagnostics(appId === 'apple-health' ? 'APPLE_HEALTH' : 'HEALTH_CONNECT', payload, { state: 'SUCCESS' }),
       wellness: wellnessFromCanonicalAggregates(previousWellness,canonicalAggregates,scores) };
   } catch (error) {

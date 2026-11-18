@@ -130,8 +130,9 @@ export const scoreUnavailableLabel = (score?: {
   return frameworkStatusLabel(score?.status);
 };
 
-const stateFromScore = (score: number | null, status?: string | null) => {
+const stateFromScore = (score: number | null, status?: string | null, componentCoverage?: number) => {
   if (score == null) return { label: frameworkStatusLabel(status) };
+  if (status === 'PARTIAL') return { label: `Partial · ${componentCoverage ?? 0}% coverage` };
   if (score >= 80) return { label: 'Strong Today' };
   if (score >= 55) return { label: 'Borderline' };
   return { label: 'Lower Today' };
@@ -366,7 +367,7 @@ export const HomeScreen = () => {
   };
   const selectedState = selected.score == null && selectedMetricAvailability[selectedMetric]
     ? { label: `Data available · ${scoreUnavailableLabel(selectedFramework)}` }
-    : stateFromScore(selected.score, selectedFramework?.status);
+    : stateFromScore(selected.score, selectedFramework?.status, selectedFramework?.componentCoverage);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
 
   return (

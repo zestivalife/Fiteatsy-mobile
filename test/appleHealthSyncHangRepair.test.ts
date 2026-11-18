@@ -63,8 +63,10 @@ describe('Apple Health sync hang repair', () => {
   });
 
   test('bounds foreground queue draining while retaining the durable pending queue', () => {
-    expect(manager).toContain('HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 10');
+    expect(manager).toContain('HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 50');
+    expect(manager).toContain('HEALTH_SYNC_MAX_UPLOAD_CYCLES_PER_RUN = 4');
     expect(manager).toContain('uploadBatchCount < HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN');
+    expect(manager).toContain('uploadCycleCount < HEALTH_SYNC_MAX_UPLOAD_CYCLES_PER_RUN');
   });
 
   test('diagnostics contain timing and status but do not log source health values', () => {

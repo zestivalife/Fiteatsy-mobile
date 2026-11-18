@@ -49,14 +49,22 @@ test('goal resolver honours governed precedence and rejects display-only or inva
   assert.equal(resolveGovernedGoal({productDefault:{value:10000,source:'PRODUCT_DEFAULT',active:true,approved:false,updatedAt:timestamp}},{min:1000,max:50000}).status,'GOAL_REQUIRED');
 });
 
-test('missing logs, goals, baselines, and clinical marker methods never become zero',()=>{
+test('available components produce partial scores while missing components remain unknown',()=>{
   const nourishment=calculateNourishmentCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',proteinGrams:0,proteinTarget:resolved(100),hydrationMl:0,hydrationTarget:resolved(2500),foodQualityDimensions:[],approvedClinicalMarkerScores:[]});
-  assert.equal(nourishment.score,null);assert.equal(nourishment.status,'INSUFFICIENT_DATA');
+  assert.equal(nourishment.score,0);assert.equal(nourishment.status,'PARTIAL');assert.equal(nourishment.componentCoverage,45);
   const activity=calculateActivityCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',steps:8000,exerciseMinutes:30,stepGoal:{value:null,source:null,status:'GOAL_REQUIRED',reason:'none'},exerciseGoal:resolved(30),dailyActivityLoad:loads,dailyRecoveryOrRest:rests});
-  assert.equal(activity.score,null);assert.ok(activity.inputsMissing.includes('step_goal'));
+  assert.notEqual(activity.score,null);assert.equal(activity.status,'PARTIAL');assert.ok(activity.inputsMissing.includes('step_goal'));
   const invalidNights=nights.map(night=>({...night,asleepMinutes:0,deepMinutes:0,remMinutes:0}));
   const sleep=calculateSleepCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',target:resolved(480),nights:invalidNights});
-  assert.equal(sleep.score,null);assert.ok(sleep.inputsMissing.includes('valid_sleep_stages'));
+  assert.notEqual(sleep.score,null);assert.equal(sleep.status,'PARTIAL');assert.ok(sleep.inputsMissing.includes('valid_sleep_stages'));
+});
+
+test('Recovery requires at least two independent available components',()=>{
+  const sleep=calculateSleepCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',target:resolved(480),nights});
+  const one=calculateRecoveryCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',sleep,activityBalance:null,currentHrv:Number.NaN,hrvBaselineSameType:Number.NaN,currentRestingHeartRate:Number.NaN,restingHeartRateBaseline:Number.NaN,baselineDays:0,sleepBehaviour:0,activityDistribution:0,mindfulnessPractice:0,explicitLifestyleHabits:[]});
+  assert.equal(one.score,null);
+  const two=calculateRecoveryCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',sleep,activityBalance:80,currentHrv:Number.NaN,hrvBaselineSameType:Number.NaN,currentRestingHeartRate:Number.NaN,restingHeartRateBaseline:Number.NaN,baselineDays:0,sleepBehaviour:0,activityDistribution:80,mindfulnessPractice:0,explicitLifestyleHabits:[]});
+  assert.equal(two.status,'PARTIAL');assert.equal(two.componentCoverage,60);assert.notEqual(two.score,null);
 });
 
 test('HRV baseline remains source-type specific and stale complete data is explicit',()=>{

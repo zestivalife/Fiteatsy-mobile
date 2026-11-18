@@ -18,7 +18,7 @@ import {
   runHealthSync,
   wellnessFromCanonicalAggregates
 } from './healthSyncManager';
-import { candidateValidationClientEnabled, getCandidateStarOrbValidation, getHealthIntelligenceV1, type CandidateStarOrbValidation, type FrameworkScore, type HealthIntelligenceV1, type HealthScoreSummary } from './healthIntelligenceService';
+import { getProductionStarOrb, getHealthIntelligenceV1, type CandidateStarOrbValidation, type FrameworkScore, type HealthIntelligenceV1, type HealthScoreSummary } from './healthIntelligenceService';
 import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLocalHealthProviderConnected,
   migrateLegacyHealthInstallationId, readLocalHealthBootstrapSnapshot,
   performApprovedStaleHealthQueueCleanup,
@@ -65,7 +65,7 @@ const serverSnapshot = (value: HealthIntelligenceV1): LocalCanonicalHealthSnapsh
 });
 
 const candidateFrameworkScore=(score:CandidateStarOrbValidation['days'][number]['activity']):Omit<FrameworkScore,'calculationVersion'>&{calculationVersion:string}=>({
-  key:score.domain,score:score.score,status:score.status,confidence:score.confidence,trend:null,
+  key:score.domain,score:score.score,status:score.status,confidence:score.confidence,trend:null,componentCoverage:score.componentCoverage,
   inputsUsed:score.inputsUsed,inputsMissing:score.inputsMissing,inputsNotApplicable:[],methodologyPending:[],
   contributingFactors:score.contributingFactors,recommendedActions:[],explanation:score.explanation,
   freshness:score.inputFreshness==='STALE'?'STALE':score.inputFreshness==='CURRENT'?'CURRENT':'UNKNOWN',
@@ -137,7 +137,7 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
     try {
       const [nextStatus, nextObservations, nextActivity, nextIntelligence,nextCandidate] = await Promise.all([
         getHealthSyncStatus(), getLatestHealthObservations(200), getHealthSyncActivity(8), getHealthIntelligenceV1(),
-        candidateValidationClientEnabled()?getCandidateStarOrbValidation():Promise.resolve(null)
+        getProductionStarOrb()
       ]);
       if (!mounted.current) return;
       setStatus(nextStatus);
@@ -216,13 +216,14 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       mergePresentationObservations(result.payload.presentationObservations ?? []);
       setSelectedDeviceId(adapter.appId);
       setWellness(result.wellness);
-      setPendingUploadCount(await countPendingLocalObservations(localScope));
+      const remainingPending=await countPendingLocalObservations(localScope);
+      setPendingUploadCount(remainingPending);
       setAggregates(await readLocalHealthAggregates(localScope));
       setLifecycle(await readLocalHealthLifecycle(localScope));
       setDiagnostics(result.diagnostics);
       setProviderState('CONNECTED');
       await markLocalHealthProviderConnected(localScope);
-      setUploadState(result.rejected > 0 ? 'ERROR' : 'SYNCED');
+      setUploadState(result.rejected > 0 ? 'ERROR' : remainingPending > 0 ? 'PENDING' : 'SYNCED');
       const nextQueries: Record<string, HealthMetricQueryState> = {};
       const nextErrors: Record<string, string | null> = {};
       HEALTH_METRIC_REGISTRY.forEach((definition) => {

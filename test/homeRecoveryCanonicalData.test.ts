@@ -29,6 +29,6 @@ describe('Journey recovery star canonical data contract', () => {
     expect(source).toContain("selectedScore == null ? '--/100'");
     expect(source).toContain("case 'METHODOLOGY_PENDING': return 'Methodology pending'");
     expect(source).toContain("case 'NOT_APPLICABLE': return 'Not applicable'");
-    expect(source).toContain('stateFromScore(selected.score, selectedFramework?.status)');
+    expect(source).toContain('stateFromScore(selected.score, selectedFramework?.status, selectedFramework?.componentCoverage)');
   });
 });

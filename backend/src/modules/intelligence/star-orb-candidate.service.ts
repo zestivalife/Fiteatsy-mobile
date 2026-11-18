@@ -18,3 +18,15 @@ export async function calculatePersistedCandidateStarOrb(
     sourceCoverage: inputs.sourceCoverage
   };
 }
+
+// Authenticated production wellness projection. This reuses the established
+// Star Orb runtime and ownership-scoped repositories; the candidate route
+// remains isolated for diagnostics.
+export async function calculatePersistedStarOrb(
+  authenticatedUserId: string,
+  throughHealthDay: string,
+  context: { tenantId: string; timezone: string }
+) {
+  const inputs = await loadStarOrbRuntimeInputs(authenticatedUserId, throughHealthDay, context);
+  return buildCandidateStarOrbRuntimeWindow(inputs, throughHealthDay);
+}

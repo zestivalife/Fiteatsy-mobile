@@ -89,14 +89,14 @@ export const getHealthScoreHistory = (scoreType?: HealthScoreType) =>
 
 export const getHealthScoreSummary = () => apiFetch<HealthScoreSummary>('/v1/intelligence/summary');
 
-export type FrameworkScore={key:string;score:number|null;status:'CALCULATED'|'PARTIAL'|'INSUFFICIENT_DATA'|'METHODOLOGY_PENDING'|'NOT_APPLICABLE'|'STALE';confidence:'HIGH'|'MODERATE'|'LOW';trend:number|null;inputsUsed:string[];inputsMissing:string[];inputsNotApplicable:string[];methodologyPending:string[];contributingFactors:string[];recommendedActions:string[];explanation:string;freshness:'CURRENT'|'STALE'|'UNKNOWN';calculationVersion:'HEALTH_INTELLIGENCE_V1';calculatedAt:string};
+export type FrameworkScore={key:string;score:number|null;status:'CALCULATED'|'PARTIAL'|'INSUFFICIENT_DATA'|'METHODOLOGY_PENDING'|'NOT_APPLICABLE'|'STALE';confidence:'HIGH'|'MODERATE'|'LOW';trend:number|null;componentCoverage?:number;inputsUsed:string[];inputsMissing:string[];inputsNotApplicable:string[];methodologyPending:string[];contributingFactors:string[];recommendedActions:string[];explanation:string;freshness:'CURRENT'|'STALE'|'UNKNOWN';calculationVersion:'HEALTH_INTELLIGENCE_V1';calculatedAt:string};
 export type HealthIntelligenceV1={calculationVersion:'HEALTH_INTELLIGENCE_V1';engineeringStatus:'IMPLEMENTED';clinicalValidationStatus:'PENDING';latestSourceReadAt:string|null;latestCalculationAt:string;baselines:Record<string,{today:number|null;sevenDayAverage:number|null;twentyEightDayBaseline:number|null;trend:number|null;deviation:number|null}>;scores:{activity:FrameworkScore;sleep:FrameworkScore;nutrition:FrameworkScore;calm:FrameworkScore;stressRecovery:FrameworkScore;cycle:FrameworkScore;recovery:FrameworkScore;mind:FrameworkScore;healthIntelligence:FrameworkScore};performanceReport:{sections:string[];keyTrends:string[];recommendedActions:string[];confidence:string};sourceSemantics:{hrv:string}};
 export const getHealthIntelligenceV1=()=>{
   const healthDay=new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10);
   return apiFetch<HealthIntelligenceV1>(`/v1/intelligence/v1?healthDay=${healthDay}`);
 };
 
-export type CandidateValidationScore={domain:string;score:number|null;status:FrameworkScore['status'];methodologyId:string;methodologyVersion:string;healthDay:string;calculatedAt:string;confidence:FrameworkScore['confidence'];inputFreshness:string;inputsUsed:string[];inputsMissing:string[];contributingFactors:string[];explanation:string;activation:'CANDIDATE_ONLY';clinicalValidation:'PENDING'};
+export type CandidateValidationScore={domain:string;score:number|null;status:FrameworkScore['status'];methodologyId:string;methodologyVersion:string;healthDay:string;calculatedAt:string;confidence:FrameworkScore['confidence'];inputFreshness:string;inputsUsed:string[];inputsMissing:string[];contributingFactors:string[];explanation:string;componentCoverage?:number;activation:'CANDIDATE_ONLY';clinicalValidation:'PENDING'};
 export type CandidateProposalScore={score:number|null;status:'PROPOSAL_ONLY'|'UNAVAILABLE';version:string;reason?:string;label?:string};
 export type CandidateStarOrbValidation={activation:'ISOLATED_VALIDATION_ONLY';methodologyVersion:string|null;days:Array<{healthDay:string;activity:CandidateValidationScore;sleep:CandidateValidationScore;nourishment:CandidateValidationScore;calm:CandidateValidationScore;mind:CandidateValidationScore;recovery:CandidateValidationScore;proposals:{everydayNourishment:CandidateProposalScore;selfReportedMindWellness:CandidateProposalScore}}>;sourceCoverage:Record<string,{source:string;status:'INTEGRATED'|'UNAVAILABLE';reason?:string}>};
 export const candidateValidationClientEnabled=()=>__DEV__&&process.env.EXPO_PUBLIC_STAR_ORB_CANDIDATE_VALIDATION_ENABLED==='true';
@@ -104,6 +104,11 @@ export const getCandidateStarOrbValidation=()=>{
   const healthDay=new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10);
   const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
   return apiFetch<CandidateStarOrbValidation>(`/v1/intelligence/candidate-validation?healthDay=${healthDay}&timezone=${encodeURIComponent(timezone)}`);
+};
+export const getProductionStarOrb=()=>{
+  const healthDay=new Date(Date.now()-new Date().getTimezoneOffset()*60_000).toISOString().slice(0,10);
+  const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+  return apiFetch<CandidateStarOrbValidation>(`/v1/intelligence/star-orb?healthDay=${healthDay}&timezone=${encodeURIComponent(timezone)}`);
 };
 
 export const getPssQuestions = (count = 4) =>
