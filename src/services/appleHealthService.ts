@@ -51,6 +51,11 @@ export const inspectAppleHealthPermissionState = async () => withAppleHealthTime
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 const average = (values: number[]) => values.length ? sum(values) / values.length : null;
 const validValues = (values: number[]) => values.filter((value) => Number.isFinite(value) && value > 0);
+const localHealthDay = (date: Date) => [
+  date.getFullYear(),
+  String(date.getMonth() + 1).padStart(2, '0'),
+  String(date.getDate()).padStart(2, '0')
+].join('-');
 
 export const settleWithConcurrency = async <T, R>(
   items: T[],
@@ -222,7 +227,8 @@ export const syncFromAppleHealth = async (
   });
   // HealthKit statistics apply Apple's source-priority policy for cumulative
   // product totals while anchored source rows remain available for audit.
-  const statisticEndISO = new Date().toISOString();
+  const statisticEndDate = new Date();
+  const statisticEndISO = statisticEndDate.toISOString();
   const statisticStartDate = new Date(); statisticStartDate.setHours(0, 0, 0, 0);
   (await statisticsPromise).forEach(({ metric, value, failed }) => {
     // Older installed native builds may not expose statistics yet. Anchored
@@ -232,10 +238,18 @@ export const syncFromAppleHealth = async (
       if (value > 0) {
         const canonicalMetric = metric === 'exercise_minutes' ? 'active_minutes' : metric;
         const unit = {steps:'count',active_energy:'kcal',distance:'m',exercise_minutes:'min'}[metric] ?? '';
-        presentationObservations.push({metricType:canonicalMetric,value,unit,measuredAtISO:statisticEndISO,
+        const healthDay = localHealthDay(statisticEndDate);
+        const dailySnapshot: HealthObservationDraft = {metricType:canonicalMetric,value,unit,measuredAtISO:statisticEndISO,
           startAtISO:statisticStartDate.toISOString(),endAtISO:statisticEndISO,sourceProvider:'apple_health',
-          sourceRecordId:`daily-total:${metric}:${statisticStartDate.toISOString().slice(0,10)}`,
-          qualityStatus:'accepted',sourceMetadata:{recordType:metric,measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'}});
+          sourceRecordId:`daily-total:${canonicalMetric}:${healthDay}`,
+          syncKey:`apple_health:daily-total:${canonicalMetric}:${healthDay}`,
+          timezoneOffsetMinutes:-statisticEndDate.getTimezoneOffset(),providerUpdatedAtISO:statisticEndISO,
+          qualityStatus:'accepted',sourceMetadata:{recordType:metric,measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'}};
+        // The platform statistic is both the presentation authority and a
+        // durable, idempotent scoring input. Source priority prevents the raw
+        // HealthKit rows from being added to this already source-deduplicated total.
+        observations.push(dailySnapshot);
+        presentationObservations.push(dailySnapshot);
       }
     }
     if (failed) {

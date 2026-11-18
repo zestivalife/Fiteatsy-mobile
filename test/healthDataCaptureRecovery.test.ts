@@ -88,6 +88,8 @@ describe('end-to-end health data capture recovery contracts', () => {
     expect(apple).toContain('startDate.setHours(0, 0, 0, 0)');
     expect(apple).toContain("dropReasons:result.samples.length===acceptedSampleCount?[]:['NON_CONSUMPTIVE_OR_NON_POSITIVE_SAMPLE']");
     expect(apple).toContain('presentationObservations.push');
+    expect(apple).toContain('observations.push(dailySnapshot)');
+    expect(apple).toContain('apple_health:daily-total');
     expect(apple).toContain("measurementMethod:'HEALTHKIT_DAILY_CUMULATIVE_STATISTIC'");
   });
 

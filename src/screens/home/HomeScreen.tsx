@@ -138,6 +138,25 @@ const stateFromScore = (score: number | null, status?: string | null, componentC
   return { label: 'Lower Today' };
 };
 
+export const activityHomeState = (input: {
+  score: number | null;
+  status?: string | null;
+  componentCoverage?: number;
+  inputsMissing?: string[];
+  hasCurrentDayMeasurement: boolean;
+}) => {
+  if (input.score != null) {
+    return { label: input.status === 'PARTIAL'
+      ? `Partial · ${input.componentCoverage ?? 0}% coverage`
+      : 'Complete' };
+  }
+  if (!input.hasCurrentDayMeasurement) return { label: 'No Activity data for today' };
+  if ((input.inputsMissing ?? []).some((item) => item.includes('goal') || item.includes('target'))) {
+    return { label: 'Set your Activity goal' };
+  }
+  return { label: scoreUnavailableLabel(input) };
+};
+
 const arcGradientForMetric = (key: MetricKey) => {
   switch (key) {
     case 'activity':
@@ -363,14 +382,24 @@ export const HomeScreen = () => {
   const selectedComponentCoverage = selectedFramework && 'componentCoverage' in selectedFramework
     ? selectedFramework.componentCoverage
     : undefined;
+  const currentDate = new Date();
+  const currentHealthDay = [currentDate.getFullYear(), String(currentDate.getMonth() + 1).padStart(2, '0'),
+    String(currentDate.getDate()).padStart(2, '0')].join('-');
+  const hasCurrentDayActivity = hasCanonicalMetricData(
+    health.aggregates.filter((item) => item.healthDay === currentHealthDay),
+    ['steps', 'active_minutes', 'workout_minutes']
+  );
   const selectedMetricAvailability: Partial<Record<MetricKey, boolean>> = {
-    activity: hasCanonicalMetricData(health.aggregates, ['steps', 'active_minutes', 'workout_minutes', 'active_energy']),
+    activity: hasCurrentDayActivity,
     sleep: hasCanonicalMetricData(health.aggregates, ['sleep_minutes']),
     calm: hasCanonicalMetricData(health.aggregates, ['hrv_sdnn_ms', 'hrv_rmssd_ms', 'mindfulness_minutes'])
   };
-  const selectedState = selected.score == null && selectedMetricAvailability[selectedMetric]
-    ? { label: `Data available · ${scoreUnavailableLabel(selectedFramework)}` }
-    : stateFromScore(selected.score, selectedFramework?.status, selectedComponentCoverage);
+  const selectedState = selectedMetric === 'activity'
+    ? activityHomeState({score:selected.score,status:selectedFramework?.status,componentCoverage:selectedComponentCoverage,
+      inputsMissing:selectedFramework?.inputsMissing,hasCurrentDayMeasurement:hasCurrentDayActivity})
+    : selected.score == null && selectedMetricAvailability[selectedMetric]
+      ? { label: `Data available · ${scoreUnavailableLabel(selectedFramework)}` }
+      : stateFromScore(selected.score, selectedFramework?.status, selectedComponentCoverage);
   const todayMedicationTimeline = getMedicationTimelineForDate(new Date().toISOString());
 
   return (

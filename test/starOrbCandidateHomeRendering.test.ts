@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import { Text } from 'react-native';
-import { RecoveryPanel, RecoveryTrend, scoreUnavailableLabel } from '../src/screens/home/HomeScreen';
+import { activityHomeState, RecoveryPanel, RecoveryTrend, scoreUnavailableLabel } from '../src/screens/home/HomeScreen';
 
 jest.mock('@react-native-async-storage/async-storage',()=>({getItem:jest.fn(),setItem:jest.fn(),removeItem:jest.fn(),multiGet:jest.fn(),multiSet:jest.fn()}));
 jest.mock('@react-native-community/netinfo',()=>({addEventListener:jest.fn(()=>()=>{}),fetch:jest.fn()}));
@@ -67,4 +67,15 @@ test('pending score copy identifies actionable goals, history, methodology, and 
   expect(scoreUnavailableLabel({status:'METHODOLOGY_PENDING'})).toBe('Methodology pending');
   expect(scoreUnavailableLabel({status:'OFFLINE'})).toBe('Available offline');
   expect(scoreUnavailableLabel({status:'ERROR'})).toBe('Scoring unavailable');
+});
+
+test('Activity Home state distinguishes today data, missing goals, and partial scores',()=>{
+  expect(activityHomeState({score:null,status:'INSUFFICIENT_DATA',inputsMissing:['step_goal'],hasCurrentDayMeasurement:false}))
+    .toEqual({label:'No Activity data for today'});
+  expect(activityHomeState({score:null,status:'INSUFFICIENT_DATA',inputsMissing:['step_goal'],hasCurrentDayMeasurement:true}))
+    .toEqual({label:'Set your Activity goal'});
+  expect(activityHomeState({score:64,status:'PARTIAL',componentCoverage:40,inputsMissing:['exercise_minutes'],hasCurrentDayMeasurement:true}))
+    .toEqual({label:'Partial · 40% coverage'});
+  expect(activityHomeState({score:82,status:'CALCULATED',componentCoverage:100,inputsMissing:[],hasCurrentDayMeasurement:true}))
+    .toEqual({label:'Complete'});
 });
