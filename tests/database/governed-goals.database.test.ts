@@ -5,9 +5,8 @@ import { pool } from '../../backend/src/db/pool.js';
 import { resetBackendStateForTests } from '../../backend/src/test-support/reset.js';
 import { listGovernedGoals, reviseGovernedGoal } from '../../backend/src/modules/intelligence/governed-goals.repository.js';
 
-const tenantId='83000000-0000-4000-8000-000000000001';
 const setup=async()=>{
-  await resetBackendStateForTests();const accountId=randomUUID();const clientId=randomUUID();
+  await resetBackendStateForTests();const accountId=randomUUID();const clientId=randomUUID();const tenantId=randomUUID();
   await pool.query(`insert into tenants(id,name,slug,tenant_type,status) values($1,'Goal QA','goal-qa','PRACTICE','active')`,[tenantId]);
   await pool.query(`insert into users(id,name,email_normalized,role,status,account_purpose) values($1,'Goal Client',$2,'user','active','QA_TEST')`,[accountId,`goal-${accountId}@example.test`]);
   await pool.query(`insert into tenant_memberships(id,tenant_id,user_id,tenant_role,status) values($1,$2,$3,'CLIENT','active')`,[randomUUID(),tenantId,accountId]);
@@ -35,5 +34,5 @@ test('concurrent initial goal requests converge without duplicate active history
     reviseGovernedGoal(owner,{kind:'exercise_minutes',value:30,effectiveFrom:'2026-11-18',source:'USER'})
   ]);
   assert.equal(results[0].id,results[1].id);assert.equal((await listGovernedGoals(owner)).length,1);
-  assert.equal((await listGovernedGoals({...owner,tenantId:'84000000-0000-4000-8000-000000000001'})).length,0);
+  assert.equal((await listGovernedGoals({...owner,tenantId:randomUUID()})).length,0);
 });
