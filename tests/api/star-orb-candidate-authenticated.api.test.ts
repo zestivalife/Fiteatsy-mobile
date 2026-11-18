@@ -4,6 +4,7 @@ import { authHeaders, createAuthenticatedSession } from '../helpers/auth.js';
 import { getJson } from '../helpers/http.js';
 import { resetTestState, startTestServer } from '../helpers/testServer.js';
 import { getClientByAccountUserId } from '../../backend/src/modules/client/client.repository.js';
+import { ingestHealthObservations } from '../../backend/src/modules/health/health-observations.repository.js';
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 const priorFlag=process.env.STAR_ORB_CANDIDATE_VALIDATION_ENABLED;
@@ -26,6 +27,10 @@ test('candidate-validation is authenticated, self-scoped and remains fail-closed
   const twoClient=await getClientByAccountUserId(two.current.body.accountId);
   assert.ok(oneClient&&twoClient);
   const day=new Date().toISOString().slice(0,10);
+  await ingestHealthObservations({accountId:one.current.body.accountId,clientId:oneClient.id},[{
+    metricType:'steps',value:4321,unit:'count',measuredAtISO:`${day}T10:00:00.000Z`,
+    sourceProvider:'qa',sourceRecordId:'client-one-only-steps',syncKey:'qa:client-one-only-steps'
+  }]);
   const path=`/v1/intelligence/candidate-validation?healthDay=${day}&timezone=UTC`;
 
   const unauthenticated=await getJson(server.baseUrl,path);
@@ -36,11 +41,12 @@ test('candidate-validation is authenticated, self-scoped and remains fail-closed
   assert.equal(first.body.ownerScope.tenantId,oneClient.tenantId);
   assert.equal(first.body.days.length,7);
   assert.equal(first.body.days.every((item:{recovery:{score:number|null}})=>item.recovery.score===null),true);
+  assert.equal(first.body.days.at(-1).activity.inputsMissing.includes('steps'),false);
 
   const second=await getJson(server.baseUrl,path,{headers:authHeaders(two.token)});
   assert.equal(second.response.status,200,JSON.stringify(second.body));
   assert.equal(second.body.ownerScope.tenantId,twoClient.tenantId);
-  assert.notEqual(second.body.ownerScope.tenantId,first.body.ownerScope.tenantId);
+  assert.equal(second.body.days.at(-1).activity.inputsMissing.includes('steps'),true);
   assert.equal(JSON.stringify(second.body).includes(oneClient.id),false);
 
   const priorNodeEnv=process.env.NODE_ENV;
