@@ -59,6 +59,15 @@ const toRecord = (value: unknown): Record<string, unknown> => {
   return value as Record<string, unknown>;
 };
 
+const toHealthDay = (value: unknown) => {
+  if (value == null) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text=String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0,10);
+  const parsed=new Date(text);
+  return Number.isNaN(parsed.getTime())?null:parsed.toISOString().slice(0,10);
+};
+
 const rowToScore = (row: Record<string, unknown>): HealthScoreRecord => ({
   id: String(row.id),
   userId: String(row.user_id),
@@ -70,7 +79,7 @@ const rowToScore = (row: Record<string, unknown>): HealthScoreRecord => ({
   inputSummary: toRecord(row.input_summary),
   calculatedAtISO: new Date(String(row.calculated_at)).toISOString(),
   calculationVersion: String(row.calculation_version),
-  healthDay: row.health_day == null ? null : String(row.health_day).slice(0, 10)
+  healthDay: toHealthDay(row.health_day)
 });
 
 export const createHealthScore = async (owner: ClientOwnershipContext, input: HealthScoreInput) => {
