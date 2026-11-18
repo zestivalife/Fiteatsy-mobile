@@ -28,7 +28,7 @@ test('candidate-validation is authenticated, self-scoped and remains fail-closed
   assert.ok(oneClient&&twoClient);
   const day=new Date().toISOString().slice(0,10);
   await ingestHealthObservations({accountId:one.current.body.accountId,clientId:oneClient.id},[{
-    metricType:'steps',value:4321,unit:'count',measuredAtISO:`${day}T10:00:00.000Z`,
+    metricType:'steps',value:4321,unit:'count',measuredAtISO:new Date().toISOString(),
     sourceProvider:'qa',sourceRecordId:'client-one-only-steps',syncKey:'qa:client-one-only-steps'
   }]);
   const path=`/v1/intelligence/candidate-validation?healthDay=${day}&timezone=UTC`;
