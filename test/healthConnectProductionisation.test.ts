@@ -31,6 +31,9 @@ describe('Health Connect D2 production contracts', () => {
 
     expect(manifest.match(/androidx\.health\.ACTION_SHOW_PERMISSIONS_RATIONALE/g)).toHaveLength(1);
     expect(manifest).toContain('android:name=".MainActivity"');
+    expect(manifest).toContain('android:name="ViewPermissionUsageActivity"');
+    expect(manifest).toContain('android.permission.START_VIEW_PERMISSION_USAGE');
+    expect(manifest).toContain('android.intent.category.HEALTH_PERMISSIONS');
     expect(declaredHealthPermissions).toEqual(expectedReadPermissions);
     expect(new Set(declaredHealthPermissions).size).toBe(declaredHealthPermissions.length);
     expect(manifest).not.toMatch(/android\.permission\.health\.WRITE_/);
@@ -44,26 +47,17 @@ describe('Health Connect D2 production contracts', () => {
     expect(fs.existsSync(path.join(root,'src/services/healthConnectOperationCoordinator.ts'))).toBe(false);
   });
 
-  it('registers the native Health Connect permission delegate in MainActivity', () => {
+  it('uses the library-owned Expo lifecycle delegate without duplicate MainActivity registration', () => {
     const appConfig = read('app.json');
-    const configPlugin = read('plugins/withHealthConnectPermissionDelegate.js');
     const mainActivity = read(
       'android/app/src/main/java/com/fiteatsy/health/MainActivity.kt'
     );
-    expect(appConfig).toContain('./plugins/withHealthConnectPermissionDelegate');
-    expect(configPlugin).toContain('withMainActivity');
-    expect(configPlugin).toContain(
-      'HealthConnectPermissionDelegate.setPermissionDelegate(this)'
-    );
-    expect(mainActivity).toContain(
-      'import dev.matinzd.healthconnect.permissions.HealthConnectPermissionDelegate'
-    );
-    expect(mainActivity).toContain(
-      'HealthConnectPermissionDelegate.setPermissionDelegate(this)'
-    );
-    expect(mainActivity.indexOf('super.onCreate(null)')).toBeLessThan(
-      mainActivity.indexOf('HealthConnectPermissionDelegate.setPermissionDelegate(this)')
-    );
+    const dependency = JSON.parse(read('package.json')).dependencies['react-native-health-connect'];
+    expect(dependency).toBe('4.1.3');
+    expect(appConfig).toContain('"react-native-health-connect"');
+    expect(appConfig).not.toContain('./plugins/withHealthConnectPermissionDelegate');
+    expect(fs.existsSync(path.join(root, 'plugins/withHealthConnectPermissionDelegate.js'))).toBe(false);
+    expect(mainActivity).not.toContain('HealthConnectPermissionDelegate');
   });
 
   it('uses real Health Connect record identities and preserves provenance', () => {

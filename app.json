@@ -81,7 +81,6 @@
       "expo-document-picker",
       "@react-native-community/datetimepicker",
       "react-native-health-connect",
-      "./plugins/withHealthConnectPermissionDelegate",
       "expo-video",
       "./plugins/withFrozenSplashBridge",
       "expo-secure-store"
