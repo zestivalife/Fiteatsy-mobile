@@ -464,6 +464,39 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     // Authentication is complete once the canonical local session is durable.
     // Profile, onboarding, Nutrition and Health reconciliation must not delay navigation.
     await persistAuthSession(localSession);
+    const readSessionScoped = (key: string) => {
+      const scopedKey = getSessionScopedKey(key, localSession);
+      return scopedKey
+        ? AsyncStorage.getItem(scopedKey).catch(() => null)
+        : Promise.resolve(null);
+    };
+    const [storedWearableSetupCompleted, storedOnboarding, storedCanonicalProfile] = await Promise.all([
+      readSessionScoped(STORAGE_KEYS.wearableSetupCompleted),
+      readSessionScoped(STORAGE_KEYS.onboarding),
+      readSessionScoped(STORAGE_KEYS.canonicalProfile)
+    ]);
+    const cachedOnboarding = safeParse<OnboardingProfile | null>(storedOnboarding, null);
+    const cachedCanonicalProfile = safeParse<PlatformHealthProfileBundle | null>(storedCanonicalProfile, null);
+    const identityMatchedCanonicalProfile = cachedCanonicalProfile?.profile.userId === localSession.accountId
+      ? cachedCanonicalProfile
+      : null;
+    const hasCompletedAppShell = storedWearableSetupCompleted === '1'
+      || deriveOnboardingGate(identityMatchedCanonicalProfile?.profile ?? null).status === 'COMPLETED'
+      || deriveOnboardingGate(cachedOnboarding).status === 'COMPLETED';
+
+    if (cachedOnboarding) setOnboardingState(normalizeOnboardingProfile(cachedOnboarding));
+    if (identityMatchedCanonicalProfile) setCanonicalProfile(identityMatchedCanonicalProfile);
+    if (hasCompletedAppShell) {
+      // Completion belongs to the authenticated identity and survives logout.
+      // Restore it before SignIn mounts Splash and never let a stale/incomplete
+      // remote projection reopen onboarding for an established client.
+      setWearableSetupCompletedState(true);
+      setOnboardingStatus('COMPLETED');
+      setOnboardingResumeStep(null);
+      const completionKey = getSessionScopedKey(STORAGE_KEYS.wearableSetupCompleted, localSession);
+      if (completionKey) await AsyncStorage.setItem(completionKey, '1');
+      void clearOnboardingRuntimeProgress(localSession.client.fiteatsyClientId);
+    }
     const authenticationGeneration = sessionGenerationRef.current;
     const isCurrentAuthentication = () => sessionGenerationRef.current === authenticationGeneration;
 
@@ -492,9 +525,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           if (onboardingKey) void AsyncStorage.setItem(onboardingKey, JSON.stringify(normalized));
           return normalized;
         });
-        const gate = deriveOnboardingGate(remoteBundle.profile);
-        setOnboardingStatus(gate.status);
-        setOnboardingResumeStep(gate.resumeStep);
+        if (!hasCompletedAppShell) {
+          const gate = deriveOnboardingGate(remoteBundle.profile);
+          setOnboardingStatus(gate.status);
+          setOnboardingResumeStep(gate.resumeStep);
+        }
         try {
           const plan = await getPublishedNutritionPlan(session.sessionToken);
           if (!isCurrentAuthentication()) return;
@@ -513,7 +548,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           clearPersistedAuth(localSession);
           return;
         }
-        if (isCanonicalNoData(error)) {
+        if (isCanonicalNoData(error) && !hasCompletedAppShell) {
           setOnboardingStatus('UNKNOWN');
           setOnboardingResumeStep(null);
         }
@@ -1778,7 +1813,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setAssessmentState(null);
     setDevicesState([]);
     setSelectedDeviceId(null);
-    setWearableSetupCompleted(false);
+    // Clear only the signed-out in-memory view. The identity-scoped completion
+    // marker is routing evidence for a future login and must survive logout.
+    setWearableSetupCompletedState(false);
     setMedicationPermissionGranted(false);
     setCheckIns([]);
     setPriorityPlan(null);
@@ -1796,7 +1833,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setClientBootstrap(createClientBootstrapState());
     setPublishedNutritionPlan(null);
     setWellnessState(emptyWellness);
-  }, [authSession, clearPersistedAuth, setSelectedDeviceId, setWearableSetupCompleted]);
+  }, [authSession, clearPersistedAuth, setSelectedDeviceId]);
 
 
   useEffect(() => {
