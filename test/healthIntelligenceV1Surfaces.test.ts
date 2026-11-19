@@ -15,13 +15,13 @@ describe('Health Intelligence V1 canonical surfaces', () => {
     expect(home).not.toContain("label: 'Active Performance'");
   });
 
-  test('Tracker consumes canonical histories and keeps supporting scores non-numeric', () => {
+  test('Tracker consumes canonical histories and approved Overview projections', () => {
     const tracker = read('src/screens/home/TrackerScreen.tsx');
     expect(tracker).toContain('getHealthIntelligenceV1');
     expect(tracker).toContain('getHealthScoreHistory()');
     expect(tracker).toContain('Promise.allSettled');
-    expect(tracker).toContain("['Energy Balance', null, 'Supporting insight only · Methodology pending']");
-    expect(tracker).toContain("['Body & Biomarker Health', null, 'Supporting insight only · Methodology pending']");
+    expect(tracker).toContain("['Energy Balance', overviewEnergyBalanceScore");
+    expect(tracker).toContain("['Body & Biomarker Health', overviewBodyBiomarkerScore");
     expect(tracker).not.toContain('Physical Ease');
     expect(tracker).not.toContain('const stepTarget = 5000');
   });

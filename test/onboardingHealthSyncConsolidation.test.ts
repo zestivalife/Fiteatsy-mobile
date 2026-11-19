@@ -38,12 +38,27 @@ describe('returning-user bootstrap and canonical Health Data Sync', () => {
 
   test('completed users ignore stale onboarding runtime progress', () => {
     const splash = read('src/screens/auth/SplashScreen.tsx');
+    const context = read('src/state/AppContext.tsx');
     expect(splash).toContain("if (onboardingStatus === 'COMPLETED')");
     expect(splash.indexOf("if (onboardingStatus === 'COMPLETED')")).toBeLessThan(splash.indexOf('await getOnboardingRuntimeProgress'));
     expect(splash).toContain("progress?.phase === 'connect'");
     expect(splash).toContain("if (onboardingStatus === 'UNKNOWN')");
     expect(splash).toContain("navigation.replace('Main')");
+    expect(splash).toContain('if (wearableSetupCompleted)');
+    expect(context).toContain("const hasCompletedAppShell = storedWearableSetupCompleted === '1'");
+    expect(context.indexOf("const hasCompletedAppShell = storedWearableSetupCompleted === '1'")).toBeLessThan(
+      context.indexOf('setBootstrapped(true)', context.indexOf("const hasCompletedAppShell = storedWearableSetupCompleted === '1'"))
+    );
     expect(splash).not.toContain("if (isAuthenticated && onboardingStatus === 'UNKNOWN') return");
+  });
+
+  test('a legacy connect checkpoint enters Home while health sync runs in the background', () => {
+    const splash = read('src/screens/auth/SplashScreen.tsx');
+    const home = read('src/screens/home/HomeScreen.tsx');
+    const connectBranch = splash.slice(splash.indexOf("progress?.phase === 'connect'"), splash.indexOf("progress?.phase === 'ready'"));
+    expect(connectBranch).toContain("navigation.replace('Main')");
+    expect(connectBranch).not.toContain("navigation.replace('HealthData'");
+    expect(home).toContain('syncHealthOnHomeFocus.current({ liveOnly: true })');
   });
 
   test('all navigation entries use the one canonical screen', () => {

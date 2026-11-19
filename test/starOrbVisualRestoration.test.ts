@@ -16,16 +16,27 @@ describe('original Star Orb visual and animation contract', () => {
   });
 
   test('preserves score selection animation and the xx/100 presentation', () => {
-    expect(source).toContain('duration: reduceMotion ? 0 : 620');
+    expect(source).toContain('ProgressDonutChartAsset');
+    expect(source).toContain('Animated.delay(350)');
+    expect(source).toContain('duration: 1600');
+    expect(source).toContain('selectedMetric, selectedScore]);');
+    expect(source).toContain('Easing.out(Easing.cubic)');
     expect(source).toContain('toValue: clampedScore');
     expect(source).toContain('animation.stop()');
+    expect(source).toContain('recovery-score-track');
+    expect(source).toContain('recovery-score-progress');
+    expect(source).toContain('const SCORE_ARC_RADIUS = 80');
     expect(source).toContain("selectedScore == null ? '--/100' : `${selectedScore}/100`");
   });
 
-  test('keeps ambient perimeter motion active for pending scores without fake progress', () => {
-    expect(source).toContain('STAR_ORB_MOTION_DURATION_MS = 3500');
-    expect(source).toContain('Animated.loop(');
-    expect(source).toContain('<StarOrbSurface reduceMotion={reduceMotion} />');
+  test('fills the selected score ring without tinting the accepted star surface', () => {
+    expect(source).toContain('scoreArcProgress.setValue(0)');
+    expect(source).toContain('<StarOrbSurface selectedColor={selectedColor} />');
+    expect(source).toContain('star-orb-selection-border');
+    expect(source).toContain('strokeWidth={1}');
+    expect(source).not.toContain('star-orb-shaped-glow');
+    expect(source).not.toContain('star-orb-background-glow');
+    expect(source).not.toContain("outputRange: ['0deg', '360deg']");
     expect(source).toContain('testID="recovery-score-track"');
     expect(source).toContain('{selectedScore != null ? <>');
     expect(source).toContain("case 'METHODOLOGY_PENDING': return 'Methodology pending'");

@@ -103,6 +103,7 @@ import { deriveOnboardingGate, type OnboardingResumeStep, type OnboardingStatus 
 import { traceSessionLifecycle } from '../services/sessionLifecycleTrace';
 import { clearPersistedAuthSession, readPersistedAuthSession, writePersistedAuthSession } from '../services/authSessionStore';
 import { getAuthErrorCode, isTerminalSessionCode } from '../services/sessionLifecyclePolicy';
+import { clearOnboardingRuntimeProgress } from '../services/onboardingRuntimeProgress';
 
 type StoredAuthSession = CurrentAuthSession & {
   sessionToken: string;
@@ -724,6 +725,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const parsed = safeParse<AssessmentProfile | null>(storedAssessment, null);
           if (parsed && typeof parsed === 'object') setAssessmentState(parsed);
         }
+        const hasCompletedAppShell = storedWearableSetupCompleted === '1';
+        if (hasCompletedAppShell) {
+          // Restore established completion evidence before releasing Splash.
+          // This prevents an incomplete legacy profile projection or stale runtime
+          // checkpoint from reopening onboarding for a returning client.
+          setWearableSetupCompletedState(true);
+          setOnboardingStatus('COMPLETED');
+          setOnboardingResumeStep(null);
+          void clearOnboardingRuntimeProgress(sessionForStorage.client.fiteatsyClientId);
+        }
         setBootstrapped(true);
         void initMedicationNotifications().catch((error) => {
           console.warn('[AppContext] medication notification initialization deferred', {
@@ -771,9 +782,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             setCanonicalProfile(remoteBundle);
             const canonicalKey = getSessionScopedKey(STORAGE_KEYS.canonicalProfile, sessionForStorage);
             if (canonicalKey) await AsyncStorage.setItem(canonicalKey, JSON.stringify(remoteBundle));
-            const gate = deriveOnboardingGate(remoteBundle.profile);
-            setOnboardingStatus(gate.status);
-            setOnboardingResumeStep(gate.resumeStep);
+            if (!hasCompletedAppShell) {
+              const gate = deriveOnboardingGate(remoteBundle.profile);
+              setOnboardingStatus(gate.status);
+              setOnboardingResumeStep(gate.resumeStep);
+            }
             setOnboardingState((previous) => {
               const baseProfile = previous ?? normalizeOnboardingProfile({
                 name: sessionForStorage.user.name,

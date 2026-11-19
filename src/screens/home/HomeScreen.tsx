@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Animated, Easing, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -26,7 +26,6 @@ import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../serv
 import { useAppContext } from '../../state/AppContext';
 import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
 import { hasCanonicalMetricData } from '../../services/healthPresentationState';
-import { getMySubscription } from '../../services/subscriptionService';
 import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
 import {
   getHealthScoreHistory,
@@ -49,16 +48,14 @@ const DONUT_ASSET_SIZE = 276;
 const DONUT_ASSET_VISUAL_CENTER = 126;
 const DONUT_VERTICAL_OFFSET = Math.round(DONUT_ASSET_SIZE * 0.03);
 const CORE_SIZE = 150;
-const SCORE_ARC_SIZE = 209;
-const SCORE_ARC_RADIUS = 69;
+// The score progress belongs to the outer donut surface (r=80 in the
+// companion asset). Keep the centre free of a second, decorative ring.
+const SCORE_ARC_SIZE = 252;
+const SCORE_ARC_RADIUS = 80;
 const SCORE_ARC_STROKE_WIDTH = 20;
 const SCORE_ARC_CIRCUMFERENCE = 2 * Math.PI * SCORE_ARC_RADIUS;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedPath = Animated.createAnimatedComponent(Path);
 const STAR_ORB_PATH = 'M151.923 102.197C167.069 87.7458 174.642 80.5201 183.297 77.7974C190.915 75.4008 199.085 75.4008 206.703 77.7974C215.358 80.5201 222.931 87.7458 238.077 102.197L269.599 132.274C271.87 134.442 273.006 135.526 274.221 136.512C275.3 137.388 276.426 138.205 277.592 138.961C278.905 139.812 280.287 140.557 283.051 142.048L321.396 162.732C339.821 172.671 349.033 177.64 354.297 185.03C358.93 191.535 361.455 199.306 361.53 207.291C361.615 216.364 357.083 225.799 348.019 244.669L329.155 283.943C327.796 286.773 327.116 288.188 326.554 289.648C326.054 290.945 325.624 292.268 325.266 293.611C324.863 295.123 324.581 296.667 324.017 299.756L316.194 342.617C312.435 363.211 310.556 373.508 305.154 380.798C300.4 387.215 293.79 392.017 286.218 394.556C277.615 397.441 267.242 396.046 246.494 393.257L203.314 387.452C200.202 387.034 198.646 386.825 197.084 386.741C195.696 386.667 194.304 386.667 192.916 386.741C191.354 386.825 189.798 387.034 186.686 387.452L143.506 393.257C122.758 396.046 112.385 397.441 103.782 394.556C96.2102 392.017 89.6004 387.215 84.8458 380.798C79.444 373.508 77.5647 363.211 73.806 342.617L65.9832 299.756C65.4194 296.667 65.1375 295.123 64.7343 293.611C64.3759 292.268 63.9461 290.945 63.4465 289.648C62.8843 288.188 62.2045 286.773 60.845 283.943L41.9807 244.669C32.9169 225.799 28.3849 216.364 28.47 207.291C28.5449 199.306 31.0697 191.535 35.703 185.03C40.9671 177.64 50.1793 172.671 68.6036 162.732L106.949 142.048C109.713 140.557 111.095 139.812 112.408 138.961C113.574 138.205 114.7 137.388 115.779 136.512C116.994 135.526 118.13 134.442 120.401 132.274L151.923 102.197Z';
-const STAR_ORB_PATH_LENGTH = 1140;
-const STAR_ORB_MOTION_DURATION_MS = 3500;
-const STAR_ORB_NEON_PALETTE = ['#39F3FF', '#4D7CFF', '#FF4FD8', '#A970FF', '#7CFF00', '#7B61FF', '#39F3FF'] as const;
 
 const font = {
   regular: 'Exo_400Regular',
@@ -154,26 +151,21 @@ export const activityHomeState = (input: {
   return { label: scoreUnavailableLabel(input) };
 };
 
-const arcGradientForMetric = (key: MetricKey) => {
-  switch (key) {
-    case 'activity':
-      return ['#FF8A1E', '#A74200'];
-    case 'nourishment':
-      return ['#96FF45', '#2F9400'];
-    case 'mind':
-      return ['#9B70FF', '#763CEF'];
-    case 'sleep':
-      return ['#2E92FF', '#0643B5'];
-    case 'calm':
-    case 'healthIntelligence':
-    default:
-      return ['#F4052D', '#8C071E'];
-  }
-};
-
 const normalizeScore = (value: number | null | undefined) => {
   if (value == null || !Number.isFinite(value)) return null;
   return Math.max(0, Math.min(100, Math.round(value)));
+};
+
+const arcGradientForMetric = (key: MetricKey) => {
+  switch (key) {
+    case 'activity': return ['#FF8A1E', '#A74200'];
+    case 'nourishment': return ['#96FF45', '#2F9400'];
+    case 'mind': return ['#9B70FF', '#763CEF'];
+    case 'sleep': return ['#2E92FF', '#0643B5'];
+    case 'calm':
+    case 'healthIntelligence':
+    default: return ['#F4052D', '#8C071E'];
+  }
 };
 
 export const HomeScreen = () => {
@@ -192,39 +184,8 @@ export const HomeScreen = () => {
   const sessionToken = authSession?.sessionToken;
   const profilePhoto = useProfilePhoto(authSession?.accountId ?? '');
   const hasAuthSession = Boolean(authSession);
-
-  const openAssist = useCallback(async () => {
-    try {
-      const subscription = await getMySubscription();
-      const hasAssist = subscription.entitlements.AI_ASSIST?.value === true;
-
-      if (['PENDING', 'PAYMENT_PENDING', 'PROCESSING'].includes(subscription.status)) {
-        navigation.navigate('SubscriptionPaymentPlaceholder', {
-          status: subscription.status as 'PENDING' | 'PAYMENT_PENDING' | 'PROCESSING',
-          returnDestination: 'AssistHub'
-        });
-        return;
-      }
-
-      if (subscription.status === 'PAYMENT_FAILED') {
-        navigation.navigate('SubscriptionPaymentPlaceholder', { status: 'PAYMENT_FAILED', returnDestination: 'AssistHub' });
-        return;
-      }
-
-      if (hasAssist && ['ACTIVE', 'EXPIRING_SOON', 'CANCELLED'].includes(subscription.status)) {
-        navigation.navigate('AssistHub');
-        return;
-      }
-
-      navigation.navigate('SubscriptionPlans', {
-        source: 'assist',
-        requiredEntitlement: 'AI_ASSIST',
-        returnDestination: 'AssistHub'
-      });
-    } catch {
-      Alert.alert('Subscription unavailable', 'We could not check Assist access right now. Please try again.');
-    }
-  }, [navigation]);
+  const syncHealthOnHomeFocus = useRef(health.syncLocalMetrics);
+  syncHealthOnHomeFocus.current = health.syncLocalMetrics;
 
   const refreshPss10Context = useCallback(async () => {
     if (!hasAuthSession || !sessionToken) {
@@ -276,6 +237,11 @@ export const HomeScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
+      // Home is the score surface, so every genuine focus must initiate a
+      // fresh platform read before requesting projections. Provider bootstrap
+      // remains a fallback for non-Home entry paths, but cannot be the only
+      // trigger: it may complete before a restored session has hydrated.
+      void syncHealthOnHomeFocus.current({ liveOnly: true });
       void refreshPss10Context();
       void refreshDailyNutrition();
       void refreshHealthScores();
@@ -427,8 +393,6 @@ export const HomeScreen = () => {
             />
 
             <HomeHealthActions
-              onAssist={() => { void openAssist(); }}
-              onPlans={() => navigation.navigate('SubscriptionPlans', { source: 'subscription_management' })}
               onMyFitness={() => navigation.navigate('HealthData', { entryContext: 'HOME' })}
               onHealthReports={() => navigation.navigate('Reports')}
               onCycle={() => navigation.navigate('Cycle')}
@@ -509,85 +473,12 @@ export const RecoveryTrend = ({ values, hasData, unavailableLabel = 'Waiting for
   </View>
 );
 
-export const useReducedMotionPreference = () => {
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted) setReduceMotion(enabled);
-    });
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
-    return () => {
-      mounted = false;
-      subscription.remove();
-    };
-  }, []);
-
-  return reduceMotion;
-};
-
-const StarOrbSurface = ({ reduceMotion }: { reduceMotion: boolean }) => {
-  const perimeterProgress = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    perimeterProgress.stopAnimation();
-    if (reduceMotion) {
-      perimeterProgress.setValue(0);
-      return;
-    }
-    const animation = Animated.loop(
-      Animated.timing(perimeterProgress, {
-        toValue: 1,
-        duration: STAR_ORB_MOTION_DURATION_MS,
-        easing: Easing.linear,
-        useNativeDriver: false
-      })
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [perimeterProgress, reduceMotion]);
-
-  const perimeterOffset = perimeterProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -STAR_ORB_PATH_LENGTH]
-  });
-  const perimeterColor = perimeterProgress.interpolate({
-    inputRange: STAR_ORB_NEON_PALETTE.map((_, index) => index / (STAR_ORB_NEON_PALETTE.length - 1)),
-    outputRange: [...STAR_ORB_NEON_PALETTE]
-  });
-
+const StarOrbSurface = ({ selectedColor }: { selectedColor: string }) => {
   return (
     <View style={StyleSheet.absoluteFill} testID="star-orb-surface">
       <RecoveryStarAsset width="100%" height="100%" pointerEvents="none" />
       <Svg width="100%" height="100%" viewBox="0 0 390 473" style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Path d={STAR_ORB_PATH} fill="none" stroke="#626B75" strokeOpacity={reduceMotion ? 0.68 : 0.3} strokeWidth={1} />
-        {!reduceMotion ? (
-          <>
-            <AnimatedPath
-              d={STAR_ORB_PATH}
-              fill="none"
-              stroke={perimeterColor}
-              strokeOpacity={0.2}
-              strokeWidth={7}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray={`${STAR_ORB_PATH_LENGTH * 0.2} ${STAR_ORB_PATH_LENGTH * 0.8}`}
-              strokeDashoffset={perimeterOffset}
-            />
-            <AnimatedPath
-              d={STAR_ORB_PATH}
-              fill="none"
-              stroke={perimeterColor}
-              strokeOpacity={0.82}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray={`${STAR_ORB_PATH_LENGTH * 0.2} ${STAR_ORB_PATH_LENGTH * 0.8}`}
-              strokeDashoffset={perimeterOffset}
-            />
-          </>
-        ) : null}
+        <Path testID="star-orb-selection-border" d={STAR_ORB_PATH} fill="none" stroke={selectedColor} strokeOpacity={0.92} strokeWidth={1} />
       </Svg>
     </View>
   );
@@ -610,9 +501,8 @@ export const RecoveryPanel = ({
   selectedState: { label: string };
   onSelectMetric: (metric: MetricKey) => void;
 }) => {
-  const reduceMotion = useReducedMotionPreference();
   const clampedScore = selectedScore == null ? 0 : Math.max(0, Math.min(100, selectedScore));
-  const scoreArcProgress = useRef(new Animated.Value(clampedScore)).current;
+  const scoreArcProgress = useRef(new Animated.Value(0)).current;
   const scoreArcOffset = scoreArcProgress.interpolate({
     inputRange: [0, 100],
     outputRange: [SCORE_ARC_CIRCUMFERENCE, 0]
@@ -620,64 +510,49 @@ export const RecoveryPanel = ({
   const [arcStart, arcEnd] = arcGradientForMetric(selectedMetric);
 
   useEffect(() => {
-    if (selectedScore == null) return undefined;
-    const animation = Animated.timing(scoreArcProgress, {
-      toValue: clampedScore,
-      duration: reduceMotion ? 0 : 620,
-      useNativeDriver: false
-    });
+    scoreArcProgress.stopAnimation();
+    if (selectedScore == null) {
+      scoreArcProgress.setValue(0);
+      return undefined;
+    }
+    // Always begin from an empty track so the score visibly fills when Home
+    // appears and whenever the selected metric changes. A short delay keeps
+    // the motion from completing behind the navigation transition.
+    scoreArcProgress.setValue(0);
+    const animation = Animated.sequence([
+      Animated.delay(350),
+      Animated.timing(scoreArcProgress, {
+        toValue: clampedScore,
+        duration: 1600,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false
+      })
+    ]);
     animation.start();
     return () => animation.stop();
-  }, [clampedScore, reduceMotion, scoreArcProgress, selectedScore]);
+  }, [clampedScore, scoreArcProgress, selectedMetric, selectedScore]);
 
   return (
     <View style={styles.recoveryPanel}>
       <View style={styles.recoveryStage}>
         <View style={styles.starShadow} pointerEvents="none">
-          <StarOrbSurface reduceMotion={reduceMotion} />
+          <StarOrbSurface selectedColor={selectedColor} />
         </View>
         <ProgressDonutChartAsset width={DONUT_ASSET_SIZE} height={DONUT_ASSET_SIZE} style={styles.progressDonutAsset} pointerEvents="none" />
-        <Svg
-            width={SCORE_ARC_SIZE}
-            height={SCORE_ARC_SIZE}
-            viewBox={`0 0 ${SCORE_ARC_SIZE} ${SCORE_ARC_SIZE}`}
-            style={styles.scoreArc}
-            pointerEvents="none"
-          >
-            <Circle
-              testID="recovery-score-track"
-              cx={SCORE_ARC_SIZE / 2}
-              cy={SCORE_ARC_SIZE / 2}
-              r={SCORE_ARC_RADIUS}
-              fill="transparent"
-              stroke="#292E35"
-              strokeWidth={SCORE_ARC_STROKE_WIDTH}
-            />
-            {selectedScore != null ? <>
-              <Defs>
-                <SvgLinearGradient id="homeRecoveryScoreArc" x1="42" y1="12" x2="135" y2="126" gradientUnits="userSpaceOnUse">
-                  <Stop offset="0" stopColor={arcStart} />
-                  <Stop offset="1" stopColor={arcEnd} />
-                </SvgLinearGradient>
-              </Defs>
-              <AnimatedCircle
-              testID="recovery-score-progress"
-              cx={SCORE_ARC_SIZE / 2}
-              cy={SCORE_ARC_SIZE / 2}
-              r={SCORE_ARC_RADIUS}
-              fill="transparent"
-              stroke="url(#homeRecoveryScoreArc)"
-              strokeWidth={SCORE_ARC_STROKE_WIDTH}
-              strokeLinecap="round"
-              strokeDasharray={`${SCORE_ARC_CIRCUMFERENCE} ${SCORE_ARC_CIRCUMFERENCE}`}
-              strokeDashoffset={scoreArcOffset}
-              originX={SCORE_ARC_SIZE / 2}
-              originY={SCORE_ARC_SIZE / 2}
-              rotation="-72"
-              />
-            </> : null}
-          </Svg>
-
+        <View style={styles.scoreArc} pointerEvents="none">
+        <Svg width={SCORE_ARC_SIZE} height={SCORE_ARC_SIZE} viewBox={`0 0 ${SCORE_ARC_SIZE} ${SCORE_ARC_SIZE}`} pointerEvents="none">
+          <Circle testID="recovery-score-track" cx={SCORE_ARC_SIZE / 2} cy={SCORE_ARC_SIZE / 2} r={SCORE_ARC_RADIUS} fill="transparent" stroke="#292E35" strokeWidth={SCORE_ARC_STROKE_WIDTH} />
+          {selectedScore != null ? <>
+            <Defs>
+              <SvgLinearGradient id="homeRecoveryScoreArc" x1="42" y1="12" x2="135" y2="126" gradientUnits="userSpaceOnUse">
+                <Stop offset="0" stopColor={arcStart} />
+                <Stop offset="1" stopColor={arcEnd} />
+              </SvgLinearGradient>
+            </Defs>
+            <AnimatedCircle testID="recovery-score-progress" cx={SCORE_ARC_SIZE / 2} cy={SCORE_ARC_SIZE / 2} r={SCORE_ARC_RADIUS} fill="transparent" stroke="url(#homeRecoveryScoreArc)" strokeWidth={SCORE_ARC_STROKE_WIDTH} strokeLinecap="round" strokeDasharray={`${SCORE_ARC_CIRCUMFERENCE} ${SCORE_ARC_CIRCUMFERENCE}`} strokeDashoffset={scoreArcOffset} originX={SCORE_ARC_SIZE / 2} originY={SCORE_ARC_SIZE / 2} rotation="-72" />
+          </> : null}
+        </Svg>
+        </View>
         {metrics.map((metric) => (
           <RecoveryNode
             key={metric.key}
@@ -1015,6 +890,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: STAR_CENTER_Y - SCORE_ARC_SIZE / 2 + DONUT_VERTICAL_OFFSET,
     left: STAR_CENTER_X - SCORE_ARC_SIZE / 2,
+    width: SCORE_ARC_SIZE,
+    height: SCORE_ARC_SIZE,
     zIndex: 2
   },
   coreCenter: {

@@ -176,6 +176,8 @@ export const syncFromAppleHealth = async (
       const observationCountBefore = observations.length;
       result.samples.forEach((sample) => {
         if (sample.metric === 'sleep_minutes' && sample.sleepStage === 'IN_BED') return;
+        const measuredAt = Date.parse(sample.endAtISO);
+        if (!Number.isFinite(measuredAt) || measuredAt > Date.now() + 5 * 60_000) return;
         const canonicalMetric = sample.metric === 'exercise_minutes' ? 'active_minutes'
           : sample.metric === 'hrv_ms' ? 'hrv_sdnn_ms' : sample.metric;
         if(sample.metric!=='sleep_minutes'||sample.sleepStage!=='AWAKE') {

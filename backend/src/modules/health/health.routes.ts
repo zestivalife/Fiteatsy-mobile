@@ -53,7 +53,11 @@ const observationSchema = z.object({
     ,workoutEnergyKcal:z.number().finite().nonnegative().optional()
     ,workoutDistanceMeters:z.number().finite().nonnegative().optional()
     ,workoutDurationSeconds:z.number().finite().nonnegative().optional()
-  }).strict().optional()
+  // Older accepted mobile builds persisted additional provenance-only keys in
+  // the durable offline queue. Unknown metadata must not invalidate an entire
+  // otherwise canonical batch; Zod strips those keys while every supported
+  // scoring/provenance field above remains fully validated.
+  }).strip().optional()
   ,startAtISO: z.string().datetime().nullable().optional()
   ,endAtISO: z.string().datetime().nullable().optional()
   ,timezoneOffsetMinutes: z.number().int().min(-840).max(840).nullable().optional()
@@ -234,6 +238,10 @@ healthRouter.delete('/wearable-consents/:provider', async (req, res) => {
 healthRouter.post('/observations:batch', async (req, res) => {
   const parsed = batchSchema.safeParse(req.body);
   if (!parsed.success) {
+    console.warn('HEALTH_OBSERVATION_BATCH_REJECTED', {
+      reason: 'SCHEMA',
+      fieldErrors: parsed.error.flatten().fieldErrors
+    });
     return res.status(400).json({
       error: 'INVALID_OBSERVATION_BATCH',
       details: parsed.error.flatten()
@@ -246,6 +254,7 @@ healthRouter.post('/observations:batch', async (req, res) => {
     .map((observation, index) => ({ index, reason: validateObservation(observation) }))
     .filter((item) => item.reason != null);
   if (invalid.length) {
+    console.warn('HEALTH_OBSERVATION_BATCH_REJECTED', { reason: 'SEMANTIC', invalid });
     return res.status(400).json({ error: 'INVALID_HEALTH_OBSERVATION', details: invalid });
   }
   const providers = [...new Set(parsed.data.observations.map((item) => item.sourceProvider))];

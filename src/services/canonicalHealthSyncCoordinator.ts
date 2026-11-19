@@ -33,8 +33,60 @@ import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 import { traceSessionLifecycle } from './sessionLifecycleTrace';
 import { buildHealthSourceDiagnostics } from './healthSourceDiagnostics';
+import { ApiClientError } from './apiClient';
 
 export type { HealthObservationDto } from './healthSyncManager';
+
+export type HomeHealthRefreshEndpoint =
+  | 'syncStatus'
+  | 'latestObservations'
+  | 'syncActivity'
+  | 'canonicalIntelligence'
+  | 'starOrb';
+type HomeHealthRefreshRequests = {
+  syncStatus: () => Promise<HealthSyncStatus>;
+  latestObservations: () => Promise<Awaited<ReturnType<typeof getLatestHealthObservations>>>;
+  syncActivity: () => Promise<Awaited<ReturnType<typeof getHealthSyncActivity>>>;
+  canonicalIntelligence: () => Promise<HealthIntelligenceV1>;
+  starOrb: () => Promise<CandidateStarOrbValidation>;
+};
+type HomeHealthRefreshHandlers = {
+  syncStatus: (value: HealthSyncStatus) => void | Promise<void>;
+  latestObservations: (value: Awaited<ReturnType<typeof getLatestHealthObservations>>) => void | Promise<void>;
+  syncActivity: (value: Awaited<ReturnType<typeof getHealthSyncActivity>>) => void | Promise<void>;
+  canonicalIntelligence: (value: HealthIntelligenceV1) => void | Promise<void>;
+  starOrb: (value: CandidateStarOrbValidation) => void | Promise<void>;
+};
+type HomeHealthRefreshResult =
+  | { endpoint: HomeHealthRefreshEndpoint; status: 'fulfilled' }
+  | { endpoint: HomeHealthRefreshEndpoint; status: 'rejected'; reason: unknown };
+
+const homeRefreshFailureDetails = (error: unknown) => ({
+  status: error instanceof ApiClientError ? error.status ?? null : null,
+  errorCategory: error instanceof ApiClientError ? error.code : error instanceof Error ? error.name : 'UNKNOWN'
+});
+
+export const refreshHomeHealthResponses = async (
+  requests: HomeHealthRefreshRequests,
+  handlers: HomeHealthRefreshHandlers
+) => {
+  const execute = <K extends HomeHealthRefreshEndpoint>(endpoint: K): Promise<HomeHealthRefreshResult> =>
+    requests[endpoint]().then(async (value) => {
+      await (handlers[endpoint] as (resolved: typeof value) => void | Promise<void>)(value);
+      return { endpoint, status: 'fulfilled' as const };
+    }).catch((reason: unknown) => ({ endpoint, status: 'rejected' as const, reason }));
+  const results = await Promise.all((Object.keys(requests) as HomeHealthRefreshEndpoint[]).map(execute));
+  const starOrbSucceeded = results.some((result) => result.endpoint === 'starOrb' && result.status === 'fulfilled');
+  results.forEach((result) => {
+    if (result.status === 'fulfilled') return;
+    console.warn('[HomeHealthRefresh] request failed; preserving last valid endpoint state', {
+      endpoint: result.endpoint,
+      ...homeRefreshFailureDetails(result.reason),
+      starOrbSucceeded
+    });
+  });
+  return results;
+};
 
 
 export type CanonicalHealthMetricState = {
@@ -136,30 +188,42 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
 
   const refreshRemoteSnapshot = useCallback(async () => {
     const locallyAvailable = await adapter.isAvailable().catch(() => false);
-    try {
-      const [nextStatus, nextObservations, nextActivity, nextIntelligence,nextCandidate] = await Promise.all([
-        getHealthSyncStatus(), getLatestHealthObservations(200), getHealthSyncActivity(8), getHealthIntelligenceV1(),
-        getProductionStarOrb()
-      ]);
-      if (!mounted.current) return;
-      setStatus(nextStatus);
-      setProviderState(deriveHealthProviderState(nextStatus, adapter.platform, locallyAvailable));
-      setObservations((current) => {
-        const byIdentity = new Map(current.map((item) => [item.syncKey ?? item.id, item]));
-        nextObservations.items.forEach((item) => byIdentity.set(item.syncKey ?? item.id, item));
-        return [...byIdentity.values()];
-      });
-      setActivity(nextActivity.items);
-      const snapshot = serverSnapshot(nextIntelligence);
-      // Preserve a calculated local projection from a just-completed native read,
-      // but allow a calculated server snapshot to replace an uncalculated local placeholder.
-      setCanonicalIntelligence((current) => preferCanonicalHealthSnapshot(current, snapshot));
-      setCandidateIntelligence(nextCandidate?candidateResponseToHomeSnapshot(nextCandidate):null);
-      if (localScope) await persistLocalCanonicalHealthSnapshot(localScope, snapshot);
-    } catch {
-      // Backend availability is not provider availability. Local reads stay usable.
-      if (mounted.current) setProviderState((current) => current === 'CONNECTED' ? current : locallyAvailable ? 'AVAILABLE' : 'UNAVAILABLE');
-    }
+    const results = await refreshHomeHealthResponses({
+      syncStatus: getHealthSyncStatus,
+      latestObservations: () => getLatestHealthObservations(200),
+      syncActivity: () => getHealthSyncActivity(8),
+      canonicalIntelligence: getHealthIntelligenceV1,
+      starOrb: getProductionStarOrb
+    }, {
+      syncStatus: (nextStatus) => {
+        if (!mounted.current) return;
+        setStatus(nextStatus);
+        setProviderState(deriveHealthProviderState(nextStatus, adapter.platform, locallyAvailable));
+      },
+      latestObservations: (nextObservations) => {
+        if (!mounted.current) return;
+        setObservations((current) => {
+          const byIdentity = new Map(current.map((item) => [item.syncKey ?? item.id, item]));
+          nextObservations.items.forEach((item) => byIdentity.set(item.syncKey ?? item.id, item));
+          return [...byIdentity.values()];
+        });
+      },
+      syncActivity: (nextActivity) => { if (mounted.current) setActivity(nextActivity.items); },
+      canonicalIntelligence: async (nextIntelligence) => {
+        if (!mounted.current) return;
+        const snapshot = serverSnapshot(nextIntelligence);
+        setCanonicalIntelligence((current) => preferCanonicalHealthSnapshot(current, snapshot));
+        if (localScope) await persistLocalCanonicalHealthSnapshot(localScope, snapshot);
+      },
+      starOrb: (nextCandidate) => {
+        if (mounted.current) setCandidateIntelligence(candidateResponseToHomeSnapshot(nextCandidate));
+      }
+    });
+    if (!mounted.current) return;
+    const statusFailed = results.some((result) => result.endpoint === 'syncStatus' && result.status === 'rejected');
+    if (statusFailed) setProviderState((current) => current === 'CONNECTED'
+      ? current
+      : locallyAvailable ? 'AVAILABLE' : 'UNAVAILABLE');
   }, [adapter, localScope]);
 
   const syncLocalMetrics = useCallback(async (options: { forceSourceBackfill?: boolean; liveOnly?: boolean } = {}) => {
@@ -271,6 +335,12 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setMessage(error instanceof HealthSyncPostUploadRefreshError
           ? `${sourceName} data was uploaded. Account status will refresh automatically.`
           : `${sourceName} data is available locally. Upload is pending.`);
+        if (error instanceof HealthSyncPostUploadRefreshError) {
+          // The observation commit succeeded; refresh the independent Star Orb
+          // projection instead of leaving Home on the strict canonical
+          // methodology-pending fallback until the next app lifecycle event.
+          void refreshRemoteSnapshot();
+        }
       } else {
         const available = await adapter.isAvailable().catch(() => false);
         setProviderState(available ? 'ERROR' : 'UNAVAILABLE');

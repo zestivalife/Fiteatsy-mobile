@@ -26,7 +26,6 @@ import { HydrationScreen } from '../screens/wellness/HydrationScreen';
 import { FloatingTabBar } from '../components/FloatingTabBar';
 import { LeadershipScreen } from '../screens/home/LeadershipScreen';
 import { ConsultantBookingScreen } from '../screens/home/ConsultantBookingScreen';
-import { AssistHubScreen } from '../screens/home/AssistHubScreen';
 import { PaymentSuccessScreen } from '../screens/home/PaymentSuccessScreen';
 import { SubscriptionPlansScreen } from '../screens/home/SubscriptionPlansScreen';
 import { SubscriptionPlanDetailsScreen } from '../screens/home/SubscriptionPlanDetailsScreen';
@@ -140,7 +139,6 @@ export const AppNavigation = () => {
         <Stack.Screen name="HydrationSession" component={HydrationScreen} />
         <Stack.Screen name="Leadership" component={LeadershipScreen} />
         <Stack.Screen name="ConsultantBooking" component={ConsultantBookingScreen} />
-        <Stack.Screen name="AssistHub" component={AssistHubScreen} />
         <Stack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
         <Stack.Screen name="SubscriptionPlanDetails" component={SubscriptionPlanDetailsScreen} />
         <Stack.Screen name="SubscriptionCompare" component={SubscriptionCompareScreen} />

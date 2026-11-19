@@ -1,13 +1,10 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import AssistIcon from '../assets/fiteatsy-home/assist.svg';
 import type { SvgProps } from 'react-native-svg';
 
 type SvgAsset = React.ComponentType<SvgProps>;
 type Props = {
-  onAssist: () => void;
-  onPlans: () => void;
   onMyFitness: () => void;
   onHealthReports: () => void;
   onCycle: () => void;
@@ -16,7 +13,6 @@ type Props = {
 const Icon = ({ name }: { name: React.ComponentProps<typeof Ionicons>['name'] }) => (
   <Ionicons name={name} size={18} color="#FFFFFF" />
 );
-const PlansIcon: SvgAsset = () => <Icon name="layers-outline" />;
 const HealthDataIcon: SvgAsset = () => <Icon name="heart-outline" />;
 const ReportsIcon: SvgAsset = () => <Icon name="document-text-outline" />;
 const CycleIcon: SvgAsset = () => <Icon name="calendar-outline" />;
@@ -28,42 +24,43 @@ const Action = ({ label, icon: ActionIcon, onPress }: { label: string; icon: Svg
   </Pressable>
 );
 
-export const HomeHealthActions = ({ onAssist, onPlans, onMyFitness, onHealthReports, onCycle }: Props) => (
-  <View style={styles.row}>
-    <Action label="Assist" icon={AssistIcon} onPress={onAssist} />
-    <Action label="Plans" icon={PlansIcon} onPress={onPlans} />
-    <Action label="My Fitness" icon={HealthDataIcon} onPress={onMyFitness} />
-    <Action label="Health Reports" icon={ReportsIcon} onPress={onHealthReports} />
-    <Action label="Cycle" icon={CycleIcon} onPress={onCycle} />
+export const HomeHealthActions = ({ onMyFitness, onHealthReports, onCycle }: Props) => (
+  <View style={styles.actions}>
+    <View style={styles.actionRow}>
+      <Action label="My Fitness" icon={HealthDataIcon} onPress={onMyFitness} />
+      <Action label="Health Reports" icon={ReportsIcon} onPress={onHealthReports} />
+      <Action label="Cycle" icon={CycleIcon} onPress={onCycle} />
+    </View>
   </View>
 );
 
 const styles = StyleSheet.create({
-  row: {
+  actions: {
     marginTop: 8,
+    gap: 7
+  },
+  actionRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    rowGap: 7
+    gap: 7
   },
   action: {
-    minHeight: 44,
-    width: '49%',
-    borderRadius: 16,
+    flex: 1,
+    minWidth: 0,
+    minHeight: 40,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#2B3137',
     backgroundColor: '#171C21',
-    paddingHorizontal: 12,
+    paddingHorizontal: 6,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8
+    gap: 5
   },
   label: {
     color: '#FFFFFF',
     fontFamily: 'Exo_700Bold',
-    fontSize: 10,
-    lineHeight: 13
+    fontSize: 9,
+    lineHeight: 11
   }
 });

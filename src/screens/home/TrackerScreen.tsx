@@ -18,6 +18,8 @@ import {
 } from '../../services/trackerAnalysisService';
 import { toDayKey } from '../../utils/date';
 import { buildRecoveryIntelligence } from '../../services/recoveryIntelligenceEngine';
+import { listBiomarkerHistory, type BiomarkerHistoryItem } from '../../services/reportUploadService';
+import { calculateTrackerBodyBiomarkerHealth, calculateTrackerEnergyBalance, calculateTrackerHealthIntelligence, calculateTrackerStressRecovery } from '../../services/trackerOverviewScores';
 import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
 import {getHealthIntelligenceV1,getHealthScoreHistory,getHealthScoreSummary,type HealthIntelligenceV1,type HealthScore,type HealthScoreSummary,type HealthScoreType} from '../../services/healthIntelligenceService';
 import { useCanonicalHealthSyncCoordinator, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
@@ -79,8 +81,8 @@ const CURVED_TAB_PATH =
 const CURVED_TAB_FILL_PATH = `${CURVED_TAB_PATH} Z`;
 const PARTICLE_FIELD_SIZE = 384;
 const PARTICLE_COUNT = 360;
-const PARTICLE_INNER_RADIUS = 0.235;
-const PARTICLE_OUTER_RADIUS = 0.465;
+const PARTICLE_INNER_RADIUS = 0.16;
+const PARTICLE_OUTER_RADIUS = 0.49;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const TAU = Math.PI * 2;
 const HEART_PARTICLE_FIELD_SIZE = 356;
@@ -93,6 +95,11 @@ const SLEEP_PARTICLE_CORE_RADIUS = 0.395;
 const SLEEP_PARTICLE_OUTER_RADIUS = 0.525;
 const SLEEP_PARTICLE_COLORS = ['#506CFF', '#544DE6', '#7E5BFF', '#A869FF', '#48A4FF', '#5BD0FF'];
 const SLEEP_FRAME_DELTA = 0.029952;
+const ACTIVITY_PARTICLE_FIELD_SIZE = 356;
+const ACTIVITY_PARTICLE_GRID_SIZE = 17;
+const ACTIVITY_PARTICLE_SPACING = 27;
+const ACTIVITY_PARTICLE_RADIUS_SCALE = 0.5;
+const ACTIVITY_FRAME_DELTA = 0.022;
 
 const healthSubTabs: Array<{
   key: HealthSubTab;
@@ -253,6 +260,24 @@ const sleepParticlePoints = Array.from({ length: SLEEP_PARTICLE_COUNT }, (_, ind
   };
 });
 
+const activityParticlePoints = Array.from(
+  { length: ACTIVITY_PARTICLE_GRID_SIZE * ACTIVITY_PARTICLE_GRID_SIZE },
+  (_, index) => {
+    const row = Math.floor(index / ACTIVITY_PARTICLE_GRID_SIZE);
+    const column = index % ACTIVITY_PARTICLE_GRID_SIZE;
+    const midpoint = (ACTIVITY_PARTICLE_GRID_SIZE - 1) / 2;
+    const dx = column - midpoint;
+    const dy = row - midpoint;
+    return {
+      key: `activity-particle-${row}-${column}`,
+      x: ACTIVITY_PARTICLE_FIELD_SIZE / 2 + dx * ACTIVITY_PARTICLE_SPACING,
+      y: ACTIVITY_PARTICLE_FIELD_SIZE / 2 + dy * ACTIVITY_PARTICLE_SPACING,
+      distance: Math.hypot(dx, dy) / Math.hypot(midpoint, midpoint),
+      phase: seededFraction(index + 401) * 0.18
+    };
+  }
+);
+
 const latestObservationValue = (
   observations: HealthObservationDto[] | undefined,
   metricType: string
@@ -392,14 +417,6 @@ const RecoveryParticleMetric = ({
       >
         <Animated.View style={[styles.particleCanvas, { opacity, transform: [{ scale }, { rotate }] }]}>
           <Svg width="100%" height="100%" viewBox={`0 0 ${PARTICLE_FIELD_SIZE} ${PARTICLE_FIELD_SIZE}`}>
-            <Defs>
-              <SvgLinearGradient id="particleCoreGlow" x1="20%" y1="10%" x2="80%" y2="90%">
-                <Stop offset="0%" stopColor="#24153A" stopOpacity="0.44" />
-                <Stop offset="65%" stopColor="#07030D" stopOpacity="0.2" />
-                <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
-              </SvgLinearGradient>
-            </Defs>
-            <Circle cx={160} cy={160} r={118} fill="url(#particleCoreGlow)" />
             {particlePoints.map((particle) => (
               <Circle
                 key={particle.key}
@@ -415,6 +432,104 @@ const RecoveryParticleMetric = ({
         <View style={styles.particleMetricCenter}>
           <Text style={styles.particleMetricValue}>{value == null ? '—' : Math.round(value)}</Text>
           <Text style={styles.particleMetricLabel}>{label}</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const ActivityParticleMetric = ({
+  score,
+  steps,
+  workoutMinutes,
+  activeCalories
+}: {
+  score: number | null | undefined;
+  steps: number | null | undefined;
+  workoutMinutes: number | null | undefined;
+  activeCalories: number | null | undefined;
+}) => {
+  const [activityTime, setActivityTime] = useState(0);
+
+  useEffect(() => {
+    let frame = 0;
+    let mounted = true;
+    const tick = () => {
+      if (!mounted) return;
+      setActivityTime((current) => (current + ACTIVITY_FRAME_DELTA) % TAU);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => {
+      mounted = false;
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  const renderedActivityParticles = useMemo(() => {
+    // A cosine wave travels from the centre to the edge and back. Dots near
+    // the wave front expand while the remainder stay present as a quiet grid.
+    const waveCenter = 0.08 + (0.5 - 0.5 * Math.cos(activityTime)) * 0.88;
+    return activityParticlePoints.map((particle) => {
+      const width = 0.13;
+      const delta = particle.distance - waveCenter + particle.phase * Math.sin(activityTime * 0.7);
+      const wave = Math.exp(-(delta * delta) / (2 * width * width));
+      const echoDelta = particle.distance - Math.max(0, waveCenter - 0.22);
+      const echo = Math.exp(-(echoDelta * echoDelta) / (2 * 0.1 * 0.1));
+      return {
+        ...particle,
+        size: (0.9 + wave * 6.2 + echo * 1.4) * ACTIVITY_PARTICLE_RADIUS_SCALE,
+        opacity: 0.16 + wave * 0.78 + echo * 0.2,
+        color: wave > 0.72 ? '#52A0FF' : wave > 0.34 ? '#2F78D8' : '#19477D'
+      };
+    });
+  }, [activityTime]);
+
+  return (
+    <View style={styles.activityParticleField}>
+      <View
+        style={styles.activityParticleWrap}
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={`Activity score ${score == null ? 'calibrating' : `${Math.round(score)} out of 100`}. Steps ${compactMetricValue(steps)}. Active minutes ${compactMetricValue(workoutMinutes)}. Active calories ${compactMetricValue(activeCalories)}.`}
+      >
+        <View style={styles.activityParticleCanvas} pointerEvents="none">
+          <Svg
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${ACTIVITY_PARTICLE_FIELD_SIZE} ${ACTIVITY_PARTICLE_FIELD_SIZE}`}
+            style={styles.activityParticleSvg}
+          >
+            {renderedActivityParticles.map((particle) => (
+              <Circle
+                key={particle.key}
+                cx={particle.x}
+                cy={particle.y}
+                r={particle.size}
+                fill={particle.color}
+                opacity={Math.min(1, particle.opacity)}
+              />
+            ))}
+          </Svg>
+        </View>
+        <View style={styles.activityParticleCenter}>
+          <Text style={styles.activityMetricEyebrow}>Activity</Text>
+          <Text style={styles.activityMetricScore}>{score == null ? '—' : Math.round(score)}<Text style={styles.activityMetricScoreSuffix}> / 100</Text></Text>
+          <View style={styles.activityMetricDivider} />
+          <View style={styles.activityMetricInputs}>
+            <View style={styles.activityMetricInput}>
+              <Text style={styles.activityMetricInputValue}>{compactMetricValue(steps)}</Text>
+              <Text style={styles.activityMetricInputLabel}>Steps</Text>
+            </View>
+            <View style={styles.activityMetricInput}>
+              <Text style={styles.activityMetricInputValue}>{compactMetricValue(workoutMinutes)}</Text>
+              <Text style={styles.activityMetricInputLabel}>Min</Text>
+            </View>
+            <View style={styles.activityMetricInput}>
+              <Text style={styles.activityMetricInputValue}>{compactMetricValue(activeCalories)}</Text>
+              <Text style={styles.activityMetricInputLabel}>kcal</Text>
+            </View>
+          </View>
         </View>
       </View>
     </View>
@@ -856,53 +971,6 @@ const CurvedHealthTabs = ({
   );
 };
 
-const ProgressRing = ({
-  value,
-  color = BRAND_GREEN,
-  size = 100,
-  stroke = 10,
-  label
-}: {
-  value: number | null | undefined;
-  color?: string;
-  size?: number;
-  stroke?: number;
-  label: string;
-}) => {
-  const safeValue = value == null ? 0 : Math.max(0, Math.min(100, value));
-  const radiusValue = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radiusValue;
-  const dashOffset = circumference - (safeValue / 100) * circumference;
-
-  return (
-    <View style={[styles.progressRingWrap, { width: size, height: size }]}>
-      <Svg width={size} height={size}>
-        <Circle cx={size / 2} cy={size / 2} r={radiusValue} stroke="#222A30" strokeWidth={stroke} fill="none" />
-        {value != null ? (
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radiusValue}
-            stroke={color}
-            strokeWidth={stroke}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={`${circumference} ${circumference}`}
-            strokeDashoffset={dashOffset}
-            rotation="-90"
-            originX={size / 2}
-            originY={size / 2}
-          />
-        ) : null}
-      </Svg>
-      <View style={styles.progressRingCenter}>
-        <Text style={styles.progressRingValue}>{value == null ? '—' : Math.round(value)}</Text>
-        <Text style={styles.progressRingLabel}>{label}</Text>
-      </View>
-    </View>
-  );
-};
-
 const MetricSparkCard = ({
   title,
   subtitle,
@@ -1118,6 +1186,7 @@ export const TrackerScreen = () => {
   const [canonicalIntelligence,setCanonicalIntelligence]=useState<HealthIntelligenceV1|null>(null);
   const [masterScoreSummary,setMasterScoreSummary]=useState<HealthScoreSummary|null>(null);
   const [canonicalScoreHistory,setCanonicalScoreHistory]=useState<HealthScore[]>([]);
+  const [overviewBiomarkers, setOverviewBiomarkers] = useState<BiomarkerHistoryItem[]>([]);
   const isLight = themeMode === 'light';
   const todayWeekIndex = new Date().getDay();
 
@@ -1140,6 +1209,12 @@ export const TrackerScreen = () => {
     model: 'fiteatsy-seed-v1'
   });
   const contentAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!authSession || activeTab !== 'health' || activeHealthTab !== 'overview') return;
+    void health.syncLocalMetrics({ liveOnly: true });
+    void listBiomarkerHistory().then(setOverviewBiomarkers).catch(() => setOverviewBiomarkers([]));
+  }, [activeHealthTab, activeTab, authSession?.accountId]);
 
   useEffect(() => {
     let active = true;
@@ -1287,6 +1362,18 @@ export const TrackerScreen = () => {
   // Tracker and Journey share the coordinator's persisted local projection.
   // A separately fetched server snapshot may lag the native commit boundary.
   const displayScores = health.canonicalIntelligence?.scores ?? canonicalIntelligence?.scores ?? null;
+  const overviewScores = health.candidateIntelligence?.scores ?? null;
+  const overviewRecoveryScore = overviewScores?.recovery.score ?? displayScores?.recovery.score ?? null;
+  const overviewStressRecoveryScore = calculateTrackerStressRecovery(health.aggregates);
+  const overviewEnergyBalanceScore = calculateTrackerEnergyBalance(health.aggregates);
+  const overviewBodyBiomarkerScore = calculateTrackerBodyBiomarkerHealth(overviewBiomarkers);
+  const overviewHealthIntelligenceScore = calculateTrackerHealthIntelligence({
+    activity: overviewScores?.activity.score ?? null,
+    sleep: overviewScores?.sleep.score ?? null,
+    nutrition: overviewScores?.nutrition.score ?? null,
+    calm: overviewScores?.calm.score ?? null,
+    stressRecovery: overviewStressRecoveryScore
+  });
   const activityScoreValue = displayScores?.activity.score ?? null;
   const restingHeartRateValue = recoveryIntel.signalCoverage.restingHeartRate ? todayAggregate(['resting_heart_rate']) : null;
   const hrvValue = recoveryIntel.signalCoverage.hrv ? todayAggregate(['hrv_sdnn_ms','hrv_rmssd_ms']) : null;
@@ -1306,21 +1393,29 @@ export const TrackerScreen = () => {
   const hydrationValue = wellness.hydrationLiters > 0 ? wellness.hydrationLiters : null;
   const activeMinutesValue = wellness.movementMinutes > 0 ? wellness.movementMinutes : workoutMinutesValue;
   const recommendationText = recoveryIntel.highestImpactActions[0] ?? recoveryIntel.insufficientReason ?? 'Sync health data to unlock personalized guidance.';
-  const canonicalScoreRows: Array<[string, HealthIntelligenceV1['scores']['activity']]> = displayScores ? [
-    ['Health Intelligence', displayScores.healthIntelligence],
-    ['Recovery', displayScores.recovery],
-    ['Activity', displayScores.activity],
-    ['Sleep', displayScores.sleep],
-    ['Calm', displayScores.calm],
-    ['Stress Recovery', displayScores.stressRecovery],
-    ['Nourishment', displayScores.nutrition]
+  type OverviewScore = Pick<HealthIntelligenceV1['scores']['activity'], 'score'|'status'|'confidence'|'freshness'>;
+  const overviewCalculatedScore = (score: number | null): OverviewScore => ({
+    score,
+    status: score == null ? 'INSUFFICIENT_DATA' : 'CALCULATED',
+    confidence: score == null ? 'LOW' : 'MODERATE',
+    freshness: score == null ? 'UNKNOWN' : 'CURRENT'
+  });
+  const canonicalScoreRows: Array<[string, OverviewScore]> = displayScores ? [
+    ['Health Intelligence', overviewCalculatedScore(overviewHealthIntelligenceScore)],
+    ['Recovery', overviewScores?.recovery ?? displayScores.recovery],
+    ['Activity', overviewScores?.activity ?? displayScores.activity],
+    ['Sleep', overviewScores?.sleep ?? displayScores.sleep],
+    ['Calm', overviewScores?.calm ?? displayScores.calm],
+    ['Mind', overviewScores?.mind ?? displayScores.mind],
+    ['Stress Recovery', overviewCalculatedScore(overviewStressRecoveryScore)],
+    ['Nourishment', overviewScores?.nutrition ?? displayScores.nutrition]
   ] : [];
   if (displayScores?.cycle.status !== 'NOT_APPLICABLE') {
     if (displayScores) canonicalScoreRows.push(['Cycle Wellness', displayScores.cycle]);
   }
   const supportingScoreRows: Array<[string, number | null, string]> = [
-    ['Energy Balance', null, 'Supporting insight only · Methodology pending'],
-    ['Body & Biomarker Health', null, 'Supporting insight only · Methodology pending']
+    ['Energy Balance', overviewEnergyBalanceScore, 'Sleep, movement and hydration from current platform health data'],
+    ['Body & Biomarker Health', overviewBodyBiomarkerScore, 'Latest validated report biomarkers scored against their recorded reference ranges']
   ];
 
   const healthMetrics: MetricConfig[] = [
@@ -1574,11 +1669,11 @@ export const TrackerScreen = () => {
     <Card style={styles.healthPanel}>
       <Text style={styles.healthPanelTitle}>7-Day Recovery Trend</Text>
       <View style={styles.recoveryTrendRow}>
-        {scoreSeries('recovery').map((value, index) => {
-          const hasTrend = scoreSeries('recovery').length > 0;
-          const color = value >= 70 ? '#41B96B' : value >= 50 ? '#B7686C' : '#FF8188';
+        {(health.candidateIntelligence?.recoveryTrend.map((item) => item.score) ?? scoreSeries('recovery')).map((value, index) => {
+          const hasTrend = value != null;
+          const color = value != null && value >= 70 ? '#41B96B' : value != null && value >= 50 ? '#B7686C' : '#FF8188';
           return (
-            <View key={`${index}-${value}`} style={styles.recoveryTrendItem}>
+            <View key={`${index}-${value ?? 'missing'}`} style={styles.recoveryTrendItem}>
               <View style={styles.recoveryTrendBar}>
                 {hasTrend ? <View style={[styles.recoveryTrendFill, { height: `${Math.max(6, value)}%`, backgroundColor: color }]} /> : null}
               </View>
@@ -1592,7 +1687,7 @@ export const TrackerScreen = () => {
 
   const renderHealthOverview = () => (
     <View style={styles.healthContentStack}>
-      <RecoveryParticleMetric value={displayScores?.recovery.score ?? null} label={statusLabel(displayScores?.recovery.score)} />
+      <RecoveryParticleMetric value={overviewRecoveryScore} label={statusLabel(overviewRecoveryScore)} />
       <Card style={styles.healthPanel}>
         <Text style={styles.healthPanelTitle}>Health Intelligence Scores</Text>
         <Text style={styles.healthPanelIntro}>Scores appear automatically when enough recent health data is available.</Text>
@@ -1625,13 +1720,18 @@ export const TrackerScreen = () => {
   const renderActivityTab = () => {
     return (
       <View style={styles.healthContentStack}>
+        <ActivityParticleMetric
+          score={activityScoreValue}
+          steps={stepsValue}
+          workoutMinutes={workoutMinutesValue}
+          activeCalories={caloriesValue}
+        />
         <Card style={styles.activityCard}>
           <View style={styles.activityHeader}>
             <View>
               <Text style={styles.healthPanelTitle}>Today's Movement</Text>
               <Text style={styles.healthMuted}>Activity: {scoreLabel(activityScoreValue)}</Text>
             </View>
-            <ProgressRing value={activityScoreValue} label="Activity" />
           </View>
           {renderMetricRow('Steps', numberLabel(stepsValue), '', null)}
           {renderMetricRow('Workout', numberLabel(workoutMinutesValue, ' min'), '', null, '#BFFFA9')}
@@ -2108,7 +2208,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingVertical: 0,
     height: 264,
-    overflow: 'hidden',
+    overflow: 'visible',
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -2120,8 +2220,8 @@ const styles = StyleSheet.create({
   },
   particleCanvas: {
     position: 'absolute',
-    width: '100%',
-    height: '100%'
+    width: '118%',
+    height: '118%'
   },
   particleMetricCenter: {
     position: 'absolute',
@@ -2130,7 +2230,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(10,4,20,0.34)'
+    backgroundColor: 'transparent'
   },
   particleMetricValue: {
     fontSize: 36,
@@ -2147,6 +2247,92 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Exo_600SemiBold',
     color: '#A9A2B6'
+  },
+  activityParticleField: {
+    alignSelf: 'stretch',
+    height: 306,
+    overflow: 'visible',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  activityParticleWrap: {
+    width: '124%',
+    height: 306,
+    overflow: 'visible',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  activityParticleCanvas: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    overflow: 'visible'
+  },
+  activityParticleSvg: {
+    overflow: 'visible'
+  },
+  activityParticleCenter: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(5,10,18,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(82,160,255,0.2)'
+  },
+  activityMetricEyebrow: {
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    fontFamily: 'Exo_700Bold',
+    color: '#67ACFF'
+  },
+  activityMetricScore: {
+    marginTop: 3,
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: -1.2,
+    fontFamily: 'Exo_600SemiBold',
+    color: '#FFFFFF'
+  },
+  activityMetricScoreSuffix: {
+    fontSize: 12,
+    lineHeight: 15,
+    color: '#7D91AA'
+  },
+  activityMetricDivider: {
+    width: 72,
+    height: 1,
+    marginTop: 7,
+    marginBottom: 7,
+    backgroundColor: 'rgba(82,160,255,0.25)'
+  },
+  activityMetricInputs: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  activityMetricInput: {
+    flex: 1,
+    alignItems: 'center'
+  },
+  activityMetricInputValue: {
+    fontSize: 11,
+    lineHeight: 13,
+    fontFamily: 'Exo_700Bold',
+    color: '#EAF4FF'
+  },
+  activityMetricInputLabel: {
+    marginTop: 1,
+    fontSize: 7,
+    lineHeight: 9,
+    textTransform: 'uppercase',
+    fontFamily: 'Exo_600SemiBold',
+    color: '#71849A'
   },
   heartParticleField: {
     alignSelf: 'stretch',
@@ -2178,7 +2364,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.14)'
+    backgroundColor: 'transparent'
   },
   heartMetricEyebrow: {
     marginTop: 4,
@@ -2480,29 +2666,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 16,
     marginBottom: 16
-  },
-  progressRingWrap: {
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  progressRingCenter: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  progressRingValue: {
-    ...typography.section,
-    fontSize: 22,
-    lineHeight: 26,
-    fontFamily: 'Exo_700Bold',
-    color: '#FFFFFF'
-  },
-  progressRingLabel: {
-    ...typography.caption,
-    fontSize: 10,
-    lineHeight: 12,
-    fontFamily: 'Exo_600SemiBold',
-    color: TRACKER_MUTED
   },
   healthMetricRow: {
     marginTop: 14

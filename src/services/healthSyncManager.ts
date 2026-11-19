@@ -112,6 +112,11 @@ export const HEALTH_SYNC_UPLOAD_BATCH_SIZE = 50;
 // final recalculation and lastFullySyncedAtISO were never reached.
 export const HEALTH_SYNC_MAX_UPLOAD_BATCHES_PER_RUN = 50;
 export const HEALTH_SYNC_MAX_UPLOAD_CYCLES_PER_RUN = 4;
+export const HEALTH_OBSERVATION_FUTURE_TOLERANCE_MS = 5 * 60_000;
+export const isFutureDatedHealthObservation = (observation: HealthObservationDraft, now = Date.now()) => {
+  const measuredAt = Date.parse(observation.measuredAtISO);
+  return Number.isFinite(measuredAt) && measuredAt > now + HEALTH_OBSERVATION_FUTURE_TOLERANCE_MS;
+};
 export const withHealthSyncPipelineTimeout = <T>(operation: Promise<T>, code: string): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(code)), HEALTH_SYNC_PIPELINE_TIMEOUT_MS);
@@ -252,7 +257,22 @@ export const runHealthSync = async (
     run = governed ? await beginWearableSyncRun(governed.connectionId, governed.provider, governed.trigger).catch(() => null) : null;
 
     let accepted = 0, duplicate = 0, rejected = 0, updated = 0, deleted = 0;
-    let pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+    const readUploadablePending = async () => {
+      while (true) {
+        const batch = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+        const invalidFuture = batch.filter((item) => isFutureDatedHealthObservation(item.observation));
+        if (!invalidFuture.length) return batch;
+        // A future-dated HealthKit record cannot be accepted by the canonical
+        // server contract. Remove only those proven-invalid queue entries so a
+        // single legacy record cannot poison every retry behind it.
+        await acknowledgeLocalObservations(localScope, invalidFuture.map((item) => item.recordKey));
+        emitHealthSyncDiagnostic({ event:'QUEUE_INVALID_FUTURE_DISCARDED',correlationId,provider,
+          recordsRejected:invalidFuture.length });
+        const valid = batch.filter((item) => !isFutureDatedHealthObservation(item.observation));
+        if (valid.length) return valid;
+      }
+    };
+    let pending = await readUploadablePending();
     emitHealthSyncDiagnostic({ event:'QUEUE_STATE',correlationId,provider,...await readLocalHealthQueueDiagnostics(localScope) });
     let uploadCycleCount = 0;
     while (pending.length && uploadCycleCount < HEALTH_SYNC_MAX_UPLOAD_CYCLES_PER_RUN && rejected === 0) {
@@ -271,7 +291,7 @@ export const runHealthSync = async (
           recordsAccepted:ingest.accepted,recordsUpdated:ingest.updated??0,recordsDeleted:ingest.deleted??0,
           recordsRejected:ingest.rejected });
         uploadBatchCount += 1;
-        pending = await readPendingLocalObservations(localScope, HEALTH_SYNC_UPLOAD_BATCH_SIZE);
+        pending = await readUploadablePending();
       }
       uploadCycleCount += 1;
     }

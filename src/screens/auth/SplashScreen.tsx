@@ -11,7 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import FiteatsyLogo from '../../assets/brand/fiteatsy-logo.svg';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
-import { getOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
+import { clearOnboardingRuntimeProgress, getOnboardingRuntimeProgress } from '../../services/onboardingRuntimeProgress';
 import { traceSessionLifecycle } from '../../services/sessionLifecycleTrace';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
@@ -22,7 +22,7 @@ const EXIT_FADE_DURATION = 320;
 const LOGO_ANIMATION_DURATION = 640;
 
 export const SplashScreen = ({ navigation }: Props) => {
-  const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep, authSession } = useAppContext();
+  const { isAuthenticated, bootstrapped, onboardingStatus, onboardingResumeStep, authSession, wearableSetupCompleted } = useAppContext();
   const { width, height } = useWindowDimensions();
   const [exitRequested, setExitRequested] = useState(false);
   const [forceExit, setForceExit] = useState(false);
@@ -60,6 +60,13 @@ export const SplashScreen = ({ navigation }: Props) => {
       return;
     }
 
+    if (wearableSetupCompleted) {
+      traceSessionLifecycle('NAVIGATION_HOME', { onboardingState: 'ESTABLISHED_APP_SHELL' });
+      void clearOnboardingRuntimeProgress(authSession?.client.fiteatsyClientId);
+      transitionTo(() => navigation.replace('Main'));
+      return;
+    }
+
     // A returning user's remotely unresolved onboarding state must never reopen
     // onboarding or block the authenticated shell. UNKNOWN is not INCOMPLETE.
     if (onboardingStatus === 'UNKNOWN') {
@@ -82,7 +89,11 @@ export const SplashScreen = ({ navigation }: Props) => {
       return;
     }
     if (progress?.phase === 'connect') {
-      transitionTo(() => navigation.replace('HealthData', { entryContext: 'ONBOARDING' }));
+      // Health sync is a background Home concern, never a cold-launch gate.
+      // A persisted legacy "connect" checkpoint must not keep reopening the
+      // Health Data screen after the client has already reached the app shell.
+      traceSessionLifecycle('NAVIGATION_HOME', { onboardingState: 'LEGACY_CONNECT_CHECKPOINT' });
+      transitionTo(() => navigation.replace('Main'));
       return;
     }
     if (progress?.phase === 'ready') {
@@ -106,7 +117,8 @@ export const SplashScreen = ({ navigation }: Props) => {
     navigation,
     onboardingResumeStep,
     onboardingStatus,
-    transitionTo
+    transitionTo,
+    wearableSetupCompleted
   ]);
 
   useEffect(() => {

@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const source = fs.readFileSync(path.join(process.cwd(), 'src/screens/home/TrackerScreen.tsx'), 'utf8');
+
+test('Tracker Overview initiates a fresh platform sync without changing the other tab renderers', () => {
+  expect(source).toContain("activeTab !== 'health' || activeHealthTab !== 'overview'");
+  expect(source).toContain('void health.syncLocalMetrics({ liveOnly: true });');
+});
+
+test('Tracker Overview consumes production Star Orb scores and preserves missing recovery days as gaps', () => {
+  expect(source).toContain('const overviewScores = health.candidateIntelligence?.scores ?? null;');
+  expect(source).toContain("['Recovery', overviewScores?.recovery ?? displayScores.recovery]");
+  expect(source).toContain("['Activity', overviewScores?.activity ?? displayScores.activity]");
+  expect(source).toContain("['Sleep', overviewScores?.sleep ?? displayScores.sleep]");
+  expect(source).toContain("['Calm', overviewScores?.calm ?? displayScores.calm]");
+  expect(source).toContain("['Mind', overviewScores?.mind ?? displayScores.mind]");
+  expect(source).toContain("['Nourishment', overviewScores?.nutrition ?? displayScores.nutrition]");
+  expect(source).toContain("key={`${index}-${value ?? 'missing'}`}");
+});
+
+test('Tracker Overview renders its animated particles at the approved doubled radius', () => {
+  expect(source).toContain('const size = 0.7 + 1.7 * (1 - q) + (index % 7) * 0.06;');
+  expect(source).not.toContain('const size = (0.7 + 1.7 * (1 - q) + (index % 7) * 0.06) * 0.5;');
+});

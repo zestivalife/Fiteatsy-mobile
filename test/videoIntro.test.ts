@@ -71,12 +71,12 @@ describe('bounded static app intro contract', () => {
       'SignIn',
       'FoodPreferences',
       'OnboardingAssessment',
-      'HealthData',
       'OnboardingBasics',
       'Main'
     ]) {
       expect(source).toContain(`navigation.replace('${route}'`);
     }
+    expect(source).not.toContain("navigation.replace('HealthData'");
   });
 
   it('keeps the native bootstrap unbranded and black before video playback', () => {

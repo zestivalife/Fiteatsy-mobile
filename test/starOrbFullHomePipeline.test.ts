@@ -1,5 +1,5 @@
 import React from 'react';
-import {render} from '@testing-library/react-native';
+import {fireEvent,render} from '@testing-library/react-native';
 import type {CandidateStarOrbValidation} from '../src/services/healthIntelligenceService';
 
 const mockNavigate=jest.fn();
@@ -43,4 +43,19 @@ test('authenticated candidate API projection reaches the complete Home Star Orb 
   expect(view.getByText('80/100')).toBeTruthy();
   for(const value of [74,75,76,77,78,79,80])expect(view.getByText(`${value}%`)).toBeTruthy();
   for(const label of ['Calm','Activity','Nutrition','Mind','Sleep'])expect(view.getAllByText(label).length).toBeGreaterThan(0);
+});
+
+test.each([81,0])('candidate Activity %s overrides stale canonical methodology state without losing zero',value=>{
+  const candidate={...response,days:response.days.map((day,index)=>index===response.days.length-1
+    ?{...day,activity:score('activity',day.healthDay,value)}:day)};
+  const pending={scores:{
+    activity:{score:null,status:'METHODOLOGY_PENDING'},sleep:{score:null,status:'METHODOLOGY_PENDING'},
+    nutrition:{score:null,status:'METHODOLOGY_PENDING'},calm:{score:null,status:'METHODOLOGY_PENDING'},
+    mind:{score:null,status:'METHODOLOGY_PENDING'},recovery:{score:null,status:'METHODOLOGY_PENDING'}
+  }};
+  (useCanonicalHealthSyncCoordinator as jest.Mock).mockReturnValue({candidateIntelligence:candidateResponseToHomeSnapshot(candidate),canonicalIntelligence:pending,aggregates:[],lifecycle:{lastUploadedAtISO:null}});
+  const view=render(React.createElement(HomeScreen));
+  fireEvent.press(view.getAllByText('Activity')[0]);
+  expect(view.getByText(`${value}/100`)).toBeTruthy();
+  expect(view.queryByText('--/100')).toBeNull();
 });

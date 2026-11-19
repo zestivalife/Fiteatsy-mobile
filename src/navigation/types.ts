@@ -25,7 +25,6 @@ export type RootStackParamList = {
   HydrationSession: undefined;
   Leadership: undefined;
   ConsultantBooking: undefined;
-  AssistHub: undefined;
   SubscriptionPlans: {
     source?: 'assist' | 'talk_to_expert' | 'get_assistance' | 'book_consultation' | 'subscription_management';
     requiredEntitlement?: string | null;

@@ -37,16 +37,10 @@ test('the HealthData route mounts the accepted dedicated connected-health experi
   expect(screen.getByText('Health Data')).toBeTruthy();
   expect(screen.getByText('Live data available from Apple Health')).toBeTruthy();
   expect(screen.getByText('Read-only data from this iPhone')).toBeTruthy();
-  for (const category of ['Activity', 'Sleep', 'Heart', 'Recovery', 'Body', 'Mindfulness']) {
-    expect(screen.getByText(category)).toBeTruthy();
+  for (const removed of ['Personal activity goals', 'Health parameters', 'Mindfulness', 'Detailed Health Data', 'Tap the star to add favourites', 'Activity', 'Sleep', 'Heart', 'Recovery', 'Body']) {
+    expect(screen.queryByText(removed)).toBeNull();
   }
-  expect(screen.getByText('Latest Distance: 2.5 km')).toBeTruthy();
-  expect(screen.getAllByText('records')).toHaveLength(6);
-  expect(screen.getByText('Apple Health · Available locally · Uploaded')).toBeTruthy();
-  expect(screen.getAllByText('Not supported by the current health source').length).toBeGreaterThan(0);
-  expect(screen.getByText(/Measured .*2026/)).toBeTruthy();
-  expect(screen.getByText('Detailed Health Data')).toBeTruthy();
-  expect(screen.getByText('ACTIVITY')).toBeTruthy();
+  expect(screen.queryByText('ACTIVITY')).toBeNull();
   expect(screen.getByText('Steps')).toBeTruthy();
   expect(screen.getByText('Distance')).toBeTruthy();
   expect(screen.getByText('3,200 count')).toBeTruthy();

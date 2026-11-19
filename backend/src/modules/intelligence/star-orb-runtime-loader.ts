@@ -167,6 +167,8 @@ export async function loadStarOrbRuntimeInputs(
     nutrition.push({
       healthDay: day,
       complete,
+      plannedMealHeads: experience.mealSummary.totalMealHeads,
+      consumedPlannedMealHeads: experience.mealSummary.consumedApprovedMeals,
       proteinGrams: consumedProtein ?? Number.NaN,
       foodQualityDimensions: foodQuality.score==null?[]:[foodQuality.score],
       foodQualityStatus:foodQuality.status,

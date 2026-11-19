@@ -18,15 +18,16 @@ describe('forward-only Fitness presentation integration', () => {
     expect(navigation).not.toContain('<Stack.Screen name="Fitness"');
   });
 
-  test('renders the six accepted Fitness categories from the canonical snapshot', () => {
-    for (const title of ['Activity', 'Sleep', 'Heart', 'Recovery', 'Body', 'Mindfulness']) {
-      expect(fitness).toContain(`title: '${title}'`);
-    }
+  test('removes goals and duplicate health-category summaries while retaining the canonical snapshot', () => {
+    expect(fitness).toContain("title: 'Mindfulness'");
+    for (const title of ['Activity', 'Sleep', 'Heart', 'Recovery', 'Body']) expect(fitness).not.toContain(`title: '${title}'`);
+    expect(fitness).not.toContain('WellnessGoalConfiguration');
+    expect(fitness).not.toContain('supportedProgress');
     expect(fitness).toContain('CanonicalHealthSyncSnapshot');
     expect(fitness).toContain('health.metrics.filter');
     expect(fitness).toContain('metric.localRecordCount');
     expect(fitness).toContain('metric.observation.measuredAtISO');
-    expect(healthData).toContain('<FitnessParameterCards health={health} />');
+    expect(healthData).not.toContain('<FitnessParameterCards health={health} />');
   });
 
   test('does not create a second native reader, upload path, store, or score authority', () => {
@@ -53,7 +54,7 @@ describe('forward-only Fitness presentation integration', () => {
     expect(fitness).not.toContain("|| '0'");
   });
 
-  test('retains the original detailed metric presentation alongside Fitness summaries', () => {
+  test('retains the detailed metric cards without redundant presentation headings', () => {
     for (const contract of [
       'metric.definition.displayName',
       'formatValue(metric)',
@@ -61,7 +62,9 @@ describe('forward-only Fitness presentation integration', () => {
       'statusLabel(metric)',
       'sourceMetadata.sourceApplication'
     ]) expect(healthData).toContain(contract);
-    expect(healthData).toContain('Detailed Health Data');
+    expect(healthData).not.toContain('Detailed Health Data');
+    expect(healthData).not.toContain('<FitnessParameterCards health={health} />');
+    expect(healthData).not.toContain('presentation.section.toUpperCase()');
     expect(healthData).toContain('metricPresentation');
   });
 

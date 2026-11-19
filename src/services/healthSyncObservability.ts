@@ -1,5 +1,5 @@
 export type HealthSyncDiagnosticEvent = {
-  event: 'LOCAL_READ'|'QUEUE_STATE'|'UPLOAD_BATCH'|'SYNC_COMPLETE'|'SYNC_FAILED';
+  event: 'LOCAL_READ'|'QUEUE_STATE'|'QUEUE_INVALID_FUTURE_DISCARDED'|'UPLOAD_BATCH'|'SYNC_COMPLETE'|'SYNC_FAILED';
   correlationId: string;
   provider: 'APPLE_HEALTH'|'HEALTH_CONNECT';
   durationMs?: number;

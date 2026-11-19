@@ -22,11 +22,11 @@ describe('health score status contract', () => {
     expect(home).toContain('stateFromScore(selected.score, selectedFramework?.status, selectedComponentCoverage)');
   });
 
-  it('does not render legacy supporting scores as current numerics', () => {
+  it('renders approved Tracker Overview projections without changing Consultant contracts', () => {
     const tracker = source('src/screens/home/TrackerScreen.tsx');
     const consultant = source('backend/src/modules/consultants/consultants.service.ts');
-    expect(tracker).toContain("['Energy Balance', null, 'Supporting insight only · Methodology pending']");
-    expect(tracker).toContain("['Body & Biomarker Health', null, 'Supporting insight only · Methodology pending']");
+    expect(tracker).toContain("['Energy Balance', overviewEnergyBalanceScore");
+    expect(tracker).toContain("['Body & Biomarker Health', overviewBodyBiomarkerScore");
     expect(consultant).toContain('bodySupportScore: null');
   });
 });

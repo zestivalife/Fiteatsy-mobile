@@ -12,7 +12,6 @@ import {
   type CanonicalHealthMetricState
 } from '../../services/canonicalHealthSyncCoordinator';
 import { useAppContext } from '../../state/AppContext';
-import { FitnessParameterCards } from '../fitness/FitnessScreen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HealthData'>;
 type Section = 'Activity' | 'Sleep' | 'Heart & Vitals' | 'Body & Mind';
@@ -184,29 +183,13 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
         </View>
       ) : (
         <>
-          <FitnessParameterCards health={health} />
-          <View style={styles.detailedHeading}>
-            <View>
-              <Text style={[styles.detailedTitle, { color: palette.textPrimary }]}>Detailed Health Data</Text>
-              <Text style={[styles.detailedSubtitle, { color: palette.textMuted }]}>{favorites.length ? `${favorites.length} favourite ${favorites.length === 1 ? 'metric' : 'metrics'}` : 'Tap the star to add favourites'}</Text>
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Open health source diagnostics" onPress={() => navigation.navigate('ConnectedMetrics')} style={[styles.diagnosticsButton, { borderColor: palette.stroke }]}>
-              <Ionicons name="information-circle-outline" size={22} color={palette.blue} />
-            </Pressable>
-          </View>
           <View style={styles.list}>
-            {orderedRows.map((metric, index) => {
+            {orderedRows.map((metric) => {
               const presentation = metricPresentation[metric.definition.metricKey];
-              const previous = orderedRows[index - 1];
-              const previousSection = previous ? metricPresentation[previous.definition.metricKey].section : null;
               const status = statusLabel(metric);
               const favorite = favorites.includes(metric.definition.metricKey);
               return (
-                <React.Fragment key={metric.definition.metricKey}>
-                  {presentation.section !== previousSection ? (
-                    <Text style={[styles.sectionTitle, { color: palette.textSecondary }]}>{presentation.section.toUpperCase()}</Text>
-                  ) : null}
-                  <Pressable accessibilityRole="button" accessibilityLabel={`Open ${metric.definition.displayName} details`} onPress={() => navigation.navigate('HealthMetricDetail', { metricKey: metric.definition.metricKey })} style={({ pressed }) => [styles.metricCard, { backgroundColor: palette.card, opacity: pressed ? 0.76 : 1 }]}>
+                  <Pressable key={metric.definition.metricKey} accessibilityRole="button" accessibilityLabel={`Open ${metric.definition.displayName} details`} onPress={() => navigation.navigate('HealthMetricDetail', { metricKey: metric.definition.metricKey })} style={({ pressed }) => [styles.metricCard, { backgroundColor: palette.card, opacity: pressed ? 0.76 : 1 }]}>
                     <View style={styles.metricTopRow}>
                       <View style={styles.metricIdentity}>
                         <Ionicons name={presentation.icon} size={20} color={presentation.accent} />
@@ -228,7 +211,6 @@ export const HealthDataScreen = ({ navigation, route }: Props) => {
                       <Text style={[styles.source, { color: palette.textMuted }]}>Source: {metric.observation.sourceMetadata.sourceApplication}</Text>
                     ) : null}
                   </Pressable>
-                </React.Fragment>
               );
             })}
           </View>
@@ -290,12 +272,7 @@ const styles = StyleSheet.create({
   connectBody: { ...typography.bodySmall, marginTop: spacing.xs, textAlign: 'center' },
   syncButton: { minHeight: 52, marginTop: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   connectError: { ...typography.bodySmall, marginTop: spacing.sm, textAlign: 'center' },
-  detailedHeading: { marginTop: spacing.xl, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  detailedTitle: typography.sectionTitle,
-  detailedSubtitle: { ...typography.subtext, marginTop: spacing.xxs },
-  diagnosticsButton: { width: 44, height: 44, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { marginTop: spacing.md, gap: 12 },
-  sectionTitle: { ...typography.label, letterSpacing: 1.1, marginLeft: 6, marginTop: 8 },
+  list: { marginTop: spacing.xl, gap: 12 },
   metricCard: { minHeight: 154, padding: 20, borderRadius: 22 },
   metricTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   metricIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },

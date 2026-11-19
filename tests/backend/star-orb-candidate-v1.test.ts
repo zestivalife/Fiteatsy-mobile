@@ -18,7 +18,7 @@ const completeScores=()=>{
   return {
     activity:calculateActivityCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',steps:8000,exerciseMinutes:30,stepGoal:resolved(10000),exerciseGoal:resolved(30),dailyActivityLoad:loads,dailyRecoveryOrRest:rests}),
     sleep,
-    nourishment:calculateNourishmentCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',proteinGrams:90,proteinTarget:resolved(100),hydrationMl:2000,hydrationTarget:resolved(2500),foodQualityDimensions:[80,90],approvedClinicalMarkerScores:[75,85]}),
+    nourishment:calculateNourishmentCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',plannedMealHeads:7,consumedPlannedMealHeads:6}),
     calm:calculateCalmCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',hrvType:'SDNN',currentHrv:55,hrvBaselineSameType:50,hrvHistoryDays:28,stressAssessment:{score:10,minimum:0,maximum:40,validatedScale:'PSS-10'},mindfulnessMinutes:15,mindfulnessGoal:resolved(20)}),
     mind:calculateMindCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',moodCheckIns:[70,80],validatedWellbeingScore:80,completedSessions:3,sessionGoal:resolved(4),emotionalWellbeingHistory:[70,72,74,76,78,80,82]}),
     recovery:calculateRecoveryCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',sleep,activityBalance,currentHrv:55,hrvBaselineSameType:50,currentRestingHeartRate:58,restingHeartRateBaseline:60,baselineDays:28,sleepBehaviour:90,activityDistribution:95,mindfulnessPractice:75,explicitLifestyleHabits:[80,90]})
@@ -28,7 +28,7 @@ const completeScores=()=>{
 test('candidate golden fixture calculates every visible domain and central Recovery',()=>{
   const actual=completeScores();
   assert.deepEqual(Object.fromEntries(Object.entries(actual).map(([key,value])=>[key,value.score])),{
-    activity:76.2,sleep:95.68,nourishment:84,calm:69,mind:78.85,recovery:81.17
+    activity:76.2,sleep:95.68,nourishment:85.71,calm:69,mind:78.85,recovery:81.17
   });
   for(const result of Object.values(actual)){
     assert.equal(result.status,'CALCULATED');
@@ -50,8 +50,8 @@ test('goal resolver honours governed precedence and rejects display-only or inva
 });
 
 test('available components produce partial scores while missing components remain unknown',()=>{
-  const nourishment=calculateNourishmentCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',proteinGrams:0,proteinTarget:resolved(100),hydrationMl:0,hydrationTarget:resolved(2500),foodQualityDimensions:[],approvedClinicalMarkerScores:[]});
-  assert.equal(nourishment.score,0);assert.equal(nourishment.status,'PARTIAL');assert.equal(nourishment.componentCoverage,45);
+  const nourishment=calculateNourishmentCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',plannedMealHeads:7,consumedPlannedMealHeads:0});
+  assert.equal(nourishment.score,0);assert.equal(nourishment.status,'CALCULATED');assert.equal(nourishment.componentCoverage,100);
   const activity=calculateActivityCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',steps:8000,exerciseMinutes:30,stepGoal:{value:null,source:null,status:'GOAL_REQUIRED',reason:'none'},exerciseGoal:resolved(30),dailyActivityLoad:loads,dailyRecoveryOrRest:rests});
   assert.notEqual(activity.score,null);assert.equal(activity.status,'CALCULATED');assert.equal(activity.inputsMissing.includes('step_goal'),false);
   const stepsOnly=calculateActivityCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',steps:6400,exerciseMinutes:Number.NaN,stepGoal:resolved(8000),exerciseGoal:{value:null,source:null,status:'GOAL_REQUIRED',reason:'none'},dailyActivityLoad:[],dailyRecoveryOrRest:[]});
@@ -63,6 +63,8 @@ test('available components produce partial scores while missing components remai
   const invalidNights=nights.map(night=>({...night,asleepMinutes:0,deepMinutes:0,remMinutes:0}));
   const sleep=calculateSleepCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',target:resolved(480),nights:invalidNights});
   assert.notEqual(sleep.score,null);assert.equal(sleep.status,'PARTIAL');assert.ok(sleep.inputsMissing.includes('valid_sleep_stages'));
+  const noGoal=calculateSleepCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',target:{value:null,source:null,status:'GOAL_REQUIRED',reason:'none'},nights:[nights.at(-1)!]});
+  assert.notEqual(noGoal.score,null);assert.equal(noGoal.status,'PARTIAL');assert.deepEqual(noGoal.inputsUsed,['quality']);assert.ok(noGoal.inputsMissing.includes('sleep_target'));
 });
 
 test('Recovery requires at least two independent available components',()=>{
