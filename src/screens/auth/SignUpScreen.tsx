@@ -53,6 +53,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [touched, setTouched] = useState({ name: false, email: false, phone: false });
   const hiddenOtpRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
@@ -73,14 +75,34 @@ export const SignUpScreen = ({ navigation }: Props) => {
   const trimmedName = name.trim();
   const trimmedEmail = email.trim().toLowerCase();
   const isValidEmail = EMAIL_PATTERN.test(trimmedEmail);
+  const nameError = (submitAttempted || touched.name) && trimmedName.length < 2
+    ? 'Enter your full name.'
+    : null;
+  const emailError = (submitAttempted || touched.email) && !isValidEmail
+    ? 'Enter a valid email address, for example name@example.com.'
+    : null;
+  const phoneError = useMemo(() => {
+    if (!submitAttempted && !touched.phone) return null;
+    const digits = getPhoneDigits(nationalNumber);
+    if (selectedCountry.iso2 === 'IN' && digits.length !== 10) {
+      return 'Enter a valid 10-digit Indian mobile number.';
+    }
+    try {
+      normalizePhoneNumber(selectedCountry.dialCode, digits);
+      return null;
+    } catch (phoneValidationError) {
+      return phoneValidationError instanceof Error
+        ? phoneValidationError.message
+        : 'Enter a valid phone number.';
+    }
+  }, [nationalNumber, selectedCountry.dialCode, selectedCountry.iso2, submitAttempted, touched.phone]);
 
   const otpExpired = phase === 'verify' && expiresAtMs > 0 && nowMs >= expiresAtMs;
   const resendRemainingSec = Math.max(0, Math.ceil((resendAtMs - nowMs) / 1000));
   const requestCooldownRemainingSec = Math.max(0, Math.ceil((requestCooldownAtMs - nowMs) / 1000));
   const canResend = phase === 'verify' && resendRemainingSec === 0 && !loading;
   const canVerify = otp.length === OTP_LENGTH && !otpExpired && !verifying;
-  const canRequestOtp =
-    trimmedName.length >= 2 && isValidEmail && normalizedPhone !== null && !loading && requestCooldownRemainingSec === 0;
+  const hasValidPhone = normalizedPhone !== null && (selectedCountry.iso2 !== 'IN' || getPhoneDigits(nationalNumber).length === 10);
 
   useEffect(() => {
     AsyncStorage.getItem(LAST_COUNTRY_KEY).then((storedCountry) => {
@@ -113,12 +135,15 @@ export const SignUpScreen = ({ navigation }: Props) => {
 
   const requestOtp = async () => {
     setError(null);
+    setSubmitAttempted(true);
+    setTouched({ name: true, email: true, phone: true });
     if (trimmedName.length < 2) {
-      setError('Enter your full name.');
       return;
     }
     if (!isValidEmail) {
-      setError('Enter a valid email address.');
+      return;
+    }
+    if (!hasValidPhone) {
       return;
     }
 
@@ -257,6 +282,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
 
   const handleOtpChange = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, OTP_LENGTH);
+    setError(null);
     setOtp(digits);
   };
 
@@ -264,7 +290,9 @@ export const SignUpScreen = ({ navigation }: Props) => {
     <KeyboardAwareFormScreen contentStyle={styles.container}>
         {phase === 'collect' ? (
           <>
-            <TextField label="Name" placeholder="Enter your full name" value={name} onChangeText={setName}
+            <TextField label="Name" placeholder="Enter your full name" value={name} error={nameError}
+              onChangeText={(value) => { setName(value); setError(null); }}
+              onBlur={() => setTouched((current) => ({ ...current, name: true }))}
               returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => emailRef.current?.focus()} />
             <TextField
               ref={emailRef}
@@ -273,7 +301,9 @@ export const SignUpScreen = ({ navigation }: Props) => {
               autoCapitalize="none"
               keyboardType="email-address"
               value={email}
-              onChangeText={setEmail}
+              error={emailError}
+              onChangeText={(value) => { setEmail(value); setError(null); }}
+              onBlur={() => setTouched((current) => ({ ...current, email: true }))}
               returnKeyType="next"
               blurOnSubmit={false}
               onSubmitEditing={() => phoneRef.current?.focus()}
@@ -285,10 +315,12 @@ export const SignUpScreen = ({ navigation }: Props) => {
               placeholder={selectedCountry.iso2 === 'IN' ? '9876543210' : 'National phone number'}
               keyboardType="phone-pad"
               value={nationalNumber}
-              onChangeText={(value) => setNationalNumber(getPhoneDigits(value))}
+              error={phoneError}
+              onChangeText={(value) => { setNationalNumber(getPhoneDigits(value)); setError(null); }}
+              onBlur={() => setTouched((current) => ({ ...current, phone: true }))}
               maxLength={14}
               returnKeyType="done"
-              onSubmitEditing={() => { if (canRequestOtp) void requestOtp(); }}
+              onSubmitEditing={() => { void requestOtp(); }}
             />
             <PrimaryButton
               title={
@@ -299,7 +331,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
                     : 'Send OTP'
               }
               onPress={requestOtp}
-              disabled={!canRequestOtp}
+              disabled={loading || requestCooldownRemainingSec > 0}
             />
             {requestCooldownRemainingSec > 0 ? (
               <Text style={[styles.timerText, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>
@@ -347,6 +379,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
                 );
               })}
             </Pressable>
+            {error ? <Text accessibilityRole="alert" style={[styles.errorText, { color: themeColors.danger }]}>{error}</Text> : null}
 
             <Text style={[styles.timerText, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>
               {otpExpired ? 'OTP expired' : `Code expires in ${formatCountdown(Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000)))}`}
@@ -366,7 +399,7 @@ export const SignUpScreen = ({ navigation }: Props) => {
           </>
         )}
 
-        {error ? <Text style={[styles.errorText, { color: themeColors.danger }]}>{error}</Text> : null}
+        {phase === 'collect' && error ? <Text accessibilityRole="alert" style={[styles.errorText, { color: themeColors.danger }]}>{error}</Text> : null}
 
         <View style={styles.footerLine}>
           <Text style={[styles.helper, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>Returning member? </Text>

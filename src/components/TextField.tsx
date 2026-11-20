@@ -5,9 +5,10 @@ import { useAppContext } from '../state/AppContext';
 
 type Props = TextInputProps & {
   label: string;
+  error?: string | null;
 };
 
-export const TextField = React.forwardRef<TextInput, Props>(({ label, ...props }, ref) => {
+export const TextField = React.forwardRef<TextInput, Props>(({ label, error, style, accessibilityHint, ...props }, ref) => {
   const { themeMode } = useAppContext();
   const themeColors = getThemeColors(themeMode);
 
@@ -24,10 +25,18 @@ export const TextField = React.forwardRef<TextInput, Props>(({ label, ...props }
             borderColor: themeColors.stroke,
             backgroundColor: themeColors.cardMuted,
             color: themeColors.textPrimary
-          }
+          },
+          error ? { borderColor: themeColors.danger } : null,
+          style
         ]}
+        accessibilityHint={error ?? accessibilityHint}
         {...props}
       />
+      {error ? (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[styles.error, { color: themeColors.danger }]}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 });
@@ -47,5 +56,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     borderWidth: 1,
     paddingHorizontal: 14
+  },
+  error: {
+    ...typography.caption
   }
 });
