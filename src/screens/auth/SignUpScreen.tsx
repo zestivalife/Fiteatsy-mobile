@@ -406,9 +406,8 @@ export const SignUpScreen = ({ navigation }: Props) => {
         {phase === 'collect' && error ? <Text accessibilityRole="alert" style={[styles.errorText, { color: themeColors.danger }]}>{error}</Text> : null}
 
         <View style={styles.footerLine}>
-          <Text style={[styles.helper, { color: themeMode === 'light' ? '#334155' : '#FFFFFF' }]}>Returning member? </Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Go back to welcome" onPress={() => navigation.navigate('SignIn')}>
-            <Text style={[styles.link, { color: themeColors.blue }]}>Use the same OTP flow</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Existing member login" onPress={() => navigation.navigate('SignIn')}>
+            <Text style={[styles.link, { color: themeColors.blue }]}>Existing Member Login?</Text>
           </Pressable>
         </View>
     </KeyboardAwareFormScreen>

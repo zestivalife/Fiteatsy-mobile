@@ -154,7 +154,7 @@ export const SignInScreen = ({ navigation }: Props) => {
           />
 
           <Pressable accessibilityRole="button" onPress={() => navigation.navigate('SignUp')}>
-            <Text style={[styles.otpLink, { color: themeColors.blue }]}>Login with OTP</Text>
+            <Text style={[styles.otpLink, { color: themeColors.blue }]}>Register with Fiteatsy</Text>
           </Pressable>
         </View>
       </View>
