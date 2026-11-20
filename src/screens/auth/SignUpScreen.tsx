@@ -222,32 +222,36 @@ export const SignUpScreen = ({ navigation }: Props) => {
     try {
       const session = await verifySignupOtp(challengeId, otp);
       await completeAuthentication(session);
-      setOnboarding((previous) => ({
-        name: name.trim() || previous?.name || 'Member',
-        dateOfBirthISO: previous?.dateOfBirthISO,
-        calculatedAge: previous?.calculatedAge,
-        age: previous?.age,
-        ageBracket: previous?.ageBracket,
-        gender: previous?.gender,
-        wellnessGoal: previous?.wellnessGoal,
-        primaryConditions: previous?.primaryConditions ?? [],
-        symptomTags: previous?.symptomTags ?? [],
-        healthGoals: previous?.healthGoals ?? [],
-        primaryGoal: previous?.primaryGoal ?? previous?.healthGoals?.[0] ?? previous?.wellnessGoal,
-        secondaryGoals: previous?.secondaryGoals ?? [],
-        wearablePreference: previous?.wearablePreference ?? 'later',
-        careTrack: previous?.careTrack ?? 'Foundational Recovery Care',
-        assignedConsultantId: previous?.assignedConsultantId ?? null,
-        assignedConsultant: previous?.assignedConsultant ?? null,
-        matchedDietitianName: previous?.matchedDietitianName,
-        matchedDietitianSpecialty: previous?.matchedDietitianSpecialty,
-        calendarProvider: previous?.calendarProvider ?? 'None',
-        calendarPermissionGranted: previous?.calendarPermissionGranted ?? false,
-        notificationPermissionGranted: previous?.notificationPermissionGranted ?? false,
-        createdAtISO: previous?.createdAtISO ?? new Date().toISOString()
-      }));
       try {
-        navigation.reset({ index: 0, routes: [{ name: 'ChangePin', params: { mode: 'setup', force: true } }] });
+        if (session.requiresPinSetup) {
+          setOnboarding((previous) => ({
+            name: name.trim() || previous?.name || 'Member',
+            dateOfBirthISO: previous?.dateOfBirthISO,
+            calculatedAge: previous?.calculatedAge,
+            age: previous?.age,
+            ageBracket: previous?.ageBracket,
+            gender: previous?.gender,
+            wellnessGoal: previous?.wellnessGoal,
+            primaryConditions: previous?.primaryConditions ?? [],
+            symptomTags: previous?.symptomTags ?? [],
+            healthGoals: previous?.healthGoals ?? [],
+            primaryGoal: previous?.primaryGoal ?? previous?.healthGoals?.[0] ?? previous?.wellnessGoal,
+            secondaryGoals: previous?.secondaryGoals ?? [],
+            wearablePreference: previous?.wearablePreference ?? 'later',
+            careTrack: previous?.careTrack ?? 'Foundational Recovery Care',
+            assignedConsultantId: previous?.assignedConsultantId ?? null,
+            assignedConsultant: previous?.assignedConsultant ?? null,
+            matchedDietitianName: previous?.matchedDietitianName,
+            matchedDietitianSpecialty: previous?.matchedDietitianSpecialty,
+            calendarProvider: previous?.calendarProvider ?? 'None',
+            calendarPermissionGranted: previous?.calendarPermissionGranted ?? false,
+            notificationPermissionGranted: previous?.notificationPermissionGranted ?? false,
+            createdAtISO: previous?.createdAtISO ?? new Date().toISOString()
+          }));
+          navigation.reset({ index: 0, routes: [{ name: 'ChangePin', params: { mode: 'setup', force: true } }] });
+          return;
+        }
+        navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
       } catch (navigationError) {
         console.error('[SignUpScreen] OTP VERIFY NAVIGATION FAILED', {
           errorMessage: navigationError instanceof Error ? navigationError.message : String(navigationError),

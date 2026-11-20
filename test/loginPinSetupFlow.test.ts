@@ -13,6 +13,15 @@ describe('client login PIN setup flow', () => {
     expect(splash).toContain("navigation.replace('ChangePin', { mode: 'setup', force: true })");
   });
 
+  it('does not send returning OTP users through PIN creation again', () => {
+    const signup = read('src/screens/auth/SignUpScreen.tsx');
+    expect(signup).toContain('if (session.requiresPinSetup)');
+    expect(signup).toContain("navigation.reset({ index: 0, routes: [{ name: 'Splash' }] })");
+    expect(signup.indexOf('if (session.requiresPinSetup)')).toBeLessThan(
+      signup.indexOf("name: 'ChangePin', params: { mode: 'setup', force: true }")
+    );
+  });
+
   it('creates a login PIN without requiring or reusing a consultant Connection PIN', () => {
     const auth = read('src/services/authService.ts');
     const screen = read('src/screens/auth/ChangePinScreen.tsx');
