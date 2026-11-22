@@ -93,10 +93,11 @@ test('runtime preserves valid partial nutrition and recent mood instead of suppr
   assert.notEqual(result.mind.score,null);assert.ok(result.mind.inputsUsed.includes('mood_checkins'));
 });
 
-test('sealed Home binds each visible node to its matching production canonical domain',()=>{
+test('sealed Home binds each visible node to one authoritative scoring state',()=>{
   const source=readFileSync(resolve(repositoryRoot,'src/screens/home/HomeScreen.tsx'),'utf8');
+  assert.ok(source.includes('export const resolveAuthoritativeFrameworkScore'));
   for(const domain of ['activity','sleep','nutrition','calm','mind','recovery']) {
-    assert.ok(source.includes(`health.candidateIntelligence?.scores.${domain}.score ?? health.canonicalIntelligence?.scores.${domain}.score`));
+    assert.ok(source.includes(`${domain}: resolveAuthoritativeFrameworkScore(candidateScores?.${domain}, canonicalScores?.${domain})`));
   }
   const routes=readFileSync(resolve(repositoryRoot,'backend/src/modules/intelligence/intelligence.routes.ts'),'utf8');
   assert.ok(routes.includes("intelligenceRouter.get('/candidate-validation'"));
