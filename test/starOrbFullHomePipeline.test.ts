@@ -59,3 +59,17 @@ test.each([81,0])('candidate Activity %s overrides stale canonical methodology s
   expect(view.getByText(`${value}/100`)).toBeTruthy();
   expect(view.queryByText('--/100')).toBeNull();
 });
+
+test('candidate methodology-pending Recovery does not borrow a canonical number with a conflicting status',()=>{
+  const pendingCandidate={...response,days:response.days.map((day,index)=>index===response.days.length-1
+    ?{...day,recovery:{...day.recovery,score:null,status:'METHODOLOGY_PENDING' as const}}:day)};
+  const canonical={scores:{
+    recovery:{...pendingCandidate.days.at(-1)!.recovery,score:62,status:'CALCULATED' as const},
+    activity:{score:null},sleep:{score:null},nutrition:{score:null},calm:{score:null},mind:{score:null}
+  }};
+  (useCanonicalHealthSyncCoordinator as jest.Mock).mockReturnValue({candidateIntelligence:candidateResponseToHomeSnapshot(pendingCandidate),canonicalIntelligence:canonical,aggregates:[],lifecycle:{lastUploadedAtISO:null}});
+  const view=render(React.createElement(HomeScreen));
+  expect(view.getByText('--/100')).toBeTruthy();
+  expect(view.getByText('Methodology pending')).toBeTruthy();
+  expect(view.queryByText('62/100')).toBeNull();
+});

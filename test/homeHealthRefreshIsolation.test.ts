@@ -73,3 +73,10 @@ test('post-upload recovery path explicitly refreshes the independent Star Orb pr
   expect(source).toContain('if (error instanceof HealthSyncPostUploadRefreshError) {');
   expect(source).toContain('void refreshRemoteSnapshot();');
 });
+
+test('concurrent Home refreshes apply callbacks only from the latest generation',()=>{
+  const source=require('fs').readFileSync(require('path').join(process.cwd(),'src/services/canonicalHealthSyncCoordinator.ts'),'utf8');
+  expect(source).toContain('const generation = ++remoteRefreshGeneration.current;');
+  expect(source).toContain('generation === remoteRefreshGeneration.current');
+  expect(source).toContain('if (!appliesToCurrentGeneration()) return;');
+});

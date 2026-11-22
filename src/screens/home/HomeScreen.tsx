@@ -30,7 +30,7 @@ import { getNutritionExperience, type NutritionExperience } from '../../services
 import {
   getHealthScoreHistory,
 } from '../../services/healthIntelligenceService';
-import { buildSevenDayRecoveryTrend, type RecoveryTrendDay } from '../../services/recoveryTrend';
+import { buildSevenDayRecoveryTrend, reconcileSevenDayRecoveryTrend, type RecoveryTrendDay } from '../../services/recoveryTrend';
 import type { Medication, MedicationLogStatus } from '../../types';
 import { nutritionDate, subscribeToNutritionDay } from '../../utils/nutritionDate';
 import { resolveClientFirstName } from '../../utils/clientIdentity';
@@ -87,6 +87,11 @@ type MedicationTimelineEntry = {
   scheduledForISO: string;
   status: MedicationLogStatus;
 };
+
+export const resolveAuthoritativeFrameworkScore = <TCandidate, TCanonical>(
+  candidate: TCandidate | null | undefined,
+  canonical: TCanonical | null | undefined
+): TCandidate | TCanonical | null => candidate ?? canonical ?? null;
 
 const trendTone = (value: number) => {
   if (value >= 80) return { bg: '#88FF74', text: '#111111' };
@@ -265,11 +270,21 @@ export const HomeScreen = () => {
   // A separately gated development build may expose the isolated candidate
   // contract. Release builds cannot enable it because the client gate requires
   // __DEV__ and the backend independently rejects it in production.
+  const candidateScores = health.candidateIntelligence?.scores;
+  const canonicalScores = health.canonicalIntelligence?.scores;
+  const authoritativeScores = {
+    calm: resolveAuthoritativeFrameworkScore(candidateScores?.calm, canonicalScores?.calm),
+    activity: resolveAuthoritativeFrameworkScore(candidateScores?.activity, canonicalScores?.activity),
+    nutrition: resolveAuthoritativeFrameworkScore(candidateScores?.nutrition, canonicalScores?.nutrition),
+    mind: resolveAuthoritativeFrameworkScore(candidateScores?.mind, canonicalScores?.mind),
+    sleep: resolveAuthoritativeFrameworkScore(candidateScores?.sleep, canonicalScores?.sleep),
+    recovery: resolveAuthoritativeFrameworkScore(candidateScores?.recovery, canonicalScores?.recovery)
+  };
   const metrics: RecoveryMetric[] = [
     {
       key: 'calm',
       label: 'Calm',
-      score: normalizeScore(health.candidateIntelligence?.scores.calm.score ?? health.canonicalIntelligence?.scores.calm.score),
+      score: normalizeScore(authoritativeScores.calm?.score),
       color: '#FF1717',
       position: 'top',
       DefaultIcon: CalmDefaultIcon,
@@ -278,7 +293,7 @@ export const HomeScreen = () => {
     {
       key: 'activity',
       label: 'Activity',
-      score: normalizeScore(health.candidateIntelligence?.scores.activity.score ?? health.canonicalIntelligence?.scores.activity.score),
+      score: normalizeScore(authoritativeScores.activity?.score),
       color: '#F27A1A',
       position: 'left',
       DefaultIcon: ActivityDefaultIcon,
@@ -287,7 +302,7 @@ export const HomeScreen = () => {
     {
       key: 'nourishment',
       label: 'Nutrition',
-      score: normalizeScore(health.candidateIntelligence?.scores.nutrition.score ?? health.canonicalIntelligence?.scores.nutrition.score),
+      score: normalizeScore(authoritativeScores.nutrition?.score),
       color: '#77FF22',
       position: 'right',
       DefaultIcon: NutritionDefaultIcon,
@@ -296,7 +311,7 @@ export const HomeScreen = () => {
     {
       key: 'mind',
       label: 'Mind',
-      score: normalizeScore(health.candidateIntelligence?.scores.mind.score ?? health.canonicalIntelligence?.scores.mind.score),
+      score: normalizeScore(authoritativeScores.mind?.score),
       color: '#763CEF',
       position: 'bottomLeft',
       DefaultIcon: MindDefaultIcon,
@@ -305,7 +320,7 @@ export const HomeScreen = () => {
     {
       key: 'sleep',
       label: 'Sleep',
-      score: normalizeScore(health.candidateIntelligence?.scores.sleep.score ?? health.canonicalIntelligence?.scores.sleep.score),
+      score: normalizeScore(authoritativeScores.sleep?.score),
       color: '#0F80FF',
       position: 'bottomRight',
       DefaultIcon: SleepDefaultIcon,
@@ -313,34 +328,29 @@ export const HomeScreen = () => {
     },
   ];
   const displayMetrics = metrics;
-  const trendValues = health.candidateIntelligence?.recoveryTrend.map(item=>({
-    ...item,dayLabel:new Date(`${item.dayKey}T12:00:00`).toLocaleDateString(undefined,{weekday:'short'})
-  }))??recoveryTrend;
+  const trendValues = reconcileSevenDayRecoveryTrend(
+    recoveryTrend,
+    health.candidateIntelligence?.recoveryTrend,
+    health.candidateIntelligence?.methodologyVersion
+  );
   const hasTrendData = trendValues.some((item) => item.score != null);
-  const recoveryFramework = health.candidateIntelligence?.scores.recovery ?? health.canonicalIntelligence?.scores.recovery;
+  const recoveryFramework = authoritativeScores.recovery;
   const recoveryTrendUnavailableLabel = scoreUnavailableLabel(recoveryFramework);
   // The centre is labelled Recovery Core, so it must bind to the governed
   // Recovery domain rather than silently displaying Overall Health Intelligence.
-  const recoveryScore = normalizeScore(health.candidateIntelligence?.scores.recovery.score ?? health.canonicalIntelligence?.scores.recovery.score);
+  const recoveryScore = normalizeScore(authoritativeScores.recovery?.score);
 
   const selected = selectedMetric === 'healthIntelligence'
     ? { label: 'Recovery Core', score: recoveryScore, color: '#D5062D' }
     : displayMetrics.find((metric) => metric.key === selectedMetric) ?? { label: 'Recovery Core', score: recoveryScore, color: '#D5062D' };
-  const frameworkByMetric = health.candidateIntelligence?.scores ? {
-    healthIntelligence: health.candidateIntelligence.scores.recovery,
-    mind: health.candidateIntelligence.scores.mind,
-    sleep: health.candidateIntelligence.scores.sleep,
-    activity: health.candidateIntelligence.scores.activity,
-    nourishment: health.candidateIntelligence.scores.nutrition,
-    calm: health.candidateIntelligence.scores.calm
-  } : health.canonicalIntelligence?.scores ? {
-    healthIntelligence: health.canonicalIntelligence.scores.recovery,
-    mind: health.canonicalIntelligence.scores.mind,
-    sleep: health.canonicalIntelligence.scores.sleep,
-    activity: health.canonicalIntelligence.scores.activity,
-    nourishment: health.canonicalIntelligence.scores.nutrition,
-    calm: health.canonicalIntelligence.scores.calm
-  } : null;
+  const frameworkByMetric = {
+    healthIntelligence: authoritativeScores.recovery,
+    mind: authoritativeScores.mind,
+    sleep: authoritativeScores.sleep,
+    activity: authoritativeScores.activity,
+    nourishment: authoritativeScores.nutrition,
+    calm: authoritativeScores.calm
+  };
   const selectedFramework = frameworkByMetric?.[selectedMetric];
   const selectedComponentCoverage = selectedFramework && 'componentCoverage' in selectedFramework
     ? selectedFramework.componentCoverage

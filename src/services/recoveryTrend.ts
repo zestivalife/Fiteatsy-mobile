@@ -4,6 +4,7 @@ export type RecoveryTrendDay = {
   dayKey: string;
   dayLabel: string;
   score: number | null;
+  calculationVersion?: string | null;
 };
 
 const localDayKey = (date: Date) => {
@@ -17,7 +18,7 @@ export const buildSevenDayRecoveryTrend = (
   history: HealthScore[],
   now = new Date()
 ): RecoveryTrendDay[] => {
-  const scoreByDay = new Map<string, { score: number; timestamp: number }>();
+  const scoreByDay = new Map<string, { score: number; timestamp: number; calculationVersion: string }>();
 
   history.forEach((item) => {
     if (item.scoreStatus !== 'calculated' || item.scoreValue == null || !Number.isFinite(item.scoreValue)) return;
@@ -33,7 +34,8 @@ export const buildSevenDayRecoveryTrend = (
     if (!current || calculatedAt.getTime() > current.timestamp) {
       scoreByDay.set(dayKey, {
         score: Math.max(0, Math.min(100, Math.round(item.scoreValue))),
-        timestamp: calculatedAt.getTime()
+        timestamp: calculatedAt.getTime(),
+        calculationVersion: item.calculationVersion
       });
     }
   });
@@ -46,7 +48,50 @@ export const buildSevenDayRecoveryTrend = (
     return {
       dayKey,
       dayLabel: date.toLocaleDateString(undefined, { weekday: 'short' }),
-      score: scoreByDay.get(dayKey)?.score ?? null
+      score: scoreByDay.get(dayKey)?.score ?? null,
+      calculationVersion: scoreByDay.get(dayKey)?.calculationVersion ?? null
     };
+  });
+};
+
+export type CandidateRecoveryTrendDay = {
+  dayKey: string;
+  score: number | null;
+  calculationVersion: string | null;
+};
+
+export const reconcileSevenDayRecoveryTrend = (
+  calendar: RecoveryTrendDay[],
+  candidate: CandidateRecoveryTrendDay[] | null | undefined,
+  candidateCalculationVersion: string | null | undefined
+): RecoveryTrendDay[] => {
+  if (!candidate) return calendar;
+  const compatibleCandidateDay = (day: CandidateRecoveryTrendDay) => ({
+    ...day,
+    score: candidateCalculationVersion != null && day.calculationVersion !== candidateCalculationVersion
+      ? null
+      : day.score
+  });
+  if (candidate.length >= calendar.length) {
+    return [...candidate]
+      .sort((left, right) => left.dayKey.localeCompare(right.dayKey))
+      .slice(-calendar.length)
+      .map((day) => ({
+        ...compatibleCandidateDay(day),
+        dayLabel: new Date(`${day.dayKey}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' })
+      }));
+  }
+  const candidateByDay = new Map(candidate.map((item) => [item.dayKey, item]));
+  return calendar.map((day) => {
+    const candidateDay = candidateByDay.get(day.dayKey);
+    if (candidateDay) {
+      return {
+        ...day,
+        ...compatibleCandidateDay(candidateDay)
+      };
+    }
+    const compatible = candidateCalculationVersion != null
+      && day.calculationVersion === candidateCalculationVersion;
+    return compatible ? day : { ...day, score: null, calculationVersion: candidateCalculationVersion ?? null };
   });
 };

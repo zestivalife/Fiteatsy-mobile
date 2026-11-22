@@ -129,8 +129,37 @@ export const candidateResponseToHomeSnapshot=(value:CandidateStarOrbValidation)=
   const recovery=candidateFrameworkScore(current.recovery);
   return {methodologyVersion:value.methodologyVersion,activation:value.activation,sourceCoverage:value.sourceCoverage,
     scores:{activity:candidateFrameworkScore(current.activity),sleep:candidateFrameworkScore(current.sleep),nutrition:candidateFrameworkScore(current.nourishment),calm:candidateFrameworkScore(current.calm),mind:candidateFrameworkScore(current.mind),recovery},
-    recoveryTrend:value.days.map(day=>({dayKey:day.healthDay,score:day.recovery.score}))};
+    recoveryTrend:value.days.map(day=>({dayKey:day.healthDay,score:day.recovery.score,status:day.recovery.status,
+      calculatedAt:day.recovery.calculatedAt,calculationVersion:day.recovery.methodologyVersion}))};
 };
+
+export type CandidateHomeSnapshot = NonNullable<ReturnType<typeof candidateResponseToHomeSnapshot>>;
+
+const candidateSnapshotTime = (snapshot: CandidateHomeSnapshot) => Math.max(
+  ...Object.values(snapshot.scores).map((score) => Date.parse(score.calculatedAt)).filter(Number.isFinite),
+  0
+);
+
+export const reconcileCandidateHomeSnapshot = (
+  current: CandidateHomeSnapshot | null,
+  incoming: CandidateHomeSnapshot | null
+): CandidateHomeSnapshot | null => {
+  if (!incoming) return current;
+  if (!current) return incoming;
+  const currentTime = candidateSnapshotTime(current);
+  const incomingTime = candidateSnapshotTime(incoming);
+  if (incomingTime < currentTime) return current;
+  if (incoming.methodologyVersion !== current.methodologyVersion) return incoming;
+  const byDay = new Map(current.recoveryTrend.map((item) => [item.dayKey, item]));
+  incoming.recoveryTrend.forEach((item) => {
+    const previous = byDay.get(item.dayKey);
+    if (!previous || Date.parse(item.calculatedAt) >= Date.parse(previous.calculatedAt)) byDay.set(item.dayKey, item);
+  });
+  return { ...incoming, recoveryTrend: [...byDay.values()].sort((a, b) => a.dayKey.localeCompare(b.dayKey)) };
+};
+
+export const shouldPreserveAccountScopedSnapshot = (currentScope: string | null, nextScope: string | null) =>
+  currentScope != null && currentScope === nextScope;
 
 export const countAvailableHealthMetrics = (metrics: CanonicalHealthMetricState[]) =>
   metrics.filter((metric) => metric.queryState === 'DATA_AVAILABLE').length;
@@ -145,6 +174,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   const queuedSyncOptions = useRef<{ forceSourceBackfill?: boolean; liveOnly?: boolean }>({});
   const awaitingPermissionReturn = useRef(false);
   const foregroundRefreshAt = useRef(0);
+  const remoteRefreshGeneration = useRef(0);
+  const hydratedSnapshotScope = useRef<string | null>(null);
   const syncGeneration = useRef(0);
   const automaticallySyncedScope = useRef<string|null>(null);
   const forceBackfill = useRef(false);
@@ -187,6 +218,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   }, [status?.fiteatsyClientId]);
 
   const refreshRemoteSnapshot = useCallback(async () => {
+    const generation = ++remoteRefreshGeneration.current;
+    const appliesToCurrentGeneration = () => mounted.current && generation === remoteRefreshGeneration.current;
     const locallyAvailable = await adapter.isAvailable().catch(() => false);
     const results = await refreshHomeHealthResponses({
       syncStatus: getHealthSyncStatus,
@@ -196,30 +229,33 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
       starOrb: getProductionStarOrb
     }, {
       syncStatus: (nextStatus) => {
-        if (!mounted.current) return;
+        if (!appliesToCurrentGeneration()) return;
         setStatus(nextStatus);
         setProviderState(deriveHealthProviderState(nextStatus, adapter.platform, locallyAvailable));
       },
       latestObservations: (nextObservations) => {
-        if (!mounted.current) return;
+        if (!appliesToCurrentGeneration()) return;
         setObservations((current) => {
           const byIdentity = new Map(current.map((item) => [item.syncKey ?? item.id, item]));
           nextObservations.items.forEach((item) => byIdentity.set(item.syncKey ?? item.id, item));
           return [...byIdentity.values()];
         });
       },
-      syncActivity: (nextActivity) => { if (mounted.current) setActivity(nextActivity.items); },
+      syncActivity: (nextActivity) => { if (appliesToCurrentGeneration()) setActivity(nextActivity.items); },
       canonicalIntelligence: async (nextIntelligence) => {
-        if (!mounted.current) return;
+        if (!appliesToCurrentGeneration()) return;
         const snapshot = serverSnapshot(nextIntelligence);
         setCanonicalIntelligence((current) => preferCanonicalHealthSnapshot(current, snapshot));
         if (localScope) await persistLocalCanonicalHealthSnapshot(localScope, snapshot);
       },
       starOrb: (nextCandidate) => {
-        if (mounted.current) setCandidateIntelligence(candidateResponseToHomeSnapshot(nextCandidate));
+        if (appliesToCurrentGeneration()) {
+          const incoming = candidateResponseToHomeSnapshot(nextCandidate);
+          setCandidateIntelligence((current) => reconcileCandidateHomeSnapshot(current, incoming));
+        }
       }
     });
-    if (!mounted.current) return;
+    if (!appliesToCurrentGeneration()) return;
     const statusFailed = results.some((result) => result.endpoint === 'syncStatus' && result.status === 'rejected');
     if (statusFailed) setProviderState((current) => current === 'CONNECTED'
       ? current
@@ -416,15 +452,20 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   }, [refreshRemoteSnapshot]);
 
   useEffect(() => {
+    remoteRefreshGeneration.current += 1;
+    const preserveSameAccount = shouldPreserveAccountScopedSnapshot(hydratedSnapshotScope.current, localScope);
+    hydratedSnapshotScope.current = localScope;
     connectionIdOverride.current = null;
-    setObservations([]);
-    setPresentationObservations([]);
-    setQueryStates({});
-    setErrors({});
-    setPendingUploadCount(0);
-    setCanonicalIntelligence(null);
-    setCandidateIntelligence(null);
-    setAggregates([]);
+    if (!preserveSameAccount) {
+      setObservations([]);
+      setPresentationObservations([]);
+      setQueryStates({});
+      setErrors({});
+      setPendingUploadCount(0);
+      setCanonicalIntelligence(null);
+      setCandidateIntelligence(null);
+      setAggregates([]);
+    }
     setLocalHydrated(false);
     if (!bootstrapped || !localScope) return;
     let active = true;
