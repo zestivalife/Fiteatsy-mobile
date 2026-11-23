@@ -22,14 +22,16 @@ test('database loader reads only the authenticated tenant client and scores meas
   await pool.query(`insert into fiteatsy_clients(id,tenant_id,fiteatsy_client_id,account_user_id) values($1,$2,$3,$4)`,[clientId,tenantId,`fc_star_${Date.now()}`,userId]);
   await pool.query(`insert into health_profiles(id,user_id,client_id,sleep_goal_hours) values($1,$2,$3,8)`,[profileId,userId,clientId]);
   const owner={accountId:userId,clientId};
-  const healthDay=new Date().toISOString().slice(0,10);
-  const previousDay=new Date(Date.parse(`${healthDay}T12:00:00.000Z`)-86_400_000).toISOString().slice(0,10);
+  const measuredAtISO=new Date(Date.now()-60_000).toISOString();
+  const healthDay=new Date(Date.parse(measuredAtISO)+330*60_000).toISOString().slice(0,10);
+  const sleepEndISO=measuredAtISO;
+  const sleepStartISO=new Date(Date.parse(sleepEndISO)-470*60_000).toISOString();
   await ingestHealthObservations(owner,[
-    {metricType:'steps',value:8200,unit:'count',measuredAtISO:`${healthDay}T10:00:00.000Z`,sourceProvider:'qa',sourceRecordId:'steps',syncKey:'qa:steps'},
-    {metricType:'active_minutes',value:35,unit:'min',measuredAtISO:`${healthDay}T10:00:00.000Z`,sourceProvider:'qa',sourceRecordId:'active',syncKey:'qa:active'},
-    {metricType:'sleep_minutes',value:470,unit:'min',measuredAtISO:`${healthDay}T06:30:00.000Z`,startAtISO:`${previousDay}T22:40:00.000Z`,endAtISO:`${healthDay}T06:30:00.000Z`,sourceProvider:'qa',sourceRecordId:'sleep',syncKey:'qa:sleep'},
-    {metricType:'hrv_sdnn_ms',value:52,unit:'ms',measuredAtISO:`${healthDay}T07:00:00.000Z`,sourceProvider:'qa',sourceRecordId:'hrv',syncKey:'qa:hrv'},
-    {metricType:'resting_heart_rate',value:61,unit:'bpm',measuredAtISO:`${healthDay}T07:00:00.000Z`,sourceProvider:'qa',sourceRecordId:'rhr',syncKey:'qa:rhr'}
+    {metricType:'steps',value:8200,unit:'count',measuredAtISO,sourceProvider:'qa',sourceRecordId:'steps',syncKey:'qa:steps'},
+    {metricType:'active_minutes',value:35,unit:'min',measuredAtISO,sourceProvider:'qa',sourceRecordId:'active',syncKey:'qa:active'},
+    {metricType:'sleep_minutes',value:470,unit:'min',measuredAtISO:sleepEndISO,startAtISO:sleepStartISO,endAtISO:sleepEndISO,sourceProvider:'qa',sourceRecordId:'sleep',syncKey:'qa:sleep'},
+    {metricType:'hrv_sdnn_ms',value:52,unit:'ms',measuredAtISO,sourceProvider:'qa',sourceRecordId:'hrv',syncKey:'qa:hrv'},
+    {metricType:'resting_heart_rate',value:61,unit:'bpm',measuredAtISO,sourceProvider:'qa',sourceRecordId:'rhr',syncKey:'qa:rhr'}
   ]);
   await upsertDailyCheckIn(owner,{dateISO:healthDay,mood:4,energy:4,sleepQuality:4});
   const session=await createAssessmentSession(owner);
