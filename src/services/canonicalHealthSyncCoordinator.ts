@@ -447,9 +447,8 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
   useEffect(() => {
     mounted.current = true;
     void migrateLegacyHealthInstallationId();
-    void refreshRemoteSnapshot();
     return () => { mounted.current = false; };
-  }, [refreshRemoteSnapshot]);
+  }, []);
 
   useEffect(() => {
     remoteRefreshGeneration.current += 1;
@@ -481,10 +480,19 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         setPresentationObservations(presentations.map((item, index) => toDto(item, 'local', index)));
         setLifecycle(snapshot.lifecycle);
         setLocalHydrated(true);
+        // The account-scope transition invalidates every request started for
+        // the previous generation. Start the authoritative remote refresh
+        // only after that transition is complete so a successful Star Orb
+        // response cannot be discarded while the longer native upload runs.
+        void refreshRemoteSnapshot();
       })
-      .catch(() => { if (active && mounted.current) setLocalHydrated(true); });
+      .catch(() => {
+        if (!active || !mounted.current) return;
+        setLocalHydrated(true);
+        void refreshRemoteSnapshot();
+      });
     return () => { active = false; };
-  }, [authSession?.client.fiteatsyClientId, bootstrapped, localScope, mergeLocalObservations]);
+  }, [authSession?.client.fiteatsyClientId, bootstrapped, localScope, mergeLocalObservations, refreshRemoteSnapshot]);
 
   useEffect(() => {
     if (!localHydrated || !localScope) return;

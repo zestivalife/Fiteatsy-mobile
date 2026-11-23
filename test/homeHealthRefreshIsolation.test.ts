@@ -80,3 +80,11 @@ test('concurrent Home refreshes apply callbacks only from the latest generation'
   expect(source).toContain('generation === remoteRefreshGeneration.current');
   expect(source).toContain('if (!appliesToCurrentGeneration()) return;');
 });
+
+test('account hydration restarts the authoritative refresh after invalidating the prior generation',()=>{
+  const source=require('fs').readFileSync(require('path').join(process.cwd(),'src/services/canonicalHealthSyncCoordinator.ts'),'utf8');
+  const accountTransition=source.slice(source.indexOf('remoteRefreshGeneration.current += 1;'),source.indexOf('if (!localHydrated || !localScope) return;'));
+  expect(accountTransition).toContain('setLocalHydrated(true);');
+  expect(accountTransition.match(/void refreshRemoteSnapshot\(\);/g)).toHaveLength(2);
+  expect(accountTransition.indexOf('remoteRefreshGeneration.current += 1;')).toBeLessThan(accountTransition.indexOf('void refreshRemoteSnapshot();'));
+});
