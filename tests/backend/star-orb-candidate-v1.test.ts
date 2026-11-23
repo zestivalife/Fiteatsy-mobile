@@ -67,10 +67,11 @@ test('available components produce partial scores while missing components remai
   assert.notEqual(noGoal.score,null);assert.equal(noGoal.status,'PARTIAL');assert.deepEqual(noGoal.inputsUsed,['quality']);assert.ok(noGoal.inputsMissing.includes('sleep_target'));
 });
 
-test('Recovery requires at least two independent available components',()=>{
+test('Recovery preserves an explicitly partial score from one measured component',()=>{
   const sleep=calculateSleepCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',target:resolved(480),nights});
   const one=calculateRecoveryCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',sleep,activityBalance:null,currentHrv:Number.NaN,hrvBaselineSameType:Number.NaN,currentRestingHeartRate:Number.NaN,restingHeartRateBaseline:Number.NaN,baselineDays:0,sleepBehaviour:0,activityDistribution:0,mindfulnessPractice:0,explicitLifestyleHabits:[]});
-  assert.equal(one.score,null);
+  assert.equal(one.score,sleep.score);assert.equal(one.status,'PARTIAL');assert.equal(one.componentCoverage,40);
+  assert.deepEqual(one.inputsUsed,['sleep']);
   const two=calculateRecoveryCandidate({healthDay:'2026-11-17',calculatedAt,freshness:'CURRENT',sleep,activityBalance:80,currentHrv:Number.NaN,hrvBaselineSameType:Number.NaN,currentRestingHeartRate:Number.NaN,restingHeartRateBaseline:Number.NaN,baselineDays:0,sleepBehaviour:0,activityDistribution:80,mindfulnessPractice:0,explicitLifestyleHabits:[]});
   assert.equal(two.status,'PARTIAL');assert.equal(two.componentCoverage,60);assert.notEqual(two.score,null);
 });

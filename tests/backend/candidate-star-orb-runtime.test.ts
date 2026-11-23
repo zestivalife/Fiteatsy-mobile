@@ -45,7 +45,7 @@ const repositories:CandidateRuntimeRepositories={
 test('runtime adapters calculate eligible domains and Recovery stays partial without genuine lifestyle habits',()=>{
   const result=buildCandidateStarOrbRuntimeDay(repositories,through);
   const values=Object.fromEntries(Object.entries(result).filter(([key])=>key!=='healthDay'&&key!=='proposals').map(([key,value])=>[key,(value as {score:number|null}).score]));
-  assert.deepEqual(values,{activity:77.29,sleep:94.88,nourishment:85.71,calm:65.42,mind:66.8,recovery:81.11});
+  assert.deepEqual(values,{activity:77.29,sleep:94.88,nourishment:85.71,calm:65.42,mind:76.45,recovery:81.11});
   assert.ok(result.recovery.inputsMissing.includes('explicit_lifestyle_habits'));
   assert.equal(result.recovery.status,'PARTIAL');
   for(const [key,value] of Object.entries(result).filter(([key,value])=>key!=='proposals'&&typeof value==='object'))assert.equal((value as {activation:string}).activation,'CANDIDATE_ONLY');
@@ -91,6 +91,20 @@ test('runtime preserves valid partial nutrition and recent mood instead of suppr
   const result=buildCandidateStarOrbRuntimeDay(partial,through);
   assert.equal(result.nourishment.score,85.71);assert.deepEqual(result.nourishment.inputsUsed,['prescribed_meals_consumed']);
   assert.notEqual(result.mind.score,null);assert.ok(result.mind.inputsUsed.includes('mood_checkins'));
+});
+
+test('runtime carries recent validated Calm and aggregates seven-day Mind inputs forward',()=>{
+  const recentOnly={...repositories,
+    assessments:repositories.assessments.filter(row=>row.healthDay===shifted(-2)),
+    mind:[
+      {healthDay:shifted(-3),moodCheckIns:[3],completedSessions:1,emotionalWellbeing:[3,4]},
+      {healthDay:shifted(-1),moodCheckIns:[5],completedSessions:2,emotionalWellbeing:[4,5]}
+    ]
+  };
+  const result=buildCandidateStarOrbRuntimeDay(recentOnly,through);
+  assert.notEqual(result.calm.score,null);assert.ok(result.calm.inputsUsed.includes('validated_stress_assessment'));
+  assert.notEqual(result.mind.score,null);assert.ok(result.mind.inputsUsed.includes('mood_checkins'));
+  assert.ok(result.mind.inputsUsed.includes('mental_wellness_sessions'));
 });
 
 test('sealed Home binds each visible node to one authoritative scoring state',()=>{
