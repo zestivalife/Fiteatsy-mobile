@@ -181,7 +181,7 @@ test('Home uses canonical intelligence for Nourishment while Nutrition keeps the
   assert.match(service, /nutritionMonitoring: dailyMonitoring/);
   assert.match(home, /getNutritionExperience\(nutritionDate\(\)\)/);
   assert.match(home, /useCanonicalHealthSyncCoordinator\(\)/);
-  assert.match(home, /health\.canonicalIntelligence\?\.scores\.nutrition\.score/);
+  assert.match(home, /nutrition: resolveAuthoritativeFrameworkScore\(candidateScores\?\.nutrition, canonicalScores\?\.nutrition\)/);
   assert.doesNotMatch(home, /getHealthScoreSummary\(\)/);
   assert.doesNotMatch(home, /dailyNutrition\?\.nutritionScore/);
   assert.match(dateUtility, /Asia\/Kolkata/);
