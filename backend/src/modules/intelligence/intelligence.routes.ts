@@ -32,8 +32,25 @@ import { getReport } from '../reports/reports.store.js';
 import { listHealthObservationsForCalculation } from '../health/health-observations.repository.js';
 import { buildHealthIntelligenceV1 } from './health-intelligence-projection.js';
 import { calculatePersistedCandidateStarOrb, calculatePersistedStarOrb, candidateValidationEnabled } from './star-orb-candidate.service.js';
+import { getMindComposite, upsertMindComposite } from './mind-composite.service.js';
 
 export const intelligenceRouter = Router();
+
+const mindCheckInQuery=z.object({healthDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),timezone:z.string().min(1).max(100)});
+const mindAnswers=z.object({emotionalFeeling:z.union([z.literal(0),z.literal(25),z.literal(50),z.literal(75),z.literal(100)]),emotionalBalance:z.union([z.literal(0),z.literal(25),z.literal(50),z.literal(75),z.literal(100)]),mentalEnergy:z.union([z.literal(0),z.literal(25),z.literal(50),z.literal(75),z.literal(100)]),concentration:z.union([z.literal(0),z.literal(25),z.literal(50),z.literal(75),z.literal(100)])});
+
+intelligenceRouter.get('/mind-check-in',requireAuthenticatedAccount,async(req,res)=>{
+  const account=getAuthenticatedAccount(req);const parsed=mindCheckInQuery.safeParse(req.query);
+  if(!parsed.success)return res.status(400).json({error:'INVALID_MIND_CHECK_IN_QUERY',details:parsed.error.flatten()});
+  return res.status(200).json({item:await getMindComposite(account.accountId,account.client.id,parsed.data.healthDay)});
+});
+intelligenceRouter.put('/mind-check-in',requireAuthenticatedAccount,async(req,res)=>{
+  const account=getAuthenticatedAccount(req);const query=mindCheckInQuery.safeParse(req.query);const body=z.object({answers:mindAnswers}).safeParse(req.body);
+  if(!query.success)return res.status(400).json({error:'INVALID_MIND_CHECK_IN',details:query.error.flatten()});
+  if(!body.success)return res.status(400).json({error:'INVALID_MIND_CHECK_IN',details:body.error.flatten()});
+  const item=await upsertMindComposite(account.accountId,account.client.id,query.data.healthDay,query.data.timezone,body.data.answers,account.client.tenantId);
+  return res.status(200).json({item});
+});
 
 const currentOwner = (account: ReturnType<typeof getAuthenticatedAccount>): ClientOwnershipContext => ({
   accountId: account.accountId,
@@ -79,9 +96,11 @@ intelligenceRouter.get('/star-orb', requireAuthenticatedAccount, async (req, res
   }).safeParse(req.query);
   if (!parsed.success) return res.status(400).json({error:'INVALID_STAR_ORB_QUERY',details:parsed.error.flatten()});
   try {
-    return res.status(200).json(await calculatePersistedStarOrb(account.accountId, parsed.data.healthDay, {
+    const starOrb=await calculatePersistedStarOrb(account.accountId, parsed.data.healthDay, {
       tenantId:account.client.tenantId,timezone:parsed.data.timezone
-    }));
+    });
+    const mindComposite=await getMindComposite(account.accountId,account.client.id,parsed.data.healthDay);
+    return res.status(200).json({...starOrb,mindComposite});
   } catch (error) {
     return res.status(error instanceof RangeError ? 400 : 409).json({
       error:'STAR_ORB_CALCULATION_UNAVAILABLE',

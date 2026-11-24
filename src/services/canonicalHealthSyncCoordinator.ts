@@ -128,7 +128,8 @@ const candidateFrameworkScore=(score:CandidateStarOrbValidation['days'][number][
 export const candidateResponseToHomeSnapshot=(value:CandidateStarOrbValidation)=>{
   const current=value.days.at(-1);if(!current)return null;
   const recovery=candidateFrameworkScore(current.recovery);
-  return {methodologyVersion:value.methodologyVersion,activation:value.activation,sourceCoverage:value.sourceCoverage,
+  const mindComposite=value.mindComposite?candidateFrameworkScore(value.mindComposite):null;
+  return {methodologyVersion:value.methodologyVersion,activation:value.activation,sourceCoverage:value.sourceCoverage,mindComposite,
     scores:{activity:candidateFrameworkScore(current.activity),sleep:candidateFrameworkScore(current.sleep),nutrition:candidateFrameworkScore(current.nourishment),calm:candidateFrameworkScore(current.calm),mind:candidateFrameworkScore(current.mind),recovery},
     recoveryTrend:value.days.map(day=>({dayKey:day.healthDay,score:day.recovery.score,status:day.recovery.status,
       calculatedAt:day.recovery.calculatedAt,calculationVersion:day.recovery.methodologyVersion}))};
@@ -226,7 +227,7 @@ export const mergeCandidateIntoCanonicalSnapshot = (
       sleep: resolve('sleep'),
       nutrition: resolve('nutrition'),
       calm: resolve('calm'),
-      mind: resolve('mind'),
+      mind: incoming.mindComposite ?? resolve('mind'),
       recovery: resolve('recovery')
     }
   };

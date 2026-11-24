@@ -156,7 +156,7 @@ export const resolveTrackerScoreProjection = (
       sleep: resolveAuthoritativeHealthScore(candidate.sleep, null, candidateSnapshot)!,
       nutrition: resolveAuthoritativeHealthScore(candidate.nutrition, null, candidateSnapshot)!,
       calm: resolveAuthoritativeHealthScore(candidate.calm, null, candidateSnapshot)!,
-      mind: resolveAuthoritativeHealthScore(candidate.mind, null, candidateSnapshot)!,
+      mind: candidateSnapshot?.mindComposite ?? resolveAuthoritativeHealthScore(candidate.mind, null, candidateSnapshot)!,
       recovery: resolveAuthoritativeHealthScore(candidate.recovery, null, candidateSnapshot)!
     };
   }
@@ -166,7 +166,7 @@ export const resolveTrackerScoreProjection = (
     sleep: resolveAuthoritativeHealthScore(candidate.sleep, canonical.sleep, candidateSnapshot) ?? canonical.sleep,
     nutrition: resolveAuthoritativeHealthScore(candidate.nutrition, canonical.nutrition, candidateSnapshot) ?? canonical.nutrition,
     calm: resolveAuthoritativeHealthScore(candidate.calm, canonical.calm, candidateSnapshot) ?? canonical.calm,
-    mind: resolveAuthoritativeHealthScore(candidate.mind, canonical.mind, candidateSnapshot) ?? canonical.mind,
+    mind: candidateSnapshot?.mindComposite ?? resolveAuthoritativeHealthScore(candidate.mind, canonical.mind, candidateSnapshot) ?? canonical.mind,
     recovery: resolveAuthoritativeHealthScore(candidate.recovery, canonical.recovery, candidateSnapshot) ?? canonical.recovery
   };
 };

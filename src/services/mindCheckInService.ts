@@ -1,0 +1,12 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiFetch } from './apiClient';
+export type MindAnswer=0|25|50|75|100;
+export type MindAnswers={emotionalFeeling:MindAnswer;emotionalBalance:MindAnswer;mentalEnergy:MindAnswer;concentration:MindAnswer};
+export type MindCompositeDto={id:string;healthDay:string;questionnaireVersion:string;answers:MindAnswers;questionnaireScore:number;methodologyVersion:'FITEATSY_MIND_COMPOSITE_V1';sourceComponents:Record<string,unknown>;score:number|null;status:'CALCULATED'|'PARTIAL';componentCoverage:number;inputsUsed:string[];inputsMissing:string[];calculatedAt:string;submittedAt:string};
+const params=(healthDay:string)=>`healthDay=${healthDay}&timezone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC')}`;
+export const getMindCheckIn=(healthDay:string)=>apiFetch<{item:MindCompositeDto|null}>(`/v1/intelligence/mind-check-in?${params(healthDay)}`);
+export const submitMindCheckIn=(healthDay:string,answers:MindAnswers)=>apiFetch<{item:MindCompositeDto}>(`/v1/intelligence/mind-check-in?${params(healthDay)}`,{method:'PUT',body:JSON.stringify({answers})});
+const draftKey=(accountId:string,day:string)=>`fiteatsy:mind-check-in:v1:${accountId}:${day}`;
+export const readMindDraft=async(accountId:string,day:string)=>{const raw=await AsyncStorage.getItem(draftKey(accountId,day));return raw?JSON.parse(raw) as Partial<MindAnswers>:null;};
+export const saveMindDraft=(accountId:string,day:string,answers:Partial<MindAnswers>)=>AsyncStorage.setItem(draftKey(accountId,day),JSON.stringify(answers));
+export const clearMindDraft=(accountId:string,day:string)=>AsyncStorage.removeItem(draftKey(accountId,day));

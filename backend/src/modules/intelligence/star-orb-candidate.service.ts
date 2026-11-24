@@ -2,6 +2,7 @@ import { buildCandidateStarOrbRuntimeWindow } from './candidate-star-orb-runtime
 import { loadStarOrbRuntimeInputs } from './star-orb-runtime-loader.js';
 import { createHealthScores } from './health-scores.repository.js';
 import type { ClientOwnershipContext } from '../platform/platform.types.js';
+import { recalculateMindCompositeIfPresent } from './mind-composite.service.js';
 
 export const candidateValidationEnabled = () =>
   process.env.NODE_ENV !== 'production' && process.env.STAR_ORB_CANDIDATE_VALIDATION_ENABLED === 'true';
@@ -50,5 +51,6 @@ export async function recalculateAndPersistStarOrb(
       inputSummary:{wellnessState:result.status,componentCoverage:result.componentCoverage,inputsUsed:result.inputsUsed,
         inputsMissing:result.inputsMissing,contributingFactors:result.contributingFactors,inputFreshness:result.inputFreshness}}
   })));
+  await recalculateMindCompositeIfPresent(owner.accountId,owner.clientId,throughHealthDay,context.timezone,context.tenantId);
   return window;
 }

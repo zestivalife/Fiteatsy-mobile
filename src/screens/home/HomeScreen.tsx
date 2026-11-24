@@ -7,6 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Path, Stop, SvgProps } from 'react-native-svg';
 import { AppBackground } from '../../components/AppBackground';
+import { MindCheckInSheet } from '../../components/MindCheckInSheet';
 import { ConsultantAccessPrompt } from '../../components/ConsultantAccessPrompt';
 import { HomeHealthActions } from '../../components/HomeHealthActions';
 import RecoveryStarAsset from '../../assets/fiteatsy-home/recovery-star.svg';
@@ -176,6 +177,7 @@ export const HomeScreen = () => {
     getMedicationTimelineForDate
   } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('healthIntelligence');
+  const [mindCheckInVisible,setMindCheckInVisible]=useState(false);
   const [dailyNutrition, setDailyNutrition] = useState<NutritionExperience | null>(null);
   const [recoveryTrend, setRecoveryTrend] = useState<RecoveryTrendDay[]>(() => buildSevenDayRecoveryTrend([]));
   const [pss10Context, setPss10Context] = useState<Pss10StressContext>(() =>
@@ -277,6 +279,7 @@ export const HomeScreen = () => {
     sleep: resolveScore('sleep'),
     recovery: resolveScore('recovery')
   };
+  if (health.candidateIntelligence?.mindComposite) authoritativeScores.mind=health.candidateIntelligence.mindComposite;
   const metrics: RecoveryMetric[] = [
     {
       key: 'calm',
@@ -396,7 +399,7 @@ export const HomeScreen = () => {
               selectedScore={selected.score}
               selectedColor={selected.color}
               selectedState={selectedState}
-              onSelectMetric={setSelectedMetric}
+              onSelectMetric={(metric)=>{setSelectedMetric(metric);if(metric==='mind')setMindCheckInVisible(true);}}
             />
 
             <HomeHealthActions
@@ -416,6 +419,7 @@ export const HomeScreen = () => {
           </View>
         </ScrollView>
       </SafeAreaView>
+      <MindCheckInSheet visible={mindCheckInVisible} accountId={authSession?.accountId??''} healthDay={currentHealthDay} onClose={()=>setMindCheckInVisible(false)} onSaved={()=>{setMindCheckInVisible(false);void health.syncLocalMetrics({liveOnly:true});}} />
     </AppBackground>
   );
 };
