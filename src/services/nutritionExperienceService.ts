@@ -40,7 +40,18 @@ export type NutritionOption = {
   fibreGrams?: number | null;
   recommendationReason?: string | null;
   rankingReasons?: string[];
-  components?: Array<{ id?: string; name?: string; serving?: string; grams?: number | null; millilitres?: number | null }>;
+  components?: Array<{
+    id?: string;
+    name?: string;
+    componentName?: string;
+    serving?: string;
+    householdLabel?: string | null;
+    quantity?: number | null;
+    quantityUnit?: string;
+    grams?: number | null;
+    canonicalGrams?: number | null;
+    millilitres?: number | null;
+  }>;
   publishedOptionHash?: string | null;
 };
 
@@ -102,6 +113,45 @@ export type NutritionExperience = {
   consultantNote: string | null;
 };
 
+const isTechnicalMealName = (value: string, mealKey: string) => {
+  const canonical = value.trim().toUpperCase().replace(/[\s-]+/g, '_');
+  const canonicalKey = mealKey.trim().toUpperCase().replace(/[\s-]+/g, '_');
+  return canonical === canonicalKey
+    || /^(EARLY_MORNING|BREAKFAST|MID_MORNING|LUNCH|EVENING_SNACK|DINNER|BEDTIME)$/.test(canonical);
+};
+
+const normalisePublishedOption = (option: NutritionOption, mealKey: string): NutritionOption => {
+  const components = option.components?.map(component => {
+    const quantityServing = component.quantity != null && component.quantityUnit
+      ? `${component.quantity} ${component.quantityUnit}`
+      : undefined;
+    return {
+      ...component,
+      name: component.name?.trim() || component.componentName?.trim() || undefined,
+      serving: component.serving?.trim() || component.householdLabel?.trim() || quantityServing,
+      grams: component.grams ?? component.canonicalGrams ?? null,
+    };
+  });
+  const componentTitle = components?.map(component => component.name).filter(Boolean).join(' + ') ?? '';
+  const componentServing = components?.map(component => component.serving).filter(Boolean).join(' · ') ?? '';
+  return {
+    ...option,
+    meal: isTechnicalMealName(option.meal, mealKey) ? (componentTitle || 'Food name unavailable') : option.meal,
+    portion: !option.portion?.trim() || option.portion === 'Not reported'
+      ? (componentServing || 'Not reported')
+      : option.portion,
+    components,
+  };
+};
+
+export const normalisePublishedNutritionExperience = (response: NutritionExperience): NutritionExperience => ({
+  ...response,
+  meals: response.meals.map(meal => ({
+    ...meal,
+    options: meal.options.map(option => normalisePublishedOption(option, meal.key)),
+  })),
+});
+
 export const getNutritionExperience = async (date?: string) => {
   const canonicalDate = date ?? nutritionDate();
   let response: NutritionExperience;
@@ -116,7 +166,7 @@ export const getNutritionExperience = async (date?: string) => {
   if (!response?.plan?.id || !response?.version?.id || !Array.isArray(response.meals) || !response.version.content?.nutritionSnapshot) {
     throw new ApiClientError('VALIDATION_ERROR', 'The published nutrition plan response is malformed.');
   }
-  return { ...response, selectedDate: response.selectedDate || canonicalDate };
+  return normalisePublishedNutritionExperience({ ...response, selectedDate: response.selectedDate || canonicalDate });
 };
 
 export const getNutritionPattern = (endDate?: string) =>

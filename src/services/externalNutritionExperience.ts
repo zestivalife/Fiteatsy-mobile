@@ -15,6 +15,12 @@ const MEALS = [
 type PublishedOption = {
   id?: unknown; mealHead?: unknown; title?: unknown; serving?: unknown;
   nutrition?: Record<string, unknown>; calculationStatus?: unknown;
+  components?: unknown;
+};
+type PublishedComponent = {
+  id?: unknown; componentId?: unknown; name?: unknown; foodDisplayNameSnapshot?: unknown;
+  serving?: unknown; label?: unknown; servingDisplayNameSnapshot?: unknown;
+  grams?: unknown; millilitres?: unknown;
 };
 type PublishedContent = {
   contractVersion?: unknown;
@@ -42,11 +48,19 @@ export const externalPlanToNutritionExperience = (publication: ExternalDietPlan,
   const meals: NutritionMeal[] = MEALS.map(([key, label, window]) => {
     const mealOptions = options.filter(option => option.mealHead === key).map((option, slot): NutritionOption => {
       const nutrition = option.nutrition ?? {};
+      const components = Array.isArray(option.components) ? (option.components as PublishedComponent[]).map(component => ({
+        id: text(component.id) || text(component.componentId) || undefined,
+        name: text(component.name) || text(component.foodDisplayNameSnapshot) || undefined,
+        serving: text(component.serving) || text(component.label) || text(component.servingDisplayNameSnapshot) || undefined,
+        grams: finite(component.grams),
+        millilitres: finite(component.millilitres),
+      })) : undefined;
       return {
-        id: text(option.id), slot: slot + 1, meal: text(option.title) || label,
-        portion: text(option.serving), approxKcal: finite(nutrition.kcal),
+        id: text(option.id), slot: slot + 1, meal: text(option.title) || 'Food name unavailable',
+        portion: text(option.serving) || 'Not reported', approxKcal: finite(nutrition.kcal),
         proteinGrams: finite(nutrition.protein), carbsGrams: finite(nutrition.carbohydrate),
         fatGrams: finite(nutrition.fat), fibreGrams: finite(nutrition.fibre),
+        components,
       };
     });
     return {

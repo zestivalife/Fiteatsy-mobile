@@ -60,7 +60,9 @@ test('mobile Nutrition renders exact consultant-published meals read-only', asyn
   await waitFor(() => expect(screen.getAllByText('Consultant plan').length).toBeGreaterThan(0));
   expect(screen.getByText('Poha + curd')).toBeTruthy();
   expect(screen.getByText('Serving: 1 bowl · 100 g')).toBeTruthy();
-  expect(screen.getByText('320 kcal · P 14g · C 48g · F 8g · Fibre 6g')).toBeTruthy();
+  expect(screen.getByText('320 kcal · P 14 g · C 48 g · F 8 g · Fibre 6 g')).toBeTruthy();
+  expect(screen.queryByText('PLANNED VS ACTUAL')).toBeNull();
+  expect(screen.queryByText("TODAY'S ADHERENCE")).toBeNull();
   expect(screen.queryByText('My Pattern')).toBeNull();
   expect(screen.queryByText('What can I eat now?')).toBeNull();
   expect(mockLogNutritionEvent).not.toHaveBeenCalled();
@@ -76,8 +78,14 @@ test('canonical consultant plan enables persisted meal and hydration tracking', 
     meals: [
       { key: 'breakfast', label: 'Breakfast', window: '08:00–09:00', state: 'PENDING', consumedAtISO: null, consumed: null,
         selectedOptionId: 'breakfast-1',
-        options: [{ id: 'breakfast-1', slot: 1, meal: 'Poha + curd', portion: '1 bowl · 100 g', approxKcal: 320, proteinGrams: 14, carbsGrams: 48, fatGrams: 8, fibreGrams: 6,
-          components: [{ id: 'poha', name: 'Poha', serving: '1 bowl' }, { id: 'curd', name: 'Curd', serving: '100 g' }] }] },
+        options: [
+          { id: 'breakfast-1', slot: 1, meal: 'Poha + curd', portion: '1 bowl · 100 g', approxKcal: 320.00000000001, proteinGrams: 13.909999999999998, carbsGrams: 48, fatGrams: 8, fibreGrams: null,
+            components: [{ id: 'poha', name: 'Poha', serving: '1 bowl', grams: 120 }, { id: 'curd', name: 'Curd', serving: '100 g', grams: 100 }] },
+          { id: 'breakfast-2', slot: 2, meal: 'Idli + sambar', portion: '2 idli · 1 bowl', approxKcal: 280, proteinGrams: 10, carbsGrams: 50, fatGrams: 4, fibreGrams: 5 },
+          { id: 'breakfast-3', slot: 3, meal: 'Upma', portion: '1 bowl', approxKcal: 260, proteinGrams: 8, carbsGrams: 42, fatGrams: 7, fibreGrams: 4 },
+          { id: 'breakfast-4', slot: 4, meal: 'Dosa + chutney', portion: '1 dosa', approxKcal: 300, proteinGrams: 7, carbsGrams: 52, fatGrams: 8, fibreGrams: 3 },
+          { id: 'breakfast-5', slot: 5, meal: 'Oats porridge', portion: '1 bowl', approxKcal: 240, proteinGrams: 9, carbsGrams: 38, fatGrams: 6, fibreGrams: 6 },
+        ] },
     ],
     totals: { calories: 0, protein: 0, carbs: 0, fat: 0, fibre: 0 }, remaining: { calories: 1800, protein: 100, carbs: 200, fat: 60, fibre: 30 },
     water: { litres: 0, targetLitres: 2.5 }, mealCount: 1, mealsFollowed: 0, outOfPlanCount: 0, skippedCount: 0, pendingCount: 1,
@@ -86,12 +94,36 @@ test('canonical consultant plan enables persisted meal and hydration tracking', 
     adherence: { percent: 0, label: 'No meals logged yet' }, nutritionScore: 0, selectedDate: '2026-11-07', consultantNote: null,
   };
   mockGetNutritionExperience.mockResolvedValueOnce(experience);
-  mockLogNutritionEvent.mockResolvedValueOnce(experience);
+  mockLogNutritionEvent.mockResolvedValue(experience);
   mockLogWater.mockResolvedValueOnce({ ...experience, water: { litres: .25, targetLitres: 2.5 } });
   const screen = render(React.createElement(require('../src/screens/home/NutritionExperienceScreen').NutritionExperienceScreen));
   await waitFor(() => expect(screen.getByText('Poha + curd')).toBeTruthy());
   expect(screen.getByText("Today's Plan")).toBeTruthy();
   expect(screen.queryByText('Tracking remains read-only in this view.')).toBeNull();
+  expect(screen.getByText('320 kcal · P 13.9 g · C 48 g · F 8 g · Fibre Not reported')).toBeTruthy();
+
+  fireEvent.press(screen.getByText('Change meal'));
+  expect(screen.getByText('Confirm')).toBeTruthy();
+  expect(screen.getByText('Idli + sambar')).toBeTruthy();
+  expect(screen.getByText('Oats porridge')).toBeTruthy();
+  expect(screen.queryByText('View ingredients / quantities')).toBeNull();
+  expect(screen.getByText('Ingredients')).toBeTruthy();
+  expect(screen.getByText('Poha')).toBeTruthy();
+  expect(screen.getByText('1 bowl · 120 g')).toBeTruthy();
+  expect(screen.getAllByText('Calories').length).toBeGreaterThanOrEqual(5);
+  expect(screen.getAllByText('Protein').length).toBeGreaterThanOrEqual(5);
+  expect(screen.getAllByText('Carbs').length).toBeGreaterThanOrEqual(5);
+  expect(screen.getAllByText('Fat').length).toBeGreaterThanOrEqual(5);
+  expect(screen.getAllByText('Fibre').length).toBeGreaterThanOrEqual(5);
+  expect(screen.getByText('13.9 g')).toBeTruthy();
+  expect(screen.getByText('Not reported')).toBeTruthy();
+  fireEvent.press(screen.getByText('Idli + sambar'));
+  fireEvent.press(screen.getByText('Confirm'));
+  await waitFor(() => expect(mockLogNutritionEvent).toHaveBeenCalledWith(expect.objectContaining({
+    planId: 'canonical-plan-1', versionId: 'canonical-version-7', mealKey: 'breakfast', optionId: 'breakfast-2', state: 'PENDING',
+  })));
+  await waitFor(() => expect(screen.queryByText('Confirm')).toBeNull());
+  mockLogNutritionEvent.mockClear();
 
   fireEvent.press(screen.getByText('Log meal'));
   await waitFor(() => expect(mockLogNutritionEvent).toHaveBeenCalledWith(expect.objectContaining({

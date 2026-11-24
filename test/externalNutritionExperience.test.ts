@@ -7,6 +7,7 @@ jest.mock('../src/services/externalConsultantService', () => ({
 }));
 
 import { externalPlanToNutritionExperience } from '../src/services/externalNutritionExperience';
+import { normalisePublishedNutritionExperience, type NutritionExperience } from '../src/services/nutritionExperienceService';
 import type { ExternalDietPlan } from '../src/services/externalConsultantService';
 
 const publication: ExternalDietPlan = {
@@ -18,7 +19,8 @@ const publication: ExternalDietPlan = {
     targets: { calories: 1800, protein: 100 }, instructions: ['Prefer freshly prepared meals.'],
     mealOptions: [
       { id: 'breakfast-1', mealHead: 'BREAKFAST', title: 'Poha + curd', serving: '1 bowl · 100 g',
-        calculationStatus: 'AUTHORITATIVELY_RESOLVED', nutrition: { kcal: 320, protein: 14, carbohydrate: 48, fat: 8, fibre: 6 } },
+        calculationStatus: 'AUTHORITATIVELY_RESOLVED', nutrition: { kcal: 320, protein: 14, carbohydrate: 48, fat: 8, fibre: 6 },
+        components: [{ componentId: 'poha', foodDisplayNameSnapshot: 'Poha', label: '1 bowl', grams: 120 }] },
       { id: 'dinner-1', mealHead: 'DINNER', title: 'Roti + dal + sabji', serving: '2 roti · 1 bowl · 1 bowl',
         calculationStatus: 'AUTHORITATIVELY_RESOLVED', nutrition: { kcal: 510, protein: 22, carbohydrate: 72, fat: 12, fibre: 11 } },
     ],
@@ -34,6 +36,7 @@ test('exact active consultant publication renders as a seven-meal read-only Nutr
   expect(result.meals.find(meal => meal.key === 'BREAKFAST')?.options[0]).toMatchObject({
     id: 'breakfast-1', meal: 'Poha + curd', portion: '1 bowl · 100 g', approxKcal: 320,
     proteinGrams: 14, carbsGrams: 48, fatGrams: 8, fibreGrams: 6,
+    components: [{ id: 'poha', name: 'Poha', serving: '1 bowl', grams: 120, millilitres: null }],
   });
   expect(result.meals.find(meal => meal.key === 'DINNER')?.options[0].approxKcal).toBe(510);
 });
@@ -44,4 +47,24 @@ test('non-authoritative or malformed consultant publications fail closed', () =>
   const ungoverned = { ...publication, content: { ...publication.content,
     mealOptions: [{ id: 'x', mealHead: 'LUNCH', calculationStatus: 'UNVERIFIED', nutrition: { kcal: 1 } }] } };
   expect(() => externalPlanToNutritionExperience(ungoverned, '2026-11-07')).toThrow();
+});
+
+test('legacy canonical options show consultant component names instead of technical meal-head keys', () => {
+  const base = externalPlanToNutritionExperience(publication, '2026-11-07');
+  const result = normalisePublishedNutritionExperience({
+    ...base,
+    meals: [{
+      ...base.meals[0], key: 'MID_MORNING',
+      options: [{
+        id: 'legacy-option', slot: 1, meal: 'MID_MORNING', portion: 'Not reported',
+        approxKcal: 154.4, proteinGrams: 2.9, carbsGrams: null,
+        components: [{ componentName: 'Roasted almonds', householdLabel: '10 almonds', canonicalGrams: 12 }],
+      }],
+    }],
+  } as NutritionExperience);
+
+  expect(result.meals[0].options[0]).toMatchObject({
+    meal: 'Roasted almonds', portion: '10 almonds',
+    components: [{ name: 'Roasted almonds', serving: '10 almonds', grams: 12 }],
+  });
 });
