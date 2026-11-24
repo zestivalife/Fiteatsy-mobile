@@ -9,13 +9,15 @@ test('Tracker Overview initiates a fresh platform sync without changing the othe
 });
 
 test('Tracker Overview consumes production Star Orb scores and preserves missing recovery days as gaps', () => {
-  expect(source).toContain('const overviewScores = health.candidateIntelligence?.scores ?? null;');
-  expect(source).toContain("['Recovery', overviewScores?.recovery ?? displayScores.recovery]");
-  expect(source).toContain("['Activity', overviewScores?.activity ?? displayScores.activity]");
-  expect(source).toContain("['Sleep', overviewScores?.sleep ?? displayScores.sleep]");
-  expect(source).toContain("['Calm', overviewScores?.calm ?? displayScores.calm]");
-  expect(source).toContain("['Mind', overviewScores?.mind ?? displayScores.mind]");
-  expect(source).toContain("['Nourishment', overviewScores?.nutrition ?? displayScores.nutrition]");
+  expect(source).toContain('const displayScores = resolveTrackerScoreProjection(');
+  expect(source).toContain('health.candidateIntelligence?.scores');
+  expect(source).toContain("['Recovery', displayScores.recovery]");
+  expect(source).toContain("['Activity', displayScores.activity]");
+  expect(source).toContain("['Sleep', displayScores.sleep]");
+  expect(source).toContain("['Calm', displayScores.calm]");
+  expect(source).toContain("['Mind', displayScores.mind]");
+  expect(source).toContain("['Nourishment', displayScores.nutrition]");
+  expect(source).toContain('const activityScoreValue = displayScores?.activity.score ?? null;');
   expect(source).toContain("key={`${index}-${value ?? 'missing'}`}");
 });
 

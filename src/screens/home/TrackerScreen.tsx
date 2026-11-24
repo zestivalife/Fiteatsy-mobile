@@ -22,7 +22,7 @@ import { listBiomarkerHistory, type BiomarkerHistoryItem } from '../../services/
 import { calculateTrackerBodyBiomarkerHealth, calculateTrackerEnergyBalance, calculateTrackerHealthIntelligence, calculateTrackerStressRecovery } from '../../services/trackerOverviewScores';
 import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
 import {getHealthIntelligenceV1,getHealthScoreHistory,getHealthScoreSummary,type HealthIntelligenceV1,type HealthScore,type HealthScoreSummary,type HealthScoreType} from '../../services/healthIntelligenceService';
-import { useCanonicalHealthSyncCoordinator, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
+import { useCanonicalHealthSyncCoordinator, type CandidateHomeSnapshot, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
 import { baselineCopy, buildSleepStagePresentation, currentDayAggregate, hasCanonicalMetricData } from '../../services/healthPresentationState';
 
 type RangeMode = '7D' | '30D';
@@ -122,7 +122,39 @@ const toPct = (value: number, min: number, max: number) => {
   return (value - min) / (max - min);
 };
 
-const scoreLabel = (score: number | null | undefined) => (score == null ? 'Calibrating' : `${score}/100`);
+const scoreLabel = (score: number | null | undefined) => (score == null ? 'Calibrating' : `${Math.round(score)}/100`);
+
+type TrackerFrameworkScore = Pick<HealthIntelligenceV1['scores']['activity'], 'score' | 'status' | 'confidence' | 'freshness'>;
+type TrackerScoreProjection = {
+  activity: TrackerFrameworkScore;
+  sleep: TrackerFrameworkScore;
+  nutrition: TrackerFrameworkScore;
+  calm: TrackerFrameworkScore;
+  mind: TrackerFrameworkScore;
+  recovery: TrackerFrameworkScore;
+  stressRecovery?: TrackerFrameworkScore;
+  cycle?: TrackerFrameworkScore;
+  healthIntelligence?: TrackerFrameworkScore;
+};
+
+export const resolveTrackerScoreProjection = (
+  candidate: CandidateHomeSnapshot['scores'] | null | undefined,
+  localCanonical: HealthIntelligenceV1['scores'] | null | undefined,
+  remoteCanonical: HealthIntelligenceV1['scores'] | null | undefined
+): TrackerScoreProjection | null => {
+  const canonical = localCanonical ?? remoteCanonical ?? null;
+  if (!candidate) return canonical;
+  if (!canonical) return candidate;
+  return {
+    ...canonical,
+    activity: candidate.activity,
+    sleep: candidate.sleep,
+    nutrition: candidate.nutrition,
+    calm: candidate.calm,
+    mind: candidate.mind,
+    recovery: candidate.recovery
+  };
+};
 const numberLabel = (value: number | null | undefined, suffix = '') =>
   value == null || !Number.isFinite(value) || value <= 0 ? 'No data' : `${Math.round(value).toLocaleString()}${suffix}`;
 const decimalLabel = (value: number | null | undefined, suffix = '') =>
@@ -1359,19 +1391,23 @@ export const TrackerScreen = () => {
   const stepsValue = todayAggregate(['steps']);
   const caloriesValue = todayAggregate(['active_energy']);
   const workoutMinutesValue = todayAggregate(['workout_minutes','active_minutes']);
-  // Tracker and Journey share the coordinator's persisted local projection.
-  // A separately fetched server snapshot may lag the native commit boundary.
-  const displayScores = health.canonicalIntelligence?.scores ?? canonicalIntelligence?.scores ?? null;
-  const overviewScores = health.candidateIntelligence?.scores ?? null;
-  const overviewRecoveryScore = overviewScores?.recovery.score ?? displayScores?.recovery.score ?? null;
+  // Every Tracker surface resolves from the same authoritative projection as
+  // Journey. The candidate projection represents the latest acknowledged
+  // daily calculation; canonical data fills domains it does not contain.
+  const displayScores = resolveTrackerScoreProjection(
+    health.candidateIntelligence?.scores,
+    health.canonicalIntelligence?.scores,
+    canonicalIntelligence?.scores
+  );
+  const overviewRecoveryScore = displayScores?.recovery.score ?? null;
   const overviewStressRecoveryScore = calculateTrackerStressRecovery(health.aggregates);
   const overviewEnergyBalanceScore = calculateTrackerEnergyBalance(health.aggregates);
   const overviewBodyBiomarkerScore = calculateTrackerBodyBiomarkerHealth(overviewBiomarkers);
   const overviewHealthIntelligenceScore = calculateTrackerHealthIntelligence({
-    activity: overviewScores?.activity.score ?? null,
-    sleep: overviewScores?.sleep.score ?? null,
-    nutrition: overviewScores?.nutrition.score ?? null,
-    calm: overviewScores?.calm.score ?? null,
+    activity: displayScores?.activity.score ?? null,
+    sleep: displayScores?.sleep.score ?? null,
+    nutrition: displayScores?.nutrition.score ?? null,
+    calm: displayScores?.calm.score ?? null,
     stressRecovery: overviewStressRecoveryScore
   });
   const activityScoreValue = displayScores?.activity.score ?? null;
@@ -1402,16 +1438,16 @@ export const TrackerScreen = () => {
   });
   const canonicalScoreRows: Array<[string, OverviewScore]> = displayScores ? [
     ['Health Intelligence', overviewCalculatedScore(overviewHealthIntelligenceScore)],
-    ['Recovery', overviewScores?.recovery ?? displayScores.recovery],
-    ['Activity', overviewScores?.activity ?? displayScores.activity],
-    ['Sleep', overviewScores?.sleep ?? displayScores.sleep],
-    ['Calm', overviewScores?.calm ?? displayScores.calm],
-    ['Mind', overviewScores?.mind ?? displayScores.mind],
+    ['Recovery', displayScores.recovery],
+    ['Activity', displayScores.activity],
+    ['Sleep', displayScores.sleep],
+    ['Calm', displayScores.calm],
+    ['Mind', displayScores.mind],
     ['Stress Recovery', overviewCalculatedScore(overviewStressRecoveryScore)],
-    ['Nourishment', overviewScores?.nutrition ?? displayScores.nutrition]
+    ['Nourishment', displayScores.nutrition]
   ] : [];
-  if (displayScores?.cycle.status !== 'NOT_APPLICABLE') {
-    if (displayScores) canonicalScoreRows.push(['Cycle Wellness', displayScores.cycle]);
+  if (displayScores?.cycle?.status !== 'NOT_APPLICABLE') {
+    if (displayScores?.cycle) canonicalScoreRows.push(['Cycle Wellness', displayScores.cycle]);
   }
   const supportingScoreRows: Array<[string, number | null, string]> = [
     ['Energy Balance', overviewEnergyBalanceScore, 'Sleep, movement and hydration from current platform health data'],
@@ -1511,10 +1547,10 @@ export const TrackerScreen = () => {
       kind: 'bars',
       color: '#60AF00',
       values: scoreSeries('stress_resilience'),
-      latestValue: displayScores?.stressRecovery.score ?? null,
+      latestValue: displayScores?.stressRecovery?.score ?? null,
       compareValues: scoreSeries('stress_resilience'),
       signalState: trendState(scoreSeries('stress_resilience')),
-      recoveryImpact: impactState(displayScores?.stressRecovery.score),
+      recoveryImpact: impactState(displayScores?.stressRecovery?.score),
       freshness: recoveryIntel.questionnaireAvailable ? 'Synced Recently' : 'No Recent Data',
       confidence: confidenceState()
     },

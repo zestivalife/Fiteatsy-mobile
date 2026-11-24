@@ -10,11 +10,13 @@ import type { MainTabParamList, RootStackParamList } from '../../navigation/type
 import { useProfilePhoto } from '../../hooks/useProfilePhoto';
 import { useAppContext } from '../../state/AppContext';
 import { resolveClientName } from '../../utils/clientIdentity';
+import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
 
 type Props=CompositeScreenProps<BottomTabScreenProps<MainTabParamList,'Profile'>,NativeStackScreenProps<RootStackParamList>>;
 
 export const ProfileScreen=({navigation}:Props)=>{
-  const {themeMode,authSession,onboarding,canonicalProfile}=useAppContext();
+  const {themeMode,authSession,canonicalProfile}=useAppContext();
+  const health=useCanonicalHealthSyncCoordinator();
   const p=getThemeColors(themeMode);const name=resolveClientName(authSession?.user.name);
   const initials=name.split(/\s+/).map(v=>v[0]).join('').slice(0,2).toUpperCase();
   const completion=canonicalProfile ? canonicalProfile.nutrition.completionPercent : null;
@@ -28,7 +30,7 @@ export const ProfileScreen=({navigation}:Props)=>{
     </View>
     <ProfileSection label="Account"><ProfileRow icon="person-outline" color="#35B8D0" title="My Profile" subtitle="Personal details and health information" onPress={()=>navigation.navigate('MyProfile')}/><ProfileRow icon="restaurant-outline" color="#FF9F0A" title="Food Preferences" subtitle="Diet type, likes and restrictions" onPress={()=>navigation.navigate('FoodPreferences',{mode:'profile'})}/></ProfileSection>
     <ProfileSection label="Health connections">
-      <ProfileRow icon="heart-outline" color="#FF375F" title="Connected Health" subtitle={onboarding?.wearablePreference==='sync'?'Health connection configured':'Manage health connection'} onPress={()=>navigation.navigate('ConnectedHealth')}/>
+      <ProfileRow icon="heart-outline" color="#FF375F" title="Connected Health" subtitle={health.providerState==='CONNECTED'||health.availableMetricCount>0?`${health.sourceName} connected`:`Connect ${health.sourceName}`} onPress={()=>navigation.navigate('ConnectedHealth')}/>
       <ProfileRow icon="people-outline" color="#35B8D0" title="My Consultants" subtitle="Connect and manage your consultants" onPress={()=>navigation.navigate('MyConsultants')}/>
       {__DEV__ ? (
         <ProfileRow icon="bug-outline" color="#FF9F0A" title="Health Sync Debug" onPress={()=>navigation.navigate('HealthSyncDebug')}/>

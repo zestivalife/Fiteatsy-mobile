@@ -10,6 +10,7 @@ jest.mock('expo-task-manager',()=>({defineTask:jest.fn(),isTaskDefined:jest.fn((
 import type { CandidateStarOrbValidation } from '../src/services/healthIntelligenceService';
 import {
   candidateResponseToHomeSnapshot,
+  mergeCandidateIntoCanonicalSnapshot,
   reconcileCandidateHomeSnapshot,
   shouldPreserveAccountScopedSnapshot
 } from '../src/services/canonicalHealthSyncCoordinator';
@@ -59,4 +60,26 @@ test('hydration preserves data only for the identical account scope', () => {
   expect(shouldPreserveAccountScopedSnapshot('account:a:apple', 'account:a:apple')).toBe(true);
   expect(shouldPreserveAccountScopedSnapshot('account:a:apple', 'account:b:apple')).toBe(false);
   expect(shouldPreserveAccountScopedSnapshot('account:a:apple', null)).toBe(false);
+});
+
+test('latest candidate scores are persisted into the account-scoped canonical launch snapshot', () => {
+  const incoming = candidateResponseToHomeSnapshot(response('2026-11-22', 71, '2026-11-22T10:05:00.000Z'));
+  const pending = candidateScore('2026-11-22', null, '2026-11-22T10:00:00.000Z');
+  const current = {
+    calculationVersion: 'HEALTH_INTELLIGENCE_V1',
+    calculatedAt: '2026-11-22T10:00:00.000Z',
+    inputWindow: { startAtISO: null, endAtISO: null },
+    inputFreshness: 'CURRENT',
+    source: 'CACHED_CANONICAL_SERVER',
+    scores: {
+      activity: pending, sleep: pending, nutrition: pending, calm: pending,
+      stressRecovery: pending, recovery: pending, cycle: pending, mind: pending,
+      healthIntelligence: pending
+    }
+  } as any;
+  const merged = mergeCandidateIntoCanonicalSnapshot(current, incoming);
+  expect(merged?.scores.recovery.score).toBe(71);
+  expect(merged?.scores.activity.score).toBe(71);
+  expect(merged?.scores.healthIntelligence).toBe(current.scores.healthIntelligence);
+  expect(merged?.calculatedAt).toBe('2026-11-22T10:05:00.000Z');
 });

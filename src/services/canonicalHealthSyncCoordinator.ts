@@ -158,6 +158,34 @@ export const reconcileCandidateHomeSnapshot = (
   return { ...incoming, recoveryTrend: [...byDay.values()].sort((a, b) => a.dayKey.localeCompare(b.dayKey)) };
 };
 
+export const mergeCandidateIntoCanonicalSnapshot = (
+  current: LocalCanonicalHealthSnapshot | null,
+  incoming: CandidateHomeSnapshot | null
+): LocalCanonicalHealthSnapshot | null => {
+  if (!current || !incoming) return current;
+  const calculatedAt = new Date(Math.max(
+    Date.parse(current.calculatedAt) || 0,
+    candidateSnapshotTime(incoming)
+  )).toISOString();
+  const asCanonicalScore = (score: CandidateHomeSnapshot['scores']['activity']) => ({
+    ...score,
+    calculationVersion: 'HEALTH_INTELLIGENCE_V1' as const
+  });
+  return {
+    ...current,
+    calculatedAt,
+    scores: {
+      ...current.scores,
+      activity: asCanonicalScore(incoming.scores.activity),
+      sleep: asCanonicalScore(incoming.scores.sleep),
+      nutrition: asCanonicalScore(incoming.scores.nutrition),
+      calm: asCanonicalScore(incoming.scores.calm),
+      mind: asCanonicalScore(incoming.scores.mind),
+      recovery: asCanonicalScore(incoming.scores.recovery)
+    }
+  };
+};
+
 export const shouldPreserveAccountScopedSnapshot = (currentScope: string | null, nextScope: string | null) =>
   currentScope != null && currentScope === nextScope;
 
@@ -252,6 +280,11 @@ const useCreateCanonicalHealthSyncCoordinator = () => {
         if (appliesToCurrentGeneration()) {
           const incoming = candidateResponseToHomeSnapshot(nextCandidate);
           setCandidateIntelligence((current) => reconcileCandidateHomeSnapshot(current, incoming));
+          setCanonicalIntelligence((current) => {
+            const merged = mergeCandidateIntoCanonicalSnapshot(current, incoming);
+            if (merged && localScope) void persistLocalCanonicalHealthSnapshot(localScope, merged);
+            return merged;
+          });
         }
       }
     });

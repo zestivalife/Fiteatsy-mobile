@@ -35,9 +35,13 @@ describe('profile and account experience contract', () => {
 
   test('connected health is device-platform aware and reuses canonical sync', () => {
     const screen = read('src/screens/profile/ConnectedHealthScreen.tsx');
+    const hub = read('src/screens/home/ProfileScreen.tsx');
     expect(screen).toContain("Platform.OS==='ios'?'Apple Health':'Health Connect'");
     expect(screen).toContain('useCanonicalHealthSyncCoordinator');
     expect(screen).toContain("navigate('HealthData'");
+    expect(hub).toContain('useCanonicalHealthSyncCoordinator');
+    expect(hub).toContain("health.providerState==='CONNECTED'||health.availableMetricCount>0");
+    expect(hub).not.toContain("onboarding?.wearablePreference==='sync'");
   });
 
   test('profile rendering never contains screenshot fixture identities', () => {
