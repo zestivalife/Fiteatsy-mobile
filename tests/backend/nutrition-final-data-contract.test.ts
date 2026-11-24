@@ -140,15 +140,36 @@ test('daily client projection exposes canonical date and reconciled meal states'
 
 test('Phase 2 views consume one backend projection without local nutrition heuristics', () => {
   const service = readFileSync(new URL('../../backend/src/modules/nutrition/nutrition.service.ts', import.meta.url), 'utf8');
+  const client = readFileSync(new URL('../../src/services/nutritionExperienceService.ts', import.meta.url), 'utf8');
   const screen = readFileSync(new URL('../../src/screens/home/NutritionExperienceScreen.tsx', import.meta.url), 'utf8');
 
   assert.match(service, /dailyNutrition:/);
   assert.match(service, /mealSummary:/);
   assert.match(service, /mealStates,/);
   assert.match(service, /plannedVsActual:/);
-  assert.match(screen, /data\.plannedVsActual/);
-  assert.match(screen, /data\.mealStates/);
-  assert.match(screen, /data\.adherence\.label/);
+  assert.match(service, /adherence: \{ percent: adherencePercent, label: adherenceLabel \}/);
+  assert.match(client, /meals: NutritionMeal\[\]/);
+  assert.match(client, /selectedOptionId: string \| null/);
+  assert.match(client, /plannedVsActual:/);
+  assert.match(client, /mealStates:/);
+  assert.match(client, /adherence:/);
+  assert.match(screen, /data\.meals\.map/);
+  assert.match(screen, /meal\.selectedOptionId/);
+  assert.match(screen, /option\.approxKcal/);
+  assert.match(screen, /option\.proteinGrams/);
+  assert.match(screen, /option\.carbsGrams/);
+  assert.match(screen, /option\.fatGrams/);
+  assert.match(screen, /option\.fibreGrams/);
+  assert.match(screen, /updateMeal\(selected, 'PENDING', option\)/);
+  assert.match(screen, /updateMeal\(meal, 'CONSUMED_APPROVED', option\)/);
+  assert.match(screen, /updateMeal\(meal, 'SKIPPED'\)/);
+  assert.match(screen, /updateMeal\(meal, 'PENDING', meal\.options\.find/);
+  assert.match(screen, /setData\(await logNutritionEvent/);
+  assert.doesNotMatch(screen, /data\.plannedVsActual/);
+  assert.doesNotMatch(screen, /data\.mealStates/);
+  assert.doesNotMatch(screen, /data\.adherence\.label/);
+  assert.doesNotMatch(screen, /PLANNED VS ACTUAL/);
+  assert.doesNotMatch(screen, /TODAY'S ADHERENCE/);
   assert.doesNotMatch(screen, /percent >= 80/);
 });
 

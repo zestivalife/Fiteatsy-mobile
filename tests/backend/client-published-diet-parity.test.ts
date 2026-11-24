@@ -40,8 +40,13 @@ test('client projection never ranks, regenerates or leaks incomplete candidates'
 
 test('mobile choice is reversible before logging and exposes exact component detail', () => {
   const screen = readFileSync(new URL('../../src/screens/home/NutritionExperienceScreen.tsx', import.meta.url), 'utf8');
-  for (const copy of ['Choose 1 of 5 Consultant-approved options', 'Use this meal', 'Change meal', 'Log meal', 'View ingredients / quantities']) assert.match(screen, new RegExp(copy));
+  const behaviouralFixture = readFileSync(new URL('../../test/externalNutritionExperienceScreen.test.ts', import.meta.url), 'utf8');
+  for (const copy of ['Choose 1 of 5 Consultant-approved options', 'Confirm', 'Change meal', 'Log meal', 'Ingredients']) assert.match(screen, new RegExp(copy));
   assert.match(screen, /updateMeal\(selected, 'PENDING', option\)/);
   assert.match(screen, /updateMeal\(meal, 'CONSUMED_APPROVED', option\)/);
+  assert.match(screen, /setData\(await logNutritionEvent/);
   assert.doesNotMatch(screen, /onPress=\{\(\) => void updateMeal\(selected, 'CONSUMED_APPROVED'/);
+  assert.match(behaviouralFixture, /optionId: 'breakfast-2', state: 'PENDING'/);
+  assert.match(behaviouralFixture, /optionId: 'breakfast-1', state: 'CONSUMED_APPROVED'/);
+  assert.match(behaviouralFixture, /mockLogNutritionEvent\.mockResolvedValue\(experience\)/);
 });
