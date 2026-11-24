@@ -109,9 +109,9 @@ test('runtime carries recent validated Calm and aggregates seven-day Mind inputs
 
 test('sealed Home binds each visible node to one authoritative scoring state',()=>{
   const source=readFileSync(resolve(repositoryRoot,'src/screens/home/HomeScreen.tsx'),'utf8');
-  assert.ok(source.includes('resolveAuthoritativeHealthScore'));
+  assert.ok(source.includes('resolveAuthoritativeHealthScore(candidateScores?.[key], canonicalScores?.[key], health.candidateIntelligence)'));
   for(const domain of ['activity','sleep','nutrition','calm','mind','recovery']) {
-    assert.ok(source.includes(`${domain}: resolveAuthoritativeHealthScore(candidateScores, canonicalScores, '${domain}')`));
+    assert.ok(source.includes(`${domain}: resolveScore('${domain}')`));
   }
   const routes=readFileSync(resolve(repositoryRoot,'backend/src/modules/intelligence/intelligence.routes.ts'),'utf8');
   assert.ok(routes.includes("intelligenceRouter.get('/candidate-validation'"));
