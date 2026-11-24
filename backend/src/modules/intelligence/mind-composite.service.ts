@@ -1,10 +1,18 @@
 import crypto from 'node:crypto';
 import { calculateMindCompositeV1, MIND_CHECK_IN_VERSION, MIND_COMPOSITE_METHODOLOGY_VERSION, type MindCheckInAnswers } from '@fiteatsy/health-intelligence';
 import { pool } from '../../db/pool.js';
-import { buildCandidateStarOrbRuntimeWindow } from './candidate-star-orb-runtime.js';
+import { buildCandidateStarOrbRuntimeWindow, candidateFreshnessForHealthDay } from './candidate-star-orb-runtime.js';
 import { loadStarOrbRuntimeInputs } from './star-orb-runtime-loader.js';
 
-const source=(value:{score:number|null;status:string;healthDay:string;calculatedAt:string;methodologyVersion:string})=>({score:value.score,status:value.status,healthDay:value.healthDay,calculatedAt:value.calculatedAt,methodologyVersion:value.methodologyVersion});
+const source=(value:{score:number|null;status:string;healthDay:string;calculatedAt:string;methodologyVersion:string;inputFreshness:string})=>({score:value.score,status:value.status,healthDay:value.healthDay,calculatedAt:value.calculatedAt,methodologyVersion:value.methodologyVersion,inputFreshness:value.inputFreshness});
+const storedFreshness=(row:Record<string,unknown>)=>{
+  const dayFreshness=candidateFreshnessForHealthDay(String(row.health_day).slice(0,10),new Date().toISOString());
+  if(dayFreshness==='STALE')return 'STALE' as const;
+  const sources=Object.values((row.source_components??{}) as Record<string,{inputFreshness?:string;calculatedAt?:string}>);
+  if(sources.some(item=>item.inputFreshness==='STALE'))return 'STALE' as const;
+  if(sources.some(item=>item.inputFreshness!=='CURRENT'||!item.calculatedAt||!Number.isFinite(Date.parse(item.calculatedAt))))return 'UNKNOWN' as const;
+  return 'CURRENT' as const;
+};
 const rowDto=(row:Record<string,unknown>)=>row?({
   id:String(row.id),healthDay:String(row.health_day).slice(0,10),questionnaireVersion:String(row.questionnaire_version),
   answers:row.answers,questionnaireScore:Number(row.questionnaire_score),methodologyVersion:String(row.methodology_version),
@@ -12,7 +20,7 @@ const rowDto=(row:Record<string,unknown>)=>row?({
   componentCoverage:Number(row.component_coverage),inputsUsed:row.inputs_used,inputsMissing:row.inputs_missing,
   calculatedAt:new Date(String(row.updated_at)).toISOString(),submittedAt:new Date(String(row.submitted_at)).toISOString(),
   domain:'mind',methodologyId:MIND_COMPOSITE_METHODOLOGY_VERSION,confidence:Number(row.component_coverage)===100?'HIGH':'MODERATE',
-  inputFreshness:'CURRENT',contributingFactors:row.inputs_used,explanation:Number(row.component_coverage)===100?'Calculated from the daily check-in and all eligible Star Orb domains.':`Estimated Mind score with ${Number(row.component_coverage)}% component coverage.`,activation:'CANDIDATE_ONLY',clinicalValidation:'PENDING'
+  inputFreshness:storedFreshness(row),contributingFactors:row.inputs_used,explanation:Number(row.component_coverage)===100?'Calculated from the daily check-in and all eligible Star Orb domains.':`Estimated Mind score with ${Number(row.component_coverage)}% component coverage.`,activation:'CANDIDATE_ONLY',clinicalValidation:'PENDING'
 }):null;
 
 export async function getMindComposite(accountId:string,clientId:string,healthDay:string){

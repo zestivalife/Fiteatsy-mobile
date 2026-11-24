@@ -42,6 +42,8 @@ const finite=(value:unknown):value is number=>typeof value==='number'&&Number.is
 const clamp=(value:number)=>Math.max(0,Math.min(100,value));
 const mean=(values:number[])=>values.reduce((sum,value)=>sum+value,0)/values.length;
 const scale=(value:number,minimum:number,maximum:number)=>clamp((value-minimum)/(maximum-minimum)*100);
+export const candidateFreshnessForHealthDay=(healthDay:string,nowISO:string):'CURRENT'|'STALE'=>
+  Date.parse(nowISO)-Date.parse(`${healthDay}T23:59:59.999Z`)>36*60*60_000?'STALE':'CURRENT';
 
 const goalFor=(goals:RuntimeGoal[],kind:RuntimeGoal['kind'],healthDay:string,limits:{min:number;max:number})=>{
   const eligible=goals.filter(goal=>goal.kind===kind&&goal.effectiveFrom<=healthDay&&(!goal.effectiveThrough||goal.effectiveThrough>=healthDay));
@@ -68,7 +70,7 @@ const sleepNights=(repositories:CandidateRuntimeRepositories,throughDay:string):
 
 export const buildCandidateStarOrbRuntimeDay=(repositories:CandidateRuntimeRepositories,healthDay:string):CandidateRuntimeDay=>{
   const aggregates=aggregateCanonicalHealthObservations(repositories.observations,{fallbackOffsetMinutes:repositories.fallbackOffsetMinutes,nowMs:Date.parse(repositories.nowISO)});
-  const freshness=Date.parse(repositories.nowISO)-Date.parse(`${healthDay}T23:59:59.999Z`)>36*60*60_000?'STALE':'CURRENT';
+  const freshness=candidateFreshnessForHealthDay(healthDay,repositories.nowISO);
   const steps=metric(aggregates,healthDay,'steps');const exercise=metric(aggregates,healthDay,'active_minutes')??metric(aggregates,healthDay,'workout_minutes');
   const activityLoads=Array.from({length:14},(_,index)=>{const day=dayShift(healthDay,index-13);const s=metric(aggregates,day,'steps');const e=metric(aggregates,day,'active_minutes')??metric(aggregates,day,'workout_minutes');const ss=s==null?null:normalizeMeasuredActivityComponent('steps',s);const es=e==null?null:normalizeMeasuredActivityComponent('exercise_minutes',e);return ss==null||es==null?NaN:(ss+es)/2;});
   const rest=Array.from({length:7},(_,index)=>{const day=dayShift(healthDay,index-6);const asleep=metric(aggregates,day,'sleep_minutes');const target=goalFor(repositories.goals,'sleep_minutes',day,{min:360,max:600});return asleep==null||target.value==null?NaN:clamp(asleep/target.value*100);});

@@ -2,25 +2,18 @@ import React,{useEffect,useMemo,useState} from 'react';
 import {ActivityIndicator,Modal,Pressable,StyleSheet,Text,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {clearMindDraft,getMindCheckIn,readMindDraft,saveMindDraft,submitMindCheckIn,type MindAnswer,type MindAnswers,type MindCompositeDto} from '../services/mindCheckInService';
-
-const QUESTIONS=[
-  ['emotionalFeeling','How have you been feeling emotionally today?'],
-  ['emotionalBalance','How emotionally balanced have you felt today?'],
-  ['mentalEnergy','How mentally energetic have you felt today?'],
-  ['concentration','How well have you been able to concentrate today?']
-] as const;
-const OPTIONS:[MindAnswer,string][]=[[0,'Very difficult'],[25,'Difficult'],[50,'Neutral'],[75,'Good'],[100,'Very good']];
+import {MIND_CHECK_IN_QUESTIONS} from './mindCheckInQuestions';
 export const MindCheckInSheet=({visible,accountId,healthDay,onClose,onSaved}:{visible:boolean;accountId:string;healthDay:string;onClose:()=>void;onSaved:(item:MindCompositeDto)=>void})=>{
   const [step,setStep]=useState(0);const [answers,setAnswers]=useState<Partial<MindAnswers>>({});const [loading,setLoading]=useState(false);const [error,setError]=useState('');const [success,setSuccess]=useState(false);
   useEffect(()=>{if(!visible)return;setLoading(true);setError('');setSuccess(false);void Promise.all([getMindCheckIn(healthDay),readMindDraft(accountId,healthDay)]).then(([remote,draft])=>setAnswers(draft??remote.item?.answers??{})).catch(()=>setError('Unable to load your check-in. You can retry.')).finally(()=>setLoading(false));},[accountId,healthDay,visible]);
-  const key=QUESTIONS[step][0];const selected=answers[key];const complete=useMemo(()=>QUESTIONS.every(([question])=>answers[question]!=null),[answers]);
+  const [key,question,options]=MIND_CHECK_IN_QUESTIONS[step];const selected=answers[key];const complete=useMemo(()=>MIND_CHECK_IN_QUESTIONS.every(([questionKey])=>answers[questionKey]!=null),[answers]);
   const choose=(value:MindAnswer)=>{const next={...answers,[key]:value};setAnswers(next);setError('');void saveMindDraft(accountId,healthDay,next);};
   const submit=async()=>{if(!complete)return setError('Please answer all four questions.');setLoading(true);setError('');try{const response=await submitMindCheckIn(healthDay,answers as MindAnswers);await clearMindDraft(accountId,healthDay);setSuccess(true);onSaved(response.item);}catch{setError('Your check-in was not saved. Please retry.');}finally{setLoading(false);}};
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><SafeAreaView style={styles.overlay}><Pressable style={styles.backdrop} onPress={onClose}/><View style={styles.sheet} accessibilityViewIsModal>
     <View style={styles.handle}/><View style={styles.header}><Text style={styles.title}>Mind Check-in</Text><Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close Mind Check-in"><Text style={styles.close}>×</Text></Pressable></View>
-    <Text style={styles.disclaimer}>A daily, non-diagnostic self-report</Text><View style={styles.progress}>{QUESTIONS.map((_,i)=><View key={i} style={[styles.progressBar,i<=step&&styles.progressActive]}/>)}</View>
-    {loading&&!Object.keys(answers).length?<ActivityIndicator color="#8E61FF"/>:<><Text style={styles.step}>Question {step+1} of 4 · Today</Text><Text style={styles.question}>{QUESTIONS[step][1]}</Text>
-    {OPTIONS.map(([value,label])=><Pressable key={value} onPress={()=>choose(value)} style={[styles.option,selected===value&&styles.optionSelected]} accessibilityRole="radio" accessibilityState={{checked:selected===value}}><Text style={[styles.optionText,selected===value&&styles.optionTextSelected]}>{label}</Text></Pressable>)}</>}
+    <Text style={styles.disclaimer}>A daily, non-diagnostic self-report</Text><View style={styles.progress}>{MIND_CHECK_IN_QUESTIONS.map((_,i)=><View key={i} style={[styles.progressBar,i<=step&&styles.progressActive]}/>)}</View>
+    {loading&&!Object.keys(answers).length?<ActivityIndicator color="#8E61FF"/>:<><Text style={styles.step}>Question {step+1} of 4 · Today</Text><Text style={styles.question}>{question}</Text>
+    {options.map(([value,label])=><Pressable key={value} onPress={()=>choose(value)} style={[styles.option,selected===value&&styles.optionSelected]} accessibilityRole="radio" accessibilityState={{checked:selected===value}}><Text style={[styles.optionText,selected===value&&styles.optionTextSelected]}>{label}</Text></Pressable>)}</>}
     {error?<Text style={styles.error} accessibilityRole="alert">{error}</Text>:null}{success?<Text style={styles.success}>Saved. Your Mind score has been refreshed.</Text>:null}
     <View style={styles.actions}><Pressable disabled={step===0||loading} onPress={()=>setStep(v=>v-1)} style={[styles.secondary,step===0&&styles.disabled]} accessibilityRole="button" accessibilityLabel="Back"><Text style={styles.secondaryText}>←</Text></Pressable>{step<3?<Pressable disabled={selected==null} onPress={()=>setStep(v=>v+1)} style={[styles.primary,selected==null&&styles.disabled]}><Text style={styles.primaryText}>Next</Text></Pressable>:<Pressable disabled={!complete||loading} onPress={submit} style={[styles.primary,(!complete||loading)&&styles.disabled]}><Text style={styles.primaryText}>{loading?'Saving…':'Submit'}</Text></Pressable>}</View>
   </View></SafeAreaView></Modal>;
