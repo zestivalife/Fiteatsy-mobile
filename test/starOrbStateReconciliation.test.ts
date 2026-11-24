@@ -12,6 +12,7 @@ import {
   candidateResponseToHomeSnapshot,
   mergeCandidateIntoCanonicalSnapshot,
   reconcileCandidateHomeSnapshot,
+  resolveAuthoritativeHealthScore,
   shouldPreserveAccountScopedSnapshot
 } from '../src/services/canonicalHealthSyncCoordinator';
 
@@ -80,6 +81,69 @@ test('latest candidate scores are persisted into the account-scoped canonical la
   const merged = mergeCandidateIntoCanonicalSnapshot(current, incoming);
   expect(merged?.scores.recovery.score).toBe(71);
   expect(merged?.scores.activity.score).toBe(71);
+  expect(merged?.scores.activity.calculationVersion).toBe('STAR_ORB_V1');
+  expect(merged?.source).toBe('CACHED_RECONCILED_SCORES');
   expect(merged?.scores.healthIntelligence).toBe(current.scores.healthIntelligence);
   expect(merged?.calculatedAt).toBe('2026-11-22T10:05:00.000Z');
+});
+
+const authorityScore = (
+  score: number | null,
+  calculationVersion: string,
+  calculatedAt: string,
+  freshness: 'CURRENT' | 'STALE' | 'UNKNOWN' = 'CURRENT'
+) => ({
+  score,
+  status: score == null ? 'METHODOLOGY_PENDING' as const : 'CALCULATED' as const,
+  confidence: 'HIGH' as const,
+  freshness,
+  calculationVersion,
+  calculatedAt
+});
+const authorityContext = (methodologyVersion: string | null = 'STAR_ORB_V1') => ({
+  activation: 'ISOLATED_VALIDATION_ONLY' as const,
+  methodologyVersion
+});
+
+test('same-methodology candidate newer than canonical is authoritative', () => {
+  const candidate = authorityScore(72, 'STAR_ORB_V1', '2026-11-22T10:05:00.000Z');
+  const canonical = authorityScore(68, 'STAR_ORB_V1', '2026-11-22T10:04:00.000Z');
+  expect(resolveAuthoritativeHealthScore(candidate, canonical, authorityContext())).toBe(candidate);
+});
+
+test('same-methodology canonical newer than candidate is authoritative', () => {
+  const candidate = authorityScore(68, 'STAR_ORB_V1', '2026-11-22T10:04:00.000Z');
+  const canonical = authorityScore(72, 'STAR_ORB_V1', '2026-11-22T10:05:00.000Z');
+  expect(resolveAuthoritativeHealthScore(candidate, canonical, authorityContext())).toBe(canonical);
+});
+
+test('eligible production Star Orb remains authoritative over an incompatible canonical methodology', () => {
+  const candidate = authorityScore(68, 'STAR_ORB_V1', '2026-11-22T10:04:00.000Z');
+  const canonical = authorityScore(72, 'HEALTH_INTELLIGENCE_V1', '2026-11-22T10:05:00.000Z');
+  expect(resolveAuthoritativeHealthScore(candidate, canonical, authorityContext())).toBe(candidate);
+});
+
+test('invalid or incomparable candidate provenance falls back to canonical', () => {
+  const canonical = authorityScore(72, 'HEALTH_INTELLIGENCE_V1', '2026-11-22T10:05:00.000Z');
+  expect(resolveAuthoritativeHealthScore(
+    authorityScore(68, 'STAR_ORB_V1', 'not-a-time'), canonical, authorityContext()
+  )).toBe(canonical);
+  expect(resolveAuthoritativeHealthScore(
+    authorityScore(68, 'OTHER_VERSION', '2026-11-22T10:06:00.000Z'), canonical, authorityContext()
+  )).toBe(canonical);
+  expect(resolveAuthoritativeHealthScore(
+    authorityScore(68, 'STAR_ORB_V1', '2026-11-22T10:06:00.000Z'), canonical, authorityContext(null)
+  )).toBe(canonical);
+});
+
+test('newer confirmed invalidation wins inside the same methodology', () => {
+  const invalidated = authorityScore(null, 'STAR_ORB_V1', '2026-11-22T10:06:00.000Z');
+  const available = authorityScore(72, 'STAR_ORB_V1', '2026-11-22T10:05:00.000Z');
+  expect(resolveAuthoritativeHealthScore(invalidated, available, authorityContext())).toBe(invalidated);
+});
+
+test('equal-methodology and equal-time scores use freshness as a deterministic tie-breaker', () => {
+  const stale = authorityScore(68, 'STAR_ORB_V1', '2026-11-22T10:05:00.000Z', 'STALE');
+  const current = authorityScore(72, 'STAR_ORB_V1', '2026-11-22T10:05:00.000Z', 'CURRENT');
+  expect(resolveAuthoritativeHealthScore(stale, current, authorityContext())).toBe(current);
 });

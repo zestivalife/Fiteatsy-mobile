@@ -24,7 +24,7 @@ import CalmActiveIcon from '../../assets/fiteatsy-home/calm-selected.svg';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { getDraftAssessmentSession, getLatestAssessmentResult } from '../../services/assessmentService';
 import { useAppContext } from '../../state/AppContext';
-import { useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
+import { resolveAuthoritativeHealthScore, useCanonicalHealthSyncCoordinator } from '../../services/canonicalHealthSyncCoordinator';
 import { hasCanonicalMetricData } from '../../services/healthPresentationState';
 import { getNutritionExperience, type NutritionExperience } from '../../services/nutritionExperienceService';
 import {
@@ -87,11 +87,6 @@ type MedicationTimelineEntry = {
   scheduledForISO: string;
   status: MedicationLogStatus;
 };
-
-export const resolveAuthoritativeFrameworkScore = <TCandidate, TCanonical>(
-  candidate: TCandidate | null | undefined,
-  canonical: TCanonical | null | undefined
-): TCandidate | TCanonical | null => candidate ?? canonical ?? null;
 
 const trendTone = (value: number) => {
   if (value >= 80) return { bg: '#88FF74', text: '#111111' };
@@ -272,13 +267,15 @@ export const HomeScreen = () => {
   // __DEV__ and the backend independently rejects it in production.
   const candidateScores = health.candidateIntelligence?.scores;
   const canonicalScores = health.canonicalIntelligence?.scores;
+  const resolveScore = <T extends keyof NonNullable<typeof candidateScores>>(key: T) =>
+    resolveAuthoritativeHealthScore(candidateScores?.[key], canonicalScores?.[key], health.candidateIntelligence);
   const authoritativeScores = {
-    calm: resolveAuthoritativeFrameworkScore(candidateScores?.calm, canonicalScores?.calm),
-    activity: resolveAuthoritativeFrameworkScore(candidateScores?.activity, canonicalScores?.activity),
-    nutrition: resolveAuthoritativeFrameworkScore(candidateScores?.nutrition, canonicalScores?.nutrition),
-    mind: resolveAuthoritativeFrameworkScore(candidateScores?.mind, canonicalScores?.mind),
-    sleep: resolveAuthoritativeFrameworkScore(candidateScores?.sleep, canonicalScores?.sleep),
-    recovery: resolveAuthoritativeFrameworkScore(candidateScores?.recovery, canonicalScores?.recovery)
+    calm: resolveScore('calm'),
+    activity: resolveScore('activity'),
+    nutrition: resolveScore('nutrition'),
+    mind: resolveScore('mind'),
+    sleep: resolveScore('sleep'),
+    recovery: resolveScore('recovery')
   };
   const metrics: RecoveryMetric[] = [
     {

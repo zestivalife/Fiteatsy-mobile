@@ -6,12 +6,13 @@ describe('Journey recovery star canonical data contract', () => {
 
   it('loads the account-scoped canonical snapshot and canonical recovery history', () => {
     expect(source).toContain("getHealthScoreHistory('recovery')");
-    expect(source).toContain('canonicalScores?.mind');
-    expect(source).toContain('canonicalScores?.recovery');
+    expect(source).toContain('resolveAuthoritativeHealthScore(candidateScores?.[key], canonicalScores?.[key], health.candidateIntelligence)');
+    expect(source).toContain("mind: resolveScore('mind')");
+    expect(source).toContain("recovery: resolveScore('recovery')");
     expect(source).toContain('authoritativeScores.recovery');
-    expect(source).toContain('canonicalScores?.activity');
-    expect(source).toContain('canonicalScores?.sleep');
-    expect(source).toContain('canonicalScores?.calm');
+    expect(source).toContain("activity: resolveScore('activity')");
+    expect(source).toContain("sleep: resolveScore('sleep')");
+    expect(source).toContain("calm: resolveScore('calm')");
     expect(source).toContain("label: 'Mind'");
     // Cycle remains part of canonical health intelligence, but is intentionally
     // not rendered as a sixth Star Orb node.
@@ -19,7 +20,7 @@ describe('Journey recovery star canonical data contract', () => {
   });
 
   it('maps Nourishment only to the canonical Nutrition framework score', () => {
-    expect(source).toContain('canonicalScores?.nutrition');
+    expect(source).toContain("nutrition: resolveScore('nutrition')");
     expect(source).not.toContain('HOME_RECOVERY_UI_FIXTURE');
     expect(source).not.toContain('ENABLE_HOME_RECOVERY_UI_FIXTURE');
     expect(source).not.toContain('scoreForHomeUi');

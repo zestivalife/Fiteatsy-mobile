@@ -28,7 +28,8 @@ import { countPendingLocalObservations, getOrCreateHealthInstallationId, markLoc
 import type {CanonicalDailyAggregate} from '@fiteatsy/health-intelligence';
 import { buildPresentedHealthObservations, mergeHealthPresentationObservations } from './healthMetricPresentation';
 import { calculateCanonicalHealthIntelligenceFromAggregates, hasCalculatedCanonicalScore,
-  markCanonicalSnapshotStale, preferCanonicalHealthSnapshot, type LocalCanonicalHealthSnapshot } from './localHealthIntelligence';
+  markCanonicalSnapshotStale, preferCanonicalHealthSnapshot, type LocalCanonicalHealthSnapshot,
+  type LocalFrameworkScore } from './localHealthIntelligence';
 import { registerWearableBackgroundSync } from './wearableBackgroundSync';
 import { acceptWearableConsent, reconcileWearableConnection, type GovernedProvider } from './wearablePlatformService';
 import { traceSessionLifecycle } from './sessionLifecycleTrace';
@@ -135,6 +136,52 @@ export const candidateResponseToHomeSnapshot=(value:CandidateStarOrbValidation)=
 
 export type CandidateHomeSnapshot = NonNullable<ReturnType<typeof candidateResponseToHomeSnapshot>>;
 
+type AuthoritativeScore = Pick<LocalFrameworkScore,
+  'score' | 'status' | 'confidence' | 'freshness' | 'calculationVersion' | 'calculatedAt'
+>;
+
+const scoreTimestamp = (score: Pick<AuthoritativeScore, 'calculatedAt'> | null | undefined) => {
+  const value = score?.calculatedAt ? Date.parse(score.calculatedAt) : Number.NaN;
+  return Number.isFinite(value) ? value : null;
+};
+
+export const resolveAuthoritativeHealthScore = <
+  TCandidate extends AuthoritativeScore,
+  TCanonical extends AuthoritativeScore
+>(
+  candidate: TCandidate | null | undefined,
+  canonical: TCanonical | null | undefined,
+  context: Pick<CandidateHomeSnapshot, 'activation' | 'methodologyVersion'> | null | undefined
+): TCandidate | TCanonical | null => {
+  if (!candidate) return canonical ?? null;
+  const candidateTime = scoreTimestamp(candidate);
+  const candidateEligible = context?.activation === 'ISOLATED_VALIDATION_ONLY'
+    && typeof context.methodologyVersion === 'string'
+    && context.methodologyVersion.length > 0
+    && candidate.calculationVersion === context.methodologyVersion
+    && candidateTime != null;
+  if (!candidateEligible) return canonical ?? null;
+  if (!canonical) return candidate;
+
+  // Calculation timestamps describe comparable events only inside the same
+  // methodology. Across methodologies, retain the established production
+  // Star Orb authority rather than silently substituting another formula.
+  if (candidate.calculationVersion !== canonical.calculationVersion) return candidate;
+
+  const canonicalTime = scoreTimestamp(canonical);
+  if (canonicalTime == null) return candidate;
+  if (canonicalTime > candidateTime) return canonical;
+  if (candidateTime > canonicalTime) return candidate;
+
+  // Equal-version, equal-time results use explicit freshness as the final
+  // deterministic tie-breaker. Status is intentionally not preferred so a
+  // confirmed newer/equal-time invalidation remains a genuine invalidation.
+  const freshnessRank = { CURRENT: 2, UNKNOWN: 1, STALE: 0 } as const;
+  return freshnessRank[candidate.freshness] >= freshnessRank[canonical.freshness]
+    ? candidate
+    : canonical;
+};
+
 const candidateSnapshotTime = (snapshot: CandidateHomeSnapshot) => Math.max(
   ...Object.values(snapshot.scores).map((score) => Date.parse(score.calculatedAt)).filter(Number.isFinite),
   0
@@ -167,21 +214,20 @@ export const mergeCandidateIntoCanonicalSnapshot = (
     Date.parse(current.calculatedAt) || 0,
     candidateSnapshotTime(incoming)
   )).toISOString();
-  const asCanonicalScore = (score: CandidateHomeSnapshot['scores']['activity']) => ({
-    ...score,
-    calculationVersion: 'HEALTH_INTELLIGENCE_V1' as const
-  });
+  const resolve = <T extends keyof CandidateHomeSnapshot['scores']>(key: T) =>
+    resolveAuthoritativeHealthScore(incoming.scores[key], current.scores[key], incoming) ?? current.scores[key];
   return {
     ...current,
     calculatedAt,
+    source: 'CACHED_RECONCILED_SCORES',
     scores: {
       ...current.scores,
-      activity: asCanonicalScore(incoming.scores.activity),
-      sleep: asCanonicalScore(incoming.scores.sleep),
-      nutrition: asCanonicalScore(incoming.scores.nutrition),
-      calm: asCanonicalScore(incoming.scores.calm),
-      mind: asCanonicalScore(incoming.scores.mind),
-      recovery: asCanonicalScore(incoming.scores.recovery)
+      activity: resolve('activity'),
+      sleep: resolve('sleep'),
+      nutrition: resolve('nutrition'),
+      calm: resolve('calm'),
+      mind: resolve('mind'),
+      recovery: resolve('recovery')
     }
   };
 };

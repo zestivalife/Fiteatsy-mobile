@@ -24,22 +24,26 @@ export type CanonicalHealthInputs = {
   cycle: Parameters<typeof cycleScore>[0];
 };
 
+export type LocalFrameworkScore = Omit<ScoreResult, 'calculationVersion'> & {
+  calculationVersion: string;
+};
+
 export type LocalCanonicalHealthSnapshot = {
   calculationVersion: 'HEALTH_INTELLIGENCE_V1';
   calculatedAt: string;
   inputWindow: { startAtISO: string | null; endAtISO: string | null };
   inputFreshness: ScoreResult['freshness'];
-  source: 'LOCAL_CANONICAL_INPUTS' | 'CACHED_CANONICAL_SERVER';
+  source: 'LOCAL_CANONICAL_INPUTS' | 'CACHED_CANONICAL_SERVER' | 'CACHED_RECONCILED_SCORES';
   scores: {
-    activity: ScoreResult;
-    sleep: ScoreResult;
-    nutrition: ScoreResult;
-    calm: ScoreResult;
-    stressRecovery: ScoreResult;
-    recovery: ScoreResult;
-    cycle: ScoreResult;
-    mind: ScoreResult;
-    healthIntelligence: ScoreResult;
+    activity: LocalFrameworkScore;
+    sleep: LocalFrameworkScore;
+    nutrition: LocalFrameworkScore;
+    calm: LocalFrameworkScore;
+    stressRecovery: LocalFrameworkScore;
+    recovery: LocalFrameworkScore;
+    cycle: LocalFrameworkScore;
+    mind: LocalFrameworkScore;
+    healthIntelligence: LocalFrameworkScore;
   };
 };
 

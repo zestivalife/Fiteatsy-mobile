@@ -4,12 +4,13 @@ const root = path.resolve(__dirname, '..');
 const read = (value: string) => fs.readFileSync(path.join(root, value), 'utf8');
 
 describe('Health Intelligence V1 canonical surfaces', () => {
-  test('Star Orb uses canonical framework scores and names', () => {
+  test('Star Orb resolves eligible production and canonical framework scores consistently', () => {
     const home = read('src/screens/home/HomeScreen.tsx');
     for (const key of ['recovery', 'mind', 'activity', 'sleep', 'nutrition', 'calm']) {
-      expect(home).toContain(`canonicalScores?.${key}`);
+      expect(home).toContain(`${key}: resolveScore('${key}')`);
       expect(home).toContain(`authoritativeScores.${key}`);
     }
+    expect(home).toContain('resolveAuthoritativeHealthScore(candidateScores?.[key], canonicalScores?.[key], health.candidateIntelligence)');
     expect(home).not.toContain('canonicalScores?.cycle');
     expect(home).toContain("label: 'Nutrition'");
     expect(home).not.toContain("label: 'Active Performance'");

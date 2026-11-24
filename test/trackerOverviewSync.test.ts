@@ -10,7 +10,8 @@ test('Tracker Overview initiates a fresh platform sync without changing the othe
 
 test('Tracker Overview consumes production Star Orb scores and preserves missing recovery days as gaps', () => {
   expect(source).toContain('const displayScores = resolveTrackerScoreProjection(');
-  expect(source).toContain('health.candidateIntelligence?.scores');
+  expect(source).toContain('health.candidateIntelligence,');
+  expect(source).toContain('resolveAuthoritativeHealthScore(candidate.activity, canonical.activity, candidateSnapshot)');
   expect(source).toContain("['Recovery', displayScores.recovery]");
   expect(source).toContain("['Activity', displayScores.activity]");
   expect(source).toContain("['Sleep', displayScores.sleep]");

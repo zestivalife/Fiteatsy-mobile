@@ -22,8 +22,9 @@ import { listBiomarkerHistory, type BiomarkerHistoryItem } from '../../services/
 import { calculateTrackerBodyBiomarkerHealth, calculateTrackerEnergyBalance, calculateTrackerHealthIntelligence, calculateTrackerStressRecovery } from '../../services/trackerOverviewScores';
 import { getAssessmentHistory, type AssessmentResult } from '../../services/assessmentService';
 import {getHealthIntelligenceV1,getHealthScoreHistory,getHealthScoreSummary,type HealthIntelligenceV1,type HealthScore,type HealthScoreSummary,type HealthScoreType} from '../../services/healthIntelligenceService';
-import { useCanonicalHealthSyncCoordinator, type CandidateHomeSnapshot, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
+import { resolveAuthoritativeHealthScore, useCanonicalHealthSyncCoordinator, type CandidateHomeSnapshot, type HealthObservationDto } from '../../services/canonicalHealthSyncCoordinator';
 import { baselineCopy, buildSleepStagePresentation, currentDayAggregate, hasCanonicalMetricData } from '../../services/healthPresentationState';
+import type { LocalFrameworkScore } from '../../services/localHealthIntelligence';
 
 type RangeMode = '7D' | '30D';
 type HealthSubTab = 'overview' | 'activity' | 'heart' | 'sleep';
@@ -124,7 +125,9 @@ const toPct = (value: number, min: number, max: number) => {
 
 const scoreLabel = (score: number | null | undefined) => (score == null ? 'Calibrating' : `${Math.round(score)}/100`);
 
-type TrackerFrameworkScore = Pick<HealthIntelligenceV1['scores']['activity'], 'score' | 'status' | 'confidence' | 'freshness'>;
+type TrackerFrameworkScore = Pick<LocalFrameworkScore,
+  'score' | 'status' | 'confidence' | 'freshness' | 'calculationVersion' | 'calculatedAt'
+>;
 type TrackerScoreProjection = {
   activity: TrackerFrameworkScore;
   sleep: TrackerFrameworkScore;
@@ -138,21 +141,33 @@ type TrackerScoreProjection = {
 };
 
 export const resolveTrackerScoreProjection = (
-  candidate: CandidateHomeSnapshot['scores'] | null | undefined,
-  localCanonical: HealthIntelligenceV1['scores'] | null | undefined,
-  remoteCanonical: HealthIntelligenceV1['scores'] | null | undefined
+  candidateSnapshot: CandidateHomeSnapshot | null | undefined,
+  localCanonical: TrackerScoreProjection | null | undefined,
+  remoteCanonical: TrackerScoreProjection | null | undefined
 ): TrackerScoreProjection | null => {
+  const candidate = candidateSnapshot?.scores;
   const canonical = localCanonical ?? remoteCanonical ?? null;
   if (!candidate) return canonical;
-  if (!canonical) return candidate;
+  if (!canonical) {
+    const activity = resolveAuthoritativeHealthScore(candidate.activity, null, candidateSnapshot);
+    if (!activity) return null;
+    return {
+      activity,
+      sleep: resolveAuthoritativeHealthScore(candidate.sleep, null, candidateSnapshot)!,
+      nutrition: resolveAuthoritativeHealthScore(candidate.nutrition, null, candidateSnapshot)!,
+      calm: resolveAuthoritativeHealthScore(candidate.calm, null, candidateSnapshot)!,
+      mind: resolveAuthoritativeHealthScore(candidate.mind, null, candidateSnapshot)!,
+      recovery: resolveAuthoritativeHealthScore(candidate.recovery, null, candidateSnapshot)!
+    };
+  }
   return {
     ...canonical,
-    activity: candidate.activity,
-    sleep: candidate.sleep,
-    nutrition: candidate.nutrition,
-    calm: candidate.calm,
-    mind: candidate.mind,
-    recovery: candidate.recovery
+    activity: resolveAuthoritativeHealthScore(candidate.activity, canonical.activity, candidateSnapshot) ?? canonical.activity,
+    sleep: resolveAuthoritativeHealthScore(candidate.sleep, canonical.sleep, candidateSnapshot) ?? canonical.sleep,
+    nutrition: resolveAuthoritativeHealthScore(candidate.nutrition, canonical.nutrition, candidateSnapshot) ?? canonical.nutrition,
+    calm: resolveAuthoritativeHealthScore(candidate.calm, canonical.calm, candidateSnapshot) ?? canonical.calm,
+    mind: resolveAuthoritativeHealthScore(candidate.mind, canonical.mind, candidateSnapshot) ?? canonical.mind,
+    recovery: resolveAuthoritativeHealthScore(candidate.recovery, canonical.recovery, candidateSnapshot) ?? canonical.recovery
   };
 };
 const numberLabel = (value: number | null | undefined, suffix = '') =>
@@ -1395,7 +1410,7 @@ export const TrackerScreen = () => {
   // Journey. The candidate projection represents the latest acknowledged
   // daily calculation; canonical data fills domains it does not contain.
   const displayScores = resolveTrackerScoreProjection(
-    health.candidateIntelligence?.scores,
+    health.candidateIntelligence,
     health.canonicalIntelligence?.scores,
     canonicalIntelligence?.scores
   );
